@@ -96,6 +96,7 @@ const (
 	JobCache               Feature = "job.cache"
 	JobArtifacts           Feature = "job.artifacts"
 	JobOutputs             Feature = "job.outputs"
+	JobEnv                 Feature = "job.env"
 
 	StepScript          Feature = "step.script"
 	StepAction          Feature = "step.action"
@@ -119,7 +120,7 @@ var allFeatures = []Feature{
 	PipelineEnv, PipelineInputs, PipelineConcurrency, PipelinePermissions, PipelineFinally,
 	JobNeeds, JobNeedsArtifacts, JobIf, JobRunner, JobContainer, JobServices,
 	JobMatrix, JobTimeout, JobRetry, JobAllowFailure, JobEnvironment,
-	JobEnvironmentApproval, JobManual, JobCache, JobArtifacts, JobOutputs,
+	JobEnvironmentApproval, JobManual, JobCache, JobArtifacts, JobOutputs, JobEnv,
 	StepScript, StepAction, StepImage, StepIf, StepEnv, StepContinueOnError,
 	StepTimeout, StepWorkdir, StepShell,
 	ExprOpaque, ScriptInterpolation, ExtPassthrough,
