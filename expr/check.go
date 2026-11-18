@@ -31,44 +31,74 @@ var validBinOps = map[string]bool{
 
 // Check reports why e has no canonical text that ParseCanonical reads back exactly:
 // a nil node, a non-finite number, an unknown literal kind or operator, a literal with a field its kind does not use,
-// a Call name that is not an identifier, or an empty Ref path.
+// a Call name that is not an identifier, an empty Ref path, or nesting deeper than MaxDepth.
+// Nesting is one unit per '!', per call, and per parenthesised level: a Binary operand that is itself Binary prints in parens.
 func Check(e Expr) error {
+	d, err := check(e)
+	if err != nil {
+		return err
+	}
+	if d > MaxDepth {
+		return fmt.Errorf("expression nested deeper than %d", MaxDepth)
+	}
+	return nil
+}
+
+// operandDepth is the depth of e as an operand of a binary operator or '!'.
+func operandDepth(e Expr) (int, error) {
+	d, err := check(e)
+	if _, ok := e.(Binary); ok {
+		d++
+	}
+	return d, err
+}
+
+// check returns the nesting depth of e. It stops descending below MaxDepth+1 only through the callers' comparison,
+// so a hostile AST costs its own size, not more.
+func check(e Expr) (int, error) {
 	switch v := e.(type) {
 	case nil:
-		return fmt.Errorf("nil expression")
+		return 0, fmt.Errorf("nil expression")
 	case Lit:
-		return checkLit(v)
+		return 0, checkLit(v)
 	case Ref:
 		if len(v.Path) == 0 {
-			return fmt.Errorf("reference with empty path")
+			return 0, fmt.Errorf("reference with empty path")
 		}
 	case Unary:
 		if v.Op != OpNot {
-			return fmt.Errorf("unknown unary operator %q", v.Op)
+			return 0, fmt.Errorf("unknown unary operator %q", v.Op)
 		}
-		return Check(v.X)
+		d, err := operandDepth(v.X)
+		return d + 1, err
 	case Binary:
 		if !validBinOps[v.Op] {
-			return fmt.Errorf("unknown binary operator %q", v.Op)
+			return 0, fmt.Errorf("unknown binary operator %q", v.Op)
 		}
-		if err := Check(v.L); err != nil {
-			return err
+		l, err := operandDepth(v.L)
+		if err != nil {
+			return 0, err
 		}
-		return Check(v.R)
+		r, err := operandDepth(v.R)
+		return max(l, r), err
 	case Call:
 		if !IsIdent(v.Name) {
-			return fmt.Errorf("call name %q is not an identifier", v.Name)
+			return 0, fmt.Errorf("call name %q is not an identifier", v.Name)
 		}
+		deepest := 0
 		for _, a := range v.Args {
-			if err := Check(a); err != nil {
-				return err
+			d, err := check(a)
+			if err != nil {
+				return 0, err
 			}
+			deepest = max(deepest, d)
 		}
+		return deepest + 1, nil
 	case Opaque:
 	default:
-		return fmt.Errorf("unknown expression node %T", e)
+		return 0, fmt.Errorf("unknown expression node %T", e)
 	}
-	return nil
+	return 0, nil
 }
 
 func checkLit(l Lit) error {

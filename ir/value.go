@@ -1,9 +1,6 @@
 package ir
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/lukaszraczylo/pipemaster/expr"
 )
 
@@ -11,9 +8,6 @@ import (
 func exprText(e expr.Expr) (string, error) {
 	if err := expr.Check(e); err != nil {
 		return "", err
-	}
-	if o, ok := e.(expr.Opaque); ok && strings.Contains(o.Dialect, ")") {
-		return "", fmt.Errorf("opaque dialect %q must not contain ')'", o.Dialect)
 	}
 	return expr.String(e), nil
 }

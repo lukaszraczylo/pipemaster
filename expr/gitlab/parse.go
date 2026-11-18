@@ -75,11 +75,17 @@ func (p *parser) enter() error {
 	return nil
 }
 
-func (p *parser) expression(minPrec int) (expr.Expr, error) {
+// nested parses a full expression inside a paren. Depth counts parens and '!', not operator precedence,
+// so a long flat chain of operators costs nothing.
+func (p *parser) nested() (expr.Expr, error) {
 	if err := p.enter(); err != nil {
 		return nil, err
 	}
 	defer func() { p.depth-- }()
+	return p.expression(precOr)
+}
+
+func (p *parser) expression(minPrec int) (expr.Expr, error) {
 	left, err := p.unary()
 	if err != nil {
 		return nil, err
@@ -134,7 +140,7 @@ func (p *parser) primary() (expr.Expr, error) {
 		p.opaque = true
 		return expr.Lit{}, nil
 	case tLParen:
-		e, err := p.expression(precOr)
+		e, err := p.nested()
 		if err != nil {
 			return nil, err
 		}

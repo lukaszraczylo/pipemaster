@@ -140,10 +140,6 @@ func (p *parser) eat(tok string) bool {
 }
 
 func (p *parser) or() (Expr, error) {
-	if err := p.enter(); err != nil {
-		return nil, err
-	}
-	defer p.leave()
 	l, err := p.and()
 	if err != nil {
 		return nil, err
@@ -201,12 +197,12 @@ func (p *parser) cmp() (Expr, error) {
 }
 
 func (p *parser) unary() (Expr, error) {
-	if err := p.enter(); err != nil {
-		return nil, err
-	}
-	defer p.leave()
 	p.skip()
 	if p.i < len(p.s) && p.s[p.i] == '!' && !strings.HasPrefix(p.s[p.i:], "!=") && !strings.HasPrefix(p.s[p.i:], "!~") {
+		if err := p.enter(); err != nil {
+			return nil, err
+		}
+		defer p.leave()
 		p.i++
 		x, err := p.unary()
 		if err != nil {
@@ -225,6 +221,10 @@ func (p *parser) primary() (Expr, error) {
 	c := p.s[p.i]
 	switch {
 	case c == '(':
+		if err := p.enter(); err != nil {
+			return nil, err
+		}
+		defer p.leave()
 		p.i++
 		e, err := p.or()
 		if err != nil {
@@ -409,6 +409,10 @@ func (p *parser) bracket() (string, error) {
 }
 
 func (p *parser) call(name string) (Expr, error) {
+	if err := p.enter(); err != nil {
+		return nil, err
+	}
+	defer p.leave()
 	p.i++ // '('
 	var args []Expr
 	if p.eat(")") {

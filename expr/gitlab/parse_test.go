@@ -271,3 +271,25 @@ func FuzzParse(f *testing.F) {
 		}
 	})
 }
+
+// Nesting is one unit per paren or '!' level, however many operators sit at one level.
+func TestParseDepthBoundary(t *testing.T) {
+	m := expr.MaxDepth
+	cases := []struct {
+		name string
+		src  string
+		ok   bool
+	}{
+		{"parens at max", strings.Repeat("(", m) + "$A" + strings.Repeat(")", m), true},
+		{"parens over", strings.Repeat("(", m+1) + "$A" + strings.Repeat(")", m+1), false},
+		{"unary at max", strings.Repeat("!", m) + "$A", true},
+		{"unary over", strings.Repeat("!", m+1) + "$A", false},
+		{"long operator chain", strings.Repeat("$A == 'x' || $B && $C != 'y' || ", 40) + "$A", true},
+	}
+	for _, c := range cases {
+		_, err := gitlab.Parse(c.src)
+		if (err == nil) != c.ok {
+			t.Errorf("%s: err=%v, want ok=%v", c.name, err, c.ok)
+		}
+	}
+}

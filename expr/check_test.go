@@ -85,3 +85,41 @@ func TestCheckValidRoundTrips(t *testing.T) {
 		}
 	})
 }
+
+// nest wraps the leaf n times.
+func nest(n int, leaf expr.Expr, wrap func(expr.Expr) expr.Expr) expr.Expr {
+	e := leaf
+	for i := 0; i < n; i++ {
+		e = wrap(e)
+	}
+	return e
+}
+
+// Nesting is one unit per paren, '!' or call level; a Binary operand that is itself Binary prints in parens.
+func TestDepthBoundaryAgreesBetweenCheckAndParse(t *testing.T) {
+	a := ref("a")
+	binLeft := func(e expr.Expr) expr.Expr { return bin("==", e, a) }
+	notBin := func(e expr.Expr) expr.Expr { return not(bin("==", e, a)) }
+	m := expr.MaxDepth
+	cases := []struct {
+		e    expr.Expr
+		name string
+		ok   bool
+	}{
+		{nest(m+1, a, binLeft), "binary at max", true},
+		{nest(m+2, a, binLeft), "binary over", false},
+		{nest(m, a, not), "unary at max", true},
+		{nest(m+1, a, not), "unary over", false},
+		{nest(m, a, func(e expr.Expr) expr.Expr { return call("f", e) }), "call at max", true},
+		{nest(m+1, a, func(e expr.Expr) expr.Expr { return call("f", e) }), "call over", false},
+		{nest(m/2-1, not(bin("==", a, a)), notBin), "unary of binary at max", true},
+		{nest(m/2, not(bin("==", a, a)), notBin), "unary of binary over", false},
+	}
+	for _, c := range cases {
+		cerr := expr.Check(c.e)
+		_, perr := expr.ParseCanonical(expr.String(c.e))
+		if (cerr == nil) != c.ok || (perr == nil) != c.ok {
+			t.Errorf("%s: Check err=%v, ParseCanonical err=%v, want ok=%v", c.name, cerr, perr, c.ok)
+		}
+	}
+}

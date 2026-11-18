@@ -102,11 +102,15 @@ func validateExprs(pid string, j *Job, add func(path, format string, a ...any)) 
 	for _, sv := range j.Services {
 		checkVars(jp+"/service/"+sv.Name, "env", sv.Env, add)
 	}
-	for _, s := range j.Steps {
-		if s == nil || s.ID == "" {
+	for i, s := range j.Steps {
+		if s == nil {
 			continue
 		}
-		sp := stepPath(pid, j.ID, s.ID)
+		id := s.ID
+		if id == "" {
+			id = fmt.Sprintf("#%d", i)
+		}
+		sp := stepPath(pid, j.ID, id)
 		checkExpr(sp+"/if", s.If, add)
 		checkVars(sp, "env", s.Env, add)
 		keys := make([]string, 0, len(s.With))
@@ -127,8 +131,14 @@ func checkVars(path, field string, vs []Var, add func(path, format string, a ...
 }
 
 func checkValue(path string, v Value, add func(path, format string, a ...any)) {
-	if v.Kind == ValueExpr {
-		checkExpr(path, v.Expr, add)
+	switch v.Kind {
+	case ValueLit, ValueSecret:
+	case ValueExpr:
+		if err := expr.Check(v.Expr); err != nil {
+			add(path, "invalid expression: %v", err)
+		}
+	default:
+		add(path, "invalid value kind %d", v.Kind)
 	}
 }
 

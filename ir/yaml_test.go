@@ -100,10 +100,93 @@ func TestUnmarshalErrors(t *testing.T) {
 	}
 }
 
-func TestMarshalRejectsDialectWithParen(t *testing.T) {
+func TestMarshalOpaqueDialectWithParenRoundTrips(t *testing.T) {
 	p := one(&ir.Job{ID: "a", If: expr.Opaque{Dialect: "a)b", Text: "x"}})
-	if _, err := ir.Marshal(p); err == nil {
-		t.Fatal("want error")
+	b, err := ir.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q, err := ir.Unmarshal(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok, d := ir.Equal(p, q); !ok {
+		t.Fatalf("%s\n%s", d, b)
+	}
+}
+
+func TestValidateReportsUnmarshalableValues(t *testing.T) {
+	for name, v := range map[string]ir.Value{
+		"nil expr":     {Kind: ir.ValueExpr},
+		"invalid kind": {Kind: 99},
+	} {
+		p := one(&ir.Job{ID: "a", Env: []ir.Var{{Name: "E", Value: v}}})
+		err := ir.Validate(p)
+		if err == nil || !strings.Contains(err.Error(), "pipeline/ci/job/a/env/E") {
+			t.Errorf("%s: Validate = %v, want error at the value path", name, err)
+		}
+		if _, err := ir.Marshal(p); err == nil {
+			t.Errorf("%s: Marshal must fail too", name)
+		}
+	}
+}
+
+// hostile draws expressions that include ones Check rejects, so the property below is not vacuous.
+func hostile(t *rapid.T, label string) expr.Expr {
+	switch rapid.IntRange(0, 6).Draw(t, label+"h") {
+	case 0:
+		return expr.Lit{Kind: expr.LitNum, Num: math.NaN()}
+	case 1:
+		return expr.Lit{Kind: 9}
+	case 2:
+		return expr.Call{Name: "not ident"}
+	case 3:
+		return expr.Opaque{Dialect: "a)b", Text: "x"}
+	case 4:
+		var e expr.Expr = expr.Ref{Path: []string{"a"}}
+		for i := 0; i < rapid.IntRange(1, 70).Draw(t, label+"deep"); i++ {
+			e = expr.Unary{Op: expr.OpNot, X: e}
+		}
+		return e
+	case 5:
+		return nil
+	}
+	return irtest.GenExpr(t, label, 4, true)
+}
+
+// TestValidatedProjectsMarshalAndRoundTrip: whatever Validate accepts, Marshal prints and Unmarshal reads back.
+func TestValidatedProjectsMarshalAndRoundTrip(t *testing.T) {
+	accepted, rejected := 0, 0
+	rapid.Check(t, func(t *rapid.T) {
+		p := irtest.GenProject(t, func(caps.Feature) bool { return true })
+		j := p.Pipelines[0].Jobs[0]
+		switch rapid.IntRange(0, 3).Draw(t, "slot") {
+		case 0:
+			j.If = hostile(t, "if")
+		case 1:
+			j.Steps[0].If = hostile(t, "sif")
+		case 2:
+			j.Env = append(j.Env, ir.Var{Name: "H", Value: ir.Value{Kind: ir.ValueExpr, Expr: hostile(t, "val")}})
+		}
+		if ir.Validate(p) != nil {
+			rejected++
+			return
+		}
+		accepted++
+		b, err := ir.Marshal(p)
+		if err != nil {
+			t.Fatalf("Validate accepted but Marshal failed: %v", err)
+		}
+		q, err := ir.Unmarshal(b)
+		if err != nil {
+			t.Fatalf("%v\n%s", err, b)
+		}
+		if ok, d := ir.Equal(p, q); !ok {
+			t.Fatalf("round trip differs:\n%s", d)
+		}
+	})
+	if accepted == 0 || rejected == 0 {
+		t.Fatalf("property is vacuous: accepted=%d rejected=%d", accepted, rejected)
 	}
 }
 
