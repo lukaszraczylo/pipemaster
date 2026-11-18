@@ -52,6 +52,12 @@ func (e *emitter) source(path string, f caps.Feature, x expr.Expr) (expr.Expr, b
 		return expr.Binary{Op: expr.OpAnd, L: l, R: r}, lok && rok
 	}
 	if t, ok := expr.Translate(x, *e.from, exprgha.Lang); ok {
+		// An exact translation can still change the shape, such as a tag test that GHA spells with ref_type.
+		if (f == caps.JobIf || f == caps.StepIf) && expr.String(t) != expr.String(x) {
+			if err := e.markArg(f, path, srcArg{Src: expr.String(x)}); err != nil {
+				e.comment("expression source not carried: " + err.Error())
+			}
+		}
 		return t, true
 	}
 	t, cav, ok := expr.TranslateApprox(x, *e.from, exprgha.Lang)
