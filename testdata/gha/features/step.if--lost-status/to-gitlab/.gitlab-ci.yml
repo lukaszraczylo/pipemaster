@@ -1,0 +1,28 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+build:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - echo build
+    # pipemaster:step build-step-2
+    # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
+    # pipemaster:arg "false"
+    # pipemaster:lost step.if pipeline/ci/job/build/step/build-step-2: failure()
+    - |
+      if false; then
+      echo cleanup
+      fi
+    # pipemaster:step config
+    - echo "configured=true" >> "$GITHUB_OUTPUT"
+    # pipemaster:step build-step-4
+    # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-4
+    # pipemaster:arg "false"
+    # pipemaster:lost step.if pipeline/ci/job/build/step/build-step-4: steps.config.outputs.configured == 'true'
+    - |
+      if false; then
+      echo configured
+      fi

@@ -129,7 +129,7 @@ func (e *emitter) stepGuard(sp string, st *ir.Step, sec string) (guard, arg, src
 	rest, status, ok := splitStatus(st.If)
 	if !ok || status == "failure" {
 		e.disable(sp, caps.StepIf, st.If, "step")
-		return "false", "", "", sec, false
+		return disabledGuard, "", "", sec, false
 	}
 	if status == "always" && sec != secAfter {
 		section, moved = secAfter, true
@@ -143,12 +143,12 @@ func (e *emitter) stepGuard(sp string, st *ir.Step, sec string) (guard, arg, src
 	}
 	c, ok := e.condition(sp, caps.StepIf, rest, "step")
 	if !ok {
-		return "false", "", "", sec, false
+		return disabledGuard, "", "", sec, false
 	}
 	g, ok := shellCond(c)
 	if !ok {
 		e.disable(sp, caps.StepIf, st.If, "step")
-		return "false", "", "", sec, false
+		return disabledGuard, "", "", sec, false
 	}
 	return g, expr.String(c), expr.String(rest), section, moved
 }
@@ -192,6 +192,9 @@ type srcArg struct {
 	Src string `json:"src"`
 }
 
+// disabledGuard is the shell condition of a step whose own condition GitLab cannot state.
+const disabledGuard = "false"
+
 func lineCount(text string) int { return strings.Count(strings.TrimRight(text, "\n"), "\n") + 1 }
 
 // placeLines writes a step's lines into its section, wrapped by the guards its if, workdir, env and
@@ -214,6 +217,9 @@ func (e *emitter) placeLines(p *jobPrep, st *ir.Step, lines []string) error {
 		}
 	}
 	var marks []string
+	if guard == disabledGuard && arg == "" {
+		arg = disabledGuard
+	}
 	if (guard != "" && arg != "") || moved {
 		marks = append(marks, emitkit.Marker(caps.StepIf, sp))
 	}
@@ -223,7 +229,7 @@ func (e *emitter) placeLines(p *jobPrep, st *ir.Step, lines []string) error {
 			return err
 		}
 		marks = append(marks, a)
-		if e.from != nil && src != arg {
+		if e.from != nil && src != "" && src != arg {
 			a, err := markerArg(srcArg{Src: src})
 			if err != nil {
 				return err
