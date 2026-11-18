@@ -2,7 +2,6 @@ package gha
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -209,7 +208,7 @@ func (e *emitter) exprValue(path string, x expr.Expr) *yaml.Node {
 	}
 	x = t
 	if c, ok := x.(expr.Call); ok {
-		if parts, ok := unmixFormat(c); ok {
+		if parts, ok := emitkit.UnmixFormat(c); ok {
 			if s, ok := joinParts(parts); ok {
 				return str(s)
 			}
@@ -236,58 +235,6 @@ func joinParts(parts []expr.Part) (string, bool) {
 		sb.WriteString("${{ " + text + " }}")
 	}
 	return sb.String(), true
-}
-
-// unmixFormat inverts the parser's mixed(): format('a{0}b{1}', x, y) with sequential placeholders and
-// at least two parts is the text a${{ x }}b${{ y }}. Any other format call stays a call.
-func unmixFormat(c expr.Call) ([]expr.Part, bool) {
-	if c.Name != "format" || len(c.Args) < 2 {
-		return nil, false
-	}
-	pat, ok := c.Args[0].(expr.Lit)
-	if !ok || pat.Kind != expr.LitStr {
-		return nil, false
-	}
-	var parts []expr.Part
-	var text strings.Builder
-	flush := func() {
-		if text.Len() > 0 {
-			parts = append(parts, expr.Part{Text: text.String()})
-			text.Reset()
-		}
-	}
-	next := 0
-	s := pat.Str
-	for i := 0; i < len(s); i++ {
-		switch {
-		case strings.HasPrefix(s[i:], "{{"), strings.HasPrefix(s[i:], "}}"):
-			text.WriteByte(s[i])
-			i++
-		case s[i] == '{':
-			end := strings.IndexByte(s[i:], '}')
-			if end < 0 || s[i+1:i+end] != strconv.Itoa(next) || next+1 >= len(c.Args) {
-				return nil, false
-			}
-			flush()
-			parts = append(parts, expr.Part{Expr: c.Args[next+1]})
-			next++
-			i += end
-		case s[i] == '}':
-			return nil, false
-		default:
-			text.WriteByte(s[i])
-		}
-	}
-	flush()
-	if next != len(c.Args)-1 || len(parts) < 2 {
-		return nil, false
-	}
-	for _, p := range parts {
-		if strings.Contains(p.Text, "${{") {
-			return nil, false
-		}
-	}
-	return parts, true
 }
 
 // vars renders an env mapping in order; lost values are omitted.
