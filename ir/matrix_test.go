@@ -117,9 +117,106 @@ func TestExpandKeysSorted(t *testing.T) {
 	}
 }
 
-func TestExpandCardinality(t *testing.T) {
+func refKey(m map[string]string) string {
+	ks := make([]string, 0, len(m))
+	for k := range m {
+		ks = append(ks, k)
+	}
+	sort.Strings(ks)
+	out := ""
+	for _, k := range ks {
+		out += k + "=" + m[k] + ";"
+	}
+	return out
+}
+
+func toMap(cb Combo) map[string]string {
+	m := map[string]string{}
+	for _, kv := range cb {
+		m[kv.Key] = kv.Value
+	}
+	return m
+}
+
+// refExpand is an independent model of the GitHub rules; it shares no code with Expand.
+func refExpand(m *Matrix) (rem, out []map[string]string) {
+	prod := []map[string]string{{}}
+	for _, a := range m.Axes {
+		var next []map[string]string
+		for _, p := range prod {
+			for _, v := range a.Values {
+				q := map[string]string{a.Name: v}
+				for k, x := range p {
+					q[k] = x
+				}
+				next = append(next, q)
+			}
+		}
+		prod = next
+	}
+	if len(m.Axes) == 0 {
+		prod = nil
+	}
+	isAxis := map[string]bool{}
+	for _, a := range m.Axes {
+		isAxis[a.Name] = true
+	}
+	for _, p := range prod {
+		drop := false
+		for _, e := range m.Exclude {
+			if len(e) == 0 {
+				continue
+			}
+			hit := true
+			for _, kv := range e {
+				if v, ok := p[kv.Key]; !ok || v != kv.Value {
+					hit = false
+				}
+			}
+			drop = drop || hit
+		}
+		if !drop {
+			rem = append(rem, p)
+		}
+	}
+	for _, p := range rem {
+		cp := map[string]string{}
+		for k, v := range p {
+			cp[k] = v
+		}
+		out = append(out, cp)
+	}
+	var extra []map[string]string
+	for _, inc := range m.Include {
+		hit := false
+		for i, p := range rem {
+			ok := true
+			for _, kv := range inc {
+				if isAxis[kv.Key] && p[kv.Key] != kv.Value {
+					ok = false
+				}
+			}
+			if ok {
+				hit = true
+				for _, kv := range inc {
+					out[i][kv.Key] = kv.Value
+				}
+			}
+		}
+		if !hit {
+			e := map[string]string{}
+			for _, kv := range inc {
+				e[kv.Key] = kv.Value
+			}
+			extra = append(extra, e)
+		}
+	}
+	return rem, append(out, extra...)
+}
+
+func TestExpandMatchesReference(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		na := rapid.IntRange(1, 3).Draw(t, "na")
+		na := rapid.IntRange(0, 3).Draw(t, "na")
 		var axes []Axis
 		for i := 0; i < na; i++ {
 			vals := rapid.SliceOfNDistinct(rapid.SampledFrom([]string{"1", "2", "3"}), 1, 3, rapid.ID[string]).Draw(t, "vals")
@@ -138,31 +235,63 @@ func TestExpandCardinality(t *testing.T) {
 		})
 		m := &Matrix{Axes: axes, Include: rapid.SliceOfN(entry, 0, 3).Draw(t, "inc"), Exclude: rapid.SliceOfN(entry, 0, 3).Draw(t, "exc")}
 
-		var rem []Combo
-		for _, p := range product(axes) {
-			if !excluded(p, m.Exclude) {
-				rem = append(rem, p)
-			}
+		got := Expand(m)
+		rem, want := refExpand(m)
+
+		var gk, wk []string
+		for _, g := range got {
+			gk = append(gk, refKey(toMap(g)))
 		}
-		orig := map[string]bool{}
+		for _, w := range want {
+			wk = append(wk, refKey(w))
+		}
+		sort.Strings(gk)
+		sort.Strings(wk)
+		if !reflect.DeepEqual(gk, wk) {
+			t.Fatalf("multiset mismatch for %+v:\n got %v\nwant %v", m, gk, wk)
+		}
+
+		isAxis := map[string]bool{}
 		for _, a := range axes {
-			orig[a.Name] = true
+			isAxis[a.Name] = true
 		}
-		want := len(rem)
-		for _, inc := range m.Include {
-			matched := false
-			for _, r := range rem {
-				if agreesOnOriginal(r, inc, orig) {
-					matched = true
-					break
+		// (a) product combos keep their original axis values; output prefix follows product order.
+		if len(got) < len(rem) {
+			t.Fatalf("fewer combos than product remainder: %d < %d", len(got), len(rem))
+		}
+		for i, p := range rem {
+			g := toMap(got[i])
+			for k, v := range p {
+				if g[k] != v {
+					t.Fatalf("axis %s overwritten in combo %d: %v vs %v", k, i, g, p)
 				}
 			}
-			if !matched {
-				want++
-			}
 		}
-		if got := len(Expand(m)); got != want {
-			t.Fatalf("len %d want %d for %+v", got, want, m)
+		// (b) an include's pairs survive unless a later include shares a key and may overwrite them.
+		for i, inc := range m.Include {
+			shared := false
+			for _, later := range m.Include[i+1:] {
+				for _, a := range inc {
+					for _, b := range later {
+						shared = shared || a.Key == b.Key
+					}
+				}
+			}
+			if shared {
+				continue
+			}
+			found := false
+			for _, g := range got {
+				gm := toMap(g)
+				all := true
+				for _, kv := range inc {
+					all = all && gm[kv.Key] == kv.Value
+				}
+				found = found || all
+			}
+			if !found {
+				t.Fatalf("include %v absent from output %v", inc, got)
+			}
 		}
 	})
 }
