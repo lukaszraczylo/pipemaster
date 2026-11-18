@@ -492,3 +492,14 @@ func TestInheritVariablesKept(t *testing.T) {
 		t.Errorf("only the unapplied part of inherit stays: %v", in)
 	}
 }
+
+// A list built from an anchor nests one list in another, which GitLab flattens.
+func TestCacheNestedListIsFlattened(t *testing.T) {
+	src := ".cached: &cached\n  - key: go\n    paths: [.mod/]\nbuild:\n  cache:\n    - *cached\n    - key: lint\n      paths: [.lint/]\n  script: [make]\n"
+	pl, _ := pipeline(t, src)
+	got := job(t, pl, "build").Cache
+	want := []ir.Cache{{Key: "go", Paths: []string{".mod/"}}, {Key: "lint", Paths: []string{".lint/"}}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("cache = %+v, want %+v", got, want)
+	}
+}

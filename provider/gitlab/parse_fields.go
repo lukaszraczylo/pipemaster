@@ -207,7 +207,7 @@ func (s *state) jobCache(j *ir.Job, r *reader) error {
 	case yaml.MappingNode:
 		items = []*yaml.Node{n}
 	case yaml.SequenceNode:
-		items = n.Content
+		items = flattenSeq(n)
 	default:
 		r.release("cache")
 		return nil
@@ -231,6 +231,19 @@ func (s *state) jobCache(j *ir.Job, r *reader) error {
 		r.keep(extCache, extras)
 	}
 	return nil
+}
+
+// flattenSeq lists the items of n with nested sequences spliced in, which is how GitLab reads a list built from an anchor.
+func flattenSeq(n *yaml.Node) []*yaml.Node {
+	var out []*yaml.Node
+	for _, c := range n.Content {
+		if c.Kind == yaml.SequenceNode {
+			out = append(out, flattenSeq(c)...)
+		} else {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // cacheEntry maps one cache block. A key given as {files, prefix} also becomes a derived hashFiles key,
