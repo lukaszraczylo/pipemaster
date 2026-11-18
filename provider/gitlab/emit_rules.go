@@ -67,6 +67,9 @@ func (e *emitter) timing(jp string, j *ir.Job, finally bool) (jobTiming, error) 
 	_, opaqueCond := cond.(expr.Opaque)
 	switch {
 	case disabled:
+		if j.Manual {
+			e.lose(jp, caps.JobManual, "a job that never runs has no manual start")
+		}
 		t.rules = seqOf(ruleNever())
 	case len(fj.parts) > 0 && !opaqueCond:
 		rules, err := foldRules(fj.parts, cond, base)

@@ -1,0 +1,6 @@
+publish:
+  when: manual
+  script:
+    - make publish
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

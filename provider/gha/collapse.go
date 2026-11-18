@@ -231,6 +231,8 @@ func collapseManual(j *ir.Job) {
 		j.If, j.Manual = nil, true
 	case isAnd && b.Op == expr.OpAnd && expr.String(b.R) == guard:
 		j.If, j.Manual = b.L, true
+	case j.If == expr.Lit{Kind: expr.LitBool}:
+		j.Manual = true
 	}
 }
 

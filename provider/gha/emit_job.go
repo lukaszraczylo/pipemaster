@@ -155,7 +155,7 @@ func (e *emitter) jobCondition(c jobCtx, jp string, j *ir.Job, call *ir.Step) (*
 		}
 		if !ok {
 			e.disable(jp, caps.JobIf, cond, "job")
-			return boolNodeOf(false), nil
+			return boolNodeOf(false), e.manualMarker(jp, j)
 		}
 		cond = t
 	}
@@ -168,7 +168,7 @@ func (e *emitter) jobCondition(c jobCtx, jp string, j *ir.Job, call *ir.Step) (*
 		}
 		if !ok {
 			e.disable(sp, caps.StepIf, call.If, "job")
-			return boolNodeOf(false), nil
+			return boolNodeOf(false), e.manualMarker(jp, j)
 		}
 		cond = andExpr(cond, t)
 	}
@@ -186,6 +186,14 @@ func (e *emitter) jobCondition(c jobCtx, jp string, j *ir.Job, call *ir.Step) (*
 	}
 	text, _ := printExpr(cond)
 	return str(text), markers
+}
+
+// manualMarker tags a manual job whose condition is disabled, so Parse still reads the manual flag back.
+func (e *emitter) manualMarker(jp string, j *ir.Job) []string {
+	if !j.Manual {
+		return nil
+	}
+	return []string{emitkit.Marker(caps.JobManual, jp)}
 }
 
 func andExpr(l, r expr.Expr) expr.Expr {
