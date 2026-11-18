@@ -18,8 +18,13 @@
 #               submodules  true|false|recursive -> normal|none|recursive
 #               depth       non-negative integer, kept (0 = full history on both)
 #               lines       multi-line string -> list of trimmed non-empty lines
-#             A value a transform cannot convert (or an expression) makes
-#             the target lost with a caveat; it is never passed through.
+#           exclude: out-key     lines only; `!pattern` entries go to this key
+#                                (artifacts:exclude). Without it a negated entry
+#                                makes the target lost: GitLab cache has no exclude.
+#             A value a non-identity transform cannot convert (or an
+#             expression) makes the target lost with a caveat. Identity
+#             values holding `${{ }}` pass through raw and are listed in
+#             Target.Templated for the emitter to translate.
 #         support: {level: native|emulated|external|lost, strategy: "", caveat: ""}
 #
 # A missing image input (or only <input>-file) makes Lookup return level lost,
@@ -57,7 +62,7 @@ actions:
         kind: artifact_upload
         with:
           name: name
-          path: {to: path, transform: lines}
+          path: {to: path, transform: lines, exclude: exclude}
           retention-days: {to: expire_in, transform: days}
         support: {level: native, strategy: gitlab artifacts keyword}
 

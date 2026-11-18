@@ -35,12 +35,13 @@ const versionFileCaveat = "version read from file at runtime"
 
 // Target is how one provider expresses an action.
 type Target struct {
-	With     map[string]any // string, or []string for list-valued keys
-	Kind     string
-	Image    string
-	Support  caps.Support
-	Script   []string
-	Unmapped []string // `with` keys the entry does not map; the emitter must report them
+	With      map[string]any // string, or []string for list-valued keys
+	Kind      string
+	Image     string
+	Support   caps.Support
+	Script    []string
+	Unmapped  []string // `with` keys the entry does not map; the emitter must report them
+	Templated []string // sorted With keys whose value still holds `${{ }}` for the emitter to translate
 }
 
 //go:embed mappings.yaml
@@ -58,19 +59,36 @@ type supportDoc struct {
 	Caveat   string `yaml:"caveat"`
 }
 
-// withDoc is `out-key` or `{to: out-key, transform: name}`.
+// withDoc is `out-key` or `{to: out-key, transform: name, exclude: out-key}`.
 type withDoc struct {
 	To        string `yaml:"to"`
 	Transform string `yaml:"transform"`
+	Exclude   string `yaml:"exclude"`
 }
 
+var withDocKeys = map[string]bool{"to": true, "transform": true, "exclude": true}
+
 func (w *withDoc) UnmarshalYAML(n *yaml.Node) error {
-	if n.Kind == yaml.ScalarNode {
+	switch n.Kind {
+	case yaml.ScalarNode:
 		w.To = n.Value
-		return nil
+	case yaml.MappingNode:
+		for i := 0; i < len(n.Content); i += 2 {
+			if k := n.Content[i].Value; !withDocKeys[k] {
+				return fmt.Errorf("line %d: unknown with key %q", n.Content[i].Line, k)
+			}
+		}
+		type plain withDoc
+		if err := n.Decode((*plain)(w)); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("line %d: with value must be a key or a mapping", n.Line)
 	}
-	type plain withDoc
-	return n.Decode((*plain)(w))
+	if w.To == "" {
+		return fmt.Errorf("line %d: with mapping needs a non-empty to", n.Line)
+	}
+	return nil
 }
 
 type targetDoc struct {
@@ -151,6 +169,9 @@ func parse(src []byte) (*registry, error) {
 			for in, w := range t.With {
 				if _, ok := transforms[w.Transform]; !ok {
 					return nil, fmt.Errorf("actions[%d] %s: with %q: unknown transform %q", i, id, in, w.Transform)
+				}
+				if w.Exclude != "" && w.Transform != "lines" {
+					return nil, fmt.Errorf("actions[%d] %s: with %q: exclude needs transform lines", i, id, in)
 				}
 			}
 			if t.Kind == "" {
@@ -237,12 +258,19 @@ func resolve(c compiled, target string, with map[string]string) Target {
 		}
 		w := c.doc.With[in]
 		val, err := transforms[w.Transform](v)
+		if err == nil && w.Transform == "lines" {
+			val, err = splitNegated(val.([]string), w, out.With)
+		}
 		if err != nil {
 			out.Support = lose(out.Support, fmt.Sprintf("input %s: %v", in, err))
 			continue
 		}
 		out.With[w.To] = val
+		if w.Transform == "" && strings.Contains(v, "${{") {
+			out.Templated = append(out.Templated, w.To)
+		}
 	}
+	sort.Strings(out.Templated)
 	if c.doc.Image != "" {
 		img, problem := renderImage(c, with, consumed)
 		if problem != "" {
@@ -300,6 +328,29 @@ func renderImage(c compiled, with map[string]string, consumed map[string]bool) (
 	return img, ""
 }
 
+// splitNegated moves GHA `!pattern` entries into the target's exclude key;
+// GitLab path lists have no negation syntax.
+func splitNegated(lines []string, w withDoc, with map[string]any) ([]string, error) {
+	var pos, neg []string
+	for _, l := range lines {
+		if rest, ok := strings.CutPrefix(l, "!"); ok {
+			neg = append(neg, rest)
+		} else {
+			pos = append(pos, l)
+		}
+	}
+	if len(neg) > 0 {
+		if w.Exclude == "" {
+			return nil, errors.New("negated path pattern has no GitLab equivalent")
+		}
+		with[w.Exclude] = neg
+	}
+	if len(pos) == 0 {
+		return nil, errors.New("no paths")
+	}
+	return pos, nil
+}
+
 func firstNonEmpty(a, b string) string {
 	if a != "" {
 		return a
@@ -315,12 +366,8 @@ var (
 
 // transforms is the closed set of per-key value conversions; "" is identity.
 var transforms = map[string]func(string) (any, error){
-	"": func(v string) (any, error) {
-		if strings.Contains(v, "${{") {
-			return nil, errExpr
-		}
-		return v, nil
-	},
+	// Identity keeps `${{ }}` verbatim; the emitter translates it (see Target.Templated).
+	"": func(v string) (any, error) { return v, nil },
 	// GitLab expire_in without a unit is seconds; GHA retention-days 0 means the repository default.
 	"days": func(v string) (any, error) {
 		v = strings.TrimSpace(v)

@@ -333,3 +333,68 @@ reverse: {checkout: a/b@v1, cache: a/b@v1, upload: a/b@v1, download: a/b@v1}
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestIdentityExpressionPassesThroughAsTemplate(t *testing.T) {
+	key := "${{ runner.os }}-${{ hashFiles('**/go.sum') }}"
+	got := lookupWith(t, "cache", map[string]string{"key": key, "path": "~/.cache"})
+	if got.Support.Level != caps.Native || got.With["key"] != key {
+		t.Fatalf("got %+v", got)
+	}
+	if !reflect.DeepEqual(got.Templated, []string{"key"}) {
+		t.Fatalf("Templated = %v", got.Templated)
+	}
+	plain := lookupWith(t, "cache", map[string]string{"key": "k"})
+	if len(plain.Templated) != 0 {
+		t.Fatalf("Templated = %v", plain.Templated)
+	}
+	u := lookupWith(t, "upload-artifact", map[string]string{"name": "${{ github.sha }}", "retention-days": "${{ x }}"})
+	if !reflect.DeepEqual(u.Templated, []string{"name"}) || u.Support.Level != caps.Lost {
+		t.Fatalf("non-identity expression must stay lost: %+v", u)
+	}
+	img := lookupWith(t, "setup-go", map[string]string{"go-version": "${{ matrix.go }}"})
+	if img.Support.Level != caps.Lost || img.Image != "" {
+		t.Fatalf("image template expression must stay lost: %+v", img)
+	}
+}
+
+func TestNegatedPaths(t *testing.T) {
+	u := lookupWith(t, "upload-artifact", map[string]string{"path": "dist/\n!dist/x.o\n!dist/y"})
+	if u.Support.Level != caps.Native ||
+		!reflect.DeepEqual(u.With["path"], []string{"dist/"}) ||
+		!reflect.DeepEqual(u.With["exclude"], []string{"dist/x.o", "dist/y"}) {
+		t.Fatalf("upload: %+v", u)
+	}
+	c := lookupWith(t, "cache", map[string]string{"path": "a\n!a/b"})
+	if c.Support.Level != caps.Lost || c.Support.Caveat != "input path: negated path pattern has no GitLab equivalent" {
+		t.Fatalf("cache: %+v", c)
+	}
+	if _, set := c.With["paths"]; set {
+		t.Fatalf("negation passed through: %+v", c.With)
+	}
+	only := lookupWith(t, "upload-artifact", map[string]string{"path": "!x"})
+	if only.Support.Level != caps.Lost {
+		t.Fatalf("only negations: %+v", only)
+	}
+}
+
+func TestParseRejectsBadWithDoc(t *testing.T) {
+	tail := "\nreverse: {checkout: a/b@v1, cache: a/b@v1, upload: a/b@v1, download: a/b@v1}"
+	mk := func(with string) string {
+		return "actions:\n  - match: a/b\n    targets:\n      gitlab:\n        kind: cache\n        support: {level: native}\n        with: " + with + tail
+	}
+	bad := map[string]string{
+		"typo key":         mk("{x: {to: y, transfrom: days}}"),
+		"no to":            mk("{x: {transform: days}}"),
+		"empty scalar":     mk(`{x: ""}`),
+		"exclude no lines": mk("{x: {to: y, exclude: z}}"),
+		"sequence":         mk("{x: [a]}"),
+	}
+	for name, src := range bad {
+		if _, err := parse([]byte(src)); err == nil {
+			t.Errorf("%s: expected error", name)
+		}
+	}
+	if _, err := parse([]byte(mk("{x: {to: y, transform: lines, exclude: z}}"))); err != nil {
+		t.Errorf("valid exclude rejected: %v", err)
+	}
+}
