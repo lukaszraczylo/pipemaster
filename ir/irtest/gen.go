@@ -27,6 +27,7 @@ type gen struct {
 }
 
 // GenProject draws a valid project that uses only features frag allows, each at least once where an IR field can carry it.
+// It draws two pipelines when frag allows project.multi_pipeline and one otherwise.
 // Dependencies: job.needs.artifacts implies job.needs; job.environment.approval implies job.environment.
 // Each expression slot (job.if, step.if, expression values) is a random structured AST of depth at most 3;
 // when frag allows expr.opaque a slot is instead an Opaque by a random choice, so Opaque is never guaranteed to appear.
@@ -34,7 +35,11 @@ type gen struct {
 func GenProject(t *rapid.T, frag Fragment) *ir.Project {
 	g := &gen{t: t, frag: frag}
 	p := &ir.Project{Origin: ir.Origin{Provider: "gha", Dialect: "gha", Files: []string{"a.yml"}}}
-	for i, n := 0, rapid.IntRange(1, 2).Draw(t, "pipelines"); i < n; i++ {
+	n := 1
+	if frag(caps.ProjectMultiPipeline) {
+		n = 2
+	}
+	for i := 0; i < n; i++ {
 		p.Pipelines = append(p.Pipelines, g.pipeline(fmt.Sprintf("p%d", i)))
 	}
 	return p

@@ -108,6 +108,8 @@ const (
 	StepWorkdir         Feature = "step.workdir"
 	StepShell           Feature = "step.shell"
 
+	ProjectMultiPipeline Feature = "project.multi_pipeline"
+
 	ExprOpaque          Feature = "expr.opaque"
 	ScriptInterpolation Feature = "script.interpolation"
 	ExtPassthrough      Feature = "ext.passthrough"
@@ -123,7 +125,7 @@ var allFeatures = []Feature{
 	JobEnvironmentApproval, JobManual, JobCache, JobArtifacts, JobOutputs, JobEnv,
 	StepScript, StepAction, StepImage, StepIf, StepEnv, StepContinueOnError,
 	StepTimeout, StepWorkdir, StepShell,
-	ExprOpaque, ScriptInterpolation, ExtPassthrough,
+	ProjectMultiPipeline, ExprOpaque, ScriptInterpolation, ExtPassthrough,
 }
 
 // AllFeatures returns a sorted copy of the vocabulary.

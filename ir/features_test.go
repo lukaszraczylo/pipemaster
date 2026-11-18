@@ -286,3 +286,23 @@ func hasOpaque(v reflect.Value) bool {
 	}
 	return false
 }
+
+func TestFeaturesReportsMultiPipelineOncePerExtraPipeline(t *testing.T) {
+	mk := func(id string) *ir.Pipeline { return &ir.Pipeline{ID: id, Jobs: []*ir.Job{{ID: "j"}}} }
+	count := func(p *ir.Project) (n int, paths []string) {
+		for _, u := range ir.Features(p) {
+			if u.Feature == caps.ProjectMultiPipeline {
+				n++
+				paths = append(paths, u.IRPath)
+			}
+		}
+		return n, paths
+	}
+	if n, _ := count(&ir.Project{Pipelines: []*ir.Pipeline{mk("a")}}); n != 0 {
+		t.Errorf("one pipeline is not multi_pipeline, got %d uses", n)
+	}
+	n, paths := count(&ir.Project{Pipelines: []*ir.Pipeline{mk("a"), mk("b"), mk("c")}})
+	if n != 2 || !reflect.DeepEqual(paths, []string{"pipeline/b", "pipeline/c"}) {
+		t.Errorf("want one use per extra pipeline at pipeline/b and pipeline/c, got %v", paths)
+	}
+}

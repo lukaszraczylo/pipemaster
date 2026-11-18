@@ -49,10 +49,14 @@ var triggerFeatures = map[TriggerKind]caps.Feature{
 func Features(p *Project) []FeatureUse {
 	s := &featureSet{seen: map[FeatureUse]bool{}}
 	if p != nil {
+		first := true
 		for _, pl := range p.Pipelines {
-			if pl != nil {
-				pipelineFeatures(s, pl)
+			if pl == nil {
+				continue
 			}
+			s.when(!first, pipelinePath(pl.ID), caps.ProjectMultiPipeline)
+			first = false
+			pipelineFeatures(s, pl)
 		}
 	}
 	sort.Slice(s.out, func(i, j int) bool {
