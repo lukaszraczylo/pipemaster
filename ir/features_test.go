@@ -15,11 +15,6 @@ import (
 // notCarried are vocabulary features no IR field carries; the ledger derives them from script text.
 var notCarried = map[caps.Feature]bool{caps.ScriptInterpolation: true}
 
-// opaqueCarriers are the features whose generated fields can hold an expr.Opaque.
-var opaqueCarriers = []caps.Feature{
-	caps.JobIf, caps.StepIf, caps.PipelineEnv, caps.JobEnv, caps.StepEnv, caps.StepAction, caps.JobServices,
-}
-
 // implied lists parent features a child feature always drags in.
 var implied = map[caps.Feature]caps.Feature{
 	caps.JobNeedsArtifacts:      caps.JobNeeds,
@@ -40,20 +35,23 @@ func TestFeaturesCoversEveryField(t *testing.T) {
 				want[parent] = true
 			}
 		}
-		// expr.opaque needs a carrier.
-		carried := false
-		for _, c := range opaqueCarriers {
-			carried = carried || want[c]
-		}
-		if !carried {
-			want[caps.ExprOpaque] = false
-		}
 		p := irtest.GenProject(t, func(f caps.Feature) bool { return want[f] })
 		got := map[caps.Feature]bool{}
 		for _, u := range ir.Features(p) {
 			got[u.Feature] = true
 		}
+		// expr.opaque is random per slot, so it is checked against what was generated, not the fragment.
+		opaque := hasOpaque(reflect.ValueOf(p))
+		if opaque && !want[caps.ExprOpaque] {
+			t.Fatal("Opaque generated although the fragment disallows expr.opaque")
+		}
+		if got[caps.ExprOpaque] != opaque {
+			t.Fatalf("expr.opaque reported=%v but generated=%v", got[caps.ExprOpaque], opaque)
+		}
 		for f, w := range want {
+			if f == caps.ExprOpaque {
+				continue
+			}
 			if w && !got[f] {
 				t.Fatalf("feature %s generated but not reported", f)
 			}
@@ -229,4 +227,62 @@ func TestFeaturesOneEntryPerPathFeaturePair(t *testing.T) {
 			t.Errorf("%+v reported %d times", w, counts[w])
 		}
 	}
+}
+
+// TestGeneratorMixesOpaqueAndStructured checks that a fragment allowing both if-features and expr.opaque
+// reaches job.if and step.if with structured ASTs as well as Opaque nodes.
+func TestGeneratorMixesOpaqueAndStructured(t *testing.T) {
+	var structJobIf, opaqueJobIf, structStepIf, opaqueStepIf int
+	rapid.Check(t, func(t *rapid.T) {
+		p := irtest.GenProject(t, func(f caps.Feature) bool { return f == caps.JobIf || f == caps.StepIf || f == caps.ExprOpaque })
+		for _, pl := range p.Pipelines {
+			for _, j := range pl.Jobs {
+				if _, ok := j.If.(expr.Opaque); ok {
+					opaqueJobIf++
+				} else if j.If != nil {
+					structJobIf++
+				}
+				for _, s := range j.Steps {
+					if _, ok := s.If.(expr.Opaque); ok {
+						opaqueStepIf++
+					} else if s.If != nil {
+						structStepIf++
+					}
+				}
+			}
+		}
+	})
+	if structJobIf == 0 || opaqueJobIf == 0 || structStepIf == 0 || opaqueStepIf == 0 {
+		t.Fatalf("want both kinds in both slots: job.if struct=%d opaque=%d, step.if struct=%d opaque=%d",
+			structJobIf, opaqueJobIf, structStepIf, opaqueStepIf)
+	}
+}
+
+func hasOpaque(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Interface, reflect.Pointer:
+		return !v.IsNil() && hasOpaque(v.Elem())
+	case reflect.Slice:
+		for i := 0; i < v.Len(); i++ {
+			if hasOpaque(v.Index(i)) {
+				return true
+			}
+		}
+	case reflect.Map:
+		for _, k := range v.MapKeys() {
+			if hasOpaque(v.MapIndex(k)) {
+				return true
+			}
+		}
+	case reflect.Struct:
+		if _, ok := v.Interface().(expr.Opaque); ok {
+			return true
+		}
+		for i := 0; i < v.NumField(); i++ {
+			if v.Type().Field(i).IsExported() && hasOpaque(v.Field(i)) {
+				return true
+			}
+		}
+	}
+	return false
 }
