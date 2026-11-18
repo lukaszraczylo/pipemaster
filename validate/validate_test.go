@@ -103,3 +103,15 @@ func TestSchemaCompiledOnce(t *testing.T) {
 		t.Fatal("schema recompiled")
 	}
 }
+
+func TestPatterns(t *testing.T) {
+	if got := Patterns(provider.GitLab); len(got) != 1 || got[0] != ".gitlab-ci.yml" {
+		t.Fatalf("gitlab = %v", got)
+	}
+	if got := Patterns(provider.GHA); len(got) != 2 {
+		t.Fatalf("gha = %v", got)
+	}
+	if got := Patterns(provider.Drone); got != nil {
+		t.Fatalf("drone = %v", got)
+	}
+}

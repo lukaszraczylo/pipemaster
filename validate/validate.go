@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"sync"
 
@@ -163,4 +164,24 @@ func keyString(k any) (string, error) {
 		return strconv.FormatBool(t), nil
 	}
 	return "", fmt.Errorf("unsupported yaml map key type %T", k)
+}
+
+var patterns = map[string][]string{
+	provider.GHA:    {".github/workflows/*.yml", ".github/workflows/*.yaml"},
+	provider.GitLab: {".gitlab-ci.yml"},
+}
+
+// Patterns returns the fs.Glob patterns of the files validated as providerID, or nil when none are pinned.
+func Patterns(providerID string) []string {
+	return append([]string(nil), patterns[providerID]...)
+}
+
+// Providers lists the provider IDs that have a pinned schema, sorted.
+func Providers() []string {
+	ids := make([]string, 0, len(schemas))
+	for id := range schemas {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
 }
