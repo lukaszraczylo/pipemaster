@@ -4,6 +4,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 // jobIDMap maps each job id of pl to the valid id it is emitted under.
@@ -19,55 +20,56 @@ func jobIDMap(pl *ir.Pipeline) map[string]string {
 	return roundtrip.AssignIDs(provider.GHA, ids)
 }
 
-// withValidJobIDs returns p with job ids and needs renamed to GHA-valid ids. Unchanged pipelines and
-// jobs are shared with p, which is never written to.
+// withValidJobIDs returns p with job ids, needs and needs references renamed to GHA-valid ids. The input is
+// never written to: a project that needs renames is cloned first.
 func withValidJobIDs(p *ir.Project) *ir.Project {
 	if p == nil {
 		return nil
 	}
-	out := *p
-	out.Pipelines = make([]*ir.Pipeline, len(p.Pipelines))
-	for i, pl := range p.Pipelines {
-		out.Pipelines[i] = pl
-		if pl == nil {
-			continue
+	var plans []map[string]string
+	changed := false
+	for _, pl := range p.Pipelines {
+		var ids map[string]string
+		if pl != nil {
+			ids = jobIDMap(pl)
 		}
-		ids := jobIDMap(pl)
-		if !renames(ids) {
-			continue
-		}
-		cp := *pl
-		cp.Jobs, cp.Finally = renameJobs(pl.Jobs, ids), renameJobs(pl.Finally, ids)
-		out.Pipelines[i] = &cp
+		plans = append(plans, ids)
+		changed = changed || renames(ids)
 	}
-	return &out
+	if !changed {
+		return p
+	}
+	out := ir.Clone(p)
+	for i, pl := range out.Pipelines {
+		if pl == nil || !renames(plans[i]) {
+			continue
+		}
+		ids := plans[i]
+		emitkit.RewriteNeedsRefs(pl, renamed(ids))
+		for _, j := range append(append([]*ir.Job{}, pl.Jobs...), pl.Finally...) {
+			if j == nil {
+				continue
+			}
+			j.ID = ids[j.ID]
+			for k, n := range j.Needs {
+				if id, ok := ids[n.JobID]; ok {
+					j.Needs[k].JobID = id
+				}
+			}
+		}
+	}
+	return out
 }
 
-func renames(ids map[string]string) bool {
+func renames(ids map[string]string) bool { return len(renamed(ids)) > 0 }
+
+// renamed keeps only the ids that change.
+func renamed(ids map[string]string) map[string]string {
+	out := map[string]string{}
 	for k, v := range ids {
 		if k != v {
-			return true
+			out[k] = v
 		}
-	}
-	return false
-}
-
-func renameJobs(jobs []*ir.Job, ids map[string]string) []*ir.Job {
-	out := make([]*ir.Job, len(jobs))
-	for i, j := range jobs {
-		if j == nil {
-			continue
-		}
-		cp := *j
-		cp.ID = ids[j.ID]
-		cp.Needs = make([]ir.Need, len(j.Needs))
-		for k, n := range j.Needs {
-			if id, ok := ids[n.JobID]; ok {
-				n.JobID = id
-			}
-			cp.Needs[k] = n
-		}
-		out[i] = &cp
 	}
 	return out
 }

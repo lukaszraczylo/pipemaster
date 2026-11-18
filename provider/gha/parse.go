@@ -50,7 +50,7 @@ func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		collapseMarkers(a.d.ID, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src))
+		collapseMarkers(&emitter{d: a.d, led: emitkit.NewLedger("", a.d.ID, a.Caps())}, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src), rep)
 		proj.Pipelines = append(proj.Pipelines, pl)
 	}
 	if err := ir.Validate(proj); err != nil {

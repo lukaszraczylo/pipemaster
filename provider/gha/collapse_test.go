@@ -10,6 +10,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/gha"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 // viaGHA emits p as GHA and parses the files back.
@@ -94,5 +95,113 @@ func TestScheduleWithoutCronIsLost(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("no lost trigger.schedule entry: %+v", rep.Entries)
+	}
+}
+
+func gitlabCondProject(t *testing.T) *ir.Project {
+	t.Helper()
+	p := baseProject(t)
+	p.Origin = ir.Origin{Provider: "gitlab", Dialect: "gitlab"}
+	job(p, "build").If = expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{expr.CtxBranch}}, R: lit("main")}
+	return p
+}
+
+func parseGHAText(t *testing.T, files map[string][]byte) (*ir.Project, *report.Report) {
+	t.Helper()
+	fsys := fstest.MapFS{}
+	for n, b := range files {
+		fsys[n] = &fstest.MapFile{Data: b}
+	}
+	back, rep, err := gha.New(gha.GHA).Parse(fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return back, rep
+}
+
+func TestConditionMarkerRestoresUneditedCondition(t *testing.T) {
+	files, _, err := gha.New(gha.GHA).Emit(gitlabCondProject(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, _ := parseGHAText(t, files)
+	if got := back.Pipelines[0].Jobs[0].If; expr.String(got) != expr.String(gitlabCondProject(t).Pipelines[0].Jobs[0].If) {
+		t.Errorf("condition = %s", expr.String(got))
+	}
+}
+
+func TestEditedConditionBeatsMarker(t *testing.T) {
+	files, _, err := gha.New(gha.GHA).Emit(gitlabCondProject(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const wf = ".github/workflows/ci.yml"
+	var out []string
+	for _, l := range strings.Split(string(files[wf]), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(l), "if:") {
+			l = "    if: github.ref_name == 'other'"
+		}
+		out = append(out, l)
+	}
+	files[wf] = []byte(strings.Join(out, "\n"))
+	back, rep := parseGHAText(t, files)
+	if got := expr.String(back.Pipelines[0].Jobs[0].If); !strings.Contains(got, "other") {
+		t.Errorf("the edited condition must stand, got %s", got)
+	}
+	noted := false
+	for _, e := range rep.Entries {
+		noted = noted || strings.Contains(e.Detail, "marker ignored")
+	}
+	if !noted {
+		t.Errorf("no report note for the ignored marker: %+v", rep.Entries)
+	}
+}
+
+func TestMarkerOfAnotherPipelineIsIgnored(t *testing.T) {
+	// The file is ci.yml; the marker names pipeline ci2, so it must not touch this pipeline.
+	src := "# pipemaster:emulated trigger.push pipeline/ci2/trigger/0\nname: x\non:\n  push:\n    branches: ['**']\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n"
+	back, _ := parseGHAText(t, map[string][]byte{".github/workflows/ci.yml": []byte(src)})
+	if got := back.Pipelines[0].Triggers[0].Branches.Include; len(got) != 1 || got[0] != "**" {
+		t.Errorf("a marker for pipeline ci2 changed pipeline ci: %v", got)
+	}
+}
+
+func imageProject(t *testing.T) *ir.Project {
+	t.Helper()
+	p := baseProject(t)
+	st := job(p, "build").Steps[0]
+	st.Kind, st.Action, st.With = ir.StepScript, nil, nil
+	st.Image = &ir.Image{Ref: "alpine:3.20", Entrypoint: []string{"/bin/sh", "-c"}}
+	st.Script = []string{"echo one", "echo two"}
+	return p
+}
+
+func TestImageStepCollapses(t *testing.T) {
+	back, text := viaGHA(t, imageProject(t))
+	st := back.Pipelines[0].Jobs[0].Steps[0]
+	if st.Action != nil || st.Image == nil || st.Image.Ref != "alpine:3.20" || !slices.Equal(st.Image.Entrypoint, []string{"/bin/sh", "-c"}) ||
+		!slices.Equal(st.Script, []string{"echo one", "echo two"}) {
+		t.Errorf("image step not restored: %+v\n%s", st, text)
+	}
+}
+
+func TestEditedImageStepBeatsMarker(t *testing.T) {
+	files, _, err := gha.New(gha.GHA).Emit(imageProject(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const wf = ".github/workflows/ci.yml"
+	files[wf] = []byte(strings.ReplaceAll(string(files[wf]), "docker://alpine:3.20", "docker://alpine:3.21"))
+	back, rep := parseGHAText(t, files)
+	st := back.Pipelines[0].Jobs[0].Steps[0]
+	if st.Action == nil || st.Action.Image != "alpine:3.21" {
+		t.Errorf("the edited docker step must stand: %+v", st)
+	}
+	noted := false
+	for _, e := range rep.Entries {
+		noted = noted || strings.Contains(e.Detail, "marker ignored")
+	}
+	if !noted {
+		t.Errorf("no report note: %+v", rep.Entries)
 	}
 }

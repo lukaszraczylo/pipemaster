@@ -7,15 +7,20 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
+	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
+	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 // collapseMarkers undoes the emulations another provider's emitter marked in the file, so a pipeline that
 // travelled through GHA and came back carries no trace of the detour.
-func collapseMarkers(dialect string, pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string) {
+func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string, rep *report.Report) {
 	carriedDone := map[string]bool{}
+	// Condition markers run last: they compare against the condition once the guards are gone.
+	slices.SortStableFunc(uses, func(a, b ir.FeatureUse) int { return condRank(a.Feature) - condRank(b.Feature) })
 	for _, u := range uses {
-		if !strings.HasPrefix(u.IRPath, "pipeline/"+pl.ID) {
+		if u.IRPath != "pipeline/"+pl.ID && !strings.HasPrefix(u.IRPath, "pipeline/"+pl.ID+"/") {
 			continue
 		}
 		switch u.Feature {
@@ -25,7 +30,7 @@ func collapseMarkers(dialect string, pl *ir.Pipeline, uses []ir.FeatureUse, args
 			}
 		case caps.JobCache, caps.JobArtifacts, caps.JobNeedsArtifacts:
 			if !carriedDone[u.IRPath] && len(args[u]) == 1 {
-				carriedDone[u.IRPath] = collapseCarried(dialect, markedJob(pl, u.IRPath), args[u][0])
+				carriedDone[u.IRPath] = collapseCarried(e.d.ID, markedJob(pl, u.IRPath), args[u][0])
 			}
 		case caps.PipelineFinally:
 			collapseFinally(pl, u.IRPath)
@@ -35,12 +40,14 @@ func collapseMarkers(dialect string, pl *ir.Pipeline, uses []ir.FeatureUse, args
 			pl.Triggers = slices.DeleteFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerManual })
 		case caps.JobIf:
 			if j := markedJob(pl, u.IRPath); j != nil {
-				j.If = sourceCond(args[u], j.If)
+				j.If = sourceCond(rep, u, args[u], j.If)
 			}
 		case caps.StepIf:
 			if st := markedStep(pl, u.IRPath); st != nil {
-				st.If = sourceCond(args[u], st.If)
+				st.If = sourceCond(rep, u, args[u], st.If)
 			}
+		case caps.StepImage:
+			collapseImage(e, pl, rep, u, args[u])
 		case caps.JobRetry:
 			collapseRetry(markedJob(pl, u.IRPath), args[u])
 		case caps.TriggerPush:
@@ -126,18 +133,46 @@ func collapseCarried(dialect string, j *ir.Job, arg string) bool {
 	return true
 }
 
-// sourceCond reads the condition text the emitter carried; without one the parsed condition stays.
-func sourceCond(args []string, keep expr.Expr) expr.Expr {
+func condRank(f caps.Feature) int {
+	if f == caps.JobIf || f == caps.StepIf {
+		return 1
+	}
+	return 0
+}
+
+// sourceCond reads the condition text the emitter carried. It applies only when writing that text again
+// gives the condition parsed from the file; a hand-edited condition stays and the report says so.
+func sourceCond(rep *report.Report, u ir.FeatureUse, args []string, parsed expr.Expr) expr.Expr {
 	for _, a := range args {
 		var s srcArg
 		if json.Unmarshal([]byte(a), &s) != nil || s.Src == "" {
 			continue
 		}
-		if x, err := expr.ParseCanonical(s.Src); err == nil {
+		x, err := expr.ParseCanonical(s.Src)
+		if err != nil {
+			continue
+		}
+		if parsed != nil && rederives(x, parsed) {
 			return x
 		}
+		rep.Add(report.Entry{IRPath: u.IRPath, Feature: u.Feature, Level: caps.Lost, Strategy: "marker ignored",
+			Detail: "marker ignored: the condition was edited after conversion, so the parsed condition stands"})
 	}
-	return keep
+	return parsed
+}
+
+// rederives is true when the emitter would write src as the condition parsed.
+func rederives(src, parsed expr.Expr) bool {
+	t, _, ok := expr.TranslateApprox(src, exprgitlab.Lang, exprgha.Lang)
+	if !ok {
+		return false
+	}
+	text, err := printExpr(t)
+	if err != nil {
+		return false
+	}
+	back, err := exprgha.Parse(text)
+	return err == nil && expr.String(back) == expr.String(parsed)
 }
 
 func markedStep(pl *ir.Pipeline, path string) *ir.Step {
@@ -195,4 +230,31 @@ func collapseFinally(pl *ir.Pipeline, path string) {
 	}
 	pl.Jobs = slices.DeleteFunc(pl.Jobs, func(o *ir.Job) bool { return o == j })
 	pl.Finally = append(pl.Finally, j)
+}
+
+// collapseImage turns a docker action back into an image step when writing the marked step again gives the
+// parsed one; an edited step stays as parsed and the report says so.
+func collapseImage(e *emitter, pl *ir.Pipeline, rep *report.Report, u ir.FeatureUse, args []string) {
+	st := markedStep(pl, u.IRPath)
+	var a imageArg
+	if st == nil || len(args) != 1 || json.Unmarshal([]byte(args[0]), &a) != nil || st.Action == nil || st.Action.Kind != ir.ActionDocker {
+		return
+	}
+	ref, entrypoint, argText, err := e.imageParts(u.IRPath, &ir.Step{Image: &a.Image, Script: a.Script})
+	lit := func(k string) string { return st.With[k].Lit }
+	if err != nil || st.Action.Image != ref || lit("entrypoint") != entrypoint || lit("args") != argText {
+		rep.Add(report.Entry{IRPath: u.IRPath, Feature: u.Feature, Level: caps.Lost, Strategy: "marker ignored",
+			Detail: "marker ignored: the docker step was edited after conversion, so the parsed step stands"})
+		return
+	}
+	with := map[string]ir.Value{}
+	for k, v := range st.With {
+		if k != "entrypoint" && k != "args" {
+			with[k] = v
+		}
+	}
+	if len(with) == 0 {
+		with = nil
+	}
+	st.Kind, st.Action, st.With, st.Image, st.Script = ir.StepScript, nil, with, &a.Image, a.Script
 }

@@ -164,22 +164,21 @@ func (e *emitter) stepTail(m *omap, sp string, st *ir.Step, ext map[string]any) 
 
 // imageStep runs a step in its own image through a docker:// action; the script runs under sh -ec
 // when the image names no entrypoint, otherwise it becomes the entrypoint's last argument.
-func (e *emitter) imageStep(m *omap, sp string, st *ir.Step) error {
-	ref, err := e.template(sp, st.Image.Ref)
-	if err != nil {
-		return err
+// imageParts is what an image step writes: the image reference, the entrypoint and the args, the last two empty
+// when the step has no script and no entrypoint.
+func (e *emitter) imageParts(sp string, st *ir.Step) (ref, entrypoint, args string, err error) {
+	if ref, err = e.template(sp, st.Image.Ref); err != nil {
+		return
 	}
-	m.set("uses", str(dockerPrefix+ref))
 	ts, err := e.templates(sp, st.Script)
 	if err != nil {
-		return err
+		return
 	}
 	script := strings.Join(ts, "\n")
 	ep := st.Image.Entrypoint
-	args := newMap()
 	switch {
 	case len(ep) > 0 && ep[0] != "":
-		args.set("entrypoint", str(ep[0]))
+		entrypoint = ep[0]
 		words := make([]string, 0, len(ep))
 		for _, w := range ep[1:] {
 			words = append(words, shellQuote(w))
@@ -187,14 +186,36 @@ func (e *emitter) imageStep(m *omap, sp string, st *ir.Step) error {
 		if script != "" {
 			words = append(words, shellQuote(script))
 		}
-		if len(words) > 0 {
-			args.set("args", str(strings.Join(words, " ")))
-		}
+		args = strings.Join(words, " ")
 	case script != "":
-		args.set("entrypoint", str(defaultEntrypoint))
-		args.set("args", str("-ec "+shellQuote(script)))
+		entrypoint, args = defaultEntrypoint, "-ec "+shellQuote(script)
+	}
+	return
+}
+
+func (e *emitter) imageStep(m *omap, sp string, st *ir.Step) error {
+	ref, entrypoint, argText, err := e.imageParts(sp, st)
+	if err != nil {
+		return err
+	}
+	m.set("uses", str(dockerPrefix+ref))
+	args := newMap()
+	if entrypoint != "" {
+		args.set("entrypoint", str(entrypoint))
+	}
+	if argText != "" {
+		args.set("args", str(argText))
+	}
+	if err := e.markArg(caps.StepImage, sp, imageArg{Image: *st.Image, Script: st.Script}); err != nil {
+		return err
 	}
 	return e.withKey(m, sp, st.With, args)
+}
+
+// imageArg is the marker argument of an image step: what the step ran before it became a docker action.
+type imageArg struct {
+	Image  ir.Image `json:"image"`
+	Script []string `json:"script,omitempty"`
 }
 
 // jobSteps lists a job's steps with the emulation steps around them: downloads and cache first, uploads last.
