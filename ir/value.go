@@ -9,6 +9,9 @@ import (
 
 // exprText renders an expression for YAML in the canonical form of expr.String.
 func exprText(e expr.Expr) (string, error) {
+	if err := expr.Check(e); err != nil {
+		return "", err
+	}
 	if o, ok := e.(expr.Opaque); ok && strings.Contains(o.Dialect, ")") {
 		return "", fmt.Errorf("opaque dialect %q must not contain ')'", o.Dialect)
 	}

@@ -1,6 +1,7 @@
 package ir_test
 
 import (
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -103,5 +104,31 @@ func TestMarshalRejectsDialectWithParen(t *testing.T) {
 	p := one(&ir.Job{ID: "a", If: expr.Opaque{Dialect: "a)b", Text: "x"}})
 	if _, err := ir.Marshal(p); err == nil {
 		t.Fatal("want error")
+	}
+}
+
+func TestMarshalRejectsUnprintableExpressions(t *testing.T) {
+	bad := map[string]expr.Expr{
+		"nan":       expr.Lit{Kind: expr.LitNum, Num: math.NaN()},
+		"inf":       expr.Lit{Kind: expr.LitNum, Num: math.Inf(1)},
+		"lit kind":  expr.Lit{Kind: 7},
+		"call name": expr.Call{Name: "not an ident"},
+	}
+	for name, e := range bad {
+		if _, err := ir.Marshal(one(&ir.Job{ID: "a", If: e})); err == nil || !strings.Contains(err.Error(), `job "a" if`) {
+			t.Errorf("%s: job.if: want error naming the job, got %v", name, err)
+		}
+		if _, err := ir.Marshal(one(&ir.Job{ID: "a", Steps: []*ir.Step{{ID: "s", If: e}}})); err == nil {
+			t.Errorf("%s: step.if: want error", name)
+		}
+		v := ir.Value{Kind: ir.ValueExpr, Expr: e}
+		if _, err := ir.Marshal(one(&ir.Job{ID: "a", Env: []ir.Var{{Name: "E", Value: v}}})); err == nil {
+			t.Errorf("%s: value: want error", name)
+		}
+		p := one(&ir.Job{ID: "a", Steps: []*ir.Step{{ID: "s", With: map[string]ir.Value{"k": v}}}})
+		err := ir.Validate(p)
+		if err == nil || !strings.Contains(err.Error(), "pipeline/ci/job/a/step/s") {
+			t.Errorf("%s: Validate: want error with IR path, got %v", name, err)
+		}
 	}
 }

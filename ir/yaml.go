@@ -119,7 +119,7 @@ func (v Value) MarshalYAML() (any, error) {
 	case ValueExpr:
 		s, err := exprText(v.Expr)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("value expr: %w", err)
 		}
 		return valueYAML{Expr: &s}, nil
 	}

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/lukaszraczylo/pipemaster/expr"
 )
 
 // Error is a validation failure at an IR path.
@@ -71,6 +73,12 @@ func validatePipeline(pl *Pipeline, add func(path, format string, a ...any)) {
 			seenS[s.ID] = true
 		}
 	}
+	checkVars(pipelinePath(pl.ID), "env", pl.Env, add)
+	for _, j := range all {
+		if j != nil && j.ID != "" {
+			validateExprs(pl.ID, j, add)
+		}
+	}
 	for _, j := range all {
 		if j == nil || j.ID == "" {
 			continue
@@ -83,6 +91,53 @@ func validatePipeline(pl *Pipeline, add func(path, format string, a ...any)) {
 	}
 	for _, cyc := range findCycles(byID) {
 		add(pipelinePath(pl.ID), "needs cycle: %s", joinPath(cyc))
+	}
+}
+
+// validateExprs reports every Expr that has no canonical text, so Marshal cannot fail on a validated project.
+func validateExprs(pid string, j *Job, add func(path, format string, a ...any)) {
+	jp := jobPath(pid, j.ID)
+	checkExpr(jp+"/if", j.If, add)
+	checkVars(jp, "env", j.Env, add)
+	for _, sv := range j.Services {
+		checkVars(jp+"/service/"+sv.Name, "env", sv.Env, add)
+	}
+	for _, s := range j.Steps {
+		if s == nil || s.ID == "" {
+			continue
+		}
+		sp := stepPath(pid, j.ID, s.ID)
+		checkExpr(sp+"/if", s.If, add)
+		checkVars(sp, "env", s.Env, add)
+		keys := make([]string, 0, len(s.With))
+		for k := range s.With {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			checkValue(sp+"/with/"+k, s.With[k], add)
+		}
+	}
+}
+
+func checkVars(path, field string, vs []Var, add func(path, format string, a ...any)) {
+	for _, v := range vs {
+		checkValue(path+"/"+field+"/"+v.Name, v.Value, add)
+	}
+}
+
+func checkValue(path string, v Value, add func(path, format string, a ...any)) {
+	if v.Kind == ValueExpr {
+		checkExpr(path, v.Expr, add)
+	}
+}
+
+func checkExpr(path string, e expr.Expr, add func(path, format string, a ...any)) {
+	if e == nil {
+		return
+	}
+	if err := expr.Check(e); err != nil {
+		add(path, "invalid expression: %v", err)
 	}
 }
 

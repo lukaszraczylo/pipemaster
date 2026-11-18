@@ -13,7 +13,6 @@ const (
 )
 
 var (
-	identRE      = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
 	topOpaqueRE  = regexp.MustCompile(`(?s)^opaque\(([^)]*)\): (.*)$`)
 	keywordIdent = map[string]bool{"true": true, "false": true, "null": true}
 )
@@ -31,8 +30,6 @@ func String(e Expr) string {
 	return sb.String()
 }
 
-func quote(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
-
 func write(sb *strings.Builder, e Expr) {
 	switch v := e.(type) {
 	case Lit:
@@ -44,18 +41,18 @@ func write(sb *strings.Builder, e Expr) {
 		case LitNum:
 			sb.WriteString(strconv.FormatFloat(v.Num, 'g', -1, 64))
 		case LitStr:
-			sb.WriteString(quote(v.Str))
+			sb.WriteString(QuoteSingle(v.Str))
 		}
 	case Ref:
 		for i, seg := range v.Path {
-			plain := identRE.MatchString(seg) && (i != 0 || !keywordIdent[seg])
+			plain := IsIdent(seg) && (i != 0 || !keywordIdent[seg])
 			switch {
 			case plain && i == 0:
 				sb.WriteString(seg)
 			case plain:
 				sb.WriteString("." + seg)
 			default:
-				sb.WriteString("[" + quote(seg) + "]")
+				sb.WriteString("[" + QuoteSingle(seg) + "]")
 			}
 		}
 	case Unary:
@@ -75,7 +72,7 @@ func write(sb *strings.Builder, e Expr) {
 		}
 		sb.WriteString(")")
 	case Opaque:
-		sb.WriteString(nestedOpaque + quote(v.Dialect) + ", " + quote(v.Text) + ")")
+		sb.WriteString(nestedOpaque + QuoteSingle(v.Dialect) + ", " + QuoteSingle(v.Text) + ")")
 	}
 }
 
@@ -108,9 +105,20 @@ func ParseCanonical(s string) (Expr, error) {
 }
 
 type parser struct {
-	s string
-	i int
+	s     string
+	i     int
+	depth int
 }
+
+func (p *parser) enter() error {
+	p.depth++
+	if p.depth > MaxDepth {
+		return p.errf("expression nested deeper than %d", MaxDepth)
+	}
+	return nil
+}
+
+func (p *parser) leave() { p.depth-- }
 
 func (p *parser) errf(format string, a ...any) error {
 	return fmt.Errorf("parse expression %q at %d: %s", p.s, p.i, fmt.Sprintf(format, a...))
@@ -132,6 +140,10 @@ func (p *parser) eat(tok string) bool {
 }
 
 func (p *parser) or() (Expr, error) {
+	if err := p.enter(); err != nil {
+		return nil, err
+	}
+	defer p.leave()
 	l, err := p.and()
 	if err != nil {
 		return nil, err
@@ -189,6 +201,10 @@ func (p *parser) cmp() (Expr, error) {
 }
 
 func (p *parser) unary() (Expr, error) {
+	if err := p.enter(); err != nil {
+		return nil, err
+	}
+	defer p.leave()
 	p.skip()
 	if p.i < len(p.s) && p.s[p.i] == '!' && !strings.HasPrefix(p.s[p.i:], "!=") && !strings.HasPrefix(p.s[p.i:], "!~") {
 		p.i++
@@ -225,23 +241,18 @@ func (p *parser) primary() (Expr, error) {
 		return p.number()
 	case strings.HasPrefix(p.s[p.i:], nestedOpaque):
 		return p.opaque()
-	case c == '[' || isIdentStart(c):
+	case c == '[' || IsIdentStart(c):
 		return p.refOrCall()
 	}
 	return nil, p.errf("unexpected %q", string(c))
 }
 
-func isIdentStart(c byte) bool { return c == '_' || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') }
-func isIdentPart(c byte) bool {
-	return isIdentStart(c) || c == '-' || (c >= '0' && c <= '9')
-}
-
 func (p *parser) ident() (string, bool) {
 	start := p.i
-	if p.i >= len(p.s) || !isIdentStart(p.s[p.i]) {
+	if p.i >= len(p.s) || !IsIdentStart(p.s[p.i]) {
 		return "", false
 	}
-	for p.i < len(p.s) && isIdentPart(p.s[p.i]) {
+	for p.i < len(p.s) && IsIdentPart(p.s[p.i]) {
 		p.i++
 	}
 	return p.s[start:p.i], true
