@@ -18,6 +18,7 @@ const workflowExt = ".yml"
 // Emit writes one workflow file per pipeline at <Dir>/<pipeline id>.yml. Every feature use goes
 // through the ledger; Finish fails the call when one was never accounted for.
 func (a *adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	p = withValidJobIDs(p)
 	e := &emitter{d: a.d, from: sourceDialect(originProvider(p)), led: emitkit.NewLedger("ir", a.d.ID, a.Caps())}
 	uses := ir.Features(p)
 	for _, u := range uses {
@@ -64,6 +65,7 @@ func (e *emitter) pipelineFile(pl *ir.Pipeline) (string, []byte, error) {
 func (e *emitter) workflow(pl *ir.Pipeline) (*yaml.Node, error) {
 	pp := "pipeline/" + pl.ID
 	ext := extMap(pl.Ext, e.d.ID)
+	e.foreignExt(pp, pl.Ext)
 	m := newMap()
 	if pl.Name != "" {
 		m.set("name", str(pl.Name))
@@ -104,9 +106,10 @@ func (e *emitter) workflow(pl *ir.Pipeline) (*yaml.Node, error) {
 		return nil, err
 	}
 	m.set("jobs", jobs)
-	if lost := e.drain(); len(lost) > 0 {
-		m.n.Content[0].HeadComment = strings.Join(lost, "\n")
+	if head := append(e.marks, e.drain()...); len(head) > 0 {
+		m.n.Content[0].HeadComment = strings.Join(head, "\n")
 	}
+	e.marks = nil
 	return m.n, nil
 }
 

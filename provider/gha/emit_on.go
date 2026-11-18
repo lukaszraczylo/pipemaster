@@ -114,6 +114,7 @@ func (e *emitter) on(pl *ir.Pipeline, jobManual string) (*yaml.Node, error) {
 		t := &pl.Triggers[i]
 		path := fmt.Sprintf("pipeline/%s/trigger/%d", pl.ID, i)
 		var err error
+		e.foreignExt(path, t.Ext)
 		switch t.Kind {
 		case ir.TriggerPush, ir.TriggerTag:
 			err = e.pushEvent(b, pl, i, used)
@@ -122,7 +123,7 @@ func (e *emitter) on(pl *ir.Pipeline, jobManual string) (*yaml.Node, error) {
 			err = e.prEvent(b, path, t)
 		case ir.TriggerSchedule:
 			e.loseFilters(path, t, false, false, false)
-			schedule, err = e.scheduleEntry(schedule, t)
+			schedule, err = e.scheduleEntry(schedule, path, t)
 		case ir.TriggerManual:
 			hasManual = true
 			e.loseFilters(path, t, false, false, false)
@@ -168,6 +169,7 @@ func (e *emitter) implicitDispatch(b *onBuilder, pl *ir.Pipeline, jobManual stri
 	switch {
 	case jobManual != "":
 		marker = emitkit.Marker(caps.JobManual, jobManual)
+		e.mark(caps.TriggerManual, pp)
 	case len(pl.Inputs) > 0:
 		marker = emitkit.Marker(caps.PipelineInputs, pp)
 		e.emulate(pp, caps.PipelineInputs, "workflow_dispatch trigger", "inputs need a workflow_dispatch trigger; the pipeline had none")
@@ -217,6 +219,7 @@ func (e *emitter) pushEvent(b *onBuilder, pl *ir.Pipeline, i int, used map[int]b
 		if tag != nil && !hasFilter(push.Branches) {
 			e.emulate(pp, caps.TriggerPush, "branches: '**'", "GHA fires push only for named ref kinds; branches are named explicitly beside tags")
 			m.set("branches", strSeq([]string{matchAll}))
+			e.mark(caps.TriggerPush, pp)
 		}
 		e.filterKeys(m, "branches", push.Branches, pp, caps.TriggerFilterBranch)
 		paths = push.Paths
@@ -231,6 +234,7 @@ func (e *emitter) pushEvent(b *onBuilder, pl *ir.Pipeline, i int, used map[int]b
 		if !hasFilter(tag.Tags) {
 			e.emulate(tp, caps.TriggerTag, "tags: '**'", "GHA fires tag pushes only when a tags filter names them")
 			m.set("tags", strSeq([]string{matchAll}))
+			e.mark(caps.TriggerTag, tp)
 		}
 		e.filterKeys(m, "tags", tag.Tags, tp, caps.TriggerFilterTags)
 		if push == nil {
@@ -276,7 +280,11 @@ func (e *emitter) prEvent(b *onBuilder, path string, t *ir.Trigger) error {
 	return nil
 }
 
-func (e *emitter) scheduleEntry(seq *yaml.Node, t *ir.Trigger) (*yaml.Node, error) {
+func (e *emitter) scheduleEntry(seq *yaml.Node, path string, t *ir.Trigger) (*yaml.Node, error) {
+	if t.Cron == "" {
+		e.lose(path, caps.TriggerSchedule, "the schedule names no cron expression; GHA needs one")
+		return seq, nil
+	}
 	if seq == nil {
 		seq = seqOf()
 	}

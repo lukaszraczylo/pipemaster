@@ -53,6 +53,7 @@ func minutesNode(d ir.Duration) *yaml.Node {
 func (e *emitter) jobNode(c jobCtx, j *ir.Job) (*yaml.Node, []string, error) {
 	jp := jobPath(c.pl.ID, j.ID)
 	ext := extMap(j.Ext, e.d.ID)
+	e.foreignExt(jp, j.Ext)
 	consumed := map[string]bool{}
 	call := callStep(j)
 	m := newMap()
@@ -113,6 +114,7 @@ func (e *emitter) jobNode(c jobCtx, j *ir.Job) (*yaml.Node, []string, error) {
 	}
 	if c.finally {
 		markers = append(markers, emitkit.Marker(caps.PipelineFinally, "pipeline/"+c.pl.ID))
+		e.mark(caps.PipelineFinally, jp)
 	}
 	return m.n, append(markers, e.drain()...), nil
 }
@@ -272,6 +274,7 @@ func (e *emitter) runsOn(m *omap, jp string, j *ir.Job, ext map[string]any, cons
 			return nil
 		}
 		e.emulate(jp, caps.JobRunner, "default runner label "+defaultRunner, "the pipeline named no runner")
+		e.mark(caps.JobRunner, jp)
 		m.set("runs-on", str(defaultRunner))
 	case group == "" && len(rest) == 0 && len(labels) == 1:
 		m.set("runs-on", str(labels[0]))

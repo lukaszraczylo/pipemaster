@@ -26,6 +26,7 @@ type emitter struct {
 	from     *expr.Dialect
 	d        Dialect
 	comments []string
+	marks    []string
 }
 
 // sourceDialect is the expression dialect of a project's origin; nil means GHA semantics already hold.
@@ -42,8 +43,13 @@ func sourceDialect(origin string) *expr.Dialect {
 // source rewrites x from the origin dialect's semantics into GHA's. An approximate result is
 // reported as emulated with the translator's caveats; ok is false when no translation exists.
 func (e *emitter) source(path string, f caps.Feature, x expr.Expr) (expr.Expr, bool) {
-	if e.from == nil {
+	if e.from == nil || isStatus(x) {
 		return x, true
+	}
+	if b, ok := x.(expr.Binary); ok && b.Op == expr.OpAnd && (isStatus(b.L) || isStatus(b.R)) {
+		l, lok := e.source(path, f, b.L)
+		r, rok := e.source(path, f, b.R)
+		return expr.Binary{Op: expr.OpAnd, L: l, R: r}, lok && rok
 	}
 	if t, ok := expr.Translate(x, *e.from, exprgha.Lang); ok {
 		return t, true
@@ -53,7 +59,30 @@ func (e *emitter) source(path string, f caps.Feature, x expr.Expr) (expr.Expr, b
 		return nil, false
 	}
 	e.emulate(path, f, "approximate expression translation", strings.Join(cav, "; "))
+	if f == caps.JobIf || f == caps.StepIf {
+		if err := e.markArg(f, path, srcArg{Src: expr.String(x)}); err != nil {
+			e.comment("expression source not carried: " + err.Error())
+		}
+	}
 	return t, true
+}
+
+// srcArg carries a condition as the source dialect wrote it, which the emitted one only approximates.
+type srcArg struct {
+	Src string `json:"src"`
+}
+
+// isStatus is true for a job-status function, which both dialects' emitters share and no dialect translates.
+func isStatus(x expr.Expr) bool {
+	c, ok := x.(expr.Call)
+	if !ok || len(c.Args) != 0 {
+		return false
+	}
+	switch c.Name {
+	case "always", "success", "failure", "cancelled":
+		return true
+	}
+	return false
 }
 
 // condition renders an if: for a slot that must fail safe: when GHA cannot state it the construct is disabled.
@@ -83,6 +112,26 @@ func (e *emitter) emulate(path string, f caps.Feature, strategy, detail string) 
 
 func (e *emitter) comment(s string) {
 	e.comments = append(e.comments, lostPrefix+strings.ReplaceAll(s, "\n", `\n`))
+}
+
+// foreignExt reports Ext data of other providers: it is not in the GHA file, only in the round-trip metadata.
+func (e *emitter) foreignExt(path string, x ir.Ext) {
+	emitkit.ForeignExt(e.led, e.d.ID, "GHA", path, x)
+}
+
+// mark queues a marker line for the file head, where the parser finds it whatever the construct's position.
+func (e *emitter) mark(f caps.Feature, path string) {
+	e.marks = append(e.marks, emitkit.Marker(f, path))
+}
+
+// markArg queues a marker and its JSON argument line.
+func (e *emitter) markArg(f caps.Feature, path string, v any) error {
+	line, err := emitkit.ArgLine(v)
+	if err != nil {
+		return err
+	}
+	e.marks = append(e.marks, emitkit.Marker(f, path), line)
+	return nil
 }
 
 // drain returns the pending comment lines and clears them.

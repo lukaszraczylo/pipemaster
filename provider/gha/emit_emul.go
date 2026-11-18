@@ -190,3 +190,33 @@ func retentionDays(s string) (int, bool) {
 	}
 	return n, true
 }
+
+// carried is the marker argument for the steps that stand in for cache, artifacts and artifact needs: how many
+// steps open and close the job, and the IR values they came from.
+type carried struct {
+	Cache     []ir.Cache    `json:"cache,omitempty"`
+	Artifacts []ir.Artifact `json:"artifacts,omitempty"`
+	Needs     []string      `json:"needs,omitempty"`
+	Pre       int           `json:"pre"`
+	Post      int           `json:"post"`
+}
+
+func (e *emitter) markCarried(jp string, j *ir.Job, pre, post int) error {
+	if pre+post == 0 {
+		return nil
+	}
+	c := carried{Cache: j.Cache, Artifacts: j.Artifacts, Pre: pre, Post: post}
+	for _, n := range j.Needs {
+		if n.Artifacts {
+			c.Needs = append(c.Needs, n.JobID)
+		}
+	}
+	f := caps.JobArtifacts
+	switch {
+	case len(c.Needs) > 0:
+		f = caps.JobNeedsArtifacts
+	case len(c.Cache) > 0:
+		f = caps.JobCache
+	}
+	return e.markArg(f, jp, c)
+}

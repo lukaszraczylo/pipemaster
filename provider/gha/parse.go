@@ -13,6 +13,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
@@ -49,6 +50,7 @@ func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		if err != nil {
 			return nil, nil, err
 		}
+		collapseMarkers(a.d.ID, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src))
 		proj.Pipelines = append(proj.Pipelines, pl)
 	}
 	if err := ir.Validate(proj); err != nil {

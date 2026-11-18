@@ -50,12 +50,16 @@ func retryScript(body []string, attempts int) []string {
 	)
 }
 
+// noopScript runs for a script step whose lines an earlier conversion could not carry.
+const noopScript = "true"
+
 func retryable(shell string) bool { return shell == "" || shell == shellBash || shell == shellSh }
 
 // stepNode builds one step; attempts > 0 wraps a script step in the retry loop.
 func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bool, error) {
 	sp := stepPath(jp, st.ID)
 	ext := extMap(st.Ext, e.d.ID)
+	e.foreignExt(sp, st.Ext)
 	derived, _ := ext[ExtDerivedID].(bool)
 	m := newMap()
 	if !derived && st.ID != "" {
@@ -91,6 +95,8 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 	case (st.Kind == ir.StepAction || st.Kind == ir.StepPipelineCall) && st.Action != nil:
 		m.set("uses", str(actionString(st.Action)))
 		err = e.withKey(m, sp, st.With, nil)
+	case st.Kind == ir.StepScript && st.Image == nil:
+		m.set("run", str(noopScript))
 	default:
 		err = fmt.Errorf("%s: step of kind %q has nothing GHA can run", sp, st.Kind)
 	}
@@ -225,11 +231,19 @@ func (e *emitter) jobSteps(c jobCtx, j *ir.Job) (*yaml.Node, error) {
 	if j.Retry != nil && wrapped == 0 {
 		e.lose(jp, caps.JobRetry, "the job has no bash or sh script step to retry")
 	}
+	if j.Retry != nil && wrapped > 0 {
+		if err := e.markArg(caps.JobRetry, jp, j.Retry); err != nil {
+			return nil, err
+		}
+	}
 	post, err := e.postSteps(jp, j)
 	if err != nil {
 		return nil, err
 	}
 	seq.Content = append(seq.Content, post...)
+	if err := e.markCarried(jp, j, len(pre), len(post)); err != nil {
+		return nil, err
+	}
 	if len(seq.Content) == 0 {
 		return nil, fmt.Errorf("%s: job has no steps", jp)
 	}
