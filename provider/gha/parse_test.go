@@ -81,30 +81,23 @@ func TestParseFeatures(t *testing.T) {
 }
 
 func TestOnShorthandForms(t *testing.T) {
-	forms := []string{
-		"on: push\n",
-		"on: [push]\n",
-		"on:\n  push:\n",
-		"on:\n  push: {}\n",
+	const jobs = "jobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: x\n"
+	groups := [][]string{
+		{"on: push\n", "on: [push]\n", "on:\n  push:\n", "on:\n  push: {}\n"},
+		{"on: issues\n", "on: [issues]\n", "on:\n  issues:\n"},
+		{"on: [pull_request, push]\n", "on:\n  push:\n  pull_request:\n"},
 	}
-	var want []ir.Trigger
-	for i, on := range forms {
-		got := one(t, on+"jobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: x\n").Triggers
-		if i == 0 {
-			want = got
-			if len(want) != 1 || want[0].Kind != ir.TriggerPush {
-				t.Fatalf("triggers = %+v", want)
+	for _, forms := range groups {
+		want := one(t, forms[0]+jobs)
+		for _, on := range forms[1:] {
+			got := one(t, on+jobs)
+			if ok, diff := ir.Equal(&ir.Project{Pipelines: []*ir.Pipeline{want}}, &ir.Project{Pipelines: []*ir.Pipeline{got}}); !ok {
+				t.Errorf("form %q differs from %q:\n%s", on, forms[0], diff)
 			}
-			continue
-		}
-		if !reflect.DeepEqual(got, want) {
-			t.Errorf("form %q: %+v want %+v", on, got, want)
 		}
 	}
-	list := one(t, "on: [pull_request, push]\njobs: {}\n").Triggers
-	mapf := one(t, "on:\n  push:\n  pull_request:\njobs: {}\n").Triggers
-	if !reflect.DeepEqual(list, mapf) || len(list) != 2 {
-		t.Errorf("list %+v != map %+v", list, mapf)
+	if tr := one(t, "on: push\n"+jobs).Triggers; len(tr) != 1 || tr[0].Kind != ir.TriggerPush {
+		t.Fatalf("triggers = %+v", tr)
 	}
 }
 

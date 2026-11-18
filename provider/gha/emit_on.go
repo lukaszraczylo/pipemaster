@@ -43,8 +43,27 @@ func eventMap(ext map[string]any, skip ...string) (*omap, error) {
 	return m, m.addExtra(ext, skipSet)
 }
 
-// filterKeys writes key and key-ignore; GHA forbids both on one event, so include and exclude together become "!" entries.
-func filterKeys(m *omap, key string, f ir.Filter) {
+func hasFilter(f ir.Filter) bool { return len(f.Include) > 0 || len(f.Exclude) > 0 }
+
+func sameStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func sameFilter(a, b ir.Filter) bool {
+	return sameStrings(a.Include, b.Include) && sameStrings(a.Exclude, b.Exclude)
+}
+
+// filterKeys writes key and key-ignore; GHA forbids both on one event, so include and exclude together
+// become "!" entries and the ledger says so.
+func (e *emitter) filterKeys(m *omap, key string, f ir.Filter, path string, feature caps.Feature) {
 	switch {
 	case len(f.Include) > 0 && len(f.Exclude) > 0:
 		all := append([]string{}, f.Include...)
@@ -52,10 +71,28 @@ func filterKeys(m *omap, key string, f ir.Filter) {
 			all = append(all, negate+x)
 		}
 		m.set(key, strSeq(all))
+		e.emulate(path, feature, "exclusions written as ! entries", "GHA cannot combine "+key+" and "+key+"-ignore on one event")
 	case len(f.Include) > 0:
 		m.set(key, strSeq(f.Include))
 	case len(f.Exclude) > 0:
 		m.set(key+"-ignore", strSeq(f.Exclude))
+	}
+}
+
+// loseFilters reports every filter of t that its GHA event has no key for.
+func (e *emitter) loseFilters(path string, t *ir.Trigger, branches, tags, paths bool) {
+	for _, f := range []struct {
+		feature caps.Feature
+		flt     ir.Filter
+		allowed bool
+	}{
+		{caps.TriggerFilterBranch, t.Branches, branches},
+		{caps.TriggerFilterTags, t.Tags, tags},
+		{caps.TriggerFilterPaths, t.Paths, paths},
+	} {
+		if !f.allowed && hasFilter(f.flt) {
+			e.lose(path, f.feature, "this trigger kind has no GHA key for the filter")
+		}
 	}
 }
 
@@ -81,16 +118,21 @@ func (e *emitter) on(pl *ir.Pipeline, jobManual string) (*yaml.Node, error) {
 		case ir.TriggerPush, ir.TriggerTag:
 			err = e.pushEvent(b, pl, i, used)
 		case ir.TriggerPR:
+			e.loseFilters(path, t, true, false, true)
 			err = e.prEvent(b, path, t)
 		case ir.TriggerSchedule:
+			e.loseFilters(path, t, false, false, false)
 			schedule, err = e.scheduleEntry(schedule, t)
 		case ir.TriggerManual:
 			hasManual = true
+			e.loseFilters(path, t, false, false, false)
 			err = e.dispatchEvent(b, path, pl, t)
 		case ir.TriggerAPI:
+			e.loseFilters(path, t, false, false, false)
 			err = e.apiEvent(b, path, t)
 		case ir.TriggerPipelineDone:
-			err = e.workflowRun(b, path, pl, t)
+			e.loseFilters(path, t, true, false, false)
+			err = e.workflowRun(b, path, t)
 		case ir.TriggerResource:
 		default:
 			err = fmt.Errorf("%s: trigger has unsupported kind %q", path, t.Kind)
@@ -102,11 +144,6 @@ func (e *emitter) on(pl *ir.Pipeline, jobManual string) (*yaml.Node, error) {
 	if schedule != nil {
 		b.events.set("schedule", schedule)
 	}
-	if !hasManual && !b.events.has("workflow_dispatch") {
-		if err := e.implicitDispatch(b, pl, jobManual); err != nil {
-			return nil, err
-		}
-	}
 	if raw, ok := pext[extEvents].(map[string]any); ok {
 		for _, k := range sortedKeys(raw) {
 			n, err := plainNode(raw[k])
@@ -114,6 +151,11 @@ func (e *emitter) on(pl *ir.Pipeline, jobManual string) (*yaml.Node, error) {
 				return nil, err
 			}
 			b.events.set(k, n)
+		}
+	}
+	if !hasManual && !b.events.has("workflow_dispatch") {
+		if err := e.implicitDispatch(b, pl, jobManual); err != nil {
+			return nil, err
 		}
 	}
 	return b.events.n, nil
@@ -142,38 +184,60 @@ func (e *emitter) implicitDispatch(b *onBuilder, pl *ir.Pipeline, jobManual stri
 	return nil
 }
 
+const matchAll = "**"
+
+// pushEvent writes the push trigger and the tag trigger it pairs with as one push: event. GHA fires a
+// push only for the ref kinds a filter names, so an unfiltered side is written as '**'.
 func (e *emitter) pushEvent(b *onBuilder, pl *ir.Pipeline, i int, used map[int]bool) error {
 	if used[i] {
 		return nil
 	}
 	used[i] = true
 	t := &pl.Triggers[i]
-	path := fmt.Sprintf("pipeline/%s/trigger/%d", pl.ID, i)
 	var push, tag *ir.Trigger
+	pp, tp := fmt.Sprintf("pipeline/%s/trigger/%d", pl.ID, i), ""
 	if t.Kind == ir.TriggerPush {
 		push = t
 		for j := i + 1; j < len(pl.Triggers); j++ {
 			if pl.Triggers[j].Kind == ir.TriggerTag && !used[j] {
 				used[j], tag = true, &pl.Triggers[j]
+				tp = fmt.Sprintf("pipeline/%s/trigger/%d", pl.ID, j)
 				break
 			}
 		}
 	} else {
-		tag = t
+		tag, tp, pp = t, pp, ""
 	}
 	m := newMap()
 	paths := ir.Filter{}
 	if push != nil {
-		filterKeys(m, "branches", push.Branches)
+		if hasFilter(push.Tags) {
+			e.lose(pp, caps.TriggerFilterTags, "a push trigger has no tag filter; tags belong to a tag trigger")
+		}
+		if tag != nil && !hasFilter(push.Branches) {
+			e.emulate(pp, caps.TriggerPush, "branches: '**'", "GHA fires push only for named ref kinds; branches are named explicitly beside tags")
+			m.set("branches", strSeq([]string{matchAll}))
+		}
+		e.filterKeys(m, "branches", push.Branches, pp, caps.TriggerFilterBranch)
 		paths = push.Paths
 	}
 	if tag != nil {
-		filterKeys(m, "tags", tag.Tags)
+		if hasFilter(tag.Branches) {
+			e.lose(tp, caps.TriggerFilterBranch, "a tag trigger has no branch filter")
+		}
+		if push != nil && !sameFilter(push.Paths, tag.Paths) {
+			e.lose(tp, caps.TriggerFilterPaths, "the push trigger's paths filter applies to tags too; GHA has one per push event")
+		}
+		if !hasFilter(tag.Tags) {
+			e.emulate(tp, caps.TriggerTag, "tags: '**'", "GHA fires tag pushes only when a tags filter names them")
+			m.set("tags", strSeq([]string{matchAll}))
+		}
+		e.filterKeys(m, "tags", tag.Tags, tp, caps.TriggerFilterTags)
 		if push == nil {
 			paths = tag.Paths
 		}
 	}
-	filterKeys(m, "paths", paths)
+	e.filterKeys(m, "paths", paths, firstNonEmpty(pp, tp), caps.TriggerFilterPaths)
 	for _, t := range []*ir.Trigger{push, tag} {
 		if t == nil {
 			continue
@@ -182,8 +246,18 @@ func (e *emitter) pushEvent(b *onBuilder, pl *ir.Pipeline, i int, used map[int]b
 			return err
 		}
 	}
-	b.add(path, caps.TriggerPush, "push", orNull(m))
+	if push != nil && tag != nil && len(extMap(tag.Ext, e.d.ID)) > 0 {
+		e.emulate(tp, caps.ExtPassthrough, "merged into the push event", "the tag trigger's native keys sit on the shared push event")
+	}
+	b.add(firstNonEmpty(pp, tp), caps.TriggerPush, "push", orNull(m))
 	return nil
+}
+
+func firstNonEmpty(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }
 
 func (e *emitter) prEvent(b *onBuilder, path string, t *ir.Trigger) error {
@@ -193,8 +267,8 @@ func (e *emitter) prEvent(b *onBuilder, path string, t *ir.Trigger) error {
 		name = evPRTarget
 	}
 	m := newMap()
-	filterKeys(m, "branches", t.Branches)
-	filterKeys(m, "paths", t.Paths)
+	e.filterKeys(m, "branches", t.Branches, path, caps.TriggerFilterBranch)
+	e.filterKeys(m, "paths", t.Paths, path, caps.TriggerFilterPaths)
 	if err := m.addExtra(ext, map[string]bool{extEvent: true}); err != nil {
 		return err
 	}
@@ -283,6 +357,7 @@ func (e *emitter) apiEvent(b *onBuilder, path string, t *ir.Trigger) error {
 	name, _ := ext[extEvent].(string)
 	if name == "" {
 		name = evRepoDisp
+		e.emulate(path, caps.TriggerAPI, evRepoDisp, "the API trigger names no event; repository_dispatch is used")
 	}
 	m, err := eventMap(ext, extEvent)
 	if err != nil {
@@ -292,30 +367,24 @@ func (e *emitter) apiEvent(b *onBuilder, path string, t *ir.Trigger) error {
 	return nil
 }
 
-// workflowRun needs a workflows list; without one it names its own workflow, the only name known here.
-func (e *emitter) workflowRun(b *onBuilder, path string, pl *ir.Pipeline, t *ir.Trigger) error {
+// workflowRun needs the upstream workflow names; the IR holds none for a pipeline from another provider.
+func (e *emitter) workflowRun(b *onBuilder, path string, t *ir.Trigger) error {
 	ext := extMap(t.Ext, e.d.ID)
-	m := newMap()
-	if raw, ok := ext["workflows"]; ok {
-		n, err := plainNode(raw)
-		if err != nil {
-			return err
-		}
-		m.set("workflows", n)
-	} else {
-		m.set("workflows", strSeq([]string{e.workflowName(pl)}))
+	raw, ok := ext["workflows"]
+	if !ok {
+		e.lose(path, caps.TriggerPipelineDone, "no upstream workflow named")
+		return nil
 	}
-	filterKeys(m, "branches", t.Branches)
+	n, err := plainNode(raw)
+	if err != nil {
+		return err
+	}
+	m := newMap()
+	m.set("workflows", n)
+	e.filterKeys(m, "branches", t.Branches, path, caps.TriggerFilterBranch)
 	if err := m.addExtra(ext, nil); err != nil {
 		return err
 	}
 	b.add(path, caps.TriggerPipelineDone, evWorkflowRn, m.n)
 	return nil
-}
-
-func (e *emitter) workflowName(pl *ir.Pipeline) string {
-	if pl.Name != "" {
-		return pl.Name
-	}
-	return e.d.Dir + "/" + pl.ID + ".yml"
 }

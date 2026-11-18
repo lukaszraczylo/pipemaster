@@ -72,7 +72,7 @@ func (e *emitter) jobNode(c jobCtx, j *ir.Job) (*yaml.Node, []string, error) {
 	if ids := e.needIDs(c, j); len(ids) > 0 {
 		m.set("needs", strSeq(ids))
 	}
-	cond, mk := e.jobCondition(c, jp, j)
+	cond, mk := e.jobCondition(c, jp, j, call)
 	markers = append(markers, mk...)
 	m.set("if", cond)
 	if call != nil {
@@ -143,7 +143,7 @@ func (e *emitter) needIDs(c jobCtx, j *ir.Job) []string {
 
 // jobCondition composes the job's own if with the guards the finally and manual emulations add.
 // A condition GHA cannot state disables the job rather than running it unguarded.
-func (e *emitter) jobCondition(c jobCtx, jp string, j *ir.Job) (*yaml.Node, []string) {
+func (e *emitter) jobCondition(c jobCtx, jp string, j *ir.Job, call *ir.Step) (*yaml.Node, []string) {
 	cond := j.If
 	if cond != nil {
 		t, ok := e.source(jp, caps.JobIf, cond)
@@ -156,6 +156,19 @@ func (e *emitter) jobCondition(c jobCtx, jp string, j *ir.Job) (*yaml.Node, []st
 			return boolNodeOf(false), nil
 		}
 		cond = t
+	}
+	if call != nil && call.If != nil {
+		sp := stepPath(jp, call.ID)
+		t, ok := e.source(sp, caps.StepIf, call.If)
+		if ok {
+			_, err := printExpr(t)
+			ok = err == nil
+		}
+		if !ok {
+			e.disable(sp, caps.StepIf, call.If, "job")
+			return boolNodeOf(false), nil
+		}
+		cond = andExpr(cond, t)
 	}
 	var markers []string
 	if j.Manual {
@@ -184,6 +197,19 @@ func andExpr(l, r expr.Expr) expr.Expr {
 }
 
 func (e *emitter) callKeys(m *omap, jp string, call *ir.Step) error {
+	sp := stepPath(jp, call.ID)
+	const why = "a reusable workflow call job accepts no such key"
+	for _, l := range []struct {
+		f  caps.Feature
+		on bool
+	}{
+		{caps.StepEnv, len(call.Env) > 0}, {caps.StepTimeout, call.Timeout != nil},
+		{caps.StepContinueOnError, call.ContinueOnError}, {caps.StepWorkdir, call.WorkDir != ""}, {caps.StepShell, call.Shell != ""},
+	} {
+		if l.on {
+			e.lose(sp, l.f, why)
+		}
+	}
 	m.set("uses", str(actionString(call.Action)))
 	if len(call.With) > 0 {
 		w, err := e.withNode(jp, call.With)

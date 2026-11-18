@@ -20,6 +20,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/ir/irtest"
 	"github.com/lukaszraczylo/pipemaster/provider/gha"
+	"github.com/lukaszraczylo/pipemaster/report"
 	"github.com/lukaszraczylo/pipemaster/validate"
 )
 
@@ -198,8 +199,8 @@ func TestIdentityProperty(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			rapid.Check(t, func(t *rapid.T) {
 				p := irtest.GenProject(t, nativeFragment(action))
-				nativize(p)
-				files, _, err := gha.New(gha.GHA).Emit(p)
+				nativize(t, p)
+				files, rep, err := gha.New(gha.GHA).Emit(p)
 				if err != nil {
 					t.Fatalf("Emit: %v", err)
 				}
@@ -211,6 +212,7 @@ func TestIdentityProperty(t *testing.T) {
 				if err != nil {
 					t.Fatalf("reparse: %v\n%s", err, dump(files))
 				}
+				dropLedgeredTriggers(p, back, rep)
 				if ok, diff := ir.Equal(p, back); !ok {
 					t.Fatalf("identity broken:\n%s\n--- emitted ---\n%s", diff, dump(files))
 				}
@@ -219,13 +221,29 @@ func TestIdentityProperty(t *testing.T) {
 	}
 }
 
-// nativize narrows generated IR to what one GHA file can state: no both-sided filters, no runner
-// platform, no image entrypoints, no ${{ in plain text, and expressions GHA can spell.
-func nativize(p *ir.Project) {
+// dropLedgeredTriggers removes the triggers of every pipeline whose triggers the report lists as
+// lost or emulated from both sides, so the rest of that pipeline is still compared exactly.
+func dropLedgeredTriggers(p, back *ir.Project, rep *report.Report) {
+	skip := map[string]bool{}
+	for _, e := range rep.Entries {
+		if id, _, ok := strings.Cut(strings.TrimPrefix(e.IRPath, "pipeline/"), "/trigger/"); ok && e.Level != caps.Native {
+			skip[id] = true
+		}
+	}
+	for _, proj := range []*ir.Project{p, back} {
+		for _, pl := range proj.Pipelines {
+			if skip[pl.ID] {
+				pl.Triggers = nil
+			}
+		}
+	}
+}
+
+// nativize narrows generated IR to what one GHA file can state: no runner platform, no image entrypoints, no ${{ in plain text, and expressions GHA can spell.
+func nativize(t *rapid.T, p *ir.Project) {
 	prefixExtKeys(p)
 	for _, pl := range p.Pipelines {
 		scrubStrings(reflect.ValueOf(pl))
-		nativizeTriggers(pl)
 		if pl.Permissions != nil {
 			scopes := map[string]string{}
 			for k, v := range pl.Permissions.Scopes {
@@ -237,43 +255,12 @@ func nativize(p *ir.Project) {
 		}
 		pl.Env = nativeVars(pl.Env)
 		for _, j := range pl.Jobs {
-			nativizeJob(j)
+			nativizeJob(t, j)
 		}
 	}
 }
 
-func nativizeTriggers(pl *ir.Pipeline) {
-	var push *ir.Trigger
-	for i := range pl.Triggers {
-		if pl.Triggers[i].Kind == ir.TriggerPush {
-			push = &pl.Triggers[i]
-		}
-	}
-	for i := range pl.Triggers {
-		tr := &pl.Triggers[i]
-		for _, f := range []*ir.Filter{&tr.Branches, &tr.Tags, &tr.Paths} {
-			f.Exclude = nil
-		}
-		switch tr.Kind {
-		case ir.TriggerPush:
-			tr.Tags = ir.Filter{}
-		case ir.TriggerTag:
-			tr.Branches = ir.Filter{}
-			if push != nil {
-				tr.Paths = push.Paths
-				tr.Ext = nil
-			}
-		case ir.TriggerPR:
-			tr.Tags = ir.Filter{}
-		case ir.TriggerPipelineDone:
-			tr.Ext = withGhaKey(tr.Ext, "workflows", []any{"ci"})
-		case ir.TriggerAPI:
-			tr.Ext = withGhaKey(tr.Ext, "event", "repository_dispatch")
-		}
-	}
-}
-
-func nativizeJob(j *ir.Job) {
+func nativizeJob(t *rapid.T, j *ir.Job) {
 	j.Runner.Platform = ""
 	if len(j.Runner.Selector) > 0 {
 		var group string
@@ -298,7 +285,7 @@ func nativizeJob(j *ir.Job) {
 		s.If = nativeExpr(s.If)
 		s.Env = nativeVars(s.Env)
 		if s.Action != nil {
-			s.Action = &ir.ActionRef{Kind: ir.ActionRepo, Owner: "o", Repo: "r", Ref: "v1"}
+			s.Action = actionRefs[rapid.IntRange(0, len(actionRefs)-1).Draw(t, "action")]
 		}
 		for k, v := range s.With {
 			s.With[k] = nativeValue(v)
@@ -306,12 +293,11 @@ func nativizeJob(j *ir.Job) {
 	}
 }
 
-func withGhaKey(ext ir.Ext, k string, v any) ir.Ext {
-	if ext == nil {
-		ext = ir.Ext{"gha": map[string]any{}}
-	}
-	ext["gha"].(map[string]any)[k] = v
-	return ext
+var actionRefs = []*ir.ActionRef{
+	{Kind: ir.ActionRepo, Owner: "o", Repo: "r", Ref: "v1"},
+	{Kind: ir.ActionRepo, Owner: "o", Repo: "r", Path: "sub/dir", Ref: "v2"},
+	{Kind: ir.ActionDocker, Image: "alpine:3"},
+	{Kind: ir.ActionLocal, Path: "./local/action"},
 }
 
 // nativeVars makes env names unique, since a mapping holds each key once.
