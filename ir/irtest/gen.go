@@ -25,9 +25,10 @@ type gen struct {
 	n    int
 }
 
-// GenProject draws a valid project that uses exactly the features frag allows.
-// Allowing job.needs.artifacts implies job.needs, and job.environment.approval implies job.environment.
-// expr.opaque is generated only when allowed and needs a carrier (job.if, step.if or any env/with feature);
+// GenProject draws a valid project that uses only features frag allows, each at least once where an IR field can carry it.
+// Dependencies: job.needs.artifacts implies job.needs; job.environment.approval implies job.environment.
+// Opaque is the only Expr type, so job.if and step.if are generated only when frag also allows expr.opaque,
+// and expr.opaque appears only if a carrier (job.if, step.if, pipeline.env, job.env, step.env, step.action, job.services) is allowed.
 // script.interpolation is derived from script text, so it is never generated.
 func GenProject(t *rapid.T, frag Fragment) *ir.Project {
 	g := &gen{t: t, frag: frag}

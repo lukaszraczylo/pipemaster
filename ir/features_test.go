@@ -205,7 +205,7 @@ func TestFeaturesOneEntryPerPathFeaturePair(t *testing.T) {
 		{ID: "a"},
 		{
 			ID: "b", If: expr.Opaque{Dialect: "gha", Text: "y"},
-			Needs: []ir.Need{{JobID: "a"}, {JobID: "a", Artifacts: true}},
+			Needs: []ir.Need{{JobID: "a", Artifacts: true}, {JobID: "a", Artifacts: true}},
 			Steps: []*ir.Step{{ID: "s", Env: []ir.Var{{Name: "X", Value: op}, {Name: "Y", Value: op}}, With: map[string]ir.Value{"k": op, "l": op}}},
 		},
 	}}}}
