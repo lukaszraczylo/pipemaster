@@ -6,6 +6,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 // IDMapper is implemented by emitters that rename IDs. EmittedIDs maps the IR path of each renamed
@@ -88,6 +89,7 @@ func RestoreIDs(p *ir.Project, ids map[string]string) {
 				jobs[j.ID] = src
 			}
 		}
+		emitkit.RewriteNeedsRefs(pl, jobs)
 		for _, j := range allJobs(pl) {
 			if src, ok := jobs[j.ID]; ok {
 				j.ID = src

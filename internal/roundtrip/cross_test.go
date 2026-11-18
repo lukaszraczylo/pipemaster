@@ -23,7 +23,6 @@ const (
 )
 
 func TestCrossGolden(t *testing.T) {
-	_, lintErr := exec.LookPath("actionlint")
 	for _, f := range allFixtures(t) {
 		t.Run(f.provider+"/"+f.name, func(t *testing.T) {
 			a, b := prov(t, f.provider), prov(t, other(f.provider))
@@ -43,9 +42,6 @@ func TestCrossGolden(t *testing.T) {
 				if b.ID() == provider.GitLab && strings.Contains(string(files[name]), exprOpen) {
 					t.Errorf("%s holds a GHA expression", name)
 				}
-				if b.ID() == provider.GHA && lintErr == nil {
-					lintFile(t, name, files[name])
-				}
 				golden.Assert(t, filepath.Join(out, name), files[name])
 			}
 			rep.Source, rep.Target = a.ID(), b.ID()
@@ -54,6 +50,27 @@ func TestCrossGolden(t *testing.T) {
 				t.Fatal(err)
 			}
 			golden.Assert(t, filepath.Join(out, reportGolden), buf.Bytes())
+		})
+	}
+}
+
+func TestCrossGoldenActionlint(t *testing.T) {
+	if _, err := exec.LookPath("actionlint"); err != nil {
+		t.Skip("actionlint is not installed; GHA outputs of the cross conversion are not linted")
+	}
+	for _, f := range fixtures(t, provider.GitLab) {
+		t.Run(f.name, func(t *testing.T) {
+			proj, _, err := prov(t, provider.GitLab).Parse(os.DirFS(f.dir))
+			if err != nil {
+				t.Fatal(err)
+			}
+			files, _, err := prov(t, provider.GHA).Emit(proj)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, name := range names(files) {
+				lintFile(t, name, files[name])
+			}
 		})
 	}
 }

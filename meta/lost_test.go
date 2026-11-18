@@ -32,7 +32,11 @@ func TestLostRestoresOnlyReportedFeatures(t *testing.T) {
 		{IRPath: "pipeline/ci/job/build", Feature: caps.JobAllowFailure, Level: caps.Lost},
 		{IRPath: "pipeline/ci/job/build", Feature: caps.JobRunner, Level: caps.Emulated},
 	}
-	m := &meta.Meta{Lost: meta.CollectLost(src, rep), Residual: meta.CollectResidual(src)}
+	lost, skipped := meta.CollectLost(src, rep)
+	if len(skipped) != 0 {
+		t.Fatalf("unrecorded = %+v", skipped)
+	}
+	m := &meta.Meta{Lost: lost, Residual: meta.CollectResidual(src)}
 	if _, ok := m.Lost["pipeline/ci/job/build"]; !ok || len(m.Lost) != 1 {
 		t.Fatalf("Lost = %+v, want only the lost entry's node", m.Lost)
 	}

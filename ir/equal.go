@@ -23,6 +23,9 @@ func Equal(a, b *Project) (bool, string) {
 	return d == "", d
 }
 
+// Clone returns a deep copy of p, so a caller can rewrite it without touching the original.
+func Clone(p *Project) *Project { return clone(p) }
+
 func clone(p *Project) *Project {
 	if p == nil {
 		return nil

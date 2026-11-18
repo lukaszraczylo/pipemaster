@@ -13,9 +13,11 @@ import (
 // steps and the fields rep marks lost or external.
 func NewMeta(sourceID string, proj *ir.Project, target provider.Provider, rep *report.Report) *meta.Meta {
 	ids := IDsFor(target, proj)
+	lost, skipped := meta.CollectLost(proj, sourceEntries(rep, ids))
+	noteUnrecorded(rep, ids, skipped)
 	return &meta.Meta{
 		IDs:      ids,
-		Lost:     meta.CollectLost(proj, sourceEntries(rep, ids)),
+		Lost:     lost,
 		Source:   sourceID,
 		Dialect:  proj.Origin.Dialect,
 		Ext:      meta.Collect(proj),
@@ -53,4 +55,19 @@ func sourceEntries(rep *report.Report, ids map[string]string) []report.Entry {
 		}
 	}
 	return out
+}
+
+// noteUnrecorded says in the report which lost features the metadata cannot return.
+func noteUnrecorded(rep *report.Report, ids map[string]string, skipped []meta.Unrecorded) {
+	if rep == nil {
+		return
+	}
+	src := sourceEntries(rep, ids)
+	for _, u := range skipped {
+		for i, e := range src {
+			if e.IRPath == u.Path && e.Feature == u.Feature {
+				rep.Entries[i].Detail += "; not kept in round-trip metadata: " + u.Reason
+			}
+		}
+	}
 }

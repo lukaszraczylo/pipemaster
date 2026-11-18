@@ -74,10 +74,10 @@ func runConvert(args []string, _, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stderr, "emit %s: %v\n", tgt.ID(), err)
 		return exitError
 	}
+	m := roundtrip.NewMeta(src.ID(), proj, tgt, emitRep)
 	rep.Merge(emitRep)
 	rep.Source, rep.Target = src.ID(), tgt.ID()
 
-	m := roundtrip.NewMeta(src.ID(), proj, tgt, emitRep)
 	if *embed {
 		files = meta.Embed(files, m)
 	} else {

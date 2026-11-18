@@ -2,7 +2,9 @@ package roundtrip_test
 
 import (
 	"os"
+	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -22,35 +24,41 @@ type irDiff struct {
 	Field string
 }
 
-// fieldFeatures names the feature prefixes whose lost or external entry accounts for a differing field.
-// A field absent from the table has no feature of its own, so only the path decides.
-var fieldFeatures = map[string][]string{
-	"Triggers":     {"trigger.", "pipeline.inputs", "ext.passthrough"},
-	"Env":          {"pipeline.env", "job.env", "step.env", "script."},
-	"Concurrency":  {"pipeline.concurrency"},
-	"Inputs":       {"pipeline.inputs"},
-	"Permissions":  {"pipeline."},
-	"Runner":       {"job.runner"},
-	"Container":    {"job.container"},
-	"Services":     {"job.services"},
-	"Matrix":       {"job.matrix"},
-	"Timeout":      {"job.timeout", "step.timeout"},
-	"Retry":        {"job.retry"},
-	"AllowFailure": {"job.allow_failure"},
-	"Environment":  {"job.environment"},
-	"Manual":       {"job.manual"},
-	"Cache":        {"job.cache"},
-	"Artifacts":    {"job.artifacts"},
-	"Outputs":      {"job.outputs"},
-	"Needs":        {"job.needs"},
-	"If":           {"job.if", "step.if", "expr.opaque"},
-	"Script":       {"step.script", "script.", "step.action", "ext.passthrough"},
-	"Action":       {"step.action", "ext.passthrough"},
-	"With":         {"step.action", "ext.passthrough"},
-	"Shell":        {"step.shell"},
-	"WorkDir":      {"step.workdir"},
-	"Image":        {"step.image"},
-	"Kind":         {"step.action", "ext.passthrough"},
+// fieldFeatures names the features whose lost or external entry accounts for a differing field. A field
+// with no row cannot be accounted for, so a difference there always fails.
+var fieldFeatures = map[string][]caps.Feature{
+	"Triggers": {caps.TriggerPush, caps.TriggerPullRequest, caps.TriggerTag, caps.TriggerSchedule, caps.TriggerManual,
+		caps.TriggerAPI, caps.TriggerPipelineDone, caps.TriggerResource, caps.TriggerFilterBranch,
+		caps.TriggerFilterTags, caps.TriggerFilterPaths, caps.PipelineInputs, caps.ExtPassthrough},
+	"Env":             {caps.PipelineEnv, caps.JobEnv, caps.StepEnv, caps.ExprOpaque, caps.ScriptInterpolation},
+	"Concurrency":     {caps.PipelineConcurrency, caps.ScriptInterpolation},
+	"Inputs":          {caps.PipelineInputs},
+	"Permissions":     {caps.PipelinePermissions},
+	"Name":            {caps.DisplayName},
+	"Ext":             {caps.ExtPassthrough},
+	"Runner":          {caps.JobRunner},
+	"Container":       {caps.JobContainer},
+	"Services":        {caps.JobServices},
+	"Matrix":          {caps.JobMatrix},
+	"Timeout":         {caps.JobTimeout, caps.StepTimeout},
+	"Retry":           {caps.JobRetry},
+	"AllowFailure":    {caps.JobAllowFailure},
+	"Environment":     {caps.JobEnvironment, caps.JobEnvironmentApproval},
+	"Manual":          {caps.JobManual},
+	"Cache":           {caps.JobCache},
+	"Artifacts":       {caps.JobArtifacts},
+	"Outputs":         {caps.JobOutputs},
+	"Needs":           {caps.JobNeeds, caps.JobNeedsArtifacts},
+	"If":              {caps.JobIf, caps.StepIf, caps.ExprOpaque},
+	"Script":          {caps.StepScript, caps.ScriptInterpolation, caps.StepAction, caps.ExtPassthrough},
+	"Action":          {caps.StepAction, caps.ExtPassthrough},
+	"With":            {caps.StepAction, caps.ExtPassthrough},
+	"Kind":            {caps.StepAction, caps.ExtPassthrough},
+	"Shell":           {caps.StepShell},
+	"WorkDir":         {caps.StepWorkdir},
+	"Image":           {caps.StepImage},
+	"ContinueOnError": {caps.StepContinueOnError},
+	"<node>":          {caps.StepAction, caps.PipelineFinally, caps.ProjectMultiPipeline},
 }
 
 // diffNodes lists the fields that differ per node path; a node present on one side only differs as "<node>".
@@ -124,15 +132,11 @@ func stripBookkeeping(v reflect.Value) reflect.Value {
 	return reflect.ValueOf(out)
 }
 
-// displayOnly lists fields with no behaviour and no feature in the capability matrix: the display names a
-// target without a name key cannot hold. Round-trip metadata restores them; without it they are not reported.
-var displayOnly = map[string]bool{"Name": true}
-
 func structDiff(a, b any) []string {
 	va, vb := reflect.ValueOf(a), reflect.ValueOf(b)
 	var out []string
 	for i := range va.NumField() {
-		if !va.Type().Field(i).IsExported() || displayOnly[va.Type().Field(i).Name] {
+		if !va.Type().Field(i).IsExported() {
 			continue
 		}
 		if !cmp.Equal(stripBookkeeping(va.Field(i)).Interface(), stripBookkeeping(vb.Field(i)).Interface(), cmpopts.EquateEmpty()) {
@@ -142,25 +146,17 @@ func structDiff(a, b any) []string {
 	return out
 }
 
-func related(a, b string) bool {
-	return a == b || strings.HasPrefix(a, b+"/") || strings.HasPrefix(b, a+"/")
-}
+// atOrBelow is true when entry is the node at path or a node under it, such as a trigger of a pipeline.
+func atOrBelow(entry, path string) bool { return entry == path || strings.HasPrefix(entry, path+"/") }
 
-// covered reports whether a lost or external entry accounts for d.
+// covered reports whether a lost or external entry at the node, or below it, names a feature that
+// accounts for the differing field.
 func covered(d irDiff, reps ...*report.Report) bool {
+	accepted := fieldFeatures[d.Field]
 	for _, r := range reps {
 		for _, e := range r.Entries {
-			if e.Level < caps.External || !related(e.IRPath, d.Path) {
-				continue
-			}
-			prefixes, known := fieldFeatures[d.Field]
-			if !known {
+			if e.Level >= caps.External && atOrBelow(e.IRPath, d.Path) && slices.Contains(accepted, e.Feature) {
 				return true
-			}
-			for _, p := range prefixes {
-				if strings.HasPrefix(string(e.Feature), p) {
-					return true
-				}
 			}
 		}
 	}
@@ -185,5 +181,41 @@ func TestRoundTripWithoutMetaBestEffort(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestCoverageRejectsUnreportedDifference injects a difference and checks the helper finds it and refuses
+// loose cover: no entry, an entry at an ancestor, and an entry with the wrong feature.
+func TestCoverageRejectsUnreportedDifference(t *testing.T) {
+	src, _, err := prov(t, "gha").Parse(os.DirFS(filepath.Join(featuresRoot, "gha", "features", "job.timeout")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, _, err := prov(t, "gha").Parse(os.DirFS(filepath.Join(featuresRoot, "gha", "features", "job.timeout")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	back.Pipelines[0].Jobs[0].Timeout = nil
+	diffs := diffNodes(src, back)
+	if len(diffs) != 1 || diffs[0].Field != "Timeout" {
+		t.Fatalf("diffs = %+v, want one Timeout difference", diffs)
+	}
+	job := diffs[0].Path
+	entry := func(path string, f caps.Feature, l caps.Level) *report.Report {
+		return &report.Report{Entries: []report.Entry{{IRPath: path, Feature: f, Level: l}}}
+	}
+	for name, rep := range map[string]*report.Report{
+		"no entry":         {},
+		"ancestor entry":   entry("pipeline/ci", caps.JobTimeout, caps.Lost),
+		"wrong feature":    entry(job, caps.JobRetry, caps.Lost),
+		"emulated only":    entry(job, caps.JobTimeout, caps.Emulated),
+		"sibling job path": entry(job+"x", caps.JobTimeout, caps.Lost),
+	} {
+		if covered(diffs[0], rep) {
+			t.Errorf("%s must not cover the difference", name)
+		}
+	}
+	if !covered(diffs[0], entry(job, caps.JobTimeout, caps.Lost)) {
+		t.Error("an exact lost entry must cover the difference")
 	}
 }

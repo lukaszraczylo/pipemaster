@@ -19,14 +19,109 @@ type Lost struct {
 
 const triggerSeg = "/trigger/"
 
-// CollectLost records the source fields of each feature entries mark lost or external. Entry paths must be
-// source IR paths. A lost trigger records the pipeline's whole trigger list, because indexes shift in the target.
-func CollectLost(p *ir.Project, entries []report.Entry) map[string]Lost {
+// Unrecorded is a lost or external feature the metadata cannot store, so it will not return on the way back.
+type Unrecorded struct {
+	Path    string
+	Feature caps.Feature
+	Reason  string
+}
+
+// kind selects the table of a node.
+type kind int
+
+const (
+	kindPipeline kind = iota
+	kindJob
+	kindStep
+)
+
+// recordViaExt marks a feature whose data the Ext record already holds.
+const recordViaExt = "Ext"
+
+var triggerFeatureNames = []caps.Feature{
+	caps.TriggerPush, caps.TriggerPullRequest, caps.TriggerTag, caps.TriggerSchedule, caps.TriggerManual,
+	caps.TriggerAPI, caps.TriggerPipelineDone, caps.TriggerResource, caps.TriggerFilterBranch,
+	caps.TriggerFilterTags, caps.TriggerFilterPaths,
+}
+
+// recorded lists, per node kind, the struct fields that restore a feature. A feature a kind can carry but
+// has no entry here must be in unrecorded, which the table test enforces.
+var recorded = map[kind]map[caps.Feature][]string{
+	kindPipeline: withTriggers(map[caps.Feature][]string{
+		caps.PipelineEnv:         {"Env"},
+		caps.PipelineInputs:      {"Inputs"},
+		caps.PipelineConcurrency: {"Concurrency"},
+		caps.PipelinePermissions: {"Permissions"},
+		caps.ScriptInterpolation: {"Env", "Concurrency"},
+		caps.ExprOpaque:          {"Env"},
+		caps.DisplayName:         {"Name"},
+		caps.ExtPassthrough:      {recordViaExt},
+	}),
+	kindJob: {
+		caps.JobNeeds: {"Needs"}, caps.JobNeedsArtifacts: {"Needs"}, caps.JobIf: {"If"},
+		caps.JobRunner: {"Runner"}, caps.JobContainer: {"Container"}, caps.JobServices: {"Services"},
+		caps.JobMatrix: {"Matrix"}, caps.JobTimeout: {"Timeout"}, caps.JobRetry: {"Retry"},
+		caps.JobAllowFailure: {"AllowFailure"}, caps.JobEnvironment: {"Environment"},
+		caps.JobEnvironmentApproval: {"Environment"}, caps.JobManual: {"Manual"}, caps.JobCache: {"Cache"},
+		caps.JobArtifacts: {"Artifacts"}, caps.JobOutputs: {"Outputs"}, caps.JobEnv: {"Env"},
+		caps.ExprOpaque:          {"If", "Env", "Services"},
+		caps.ScriptInterpolation: {"Runner", "Container", "Services", "Matrix", "Environment", "Cache", "Artifacts", "Outputs", "Env"},
+		caps.DisplayName:         {"Name"},
+		caps.ExtPassthrough:      {recordViaExt},
+	},
+	kindStep: {
+		caps.StepIf: {"If"}, caps.StepEnv: {"Env"}, caps.StepContinueOnError: {"ContinueOnError"},
+		caps.StepTimeout: {"Timeout"}, caps.StepWorkdir: {"WorkDir"}, caps.StepShell: {"Shell"},
+		caps.StepImage: {"Image"}, caps.StepScript: {"Script"}, caps.StepAction: {"Kind", "Action", "With"},
+		caps.ExprOpaque:          {"If", "Env", "With"},
+		caps.ScriptInterpolation: {"Script", "WorkDir", "Env", "With"},
+		caps.DisplayName:         {"Name"},
+		caps.ExtPassthrough:      {"Kind", "Action", "With", recordViaExt},
+	},
+}
+
+func withTriggers(m map[caps.Feature][]string) map[caps.Feature][]string {
+	for _, f := range triggerFeatureNames {
+		m[f] = []string{"Triggers"}
+	}
+	return m
+}
+
+// unrecorded lists the features a node kind can lose that the metadata does not hold, with the reason.
+// Everything else a kind cannot carry at all is reported as not applicable.
+var unrecorded = map[kind]map[caps.Feature]string{
+	kindPipeline: {
+		caps.PipelineFinally:      "the finally jobs are structure that the markers in the file rebuild",
+		caps.ProjectMultiPipeline: "the pipeline split is rebuilt from the markers in the file",
+	},
+	kindJob:  {},
+	kindStep: {},
+}
+
+// notApplicable lists the features a node kind never carries.
+func notApplicable(k kind, f caps.Feature) bool {
+	switch k {
+	case kindPipeline:
+		return strings.HasPrefix(string(f), "job.") || strings.HasPrefix(string(f), "step.")
+	case kindJob:
+		return strings.HasPrefix(string(f), "trigger.") || strings.HasPrefix(string(f), "pipeline.") ||
+			strings.HasPrefix(string(f), "step.") || f == caps.ProjectMultiPipeline
+	default:
+		return strings.HasPrefix(string(f), "trigger.") || strings.HasPrefix(string(f), "pipeline.") ||
+			strings.HasPrefix(string(f), "job.") || f == caps.ProjectMultiPipeline
+	}
+}
+
+// CollectLost records the source fields of each feature the entries mark lost or external. Entry paths must
+// be source IR paths. A lost trigger records the pipeline's whole trigger list, because indexes shift in the
+// target. A feature the tables cannot store comes back as Unrecorded, never silently.
+func CollectLost(p *ir.Project, entries []report.Entry) (map[string]Lost, []Unrecorded) {
 	idx := map[string]ir.NodeRef{}
 	for _, n := range ir.Nodes(p) {
 		idx[n.Path] = n
 	}
 	out := map[string]Lost{}
+	var skipped []Unrecorded
 	for _, e := range entries {
 		if e.Level < caps.External {
 			continue
@@ -37,111 +132,62 @@ func CollectLost(p *ir.Project, entries []report.Entry) map[string]Lost {
 		}
 		n, ok := idx[path]
 		if !ok {
+			skipped = append(skipped, Unrecorded{e.IRPath, e.Feature, "no node at this path in the source project"})
+			continue
+		}
+		k := kindOf(n)
+		fields, ok := recorded[k][e.Feature]
+		if !ok {
+			reason, known := unrecorded[k][e.Feature]
+			if !known {
+				reason = "the metadata has no record for this feature on this node"
+			}
+			skipped = append(skipped, Unrecorded{e.IRPath, e.Feature, reason})
+			continue
+		}
+		if len(fields) == 1 && fields[0] == recordViaExt {
 			continue
 		}
 		l := out[path]
 		switch {
 		case n.Pipeline != nil:
-			l.Pipeline = lostPipeline(l.Pipeline, n.Pipeline, e.Feature)
+			l.Pipeline = copyFields(l.Pipeline, n.Pipeline, fields, e.Feature)
 		case n.Job != nil:
-			l.Job = lostJob(l.Job, n.Job, e.Feature)
+			l.Job = copyFields(l.Job, n.Job, fields, e.Feature)
 		case n.Step != nil:
-			l.Step = lostStep(l.Step, n.Step, e.Feature)
+			l.Step = copyFields(l.Step, n.Step, fields, e.Feature)
 		}
-		if l != (Lost{}) {
-			out[path] = l
-		}
+		out[path] = l
 	}
-	return out
+	return out, skipped
 }
 
-func isTrigger(f caps.Feature) bool { return strings.HasPrefix(string(f), "trigger.") }
-
-func lostPipeline(dst, src *ir.Pipeline, f caps.Feature) *ir.Pipeline {
-	if dst == nil {
-		dst = &ir.Pipeline{ID: src.ID}
-	}
+func kindOf(n ir.NodeRef) kind {
 	switch {
-	case isTrigger(f):
-		dst.Triggers = src.Triggers
-	case f == caps.PipelineEnv:
-		dst.Env = src.Env
-	case f == caps.PipelineInputs:
-		dst.Inputs = src.Inputs
-	case f == caps.PipelineConcurrency:
-		dst.Concurrency = src.Concurrency
-	case f == caps.PipelinePermissions:
-		dst.Permissions = src.Permissions
-	case f == caps.ScriptInterpolation:
-		dst.Concurrency, dst.Env = src.Concurrency, src.Env
+	case n.Pipeline != nil:
+		return kindPipeline
+	case n.Job != nil:
+		return kindJob
 	}
-	return dst
+	return kindStep
 }
 
-func lostJob(dst, src *ir.Job, f caps.Feature) *ir.Job {
+// copyFields copies the named fields of src into the sparse node dst, which it creates on first use.
+// An action step records its action only when the step has one.
+func copyFields[T any](dst, src *T, fields []string, f caps.Feature) *T {
 	if dst == nil {
-		dst = &ir.Job{ID: src.ID}
+		dst = new(T)
+		reflect.ValueOf(dst).Elem().FieldByName("ID").Set(reflect.ValueOf(src).Elem().FieldByName("ID"))
 	}
-	switch f {
-	case caps.JobIf, caps.ExprOpaque:
-		dst.If = src.If
-	case caps.JobRunner:
-		dst.Runner = src.Runner
-	case caps.JobContainer:
-		dst.Container = src.Container
-	case caps.JobServices:
-		dst.Services = src.Services
-	case caps.JobMatrix:
-		dst.Matrix = src.Matrix
-	case caps.JobTimeout:
-		dst.Timeout = src.Timeout
-	case caps.JobRetry:
-		dst.Retry = src.Retry
-	case caps.JobAllowFailure:
-		dst.AllowFailure = src.AllowFailure
-	case caps.JobEnvironment, caps.JobEnvironmentApproval:
-		dst.Environment = src.Environment
-	case caps.JobManual:
-		dst.Manual = src.Manual
-	case caps.JobCache:
-		dst.Cache = src.Cache
-	case caps.JobArtifacts:
-		dst.Artifacts = src.Artifacts
-	case caps.JobOutputs:
-		dst.Outputs = src.Outputs
-	case caps.JobEnv:
-		dst.Env = src.Env
-	case caps.JobNeeds, caps.JobNeedsArtifacts:
-		dst.Needs = src.Needs
-	}
-	return dst
-}
-
-func lostStep(dst, src *ir.Step, f caps.Feature) *ir.Step {
-	if dst == nil {
-		dst = &ir.Step{ID: src.ID}
-	}
-	switch f {
-	case caps.StepIf, caps.ExprOpaque:
-		dst.If = src.If
-	case caps.StepEnv:
-		dst.Env = src.Env
-	case caps.StepContinueOnError:
-		dst.ContinueOnError = src.ContinueOnError
-	case caps.StepTimeout:
-		dst.Timeout = src.Timeout
-	case caps.StepWorkdir:
-		dst.WorkDir = src.WorkDir
-	case caps.StepShell:
-		dst.Shell = src.Shell
-	case caps.StepImage:
-		dst.Image = src.Image
-	case caps.ScriptInterpolation:
-		dst.Script = src.Script
-	case caps.StepAction, caps.ExtPassthrough:
-		if src.Action != nil {
-			dst.Kind, dst.Action, dst.With = src.Kind, src.Action, src.With
+	d, s := reflect.ValueOf(dst).Elem(), reflect.ValueOf(src).Elem()
+	for _, name := range fields {
+		if name == recordViaExt {
+			continue
 		}
+		if a := s.FieldByName("Action"); f == caps.ExtPassthrough && a.IsValid() && a.IsNil() {
+			continue
+		}
+		d.FieldByName(name).Set(s.FieldByName(name))
 	}
 	return dst
 }
