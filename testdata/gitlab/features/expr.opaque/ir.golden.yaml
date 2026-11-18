@@ -1,0 +1,30 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - if: |
+            opaque(gitlab): - changes:
+                - src/**/*
+              if: $CI_COMMIT_BRANCH == "main"
+          ext:
+            gitlab:
+                rules:
+                    - changes:
+                        - src/**/*
+                      if: $CI_COMMIT_BRANCH == "main"
+          id: build
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make

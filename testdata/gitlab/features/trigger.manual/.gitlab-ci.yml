@@ -1,0 +1,7 @@
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+adhoc:
+  script:
+    - make adhoc

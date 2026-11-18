@@ -1,0 +1,29 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - container:
+            ref: golang:1.22
+          id: test
+          services:
+            - name: postgres
+              image:
+                ref: postgres:15
+            - name: cache
+              image:
+                ref: redis:7
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make test

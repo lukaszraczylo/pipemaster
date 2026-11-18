@@ -1,0 +1,21 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - id: build
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - echo "building ${{ sha }} on ${{ branch }} for ${{ actor }}"
+                - echo "keeps $HOME and ${UNMAPPED}"

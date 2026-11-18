@@ -1,0 +1,88 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+        - ci/common.yml
+pipelines:
+    - ext:
+        gitlab:
+            default:
+                image: alpine:3
+                retry: 1
+            hidden:
+                .deploy:
+                    script:
+                        - ./deploy.sh
+                    stage: deploy
+            include:
+                - remote: https://example.com/shared.yml
+            stages:
+                - build
+                - deploy
+      id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      env:
+        - name: SHARED
+          value:
+            lit: "1"
+      jobs:
+        - container:
+            ref: alpine:3
+          retry:
+            attempts: 2
+          ext:
+            gitlab:
+                coverage: '/total: (\d+)%/'
+                stage: build
+          id: build
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make
+        - container:
+            ref: alpine:3
+          retry:
+            attempts: 2
+          ext:
+            gitlab:
+                stage: build
+          id: common
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - echo common
+        - container:
+            ref: alpine:3
+          retry:
+            attempts: 2
+          ext:
+            gitlab:
+                _derived_needs: true
+                extends:
+                    - .deploy
+                interruptible: false
+                resource_group: production
+                stage: deploy
+          id: prod
+          needs:
+            - job: build
+            - job: common
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - ./deploy.sh

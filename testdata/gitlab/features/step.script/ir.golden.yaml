@@ -1,0 +1,36 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - id: build
+          steps:
+            - ext:
+                gitlab:
+                    section: before_script
+              id: before_script
+              kind: script
+              script:
+                - echo prepare
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make build
+                - make test
+            - if: always()
+              ext:
+                gitlab:
+                    section: after_script
+              id: after_script
+              kind: script
+              script:
+                - echo cleanup

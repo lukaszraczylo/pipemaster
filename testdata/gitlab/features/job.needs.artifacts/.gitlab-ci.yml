@@ -1,0 +1,18 @@
+stages: [build, test]
+
+compile:
+  stage: build
+  script: [make]
+  artifacts:
+    paths: [bin/]
+
+unit:
+  stage: test
+  script: [make test]
+
+docs:
+  stage: test
+  needs:
+    - job: compile
+      artifacts: false
+  script: [make docs]

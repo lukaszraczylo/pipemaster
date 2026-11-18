@@ -1,0 +1,18 @@
+stages: [build, notify]
+
+build:
+  stage: build
+  script:
+    - make build
+
+report:
+  stage: notify
+  when: always
+  script:
+    - ./notify.sh
+
+alert:
+  stage: notify
+  when: on_failure
+  script:
+    - ./page.sh

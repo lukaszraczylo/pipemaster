@@ -1,0 +1,3 @@
+deploy:
+  when: manual
+  script: [make deploy]

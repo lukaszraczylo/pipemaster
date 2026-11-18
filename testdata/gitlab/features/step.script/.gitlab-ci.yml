@@ -1,0 +1,8 @@
+build:
+  before_script:
+    - echo prepare
+  script:
+    - make build
+    - make test
+  after_script:
+    - echo cleanup

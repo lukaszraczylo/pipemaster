@@ -1,0 +1,19 @@
+stages: [build, test, deploy]
+
+compile:
+  stage: build
+  script: [make]
+
+lint:
+  stage: test
+  needs: []
+  script: [make lint]
+
+unit:
+  stage: test
+  needs: [compile]
+  script: [make test]
+
+ship:
+  stage: deploy
+  script: [make ship]

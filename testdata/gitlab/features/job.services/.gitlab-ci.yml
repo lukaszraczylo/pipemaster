@@ -1,0 +1,7 @@
+test:
+  image: golang:1.22
+  services:
+    - postgres:15
+    - name: redis:7
+      alias: cache
+  script: [make test]

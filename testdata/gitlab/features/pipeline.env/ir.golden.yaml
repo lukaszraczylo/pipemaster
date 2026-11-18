@@ -1,0 +1,32 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - ext:
+        gitlab:
+            variables:
+                DEPLOY_ENV:
+                    description: Target environment
+      id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      env:
+        - name: GOFLAGS
+          value:
+            lit: -mod=readonly
+        - name: DEPLOY_ENV
+          value:
+            lit: staging
+      jobs:
+        - id: build
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make build

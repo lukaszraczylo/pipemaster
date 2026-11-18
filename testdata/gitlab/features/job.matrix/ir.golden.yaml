@@ -1,0 +1,42 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - matrix:
+            include:
+                - - key: GO
+                    value: "1.21"
+                  - key: OS
+                    value: linux
+                - - key: GO
+                    value: "1.21"
+                  - key: OS
+                    value: mac
+                - - key: GO
+                    value: "1.22"
+                  - key: OS
+                    value: linux
+                - - key: GO
+                    value: "1.22"
+                  - key: OS
+                    value: mac
+                - - key: GO
+                    value: "1.20"
+                  - key: OS
+                    value: linux
+          id: test
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make test

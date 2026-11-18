@@ -1,0 +1,29 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - ext:
+        gitlab:
+            workflow:
+                rules:
+                    - if: $CI_COMMIT_BRANCH == "main"
+                    - if: $CI_COMMIT_BRANCH == "release"
+      id: gitlab-ci
+      triggers:
+        - kind: push
+          branches:
+            include:
+                - main
+                - release
+      jobs:
+        - id: build
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make build

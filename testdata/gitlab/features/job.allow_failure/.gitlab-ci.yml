@@ -1,0 +1,3 @@
+experimental:
+  allow_failure: true
+  script: [make experimental]

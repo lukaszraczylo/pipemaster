@@ -1,0 +1,23 @@
+include:
+  - local: ci/common.yml
+  - remote: https://example.com/shared.yml
+
+default:
+  image: alpine:3
+  retry: 1
+
+.deploy:
+  stage: deploy
+  script: [./deploy.sh]
+
+stages: [build, deploy]
+
+build:
+  stage: build
+  script: [make]
+  coverage: '/total: (\d+)%/'
+
+prod:
+  extends: .deploy
+  resource_group: production
+  interruptible: false

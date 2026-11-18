@@ -1,0 +1,24 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - ext:
+        gitlab:
+            workflow:
+                rules:
+                    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      id: gitlab-ci
+      triggers:
+        - kind: pr
+      jobs:
+        - id: test
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make test

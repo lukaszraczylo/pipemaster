@@ -1,0 +1,6 @@
+variables:
+  SHARED: "1"
+
+common:
+  stage: build
+  script: [echo common]

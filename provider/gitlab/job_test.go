@@ -1,0 +1,410 @@
+package gitlab_test
+
+import (
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/lukaszraczylo/pipemaster/expr"
+	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/provider/gitlab"
+)
+
+func TestScriptsAreCanonicalTemplates(t *testing.T) {
+	pl, _ := pipeline(t, "j:\n  before_script:\n    - echo ${CI_COMMIT_BRANCH}\n  script:\n    - echo $CI_COMMIT_SHA $HOME ${HOME} $$CI_COMMIT_SHA\n    - echo '${{ x }}' $CI_COMMIT_SHA_SHORT\n    - |\n      if [ -n \"$CI_COMMIT_TAG\" ]; then\n        echo tagged\n      fi\n  after_script:\n    - echo done $GITLAB_USER_LOGIN\n")
+	j := job(t, pl, "j")
+	if len(j.Steps) != 3 {
+		t.Fatalf("steps = %d", len(j.Steps))
+	}
+	if got := j.Steps[0].Script; !reflect.DeepEqual(got, []string{"echo ${{ branch }}"}) {
+		t.Errorf("before = %v", got)
+	}
+	want := []string{
+		"echo ${{ sha }} $HOME ${HOME} $$CI_COMMIT_SHA",
+		"echo '${{ '${{' }} x }}' $CI_COMMIT_SHA_SHORT",
+		`if [ -n "${{ tag }}" ]; then`,
+		"  echo tagged",
+		"fi",
+	}
+	if got := j.Steps[1].Script; !reflect.DeepEqual(got, want) {
+		t.Errorf("script = %q\nwant     %q", got, want)
+	}
+	a := j.Steps[2]
+	if a.ID != "after_script" || !reflect.DeepEqual(a.Script, []string{"echo done ${{ actor }}"}) {
+		t.Errorf("after = %+v", a)
+	}
+	if got := expr.String(a.If); got != "always()" {
+		t.Errorf("after_script If = %s", got)
+	}
+	for i, id := range []string{"before_script", "script", "after_script"} {
+		if j.Steps[i].ID != id || ext(j.Steps[i].Ext)["section"] != id {
+			t.Errorf("step %d = %+v", i, j.Steps[i])
+		}
+	}
+	if j.Steps[1].If != nil || j.Steps[0].If != nil {
+		t.Errorf("only after_script is conditional")
+	}
+}
+
+func TestScriptEntryMustBeString(t *testing.T) {
+	err := parseErr(t, map[string]string{rootFile: "j:\n  script:\n    - echo: hi\n"})
+	if !strings.Contains(err.Error(), rootFile+":3") {
+		t.Errorf("error = %v", err)
+	}
+}
+
+func TestDefaultApplied(t *testing.T) {
+	pl, _ := pipeline(t, `
+default:
+  image: ruby:3
+  retry: 2
+  tags: [shared]
+  before_script: [echo default]
+  interruptible: true
+a:
+  script: [x]
+b:
+  script: [x]
+  image: alpine
+  retry: 0
+c:
+  script: [x]
+  inherit:
+    default: false
+d:
+  script: [x]
+  inherit:
+    default: [image]
+`)
+	a := job(t, pl, "a")
+	if a.Container.Ref != "ruby:3" || a.Retry == nil || a.Retry.Attempts != 3 || !reflect.DeepEqual(a.Runner.Labels, []string{"shared"}) || len(a.Steps) != 2 {
+		t.Errorf("a did not inherit: %+v retry=%+v", a, a.Retry)
+	}
+	if ext(a.Ext)["interruptible"] != true {
+		t.Errorf("inherited interruptible must reach Ext: %v", a.Ext)
+	}
+	b := job(t, pl, "b")
+	if b.Container.Ref != "alpine" || b.Retry != nil {
+		t.Errorf("job values replace defaults: %+v retry=%+v", b.Container, b.Retry)
+	}
+	c := job(t, pl, "c")
+	if c.Container != nil || c.Retry != nil || len(c.Runner.Labels) != 0 {
+		t.Errorf("inherit false: %+v", c)
+	}
+	if ext(c.Ext)["inherit"] == nil {
+		t.Errorf("inherit must stay in Ext")
+	}
+	d := job(t, pl, "d")
+	if d.Container == nil || d.Retry != nil {
+		t.Errorf("inherit list: %+v", d)
+	}
+	if ext(pl.Ext)["default"] == nil {
+		t.Errorf("the default block must stay in pipeline Ext")
+	}
+}
+
+func TestDeprecatedGlobalsAreDefaults(t *testing.T) {
+	pl, _ := pipeline(t, "image: node:20\nbefore_script: [echo hi]\nj:\n  script: [x]\n")
+	j := job(t, pl, "j")
+	if j.Container == nil || j.Container.Ref != "node:20" || len(j.Steps) != 2 {
+		t.Errorf("job = %+v", j)
+	}
+	if ext(pl.Ext)["image"] != "node:20" {
+		t.Errorf("global image stays in Ext: %v", pl.Ext)
+	}
+}
+
+func TestFieldMapping(t *testing.T) {
+	pl, _ := pipeline(t, `
+variables:
+  GLOBAL: g
+  RICH:
+    value: v
+    description: shown
+j:
+  script: [x]
+  image:
+    name: alpine:3
+    entrypoint: [""]
+    pull_policy: always
+  services:
+    - postgres:15
+    - name: redis:7
+      alias: cache
+      command: [serve]
+  tags: [docker, linux]
+  timeout: 1h 30m
+  retry:
+    max: 2
+    when: [runner_system_failure, api_failure]
+    exit_codes: 137
+  allow_failure: true
+  environment:
+    name: prod
+    url: https://x.example
+    action: start
+  resource_group: deploy
+  variables:
+    JOB: $CI_COMMIT_SHA
+  cache:
+    key: k-$CI_COMMIT_REF_SLUG
+    paths: [vendor/]
+    policy: pull
+  artifacts:
+    name: out
+    paths: [dist/]
+    expire_in: 1 week
+    reports:
+      junit: r.xml
+`)
+	if len(pl.Env) != 2 || pl.Env[1].Value.Lit != "v" {
+		t.Errorf("pipeline env = %+v", pl.Env)
+	}
+	if ext(pl.Ext)["variables"].(map[string]any)["RICH"] == nil {
+		t.Errorf("variable extras: %v", pl.Ext)
+	}
+	j := job(t, pl, "j")
+	if j.Container.Ref != "alpine:3" || !reflect.DeepEqual(j.Container.Entrypoint, []string{""}) {
+		t.Errorf("container = %+v", j.Container)
+	}
+	if ext(j.Ext)["image"].(map[string]any)["pull_policy"] != "always" {
+		t.Errorf("image extras: %v", j.Ext)
+	}
+	if len(j.Services) != 2 || j.Services[0].Name != "postgres" || j.Services[1].Name != "cache" || j.Services[1].Image.Ref != "redis:7" {
+		t.Errorf("services = %+v", j.Services)
+	}
+	if got := gitlab.DerivedServiceName("registry.example.com/grp/img:1.2"); got != "img" {
+		t.Errorf("DerivedServiceName = %q", got)
+	}
+	if !reflect.DeepEqual(j.Runner.Labels, []string{"docker", "linux"}) {
+		t.Errorf("labels = %v", j.Runner.Labels)
+	}
+	if j.Timeout == nil || time.Duration(*j.Timeout) != 90*time.Minute {
+		t.Errorf("timeout = %v", j.Timeout)
+	}
+	if j.Retry == nil || j.Retry.Attempts != 3 || !reflect.DeepEqual(j.Retry.On, []string{"runner_system_failure", "api_failure"}) {
+		t.Errorf("retry = %+v", j.Retry)
+	}
+	if !reflect.DeepEqual(ext(j.Ext)["retry"], map[string]any{"exit_codes": 137}) {
+		t.Errorf("retry extras = %v", ext(j.Ext)["retry"])
+	}
+	if !j.AllowFailure {
+		t.Errorf("allow_failure")
+	}
+	if j.Environment == nil || j.Environment.Name != "prod" || j.Environment.URL != "https://x.example" || ext(j.Ext)["environment"].(map[string]any)["action"] != "start" {
+		t.Errorf("environment = %+v ext=%v", j.Environment, j.Ext)
+	}
+	if ext(j.Ext)["resource_group"] != "deploy" {
+		t.Errorf("resource_group must stay in Ext")
+	}
+	if len(j.Env) != 1 || j.Env[0].Value.Lit != "$CI_COMMIT_SHA" {
+		t.Errorf("job env keeps GitLab text: %+v", j.Env)
+	}
+	if len(j.Cache) != 1 || j.Cache[0].Key != "k-$CI_COMMIT_REF_SLUG" || j.Cache[0].Policy != "pull" || !reflect.DeepEqual(j.Cache[0].Paths, []string{"vendor/"}) {
+		t.Errorf("cache = %+v", j.Cache)
+	}
+	if len(j.Artifacts) != 1 || j.Artifacts[0].Name != "out" || j.Artifacts[0].Expire != "1 week" {
+		t.Errorf("artifacts = %+v", j.Artifacts)
+	}
+	if ext(j.Ext)["artifacts"].(map[string]any)["reports"] == nil {
+		t.Errorf("artifact reports stay in Ext")
+	}
+}
+
+func TestCacheKeyFiles(t *testing.T) {
+	pl, _ := pipeline(t, "j:\n  script: [x]\n  cache:\n    - key:\n        files: [Gemfile.lock, package.json]\n        prefix: deps\n      paths: [vendor]\n    - key: plain\n      paths: [x]\n")
+	j := job(t, pl, "j")
+	if got := j.Cache[0].Key; got != "deps-${{ hashFiles('Gemfile.lock', 'package.json') }}" {
+		t.Errorf("derived key = %q", got)
+	}
+	raw := ext(j.Ext)["cache"].([]any)
+	if len(raw) != 2 || raw[0].(map[string]any)["key"] == nil {
+		t.Errorf("raw key form must stay in Ext: %v", raw)
+	}
+	if j.Cache[1].Key != "plain" {
+		t.Errorf("cache 1 = %+v", j.Cache[1])
+	}
+}
+
+func TestParallelMatrix(t *testing.T) {
+	pl, _ := pipeline(t, `
+one:
+  script: [x]
+  parallel:
+    matrix:
+      - OS: [linux, mac]
+        ARCH: [amd64, arm64]
+many:
+  script: [x]
+  parallel:
+    matrix:
+      - PROVIDER: aws
+        STACK: [monitoring, app1]
+      - PROVIDER: [gcp, vultr]
+        STACK: [data]
+count:
+  script: [x]
+  parallel: 5
+`)
+	one := job(t, pl, "one")
+	if one.Matrix == nil || !reflect.DeepEqual(one.Matrix.Axes, []ir.Axis{{Name: "OS", Values: []string{"linux", "mac"}}, {Name: "ARCH", Values: []string{"amd64", "arm64"}}}) || len(one.Matrix.Include) != 0 {
+		t.Errorf("single entry = %+v", one.Matrix)
+	}
+	many := job(t, pl, "many")
+	if len(many.Matrix.Axes) != 0 || len(many.Matrix.Include) != 4 {
+		t.Fatalf("union entry = %+v", many.Matrix)
+	}
+	if got := ir.Expand(many.Matrix); len(got) != 4 {
+		t.Errorf("Expand = %v", got)
+	}
+	c := job(t, pl, "count")
+	if c.Matrix != nil || ext(c.Ext)["parallel"] != 5 {
+		t.Errorf("parallel: N stays in Ext: %+v %v", c.Matrix, c.Ext)
+	}
+}
+
+func TestTimeoutFormats(t *testing.T) {
+	cases := map[string]time.Duration{
+		"3600 seconds": time.Hour, "60 minutes": time.Hour, "one hour": time.Hour,
+		"3 hours 30 minutes": 210 * time.Minute, "3h 30m": 210 * time.Minute, "1h30m": 90 * time.Minute,
+		"30": 30 * time.Second, "2 days": 48 * time.Hour,
+	}
+	for in, want := range cases {
+		t.Run(in, func(t *testing.T) {
+			pl, _ := pipeline(t, "j:\n  script: [x]\n  timeout: "+in+"\n")
+			if j := job(t, pl, "j"); j.Timeout == nil || time.Duration(*j.Timeout) != want {
+				t.Errorf("timeout = %v, want %v", j.Timeout, want)
+			}
+		})
+	}
+	pl, rep := pipeline(t, "j:\n  script: [x]\n  timeout: soon\n")
+	if j := job(t, pl, "j"); j.Timeout != nil || ext(j.Ext)["timeout"] != "soon" {
+		t.Errorf("unparsable timeout stays in Ext: %+v", j)
+	}
+	if !hasEntry(rep, "timeout soon") {
+		t.Errorf("report = %+v", rep.Entries)
+	}
+}
+
+func TestRetryForms(t *testing.T) {
+	pl, _ := pipeline(t, "a:\n  script: [x]\n  retry: 2\nb:\n  script: [x]\n  retry: 0\nc:\n  script: [x]\n  retry:\n    max: 1\n")
+	if r := job(t, pl, "a").Retry; r == nil || r.Attempts != 3 {
+		t.Errorf("retry: 2 is three runs: %+v", r)
+	}
+	if job(t, pl, "b").Retry != nil {
+		t.Errorf("retry: 0 is no retry")
+	}
+	if r := job(t, pl, "c").Retry; r == nil || r.Attempts != 2 {
+		t.Errorf("max 1 is two runs: %+v", r)
+	}
+}
+
+func TestAllowFailureExitCodes(t *testing.T) {
+	pl, rep := pipeline(t, "j:\n  script: [x]\n  allow_failure:\n    exit_codes: [137]\n")
+	j := job(t, pl, "j")
+	if j.AllowFailure || ext(j.Ext)["allow_failure"] == nil {
+		t.Errorf("exit_codes form: %+v", j)
+	}
+	if !hasEntry(rep, "allow_failure:exit_codes") {
+		t.Errorf("report = %+v", rep.Entries)
+	}
+}
+
+func TestUnknownKeysEveryLevel(t *testing.T) {
+	pl, _ := pipeline(t, `
+variables:
+  A: b
+j:
+  script: [x]
+  weird_job_key: [1, 2]
+  trigger:
+    include: child.yml
+  image:
+    name: a
+    docker:
+      platform: linux/arm64
+  environment:
+    name: e
+    deployment_tier: production
+  cache:
+    key: k
+    paths: [p]
+    untracked: true
+  services:
+    - name: pg
+      weird: yes
+  artifacts:
+    paths: [a]
+    untracked: true
+`)
+	x := ext(job(t, pl, "j").Ext)
+	for _, k := range []string{"weird_job_key", "trigger", "image", "environment", "cache", "services", "artifacts"} {
+		if x[k] == nil {
+			t.Errorf("Ext[gitlab][%s] missing: %v", k, x)
+		}
+	}
+	for _, k := range []string{"script", "variables", "tags"} {
+		if _, bad := x[k]; bad {
+			t.Errorf("consumed key %s must not be in Ext", k)
+		}
+	}
+	if ext(pl.Ext) != nil {
+		t.Errorf("a clean pipeline has no pipeline Ext: %v", pl.Ext)
+	}
+}
+
+func TestPipelineIdentity(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{rootFile: "\"build linux\":\n  script: [x]\n"})
+	if p.Pipelines[0].ID != "gitlab-ci" || p.Origin.Provider != "gitlab" || job(t, p.Pipelines[0], "build linux") == nil {
+		t.Errorf("project = %+v", p)
+	}
+}
+
+func TestSyntaxErrorHasLine(t *testing.T) {
+	err := parseErr(t, map[string]string{rootFile: "a:\n  script: [x\n"})
+	if !strings.Contains(err.Error(), rootFile+":") {
+		t.Errorf("error = %v", err)
+	}
+}
+
+func TestNonMappingJobIsError(t *testing.T) {
+	err := parseErr(t, map[string]string{rootFile: "a: 1\n"})
+	if !strings.Contains(err.Error(), rootFile+":1") {
+		t.Errorf("error = %v", err)
+	}
+}
+
+func TestDetectAndRegistered(t *testing.T) {
+	p := gitlab.New()
+	if !p.Detect(repo(map[string]string{rootFile: "a:\n  script: [x]\n"})) || p.Detect(repo(map[string]string{"x": "y"})) {
+		t.Errorf("Detect")
+	}
+	if got, err := provider.Get("gitlab"); err != nil || got.ID() != "gitlab" {
+		t.Errorf("registry: %v %v", got, err)
+	}
+}
+
+func TestCapsDeclared(t *testing.T) {
+	m := gitlab.New().Caps()
+	if m["trigger.schedule"].Level.String() != "external" || m["job.needs"].Level.String() != "native" {
+		t.Errorf("caps = %+v", m)
+	}
+}
+
+func FuzzParse(f *testing.F) {
+	for _, s := range []string{
+		"a:\n  script: [x]\n",
+		"stages: [a, b]\na:\n  stage: a\n  script: x\nb:\n  stage: b\n  needs: [a]\n",
+		".h: &h\n  image: x\nj:\n  <<: *h\n  extends: .h\n  rules:\n    - if: $CI_COMMIT_BRANCH == \"x\"\n",
+		"workflow:\n  rules:\n    - if: $CI_COMMIT_TAG =~ /^v/\ninclude: [a.yml, {remote: http://x}]\n",
+		"j:\n  parallel:\n    matrix:\n      - A: [1, 2]\n",
+		"j:\n  script:\n    - !reference [.a, script]\n",
+	} {
+		f.Add(s)
+	}
+	f.Fuzz(func(_ *testing.T, src string) {
+		_, _, _ = gitlab.New().Parse(repo(map[string]string{rootFile: src, "a.yml": src}))
+	})
+}

@@ -1,0 +1,31 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - ext:
+            gitlab:
+                cache:
+                    - key:
+                        files:
+                            - go.sum
+          id: build
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make
+          cache:
+            - key: ${{ hashFiles('go.sum') }}
+              policy: pull-push
+              paths:
+                - .cache/go-build

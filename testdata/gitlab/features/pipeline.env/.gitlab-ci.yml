@@ -1,0 +1,9 @@
+variables:
+  GOFLAGS: -mod=readonly
+  DEPLOY_ENV:
+    value: staging
+    description: Target environment
+
+build:
+  script:
+    - make build

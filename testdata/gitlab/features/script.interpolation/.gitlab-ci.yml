@@ -1,0 +1,4 @@
+build:
+  script:
+    - echo "building $CI_COMMIT_SHA on ${CI_COMMIT_BRANCH} for $GITLAB_USER_LOGIN"
+    - echo "keeps $HOME and ${UNMAPPED}"

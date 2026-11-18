@@ -1,0 +1,8 @@
+build:
+  script: [make]
+  artifacts:
+    name: bin
+    paths: [bin/]
+    expire_in: 1 week
+    reports:
+      junit: report.xml

@@ -1,0 +1,5 @@
+build:
+  variables:
+    CGO_ENABLED: "0"
+    TAG: $CI_COMMIT_TAG
+  script: [make]

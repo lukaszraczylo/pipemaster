@@ -1,0 +1,5 @@
+build:
+  script: [make]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "schedule"

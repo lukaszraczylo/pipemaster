@@ -1,0 +1,24 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - ext:
+        gitlab:
+            workflow:
+                rules:
+                    - if: $CI_PIPELINE_SOURCE == "api"
+      id: gitlab-ci
+      triggers:
+        - kind: api
+      jobs:
+        - id: triggered
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make triggered

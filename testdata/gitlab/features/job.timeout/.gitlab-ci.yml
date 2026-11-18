@@ -1,0 +1,3 @@
+build:
+  timeout: 1h 30m
+  script: [make]

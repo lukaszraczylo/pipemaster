@@ -1,0 +1,5 @@
+deploy:
+  environment:
+    name: production
+    url: https://example.com
+  script: [make deploy]
