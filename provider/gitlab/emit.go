@@ -1,7 +1,7 @@
 package gitlab
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
 	"strings"
 
@@ -14,6 +14,8 @@ import (
 )
 
 const (
+	jobIDPrefix = "# pipemaster:jobid "
+	rawExprOpen = "${{"
 	extWorkflow = "workflow"
 	extDefault  = "default"
 	scheme      = "://"
@@ -40,13 +42,13 @@ func (adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
 				pls = append(pls, pl)
 			}
 		}
-		if len(pls) > 1 {
-			return nil, nil, fmt.Errorf("%s: %d pipelines cannot share one %s", dialect, len(pls), rootFile)
-		}
-		for _, pl := range pls {
-			data, err := e.pipelineFile(pl)
+		if len(pls) > 0 {
+			data, err := e.pipelineFile(pls)
 			if err != nil {
 				return nil, nil, fmt.Errorf("%s: %w", dialect, err)
+			}
+			if bytes.Contains(data, []byte(rawExprOpen)) {
+				return nil, nil, fmt.Errorf("%s: %s holds a raw %s expression, which GitLab never expands", dialect, rootFile, rawExprOpen)
 			}
 			files[rootFile] = data
 		}
@@ -58,7 +60,15 @@ func (adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
 	return files, rep, nil
 }
 
-func (e *emitter) pipelineFile(pl *ir.Pipeline) ([]byte, error) {
+// pipelineFile writes one pipeline as it is, and several pipelines folded into one (see emit_multi.go).
+func (e *emitter) pipelineFile(pls []*ir.Pipeline) ([]byte, error) {
+	pl := pls[0]
+	if len(pls) > 1 {
+		var err error
+		if pl, err = e.foldPipelines(pls); err != nil {
+			return nil, err
+		}
+	}
 	root, err := e.document(pl)
 	if err != nil {
 		return nil, fmt.Errorf("pipeline %s: %w", pl.ID, err)
@@ -67,17 +77,18 @@ func (e *emitter) pipelineFile(pl *ir.Pipeline) ([]byte, error) {
 }
 
 func (e *emitter) document(pl *ir.Pipeline) (*yaml.Node, error) {
-	plan, err := planStages(pl)
+	plan, err := e.stagePlan(pl)
 	if err != nil {
 		return nil, err
 	}
+	e.foreignExt("pipeline/"+pl.ID, pl.Ext)
 	ext := extOf(pl.Ext)
-	c := &pipeCtx{pl: pl, plan: plan, preps: map[string]*jobPrep{}, defKeys: defaultKeySet(ext)}
+	c := &pipeCtx{pl: pl, plan: plan, preps: map[string]*jobPrep{}, defKeys: defaultKeySet(ext), keys: jobKeys(pl)}
 	for _, j := range allJobs(pl) {
 		if _, dup := c.preps[j.ID]; dup {
 			return nil, fmt.Errorf("job id %q is used twice", j.ID)
 		}
-		p := newJobPrep(pl.ID, j)
+		p := newJobPrep(e.pathOf(pl.ID, j), j)
 		if err := e.prepSteps(p); err != nil {
 			return nil, err
 		}
@@ -85,12 +96,21 @@ func (e *emitter) document(pl *ir.Pipeline) (*yaml.Node, error) {
 	}
 	m := newMap()
 	if inc := localFreeIncludes(ext["include"]); len(inc) > 0 {
-		m.set("include", mustNode(inc))
+		n, err := plainNode(inc)
+		if err != nil {
+			return nil, err
+		}
+		m.set("include", n)
 	}
 	if len(plan.list) > 0 {
 		m.set("stages", strSeq(plan.list))
 	}
-	marks, err := e.headerKeys(m, pl, ext, c)
+	var marks []string
+	if e.fold != nil {
+		marks, err = e.foldHeader(m, c)
+	} else {
+		marks, err = e.headerKeys(m, pl, ext, c)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -110,14 +130,6 @@ func (e *emitter) document(pl *ir.Pipeline) (*yaml.Node, error) {
 		first.HeadComment = strings.TrimSuffix(first.HeadComment, "\n")
 	}
 	return m.n, nil
-}
-
-func mustNode(v any) *yaml.Node {
-	n, err := plainNode(v)
-	if err != nil {
-		return nil
-	}
-	return n
 }
 
 // localFreeIncludes drops include entries that name local files, which Parse already merged.
@@ -222,18 +234,22 @@ func (e *emitter) pipelineVars(pp string, pl *ir.Pipeline, ext map[string]any) (
 		}
 		vars = append(vars, ir.Var{Name: in.Name, Value: ir.Value{Lit: in.Default}})
 		if in.Description != "" {
-			extras[in.Name] = map[string]any{"description": in.Description}
+			d, err := e.field(pp, caps.PipelineInputs, in.Description)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			extras[in.Name] = map[string]any{"description": d}
 		}
 		kept = append(kept, in)
 	}
 	if len(kept) == 0 {
 		return vars, extras, nil, nil
 	}
-	arg, err := json.Marshal(kept)
+	arg, err := markerArg(kept)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	return vars, extras, []string{emitkit.Marker(caps.PipelineInputs, pp), argPrefix + string(arg)}, nil
+	return vars, extras, []string{emitkit.Marker(caps.PipelineInputs, pp), arg}, nil
 }
 
 func (e *emitter) jobEntries(m *omap, c *pipeCtx) error {
@@ -243,10 +259,16 @@ func (e *emitter) jobEntries(m *omap, c *pipeCtx) error {
 		if err != nil {
 			return fmt.Errorf("job %s: %w", j.ID, err)
 		}
-		if m.has(j.ID) {
-			return fmt.Errorf("job id %q collides with a top-level key", j.ID)
+		comments = append(e.foldJobMarkers(j), comments...)
+		key := c.key(j.ID)
+		if m.has(key) {
+			return fmt.Errorf("job id %q collides with a top-level key", key)
 		}
-		m.setComment(j.ID, n, comments)
+		if key != j.ID {
+			e.emulate(p.path, caps.ExtPassthrough, "job key "+key, "the id "+j.ID+" is a GitLab keyword or hidden-job name, so the job is written as "+key+" and the id is kept in a marker comment")
+			comments = append([]string{jobIDPrefix + j.ID}, comments...)
+		}
+		m.setComment(key, n, comments)
 	}
 	return nil
 }

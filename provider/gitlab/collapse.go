@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
@@ -46,8 +47,8 @@ func collapseStep(pl *ir.Pipeline, path string, uses []ir.FeatureUse, args map[i
 	lines := append([]string{}, st.Script...)
 	out := *st
 	var ok bool
-	if set[caps.StepIf] {
-		if lines, ok = unguard(&out, lines, byFeature[caps.StepIf]); !ok {
+	if guard := guardArg(byFeature[caps.StepIf]); set[caps.StepIf] && guard != "" {
+		if lines, ok = unguard(&out, lines, guard); !ok {
 			return fail
 		}
 	}
@@ -71,11 +72,22 @@ func collapseStep(pl *ir.Pipeline, path string, uses []ir.FeatureUse, args map[i
 	return set
 }
 
-func unguard(st *ir.Step, lines, args []string) ([]string, bool) {
-	if len(args) != 1 || len(lines) < 3 || lines[len(lines)-1] != "fi" {
+// guardArg picks the step.if argument that holds the guard text; the other argument describes a move.
+func guardArg(args []string) string {
+	for _, a := range args {
+		if !strings.HasPrefix(a, "{") {
+			return a
+		}
+	}
+	return ""
+}
+
+func unguard(st *ir.Step, lines []string, arg string) ([]string, bool) {
+	var text string
+	if json.Unmarshal([]byte(arg), &text) != nil || len(lines) < 3 || lines[len(lines)-1] != "fi" {
 		return nil, false
 	}
-	x, err := expr.ParseCanonical(args[0])
+	x, err := expr.ParseCanonical(text)
 	if err != nil {
 		return nil, false
 	}
@@ -87,8 +99,73 @@ func unguard(st *ir.Step, lines, args []string) ([]string, bool) {
 	if err != nil || lines[0] != want {
 		return nil, false
 	}
+	if st.If != nil {
+		x = expr.Binary{Op: expr.OpAnd, L: st.If, R: x}
+	}
 	st.If = x
 	return lines[1 : len(lines)-1], true
+}
+
+// extractMoved gives each always() step that left the job's script its own step back. It runs before the
+// other step collapsers, which look the step up by its path.
+func extractMoved(pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string) {
+	type move struct {
+		job  *ir.Job
+		step string
+		arg  movedArg
+	}
+	var moves []move
+	for _, u := range uses {
+		if u.Feature != caps.StepIf {
+			continue
+		}
+		for _, a := range args[u] {
+			var mv movedArg
+			if !strings.HasPrefix(a, "{") || json.Unmarshal([]byte(a), &mv) != nil || mv.Moved != "always" {
+				continue
+			}
+			rest, ok := strings.CutPrefix(u.IRPath, jobPrefix(pl))
+			if !ok {
+				continue
+			}
+			jobID, stepID, ok := strings.Cut(rest, stepSep)
+			if j := findJob(pl, jobID); ok && j != nil {
+				moves = append(moves, move{arg: mv, job: j, step: stepID})
+			}
+		}
+	}
+	sort.SliceStable(moves, func(a, b int) bool { return moves[a].arg.Offset > moves[b].arg.Offset })
+	type made struct {
+		job  *ir.Job
+		step *ir.Step
+	}
+	var out []made
+	for _, m := range moves {
+		after := stepByID(m.job, secAfter)
+		end := m.arg.Offset + m.arg.Lines
+		if after == nil || m.arg.Offset < 0 || end > len(after.Script) {
+			continue
+		}
+		moved := &ir.Step{ID: m.step, Kind: ir.StepScript, If: expr.Call{Name: "always"}, ContinueOnError: m.arg.COE}
+		moved.Script = append([]string{}, after.Script[m.arg.Offset:end]...)
+		after.Script = append(append([]string{}, after.Script[:m.arg.Offset]...), after.Script[end:]...)
+		out = append(out, made{job: m.job, step: moved})
+		if len(after.Script) == 0 {
+			m.job.Steps = removeStep(m.job.Steps, after)
+		}
+	}
+	for i := len(out) - 1; i >= 0; i-- {
+		out[i].job.Steps = append(out[i].job.Steps, out[i].step)
+	}
+}
+
+func stepByID(j *ir.Job, id string) *ir.Step {
+	for _, s := range j.Steps {
+		if s.ID == id {
+			return s
+		}
+	}
+	return nil
 }
 
 func unsub(st *ir.Step, lines []string, workdir, env bool) ([]string, bool) {

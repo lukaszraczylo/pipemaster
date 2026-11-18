@@ -51,11 +51,15 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	restoreJobIDs(pl, ld.ids)
+	pls := splitPipelines(pl, ld.markers, ld.args)
 	proj := &ir.Project{
 		Origin:    ir.Origin{Provider: dialect, Dialect: dialect, Files: ld.files},
-		Pipelines: []*ir.Pipeline{pl},
+		Pipelines: pls,
 	}
-	s.collapseMarkers(pl, ld.markers, ld.args)
+	for _, p := range pls {
+		s.collapseMarkers(p, marksFor(ld.markers, p, len(pls) > 1), ld.args)
+	}
 	if err := ir.Validate(proj); err != nil {
 		return nil, nil, s.locate(err, infos)
 	}

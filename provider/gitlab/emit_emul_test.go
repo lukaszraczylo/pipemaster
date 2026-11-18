@@ -99,7 +99,15 @@ func emulCases() map[string]emulCase {
 		p.Pipelines[0].Inputs = []ir.Input{{Name: "target", Default: "prod", Description: "where to deploy"}}
 		return p
 	}
+	alwaysStep := func() *ir.Project {
+		cleanup := &ir.Step{ID: "cleanup", Kind: ir.StepScript, Script: []string{"rm -rf tmp"}, If: expr.Call{Name: "always"}}
+		return glProject("gitlab", glJob("build", glStep("make"), cleanup))
+	}
 	return map[string]emulCase{
+		"step.if.always": {
+			build: alwaysStep, feature: caps.StepIf, marker: "# pipemaster:emulated step.if pipeline/gitlab-ci/job/build/step/cleanup", level: caps.Emulated,
+			want: []string{"after_script:", "rm -rf tmp"},
+		},
 		"step.if": {
 			build: stepIf, feature: caps.StepIf, marker: "# pipemaster:emulated step.if " + stepPathOf("build"), level: caps.Emulated,
 			want: []string{`if [ "$CI_COMMIT_BRANCH" = "main" ]; then`, "make test", "fi"},
@@ -361,8 +369,13 @@ func TestInterpolationLostLineIsCommentedOut(t *testing.T) {
 	j := glJob("build", glStep("echo ${{ steps.x.outputs.y }} done", "echo ok"))
 	files, rep := emitFiles(t, glProject("gha", j))
 	doc := string(files[rootFile])
-	if strings.Contains(doc, "${{") || strings.Contains(doc, "done\n") && strings.Contains(doc, "- echo ${") {
+	if strings.Contains(doc, "${{") {
 		t.Errorf("no raw expression may survive:\n%s", doc)
+	}
+	for _, line := range strings.Split(doc, "\n") {
+		if strings.Contains(line, "echo") && strings.Contains(line, "done") && !strings.HasPrefix(strings.TrimSpace(line), "#") {
+			t.Errorf("the line with the lost expression must be commented out, got %q", line)
+		}
 	}
 	if !strings.Contains(doc, "# pipemaster:lost") || !strings.Contains(doc, "echo ok") {
 		t.Errorf("lost line is a comment and later lines stay:\n%s", doc)
@@ -383,7 +396,7 @@ func TestActionsMapToJobKeywords(t *testing.T) {
 	if !reportHas(rep, caps.StepAction, caps.Lost) {
 		t.Errorf("unmapped inputs and unknown actions are lost: %+v", rep.Entries)
 	}
-	if !reportHas(rep, caps.StepAction, caps.Emulated) && !reportHas(rep, caps.StepAction, caps.Lost) {
+	if !reportHas(rep, caps.StepAction, caps.Emulated) {
 		t.Errorf("image selection is emulated: %+v", rep.Entries)
 	}
 }

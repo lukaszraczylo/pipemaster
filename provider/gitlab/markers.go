@@ -11,9 +11,8 @@ import (
 )
 
 const (
-	stepSep       = "/step/"
-	continueSufx  = " || true"
-	markedJobPref = "pipeline/" + pipelineID + "/job/"
+	stepSep      = "/step/"
+	continueSufx = " || true"
 )
 
 // collapseCtx is what a collapser works on: the pipeline, the marked IR path and the argument lines after the marker.
@@ -54,6 +53,7 @@ func markerArgs(src []byte) map[ir.FeatureUse][]string {
 
 // collapseMarkers restores the IR feature behind each emulation marker; a marker it cannot restore is reported.
 func (s *state) collapseMarkers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string) {
+	extractMoved(pl, uses, args)
 	stepDone := map[string]map[caps.Feature]bool{}
 	for _, u := range uses {
 		if isStepFeature(u.Feature) {
@@ -73,6 +73,21 @@ func (s *state) collapseMarkers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[
 	}
 }
 
+// marksFor selects the markers that belong to one pipeline. The multi-pipeline markers were consumed by the split.
+func marksFor(uses []ir.FeatureUse, pl *ir.Pipeline, split bool) []ir.FeatureUse {
+	var out []ir.FeatureUse
+	for _, u := range uses {
+		if u.Feature == caps.ProjectMultiPipeline {
+			continue
+		}
+		if split && u.IRPath != "pipeline/"+pl.ID && !strings.HasPrefix(u.IRPath, "pipeline/"+pl.ID+"/") {
+			continue
+		}
+		out = append(out, u)
+	}
+	return out
+}
+
 func isStepFeature(f caps.Feature) bool {
 	for _, s := range stepFeatures {
 		if s == f {
@@ -82,9 +97,12 @@ func isStepFeature(f caps.Feature) bool {
 	return false
 }
 
-// findStep resolves an IR path of the form pipeline/gitlab-ci/job/<id>/step/<id>.
+// jobPrefix starts the IR path of every job of pl.
+func jobPrefix(pl *ir.Pipeline) string { return "pipeline/" + pl.ID + "/job/" }
+
+// findStep resolves an IR path of the form pipeline/<pipeline>/job/<id>/step/<id>.
 func findStep(pl *ir.Pipeline, path string) *ir.Step {
-	rest, ok := strings.CutPrefix(path, markedJobPref)
+	rest, ok := strings.CutPrefix(path, jobPrefix(pl))
 	if !ok {
 		return nil
 	}
@@ -112,7 +130,7 @@ func findJob(pl *ir.Pipeline, id string) *ir.Job {
 }
 
 func findJobAt(pl *ir.Pipeline, path string) *ir.Job {
-	id, ok := strings.CutPrefix(path, markedJobPref)
+	id, ok := strings.CutPrefix(path, jobPrefix(pl))
 	if !ok {
 		return nil
 	}

@@ -155,17 +155,19 @@ func sameTriggers(a, b []ir.Trigger) bool {
 
 // workflow writes workflow:rules from the triggers. The original block is restored when it still says what the triggers say.
 func (e *emitter) workflow(pl *ir.Pipeline) (*yaml.Node, error) {
-	pp := "pipeline/" + pl.ID
 	for i := range pl.Triggers {
 		e.triggerNotes(triggerPath(pl.ID, i), &pl.Triggers[i])
+		e.foreignExt(triggerPath(pl.ID, i), pl.Triggers[i].Ext)
 	}
 	raw := extOf(pl.Ext)["workflow"]
 	if raw != nil {
-		if n, err := plainNode(raw); err == nil {
-			s := newState(&report.Report{})
-			if ts, ok, _ := s.workflowTriggers(n); ok && sameTriggers(ts, pl.Triggers) {
-				return n, nil
-			}
+		n, err := plainNode(raw)
+		if err != nil {
+			return nil, err
+		}
+		s := newState(&report.Report{})
+		if ts, ok, _ := s.workflowTriggers(n); ok && sameTriggers(ts, pl.Triggers) {
+			return n, nil
 		}
 	}
 	if len(pl.Triggers) == 0 || (raw == nil && sameTriggers(pl.Triggers, defaultTriggers())) {
@@ -173,22 +175,9 @@ func (e *emitter) workflow(pl *ir.Pipeline) (*yaml.Node, error) {
 	}
 	rules := seqOf()
 	for i := range pl.Triggers {
-		t := &pl.Triggers[i]
-		cond, ok := triggerRule(t)
-		if !ok {
-			continue
+		if r, _ := e.triggerRuleNode(pl.ID, i, &pl.Triggers[i]); r != nil {
+			rules.Content = append(rules.Content, r)
 		}
-		text, err := exprgitlab.Print(cond)
-		if err != nil {
-			e.lose(triggerPath(pl.ID, i), triggerFilterFeature(t), "filter has no GitLab form: "+err.Error())
-			continue
-		}
-		r := newMap()
-		r.set("if", str(text))
-		if paths := e.pathFilter(pp, triggerPath(pl.ID, i), t); len(paths) > 0 {
-			r.set("changes", strSeq(paths))
-		}
-		rules.Content = append(rules.Content, r.n)
 	}
 	if len(rules.Content) == 0 {
 		rules.Content = append(rules.Content, ruleNever())
@@ -196,6 +185,29 @@ func (e *emitter) workflow(pl *ir.Pipeline) (*yaml.Node, error) {
 	w := newMap()
 	w.set("rules", rules)
 	return w.n, nil
+}
+
+// triggerRuleNode is the workflow rule for trigger i of a pipeline, with a key that names its text so callers
+// can drop duplicates. It is nil when GitLab has no form for the trigger.
+func (e *emitter) triggerRuleNode(pid string, i int, t *ir.Trigger) (*yaml.Node, string) {
+	cond, ok := triggerRule(t)
+	if !ok {
+		return nil, ""
+	}
+	tp := triggerPath(pid, i)
+	text, err := exprgitlab.Print(cond)
+	if err != nil {
+		e.lose(tp, triggerFilterFeature(t), "filter has no GitLab form: "+err.Error())
+		return nil, ""
+	}
+	r := newMap()
+	r.set("if", str(text))
+	key := text
+	if paths := e.pathFilter("pipeline/"+pid, tp, t); len(paths) > 0 {
+		r.set("changes", strSeq(paths))
+		key += " changes " + strings.Join(paths, ",")
+	}
+	return r.n, key
 }
 
 func triggerFilterFeature(t *ir.Trigger) caps.Feature {

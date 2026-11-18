@@ -57,6 +57,14 @@ func allJobs(pl *ir.Pipeline) []*ir.Job {
 	return out
 }
 
+// stagePlan chooses the stages of pl; a folded pipeline always uses DAG layers, since its jobs come from several pipelines.
+func (e *emitter) stagePlan(pl *ir.Pipeline) (*stagePlan, error) {
+	if e.fold != nil {
+		return layerStages(pl)
+	}
+	return planStages(pl)
+}
+
 // planStages restores the stages a GitLab file declared when they still respect every needs edge,
 // and otherwise builds stage-N names from the DAG layers.
 func planStages(pl *ir.Pipeline) (*stagePlan, error) {
@@ -81,16 +89,40 @@ func restoreStages(pl *ir.Pipeline) (*stagePlan, bool) {
 	}
 	idx := stageIndex(declared)
 	jobs := allJobs(pl)
+	finally := map[string]bool{}
+	for _, f := range pl.Finally {
+		if f != nil {
+			finally[f.ID] = true
+		}
+	}
 	byID := map[string]*ir.Job{}
 	stageOf := map[string]string{}
+	forced := map[string]bool{}
+	last := 0
 	for _, j := range jobs {
 		st, _ := jobStage(j)
-		if _, ok := idx[st]; !ok {
+		i, ok := idx[st]
+		if !ok && !finally[j.ID] {
 			return nil, false
+		}
+		if !finally[j.ID] {
+			last = max(last, i)
 		}
 		byID[j.ID], stageOf[j.ID] = j, st
 	}
+	// A finally job that names no stage must still run after every other job, so it goes to .post when its
+	// default stage would let it start earlier.
 	for _, j := range jobs {
+		if _, written := jobStage(j); finally[j.ID] && !written {
+			if i, ok := idx[stageOf[j.ID]]; !ok || i < last {
+				stageOf[j.ID], forced[j.ID] = stagePost, true
+			}
+		}
+	}
+	for _, j := range jobs {
+		if _, ok := idx[stageOf[j.ID]]; !ok {
+			return nil, false
+		}
 		for _, n := range j.Needs {
 			if t, ok := byID[n.JobID]; ok && idx[stageOf[t.ID]] >= idx[stageOf[j.ID]] {
 				return nil, false
@@ -101,14 +133,8 @@ func restoreStages(pl *ir.Pipeline) (*stagePlan, bool) {
 	if hasStages {
 		plan.list = declared
 	}
-	finally := map[string]bool{}
-	for _, f := range pl.Finally {
-		if f != nil {
-			finally[f.ID] = true
-		}
-	}
 	for _, j := range jobs {
-		if _, written := jobStage(j); written {
+		if _, written := jobStage(j); written || forced[j.ID] {
 			plan.stage[j.ID] = stageOf[j.ID]
 		}
 		if d, _ := extOf(j.Ext)[ExtDerivedNeeds].(bool); d {

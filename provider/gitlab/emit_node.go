@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -146,6 +147,16 @@ func marshalDoc(root *yaml.Node) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// markerArg writes v as one marker argument line. JSON keeps it on one line; the open brace of "${{" is
+// escaped so a comment never holds a raw expression, and the parser decodes the escape.
+func markerArg(v any) (string, error) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	return argPrefix + strings.ReplaceAll(string(b), "${{", `$\u007b{`), nil
 }
 
 // commentSafe makes s fit on one comment line and removes every "${{", which GitLab would never expand.

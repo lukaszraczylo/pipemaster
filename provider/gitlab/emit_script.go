@@ -40,8 +40,17 @@ type jobPrep struct {
 
 type download struct{ name string }
 
-func newJobPrep(pid string, j *ir.Job) *jobPrep {
-	return &jobPrep{j: j, path: jobPath(pid, j.ID), sections: map[string][]*yaml.Node{}}
+func newJobPrep(path string, j *ir.Job) *jobPrep {
+	return &jobPrep{j: j, path: path, sections: map[string][]*yaml.Node{}}
+}
+
+// lineCount is how many script lines a section holds so far, as Parse will count them.
+func (p *jobPrep) lineCount(sec string) int {
+	n := 0
+	for _, it := range p.sections[sec] {
+		n += lineCount(it.Value)
+	}
+	return n
 }
 
 func jobPath(pid, jid string) string { return "pipeline/" + pid + "/job/" + jid }
@@ -71,10 +80,12 @@ func sectionOf(st *ir.Step) string {
 
 // prepSteps turns every step into script items or job keywords.
 func (e *emitter) prepSteps(p *jobPrep) error {
+	e.foreignExt(p.path, p.j.Ext)
 	for _, st := range p.j.Steps {
 		if st == nil {
 			continue
 		}
+		e.foreignExt(stepPath(p.path, st.ID), st.Ext)
 		var err error
 		if st.Kind == ir.StepScript {
 			err = e.scriptStep(p, st)
@@ -89,39 +100,39 @@ func (e *emitter) prepSteps(p *jobPrep) error {
 }
 
 // stepGuard decides the shell condition around a step and the section it runs in. guard is empty when
-// the step runs unconditionally; arg is the canonical text of an emulated condition.
-func (e *emitter) stepGuard(sp string, st *ir.Step, sec string) (guard, arg, section string) {
+// the step runs unconditionally; arg is the canonical text of an emulated condition. moved is true when an
+// always() step leaves the job's script for after_script.
+func (e *emitter) stepGuard(sp string, st *ir.Step, sec string) (guard, arg, section string, moved bool) {
 	section = sec
 	if st.If == nil {
-		return "", "", sec
+		return "", "", sec, false
 	}
 	rest, status, ok := splitStatus(st.If)
 	if !ok || status == "failure" {
 		e.disable(sp, caps.StepIf, st.If, "step")
-		return "false", "", sec
+		return "false", "", sec, false
 	}
 	if status == "always" && sec != secAfter {
-		section = secAfter
-		e.emulate(sp, caps.StepIf, "moved to after_script", "after_script runs in a separate shell and its failure does not fail the job")
+		section, moved = secAfter, true
+		e.emulate(sp, caps.StepIf, "moved to after_script", "after_script runs in a separate shell, so the step runs after the job's other lines and its failure does not fail the job")
 	}
 	if rest == nil {
-		return "", "", section
+		return "", "", section, moved
 	}
 	c, ok := e.condition(sp, caps.StepIf, rest, "step")
 	if !ok {
-		return "false", "", sec
+		return "false", "", sec, false
 	}
 	g, ok := shellCond(c)
 	if !ok {
 		e.disable(sp, caps.StepIf, st.If, "step")
-		return "false", "", sec
+		return "false", "", sec, false
 	}
-	return g, expr.String(c), section
+	return g, expr.String(c), section, moved
 }
 
-// scriptStep emits a script step: plain lines, or one block item when an emulation wraps them.
-func (e *emitter) scriptStep(p *jobPrep, st *ir.Step) error {
-	sp := stepPath(p.path, st.ID)
+// stepLosses reports the step fields a GitLab script cannot carry at all.
+func (e *emitter) stepLosses(sp string, st *ir.Step) {
 	if st.Image != nil {
 		e.lose(sp, caps.StepImage, "GitLab sets the image per job, not per step")
 	}
@@ -131,11 +142,35 @@ func (e *emitter) scriptStep(p *jobPrep, st *ir.Step) error {
 	if st.Timeout != nil {
 		e.lose(sp, caps.StepTimeout, "GitLab has no per-step timeout; the job timeout applies")
 	}
-	guard, arg, sec := e.stepGuard(sp, st, sectionOf(st))
+}
+
+// scriptStep emits a script step: plain lines, or one block item when an emulation wraps them.
+func (e *emitter) scriptStep(p *jobPrep, st *ir.Step) error {
+	sp := stepPath(p.path, st.ID)
+	e.stepLosses(sp, st)
 	lines, err := e.stepLines(sp, st)
 	if err != nil {
 		return err
 	}
+	return e.placeLines(p, st, lines)
+}
+
+// movedArg is the marker argument of an always() step that moved to after_script: where its lines start in
+// that section, how many there are, and the continue-on-error flag the section forces on.
+type movedArg struct {
+	Moved  string `json:"moved"`
+	Offset int    `json:"offset"`
+	Lines  int    `json:"lines"`
+	COE    bool   `json:"coe"`
+}
+
+func lineCount(text string) int { return strings.Count(strings.TrimRight(text, "\n"), "\n") + 1 }
+
+// placeLines writes a step's lines into its section, wrapped by the guards its if, workdir, env and
+// continue-on-error fields call for. The collapsers in collapse.go invert each wrapper from its marker.
+func (e *emitter) placeLines(p *jobPrep, st *ir.Step, lines []string) error {
+	sp := stepPath(p.path, st.ID)
+	guard, arg, sec, moved := e.stepGuard(sp, st, sectionOf(st))
 	if len(lines) == 0 {
 		p.pending = append(p.pending, e.drain()...)
 		return nil
@@ -151,8 +186,15 @@ func (e *emitter) scriptStep(p *jobPrep, st *ir.Step) error {
 		}
 	}
 	var marks []string
+	if (guard != "" && arg != "") || moved {
+		marks = append(marks, emitkit.Marker(caps.StepIf, sp))
+	}
 	if guard != "" && arg != "" {
-		marks = append(marks, emitkit.Marker(caps.StepIf, sp), argPrefix+arg)
+		a, err := markerArg(arg)
+		if err != nil {
+			return err
+		}
+		marks = append(marks, a)
 	}
 	if dir != "" {
 		marks = append(marks, emitkit.Marker(caps.StepWorkdir, sp))
@@ -167,22 +209,43 @@ func (e *emitter) scriptStep(p *jobPrep, st *ir.Step) error {
 			lines[i] = orTrue(l)
 		}
 	}
+	items, targets := wrapLines(st, sec, lines, guard, dir, exports)
+	if moved {
+		mv := movedArg{Moved: "always", Offset: p.lineCount(secAfter), COE: st.ContinueOnError}
+		for _, it := range items {
+			mv.Lines += lineCount(it)
+		}
+		a, err := markerArg(mv)
+		if err != nil {
+			return err
+		}
+		marks = append(marks, a)
+	}
 	head := append(marks, e.drain()...)
+	for i, it := range items {
+		if i == 0 {
+			p.add(targets[i], block(it), head...)
+		} else {
+			p.add(targets[i], block(it))
+		}
+	}
+	return nil
+}
+
+// wrapLines returns the script items for a step and the section each goes in. Plain lines split between
+// before_script and script; any wrapper turns the step into one item so it runs in one shell.
+func wrapLines(st *ir.Step, sec string, lines []string, guard, dir string, exports []string) (items, targets []string) {
 	sub := dir != "" || len(exports) > 0
 	if !sub && guard == "" {
 		before := beforeLines(st, sec, len(lines))
 		for i, l := range lines {
-			target := sec
+			t := sec
 			if i < before {
-				target = secBefore
+				t = secBefore
 			}
-			if i == 0 {
-				p.add(target, block(l), head...)
-			} else {
-				p.add(target, block(l))
-			}
+			items, targets = append(items, l), append(targets, t)
 		}
-		return nil
+		return items, targets
 	}
 	body := lines
 	if sub {
@@ -196,8 +259,7 @@ func (e *emitter) scriptStep(p *jobPrep, st *ir.Step) error {
 	if guard != "" {
 		body = append(append([]string{"if " + guard + "; then"}, body...), "fi")
 	}
-	p.add(sec, block(strings.Join(body, "\n")), head...)
-	return nil
+	return []string{strings.Join(body, "\n")}, []string{sec}
 }
 
 // beforeLines is how many leading lines return to before_script; only plain script-section lines split, because a

@@ -45,6 +45,13 @@ func (e *emitter) timing(jp string, j *ir.Job, finally bool) (jobTiming, error) 
 	case status == "failure":
 		base = whenOnFailure
 	}
+	if extra := e.foldCond(j); extra != nil {
+		if _, opaque := cond.(expr.Opaque); opaque {
+			e.lose(jp, caps.ExprOpaque, "opaque gitlab rules cannot join the pipeline trigger condition, which is dropped for this job")
+		} else {
+			cond = andAll(extra, cond)
+		}
+	}
 	if l, ok := cond.(expr.Lit); ok && l.Kind == expr.LitBool {
 		if l.Bool {
 			cond = nil

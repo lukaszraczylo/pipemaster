@@ -1,7 +1,6 @@
 package gitlab
 
 import (
-	"encoding/json"
 	"fmt"
 	"maps"
 	"slices"
@@ -194,32 +193,58 @@ func (e *emitter) parallelNode(path string, m *ir.Matrix, extra any) (node *yaml
 		e.lose(path, caps.JobMatrix, "fail-fast and max-parallel have no GitLab equivalent")
 	}
 	entries := seqOf()
-	combos := func(cs []ir.Combo) {
+	vals := func(in []string) ([]string, error) {
+		out := make([]string, len(in))
+		for i, v := range in {
+			t, err := e.field(path, caps.JobMatrix, v)
+			if err != nil {
+				return nil, err
+			}
+			out[i] = t
+		}
+		return out, nil
+	}
+	combos := func(cs []ir.Combo) error {
 		for _, c := range cs {
 			en := newMap()
 			for _, kv := range c {
-				en.set(kv.Key, strSeq([]string{kv.Value}))
+				v, err := vals([]string{kv.Value})
+				if err != nil {
+					return err
+				}
+				en.set(kv.Key, strSeq(v))
 			}
 			entries.Content = append(entries.Content, en.n)
 		}
+		return nil
 	}
 	switch {
 	case len(m.Include) == 0 && len(m.Exclude) == 0:
 		en := newMap()
 		for _, a := range m.Axes {
-			en.set(a.Name, strSeq(a.Values))
+			v, err := vals(a.Values)
+			if err != nil {
+				return nil, nil, err
+			}
+			en.set(a.Name, strSeq(v))
 		}
 		entries.Content = append(entries.Content, en.n)
 	case len(m.Axes) == 0 && len(m.Exclude) == 0:
-		combos(m.Include)
+		err = combos(m.Include)
 	default:
-		combos(ir.Expand(m))
-		arg, jerr := json.Marshal(matrixArg{Axes: m.Axes, Include: m.Include, Exclude: m.Exclude})
-		if jerr != nil {
-			return nil, nil, jerr
+		err = combos(ir.Expand(m))
+		if err != nil {
+			break
+		}
+		var arg string
+		if arg, err = markerArg(matrixArg{Axes: m.Axes, Include: m.Include, Exclude: m.Exclude}); err != nil {
+			break
 		}
 		e.emulate(path, caps.JobMatrix, "expanded into one parallel:matrix entry per combination", "include and exclude have no GitLab form")
-		marks = []string{emitkit.Marker(caps.JobMatrix, path), argPrefix + string(arg)}
+		marks = []string{emitkit.Marker(caps.JobMatrix, path), arg}
+	}
+	if err != nil {
+		return nil, nil, err
 	}
 	if len(entries.Content) == 0 {
 		e.lose(path, caps.JobMatrix, "every matrix combination is excluded")
@@ -277,12 +302,14 @@ func (e *emitter) cacheNodes(path string, p *jobPrep, extra any) (*yaml.Node, er
 // cacheEntryKey restores the raw key mapping when it still produces the IR key, and otherwise writes the IR key.
 func (e *emitter) cacheEntryKey(path string, m *omap, c ir.Cache, rest map[string]any) error {
 	if raw, ok := rest["key"].(map[string]any); ok {
-		if n, err := plainNode(raw); err == nil {
-			if derived, err := newState(nil).cacheKeyFiles(n); err == nil && derived == c.Key {
-				m.set("key", n)
-				delete(rest, "key")
-				return nil
-			}
+		n, err := plainNode(raw)
+		if err != nil {
+			return err
+		}
+		if derived, err := newState(nil).cacheKeyFiles(n); err == nil && derived == c.Key {
+			m.set("key", n)
+			delete(rest, "key")
+			return nil
 		}
 	}
 	return e.cacheKey(path, m, c.Key)
@@ -328,6 +355,9 @@ func (e *emitter) artifactsNode(path string, p *jobPrep, extra any) (*yaml.Node,
 	}
 	if len(acc.exclude) > 0 {
 		m.set("exclude", strSeq(acc.exclude))
+	}
+	if acc.when != "" {
+		m.set("when", str(acc.when))
 	}
 	return m.n, e.artifactExtras(m, em, dotenv)
 }

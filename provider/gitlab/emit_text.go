@@ -21,6 +21,7 @@ var identRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 type emitter struct {
 	led      *emitkit.Ledger
 	from     *expr.Dialect
+	fold     *folded
 	comments []string
 }
 
@@ -41,6 +42,15 @@ func (e *emitter) use(path string, f caps.Feature) ir.FeatureUse {
 
 func (e *emitter) lose(path string, f caps.Feature, detail string) {
 	e.led.Note(e.use(path, f), caps.Support{Level: caps.Lost}, detail)
+}
+
+// foreignExt reports Ext data of other providers: it is not in the GitLab file, only in the round-trip metadata.
+func (e *emitter) foreignExt(path string, x ir.Ext) {
+	for _, k := range sortedKeys(x) {
+		if k != dialect {
+			e.lose(path, caps.ExtPassthrough, "Ext of provider "+k+" is not written to the GitLab file; it is kept in round-trip metadata")
+		}
+	}
 }
 
 func (e *emitter) emulate(path string, f caps.Feature, strategy, detail string) {
@@ -68,10 +78,11 @@ func refVar(path []string) (string, bool) {
 		return "", false
 	}
 	switch path[0] {
-	case exprgitlab.Dialect:
-		return path[1], len(path) == 2 && isIdent(path[1])
-	case expr.PrefixEnv, expr.PrefixSecrets, expr.PrefixVars, expr.PrefixInputs, expr.PrefixMatrix:
-		return path[1], len(path) == 2 && isIdent(path[1])
+	case exprgitlab.Dialect, expr.PrefixEnv, expr.PrefixSecrets, expr.PrefixVars, expr.PrefixInputs, expr.PrefixMatrix:
+		if len(path) != 2 || !isIdent(path[1]) {
+			return "", false
+		}
+		return path[1], true
 	case expr.PrefixNeeds:
 		ok := len(path) == 4 && path[2] == "outputs" && isIdent(path[3])
 		if !ok {

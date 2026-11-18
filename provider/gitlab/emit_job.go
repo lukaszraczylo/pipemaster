@@ -16,7 +16,16 @@ type pipeCtx struct {
 	plan    *stagePlan
 	preps   map[string]*jobPrep
 	defKeys map[string]bool
+	keys    map[string]string
 	group   string
+}
+
+// key is the top-level YAML key a job is written under.
+func (c *pipeCtx) key(id string) string {
+	if k, ok := c.keys[id]; ok {
+		return k
+	}
+	return id
 }
 
 func (c *pipeCtx) isFinally(id string) bool {
@@ -56,10 +65,10 @@ func (c *pipeCtx) artifactNames(id string) []string {
 
 // needsNode writes needs. It is omitted when the stage order already implies the edges, and for a
 // finally job with no edges, which must wait for its stage.
-func (e *emitter) needsNode(c *pipeCtx, p *jobPrep) *yaml.Node {
+func (e *emitter) needsNode(c *pipeCtx, p *jobPrep) (*yaml.Node, error) {
 	j := p.j
 	if c.plan.derived[j.ID] {
-		return nil
+		return nil, nil
 	}
 	ext := extOf(j.Ext)
 	raw, _ := ext[extNeedsKey].([]any)
@@ -84,22 +93,30 @@ func (e *emitter) needsNode(c *pipeCtx, p *jobPrep) *yaml.Node {
 			e.lose(p.path, caps.JobNeeds, "finally job needs another finally job "+n.JobID+", which share the last stage")
 			continue
 		}
-		out.Content = append(out.Content, needEntry(n, c.declares(n.JobID), downloaded[n.JobID], hasDeps, deps, extras[n.JobID]))
+		shown := n
+		shown.JobID = c.key(n.JobID)
+		entry, err := needEntry(shown, c.declares(n.JobID), downloaded[n.JobID], hasDeps, deps, extras[n.JobID])
+		if err != nil {
+			return nil, err
+		}
+		out.Content = append(out.Content, entry)
 	}
 	for _, r := range raw {
-		if n, err := plainNode(r); err == nil {
-			out.Content = append(out.Content, n)
+		n, err := plainNode(r)
+		if err != nil {
+			return nil, err
 		}
+		out.Content = append(out.Content, n)
 	}
 	if len(out.Content) == 0 && finally {
-		return nil
+		return nil, nil
 	}
-	return out
+	return out, nil
 }
 
 // needEntry writes one needs entry. GitLab downloads the producer's artifacts by default when it has any
 // (and dependencies lists it), so the map form appears only when the IR says otherwise or an action asked for them.
-func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps []string, extra any) *yaml.Node {
+func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps []string, extra any) (*yaml.Node, error) {
 	m := newMap()
 	m.set("job", str(n.JobID))
 	explicit := false
@@ -116,14 +133,15 @@ func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps [
 		explicit = true
 	}
 	if x, ok := extra.(map[string]any); ok && len(x) > 0 {
-		if err := m.addExtra(x, nil); err == nil {
-			explicit = true
+		if err := m.addExtra(x, nil); err != nil {
+			return nil, err
 		}
+		explicit = true
 	}
 	if !explicit {
-		return str(n.JobID)
+		return str(n.JobID), nil
 	}
-	return m.n
+	return m.n, nil
 }
 
 // downloadedFrom maps each needed job whose artifacts an action downloads, and reports downloads that match no needed job.
@@ -170,7 +188,11 @@ func (e *emitter) jobNode(c *pipeCtx, p *jobPrep) (*yaml.Node, []string, error) 
 	} else if tags != nil {
 		m.set("tags", tags)
 	}
-	m.set("needs", e.needsNode(c, p))
+	needs, err := e.needsNode(c, p)
+	if err != nil {
+		return nil, nil, err
+	}
+	m.set("needs", needs)
 	t, err := e.timing(p.path, j, finally)
 	if err != nil {
 		return nil, nil, err

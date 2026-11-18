@@ -1,0 +1,223 @@
+package gitlab
+
+import (
+	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
+	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
+	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+)
+
+const foldSep = ":"
+
+// foldJobArg and foldPipelineArg are the marker arguments Parse reads to split a folded file again.
+type foldJobArg struct {
+	If      string    `json:"if,omitempty"`
+	Needs   []ir.Need `json:"needs,omitempty"`
+	Finally bool      `json:"finally,omitempty"`
+}
+
+type foldPipelineArg struct {
+	Concurrency *ir.Concurrency `json:"concurrency,omitempty"`
+	Name        string          `json:"name,omitempty"`
+	EnvNames    []string        `json:"env,omitempty"`
+	Triggers    []ir.Trigger    `json:"triggers"`
+}
+
+type foldedJob struct {
+	cond    expr.Expr
+	origIf  expr.Expr
+	path    string
+	pid     string
+	jid     string
+	needs   []ir.Need
+	finally bool
+}
+
+// folded is the state of several pipelines written as one: each job sits under "<pipeline>:<job>", and
+// carries its pipeline's trigger condition, because GitLab has one workflow per file.
+type folded struct {
+	jobs  map[*ir.Job]foldedJob
+	marks []string
+	pls   []*ir.Pipeline
+}
+
+// pathOf is the IR path of a job as the ledger knows it, which a folded copy does not carry in its own ID.
+func (e *emitter) pathOf(pid string, j *ir.Job) string {
+	if e.fold != nil {
+		if fj, ok := e.fold.jobs[j]; ok {
+			return fj.path
+		}
+	}
+	return jobPath(pid, j.ID)
+}
+
+// foldCond is the trigger condition a folded job must also satisfy; nil for any other job.
+func (e *emitter) foldCond(j *ir.Job) expr.Expr {
+	if e.fold == nil {
+		return nil
+	}
+	return e.fold.jobs[j].cond
+}
+
+// foldJobMarkers tags a folded job with its pipeline so Parse can split the file again.
+func (e *emitter) foldJobMarkers(j *ir.Job) []string {
+	if e.fold == nil {
+		return nil
+	}
+	fj := e.fold.jobs[j]
+	arg := foldJobArg{Finally: fj.finally}
+	if fj.finally {
+		arg.Needs = fj.needs
+	}
+	if fj.origIf != nil && !expr.HasOpaque(fj.origIf) {
+		arg.If = expr.String(fj.origIf)
+	}
+	a, err := markerArg(arg)
+	if err != nil {
+		return nil
+	}
+	return []string{emitkit.Marker(caps.ProjectMultiPipeline, fj.path), a}
+}
+
+// triggerCond is the condition under which any trigger of the pipeline fires; nil when no trigger has a GitLab form.
+func triggerCond(pl *ir.Pipeline) expr.Expr {
+	var cs []expr.Expr
+	for i := range pl.Triggers {
+		c, ok := triggerRule(&pl.Triggers[i])
+		if !ok {
+			continue
+		}
+		if _, err := exprgitlab.Print(c); err != nil {
+			continue
+		}
+		cs = append(cs, c)
+	}
+	return orAny(cs)
+}
+
+// foldPipelines merges the pipelines into one whose job IDs are "<pipeline>:<job>". Variables, inputs and
+// the concurrency group of a pipeline move into its jobs, because a GitLab file has one global set.
+func (e *emitter) foldPipelines(pls []*ir.Pipeline) (*ir.Pipeline, error) {
+	f := &folded{jobs: map[*ir.Job]foldedJob{}, pls: pls}
+	e.fold = f
+	merged := &ir.Pipeline{ID: pipelineID}
+	for i, pl := range pls {
+		pp := "pipeline/" + pl.ID
+		if i > 0 {
+			e.emulate(pp, caps.ProjectMultiPipeline, "jobs of every pipeline in one file under <pipeline>:<job> keys",
+				"each job carries its pipeline's trigger condition and a marker; workflow:rules is the union of all triggers")
+		}
+		e.foreignExt(pp, pl.Ext)
+		shared, group, err := e.foldShared(pp, pl)
+		if err != nil {
+			return nil, err
+		}
+		cond := triggerCond(pl)
+		for k := range pl.Triggers {
+			e.triggerNotes(triggerPath(pl.ID, k), &pl.Triggers[k])
+			e.foreignExt(triggerPath(pl.ID, k), pl.Triggers[k].Ext)
+		}
+		for _, j := range pl.Jobs {
+			merged.Jobs = append(merged.Jobs, f.add(pl, j, shared, group, cond, false))
+		}
+		for _, j := range pl.Finally {
+			merged.Finally = append(merged.Finally, f.add(pl, j, shared, group, cond, true))
+		}
+		arg := foldPipelineArg{Name: pl.Name, Triggers: pl.Triggers, Concurrency: pl.Concurrency}
+		for _, v := range pl.Env {
+			arg.EnvNames = append(arg.EnvNames, v.Name)
+		}
+		a, err := markerArg(arg)
+		if err != nil {
+			return nil, err
+		}
+		f.marks = append(f.marks, emitkit.Marker(caps.ProjectMultiPipeline, pp), a)
+	}
+	return merged, nil
+}
+
+// foldShared returns the variables every job of pl receives and the resource group they share.
+func (e *emitter) foldShared(pp string, pl *ir.Pipeline) (vars []ir.Var, group string, err error) {
+	vars = append(vars, pl.Env...)
+	for _, in := range pl.Inputs {
+		if !isIdent(in.Name) || hasVar(vars, in.Name) {
+			e.lose(pp, caps.PipelineInputs, "input "+in.Name+" is not a unique variable name")
+			continue
+		}
+		vars = append(vars, ir.Var{Name: in.Name, Value: ir.Value{Lit: in.Default}})
+		e.emulate(pp, caps.PipelineInputs, "variable copied into every job of the pipeline", "Parse does not restore inputs from a shared file")
+	}
+	if pl.Concurrency != nil {
+		if group, err = e.field(pp, caps.PipelineConcurrency, pl.Concurrency.Group); err != nil {
+			return nil, "", err
+		}
+		e.emulate(pp, caps.PipelineConcurrency, "resource_group on every job of the pipeline", "queues, does not cancel")
+	}
+	return vars, group, nil
+}
+
+// add copies a job under its folded ID. The copy shares steps and fields with the original and never writes back.
+func (f *folded) add(pl *ir.Pipeline, j *ir.Job, shared []ir.Var, group string, cond expr.Expr, finally bool) *ir.Job {
+	cp := *j
+	cp.ID = pl.ID + foldSep + j.ID
+	cp.Needs = make([]ir.Need, len(j.Needs))
+	for i, n := range j.Needs {
+		cp.Needs[i] = n
+		cp.Needs[i].JobID = pl.ID + foldSep + n.JobID
+	}
+	cp.Env = append([]ir.Var{}, j.Env...)
+	for _, v := range shared {
+		if !hasVar(cp.Env, v.Name) {
+			cp.Env = append(cp.Env, v)
+		}
+	}
+	if group != "" {
+		cp.Ext = withGroup(j.Ext, group)
+	}
+	f.jobs[&cp] = foldedJob{needs: j.Needs, pid: pl.ID, jid: j.ID, path: jobPath(pl.ID, j.ID), cond: cond, origIf: j.If, finally: finally}
+	return &cp
+}
+
+// withGroup copies the Ext map and adds the job's resource group unless the job names one already.
+func withGroup(x ir.Ext, group string) ir.Ext {
+	out := ir.Ext{}
+	for k, v := range x {
+		out[k] = v
+	}
+	gl := map[string]any{}
+	for k, v := range extOf(x) {
+		gl[k] = v
+	}
+	if _, own := gl["resource_group"]; !own {
+		gl["resource_group"] = group
+	}
+	out[dialect] = gl
+	return out
+}
+
+// foldHeader writes workflow:rules as the union of every pipeline's trigger rules and returns the pipeline markers.
+func (e *emitter) foldHeader(m *omap, _ *pipeCtx) ([]string, error) {
+	rules := seqOf()
+	seen := map[string]bool{}
+	used := false
+	for _, pl := range e.fold.pls {
+		used = used || len(pl.Triggers) > 0
+		for i := range pl.Triggers {
+			r, key := e.triggerRuleNode(pl.ID, i, &pl.Triggers[i])
+			if r != nil && !seen[key] {
+				seen[key] = true
+				rules.Content = append(rules.Content, r)
+			}
+		}
+	}
+	if used {
+		if len(rules.Content) == 0 {
+			rules.Content = append(rules.Content, ruleNever())
+		}
+		w := newMap()
+		w.set("rules", rules)
+		m.set(extWorkflow, w.n)
+	}
+	return e.fold.marks, nil
+}
