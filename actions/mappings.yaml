@@ -1,0 +1,93 @@
+# Action registry. Embedded in the binary; edit this file to add a mapping.
+#
+# actions:                      list, one entry per GitHub action
+#   - match: owner/repo         case-insensitive, any ref
+#     path: sub/dir             optional; monorepo subpath, must match exactly.
+#                               An entry without path never matches a ref that has one.
+#     targets:                  keyed by provider id (gha, gitlab, ...)
+#       <provider id>:
+#         kind: implicit|script|image|cache|artifact_upload|artifact_download|passthrough
+#         image: "golang:{{go-version}}"   {{input}} is replaced from the step's `with`
+#         defaults: {input: value}         used when the step omits the input
+#         script: [lines]                  script kind only
+#         with: {in-key: out-key}          maps a `with` input to the target's key;
+#                                          unlisted inputs are reported as Unmapped
+#         support: {level: native|emulated|external|lost, strategy: "", caveat: ""}
+#
+# A missing image input (or only <input>-file) makes Lookup return level lost.
+# gha targets use kind passthrough: every input is kept verbatim.
+#
+# reverse: pinned GitHub actions emitted when converting GitLab to GHA.
+#   keys: checkout, cache, upload, download. Format: owner/repo@ref.
+
+actions:
+  - match: actions/checkout
+    targets:
+      gha: {kind: passthrough, support: {level: native}}
+      gitlab:
+        kind: implicit
+        with: {fetch-depth: GIT_DEPTH, submodules: GIT_SUBMODULE_STRATEGY}
+        support: {level: native, strategy: runner clones the repository before the job}
+
+  - match: actions/cache
+    targets:
+      gha: {kind: passthrough, support: {level: native}}
+      gitlab:
+        kind: cache
+        with: {key: key, path: paths}
+        support: {level: native, strategy: gitlab cache keyword}
+
+  - match: actions/upload-artifact
+    targets:
+      gha: {kind: passthrough, support: {level: native}}
+      gitlab:
+        kind: artifact_upload
+        with: {name: name, path: path, retention-days: expire_in}
+        support: {level: native, strategy: gitlab artifacts keyword}
+
+  - match: actions/download-artifact
+    targets:
+      gha: {kind: passthrough, support: {level: native}}
+      gitlab:
+        kind: artifact_download
+        with: {name: name, path: path}
+        support: {level: native, strategy: needs with artifacts}
+
+  - match: actions/setup-go
+    targets:
+      gha: {kind: passthrough, support: {level: native}}
+      gitlab:
+        kind: image
+        image: "golang:{{go-version}}"
+        support: {level: emulated, strategy: image selection, caveat: job image replaced}
+
+  - match: actions/setup-node
+    targets:
+      gha: {kind: passthrough, support: {level: native}}
+      gitlab:
+        kind: image
+        image: "node:{{node-version}}"
+        support: {level: emulated, strategy: image selection, caveat: job image replaced}
+
+  - match: actions/setup-python
+    targets:
+      gha: {kind: passthrough, support: {level: native}}
+      gitlab:
+        kind: image
+        image: "python:{{python-version}}"
+        support: {level: emulated, strategy: image selection, caveat: job image replaced}
+
+  - match: actions/setup-java
+    targets:
+      gha: {kind: passthrough, support: {level: native}}
+      gitlab:
+        kind: image
+        image: "eclipse-temurin:{{java-version}}"
+        support: {level: emulated, strategy: image selection, caveat: job image replaced}
+
+# Versions checked 2026-11-18 via the GitHub releases API (latest release, major tag).
+reverse:
+  checkout: actions/checkout@v7
+  cache: actions/cache@v6
+  upload: actions/upload-artifact@v7
+  download: actions/download-artifact@v8
