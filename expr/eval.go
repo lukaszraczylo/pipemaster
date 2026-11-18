@@ -42,7 +42,9 @@ type Env interface {
 // CaseInsensitiveEq folds case in string equality, ordering, contains, startsWith and endsWith.
 type Semantics struct {
 	// Truthy overrides the default truthiness: null, false, 0, NaN and "" are falsy, everything else truthy.
-	Truthy            func(Value) bool
+	Truthy func(Value) bool
+	// LogicalTruthy overrides Truthy for the operand test of && and || only (GitLab uses Ruby truthiness there).
+	LogicalTruthy     func(Value) bool
 	CaseInsensitiveEq bool
 	StrictTypes       bool
 	// JSONNumbers makes a string coerce to a number only when it is a JSON number (no sign prefix, no
@@ -83,6 +85,13 @@ func (ev evaluator) truthy(v Value) bool {
 		return x != ""
 	}
 	return true
+}
+
+func (ev evaluator) logicalTruthy(v Value) bool {
+	if ev.sem.LogicalTruthy != nil {
+		return ev.sem.LogicalTruthy(v)
+	}
+	return ev.truthy(v)
 }
 
 func (ev evaluator) eval(e Expr) (Value, error) {
@@ -153,12 +162,12 @@ func (ev evaluator) binary(b Binary) (Value, error) {
 	}
 	switch b.Op {
 	case OpAnd:
-		if !ev.truthy(l) {
+		if !ev.logicalTruthy(l) {
 			return l, nil
 		}
 		return ev.eval(b.R)
 	case OpOr:
-		if ev.truthy(l) {
+		if ev.logicalTruthy(l) {
 			return l, nil
 		}
 		return ev.eval(b.R)
