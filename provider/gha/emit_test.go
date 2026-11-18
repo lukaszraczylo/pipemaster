@@ -68,6 +68,9 @@ func lintFileIgnoring(t testing.TB, name string, data []byte, ignore string) {
 	t.Helper()
 	bin, err := exec.LookPath("actionlint")
 	if err != nil {
+		if os.Getenv("PIPEMASTER_REQUIRE_LINTERS") == "1" {
+			t.Fatal("actionlint not on PATH and PIPEMASTER_REQUIRE_LINTERS=1")
+		}
 		t.Skip("actionlint not on PATH")
 	}
 	dir := filepath.Join(t.TempDir(), ".github", "workflows")

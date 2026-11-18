@@ -12,6 +12,8 @@ lean:
 vectors:
 	cd lean4 && lake exe gen-vectors ../testdata/lean-vectors
 
+# A missing actionlint fails the tests here instead of skipping them.
+check: export PIPEMASTER_REQUIRE_LINTERS = 1
 check: test lint
 	scripts/check-vectors.sh
 	scripts/lean-axioms.sh

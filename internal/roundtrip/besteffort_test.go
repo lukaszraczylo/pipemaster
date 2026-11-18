@@ -146,8 +146,11 @@ func structDiff(a, b any) []string {
 	return out
 }
 
-// atOrBelow is true when entry is the node at path or a node under it, such as a trigger of a pipeline.
-func atOrBelow(entry, path string) bool { return entry == path || strings.HasPrefix(entry, path+"/") }
+// atOrBelow is true when entry is the node at path. Only a trigger entry under the node counts too, because
+// triggers are not nodes of their own; any other descendant entry names a different node's field.
+func atOrBelow(entry, path string) bool {
+	return entry == path || strings.HasPrefix(entry, path+"/trigger/")
+}
 
 // covered reports whether a lost or external entry at the node, or below it, names a feature that
 // accounts for the differing field.
@@ -214,6 +217,9 @@ func TestCoverageRejectsUnreportedDifference(t *testing.T) {
 		if covered(diffs[0], rep) {
 			t.Errorf("%s must not cover the difference", name)
 		}
+	}
+	if covered(diffs[0], entry(job+"/step/s", caps.JobTimeout, caps.Lost)) {
+		t.Error("a descendant step entry must not cover a job field")
 	}
 	if !covered(diffs[0], entry(job, caps.JobTimeout, caps.Lost)) {
 		t.Error("an exact lost entry must cover the difference")

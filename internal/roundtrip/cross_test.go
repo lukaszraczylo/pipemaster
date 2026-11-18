@@ -54,8 +54,14 @@ func TestCrossGolden(t *testing.T) {
 	}
 }
 
+// requireLintersEnv makes a missing optional linter a failure instead of a skip.
+const requireLintersEnv = "PIPEMASTER_REQUIRE_LINTERS"
+
 func TestCrossGoldenActionlint(t *testing.T) {
 	if _, err := exec.LookPath("actionlint"); err != nil {
+		if os.Getenv(requireLintersEnv) == "1" {
+			t.Fatalf("actionlint is not installed and %s=1", requireLintersEnv)
+		}
 		t.Skip("actionlint is not installed; GHA outputs of the cross conversion are not linted")
 	}
 	for _, f := range fixtures(t, provider.GitLab) {
