@@ -15,7 +15,6 @@ func TestMarkerRoundTrip(t *testing.T) {
 	}
 	src := []byte("a: 1\n  " + m + "\n" +
 		"# pipemaster:emulated onlyfeature\n" +
-		"# pipemaster:emulated a b c\n" +
 		"x: # pipemaster:emulated trigger.api p\n" +
 		Marker(caps.TriggerAPI, "p2") + "\n")
 	want := []ir.FeatureUse{
@@ -23,6 +22,14 @@ func TestMarkerRoundTrip(t *testing.T) {
 		{IRPath: "p2", Feature: caps.TriggerAPI},
 	}
 	if d := cmp.Diff(want, ParseMarkers(src)); d != "" {
+		t.Fatal(d)
+	}
+}
+
+func TestMarkerPathWithSpaces(t *testing.T) {
+	u := ir.FeatureUse{IRPath: "pipeline/gitlab-ci/job/build linux/step/s 1", Feature: caps.TriggerManual}
+	got := ParseMarkers([]byte("  " + Marker(u.Feature, u.IRPath) + "  \n# pipemaster:emulated trigger.api   \n"))
+	if d := cmp.Diff([]ir.FeatureUse{u}, got); d != "" {
 		t.Fatal(d)
 	}
 }

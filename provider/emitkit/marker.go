@@ -27,11 +27,12 @@ func ParseMarkers(src []byte) []ir.FeatureUse {
 		if !ok {
 			continue
 		}
-		f := strings.Fields(rest)
-		if len(f) != 2 {
+		feature, path, found := strings.Cut(strings.TrimSpace(rest), " ")
+		path = strings.TrimSpace(path)
+		if !found || feature == "" || path == "" {
 			continue
 		}
-		out = append(out, ir.FeatureUse{IRPath: f[1], Feature: caps.Feature(f[0])})
+		out = append(out, ir.FeatureUse{IRPath: path, Feature: caps.Feature(feature)})
 	}
 	return out
 }
