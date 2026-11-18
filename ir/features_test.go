@@ -40,10 +40,7 @@ func TestFeaturesCoversEveryField(t *testing.T) {
 				want[parent] = true
 			}
 		}
-		// Opaque is the only Expr type, so if-features need it and it needs a carrier.
-		if !want[caps.ExprOpaque] {
-			want[caps.JobIf], want[caps.StepIf] = false, false
-		}
+		// expr.opaque needs a carrier.
 		carried := false
 		for _, c := range opaqueCarriers {
 			carried = carried || want[c]

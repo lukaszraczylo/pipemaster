@@ -15,8 +15,9 @@ import (
 type Fragment func(caps.Feature) bool
 
 const (
-	maxJobs  = 3
-	textExpr = `[ -~]{1,12}`
+	maxJobs      = 3
+	maxExprDepth = 3
+	textExpr     = `[ -~]{1,12}`
 )
 
 type gen struct {
@@ -27,8 +28,8 @@ type gen struct {
 
 // GenProject draws a valid project that uses only features frag allows, each at least once where an IR field can carry it.
 // Dependencies: job.needs.artifacts implies job.needs; job.environment.approval implies job.environment.
-// Opaque is the only Expr type, so job.if and step.if are generated only when frag also allows expr.opaque,
-// and expr.opaque appears only if a carrier (job.if, step.if, pipeline.env, job.env, step.env, step.action, job.services) is allowed.
+// Expressions are random non-opaque ASTs of depth at most 3. An expr.Opaque appears only when frag allows expr.opaque,
+// and then at least once if a carrier (job.if, step.if, pipeline.env, job.env, step.env, step.action, job.services) is allowed.
 // script.interpolation is derived from script text, so it is never generated.
 func GenProject(t *rapid.T, frag Fragment) *ir.Project {
 	g := &gen{t: t, frag: frag}
@@ -50,8 +51,19 @@ func (g *gen) strs() []string {
 }
 func (g *gen) flag() bool { return rapid.Bool().Draw(g.t, g.label("b")) }
 
-func (g *gen) expr() expr.Expr {
+func (g *gen) opaque() expr.Expr {
 	return expr.Opaque{Dialect: rapid.SampledFrom([]string{"gha", "gitlab"}).Draw(g.t, g.label("d")), Text: g.str()}
+}
+
+// ast draws a structured expression that never contains an Opaque.
+func (g *gen) ast() expr.Expr { return GenExpr(g.t, g.label("e"), maxExprDepth, false) }
+
+// cond is the expression for job.if/step.if: opaque when allowed, so the feature is always exercised, else an AST.
+func (g *gen) cond() expr.Expr {
+	if g.frag(caps.ExprOpaque) {
+		return g.opaque()
+	}
+	return g.ast()
 }
 
 func (g *gen) ext() ir.Ext {
@@ -61,10 +73,10 @@ func (g *gen) ext() ir.Ext {
 func (g *gen) value() ir.Value {
 	switch rapid.IntRange(0, 2).Draw(g.t, g.label("k")) {
 	case 1:
-		if g.frag(caps.ExprOpaque) {
-			return ir.Value{Kind: ir.ValueExpr, Expr: g.expr()}
+		if g.frag(caps.ExprOpaque) && g.flag() {
+			return ir.Value{Kind: ir.ValueExpr, Expr: g.opaque()}
 		}
-		return ir.Value{Lit: g.str()}
+		return ir.Value{Kind: ir.ValueExpr, Expr: g.ast()}
 	case 2:
 		return ir.Value{Kind: ir.ValueSecret, Secret: g.str()}
 	}
@@ -74,7 +86,7 @@ func (g *gen) value() ir.Value {
 func (g *gen) vars() []ir.Var {
 	first := ir.Value{Kind: ir.ValueSecret, Secret: g.str()}
 	if g.frag(caps.ExprOpaque) {
-		first = ir.Value{Kind: ir.ValueExpr, Expr: g.expr()}
+		first = ir.Value{Kind: ir.ValueExpr, Expr: g.opaque()}
 	}
 	return []ir.Var{{Name: g.str(), Value: first}, {Name: g.str(), Value: g.value()}}
 }
@@ -185,8 +197,8 @@ func (g *gen) job(id string, prior []string) *ir.Job {
 	if wantNeeds && len(prior) > 0 {
 		j.Needs = []ir.Need{{JobID: prior[0], Artifacts: f(caps.JobNeedsArtifacts), Optional: g.flag()}}
 	}
-	if f(caps.JobIf) && f(caps.ExprOpaque) {
-		j.If = g.expr()
+	if f(caps.JobIf) {
+		j.If = g.cond()
 	}
 	if f(caps.JobRunner) {
 		j.Runner = ir.Runner{Labels: g.strs(), Platform: g.str(), Selector: map[string]string{g.str(): g.str()}}
@@ -249,9 +261,9 @@ func (g *gen) step(id string) *ir.Step {
 	if f(caps.StepAction) {
 		s.Kind = ir.StepAction
 		s.Action = &ir.ActionRef{Kind: ir.ActionRepo, Owner: g.str(), Repo: g.str(), Path: g.str(), Ref: g.str()}
-		w := ir.Value{Lit: g.str()}
+		w := ir.Value{Kind: ir.ValueExpr, Expr: g.ast()}
 		if f(caps.ExprOpaque) {
-			w = ir.Value{Kind: ir.ValueExpr, Expr: g.expr()}
+			w = ir.Value{Kind: ir.ValueExpr, Expr: g.opaque()}
 		}
 		s.With = map[string]ir.Value{g.str(): w}
 	}
@@ -259,8 +271,8 @@ func (g *gen) step(id string) *ir.Step {
 		img := g.image()
 		s.Image = &img
 	}
-	if f(caps.StepIf) && f(caps.ExprOpaque) {
-		s.If = g.expr()
+	if f(caps.StepIf) {
+		s.If = g.cond()
 	}
 	if f(caps.StepEnv) {
 		s.Env = g.vars()

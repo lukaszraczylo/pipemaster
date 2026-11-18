@@ -54,11 +54,42 @@ func TestYAMLOpaqueAndValues(t *testing.T) {
 	}
 }
 
+func TestYAMLRealExpressions(t *testing.T) {
+	cond := expr.Binary{Op: expr.OpAnd,
+		L: expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{"branch"}}, R: expr.Lit{Kind: expr.LitStr, Str: "it's"}},
+		R: expr.Call{Name: "contains", Args: []expr.Expr{expr.Ref{Path: []string{"needs", "build", "outputs", "v"}}, expr.Lit{Kind: expr.LitNum, Num: 1.5}}},
+	}
+	p := one(&ir.Job{
+		ID: "a", If: cond,
+		Env:   []ir.Var{{Name: "E", Value: ir.Value{Kind: ir.ValueExpr, Expr: expr.Unary{Op: expr.OpNot, X: expr.Ref{Path: []string{"matrix", "os"}}}}}},
+		Steps: []*ir.Step{{ID: "s", If: expr.Call{Name: "always"}}},
+	})
+	b, err := ir.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "(branch == 'it''s') && contains(needs.build.outputs.v, 1.5)") {
+		t.Fatalf("unexpected rendering:\n%s", b)
+	}
+	q, err := ir.Unmarshal(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok, d := ir.Equal(p, q); !ok {
+		t.Fatalf("%s\n%s", d, b)
+	}
+	for _, u := range ir.Features(q) {
+		if u.Feature == caps.ExprOpaque {
+			t.Fatal("structured expressions must not report expr.opaque")
+		}
+	}
+}
+
 func TestUnmarshalErrors(t *testing.T) {
 	for name, in := range map[string]string{
 		"malformed":     "pipelines: [",
 		"unknown field": "pipelines:\n- id: a\n  bogus: 1\n",
-		"bad expr":      "pipelines:\n- id: a\n  jobs:\n  - id: j\n    if: not-an-expr\n",
+		"bad expr":      "pipelines:\n- id: a\n  jobs:\n  - id: j\n    if: (unclosed\n",
 		"bad duration":  "pipelines:\n- id: a\n  jobs:\n  - id: j\n    timeout: soon\n",
 		"bad value":     "pipelines:\n- id: a\n  env:\n  - name: x\n    value: {lit: a, secret: b}\n",
 	} {

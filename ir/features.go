@@ -83,10 +83,7 @@ func pipelineFeatures(s *featureSet, pl *Pipeline) {
 	}
 }
 
-func isOpaque(e expr.Expr) bool {
-	_, ok := e.(expr.Opaque)
-	return ok
-}
+func isOpaque(e expr.Expr) bool { return expr.HasOpaque(e) }
 
 func varsOpaque(vs []Var) bool {
 	for _, v := range vs {
