@@ -1,12 +1,16 @@
 package gitlab
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
 const renameSuffix = "-job"
+
+// topKeyRE reads a top-level mapping key: quoted, or plain up to the first colon followed by a space or the line end.
+var topKeyRE = regexp.MustCompile(`^(?:"([^"]*)"|'([^']*)'|([^\s"'#][^\n]*?)):(?:\s|$)`)
 
 // reservedJobKeys cannot be job names: the keywords the GitLab docs list as unavailable, the other global
 // keywords and the YAML scalars that read as booleans or null. pages is not reserved, but as a job name it
@@ -57,8 +61,8 @@ func jobIDMarkers(src []byte) map[string]string {
 		if orig == "" || strings.HasPrefix(line, "#") || line == "" {
 			continue
 		}
-		if key, _, ok := strings.Cut(line, ":"); ok && !strings.HasPrefix(raw, " ") {
-			out[strings.Trim(key, `"'`)] = orig
+		if m := topKeyRE.FindStringSubmatch(raw); m != nil {
+			out[m[1]+m[2]+m[3]] = orig
 		}
 		orig = ""
 	}

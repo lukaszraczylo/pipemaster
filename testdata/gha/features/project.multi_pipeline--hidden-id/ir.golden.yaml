@@ -1,0 +1,44 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/.shared.yml
+        - .github/workflows/ci.yml
+pipelines:
+    - id: .shared
+      name: shared
+      triggers:
+        - ext:
+            gha:
+                event: workflow_call
+          kind: api
+      jobs:
+        - id: run
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: run-step-1
+              kind: script
+              script:
+                - echo run
+    - id: ci
+      name: CI
+      triggers:
+        - kind: push
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: script
+              script:
+                - echo build
