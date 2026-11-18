@@ -11,6 +11,12 @@ const (
 	CtxRepo     = "repo"
 	CtxActor    = "actor"
 	CtxPRNumber = "pr.number"
+	// CtxRefName is the branch or tag name; CtxBranch and CtxTag are the ref-type-specific views.
+	CtxRefName   = "ref_name"
+	CtxRefType   = "ref_type"
+	CtxRef       = "ref"
+	CtxPRHeadRef = "pr.head_ref"
+	CtxPRBaseRef = "pr.base_ref"
 )
 
 // Canonical prefix families; the tail after the prefix is user-defined.
@@ -21,11 +27,12 @@ const (
 	PrefixVars    = "vars"
 	PrefixInputs  = "inputs"
 	PrefixNeeds   = "needs"
+	PrefixSteps   = "steps"
 )
 
 var prefixFamilies = map[string]bool{
 	PrefixMatrix: true, PrefixEnv: true, PrefixSecrets: true,
-	PrefixVars: true, PrefixInputs: true, PrefixNeeds: true,
+	PrefixVars: true, PrefixInputs: true, PrefixNeeds: true, PrefixSteps: true,
 }
 
 // Vocab maps one dialect's ref paths, joined with ".", to canonical path segments and back.
