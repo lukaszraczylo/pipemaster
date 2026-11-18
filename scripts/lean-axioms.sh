@@ -8,10 +8,31 @@ cd "$root/lean4"
 
 lake build Pipemaster >&2
 
+# Theorems the gate must find; a rename or deletion fails the script.
+required=(
+  Pipemaster.Dag.layers_respect_needs
+  Pipemaster.Dag.layers_none_iff
+  Pipemaster.Dag.layers_length
+  Pipemaster.Matrix.expand_card
+  Pipemaster.Matrix.expand_mem
+  Pipemaster.Matrix.expand_combo_origin
+  Pipemaster.Matrix.expand_survivor_preserved
+  Pipemaster.Matrix.expand_include_merged
+  Pipemaster.Matrix.expand_include_appended
+  Pipemaster.Matrix.expand_include_accounted
+  Pipemaster.Ledger.complete
+  Pipemaster.Ledger.emitted_report_disjoint
+  Pipemaster.Ledger.report_unique
+  Pipemaster.Ledger.report_level
+  Pipemaster.Ledger.finish_unaccounted
+)
+required_lean="$(printf '`%s, ' "${required[@]}")"
+required_lean="[${required_lean%, }]"
+
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-cat >"$tmp/Axioms.lean" <<'LEAN'
+cat >"$tmp/Axioms.tpl" <<'LEAN'
 import Pipemaster
 import Lean
 open Lean Elab Command
@@ -19,8 +40,13 @@ open Lean Elab Command
 #eval show CommandElabM Unit from do
   let env ← getEnv
   let allowed : List Name := [``propext, ``Classical.choice, ``Quot.sound]
+  let required : List Name := @REQUIRED@
   let mut checked : Nat := 0
   let mut bad : Array String := #[]
+  for r in required do
+    match env.find? r with
+    | some (.thmInfo _) => pure ()
+    | _ => bad := bad.push s!"{r}: required theorem missing"
   for (name, ci) in env.constants.map₁.toList do
     unless (`Pipemaster).isPrefixOf name do continue
     if let .axiomInfo _ := ci then
@@ -34,11 +60,14 @@ open Lean Elab Command
     let extra := axs.filter (fun a => !allowed.contains a)
     if !extra.isEmpty then
       bad := bad.push s!"{name}: {extra.toList}"
+  if checked == 0 then
+    bad := bad.push "no Pipemaster declarations checked"
   if bad.isEmpty then
     logInfo m!"PASS: {checked} declarations use only propext, Classical.choice, Quot.sound"
   else
     throwError "FAIL:\n{"\n".intercalate bad.toList}"
 LEAN
+sed "s/@REQUIRED@/${required_lean}/" "$tmp/Axioms.tpl" >"$tmp/Axioms.lean"
 
 out="$(lake env lean "$tmp/Axioms.lean" 2>&1)" || { echo "$out"; exit 1; }
 echo "$out" | grep -v "module system" | grep -q "PASS" || { echo "$out"; exit 1; }
