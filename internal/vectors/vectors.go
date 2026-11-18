@@ -16,12 +16,20 @@ type Case struct {
 }
 
 type file struct {
-	Theorem string `json:"theorem"`
-	Cases   []Case `json:"cases"`
+	Theorem string          `json:"theorem"`
+	Envs    json.RawMessage `json:"envs"`
+	Cases   []Case          `json:"cases"`
 }
 
 // Load reads testdata/lean-vectors/<name>.json and fails the test on a missing file or zero cases.
 func Load(t *testing.T, name string) []Case {
+	t.Helper()
+	_, cases := LoadWithEnvs(t, name)
+	return cases
+}
+
+// LoadWithEnvs is Load for files that carry a shared top-level "envs" table next to the cases.
+func LoadWithEnvs(t *testing.T, name string) (json.RawMessage, []Case) {
 	t.Helper()
 	_, here, _, ok := runtime.Caller(0)
 	if !ok {
@@ -39,5 +47,5 @@ func Load(t *testing.T, name string) []Case {
 	if len(f.Cases) == 0 {
 		t.Fatalf("%s holds zero cases", path)
 	}
-	return f.Cases
+	return f.Envs, f.Cases
 }

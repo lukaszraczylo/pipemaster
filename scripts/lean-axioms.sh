@@ -25,6 +25,12 @@ required=(
   Pipemaster.Ledger.report_unique
   Pipemaster.Ledger.report_level
   Pipemaster.Ledger.finish_unaccounted
+  Pipemaster.Translate.tr_sound
+  Pipemaster.Translate.tr_sound_rev
+  Pipemaster.Translate.tr_none_iff
+  Pipemaster.Translate.tr_none_iff_rev
+  Pipemaster.Translate.naive_eq_unsound
+  Pipemaster.Translate.naive_and_unsound
 )
 required_lean="$(printf '`%s, ' "${required[@]}")"
 required_lean="[${required_lean%, }]"

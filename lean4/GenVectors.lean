@@ -37,9 +37,12 @@ def listsUpTo (pool : List α) : Nat → List (List α)
     let prev := listsUpTo pool k
     prev ++ (prev.filter (·.length == k)).flatMap fun l => pool.map (l ++ [·])
 
-def emit (theorem_ : String) (cases : List (Json × Json)) : String :=
+def emit (theorem_ : String) (cases : List (Json × Json)) (envs : Option Json := none) : String :=
   let lines := cases.map fun (i, o) => (Json.mkObj [("in", i), ("out", o)]).compress
-  s!"\{\"theorem\":\"{theorem_}\",\"cases\":[\n" ++ ",\n".intercalate lines ++ "\n]}\n"
+  let envPart := match envs with
+    | some e => s!"\"envs\":{e.compress},"
+    | none => ""
+  s!"\{\"theorem\":\"{theorem_}\",{envPart}\"cases\":[\n" ++ ",\n".intercalate lines ++ "\n]}\n"
 
 /-! ## DAG -/
 
@@ -231,6 +234,146 @@ def ledgerCases : List (Json × Json) :=
           ("report", Json.arr (r.report.map entryJson).toArray),
           ("unaccounted", Json.arr (un.map useJson).toArray)])
 
+/-! ## Expression translation
+
+Bounded-exhaustive over a fixed alphabet. Depth 1 is every comparison, affix test and bare atom over
+the refs and literals below; depth 2 negates every depth-1 expression and joins every pair of the core
+predicates with and / or; depth 3 negates a hand-picked sample of depth-2 expressions and joins every
+pair of the pivot expressions. Each case carries the truthiness of source and target on all envs. -/
+
+open Expr Translate in
+def exprJson : E → Json
+  | .null => Json.arr #["null"]
+  | .bool b => Json.arr #["bool", b]
+  | .str s => Json.arr #["str", s]
+  | .num n => Json.arr #["num", Lean.toJson n]
+  | .ref r => Json.arr #["ref", refName r]
+  | .not x => Json.arr #["not", exprJson x]
+  | .and l r => Json.arr #["and", exprJson l, exprJson r]
+  | .or l r => Json.arr #["or", exprJson l, exprJson r]
+  | .eq l r => Json.arr #["eq", exprJson l, exprJson r]
+  | .ne l r => Json.arr #["ne", exprJson l, exprJson r]
+  | .lt l r => Json.arr #["lt", exprJson l, exprJson r]
+  | .startsWith a b => Json.arr #["startsWith", exprJson a, exprJson b]
+  | .endsWith a b => Json.arr #["endsWith", exprJson a, exprJson b]
+  | .contains a b => Json.arr #["contains", exprJson a, exprJson b]
+  | .call n x => Json.arr #["call", n, exprJson x]
+  | .rx x m s => Json.arr #["rx", exprJson x, modeName m, s]
+  | .nrx x m s => Json.arr #["nrx", exprJson x, modeName m, s]
+  | .rawRx x re => Json.arr #["rawRx", exprJson x, re]
+  | .opq => Json.arr #["opq"]
+where
+  refName : Ref → String
+    | .refName => "ref_name" | .refType => "ref_type" | .event => "event" | .sha => "sha"
+    | .branch => "branch" | .tag => "tag" | .ghaNative => "gha_native" | .gitlabNative => "gitlab_native"
+  modeName : Mode → String
+    | .exact => "exact" | .prefix => "prefix" | .suffix => "suffix" | .sub => "sub"
+
+def optJson (o : Option String) : Json := match o with | some s => Json.str s | none => Json.null
+
+def envJson (e : Expr.Env) : Json :=
+  Json.mkObj [("ref_name", optJson e.refName), ("ref_type", optJson (e.refType.map Expr.rtName)),
+    ("event", optJson (e.event.map Expr.evGha)), ("sha", optJson e.sha), ("native", optJson e.nat)]
+
+/-- Seven environments: unset, empty strings, a branch, case variants, a tag named like the branch,
+a branch with no name, and a tag with a slash name. -/
+def exprEnvs : List Expr.Env :=
+  [⟨none, none, none, none, none⟩,
+   ⟨some "", some .branch, some .push, some "", some ""⟩,
+   ⟨some "main", some .branch, some .push, some "abc", some "x"⟩,
+   ⟨some "MAIN", some .branch, some .pullRequest, some "ABC", some "X"⟩,
+   ⟨some "main", some .tag, some .push, some "abc", none⟩,
+   ⟨none, some .branch, some .workflowDispatch, none, none⟩,
+   ⟨some "release/1", some .tag, some .schedule, some "0", some "0"⟩]
+
+def boolsJson (bs : List Bool) : Json := Json.arr (bs.map Json.bool).toArray
+
+open Expr Translate in
+def exprCase (dir : String) (e : E) : Json × Json :=
+  let fwd := dir == "gha-gitlab"
+  let res := if fwd then tr e else trR e
+  let srcSem : Sem := if fwd then .gha else .gitlab
+  let tgtSem : Sem := if fwd then .gitlab else .gha
+  let view (sem : Sem) (env : Env) : View := if sem == .gha then ghaView env else mapEnv env
+  let out := match res with
+    | none => Json.mkObj [("tr", Json.null)]
+    | some t => Json.mkObj [("tr", exprJson t),
+        ("src", boolsJson (exprEnvs.map fun env => holds srcSem (view srcSem env) e)),
+        ("tgt", boolsJson (exprEnvs.map fun env => holds tgtSem (view tgtSem env) t))]
+  (Json.mkObj [("dir", dir), ("expr", exprJson e)], out)
+
+open Expr in
+def lits (ss : List String) : List E := ss.map E.str
+
+open Expr in
+/-- Depth-1 expressions over the refs and literals. -/
+def depth1 (refs : List Ref) (ls : List E) (extra : List E) : List E :=
+  let rs := refs.map E.ref
+  let pairs := rs.flatMap (fun a => ls.map fun b => (a, b)) ++ ls.flatMap (fun a => rs.map fun b => (a, b))
+    ++ rs.flatMap (fun a => rs.map fun b => (a, b))
+  let rl := rs.flatMap (fun a => ls.map fun b => (a, b))
+  rs ++ ls ++ pairs.flatMap (fun (a, b) => [E.eq a b, E.ne a b, E.lt a b])
+    ++ rl.flatMap (fun (a, b) => [E.startsWith a b, E.endsWith a b, E.contains a b])
+    ++ extra
+
+open Expr in
+def joinAll (xs ys : List E) : List E :=
+  xs.flatMap fun a => ys.flatMap fun b => [E.and a b, E.or a b]
+
+open Expr in
+def layers (p1 core pivots : List E) : List E :=
+  let d2 := p1.map E.not ++ joinAll core core
+  p1 ++ d2 ++ pivots.map E.not ++ joinAll pivots pivots
+
+open Expr in
+def ghaCases : List (Json × Json) :=
+  let refs := [Ref.refName, .refType, .event, .sha, .ghaNative]
+  let ls := lits ["main", "MAIN", "", "push", "branch", "pull_request", "0"] ++ [E.num 1, E.null]
+  let rn := E.ref .refName
+  let rt := E.ref .refType
+  let ev := E.ref .event
+  let p1 := depth1 refs ls [E.ref .branch, E.ref .gitlabNative, E.call "toJSON" rn, E.opq, E.bool true]
+  let guard := E.eq rt (E.str "branch")
+  let core := [rn, E.ref .sha, ev, rt, E.ref .ghaNative,
+    E.eq rn (E.str "main"), E.eq (E.str "MAIN") rn, E.ne rn (E.str "main"), E.eq rn (E.str ""),
+    E.eq rn (E.str "0"), E.eq rn (E.ref .sha), E.eq ev (E.str "push"), E.eq ev (E.str "pull_request"),
+    E.ne ev (E.str "push"), guard, E.eq (E.str "tag") rt, E.startsWith rn (E.str "main"),
+    E.endsWith rn (E.str "main"), E.contains rn (E.str "ain"), E.contains rn (E.str "a"),
+    E.lt rn (E.str "main"), E.eq rn E.null, E.eq (E.ref .ghaNative) (E.str "main"), E.call "toJSON" rn]
+  let pivots := [rn, guard, E.eq rn (E.str "main"), E.ne rn (E.str "main"),
+    E.and guard (E.eq rn (E.str "main")), E.and guard (E.startsWith rn (E.str "rel")),
+    E.and guard (E.ne rn (E.str "main")), E.eq ev (E.str "push"), E.not (E.eq rn (E.str "main")),
+    E.or (E.eq rn (E.str "main")) (E.ref .sha), E.contains rn (E.str "a"), E.opq]
+  (layers p1 core pivots).map (exprCase "gha-gitlab")
+
+open Expr in
+def gitlabCases : List (Json × Json) :=
+  let refs := [Ref.refName, .branch, .tag, .event, .sha, .gitlabNative, .refType]
+  let rn := E.ref .refName
+  let br := E.ref .branch
+  let ev := E.ref .event
+  let ss := ["main", "MAIN", "push", "merge_request_event", "web", "0", "", "a"]
+  let rxs := refs.flatMap fun r => [Mode.exact, .prefix, .suffix, .sub].flatMap fun m =>
+    ss.flatMap fun s => [E.rx (E.ref r) m s, E.nrx (E.ref r) m s]
+  let eqs := refs.flatMap fun r => (ss.map E.str ++ [E.null]).flatMap fun l =>
+    [E.eq (E.ref r) l, E.ne (E.ref r) l]
+  let p1 := refs.map E.ref ++ [E.null, E.str "main", E.num 1] ++ rxs ++ eqs
+    ++ refs.map (fun r => E.rawRx (E.ref r) "ab.*") ++ [E.opq, E.rx (E.str "main") .exact "main"]
+  let core := [rn, br, E.ref .tag, ev, E.ref .gitlabNative, E.rx rn .exact "main", E.rx rn .exact "MAIN",
+    E.nrx rn .exact "main", E.rx br .exact "main", E.rx (E.ref .tag) .exact "main", E.rx br .prefix "main",
+    E.rx rn .suffix "main", E.rx rn .sub "ai", E.rx rn .sub "a", E.rx ev .exact "push",
+    E.rx ev .exact "merge_request_event", E.rx ev .exact "web", E.rx ev .prefix "push",
+    E.eq rn (E.str "main"), E.ne br (E.str "main"), E.rx rn .exact "0", E.rawRx rn "ab.*",
+    E.rx (E.ref .sha) .exact "main"]
+  let pivots := [rn, br, E.rx rn .exact "main", E.nrx rn .exact "main", E.rx br .exact "main",
+    E.nrx br .exact "main", E.rx ev .exact "push", E.eq rn (E.str "main"), E.rx rn .sub "a",
+    E.not (E.rx rn .exact "main"), E.or (E.rx rn .exact "main") (E.ref .sha), E.opq]
+  (layers p1 core pivots).map (exprCase "gitlab-gha")
+
+def exprCases : List (Json × Json) := ghaCases ++ gitlabCases
+
+def exprEnvsJson : Json := Json.arr (exprEnvs.map envJson).toArray
+
 end GenVectors
 
 def main (args : List String) : IO UInt32 := do
@@ -245,4 +388,7 @@ def main (args : List String) : IO UInt32 := do
   for (name, thm, cases) in files do
     IO.FS.writeFile s!"{dir}/{name}.json" (GenVectors.emit thm cases)
     IO.println s!"{name}: {cases.length} cases"
+  IO.FS.writeFile s!"{dir}/expr.json"
+    (GenVectors.emit "Pipemaster.Translate.tr_sound" GenVectors.exprCases (some GenVectors.exprEnvsJson))
+  IO.println s!"expr: {GenVectors.exprCases.length} cases"
   return 0
