@@ -22,6 +22,7 @@ type foldPipelineArg struct {
 	Concurrency *ir.Concurrency `json:"concurrency,omitempty"`
 	Name        string          `json:"name,omitempty"`
 	EnvNames    []string        `json:"env,omitempty"`
+	Inputs      []ir.Input      `json:"inputs,omitempty"`
 	Triggers    []ir.Trigger    `json:"triggers"`
 }
 
@@ -132,7 +133,7 @@ func (e *emitter) foldPipelines(pls []*ir.Pipeline) (*ir.Pipeline, error) {
 				"each job carries its pipeline's trigger condition and a marker; workflow:rules is the union of all triggers")
 		}
 		e.foreignExt(pp, pl.Ext)
-		shared, group, err := e.foldShared(pp, pl)
+		shared, group, inputs, err := e.foldShared(pp, pl)
 		if err != nil {
 			return nil, err
 		}
@@ -153,6 +154,7 @@ func (e *emitter) foldPipelines(pls []*ir.Pipeline) (*ir.Pipeline, error) {
 			merged.Finally = append(merged.Finally, f.add(pl, j, shared, group, folded1{cond: cond, parts: parts, disabled: disabled}, true))
 		}
 		arg := foldPipelineArg{Name: pl.Name, Triggers: pl.Triggers, Concurrency: pl.Concurrency}
+		arg.Inputs = inputs
 		for _, v := range pl.Env {
 			arg.EnvNames = append(arg.EnvNames, v.Name)
 		}
@@ -165,8 +167,9 @@ func (e *emitter) foldPipelines(pls []*ir.Pipeline) (*ir.Pipeline, error) {
 	return merged, nil
 }
 
-// foldShared returns the variables every job of pl receives and the resource group they share.
-func (e *emitter) foldShared(pp string, pl *ir.Pipeline) (vars []ir.Var, group string, err error) {
+// foldShared returns the variables every job of pl receives, the resource group they share and the inputs
+// that became variables.
+func (e *emitter) foldShared(pp string, pl *ir.Pipeline) (vars []ir.Var, group string, inputs []ir.Input, err error) {
 	vars = append(vars, pl.Env...)
 	for _, in := range pl.Inputs {
 		if !isIdent(in.Name) || hasVar(vars, in.Name) {
@@ -174,16 +177,17 @@ func (e *emitter) foldShared(pp string, pl *ir.Pipeline) (vars []ir.Var, group s
 			continue
 		}
 		vars = append(vars, ir.Var{Name: in.Name, Value: ir.Value{Lit: in.Default}})
-		e.emulate(pp, caps.PipelineInputs, "variable copied into every job of the pipeline", "Parse does not restore inputs from a shared file")
+		inputs = append(inputs, in)
+		e.emulate(pp, caps.PipelineInputs, "variable copied into every job of the pipeline", "the pipeline marker keeps the input list")
 	}
 	if pl.Concurrency != nil {
 		if group, err = e.field(pp, caps.PipelineConcurrency, pl.Concurrency.Group); err != nil {
-			return nil, "", err
+			return nil, "", nil, err
 		}
 		e.emulate(pp, caps.PipelineConcurrency, "resource_group on every job of the pipeline", "queues, does not cancel")
 		e.cancelLost(pp, pl.Concurrency)
 	}
-	return vars, group, nil
+	return vars, group, inputs, nil
 }
 
 // folded1 is the trigger guard shared by the jobs of one pipeline.

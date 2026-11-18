@@ -65,6 +65,7 @@ func splitPipelines(base *ir.Pipeline, uses []ir.FeatureUse, args map[ir.Feature
 			}
 		}
 		restoreFoldedEnv(pl, pa.EnvNames)
+		restoreFoldedInputs(pl, pa.Inputs)
 		if pa.Concurrency != nil {
 			for _, j := range append(append([]*ir.Job{}, pl.Jobs...), pl.Finally...) {
 				dropExt(&j.Ext, "resource_group")
@@ -134,6 +135,16 @@ func restoreFoldedEnv(pl *ir.Pipeline, names []string) {
 	for _, j := range append(append([]*ir.Job{}, pl.Jobs...), pl.Finally...) {
 		for _, name := range names {
 			j.Env = dropVar(j.Env, name)
+		}
+	}
+}
+
+// restoreFoldedInputs gives a pipeline its inputs back and removes the variables that carried them.
+func restoreFoldedInputs(pl *ir.Pipeline, inputs []ir.Input) {
+	pl.Inputs = append(pl.Inputs, inputs...)
+	for _, j := range append(append([]*ir.Job{}, pl.Jobs...), pl.Finally...) {
+		for _, in := range inputs {
+			j.Env = dropVar(j.Env, in.Name)
 		}
 	}
 }

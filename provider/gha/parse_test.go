@@ -56,7 +56,8 @@ func TestParseFeatures(t *testing.T) {
 			continue
 		}
 		t.Run(d.Name(), func(t *testing.T) {
-			if !known[d.Name()] {
+			// <feature>--<slug> is a regression fixture for the feature.
+			if feature, _, _ := strings.Cut(d.Name(), "--"); !known[feature] {
 				t.Fatalf("%s is not a caps feature", d.Name())
 			}
 			root := filepath.Join(featuresDir, d.Name())
