@@ -54,6 +54,21 @@ func genDAG(t *rapid.T) []*ir.Job {
 	return jobs
 }
 
+// depths computes longest-path node counts from topologically ordered jobs.
+func depths(jobs []*ir.Job) map[string]int {
+	depth := map[string]int{}
+	for _, j := range jobs {
+		d := 1
+		for _, n := range j.Needs {
+			if depth[n.JobID]+1 > d {
+				d = depth[n.JobID] + 1
+			}
+		}
+		depth[j.ID] = d
+	}
+	return depth
+}
+
 func layerIndex(layers [][]string) map[string]int {
 	idx := map[string]int{}
 	for i, l := range layers {
@@ -67,11 +82,17 @@ func layerIndex(layers [][]string) map[string]int {
 func TestLayersRespectsEveryEdge(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		jobs := genDAG(t)
-		layers, err := ir.Layers(jobs)
+		depth := depths(jobs)
+		layers, err := ir.Layers(rapid.Permutation(jobs).Draw(t, "shuffled"))
 		if err != nil {
 			t.Fatal(err)
 		}
 		idx := layerIndex(layers)
+		for _, j := range jobs {
+			if idx[j.ID] != depth[j.ID]-1 {
+				t.Fatalf("job %s in layer %d, want %d", j.ID, idx[j.ID], depth[j.ID]-1)
+			}
+		}
 		if len(idx) != len(jobs) {
 			t.Fatalf("placed %d of %d jobs", len(idx), len(jobs))
 		}
@@ -98,21 +119,13 @@ func TestLayersRespectsEveryEdge(t *testing.T) {
 func TestLayersCountIsLongestPathPlusOne(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		jobs := genDAG(t)
-		depth := map[string]int{}
 		longest := 0
-		for _, j := range jobs { // generated in topological order
-			d := 1
-			for _, n := range j.Needs {
-				if depth[n.JobID]+1 > d {
-					d = depth[n.JobID] + 1
-				}
-			}
-			depth[j.ID] = d
+		for _, d := range depths(jobs) {
 			if d > longest {
 				longest = d
 			}
 		}
-		layers, err := ir.Layers(jobs)
+		layers, err := ir.Layers(rapid.Permutation(jobs).Draw(t, "shuffled"))
 		if err != nil {
 			t.Fatal(err)
 		}
