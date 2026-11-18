@@ -94,9 +94,30 @@ func TestLedgerNoteWithoutDecideAccounts(t *testing.T) {
 	}
 }
 
+func TestLedgerNoteThenDecideKeepsDowngrade(t *testing.T) {
+	l := NewLedger("a", "b", caps.Matrix{caps.TriggerPush: {Level: caps.Native}})
+	u := use("p", caps.TriggerPush)
+	l.Note(u, caps.Support{Level: caps.Lost, Strategy: "s"}, "dropped")
+	if s := l.Decide(u); s.Level != caps.Lost {
+		t.Fatalf("Decide returned %v, want lost", s.Level)
+	}
+	r, err := l.Finish([]ir.FeatureUse{u})
+	if err != nil || len(r.Entries) != 1 || r.Entries[0].Level != caps.Lost || r.Entries[0].Detail != "dropped" {
+		t.Fatalf("err=%v entries=%+v", err, r.Entries)
+	}
+	if len(l.Emitted()) != 0 {
+		t.Fatal("downgraded use must not be emitted")
+	}
+}
+
 func TestLedgerCompleteness(t *testing.T) {
 	levels := []caps.Level{caps.Native, caps.Emulated, caps.External, caps.Lost}
 	feats := []caps.Feature{caps.TriggerPush, caps.TriggerTag, caps.TriggerAPI, caps.PipelineEnv}
+	type op struct {
+		u      ir.FeatureUse
+		lvl    caps.Level
+		isNote bool
+	}
 	rapid.Check(t, func(t *rapid.T) {
 		m := caps.Matrix{}
 		for _, f := range feats {
@@ -104,24 +125,34 @@ func TestLedgerCompleteness(t *testing.T) {
 				m[f] = caps.Support{Level: rapid.SampledFrom(levels).Draw(t, "lvl")}
 			}
 		}
-		n := rapid.IntRange(0, 12).Draw(t, "n")
-		var uses []ir.FeatureUse
-		seen := map[ir.FeatureUse]bool{}
-		for i := 0; i < n; i++ {
-			u := use(rapid.StringMatching(`[a-c]{1,2}`).Draw(t, "path"), rapid.SampledFrom(feats).Draw(t, "f"))
-			if !seen[u] {
-				seen[u] = true
-				uses = append(uses, u)
-			}
+		pool := rapid.SliceOfNDistinct(
+			rapid.Custom(func(t *rapid.T) ir.FeatureUse {
+				return use(rapid.StringMatching(`[a-c]{1,2}`).Draw(t, "path"), rapid.SampledFrom(feats).Draw(t, "f"))
+			}), 1, 6, func(u ir.FeatureUse) ir.FeatureUse { return u }).Draw(t, "pool")
+		n := rapid.IntRange(len(pool), 20).Draw(t, "n")
+		ops := make([]op, 0, n)
+		for _, u := range pool {
+			ops = append(ops, op{u: u})
 		}
+		for len(ops) < n {
+			ops = append(ops, op{u: rapid.SampledFrom(pool).Draw(t, "u"), isNote: rapid.Bool().Draw(t, "note"), lvl: rapid.SampledFrom(levels).Draw(t, "nl")})
+		}
+		ops = rapid.Permutation(ops).Draw(t, "order")
+
+		want := map[ir.FeatureUse]caps.Level{}
 		l := NewLedger("s", "t", m)
-		for _, u := range uses {
-			l.Decide(u)
-			if rapid.Bool().Draw(t, "note") {
-				l.Note(u, caps.Support{Level: rapid.SampledFrom(levels).Draw(t, "nl")}, "x")
+		for _, o := range ops {
+			if _, ok := want[o.u]; !ok {
+				want[o.u] = m.Lookup(o.u.Feature).Level
+			}
+			if o.isNote {
+				l.Note(o.u, caps.Support{Level: o.lvl}, "x")
+				want[o.u] = max(want[o.u], o.lvl)
+			} else {
+				l.Decide(o.u)
 			}
 		}
-		r, err := l.Finish(uses)
+		r, err := l.Finish(pool)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -129,13 +160,22 @@ func TestLedgerCompleteness(t *testing.T) {
 		for _, u := range l.Emitted() {
 			emitted[u] = true
 		}
-		reported := map[ir.FeatureUse]int{}
+		reported := map[ir.FeatureUse]caps.Level{}
+		count := map[ir.FeatureUse]int{}
 		for _, e := range r.Entries {
-			reported[use(e.IRPath, e.Feature)]++
+			k := use(e.IRPath, e.Feature)
+			reported[k] = e.Level
+			count[k]++
 		}
-		for _, u := range uses {
-			if emitted[u] == (reported[u] > 0) || reported[u] > 1 {
-				t.Fatalf("use %v emitted=%v reported=%d", u, emitted[u], reported[u])
+		for u, lvl := range want {
+			if lvl == caps.Native {
+				if !emitted[u] || count[u] != 0 {
+					t.Fatalf("%v: native, emitted=%v reports=%d", u, emitted[u], count[u])
+				}
+				continue
+			}
+			if emitted[u] || count[u] != 1 || reported[u] != lvl {
+				t.Fatalf("%v: want level %v once, emitted=%v reports=%d level=%v", u, lvl, emitted[u], count[u], reported[u])
 			}
 		}
 	})

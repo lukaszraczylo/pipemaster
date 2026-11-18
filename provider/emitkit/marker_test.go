@@ -1,6 +1,7 @@
 package emitkit
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -30,6 +31,14 @@ func TestMarkerPathWithSpaces(t *testing.T) {
 	u := ir.FeatureUse{IRPath: "pipeline/gitlab-ci/job/build linux/step/s 1", Feature: caps.TriggerManual}
 	got := ParseMarkers([]byte("  " + Marker(u.Feature, u.IRPath) + "  \n# pipemaster:emulated trigger.api   \n"))
 	if d := cmp.Diff([]ir.FeatureUse{u}, got); d != "" {
+		t.Fatal(d)
+	}
+}
+
+func TestMarkerAfterHugeLine(t *testing.T) {
+	u := ir.FeatureUse{IRPath: "p", Feature: caps.TriggerAPI}
+	src := "x: " + strings.Repeat("a", 2<<20) + "\n" + Marker(u.Feature, u.IRPath) + "\n"
+	if d := cmp.Diff([]ir.FeatureUse{u}, ParseMarkers([]byte(src))); d != "" {
 		t.Fatal(d)
 	}
 }

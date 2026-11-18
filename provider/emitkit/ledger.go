@@ -14,7 +14,7 @@ import (
 // Ledger accounts for every feature use of one emission.
 //
 // Model (mirrored by Pipemaster.Ledger.complete):
-//   - Decide(u) accounts u at the matrix level; Native means emitted, anything else adds a report entry.
+//   - Decide(u) accounts u at max(existing level, matrix level); Native means emitted, anything else has a report entry.
 //   - Note(u, s, d) raises u's effective level to max(current, s.Level); it never lowers it.
 //   - A use has at most one entry; a higher level replaces the earlier entry.
 //   - Finish(uses) errors for every use never passed to Decide or Note.
@@ -34,11 +34,15 @@ func entryFor(u ir.FeatureUse, s caps.Support, detail string) report.Entry {
 	return report.Entry{IRPath: u.IRPath, Feature: u.Feature, Level: s.Level, Strategy: s.Strategy, Detail: detail}
 }
 
-// Decide accounts u at the target matrix level and returns the support so the emitter knows what to do.
+// Decide accounts u at no less than the target matrix level and returns the effective support so the emitter knows what to do.
 func (l *Ledger) Decide(u ir.FeatureUse) caps.Support {
 	s := l.m.Lookup(u.Feature)
-	l.state[u] = entryFor(u, s, s.Caveat)
-	return s
+	cur, ok := l.state[u]
+	if !ok || s.Level > cur.Level {
+		cur = entryFor(u, s, s.Caveat)
+		l.state[u] = cur
+	}
+	return caps.Support{Level: cur.Level, Strategy: cur.Strategy, Caveat: cur.Detail}
 }
 
 // Note records an emitter-chosen downgrade; the effective level is never lower than the matrix level.

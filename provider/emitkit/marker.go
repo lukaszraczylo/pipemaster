@@ -1,7 +1,6 @@
 package emitkit
 
 import (
-	"bufio"
 	"bytes"
 	"strings"
 
@@ -19,10 +18,8 @@ func Marker(f caps.Feature, irPath string) string {
 // ParseMarkers returns the markers found as whole comment lines, in file order; malformed lines are skipped.
 func ParseMarkers(src []byte) []ir.FeatureUse {
 	var out []ir.FeatureUse
-	sc := bufio.NewScanner(bytes.NewReader(src))
-	sc.Buffer(nil, 1<<20)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
+	for _, raw := range bytes.Split(src, []byte("\n")) {
+		line := strings.TrimSpace(string(raw))
 		rest, ok := strings.CutPrefix(line, markerPrefix)
 		if !ok {
 			continue
