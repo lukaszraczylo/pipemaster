@@ -65,7 +65,7 @@ func TestValidGitLab(t *testing.T) {
 
 func TestInvalidGitLab(t *testing.T) {
 	err := File(provider.GitLab, ".gitlab-ci.yml", []byte("build:\n  script: 5\n"))
-	if err == nil || !strings.Contains(err.Error(), ".gitlab-ci.yml") {
+	if err == nil || !strings.Contains(err.Error(), ".gitlab-ci.yml") || !strings.Contains(err.Error(), "script") {
 		t.Fatalf("got %v", err)
 	}
 }
@@ -80,5 +80,26 @@ func TestNoSchema(t *testing.T) {
 func TestBadYAML(t *testing.T) {
 	if err := File(provider.GHA, "x.yml", []byte("a: [\n")); err == nil {
 		t.Fatal("want error")
+	}
+}
+
+func TestOfflineLoaderRefusesExternalRef(t *testing.T) {
+	_, err := compileDoc("https://example.test/s.json", []byte(`{"$ref":"https://example.com/x.json"}`))
+	if err == nil || !strings.Contains(err.Error(), "network access refused") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestSchemaCompiledOnce(t *testing.T) {
+	a, err := schemaFor(provider.GHA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := schemaFor(provider.GHA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a != b {
+		t.Fatal("schema recompiled")
 	}
 }

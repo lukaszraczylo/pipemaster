@@ -22,25 +22,17 @@ var schemaFS embed.FS
 // ErrNoSchema means no schema is pinned for the provider.
 var ErrNoSchema = errors.New("no schema for provider")
 
-type schemaSpec struct {
-	file string
-	id   string
-}
-
-var specs = map[string]schemaSpec{
-	provider.GHA:    {file: "schemas/github-workflow.json", id: "https://json.schemastore.org/github-workflow.json"},
-	provider.GitLab: {file: "schemas/gitlab-ci.json", id: "https://gitlab.com/.gitlab-ci.yml"},
-}
-
-type compiled struct {
+type entry struct {
 	err    error
 	schema *jsonschema.Schema
+	file   string
+	id     string
 	once   sync.Once
 }
 
-var cache = map[string]*compiled{
-	provider.GHA:    {},
-	provider.GitLab: {},
+var schemas = map[string]*entry{
+	provider.GHA:    {file: "schemas/github-workflow.json", id: "https://json.schemastore.org/github-workflow.json"},
+	provider.GitLab: {file: "schemas/gitlab-ci.json", id: "https://gitlab.com/.gitlab-ci.yml"},
 }
 
 // offlineLoader makes any reference outside the embedded schema an error.
@@ -50,38 +42,42 @@ func (offlineLoader) Load(url string) (any, error) {
 	return nil, fmt.Errorf("network access refused for %s", url)
 }
 
-func compile(id string) (*jsonschema.Schema, error) {
-	c := cache[id]
-	c.once.Do(func() {
-		sp := specs[id]
-		raw, err := schemaFS.ReadFile(sp.file)
+func compileDoc(id string, raw []byte) (*jsonschema.Schema, error) {
+	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
+	if err != nil {
+		return nil, fmt.Errorf("parse %s: %w", id, err)
+	}
+	comp := jsonschema.NewCompiler()
+	comp.UseLoader(offlineLoader{})
+	if err := comp.AddResource(id, doc); err != nil {
+		return nil, err
+	}
+	return comp.Compile(id)
+}
+
+func schemaFor(providerID string) (*jsonschema.Schema, error) {
+	e, ok := schemas[providerID]
+	if !ok {
+		return nil, fmt.Errorf("%w %q", ErrNoSchema, providerID)
+	}
+	e.once.Do(func() {
+		raw, err := schemaFS.ReadFile(e.file)
 		if err != nil {
-			c.err = err
+			e.err = err
 			return
 		}
-		doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
-		if err != nil {
-			c.err = fmt.Errorf("parse %s: %w", sp.file, err)
-			return
-		}
-		comp := jsonschema.NewCompiler()
-		comp.UseLoader(offlineLoader{})
-		if err := comp.AddResource(sp.id, doc); err != nil {
-			c.err = err
-			return
-		}
-		c.schema, c.err = comp.Compile(sp.id)
+		e.schema, e.err = compileDoc(e.id, raw)
 	})
-	return c.schema, c.err
+	return e.schema, e.err
 }
 
 // File validates YAML data emitted for providerID against its pinned schema.
 func File(providerID, name string, data []byte) error {
-	if _, ok := specs[providerID]; !ok {
-		return fmt.Errorf("%w %q", ErrNoSchema, providerID)
-	}
-	sch, err := compile(providerID)
+	sch, err := schemaFor(providerID)
 	if err != nil {
+		if errors.Is(err, ErrNoSchema) {
+			return err
+		}
 		return fmt.Errorf("compile %s schema: %w", providerID, err)
 	}
 	v, err := toJSONValue(data)
