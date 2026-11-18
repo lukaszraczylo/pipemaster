@@ -284,12 +284,32 @@ func TestParseDepthBoundary(t *testing.T) {
 		{"parens over", strings.Repeat("(", m+1) + "$A" + strings.Repeat(")", m+1), false},
 		{"unary at max", strings.Repeat("!", m) + "$A", true},
 		{"unary over", strings.Repeat("!", m+1) + "$A", false},
-		{"long operator chain", strings.Repeat("$A == 'x' || $B && $C != 'y' || ", 40) + "$A", true},
 	}
 	for _, c := range cases {
 		_, err := gitlab.Parse(c.src)
 		if (err == nil) != c.ok {
 			t.Errorf("%s: err=%v, want ok=%v", c.name, err, c.ok)
+		}
+	}
+}
+
+// A chain longer than MaxDepth parses, validates and survives the canonical text, because a flat run of one
+// operator is one nesting level.
+func TestLongOperatorChainsAreCheckValid(t *testing.T) {
+	for name, src := range map[string]string{
+		"flat":  strings.Repeat("$A || ", 200) + "$A",
+		"mixed": strings.Repeat("$A == 'x' || $B && $C != 'y' || ", 200) + "$A",
+	} {
+		e, err := gitlab.Parse(src)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if err := expr.Check(e); err != nil {
+			t.Fatalf("%s: Check: %v", name, err)
+		}
+		back, err := expr.ParseCanonical(expr.String(e))
+		if err != nil || !reflect.DeepEqual(e, back) {
+			t.Fatalf("%s: canonical round trip failed: %v", name, err)
 		}
 	}
 }

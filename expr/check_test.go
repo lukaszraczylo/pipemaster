@@ -123,3 +123,83 @@ func TestDepthBoundaryAgreesBetweenCheckAndParse(t *testing.T) {
 		}
 	}
 }
+
+func TestOpaqueNamedCallIsReserved(t *testing.T) {
+	c := call("opaque", str("x): y"))
+	if err := expr.Check(c); err == nil {
+		t.Fatalf("Check must reject a call named opaque; it prints as %q", expr.String(c))
+	}
+	for _, in := range []string{"opaque(1)", "a && opaque('x')", "f(opaque())"} {
+		if e, err := expr.ParseCanonical(in); err == nil {
+			t.Errorf("%q: want error, got %#v", in, e)
+		}
+	}
+	got, err := expr.ParseCanonical("opaque(gha): x")
+	if err != nil || got != (expr.Opaque{Dialect: "gha", Text: "x"}) {
+		t.Fatalf("top-level opaque form must still parse: %#v, %v", got, err)
+	}
+}
+
+// TestCheckValidAlwaysRoundTrips covers adversarial shapes, so rejection is the only way out for unprintable ones.
+func TestCheckValidAlwaysRoundTrips(t *testing.T) {
+	valid, invalid := 0, 0
+	rapid.Check(t, func(t *rapid.T) {
+		e := irtest.GenExprAdversarial(t, "e", 4, true)
+		if expr.Check(e) != nil {
+			invalid++
+			return
+		}
+		valid++
+		s := expr.String(e)
+		back, err := expr.ParseCanonical(s)
+		if err != nil {
+			t.Fatalf("ParseCanonical(%q): %v", s, err)
+		}
+		if d := cmp.Diff(e, back, cmpopts.EquateEmpty()); d != "" {
+			t.Fatalf("%q: %s", s, d)
+		}
+	})
+	if valid == 0 || invalid == 0 {
+		t.Fatalf("vacuous: valid=%d invalid=%d", valid, invalid)
+	}
+}
+
+func TestFlatChainOfAssociativeOperator(t *testing.T) {
+	for _, op := range []string{expr.OpAnd, expr.OpOr} {
+		e := ref("a")
+		for i := 0; i < 4*expr.MaxDepth; i++ {
+			e = bin(op, e, ref("a"))
+		}
+		s := expr.String(e)
+		if strings.Contains(s, "(") {
+			t.Fatalf("%s chain must print flat, got %.40q", op, s)
+		}
+		if err := expr.Check(e); err != nil {
+			t.Fatalf("%s chain: %v", op, err)
+		}
+		back, err := expr.ParseCanonical(s)
+		if err != nil || cmp.Diff(e, back) != "" {
+			t.Fatalf("%s chain does not round trip: %v", op, err)
+		}
+	}
+}
+
+func TestChainPrintingKeepsParensWhereNeeded(t *testing.T) {
+	a, b, c := ref("a"), ref("b"), ref("c")
+	for want, e := range map[string]expr.Expr{
+		"a && b && c":   bin("&&", bin("&&", a, b), c),
+		"a && (b && c)": bin("&&", a, bin("&&", b, c)),
+		"(a && b) || c": bin("||", bin("&&", a, b), c),
+		"(a == b) == c": bin("==", bin("==", a, b), c),
+		"a || b || c":   bin("||", bin("||", a, b), c),
+		"(a || b) && c": bin("&&", bin("||", a, b), c),
+	} {
+		if got := expr.String(e); got != want {
+			t.Errorf("String = %q want %q", got, want)
+		}
+		back, err := expr.ParseCanonical(want)
+		if err != nil || cmp.Diff(e, back) != "" {
+			t.Errorf("%q does not parse back to the AST: %v", want, err)
+		}
+	}
+}

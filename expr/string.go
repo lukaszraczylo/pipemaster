@@ -18,7 +18,9 @@ var (
 )
 
 // String renders e in the canonical form ParseCanonical reads back exactly.
-// Binary operands that are themselves binary are always parenthesised, so precedence never matters when printing.
+// Binary operands that are themselves binary are parenthesised, except the left operand of && or || when it uses the
+// same operator: that left-nested chain prints flat.
+// A Call may not be named "opaque": that name is reserved for the Opaque forms below.
 // A top-level Opaque keeps the `opaque(<dialect>): <text>` form; one nested in an operator, or whose dialect contains ')',
 // prints as `@opaque('<dialect>', '<text>')`. Lit numbers must be finite, as non-finite values have no canonical text.
 func String(e Expr) string {
@@ -59,7 +61,11 @@ func write(sb *strings.Builder, e Expr) {
 		sb.WriteString(v.Op)
 		operand(sb, v.X)
 	case Binary:
-		operand(sb, v.L)
+		if flatChain(v.Op, v.L) {
+			write(sb, v.L)
+		} else {
+			operand(sb, v.L)
+		}
 		sb.WriteString(" " + v.Op + " ")
 		operand(sb, v.R)
 	case Call:
@@ -74,6 +80,13 @@ func write(sb *strings.Builder, e Expr) {
 	case Opaque:
 		sb.WriteString(nestedOpaque + QuoteSingle(v.Dialect) + ", " + QuoteSingle(v.Text) + ")")
 	}
+}
+
+// flatChain reports whether l, the left operand of op, prints without parens: && and || are associative and the
+// parser reads a run of one of them left-nested, so `a || b || c` is one nesting level however long it is.
+func flatChain(op string, l Expr) bool {
+	b, ok := l.(Binary)
+	return ok && b.Op == op && (op == OpAnd || op == OpOr)
 }
 
 func operand(sb *strings.Builder, e Expr) {
@@ -409,6 +422,9 @@ func (p *parser) bracket() (string, error) {
 }
 
 func (p *parser) call(name string) (Expr, error) {
+	if name == ReservedCallName {
+		return nil, p.errf("call name %q is reserved for the opaque form", name)
+	}
 	if err := p.enter(); err != nil {
 		return nil, err
 	}

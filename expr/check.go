@@ -12,6 +12,9 @@ const MaxDepth = 50
 
 var identRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
 
+// ReservedCallName is the Call name no expression may use; `opaque(` starts the top-level Opaque form.
+const ReservedCallName = "opaque"
+
 // IsIdent reports whether s is a canonical identifier: a letter or underscore, then letters, digits, '_' or '-'.
 func IsIdent(s string) bool { return identRE.MatchString(s) }
 
@@ -32,7 +35,8 @@ var validBinOps = map[string]bool{
 // Check reports why e has no canonical text that ParseCanonical reads back exactly:
 // a nil node, a non-finite number, an unknown literal kind or operator, a literal with a field its kind does not use,
 // a Call name that is not an identifier, an empty Ref path, or nesting deeper than MaxDepth.
-// Nesting is one unit per '!', per call, and per parenthesised level: a Binary operand that is itself Binary prints in parens.
+// Nesting is one unit per '!', per call, and per parenthesised level: a Binary operand that is itself Binary prints in parens,
+// except the left operand of a same-operator && or || chain.
 func Check(e Expr) error {
 	d, err := check(e)
 	if err != nil {
@@ -75,15 +79,21 @@ func check(e Expr) (int, error) {
 		if !validBinOps[v.Op] {
 			return 0, fmt.Errorf("unknown binary operator %q", v.Op)
 		}
-		l, err := operandDepth(v.L)
+		var l int
+		var err error
+		if flatChain(v.Op, v.L) {
+			l, err = check(v.L)
+		} else {
+			l, err = operandDepth(v.L)
+		}
 		if err != nil {
 			return 0, err
 		}
 		r, err := operandDepth(v.R)
 		return max(l, r), err
 	case Call:
-		if !IsIdent(v.Name) {
-			return 0, fmt.Errorf("call name %q is not an identifier", v.Name)
+		if !IsIdent(v.Name) || v.Name == ReservedCallName {
+			return 0, fmt.Errorf("call name %q is not an identifier or is reserved", v.Name)
 		}
 		deepest := 0
 		for _, a := range v.Args {

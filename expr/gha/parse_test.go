@@ -299,12 +299,32 @@ func TestParseDepthBoundary(t *testing.T) {
 		{"unary over", strings.Repeat("!", m+1) + "a", false},
 		{"calls at max", build("format(", "a", ")", m), true},
 		{"calls over", build("format(", "a", ")", m+1), false},
-		{"long operator chain", strings.Repeat("a || b && c == d || ", 40) + "a", true},
 	}
 	for _, c := range cases {
 		_, err := gha.Parse(c.src)
 		if (err == nil) != c.ok {
 			t.Errorf("%s: err=%v, want ok=%v", c.name, err, c.ok)
+		}
+	}
+}
+
+// A chain longer than MaxDepth parses, validates and survives the canonical text, because a flat run of one
+// operator is one nesting level.
+func TestLongOperatorChainsAreCheckValid(t *testing.T) {
+	for name, src := range map[string]string{
+		"flat":  strings.Repeat("a || ", 200) + "a",
+		"mixed": strings.Repeat("a || b && c == d || ", 200) + "a",
+	} {
+		e, err := gha.Parse(src)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if err := expr.Check(e); err != nil {
+			t.Fatalf("%s: Check: %v", name, err)
+		}
+		back, err := expr.ParseCanonical(expr.String(e))
+		if err != nil || !reflect.DeepEqual(e, back) {
+			t.Fatalf("%s: canonical round trip failed: %v", name, err)
 		}
 	}
 }

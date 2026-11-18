@@ -25,6 +25,15 @@ const (
 // Opaque nodes appear (at any level) only when opaque is true. Unused Lit fields stay zero and empty slices are nil,
 // so a printed-and-parsed copy compares equal under go-cmp.
 func GenExpr(t *rapid.T, label string, maxDepth int, opaque bool) expr.Expr {
+	return genExpr(t, label, maxDepth, opaque, funcNames)
+}
+
+// GenExprAdversarial is GenExpr plus calls named like the reserved Opaque form, which expr.Check must reject.
+func GenExprAdversarial(t *rapid.T, label string, maxDepth int, opaque bool) expr.Expr {
+	return genExpr(t, label, maxDepth, opaque, append([]string{"opaque"}, funcNames...))
+}
+
+func genExpr(t *rapid.T, label string, maxDepth int, opaque bool, names []string) expr.Expr {
 	kinds := 3
 	if maxDepth > 0 {
 		kinds = 6
@@ -41,17 +50,17 @@ func GenExpr(t *rapid.T, label string, maxDepth int, opaque bool) expr.Expr {
 	case maxDepth <= 0:
 		return expr.Opaque{Dialect: rapid.SampledFrom([]string{"gha", "gitlab", "a)b"}).Draw(t, label+"d"), Text: rapid.StringMatching(strText).Draw(t, label+"t")}
 	case k == 3:
-		return expr.Unary{Op: expr.OpNot, X: GenExpr(t, label+"u", maxDepth-1, opaque)}
+		return expr.Unary{Op: expr.OpNot, X: genExpr(t, label+"u", maxDepth-1, opaque, names)}
 	case k == 4:
 		return expr.Binary{
 			Op: rapid.SampledFrom(binOps).Draw(t, label+"o"),
-			L:  GenExpr(t, label+"l", maxDepth-1, opaque),
-			R:  GenExpr(t, label+"r", maxDepth-1, opaque),
+			L:  genExpr(t, label+"l", maxDepth-1, opaque, names),
+			R:  genExpr(t, label+"r", maxDepth-1, opaque, names),
 		}
 	case k == 5:
-		c := expr.Call{Name: rapid.SampledFrom(funcNames).Draw(t, label+"f")}
+		c := expr.Call{Name: rapid.SampledFrom(names).Draw(t, label+"f")}
 		for i, n := 0, rapid.IntRange(0, 2).Draw(t, label+"n"); i < n; i++ {
-			c.Args = append(c.Args, GenExpr(t, label+"a"+string(rune('0'+i)), maxDepth-1, opaque))
+			c.Args = append(c.Args, genExpr(t, label+"a"+string(rune('0'+i)), maxDepth-1, opaque, names))
 		}
 		return c
 	}
