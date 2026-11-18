@@ -74,9 +74,7 @@ func (e *emitter) jobNode(c jobCtx, j *ir.Job) (*yaml.Node, []string, error) {
 	}
 	cond, mk := e.jobCondition(c, jp, j)
 	markers = append(markers, mk...)
-	if cond != "" {
-		m.set("if", str(cond))
-	}
+	m.set("if", cond)
 	if call != nil {
 		if err := e.callKeys(m, jp, call); err != nil {
 			return nil, nil, err
@@ -144,13 +142,20 @@ func (e *emitter) needIDs(c jobCtx, j *ir.Job) []string {
 }
 
 // jobCondition composes the job's own if with the guards the finally and manual emulations add.
-func (e *emitter) jobCondition(c jobCtx, jp string, j *ir.Job) (string, []string) {
+// A condition GHA cannot state disables the job rather than running it unguarded.
+func (e *emitter) jobCondition(c jobCtx, jp string, j *ir.Job) (*yaml.Node, []string) {
 	cond := j.If
 	if cond != nil {
-		if _, err := printExpr(cond); err != nil {
-			e.expression(jp, cond)
-			cond = nil
+		t, ok := e.source(jp, caps.JobIf, cond)
+		if ok {
+			_, err := printExpr(t)
+			ok = err == nil
 		}
+		if !ok {
+			e.disable(jp, caps.JobIf, cond, "job")
+			return boolNodeOf(false), nil
+		}
+		cond = t
 	}
 	var markers []string
 	if j.Manual {
@@ -162,10 +167,10 @@ func (e *emitter) jobCondition(c jobCtx, jp string, j *ir.Job) (string, []string
 		cond = andExpr(expr.Call{Name: "always"}, cond)
 	}
 	if cond == nil {
-		return "", markers
+		return nil, markers
 	}
-	text, _ := e.expression(jp, cond)
-	return text, markers
+	text, _ := printExpr(cond)
+	return str(text), markers
 }
 
 func andExpr(l, r expr.Expr) expr.Expr {

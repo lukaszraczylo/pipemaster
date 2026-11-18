@@ -9,7 +9,7 @@ func (a *adapter) Caps() caps.Matrix {
 		m[f] = caps.Support{Level: caps.Native}
 	}
 	for f, s := range map[caps.Feature]caps.Support{
-		caps.JobRetry:               {Level: caps.Emulated, Strategy: "step-level retry loop via shell"},
+		caps.JobRetry:               {Level: caps.Emulated, Strategy: "step-level retry loop via shell", Caveat: "Retry.Attempts is the total number of runs, so GitLab retry: N is Attempts N+1"},
 		caps.JobManual:              {Level: caps.Emulated, Strategy: "workflow_dispatch trigger"},
 		caps.TriggerPipelineDone:    {Level: caps.Native, Strategy: "workflow_run"},
 		caps.JobCache:               {Level: caps.Emulated, Strategy: "actions/cache step"},

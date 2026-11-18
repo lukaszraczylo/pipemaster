@@ -18,7 +18,7 @@ const workflowExt = ".yml"
 // Emit writes one workflow file per pipeline at <Dir>/<pipeline id>.yml. Every feature use goes
 // through the ledger; Finish fails the call when one was never accounted for.
 func (a *adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
-	e := &emitter{d: a.d, led: emitkit.NewLedger("ir", a.d.ID, a.Caps())}
+	e := &emitter{d: a.d, from: sourceDialect(originProvider(p)), led: emitkit.NewLedger("ir", a.d.ID, a.Caps())}
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)
@@ -180,4 +180,11 @@ func (e *emitter) concurrency(pp string, c *ir.Concurrency, ext map[string]any) 
 		m.set("cancel-in-progress", boolNodeOf(true))
 	}
 	return m.n, m.addExtra(rest, nil)
+}
+
+func originProvider(p *ir.Project) string {
+	if p == nil {
+		return ""
+	}
+	return p.Origin.Provider
 }

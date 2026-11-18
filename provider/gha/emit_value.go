@@ -10,7 +10,9 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
+	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
@@ -22,8 +24,54 @@ const (
 // emitter carries the state of one Emit call: the ledger, and the lost-text comments waiting for a node.
 type emitter struct {
 	led      *emitkit.Ledger
+	from     *expr.Dialect
 	d        Dialect
 	comments []string
+}
+
+// sourceDialect is the expression dialect of a project's origin; nil means GHA semantics already hold.
+func sourceDialect(origin string) *expr.Dialect {
+	switch origin {
+	case "", provider.GHA, provider.Gitea, provider.Forgejo:
+		return nil
+	case provider.GitLab:
+		return &exprgitlab.Lang
+	}
+	return &expr.Dialect{ID: origin}
+}
+
+// source rewrites x from the origin dialect's semantics into GHA's. An approximate result is
+// reported as emulated with the translator's caveats; ok is false when no translation exists.
+func (e *emitter) source(path string, f caps.Feature, x expr.Expr) (expr.Expr, bool) {
+	if e.from == nil {
+		return x, true
+	}
+	if t, ok := expr.Translate(x, *e.from, exprgha.Lang); ok {
+		return t, true
+	}
+	t, cav, ok := expr.TranslateApprox(x, *e.from, exprgha.Lang)
+	if !ok {
+		return nil, false
+	}
+	e.emulate(path, f, "approximate expression translation", strings.Join(cav, "; "))
+	return t, true
+}
+
+// condition renders an if: for a slot that must fail safe: when GHA cannot state it the construct is disabled.
+func (e *emitter) condition(path string, f caps.Feature, x expr.Expr, what string) *yaml.Node {
+	t, ok := e.source(path, f, x)
+	if ok {
+		if text, err := printExpr(t); err == nil {
+			return str(text)
+		}
+	}
+	e.disable(path, f, x, what)
+	return boolNodeOf(false)
+}
+
+func (e *emitter) disable(path string, f caps.Feature, x expr.Expr, what string) {
+	e.lose(path, f, "condition not expressible in GitHub Actions; "+what+" disabled")
+	e.comment(string(f) + " " + path + ": " + expr.String(x))
 }
 
 func (e *emitter) lose(path string, f caps.Feature, detail string) {
@@ -153,6 +201,13 @@ func (e *emitter) value(path string, v ir.Value) (*yaml.Node, error) {
 }
 
 func (e *emitter) exprValue(path string, x expr.Expr) *yaml.Node {
+	t, ok := e.source(path, caps.ExprOpaque, x)
+	if !ok {
+		e.lose(path, caps.ExprOpaque, "expression has no translation from "+e.from.ID)
+		e.comment("expr.opaque " + path + ": " + expr.String(x))
+		return nil
+	}
+	x = t
 	if c, ok := x.(expr.Call); ok {
 		if parts, ok := unmixFormat(c); ok {
 			if s, ok := joinParts(parts); ok {

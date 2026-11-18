@@ -60,7 +60,10 @@ func parseFixture(t testing.TB, name string) *ir.Project {
 	return p
 }
 
-func lintFile(t testing.TB, name string, data []byte) {
+func lintFile(t testing.TB, name string, data []byte) { lintFileIgnoring(t, name, data, "") }
+
+// lintFileIgnoring drops findings that match ignore; a disabled construct is `if: false`, which actionlint flags as constant.
+func lintFileIgnoring(t testing.TB, name string, data []byte, ignore string) {
 	t.Helper()
 	bin, err := exec.LookPath("actionlint")
 	if err != nil {
@@ -76,7 +79,11 @@ func lintFile(t testing.TB, name string, data []byte) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, bin, "-no-color", path).CombinedOutput() //nolint:gosec // bin from LookPath, path in a test temp dir
+	args := []string{"-no-color"}
+	if ignore != "" {
+		args = append(args, "-ignore", ignore)
+	}
+	out, err := exec.CommandContext(ctx, bin, append(args, path)...).CombinedOutput() //nolint:gosec // bin from LookPath, path in a test temp dir
 	if err != nil {
 		t.Fatalf("actionlint %s: %v\n%s\n--- file ---\n%s", name, err, out, data)
 	}

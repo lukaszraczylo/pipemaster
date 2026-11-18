@@ -56,6 +56,8 @@ type emulCase struct {
 	level   caps.Level
 }
 
+const constantIf = "constant expression"
+
 const (
 	jobBuild  = "pipeline/ci/job/build"
 	jobDeploy = "pipeline/ci/job/deploy"
@@ -126,9 +128,9 @@ func emulCases() map[string]emulCase {
 			want: []string{"push"},
 		},
 		"expr.opaque": {
-			feature: caps.ExprOpaque, path: jobBuild, level: caps.Lost,
+			feature: caps.JobIf, path: jobBuild, level: caps.Lost,
 			mutate: func(p *ir.Project) { job(p, "build").If = expr.Opaque{Dialect: "gitlab", Text: "$X == 1"} },
-			want:   []string{"# pipemaster:lost", "$X == 1"},
+			want:   []string{"# pipemaster:lost", "$X == 1", "if: false"},
 		},
 		"script.interpolation": {
 			feature: caps.ScriptInterpolation, path: jobBuild + "/step/build-step-1", level: caps.Lost,
@@ -161,7 +163,7 @@ func TestEmulations(t *testing.T) {
 			if err := validate.File("gha", "ci.yml", files[".github/workflows/ci.yml"]); err != nil {
 				t.Fatalf("%v\n%s", err, data)
 			}
-			lintFile(t, "ci.yml", files[".github/workflows/ci.yml"])
+			lintFileIgnoring(t, "ci.yml", files[".github/workflows/ci.yml"], constantIf)
 		})
 	}
 }
@@ -244,4 +246,62 @@ func TestEmitValueForms(t *testing.T) {
 	if ok, diff := ir.Equal(p, back); !ok {
 		t.Fatalf("values do not round trip:\n%s", diff)
 	}
+}
+
+func emitGitLabIf(t *testing.T, cond expr.Expr, onStep bool) (string, caps.Level, string) {
+	t.Helper()
+	p := baseProject(t)
+	p.Origin.Provider = "gitlab"
+	path, feat := jobBuild, caps.JobIf
+	if onStep {
+		job(p, "build").Steps[0].If = cond
+		path, feat = jobBuild+"/step/build-step-1", caps.StepIf
+	} else {
+		job(p, "build").If = cond
+	}
+	files, rep, err := gha.New(gha.GHA).Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := files[".github/workflows/ci.yml"]
+	if err := validate.File("gha", "ci.yml", data); err != nil {
+		t.Fatalf("%v\n%s", err, data)
+	}
+	lintFileIgnoring(t, "ci.yml", data, constantIf)
+	var detail string
+	for _, en := range rep.Entries {
+		if en.Feature == feat && en.IRPath == path {
+			detail = en.Detail
+		}
+	}
+	return string(data), entryLevel(rep, feat, path), detail
+}
+
+func TestEmitGitLabOriginConditions(t *testing.T) {
+	branch := expr.Ref{Path: []string{"branch"}}
+	t.Run("case-sensitive equality is approximate", func(t *testing.T) {
+		data, lvl, detail := emitGitLabIf(t, expr.Binary{Op: expr.OpEq, L: branch, R: lit("main")}, false)
+		if !strings.Contains(data, "github.ref_name == 'main'") || lvl != caps.Emulated || !strings.Contains(detail, "case-insensitively") {
+			t.Fatalf("level %v detail %q\n%s", lvl, detail, data)
+		}
+	})
+	t.Run("regex prefix becomes startsWith", func(t *testing.T) {
+		data, lvl, _ := emitGitLabIf(t, expr.Binary{Op: expr.OpMatch, L: branch, R: lit(expr.Pattern(expr.ModePrefix, "v"))}, false)
+		if !strings.Contains(data, "startsWith(github.ref_name, 'v')") || lvl != caps.Native {
+			t.Fatalf("level %v\n%s", lvl, data)
+		}
+	})
+	t.Run("untranslatable job condition disables the job", func(t *testing.T) {
+		data, lvl, detail := emitGitLabIf(t, expr.Binary{Op: expr.OpEq, L: branch, R: expr.Ref{Path: []string{"tag"}}}, false)
+		if !strings.Contains(data, "if: false") || !strings.Contains(data, "# pipemaster:lost") || lvl != caps.Lost ||
+			!strings.Contains(detail, "job disabled") {
+			t.Fatalf("level %v detail %q\n%s", lvl, detail, data)
+		}
+	})
+	t.Run("untranslatable step condition disables the step", func(t *testing.T) {
+		data, lvl, detail := emitGitLabIf(t, expr.Binary{Op: expr.OpEq, L: branch, R: expr.Ref{Path: []string{"tag"}}}, true)
+		if !strings.Contains(data, "if: false") || lvl != caps.Lost || !strings.Contains(detail, "step disabled") {
+			t.Fatalf("level %v detail %q\n%s", lvl, detail, data)
+		}
+	})
 }

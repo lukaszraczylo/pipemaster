@@ -29,7 +29,7 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-// retryScript wraps body in a loop that runs it up to attempts times; set -e inside the subshell
+// retryScript wraps body (attempts is the total number of runs, not the number of retries) in a loop that runs it up to attempts times; set -e inside the subshell
 // still applies because the subshell is not an if or until condition.
 func retryScript(body []string, attempts int) []string {
 	out := []string{
@@ -69,9 +69,7 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 		m.set("name", str(t))
 	}
 	if st.If != nil {
-		if text, ok := e.expression(sp, st.If); ok {
-			m.set("if", str(text))
-		}
+		m.set("if", e.condition(sp, caps.StepIf, st.If, "step"))
 	}
 	var markers []string
 	wrapped := false
