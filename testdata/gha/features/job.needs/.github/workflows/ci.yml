@@ -1,0 +1,16 @@
+name: needs
+on: push
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo lint
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo test
+  ship:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ship

@@ -1,0 +1,28 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/ci.yml
+pipelines:
+    - id: ci
+      name: pr
+      triggers:
+        - ext:
+            gha:
+                types:
+                    - opened
+                    - synchronize
+          kind: pr
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: script
+              script:
+                - echo ok

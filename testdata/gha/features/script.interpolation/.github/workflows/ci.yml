@@ -1,0 +1,9 @@
+name: interp
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "sha ${{ github.sha }} on ${{ github.ref_name }}"
+          echo "${{ github.workspace }}"

@@ -1,0 +1,57 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/ci.yml
+pipelines:
+    - id: ci
+      name: action
+      triggers:
+        - kind: push
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - action:
+                kind: repo
+                owner: actions
+                repo: checkout
+                ref: v4
+              with:
+                fetch-depth:
+                    lit: "0"
+                token:
+                    secret: PAT
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: action
+            - action:
+                kind: repo
+                owner: actions
+                repo: setup-go
+                ref: v5
+              with:
+                go-version:
+                    lit: "1.24"
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-2
+              kind: action
+            - action:
+                kind: docker
+                image: alpine:3.20
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-3
+              kind: action
+            - action:
+                kind: local
+                path: ./.github/actions/setup
+              id: local
+              kind: action

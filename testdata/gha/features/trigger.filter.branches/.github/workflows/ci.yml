@@ -1,0 +1,15 @@
+name: branches
+on:
+  push:
+    branches:
+      - main
+      - 'release/**'
+      - '!release/old'
+  pull_request:
+    branches-ignore:
+      - 'wip/**'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok

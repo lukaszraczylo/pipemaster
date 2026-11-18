@@ -1,0 +1,36 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/ci.yml
+pipelines:
+    - id: ci
+      name: env
+      triggers:
+        - kind: push
+      env:
+        - name: CGO_ENABLED
+          value:
+            lit: "0"
+        - name: VERSION
+          value:
+            lit: "3.1"
+        - name: TOKEN
+          value:
+            secret: DEPLOY_TOKEN
+        - name: LABEL
+          value:
+            expr: format('build-{0}', gha.github.run_number)
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: script
+              script:
+                - echo ok

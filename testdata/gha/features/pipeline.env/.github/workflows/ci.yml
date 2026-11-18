@@ -1,0 +1,12 @@
+name: env
+on: push
+env:
+  CGO_ENABLED: '0'
+  VERSION: 3.10
+  TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+  LABEL: build-${{ github.run_number }}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok

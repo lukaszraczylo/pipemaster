@@ -1,0 +1,50 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/ci.yml
+pipelines:
+    - id: ci
+      name: needs
+      triggers:
+        - kind: push
+      jobs:
+        - id: lint
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: lint-step-1
+              kind: script
+              script:
+                - echo lint
+        - id: ship
+          runner:
+            labels:
+                - ubuntu-latest
+          needs:
+            - job: lint
+            - job: test
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: ship-step-1
+              kind: script
+              script:
+                - echo ship
+        - id: test
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: test-step-1
+              kind: script
+              script:
+                - echo test

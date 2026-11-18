@@ -1,0 +1,40 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/ci.yml
+pipelines:
+    - id: ci
+      name: inputs
+      triggers:
+        - ext:
+            gha:
+                inputs:
+                    environment:
+                        options:
+                            - staging
+                            - production
+          kind: manual
+      inputs:
+        - name: environment
+          type: choice
+          default: staging
+          description: Where to deploy
+          required: true
+        - name: dry-run
+          type: boolean
+          default: "false"
+          description: Skip the push
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: script
+              script:
+                - echo ok

@@ -1,0 +1,39 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/ci.yml
+pipelines:
+    - id: ci
+      name: api
+      triggers:
+        - ext:
+            gha:
+                event: repository_dispatch
+                types:
+                    - deploy
+          kind: api
+        - ext:
+            gha:
+                event: workflow_call
+                inputs:
+                    target:
+                        required: true
+                        type: string
+                secrets:
+                    token:
+                        required: false
+          kind: api
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: script
+              script:
+                - echo ok

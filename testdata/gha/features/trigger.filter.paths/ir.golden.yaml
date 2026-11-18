@@ -1,0 +1,31 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/ci.yml
+pipelines:
+    - id: ci
+      name: paths
+      triggers:
+        - kind: pr
+          paths:
+            exclude:
+                - '**.md'
+        - kind: push
+          paths:
+            include:
+                - src/**
+                - '!src/docs/**'
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: script
+              script:
+                - echo ok

@@ -1,0 +1,13 @@
+name: runner
+on: push
+jobs:
+  build:
+    runs-on: [self-hosted, linux, x64]
+    steps:
+      - run: echo ok
+  grouped:
+    runs-on:
+      group: big-runners
+      labels: [linux]
+    steps:
+      - run: echo ok

@@ -1,0 +1,39 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/ci.yml
+pipelines:
+    - ext:
+        gha:
+            defaults:
+                run:
+                    shell: bash
+            events:
+                issues:
+                    types:
+                        - opened
+            run-name: Deploy by ${{ github.actor }}
+      id: ci
+      name: ext
+      triggers:
+        - kind: push
+      jobs:
+        - ext:
+            gha:
+                defaults:
+                    run:
+                        working-directory: app
+          id: build
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: script
+              shell: bash
+              script:
+                - echo ok

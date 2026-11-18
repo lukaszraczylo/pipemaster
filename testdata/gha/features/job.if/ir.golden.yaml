@@ -1,0 +1,24 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/ci.yml
+pipelines:
+    - id: ci
+      name: cond
+      triggers:
+        - kind: push
+      jobs:
+        - if: (ref == 'refs/heads/main') && (event == 'push')
+          id: deploy
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: deploy-step-1
+              kind: script
+              script:
+                - echo deploy

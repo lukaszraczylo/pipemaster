@@ -1,0 +1,15 @@
+name: outputs
+on: push
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.value }}
+    steps:
+      - id: tag
+        run: echo "value=v1" >> "$GITHUB_OUTPUT"
+  use:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ needs.version.outputs.tag }}
