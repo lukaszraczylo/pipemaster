@@ -56,7 +56,7 @@ end Level
 /-- Feature names are opaque to the model. -/
 abbrev Feature := String
 
-/-- Mirrors the shape of ir.FeatureUse. -/
+/-- Mirrors ir.FeatureUse (ir/features.go). -/
 structure FeatureUse where
   irPath : String
   feature : Feature

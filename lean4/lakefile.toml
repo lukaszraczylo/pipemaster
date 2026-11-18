@@ -8,3 +8,7 @@ rev = "v4.36.0"
 
 [[lean_lib]]
 name = "Pipemaster"
+
+[[lean_exe]]
+name = "gen-vectors"
+root = "GenVectors"
