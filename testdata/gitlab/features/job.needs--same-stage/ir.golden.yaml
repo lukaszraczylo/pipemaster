@@ -1,0 +1,58 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - ext:
+        gitlab:
+            stages:
+                - build
+                - test
+      id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - ext:
+            gitlab:
+                _derived_needs: true
+                stage: test
+          id: check
+          needs:
+            - job: compile
+            - job: package
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make check
+        - ext:
+            gitlab:
+                stage: build
+          id: compile
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make compile
+        - ext:
+            gitlab:
+                stage: build
+          id: package
+          needs:
+            - job: compile
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make package

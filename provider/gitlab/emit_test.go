@@ -206,13 +206,19 @@ func TestStagesRespectNeeds(t *testing.T) {
 	for src, load := range loaders {
 		for _, name := range dirNames(t, dirs[src]) {
 			t.Run(src+"/"+name, func(t *testing.T) {
-				assertStagesRespectNeeds(t, emitDoc(t, load(name)))
+				assertStagesOrder(t, emitDoc(t, load(name)), src == "gha")
 			})
 		}
 	}
 }
 
 func assertStagesRespectNeeds(t *testing.T, doc string) {
+	t.Helper()
+	assertStagesOrder(t, doc, true)
+}
+
+// A GitLab-origin file may keep a job and its need in one stage; other dialects get strictly earlier stages.
+func assertStagesOrder(t *testing.T, doc string, strict bool) {
 	t.Helper()
 	var root map[string]any
 	if err := yaml.Unmarshal([]byte(doc), &root); err != nil {
@@ -261,7 +267,7 @@ func assertStagesRespectNeeds(t *testing.T, doc string) {
 			case map[string]any:
 				name, _ = x["job"].(string)
 			}
-			if need, ok := stageOf[name]; ok && need >= stageOf[k] {
+			if need, ok := stageOf[name]; ok && (need > stageOf[k] || (strict && need == stageOf[k])) {
 				t.Errorf("job %s (stage %d) needs %s (stage %d)", k, stageOf[k], name, need)
 			}
 		}

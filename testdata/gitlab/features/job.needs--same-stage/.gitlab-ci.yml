@@ -1,0 +1,19 @@
+stages:
+  - build
+  - test
+
+compile:
+  stage: build
+  script:
+    - make compile
+
+package:
+  stage: build
+  needs: [compile]
+  script:
+    - make package
+
+check:
+  stage: test
+  script:
+    - make check

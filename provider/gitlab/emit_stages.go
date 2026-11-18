@@ -95,6 +95,17 @@ func restoreStages(pl *ir.Pipeline) (*stagePlan, bool) {
 			finally[f.ID] = true
 		}
 	}
+	// A GitLab file may have a job need one in its own stage; a pipeline with no stage layout of its own
+	// (from another dialect) keeps strictly earlier stages.
+	sameStage := 0
+	if hasStages {
+		sameStage = 1
+	}
+	for _, j := range jobs {
+		if _, written := jobStage(j); written {
+			sameStage = 1
+		}
+	}
 	byID := map[string]*ir.Job{}
 	stageOf := map[string]string{}
 	forced := map[string]bool{}
@@ -124,7 +135,7 @@ func restoreStages(pl *ir.Pipeline) (*stagePlan, bool) {
 			return nil, false
 		}
 		for _, n := range j.Needs {
-			if t, ok := byID[n.JobID]; ok && idx[stageOf[t.ID]] >= idx[stageOf[j.ID]] {
+			if t, ok := byID[n.JobID]; ok && idx[stageOf[t.ID]] >= idx[stageOf[j.ID]]+sameStage {
 				return nil, false
 			}
 		}
