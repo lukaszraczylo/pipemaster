@@ -11,8 +11,8 @@ import (
 
 var plainName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
 
-// RewriteNeedsRefs renames the job ids that `needs.<id>` references name, in place, across every string and
-// expression reference under v. All renames apply at once, so swapped ids stay correct. v must be a pointer.
+// RewriteNeedsRefs renames the job ids that `needs.<id>` references name, in place, across every expression
+// reference and every ${{ }} part of a string under v. All renames apply at once, so swapped ids stay correct. v must be a pointer.
 func RewriteNeedsRefs(v any, renames map[string]string) {
 	if len(renames) == 0 {
 		return
@@ -32,7 +32,17 @@ type refRewriter struct {
 	renames map[string]string
 }
 
+var templateExpr = regexp.MustCompile(`\$\{\{.*?\}\}`)
+
+// text rewrites references inside ${{ }} only; the text around them is shell or prose and stays as written.
 func (r *refRewriter) text(s string) string {
+	if !strings.Contains(s, "${{") {
+		return s
+	}
+	return templateExpr.ReplaceAllStringFunc(s, r.expression)
+}
+
+func (r *refRewriter) expression(s string) string {
 	return r.re.ReplaceAllStringFunc(s, func(m string) string {
 		sub := r.re.FindStringSubmatch(m)
 		id, open, tail := r.renames[sub[2]], sub[1], sub[3]

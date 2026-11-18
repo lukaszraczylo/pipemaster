@@ -20,11 +20,14 @@ func jobIDMap(pl *ir.Pipeline) map[string]string {
 	return roundtrip.AssignIDs(provider.GHA, ids)
 }
 
-// withValidJobIDs returns p with job ids, needs and needs references renamed to GHA-valid ids. The input is
-// never written to: a project that needs renames is cloned first.
-func withValidJobIDs(p *ir.Project) *ir.Project {
+// idRename is one job id the emitter changed, as the path of the renamed job and the original id.
+type idRename struct{ path, from, to string }
+
+// withValidJobIDs returns p with job ids, needs and needs references renamed to GHA-valid ids, and the
+// renames it made. The input is never written to: a project that needs renames is cloned first.
+func withValidJobIDs(p *ir.Project) (*ir.Project, []idRename) {
 	if p == nil {
-		return nil
+		return nil, nil
 	}
 	var plans []map[string]string
 	changed := false
@@ -37,8 +40,9 @@ func withValidJobIDs(p *ir.Project) *ir.Project {
 		changed = changed || renames(ids)
 	}
 	if !changed {
-		return p
+		return p, nil
 	}
+	var done []idRename
 	out := ir.Clone(p)
 	for i, pl := range out.Pipelines {
 		if pl == nil || !renames(plans[i]) {
@@ -50,6 +54,9 @@ func withValidJobIDs(p *ir.Project) *ir.Project {
 			if j == nil {
 				continue
 			}
+			if ids[j.ID] != j.ID {
+				done = append(done, idRename{path: jobPath(pl.ID, ids[j.ID]), from: j.ID, to: ids[j.ID]})
+			}
 			j.ID = ids[j.ID]
 			for k, n := range j.Needs {
 				if id, ok := ids[n.JobID]; ok {
@@ -58,7 +65,7 @@ func withValidJobIDs(p *ir.Project) *ir.Project {
 			}
 		}
 	}
-	return out
+	return out, done
 }
 
 func renames(ids map[string]string) bool { return len(renamed(ids)) > 0 }

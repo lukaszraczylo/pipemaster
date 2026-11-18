@@ -18,11 +18,15 @@ const workflowExt = ".yml"
 // Emit writes one workflow file per pipeline at <Dir>/<pipeline id>.yml. Every feature use goes
 // through the ledger; Finish fails the call when one was never accounted for.
 func (a *adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
-	p = withValidJobIDs(p)
+	p, idRenames := withValidJobIDs(p)
 	e := &emitter{d: a.d, from: sourceDialect(originProvider(p)), led: emitkit.NewLedger("ir", a.d.ID, a.Caps())}
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)
+	}
+	for _, r := range idRenames {
+		e.emulate(r.path, caps.ExtPassthrough, "job id renamed",
+			"job id "+r.from+" is not valid on "+a.d.ID+"; written as "+r.to+", restored only with round-trip metadata")
 	}
 	files := map[string][]byte{}
 	if p != nil {

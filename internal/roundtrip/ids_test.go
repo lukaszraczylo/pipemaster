@@ -6,6 +6,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
@@ -226,4 +227,28 @@ jobs:
 	if !slices.Equal(got, want) {
 		t.Errorf("scripts = %q, want %q", got, want)
 	}
+}
+
+func TestRewriteNeedsRefsLeavesTextOutsideExpressions(t *testing.T) {
+	pl := &ir.Pipeline{Name: "needs.build docs", Jobs: []*ir.Job{{Steps: []*ir.Step{{Script: []string{
+		"echo needs.build.outputs.x ${{ needs.build.outputs.x }}",
+	}}}}}}
+	emitkit.RewriteNeedsRefs(pl, map[string]string{"build": "_1build"})
+	if got, want := pl.Jobs[0].Steps[0].Script[0], "echo needs.build.outputs.x ${{ needs._1build.outputs.x }}"; got != want {
+		t.Errorf("got  %s\nwant %s", got, want)
+	}
+	if pl.Name != "needs.build docs" {
+		t.Errorf("a name outside an expression changed: %q", pl.Name)
+	}
+}
+
+func TestRenamedJobIDIsReported(t *testing.T) {
+	src := gitlabSourceFS(t, refProject("1build", "deploy"))
+	r := hops(t, src, prov(t, provider.GitLab), prov(t, provider.GHA), false, false)
+	for _, e := range r.toRep.Entries {
+		if strings.Contains(e.Detail, "1build") && strings.Contains(e.Detail, "restored only with round-trip metadata") && e.Level == caps.Emulated {
+			return
+		}
+	}
+	t.Errorf("no emulated entry reports the rename of 1build: %+v", r.toRep.Entries)
 }

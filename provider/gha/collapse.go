@@ -152,13 +152,36 @@ func sourceCond(rep *report.Report, u ir.FeatureUse, args []string, parsed expr.
 		if err != nil {
 			continue
 		}
-		if parsed != nil && rederives(x, parsed) {
-			return x
+		if parsed != nil {
+			if r, ok := restoreCond(x, parsed); ok {
+				parsed = r
+				continue
+			}
 		}
 		rep.Add(report.Entry{IRPath: u.IRPath, Feature: u.Feature, Level: caps.Lost, Strategy: "marker ignored",
 			Detail: "marker ignored: the condition was edited after conversion, so the parsed condition stands"})
 	}
 	return parsed
+}
+
+// restoreCond puts src in place of the part of parsed it stands for. The emitter marks each side of a
+// status guard such as `failure() && cond` on its own, so the status call stays and only the other side is
+// replaced. ok is false when the emitter would not have written parsed from src.
+func restoreCond(src, parsed expr.Expr) (expr.Expr, bool) {
+	if b, ok := parsed.(expr.Binary); ok && b.Op == expr.OpAnd {
+		switch {
+		case isStatus(b.L) && !isStatus(b.R):
+			r, ok := restoreCond(src, b.R)
+			return expr.Binary{Op: b.Op, L: b.L, R: r}, ok
+		case isStatus(b.R) && !isStatus(b.L):
+			l, ok := restoreCond(src, b.L)
+			return expr.Binary{Op: b.Op, L: l, R: b.R}, ok
+		}
+	}
+	if rederives(src, parsed) {
+		return src, true
+	}
+	return nil, false
 }
 
 // rederives is true when the emitter would write src as the condition parsed.

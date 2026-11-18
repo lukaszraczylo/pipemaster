@@ -205,3 +205,22 @@ func TestEditedImageStepBeatsMarker(t *testing.T) {
 		t.Errorf("no report note: %+v", rep.Entries)
 	}
 }
+
+func TestStatusGuardedConditionRestoresUnedited(t *testing.T) {
+	p := gitlabCondProject(t)
+	cond := p.Pipelines[0].Jobs[0].If
+	p.Pipelines[0].Jobs[0].If = expr.Binary{Op: expr.OpAnd, L: expr.Call{Name: "failure"}, R: cond}
+	files, _, err := gha.New(gha.GHA).Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, rep := parseGHAText(t, files)
+	if got, want := expr.String(back.Pipelines[0].Jobs[0].If), expr.String(p.Pipelines[0].Jobs[0].If); got != want {
+		t.Errorf("condition = %s, want %s", got, want)
+	}
+	for _, e := range rep.Entries {
+		if strings.Contains(e.Detail, "marker ignored") {
+			t.Errorf("an unedited condition was reported edited: %+v", e)
+		}
+	}
+}
