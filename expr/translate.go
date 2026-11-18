@@ -2,6 +2,7 @@ package expr
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -98,13 +99,14 @@ func asciiLower(s string) string {
 	return string(b)
 }
 
-// okLit: a literal the case-insensitive regex can stand for (non-empty, ASCII).
+// okLit: a literal the case-insensitive regex can stand for (non-empty, ASCII). A backslash is
+// refused: GitLab patterns cannot spell a trailing one and read `\/` as a slash.
 func okLit(s string) bool {
 	if s == "" {
 		return false
 	}
 	for i := 0; i < len(s); i++ {
-		if s[i] >= 0x80 {
+		if s[i] >= 0x80 || s[i] == '\\' {
 			return false
 		}
 	}
@@ -188,8 +190,13 @@ func affixMode(c Call) *Mode {
 
 func eventFrom(d Dialect, lit string) (string, bool) {
 	l := asciiLower(lit)
-	for canon, v := range d.Events {
-		if v == l {
+	canons := make([]string, 0, len(d.Events))
+	for canon := range d.Events {
+		canons = append(canons, canon)
+	}
+	sort.Strings(canons)
+	for _, canon := range canons {
+		if d.Events[canon] == l {
 			return canon, true
 		}
 	}
@@ -220,7 +227,16 @@ func rx(neg bool, x Expr, m Mode, s string) Expr {
 //   - GitLab == and != are case-sensitive: they have no exact GHA form (see TranslateApprox).
 //
 // The model is ASCII-only: literals with a non-ASCII byte are untranslatable, and the proofs do not cover
-// Unicode case folding of environment values, array values or number coercion.
+// Unicode case folding of environment values, array values or number coercion. A literal with a backslash
+// is untranslatable because GitLab patterns cannot spell a trailing one and read `\/` as a slash.
+//
+// Environment assumptions of the model (the "related by the vocabulary mapping" relation):
+//   - Both sides see the same ref: GHA ref_name equals GitLab CI_COMMIT_REF_NAME.
+//   - Merge-request and pull_request pipelines are not modelled: GitLab leaves CI_COMMIT_BRANCH unset
+//     there, while GHA ref_name is N/merge.
+//   - Case folding is ASCII only.
+//   - Only the four modelled events (push, pull_request, schedule, workflow_dispatch) exist; an event
+//     literal without an entry in both dialects' Events tables is untranslatable.
 func Translate(e Expr, from, to Dialect) (Expr, bool) {
 	switch {
 	case from.ID == provGHA && to.ID == provGitLab:
@@ -236,7 +252,7 @@ func Translate(e Expr, from, to Dialect) (Expr, bool) {
 func Translatable(e Expr, from, to Dialect) bool {
 	switch {
 	case from.ID == provGHA && to.ID == provGitLab:
-		return okFwd(e, from)
+		return okFwd(e, from, to)
 	case from.ID == provGitLab && to.ID == provGHA:
 		return okRev(e, from)
 	}
@@ -323,7 +339,11 @@ func cmpToGitLab(neg bool, l, r Expr, from, to Dialect) (Expr, bool) {
 		if !ok {
 			return nil, false
 		}
-		return rx(neg, copyRef(ref), ModeExact, to.Events[canon]), true
+		tgt, ok := to.Events[canon]
+		if !ok {
+			return nil, false
+		}
+		return rx(neg, copyRef(ref), ModeExact, tgt), true
 	case CtxRefName, CtxSHA:
 		if okEq(lit) {
 			return rx(neg, copyRef(ref), ModeExact, lit), true
@@ -383,13 +403,13 @@ func joinToGitLab(b Binary, from, to Dialect) (Expr, bool) {
 }
 
 // okFwd states the gha to gitlab subset without reference to toGitLab.
-func okFwd(e Expr, from Dialect) bool {
+func okFwd(e Expr, from, to Dialect) bool {
 	switch v := e.(type) {
 	case Ref:
 		_, ok := subject(v)
 		return ok
 	case Unary:
-		return v.Op == OpNot && okFwd(v.X, from)
+		return v.Op == OpNot && okFwd(v.X, from, to)
 	case Call:
 		m := affixMode(v)
 		if m == nil {
@@ -405,26 +425,27 @@ func okFwd(e Expr, from Dialect) bool {
 	case Binary:
 		switch v.Op {
 		case OpEq, OpNe:
-			return cmpOK(v.L, v.R, from)
+			return cmpOK(v.L, v.R, from, to)
 		case OpAnd:
 			_, g := typeGuard(v.L)
-			return (g && nameTest(v.R)) || (boolValued(v.L) && okFwd(v.L, from) && okFwd(v.R, from))
+			return (g && nameTest(v.R)) || (boolValued(v.L) && okFwd(v.L, from, to) && okFwd(v.R, from, to))
 		case OpOr:
-			return boolValued(v.L) && okFwd(v.L, from) && okFwd(v.R, from)
+			return boolValued(v.L) && okFwd(v.L, from, to) && okFwd(v.R, from, to)
 		}
 	}
 	return false
 }
 
-func cmpOK(l, r Expr, from Dialect) bool {
+func cmpOK(l, r Expr, from, to Dialect) bool {
 	ref, lit, ok := refSide(l, r)
 	if !ok {
 		return false
 	}
 	switch pathName(ref) {
 	case CtxEvent:
-		_, ok := eventFrom(from, lit)
-		return ok
+		canon, ok := eventFrom(from, lit)
+		_, mapped := to.Events[canon]
+		return ok && mapped
 	case CtxRefName, CtxSHA:
 		return okEq(lit)
 	}
@@ -584,14 +605,19 @@ func okRev(e Expr, from Dialect) bool {
 	return false
 }
 
-// ciCaveat is the caveat attached to every approximated GitLab comparison.
-const ciCaveat = "GitHub compares strings case-insensitively"
+// Caveats attached to an approximated GitLab comparison. Each names a way the GHA result can differ.
+const (
+	ciCaveat      = "GitHub compares strings case-insensitively"
+	nullCaveat    = "GitHub treats an unset value as equal to '' (null == '' is true); GitLab does not"
+	numberCaveat  = "GitHub coerces a numeric-looking literal to a number, so equality is numeric (null == '0' is true)"
+	unicodeCaveat = "GitHub case folding of non-ASCII text may differ from GitLab"
+)
 
 // TranslateApprox translates what Translate rejects but a close equivalent exists for: a GitLab == or !=
-// between a ref and a string literal becomes the GHA == or != (the same test, except that GitHub ignores
-// case), and the caveats say so. Emitters report such a result as emulated. It is NOT covered by the Lean
-// theorems: only Translate and Translatable are proved, and tests check this function in Go alone. An
-// exact translation returns no caveats.
+// between a ref and a string literal becomes the GHA == or != (the same test, except for the divergences
+// the caveats list), and the caveats say so. Emitters report such a result as emulated. It is NOT covered
+// by the Lean theorems: only Translate and Translatable are proved, and tests check this function in Go
+// alone. An exact translation returns no caveats.
 func TranslateApprox(e Expr, from, to Dialect) (Expr, []string, bool) {
 	if t, ok := Translate(e, from, to); ok {
 		return t, nil, true
@@ -599,32 +625,71 @@ func TranslateApprox(e Expr, from, to Dialect) (Expr, []string, bool) {
 	if from.ID != provGitLab || to.ID != provGHA {
 		return nil, nil, false
 	}
-	t, ok := approxToGHA(e, from, to)
+	var cav caveats
+	t, ok := approxToGHA(e, from, to, &cav)
 	if !ok {
 		return nil, nil, false
 	}
-	return t, []string{ciCaveat}, true
+	return t, cav.list(), true
 }
 
-func approxToGHA(e Expr, from, to Dialect) (Expr, bool) {
+// caveats is an ordered set of caveat strings.
+type caveats []string
+
+func (c *caveats) add(s string) {
+	for _, x := range *c {
+		if x == s {
+			return
+		}
+	}
+	*c = append(*c, s)
+}
+
+func addAll(c *caveats, xs []string) {
+	for _, x := range xs {
+		c.add(x)
+	}
+}
+
+func (c caveats) list() []string { return c }
+
+// litCaveats lists every known divergence between GitLab == lit and GHA == lit for a string value.
+func litCaveats(lit string) []string {
+	out := []string{ciCaveat}
+	if lit == "" {
+		out = append(out, nullCaveat)
+	}
+	if !okEq(lit) && lit != "" && okLit(lit) {
+		out = append(out, numberCaveat)
+	}
+	for i := 0; i < len(lit); i++ {
+		if lit[i] >= 0x80 {
+			out = append(out, unicodeCaveat)
+			break
+		}
+	}
+	return out
+}
+
+func approxToGHA(e Expr, from, to Dialect, cav *caveats) (Expr, bool) {
 	if t, ok := toGHA(e, from, to); ok {
 		return t, true
 	}
 	switch v := e.(type) {
 	case Unary:
-		if x, ok := approxToGHA(v.X, from, to); ok && v.Op == OpNot {
+		if x, ok := approxToGHA(v.X, from, to, cav); ok && v.Op == OpNot {
 			return Unary{Op: OpNot, X: x}, true
 		}
 	case Binary:
 		switch v.Op {
 		case OpEq, OpNe:
-			return approxCmp(v, from)
+			return approxCmp(v, from, cav)
 		case OpAnd, OpOr:
 			if !boolValued(v.L) {
 				return nil, false
 			}
-			l, ok := approxToGHA(v.L, from, to)
-			r, rok := approxToGHA(v.R, from, to)
+			l, ok := approxToGHA(v.L, from, to, cav)
+			r, rok := approxToGHA(v.R, from, to, cav)
 			if ok && rok {
 				return Binary{Op: v.Op, L: l, R: r}, true
 			}
@@ -633,7 +698,7 @@ func approxToGHA(e Expr, from, to Dialect) (Expr, bool) {
 	return nil, false
 }
 
-func approxCmp(b Binary, from Dialect) (Expr, bool) {
+func approxCmp(b Binary, from Dialect, cav *caveats) (Expr, bool) {
 	ref, lit, ok := refSide(b.L, b.R)
 	if !ok {
 		return nil, false
@@ -645,10 +710,13 @@ func approxCmp(b Binary, from Dialect) (Expr, bool) {
 		if !ok {
 			return nil, false
 		}
+		cav.add(ciCaveat)
 		return Binary{Op: b.Op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: canon}}, true
 	case CtxRefName, CtxSHA:
+		addAll(cav, litCaveats(lit))
 		return Binary{Op: b.Op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: lit}}, true
 	case CtxBranch, CtxTag:
+		addAll(cav, litCaveats(lit))
 		cmp = guardE(n, Binary{Op: OpEq, L: ctxRef(CtxRefName), R: Lit{Kind: LitStr, Str: lit}})
 	default:
 		return nil, false

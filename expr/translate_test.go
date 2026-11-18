@@ -427,3 +427,163 @@ func TestTranslateRandomAgreement(t *testing.T) {
 		}
 	})
 }
+
+const escAlphabet = "aAbZ09_-. /*\\+?()[]{}^$|'\"x"
+
+func genEscLit(t *rapid.T) string {
+	n := rapid.IntRange(1, 5).Draw(t, "n")
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = escAlphabet[rapid.IntRange(0, len(escAlphabet)-1).Draw(t, "c")]
+	}
+	return string(b)
+}
+
+// escEnvs holds the literal, its case variants and near-misses, plus unset.
+func escEnvs(lit string) []canonEnv {
+	vals := []string{lit, strings.ToUpper(lit), strings.ToLower(lit), lit + "x", "x" + lit, lit[:len(lit)-1], lit[1:], "y" + lit[1:]}
+	envs := []canonEnv{{}}
+	for _, v := range vals {
+		envs = append(envs, canonEnv{RefName: sp(v), RefType: sp("branch"), SHA: sp(v)})
+	}
+	return envs
+}
+
+// TestTranslateEscapingSemantics: Translate, print, parse, evaluate in the target dialect must agree
+// with the source for literals full of regex and quoting metacharacters.
+func TestTranslateEscapingSemantics(t *testing.T) {
+	modes := []expr.Mode{expr.ModeExact, expr.ModePrefix, expr.ModeSuffix, expr.ModeSub}
+	rapid.Check(t, func(t *rapid.T) {
+		lit := genEscLit(t)
+		m := rapid.SampledFrom(modes).Draw(t, "m")
+		neg := rapid.Bool().Draw(t, "neg")
+		fwd := rapid.Bool().Draw(t, "fwd")
+		subj := rapid.SampledFrom([]string{"ref_name", "sha"}).Draw(t, "subj")
+		from, to := gha.Lang, gitlab.Lang
+		sv, tv := canonEnv.ghaView, canonEnv.gitlabView
+		var srcText string
+		var err error
+		if fwd {
+			ref := expr.Ref{Path: []string{subj}}
+			l := expr.Lit{Kind: expr.LitStr, Str: lit}
+			var src expr.Expr
+			switch {
+			case m == expr.ModeExact && neg:
+				src = expr.Binary{Op: expr.OpNe, L: ref, R: l}
+			case m == expr.ModeExact:
+				src = expr.Binary{Op: expr.OpEq, L: ref, R: l}
+			default:
+				src = expr.Call{Name: map[expr.Mode]string{expr.ModePrefix: "startsWith", expr.ModeSuffix: "endsWith", expr.ModeSub: "contains"}[m], Args: []expr.Expr{ref, l}}
+				src = negateIf(neg, src)
+			}
+			srcText, err = gha.Print(src)
+		} else {
+			from, to, sv, tv = gitlab.Lang, gha.Lang, tv, sv
+			op := expr.OpMatch
+			if neg {
+				op = expr.OpNoMatch
+			}
+			srcText, err = gitlab.Print(expr.Binary{Op: op, L: expr.Ref{Path: []string{subj}}, R: expr.Lit{Kind: expr.LitStr, Str: expr.Pattern(m, lit)}})
+			if err != nil {
+				t.Skip() // GitLab cannot spell this source, so no GitLab source exists to translate
+			}
+		}
+		if err != nil {
+			t.Fatalf("print source: %v", err)
+		}
+		var src expr.Expr
+		if fwd {
+			src, err = gha.Parse(srcText)
+		} else {
+			src, err = gitlab.Parse(srcText)
+		}
+		if err != nil {
+			t.Fatalf("parse source %q: %v", srcText, err)
+		}
+		out, ok := expr.Translate(src, from, to)
+		if expr.Translatable(src, from, to) != ok {
+			t.Fatalf("Translatable != Translate for %q", srcText)
+		}
+		if !ok {
+			return
+		}
+		var tgtText string
+		var back expr.Expr
+		if fwd {
+			tgtText, err = gitlab.Print(out)
+			if err == nil {
+				back, err = gitlab.Parse(tgtText)
+			}
+		} else {
+			tgtText, err = gha.Print(out)
+			if err == nil {
+				back, err = gha.Parse(tgtText)
+			}
+		}
+		if err != nil || !reflect.DeepEqual(back, out) {
+			t.Fatalf("%q translated to %s: print/parse = %q, %v, %v", srcText, expr.String(out), tgtText, back, err)
+		}
+		for _, env := range escEnvs(lit) {
+			a, b := holdsOf(t, src, sv(env), from.Sem), holdsOf(t, back, tv(env), to.Sem)
+			if a != b {
+				t.Fatalf("%q -> %q differ on ref_name=%v sha=%v: %v vs %v", srcText, tgtText, env.RefName, env.SHA, a, b)
+			}
+		}
+	})
+}
+
+func negateIf(neg bool, e expr.Expr) expr.Expr {
+	if neg {
+		return expr.Unary{Op: expr.OpNot, X: e}
+	}
+	return e
+}
+
+func TestTranslateRefusesBackslashLiteral(t *testing.T) {
+	for _, src := range []string{
+		`startsWith(github.ref_name, 'a\')`,
+		`github.ref_name == 'a\b'`,
+		`contains(github.ref_name, 'a\/b')`,
+	} {
+		e := ghaParse(t, src)
+		if expr.Translatable(e, gha.Lang, gitlab.Lang) {
+			t.Errorf("%s must be untranslatable", src)
+		}
+		if _, ok := expr.Translate(e, gha.Lang, gitlab.Lang); ok {
+			t.Errorf("%s must not translate", src)
+		}
+	}
+}
+
+func TestTranslateMissingEventMapping(t *testing.T) {
+	e := ghaParse(t, `github.event_name == 'push'`)
+	to := gitlab.Lang
+	to.Events = map[string]string{}
+	if expr.Translatable(e, gha.Lang, to) {
+		t.Error("Translatable must be false without a target event entry")
+	}
+	if out, ok := expr.Translate(e, gha.Lang, to); ok {
+		t.Errorf("Translate = %v, want refusal", out)
+	}
+}
+
+func TestTranslateApproxCaveats(t *testing.T) {
+	const (
+		ci   = "GitHub compares strings case-insensitively"
+		null = "GitHub treats an unset value as equal to '' (null == '' is true); GitLab does not"
+		num  = "GitHub coerces a numeric-looking literal to a number, so equality is numeric (null == '0' is true)"
+	)
+	for src, want := range map[string][]string{
+		`$CI_COMMIT_REF_NAME == "main"`:                      {ci},
+		`$CI_COMMIT_REF_NAME == ""`:                          {ci, null},
+		`$CI_COMMIT_REF_NAME != ""`:                          {ci, null},
+		`$CI_COMMIT_REF_NAME == "0"`:                         {ci, num},
+		`$CI_COMMIT_BRANCH == ""`:                            {ci, null},
+		`$CI_COMMIT_REF_NAME == "" && $CI_COMMIT_SHA == "0"`: {ci, null, num},
+	} {
+		_, got, ok := expr.TranslateApprox(glParse(t, src), gitlab.Lang, gha.Lang)
+		if !ok || !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: caveats = %q, ok = %v; want %q", src, got, ok, want)
+		}
+	}
+}
