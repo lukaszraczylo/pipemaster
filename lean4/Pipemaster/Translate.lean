@@ -8,8 +8,9 @@ open Pipemaster.Expr
 /-! Translation between the GHA and GitLab expression dialects (expr.Translate, expr/translate.go).
 It is exact: the target gives the same truthiness as the source on every environment. -/
 
-/-- A literal the case-insensitive regex can stand for: non-empty and ASCII (the model lowers ASCII only). -/
-def okLit (s : String) : Bool := s != "" && s.toList.all fun c => c.toNat < 128
+/-- A literal the case-insensitive regex can stand for: non-empty and ASCII (the model lowers ASCII only),
+with no backslash (GitLab patterns cannot spell a trailing one and read `\/` as a slash). -/
+def okLit (s : String) : Bool := s != "" && s.toList.all fun c => c.toNat < 128 && c != '\\'
 
 /-- A literal that GHA could coerce to a number: it starts with a digit or a minus sign. Against a
 null value GHA reads `null == '0'` as true, which no regex reproduces. -/

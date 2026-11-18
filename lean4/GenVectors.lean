@@ -328,7 +328,7 @@ def layers (p1 core pivots : List E) : List E :=
 open Expr in
 def ghaCases : List (Json × Json) :=
   let refs := [Ref.refName, .refType, .event, .sha, .ghaNative]
-  let ls := lits ["main", "MAIN", "", "push", "branch", "pull_request", "0"] ++ [E.num 1, E.null]
+  let ls := lits ["main", "MAIN", "", "push", "branch", "pull_request", "0", ".", "a/b", "a\\"] ++ [E.num 1, E.null]
   let rn := E.ref .refName
   let rt := E.ref .refType
   let ev := E.ref .event
@@ -352,7 +352,7 @@ def gitlabCases : List (Json × Json) :=
   let rn := E.ref .refName
   let br := E.ref .branch
   let ev := E.ref .event
-  let ss := ["main", "MAIN", "push", "merge_request_event", "web", "0", "", "a"]
+  let ss := ["main", "MAIN", "push", "merge_request_event", "web", "0", "", "a", ".", "a/b"]
   let rxs := refs.flatMap fun r => [Mode.exact, .prefix, .suffix, .sub].flatMap fun m =>
     ss.flatMap fun s => [E.rx (E.ref r) m s, E.nrx (E.ref r) m s]
   let eqs := refs.flatMap fun r => (ss.map E.str ++ [E.null]).flatMap fun l =>
