@@ -76,15 +76,17 @@ func validatePipeline(pl *Pipeline, add func(path, format string, a ...any)) {
 			continue
 		}
 		for _, n := range j.Needs {
-			if _, ok := byID[n.JobID]; !ok {
+			if isDanglingNeed(byID, n) {
 				add(jobPath(pl.ID, j.ID), "needs unknown job %q", n.JobID)
 			}
 		}
 	}
 	for _, cyc := range findCycles(byID) {
-		add(pipelinePath(pl.ID), "needs cycle: %s", strings.Join(cyc, " -> "))
+		add(pipelinePath(pl.ID), "needs cycle: %s", joinPath(cyc))
 	}
 }
+
+func joinPath(cyc []string) string { return strings.Join(cyc, " -> ") }
 
 const (
 	unvisited = iota
