@@ -26,6 +26,9 @@ const (
 	fileMode = 0o600
 )
 
+// validateEmitted is a seam so tests can force a schema failure without a real schema-backed provider.
+var validateEmitted = validate.File
+
 var reportFormats = map[string]bool{"text": true, "md": true, "json": true}
 
 func runConvert(args []string, _, stderr io.Writer) int {
@@ -148,7 +151,7 @@ func validateAll(providerID string, files map[string][]byte, stderr io.Writer) b
 		if name == meta.SidecarPath {
 			continue
 		}
-		err := validate.File(providerID, name, files[name])
+		err := validateEmitted(providerID, name, files[name])
 		switch {
 		case errors.Is(err, validate.ErrNoSchema):
 			_, _ = fmt.Fprintf(stderr, "warning: no schema for %s; %s not validated\n", providerID, name)

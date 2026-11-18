@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -324,5 +325,51 @@ func TestUsageListsCommands(t *testing.T) {
 		if !strings.Contains(errs, "  "+c) {
 			t.Errorf("usage lacks %q", c)
 		}
+	}
+}
+
+func TestRoundtripInequalityPrintsDiff(t *testing.T) {
+	src := t.TempDir()
+	write(t, src, "fake.cfg", "job keep\njob lossy\n")
+	code, out, _ := run(t, "roundtrip", src, "--via", "fake3", "--from", "fake")
+	if code != 1 {
+		t.Fatalf("code=%d, want 1", code)
+	}
+	if out == "no differences\n" || !strings.Contains(out, "lossy") {
+		t.Fatalf("diff not printed to stdout: %q", out)
+	}
+}
+
+func TestConvertValidationFailureWritesNothing(t *testing.T) {
+	old := validateEmitted
+	t.Cleanup(func() { validateEmitted = old })
+	validateEmitted = func(id, name string, _ []byte) error {
+		return fmt.Errorf("%s: invalid for %s schema", name, id)
+	}
+	src, out := t.TempDir(), t.TempDir()
+	write(t, src, "fake.cfg", "job build\n")
+	code, _, errs := run(t, "convert", src, "--to", "fake2", "-o", out)
+	if code != 1 || !strings.Contains(errs, "fake2.cfg: invalid for fake2 schema") {
+		t.Fatalf("code=%d stderr=%q", code, errs)
+	}
+	entries, err := os.ReadDir(out)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("-o must stay empty, got %v (err %v)", entries, err)
+	}
+}
+
+func TestConvertNoSchemaWarnsOncePerFile(t *testing.T) {
+	src, out := t.TempDir(), t.TempDir()
+	write(t, src, "fake.cfg", "job build\n")
+	code, _, errs := run(t, "convert", src, "--to", "fake2", "-o", out)
+	if code != 0 {
+		t.Fatalf("code=%d stderr=%q", code, errs)
+	}
+	want := "warning: no schema for fake2; fake2.cfg not validated\n"
+	if n := strings.Count(errs, "warning:"); n != 1 || !strings.Contains(errs, want) {
+		t.Fatalf("want exactly one warning %q, stderr=%q", want, errs)
+	}
+	if strings.Contains(errs, "meta.yaml") {
+		t.Fatalf("sidecar must not be validated: %q", errs)
 	}
 }

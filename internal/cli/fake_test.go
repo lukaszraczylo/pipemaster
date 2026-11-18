@@ -14,11 +14,15 @@ import (
 )
 
 // fakeProv reads "<id>.cfg" with "job <id>" and "ext <value>" lines and ignores "#" lines.
-type fakeProv struct{ id string }
+type fakeProv struct {
+	id    string
+	lossy bool
+}
 
 func init() {
-	provider.Register(fakeProv{"fake"})
-	provider.Register(fakeProv{"fake2"})
+	provider.Register(fakeProv{id: "fake"})
+	provider.Register(fakeProv{id: "fake2"})
+	provider.Register(fakeProv{id: "fake3", lossy: true})
 }
 
 func (f fakeProv) ID() string   { return f.id }
@@ -58,6 +62,9 @@ func (f fakeProv) Emit(p *ir.Project) (map[string][]byte, *report.Report, error)
 	rep := &report.Report{}
 	for _, pl := range p.Pipelines {
 		for _, j := range pl.Jobs {
+			if f.lossy && j.ID == "lossy" {
+				continue
+			}
 			fmt.Fprintf(&b, "job %s\n", j.ID)
 			if j.ID == "emu" {
 				rep.Add(report.Entry{IRPath: "main/job/emu", Feature: caps.JobCache, Level: caps.Emulated, Strategy: "cache step"})
