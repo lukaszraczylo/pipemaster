@@ -3,14 +3,11 @@ package gha
 import (
 	"fmt"
 	"math"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/expr"
 )
-
-var identRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
 
 // Binding strength used to parenthesise minimally; a nested Opaque has unknown strength and is wrapped.
 const (
@@ -127,7 +124,7 @@ func writeLit(sb *strings.Builder, l expr.Lit) error {
 		}
 		sb.WriteString(strconv.FormatFloat(l.Num, 'g', -1, 64))
 	case expr.LitStr:
-		sb.WriteString("'" + strings.ReplaceAll(l.Str, "'", "''") + "'")
+		sb.WriteString(expr.QuoteSingle(l.Str))
 	default:
 		return fmt.Errorf("gha expression: unknown literal kind %d", l.Kind)
 	}
@@ -140,15 +137,15 @@ func writeRef(sb *strings.Builder, path []string) error {
 		return err
 	}
 	first := dp[0]
-	if !identRE.MatchString(first) || first == "true" || first == "false" || first == "null" || first == "NaN" || first == "Infinity" {
+	if !expr.IsIdent(first) || first == "true" || first == "false" || first == "null" || first == "NaN" || first == "Infinity" {
 		return fmt.Errorf("gha expression: ref root %q is not a GHA context name", first)
 	}
 	sb.WriteString(first)
 	for _, seg := range dp[1:] {
-		if identRE.MatchString(seg) {
+		if expr.IsIdent(seg) {
 			sb.WriteString("." + seg)
 		} else {
-			sb.WriteString("['" + strings.ReplaceAll(seg, "'", "''") + "']")
+			sb.WriteString("[" + expr.QuoteSingle(seg) + "]")
 		}
 	}
 	return nil

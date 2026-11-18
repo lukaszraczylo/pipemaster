@@ -10,7 +10,7 @@ import (
 const Dialect = "gha"
 
 // maxDepth mirrors the GitHub expression parser's nesting limit.
-const maxDepth = 50
+const maxDepth = expr.MaxDepth
 
 // functions maps the lower-cased function name to its canonical spelling.
 var functions = map[string]string{}

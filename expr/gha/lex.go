@@ -4,6 +4,8 @@ package gha
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/lukaszraczylo/pipemaster/expr"
 )
 
 type tokKind uint8
@@ -42,10 +44,8 @@ func syntaxErr(pos int, format string, a ...any) error {
 	return fmt.Errorf("gha expression: %s at position %d", fmt.Sprintf(format, a...), pos+1)
 }
 
-func isIdentStart(c byte) bool { return c == '_' || (c|0x20 >= 'a' && c|0x20 <= 'z') }
-func isDigit(c byte) bool      { return c >= '0' && c <= '9' }
-func isHex(c byte) bool        { return isDigit(c) || (c|0x20 >= 'a' && c|0x20 <= 'f') }
-func isIdentPart(c byte) bool  { return isIdentStart(c) || isDigit(c) || c == '-' }
+func isDigit(c byte) bool { return c >= '0' && c <= '9' }
+func isHex(c byte) bool   { return isDigit(c) || (c|0x20 >= 'a' && c|0x20 <= 'f') }
 
 var punct = map[string]tokKind{
 	"(": tLParen, ")": tRParen, "[": tLBrack, "]": tRBrack, ",": tComma, ".": tDot, "*": tStar,
@@ -73,9 +73,9 @@ func lex(src string) ([]token, error) {
 			}
 			toks = append(toks, token{kind: tNum, num: n, pos: i})
 			i = end
-		case isIdentStart(c):
+		case expr.IsIdentStart(c):
 			j := i + 1
-			for j < len(src) && isIdentPart(src[j]) {
+			for j < len(src) && expr.IsIdentPart(src[j]) {
 				j++
 			}
 			toks = append(toks, token{kind: tIdent, text: src[i:j], pos: i})
@@ -152,7 +152,7 @@ func lexNumber(src string, start int) (float64, int, error) {
 		}
 		lit = src[start:i]
 	}
-	if i < len(src) && isIdentPart(src[i]) {
+	if i < len(src) && expr.IsIdentPart(src[i]) {
 		return 0, 0, syntaxErr(i, "unexpected character %q after number", src[i])
 	}
 	f, err := strconv.ParseFloat(lit, 64)

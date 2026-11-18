@@ -8,7 +8,7 @@ import (
 )
 
 // maxDepth bounds nesting so hostile input cannot exhaust the stack.
-const maxDepth = 50
+const maxDepth = expr.MaxDepth
 
 // Binding strength, loosest first, matching the GitLab lexeme precedence (|| 12, && 11, comparison 10, ! 1).
 const (
