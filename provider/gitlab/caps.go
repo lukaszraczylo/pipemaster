@@ -14,6 +14,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.TriggerAPI:             {Level: caps.External, Strategy: "pipeline trigger token or API call"},
 		caps.TriggerPipelineDone:    {Level: caps.Lost, Caveat: "a GitLab downstream pipeline starts from a trigger job in the upstream project"},
 		caps.TriggerResource:        {Level: caps.Lost, Caveat: "GitLab CI has no resource triggers"},
+		caps.ProjectMultiPipeline:   {Level: caps.Emulated, Strategy: "jobs of every pipeline in one file under <pipeline>:<job> keys", Caveat: "each job carries its pipeline's trigger condition; stage names and inputs are not restored"},
 		caps.PipelineInputs:         {Level: caps.Emulated, Strategy: "variables with description", Caveat: "input types and required flags are not enforced"},
 		caps.PipelineConcurrency:    {Level: caps.Emulated, Strategy: "resource_group on every job", Caveat: "queues, does not cancel"},
 		caps.PipelinePermissions:    {Level: caps.Lost, Caveat: "job token scope is a project setting"},

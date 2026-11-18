@@ -195,6 +195,7 @@ func TestEveryNonNativeCapIsEmulatedOrLost(t *testing.T) {
 	for _, c := range emulCases() {
 		tested[c.feature] = true
 	}
+	tested[caps.ProjectMultiPipeline] = true // TestMultiPipelineSharesOneFile
 	tested[caps.StepEnv], tested[caps.StepWorkdir], tested[caps.StepContinueOnError] = true, true, true
 	for _, f := range []caps.Feature{caps.TriggerSchedule, caps.TriggerAPI, caps.JobEnvironmentApproval} {
 		tested[f] = true

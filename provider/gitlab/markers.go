@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"bytes"
+	"regexp"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
@@ -71,6 +72,22 @@ func (s *state) collapseMarkers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[
 			Detail: "marker not collapsed: no parser rule restores " + string(u.Feature) + " at this path",
 		})
 	}
+}
+
+var markerPipelineRE = regexp.MustCompile(`^pipeline/[^/]+`)
+
+// retargetMarkers points every marker at the one pipeline Parse builds. The emitter writes the IR pipeline ID
+// into marker paths, but the parser's pipeline is always gitlab-ci, so the prefix is the only part that differs.
+func retargetMarkers(uses []ir.FeatureUse, args map[ir.FeatureUse][]string, pid string) ([]ir.FeatureUse, map[ir.FeatureUse][]string) {
+	out := make([]ir.FeatureUse, len(uses))
+	moved := map[ir.FeatureUse][]string{}
+	for i, u := range uses {
+		n := u
+		n.IRPath = markerPipelineRE.ReplaceAllLiteralString(u.IRPath, "pipeline/"+pid)
+		out[i] = n
+		moved[n] = append(moved[n], args[u]...)
+	}
+	return out, moved
 }
 
 // marksFor selects the markers that belong to one pipeline. The multi-pipeline markers were consumed by the split.

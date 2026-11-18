@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"go.yaml.in/yaml/v3"
+
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
@@ -335,5 +337,141 @@ func TestSinglePipelineKeepsPlainJobIDs(t *testing.T) {
 	doc := emitDoc(t, glProject("gha", glJob("build", glStep("make"))))
 	if strings.Contains(doc, "project.multi_pipeline") || strings.Contains(doc, "gitlab-ci:build") {
 		t.Errorf("one pipeline needs no prefix and no marker:\n%s", doc)
+	}
+}
+
+func rootMap(t *testing.T, doc string) map[string]any {
+	t.Helper()
+	var root map[string]any
+	if err := yaml.Unmarshal([]byte(doc), &root); err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+func firstRule(t *testing.T, root map[string]any, job string) map[string]any {
+	t.Helper()
+	jm, _ := root[job].(map[string]any)
+	rules, _ := jm["rules"].([]any)
+	if len(rules) == 0 {
+		t.Fatalf("job %s has no rules: %v", job, root[job])
+	}
+	r, _ := rules[0].(map[string]any)
+	return r
+}
+
+func TestMultiPipelineJobKeepsItsPathFilter(t *testing.T) {
+	p := twoWorkflows()
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush, Paths: ir.Filter{Include: []string{"src/**"}}}}
+	p.Pipelines[1].Triggers = []ir.Trigger{{Kind: ir.TriggerPush}}
+	files, _ := emitFiles(t, p)
+	root := rootMap(t, string(files[rootFile]))
+	if ch, _ := firstRule(t, root, "ci:build")["changes"].([]any); len(ch) != 1 || ch[0] != "src/**" {
+		t.Errorf("ci:build must keep changes: [src/**], rules %v", root["ci:build"])
+	}
+	if _, has := firstRule(t, root, "release:build")["changes"]; has {
+		t.Errorf("release:build has no path filter")
+	}
+	schemaOK(t, files)
+}
+
+func TestProjectMultiPipelineCapsMatchLedger(t *testing.T) {
+	want := gitlab.New().Caps()[caps.ProjectMultiPipeline].Level
+	if want != caps.Emulated {
+		t.Fatalf("Caps() says %v, the emitter emulates it", want)
+	}
+	_, rep := emitFiles(t, twoWorkflows())
+	for _, e := range rep.Entries {
+		if e.Feature == caps.ProjectMultiPipeline && e.Level != want {
+			t.Errorf("ledger %v differs from Caps() %v", e.Level, want)
+		}
+	}
+}
+
+func TestFoldedOpaqueConditionSurvives(t *testing.T) {
+	p := gitlabFixture(t, "expr.opaque")
+	first := p.Pipelines[0]
+	first.ID = "ci"
+	second := &ir.Pipeline{ID: "rel", Triggers: first.Triggers}
+	for _, j := range first.Jobs {
+		cp := *j
+		second.Jobs = append(second.Jobs, &cp)
+	}
+	p.Pipelines = append(p.Pipelines, second)
+	var want []expr.Expr
+	for _, j := range first.Jobs {
+		want = append(want, j.If)
+	}
+	files, _ := emitFiles(t, p)
+	back, _, err := gitlabParse(files)
+	if err != nil {
+		t.Fatalf("reparse: %v\n%s", err, files[rootFile])
+	}
+	for _, pl := range back.Pipelines {
+		for i, j := range pl.Jobs {
+			if j.If == nil || expr.String(j.If) != expr.String(want[i]) {
+				t.Errorf("%s/%s lost its opaque condition: %v", pl.ID, j.ID, j.If)
+			}
+		}
+	}
+}
+
+func TestSuccessStatusIsAccounted(t *testing.T) {
+	up := ghaUses("up", "upload-artifact", map[string]string{"name": "bin", "path": "out"})
+	up.If = expr.Call{Name: "success"}
+	st := glStep("make")
+	st.If = expr.Call{Name: "success"}
+	if _, _, err := gitlab.New().Emit(glProject("gha", glJob("build", st, up))); err != nil {
+		t.Fatalf("success() is the default and must be accounted: %v", err)
+	}
+}
+
+func TestFoldedPipelineWithoutGitLabTriggerIsDisabled(t *testing.T) {
+	p := twoWorkflows()
+	p.Pipelines[1].Triggers = []ir.Trigger{{Kind: ir.TriggerPipelineDone}}
+	files, rep := emitFiles(t, p)
+	root := rootMap(t, string(files[rootFile]))
+	if r := firstRule(t, root, "release:build"); r["when"] != "never" {
+		t.Errorf("a pipeline with no expressible trigger must not run: %v", r)
+	}
+	found := false
+	for _, e := range rep.Entries {
+		found = found || (e.Level == caps.Lost && strings.Contains(e.Detail, "release") && strings.Contains(e.IRPath, "release/job/build"))
+	}
+	if !found {
+		t.Errorf("want a lost entry naming the pipeline: %+v", rep.Entries)
+	}
+}
+
+func TestPagesJobRenamedOnlyForForeignOrigin(t *testing.T) {
+	for origin, wantRename := range map[string]bool{"gitlab": false, "gha": true} {
+		doc := emitDoc(t, glProject(origin, glJob("pages", glStep("make"))))
+		renamed := strings.Contains(doc, "pages-job:")
+		if renamed != wantRename {
+			t.Errorf("origin %s: renamed=%v want %v\n%s", origin, renamed, wantRename, doc)
+		}
+	}
+}
+
+func TestMarkersCollapseForAnyPipelineID(t *testing.T) {
+	for name, c := range emulCases() {
+		t.Run(name, func(t *testing.T) {
+			p := c.build()
+			p.Pipelines[0].ID = "ci"
+			files, _ := emitFiles(t, p)
+			back, rep, err := gitlabParse(files)
+			if err != nil {
+				t.Fatalf("reparse: %v\n%s", err, files[rootFile])
+			}
+			for _, e := range rep.Entries {
+				if strings.Contains(e.Detail, "marker not collapsed") {
+					t.Errorf("uncollapsed marker: %+v\n%s", e, files[rootFile])
+				}
+			}
+			back.Pipelines[0].ID = "ci"
+			if ok, diff := ir.Equal(p, back); !ok {
+				t.Errorf("features must come back under any pipeline ID:\n%s\n%s", diff, files[rootFile])
+			}
+		})
 	}
 }

@@ -14,6 +14,7 @@ const foldSep = ":"
 type foldJobArg struct {
 	If      string    `json:"if,omitempty"`
 	Needs   []ir.Need `json:"needs,omitempty"`
+	HadIf   bool      `json:"hadIf,omitempty"`
 	Finally bool      `json:"finally,omitempty"`
 }
 
@@ -27,11 +28,20 @@ type foldPipelineArg struct {
 type foldedJob struct {
 	cond    expr.Expr
 	origIf  expr.Expr
+	parts   []foldPart
 	path    string
 	pid     string
 	jid     string
 	needs   []ir.Need
 	finally bool
+	// disabled marks a pipeline whose triggers GitLab cannot express: its jobs must not run on another pipeline's trigger.
+	disabled bool
+}
+
+// foldPart is the condition and path filter of one trigger.
+type foldPart struct {
+	cond    expr.Expr
+	changes []string
 }
 
 // folded is the state of several pipelines written as one: each job sits under "<pipeline>:<job>", and
@@ -52,12 +62,12 @@ func (e *emitter) pathOf(pid string, j *ir.Job) string {
 	return jobPath(pid, j.ID)
 }
 
-// foldCond is the trigger condition a folded job must also satisfy; nil for any other job.
-func (e *emitter) foldCond(j *ir.Job) expr.Expr {
+// foldJob is what the fold knows about a folded copy; the zero value for any other job.
+func (e *emitter) foldJob(j *ir.Job) foldedJob {
 	if e.fold == nil {
-		return nil
+		return foldedJob{}
 	}
-	return e.fold.jobs[j].cond
+	return e.fold.jobs[j]
 }
 
 // foldJobMarkers tags a folded job with its pipeline so Parse can split the file again.
@@ -66,7 +76,7 @@ func (e *emitter) foldJobMarkers(j *ir.Job) []string {
 		return nil
 	}
 	fj := e.fold.jobs[j]
-	arg := foldJobArg{Finally: fj.finally}
+	arg := foldJobArg{Finally: fj.finally, HadIf: fj.origIf != nil}
 	if fj.finally {
 		arg.Needs = fj.needs
 	}
@@ -80,9 +90,9 @@ func (e *emitter) foldJobMarkers(j *ir.Job) []string {
 	return []string{emitkit.Marker(caps.ProjectMultiPipeline, fj.path), a}
 }
 
-// triggerCond is the condition under which any trigger of the pipeline fires; nil when no trigger has a GitLab form.
-func triggerCond(pl *ir.Pipeline) expr.Expr {
-	var cs []expr.Expr
+// triggerParts lists the condition and path filter of each trigger that has a GitLab form.
+func triggerParts(pl *ir.Pipeline) []foldPart {
+	var out []foldPart
 	for i := range pl.Triggers {
 		c, ok := triggerRule(&pl.Triggers[i])
 		if !ok {
@@ -91,9 +101,22 @@ func triggerCond(pl *ir.Pipeline) expr.Expr {
 		if _, err := exprgitlab.Print(c); err != nil {
 			continue
 		}
-		cs = append(cs, c)
+		out = append(out, foldPart{cond: c, changes: pl.Triggers[i].Paths.Include})
 	}
-	return orAny(cs)
+	return out
+}
+
+// partsCond is the single condition for parts without path filters; ok is false when any part has one,
+// because then each part needs its own rule.
+func partsCond(parts []foldPart) (expr.Expr, bool) {
+	var cs []expr.Expr
+	for _, p := range parts {
+		if len(p.changes) > 0 {
+			return nil, false
+		}
+		cs = append(cs, p.cond)
+	}
+	return orAny(cs), true
 }
 
 // foldPipelines merges the pipelines into one whose job IDs are "<pipeline>:<job>". Variables, inputs and
@@ -113,16 +136,21 @@ func (e *emitter) foldPipelines(pls []*ir.Pipeline) (*ir.Pipeline, error) {
 		if err != nil {
 			return nil, err
 		}
-		cond := triggerCond(pl)
+		parts := triggerParts(pl)
+		cond, plain := partsCond(parts)
+		if plain {
+			parts = nil
+		}
+		disabled := len(pl.Triggers) > 0 && len(triggerParts(pl)) == 0
 		for k := range pl.Triggers {
 			e.triggerNotes(triggerPath(pl.ID, k), &pl.Triggers[k])
 			e.foreignExt(triggerPath(pl.ID, k), pl.Triggers[k].Ext)
 		}
 		for _, j := range pl.Jobs {
-			merged.Jobs = append(merged.Jobs, f.add(pl, j, shared, group, cond, false))
+			merged.Jobs = append(merged.Jobs, f.add(pl, j, shared, group, folded1{cond: cond, parts: parts, disabled: disabled}, false))
 		}
 		for _, j := range pl.Finally {
-			merged.Finally = append(merged.Finally, f.add(pl, j, shared, group, cond, true))
+			merged.Finally = append(merged.Finally, f.add(pl, j, shared, group, folded1{cond: cond, parts: parts, disabled: disabled}, true))
 		}
 		arg := foldPipelineArg{Name: pl.Name, Triggers: pl.Triggers, Concurrency: pl.Concurrency}
 		for _, v := range pl.Env {
@@ -158,7 +186,14 @@ func (e *emitter) foldShared(pp string, pl *ir.Pipeline) (vars []ir.Var, group s
 }
 
 // add copies a job under its folded ID. The copy shares steps and fields with the original and never writes back.
-func (f *folded) add(pl *ir.Pipeline, j *ir.Job, shared []ir.Var, group string, cond expr.Expr, finally bool) *ir.Job {
+// folded1 is the trigger guard shared by the jobs of one pipeline.
+type folded1 struct {
+	cond     expr.Expr
+	parts    []foldPart
+	disabled bool
+}
+
+func (f *folded) add(pl *ir.Pipeline, j *ir.Job, shared []ir.Var, group string, g folded1, finally bool) *ir.Job {
 	cp := *j
 	cp.ID = pl.ID + foldSep + j.ID
 	cp.Needs = make([]ir.Need, len(j.Needs))
@@ -175,7 +210,7 @@ func (f *folded) add(pl *ir.Pipeline, j *ir.Job, shared []ir.Var, group string, 
 	if group != "" {
 		cp.Ext = withGroup(j.Ext, group)
 	}
-	f.jobs[&cp] = foldedJob{needs: j.Needs, pid: pl.ID, jid: j.ID, path: jobPath(pl.ID, j.ID), cond: cond, origIf: j.If, finally: finally}
+	f.jobs[&cp] = foldedJob{needs: j.Needs, pid: pl.ID, jid: j.ID, path: jobPath(pl.ID, j.ID), cond: g.cond, parts: g.parts, disabled: g.disabled, origIf: j.If, finally: finally}
 	return &cp
 }
 

@@ -45,11 +45,16 @@ func (e *emitter) timing(jp string, j *ir.Job, finally bool) (jobTiming, error) 
 	case status == "failure":
 		base = whenOnFailure
 	}
-	if extra := e.foldCond(j); extra != nil {
+	fj := e.foldJob(j)
+	if fj.disabled {
+		e.lose(jp, caps.JobIf, "pipeline "+fj.pid+" has no trigger GitLab can express; job disabled")
+		disabled = true
+	}
+	if fj.cond != nil {
 		if _, opaque := cond.(expr.Opaque); opaque {
 			e.lose(jp, caps.ExprOpaque, "opaque gitlab rules cannot join the pipeline trigger condition, which is dropped for this job")
 		} else {
-			cond = andAll(extra, cond)
+			cond = andAll(fj.cond, cond)
 		}
 	}
 	if l, ok := cond.(expr.Lit); ok && l.Kind == expr.LitBool {
@@ -59,9 +64,16 @@ func (e *emitter) timing(jp string, j *ir.Job, finally bool) (jobTiming, error) 
 			disabled = true
 		}
 	}
+	_, opaqueCond := cond.(expr.Opaque)
 	switch {
 	case disabled:
 		t.rules = seqOf(ruleNever())
+	case len(fj.parts) > 0 && !opaqueCond:
+		rules, err := foldRules(fj.parts, cond, base)
+		if err != nil {
+			return t, err
+		}
+		t.rules = rules
 	case cond == nil:
 		t.when = base
 	default:
@@ -104,4 +116,25 @@ func decodeRules(text string) (*yaml.Node, error) {
 		return nil, errNotRulesList
 	}
 	return doc.Content[0], nil
+}
+
+// foldRules writes one rule per trigger, each with the job's own condition and the trigger's path filter.
+func foldRules(parts []foldPart, cond expr.Expr, base string) (*yaml.Node, error) {
+	rules := seqOf()
+	for _, p := range parts {
+		text, err := exprgitlab.Print(andAll(p.cond, cond))
+		if err != nil {
+			return nil, err
+		}
+		r := newMap()
+		r.set("if", str(text))
+		if len(p.changes) > 0 {
+			r.set("changes", strSeq(p.changes))
+		}
+		if base != "" {
+			r.set(whenRuleKey, str(base))
+		}
+		rules.Content = append(rules.Content, r.n)
+	}
+	return rules, nil
 }

@@ -107,16 +107,18 @@ func restoreFoldedJob(j *ir.Job, pid string, je foldJobEntry) {
 	if je.arg.Finally {
 		j.Needs = je.arg.Needs
 	}
-	if je.arg.If != "" {
+	dropExt(&j.Ext, "stage")
+	dropExt(&j.Ext, ExtDerivedNeeds)
+	switch {
+	case je.arg.If != "":
 		if x, err := expr.ParseCanonical(je.arg.If); err == nil {
 			j.If = x
 		}
-	} else {
+		dropExt(&j.Ext, "rules")
+	case !je.arg.HadIf:
 		j.If = nil
+		dropExt(&j.Ext, "rules")
 	}
-	dropExt(&j.Ext, "stage")
-	dropExt(&j.Ext, ExtDerivedNeeds)
-	dropExt(&j.Ext, "rules")
 }
 
 // restoreFoldedEnv lifts the variables a pipeline shared with its jobs back to pipeline level.

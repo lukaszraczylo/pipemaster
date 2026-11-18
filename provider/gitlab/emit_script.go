@@ -116,6 +116,9 @@ func (e *emitter) stepGuard(sp string, st *ir.Step, sec string) (guard, arg, sec
 		section, moved = secAfter, true
 		e.emulate(sp, caps.StepIf, "moved to after_script", "after_script runs in a separate shell, so the step runs after the job's other lines and its failure does not fail the job")
 	}
+	if status == "success" {
+		e.led.Note(e.use(sp, caps.StepIf), caps.Support{Level: caps.Native, Strategy: "success() is the default"}, "")
+	}
 	if rest == nil {
 		return "", "", section, moved
 	}

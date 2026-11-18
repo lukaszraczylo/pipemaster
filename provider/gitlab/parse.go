@@ -57,8 +57,12 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		Origin:    ir.Origin{Provider: dialect, Dialect: dialect, Files: ld.files},
 		Pipelines: pls,
 	}
+	uses, args := ld.markers, ld.args
+	if len(pls) == 1 {
+		uses, args = retargetMarkers(uses, args, pls[0].ID)
+	}
 	for _, p := range pls {
-		s.collapseMarkers(p, marksFor(ld.markers, p, len(pls) > 1), ld.args)
+		s.collapseMarkers(p, marksFor(uses, p, len(pls) > 1), args)
 	}
 	if err := ir.Validate(proj); err != nil {
 		return nil, nil, s.locate(err, infos)

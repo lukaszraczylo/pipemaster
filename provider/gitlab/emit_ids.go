@@ -9,31 +9,34 @@ import (
 const renameSuffix = "-job"
 
 // reservedJobKeys cannot be job names: the keywords the GitLab docs list as unavailable, the other global
-// keywords, pages (a Pages deployment) and the YAML scalars that read as booleans or null.
+// keywords and the YAML scalars that read as booleans or null. pages is not reserved, but as a job name it
+// starts a Pages deployment (docs: "Using pages as a job name is deprecated"), so only foreign jobs avoid it.
 var reservedJobKeys = map[string]bool{
 	"image": true, "services": true, "stages": true, "before_script": true, "after_script": true,
-	"variables": true, "cache": true, "include": true, "default": true, "workflow": true, "pages": true, "spec": true,
+	"variables": true, "cache": true, "include": true, "default": true, "workflow": true, "spec": true,
 	"true": true, "false": true, "null": true, "yes": true, "no": true, "on": true, "off": true,
 }
 
-func unsafeJobKey(id string) bool {
-	return reservedJobKeys[strings.ToLower(id)] || strings.HasPrefix(id, ".")
+const pagesJob = "pages"
+
+func unsafeJobKey(id string, foreign bool) bool {
+	return reservedJobKeys[strings.ToLower(id)] || strings.HasPrefix(id, ".") || (foreign && id == pagesJob)
 }
 
 // jobKeys maps each job id to the key it is written under. An unsafe id gets a suffix, repeated until the
 // key is free, so the result does not depend on map order.
-func jobKeys(pl *ir.Pipeline) map[string]string {
+func jobKeys(pl *ir.Pipeline, foreign bool) map[string]string {
 	taken := map[string]bool{}
 	for _, j := range allJobs(pl) {
 		taken[j.ID] = true
 	}
 	keys := map[string]string{}
 	for _, j := range allJobs(pl) {
-		if !unsafeJobKey(j.ID) {
+		if !unsafeJobKey(j.ID, foreign) {
 			continue
 		}
 		k := strings.TrimLeft(j.ID, ".") + renameSuffix
-		for taken[k] || unsafeJobKey(k) {
+		for taken[k] || unsafeJobKey(k, foreign) {
 			k += renameSuffix
 		}
 		taken[k], keys[j.ID] = true, k

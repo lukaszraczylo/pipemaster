@@ -83,7 +83,7 @@ func (e *emitter) document(pl *ir.Pipeline) (*yaml.Node, error) {
 	}
 	e.foreignExt("pipeline/"+pl.ID, pl.Ext)
 	ext := extOf(pl.Ext)
-	c := &pipeCtx{pl: pl, plan: plan, preps: map[string]*jobPrep{}, defKeys: defaultKeySet(ext), keys: jobKeys(pl)}
+	c := &pipeCtx{pl: pl, plan: plan, preps: map[string]*jobPrep{}, defKeys: defaultKeySet(ext), keys: jobKeys(pl, e.from != nil)}
 	for _, j := range allJobs(pl) {
 		if _, dup := c.preps[j.ID]; dup {
 			return nil, fmt.Errorf("job id %q is used twice", j.ID)

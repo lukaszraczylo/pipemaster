@@ -239,6 +239,8 @@ func (e *emitter) artifactWhen(sp string, st *ir.Step) string {
 		return ""
 	}
 	switch status {
+	case "success":
+		e.led.Note(e.use(sp, caps.StepIf), caps.Support{Level: caps.Native, Strategy: "artifacts:when on_success is the default"}, "")
 	case "always":
 		e.emulate(sp, caps.StepIf, "artifacts:when", "the upload runs by artifacts:when: always")
 		return whenAlways
