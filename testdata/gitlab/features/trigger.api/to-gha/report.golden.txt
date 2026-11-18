@@ -1,0 +1,3 @@
+Loss report: gitlab -> gha
+[emulated] pipeline/gitlab-ci/job/triggered job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/gitlab-ci/trigger/0 trigger.api: repository_dispatch (the API trigger names no event; repository_dispatch is used)

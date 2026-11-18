@@ -1,0 +1,20 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+build:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step build-step-2
+    # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
+    # pipemaster:arg "event =~ '(?i)^push$'"
+    # pipemaster:arg {"src":"event == 'push'"}
+    - |
+      if printf '%s\n' "$CI_PIPELINE_SOURCE" | grep -Eiq '^push$'; then
+      echo push
+      fi
+  after_script:
+    # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-1
+    # pipemaster:arg {"pos":0,"moved":"always","offset":0,"lines":1,"coe":false}
+    - echo cleanup

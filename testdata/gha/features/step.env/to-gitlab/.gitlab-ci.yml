@@ -1,0 +1,16 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+build:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    # pipemaster:emulated step.env pipeline/ci/job/build/step/build-step-1
+    - |
+      (
+      export GREETING="hello $GITLAB_USER_LOGIN"
+      export KEY="$KEY"
+      echo "$GREETING"
+      )

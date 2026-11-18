@@ -39,3 +39,36 @@ func ExtNodes(p *Project) []ExtNode {
 	}
 	return out
 }
+
+// NodeRef is one pipeline, job or step with its IR path; exactly one of the three pointers is set.
+type NodeRef struct {
+	Pipeline *Pipeline
+	Job      *Job
+	Step     *Step
+	Path     string
+}
+
+// Nodes lists every pipeline, job (Finally included) and step in the order ExtNodes uses.
+func Nodes(p *Project) []NodeRef {
+	var out []NodeRef
+	for _, pl := range p.Pipelines {
+		if pl == nil {
+			continue
+		}
+		out = append(out, NodeRef{Pipeline: pl, Path: pipelinePath(pl.ID)})
+		for _, jobs := range [][]*Job{pl.Jobs, pl.Finally} {
+			for _, j := range jobs {
+				if j == nil {
+					continue
+				}
+				out = append(out, NodeRef{Job: j, Path: jobPath(pl.ID, j.ID)})
+				for _, s := range j.Steps {
+					if s != nil {
+						out = append(out, NodeRef{Step: s, Path: stepPath(pl.ID, j.ID, s.ID)})
+					}
+				}
+			}
+		}
+	}
+	return out
+}

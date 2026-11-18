@@ -1,0 +1,12 @@
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+on:
+  push:
+    branches:
+      - main
+      - release-**
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: make build

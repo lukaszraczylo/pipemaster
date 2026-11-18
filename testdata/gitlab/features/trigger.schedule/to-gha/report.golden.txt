@@ -1,0 +1,3 @@
+Loss report: gitlab -> gha
+[lost] pipeline/gitlab-ci/trigger/0 trigger.schedule (the schedule names no cron expression; GHA needs one)
+[emulated] pipeline/gitlab-ci/job/nightly job.runner: default runner label ubuntu-latest (the pipeline named no runner)

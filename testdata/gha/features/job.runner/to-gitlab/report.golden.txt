@@ -1,0 +1,2 @@
+Loss report: gha -> gitlab
+[lost] pipeline/ci/job/grouped job.runner (runner platform and selector have no GitLab form; only labels become tags)

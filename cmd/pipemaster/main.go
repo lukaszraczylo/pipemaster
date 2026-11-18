@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/lukaszraczylo/pipemaster/internal/cli"
+	_ "github.com/lukaszraczylo/pipemaster/provider/gha"
+	_ "github.com/lukaszraczylo/pipemaster/provider/gitlab"
 )
 
 func main() {

@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"testing/fstest"
 
+	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/meta"
 	"github.com/lukaszraczylo/pipemaster/provider"
@@ -88,7 +89,7 @@ func runRoundtrip(args []string, stdout, stderr io.Writer) int {
 // from sourceID; coming back it restores m, whose Source is the target.
 func hop(proj *ir.Project, m *meta.Meta, sourceID string, p provider.Provider, rep *report.Report, attach bool) (fs.FS, error) {
 	if m != nil {
-		addOrphans(rep, meta.Reattach(proj, m))
+		addOrphans(rep, roundtrip.Restore(proj, m))
 	}
 	files, r, err := p.Emit(proj)
 	if err != nil {
@@ -96,7 +97,7 @@ func hop(proj *ir.Project, m *meta.Meta, sourceID string, p provider.Provider, r
 	}
 	rep.Merge(r)
 	if attach {
-		files = meta.Attach(files, newMeta(sourceID, proj))
+		files = meta.Attach(files, roundtrip.NewMeta(sourceID, proj, p, r))
 	}
 	out := fstest.MapFS{}
 	for name, b := range files {

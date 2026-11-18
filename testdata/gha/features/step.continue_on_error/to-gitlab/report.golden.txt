@@ -1,0 +1,2 @@
+Loss report: gha -> gitlab
+[emulated] pipeline/ci/job/build/step/build-step-1 step.continue_on_error: || true after each line of the step

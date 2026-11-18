@@ -26,12 +26,16 @@ var ErrStale = errors.New("round-trip metadata is stale")
 
 // Meta is the round-trip record written next to, or inside, emitted files.
 type Meta struct {
-	Files   map[string]string `yaml:"files,omitempty"` // path to sha256 hex
-	Ext     map[string]ir.Ext `yaml:"ext,omitempty"`   // IR path to Ext
-	IDs     map[string]string `yaml:"ids,omitempty"`   // emitted id to source id
-	Source  string            `yaml:"source,omitempty"`
-	Dialect string            `yaml:"dialect,omitempty"`
-	Version int               `yaml:"version"`
+	Files map[string]string `yaml:"files,omitempty"` // path to sha256 hex
+	Ext   map[string]ir.Ext `yaml:"ext,omitempty"`   // IR path to Ext
+	IDs   map[string]string `yaml:"ids,omitempty"`   // emitted id to source id
+	// Residual holds display names and step content the target cannot hold, by source IR path.
+	Residual map[string]Residual `yaml:"residual,omitempty"`
+	// Lost holds the source fields of features the emit report called lost or external, by source IR path.
+	Lost    map[string]Lost `yaml:"lost,omitempty"`
+	Source  string          `yaml:"source,omitempty"`
+	Dialect string          `yaml:"dialect,omitempty"`
+	Version int             `yaml:"version"`
 }
 
 // Collect copies the Ext of every IR node that has one, keyed by IR path.
@@ -46,7 +50,8 @@ func Collect(p *ir.Project) map[string]ir.Ext {
 }
 
 // Reattach restores stored Ext into p. Stored keys overwrite node keys; other node keys stay.
-// It returns the sorted paths in m that match no node. IDs are not applied here.
+// Residual fills only what the parsed node left empty. It returns the sorted paths in m that match no node.
+// IDs are not applied here.
 func Reattach(p *ir.Project, m *Meta) []string {
 	found := map[string]bool{}
 	for _, n := range ir.ExtNodes(p) {
@@ -62,10 +67,17 @@ func Reattach(p *ir.Project, m *Meta) []string {
 			(*n.Ext)[k] = copyValue(v)
 		}
 	}
+	for _, applied := range []map[string]bool{applyResidual(p, m.Residual), applyLost(p, m.Lost)} {
+		for path := range applied {
+			found[path] = true
+		}
+	}
 	var orphans []string
-	for path := range m.Ext {
-		if !found[path] {
-			orphans = append(orphans, path)
+	for _, paths := range []map[string]bool{keySet(m.Ext), keySet(m.Residual), keySet(m.Lost)} {
+		for path := range paths {
+			if !found[path] && !slices.Contains(orphans, path) {
+				orphans = append(orphans, path)
+			}
 		}
 	}
 	sort.Strings(orphans)
@@ -150,6 +162,14 @@ func hashAll(files map[string][]byte) map[string]string {
 	out := make(map[string]string, len(files))
 	for k, v := range files {
 		out[k] = hash(v)
+	}
+	return out
+}
+
+func keySet[V any](m map[string]V) map[string]bool {
+	out := make(map[string]bool, len(m))
+	for k := range m {
+		out[k] = true
 	}
 	return out
 }

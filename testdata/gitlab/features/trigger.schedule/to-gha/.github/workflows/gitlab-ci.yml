@@ -1,0 +1,10 @@
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/nightly
+on:
+  # pipemaster:emulated trigger.manual pipeline/gitlab-ci
+  workflow_dispatch:
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: make nightly

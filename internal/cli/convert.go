@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/meta"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -76,7 +77,7 @@ func runConvert(args []string, _, stderr io.Writer) int {
 	rep.Merge(emitRep)
 	rep.Source, rep.Target = src.ID(), tgt.ID()
 
-	m := newMeta(src.ID(), proj)
+	m := roundtrip.NewMeta(src.ID(), proj, tgt, emitRep)
 	if *embed {
 		files = meta.Embed(files, m)
 	} else {
@@ -99,15 +100,6 @@ func runConvert(args []string, _, stderr io.Writer) int {
 	return exitOK
 }
 
-func newMeta(sourceID string, proj *ir.Project) *meta.Meta {
-	return &meta.Meta{
-		Source:  sourceID,
-		Dialect: proj.Origin.Dialect,
-		Ext:     meta.Collect(proj),
-		Version: meta.Version,
-	}
-}
-
 // applyStoredMeta restores round-trip metadata into proj when converting
 // back to the provider that wrote it. Orphaned paths are added to rep.
 func applyStoredMeta(proj *ir.Project, rep *report.Report, srcFS fs.FS, targetID string, force bool, stderr io.Writer) int {
@@ -128,7 +120,7 @@ func applyStoredMeta(proj *ir.Project, rep *report.Report, srcFS fs.FS, targetID
 		_, _ = fmt.Fprintf(stderr, "check metadata: %v\n", err)
 		return exitError
 	}
-	addOrphans(rep, meta.Reattach(proj, m))
+	addOrphans(rep, roundtrip.Restore(proj, m))
 	return exitOK
 }
 

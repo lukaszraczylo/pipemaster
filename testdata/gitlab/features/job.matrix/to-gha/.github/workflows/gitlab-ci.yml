@@ -1,0 +1,28 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/test
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - GO: "1.21"
+            OS: linux
+          - GO: "1.21"
+            OS: mac
+          - GO: "1.22"
+            OS: linux
+          - GO: "1.22"
+            OS: mac
+          - GO: "1.20"
+            OS: linux
+    steps:
+      - id: script
+        run: make test

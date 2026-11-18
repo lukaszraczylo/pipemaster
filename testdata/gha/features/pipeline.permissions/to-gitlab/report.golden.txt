@@ -1,0 +1,2 @@
+Loss report: gha -> gitlab
+[lost] pipeline/ci pipeline.permissions (job token scope is a project setting)

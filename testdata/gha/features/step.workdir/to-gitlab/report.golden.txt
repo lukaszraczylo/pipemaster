@@ -1,0 +1,2 @@
+Loss report: gha -> gitlab
+[emulated] pipeline/ci/job/build/step/build-step-1 step.workdir: cd in a subshell around the step

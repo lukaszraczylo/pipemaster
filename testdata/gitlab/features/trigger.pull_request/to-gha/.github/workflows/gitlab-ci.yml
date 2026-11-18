@@ -1,0 +1,9 @@
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/test
+on:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: make test

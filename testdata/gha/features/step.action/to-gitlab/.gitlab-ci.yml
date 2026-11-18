@@ -1,0 +1,22 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+build:
+  image: golang:1.24
+  tags:
+    - ubuntu-latest
+  needs: []
+  variables:
+    GIT_DEPTH: "0"
+  script:
+    # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
+    # pipemaster:arg {"vars":["GIT_DEPTH"]}
+    # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
+    # pipemaster:arg {"image":"golang:1.24"}
+    # pipemaster:lost step build-step-3 uses docker://alpine:3.20
+    # pipemaster:lost step local uses ./.github/actions/setup
+    - "true"
+    # pipemaster:step build-step-1
+    # pipemaster:step build-step-2
+    # pipemaster:step build-step-3
+    # pipemaster:step local

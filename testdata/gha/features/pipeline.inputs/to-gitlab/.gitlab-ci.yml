@@ -1,0 +1,18 @@
+# pipemaster:emulated pipeline.inputs pipeline/ci
+# pipemaster:arg [{"Name":"environment","Type":"choice","Default":"staging","Description":"Where to deploy","Required":true}]
+# pipemaster:emulated trigger.manual pipeline/ci/trigger/0
+# pipemaster:arg {"kind":"manual"}
+variables:
+  environment:
+    value: staging
+    description: Where to deploy
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+build:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - echo ok

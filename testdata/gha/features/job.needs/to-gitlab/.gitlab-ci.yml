@@ -1,0 +1,32 @@
+stages:
+  - stage-0
+  - stage-1
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+lint:
+  stage: stage-0
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step lint-step-1
+    - echo lint
+ship:
+  stage: stage-1
+  tags:
+    - ubuntu-latest
+  needs:
+    - lint
+    - test
+  script:
+    # pipemaster:step ship-step-1
+    - echo ship
+test:
+  stage: stage-0
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step test-step-1
+    - echo test

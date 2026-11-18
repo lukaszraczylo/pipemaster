@@ -1,0 +1,2 @@
+Loss report: gha -> gitlab
+[lost] pipeline/ci/job/build/step/build-step-1 step.shell (GitLab runs scripts in the runner's configured shell, not bash)

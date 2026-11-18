@@ -1,0 +1,2 @@
+Loss report: gha -> gitlab
+[lost] pipeline/ci/trigger/0 trigger.filter.paths (rules:changes has no exclude patterns)

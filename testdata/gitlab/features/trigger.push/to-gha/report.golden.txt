@@ -1,0 +1,2 @@
+Loss report: gitlab -> gha
+[emulated] pipeline/gitlab-ci/job/build job.runner: default runner label ubuntu-latest (the pipeline named no runner)

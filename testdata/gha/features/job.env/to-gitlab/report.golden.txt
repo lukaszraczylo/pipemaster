@@ -1,0 +1,2 @@
+Loss report: gha -> gitlab
+[lost] pipeline/ci/job/build job.env (secret API_KEY is written as the variable $API_KEY; a GitLab file cannot mark it as a secret)

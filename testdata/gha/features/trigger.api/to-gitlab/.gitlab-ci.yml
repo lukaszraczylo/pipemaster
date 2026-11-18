@@ -1,0 +1,15 @@
+# pipemaster:emulated trigger.api pipeline/ci/trigger/0
+# pipemaster:arg {"kind":"api"}
+# pipemaster:emulated trigger.api pipeline/ci/trigger/1
+# pipemaster:arg {"kind":"api"}
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "api"
+    - if: $CI_PIPELINE_SOURCE == "api"
+build:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - echo ok

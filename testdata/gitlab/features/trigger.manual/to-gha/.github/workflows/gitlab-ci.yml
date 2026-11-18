@@ -1,0 +1,9 @@
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/adhoc
+on:
+  workflow_dispatch:
+jobs:
+  adhoc:
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: make adhoc

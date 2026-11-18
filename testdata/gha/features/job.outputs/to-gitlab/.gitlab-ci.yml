@@ -1,0 +1,25 @@
+stages:
+  - stage-0
+  - stage-1
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+use:
+  stage: stage-1
+  tags:
+    - ubuntu-latest
+  needs:
+    - version
+  script:
+    # pipemaster:lost script.interpolation pipeline/ci/job/use/step/use-step-1: echo {{ needs.version.outputs.tag }}
+    - "true"
+    # pipemaster:step use-step-1
+# pipemaster:lost job.outputs pipeline/ci/job/version: output tag is not written
+version:
+  stage: stage-0
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step tag
+    - echo "value=v1" >> "$GITHUB_OUTPUT"

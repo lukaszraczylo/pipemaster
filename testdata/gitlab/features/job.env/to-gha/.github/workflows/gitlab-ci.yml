@@ -1,0 +1,18 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "0"
+      TAG: ${{ github.ref_type == 'tag' && github.ref_name }}
+    steps:
+      - id: script
+        run: make

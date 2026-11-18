@@ -1,0 +1,2 @@
+Loss report: gha -> gitlab
+[lost] pipeline/ci/job/test job.matrix (fail-fast and max-parallel have no GitLab equivalent)

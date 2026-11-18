@@ -1,0 +1,17 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+jobs:
+  build:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      # pipemaster:lost job.if pipeline/gitlab-ci/job/build: opaque(gitlab): - changes:\n    - src/**/*\n  if: $CI_COMMIT_BRANCH == "main"\n
+      - id: script
+        run: make

@@ -1,0 +1,13 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+deploy:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step deploy-step-1
+    - echo deploy
+  environment:
+    name: production
+    url: https://example.com

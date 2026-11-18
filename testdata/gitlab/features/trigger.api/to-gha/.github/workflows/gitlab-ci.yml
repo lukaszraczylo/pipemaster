@@ -1,0 +1,9 @@
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/triggered
+on:
+  repository_dispatch:
+jobs:
+  triggered:
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: make triggered

@@ -1,0 +1,12 @@
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/release
+on:
+  push:
+    tags:
+      - '**'
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: make release

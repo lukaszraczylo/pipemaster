@@ -1,0 +1,2 @@
+Loss report: gha -> gitlab
+[lost] pipeline/ci/job/build/step/build-step-1 script.interpolation (no GitLab variable for expression gha.github.workspace; the line is commented out)

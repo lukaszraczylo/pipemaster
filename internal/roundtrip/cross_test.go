@@ -1,0 +1,75 @@
+package roundtrip_test
+
+import (
+	"bytes"
+	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/lukaszraczylo/pipemaster/internal/golden"
+	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/validate"
+)
+
+const (
+	reportGolden = "report.golden.txt"
+	exprOpen     = "${{"
+	// lintIgnore skips two findings that are the emitter's reported choices: a condition GHA cannot state
+	// becomes if: false, and a self-hosted runner label has no entry in actionlint's hosted list.
+	lintIgnore = `constant expression "false" in condition|label ".*" is unknown`
+)
+
+func TestCrossGolden(t *testing.T) {
+	_, lintErr := exec.LookPath("actionlint")
+	for _, f := range allFixtures(t) {
+		t.Run(f.provider+"/"+f.name, func(t *testing.T) {
+			a, b := prov(t, f.provider), prov(t, other(f.provider))
+			proj, _, err := a.Parse(os.DirFS(f.dir))
+			if err != nil {
+				t.Fatal(err)
+			}
+			files, rep, err := b.Emit(proj)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out := filepath.Join(f.dir, "to-"+b.ID())
+			for _, name := range names(files) {
+				if err := validate.File(b.ID(), name, files[name]); err != nil && !errors.Is(err, validate.ErrNoSchema) {
+					t.Errorf("validate %s: %v", name, err)
+				}
+				if b.ID() == provider.GitLab && strings.Contains(string(files[name]), exprOpen) {
+					t.Errorf("%s holds a GHA expression", name)
+				}
+				if b.ID() == provider.GHA && lintErr == nil {
+					lintFile(t, name, files[name])
+				}
+				golden.Assert(t, filepath.Join(out, name), files[name])
+			}
+			rep.Source, rep.Target = a.ID(), b.ID()
+			var buf bytes.Buffer
+			if err := rep.Render(&buf, "text"); err != nil {
+				t.Fatal(err)
+			}
+			golden.Assert(t, filepath.Join(out, reportGolden), buf.Bytes())
+		})
+	}
+}
+
+func lintFile(t *testing.T, name string, data []byte) {
+	t.Helper()
+	dir := t.TempDir()
+	p := filepath.Join(dir, name)
+	if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("actionlint", "-no-color", "-ignore", lintIgnore, p) // #nosec G204 -- fixed binary, temp path
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Errorf("actionlint %s: %v\n%s", name, err, out)
+	}
+}
