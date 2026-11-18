@@ -66,7 +66,7 @@ func validatePipeline(pl *Pipeline, add func(path, format string, a ...any)) {
 				continue
 			}
 			if seenS[s.ID] {
-				add(jobPath(pl.ID, j.ID)+"/step/"+s.ID, "duplicate step id")
+				add(stepPath(pl.ID, j.ID, s.ID), "duplicate step id")
 			}
 			seenS[s.ID] = true
 		}

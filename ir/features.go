@@ -2,7 +2,6 @@ package ir
 
 import (
 	"sort"
-	"strconv"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
@@ -75,7 +74,7 @@ func pipelineFeatures(s *featureSet, pl *Pipeline) {
 	s.when(len(pl.Finally) > 0, path, caps.PipelineFinally)
 	s.when(len(pl.Ext) > 0, path, caps.ExtPassthrough)
 	for i := range pl.Triggers {
-		triggerUse(s, path+"/trigger/"+strconv.Itoa(i), &pl.Triggers[i])
+		triggerUse(s, triggerPath(pl.ID, i), &pl.Triggers[i])
 	}
 	for _, j := range append(append([]*Job{}, pl.Jobs...), pl.Finally...) {
 		if j != nil {
@@ -142,7 +141,7 @@ func jobFeatures(s *featureSet, pid string, j *Job) {
 	s.when(len(j.Ext) > 0, path, caps.ExtPassthrough)
 	for _, st := range j.Steps {
 		if st != nil {
-			stepFeatures(s, path+"/step/"+st.ID, st)
+			stepFeatures(s, stepPath(pid, j.ID, st.ID), st)
 		}
 	}
 }
