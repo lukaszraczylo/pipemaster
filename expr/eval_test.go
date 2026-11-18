@@ -224,3 +224,31 @@ func TestEvalRejectsUnknownValueType(t *testing.T) {
 		t.Fatal("unsupported value type must error")
 	}
 }
+
+func TestJSONNumbers(t *testing.T) {
+	cases := []struct {
+		e    expr.Expr
+		name string
+		json bool
+		want bool
+	}{
+		{bin("==", str("inf"), num(math.Inf(1))), "inf word coerces by default", false, true},
+		{bin("==", str("inf"), num(math.Inf(1))), "inf word is NaN under json", true, false},
+		{bin("==", str("+1"), num(1)), "plus sign accepted by default", false, true},
+		{bin("==", str("+1"), num(1)), "plus sign is NaN under json", true, false},
+		{bin("==", str(".5"), num(0.5)), "leading dot is NaN under json", true, false},
+		{bin("==", str("01"), num(1)), "leading zero is NaN under json", true, false},
+		{bin("==", str("-2.5e-1"), num(-0.25)), "exponent form parses under json", true, true},
+		{bin("==", str("42"), num(42)), "plain int parses under json", true, true},
+		{bin("==", str(""), num(0)), "empty string is zero under json", true, true},
+		{bin("<", str("x"), num(1)), "relational NaN stays false", true, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := expr.Eval(c.e, mapEnv{}, expr.Semantics{JSONNumbers: c.json})
+			if err != nil || got != c.want {
+				t.Fatalf("got %v, %v want %v", got, err, c.want)
+			}
+		})
+	}
+}

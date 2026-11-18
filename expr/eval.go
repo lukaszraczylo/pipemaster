@@ -45,7 +45,12 @@ type Semantics struct {
 	Truthy            func(Value) bool
 	CaseInsensitiveEq bool
 	StrictTypes       bool
+	// JSONNumbers makes a string coerce to a number only when it is a JSON number (no sign prefix, no
+	// padding, no inf/nan words); any other non-empty string is NaN.
+	JSONNumbers bool
 }
+
+var jsonNumberRE = regexp.MustCompile(`^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$`)
 
 // ErrOpaque is returned when evaluation reaches an Opaque node.
 var ErrOpaque = errors.New("opaque expression cannot be evaluated")
@@ -204,7 +209,7 @@ func sameType(a, b Value) bool {
 	return false
 }
 
-func toNumber(v Value) float64 {
+func (ev evaluator) toNumber(v Value) float64 {
 	switch x := v.(type) {
 	case nil:
 		return 0
@@ -217,6 +222,12 @@ func toNumber(v Value) float64 {
 		return x
 	case string:
 		t := strings.TrimSpace(x)
+		if ev.sem.JSONNumbers {
+			t = x
+			if t != "" && !jsonNumberRE.MatchString(t) {
+				return math.NaN()
+			}
+		}
 		if t == "" {
 			return 0
 		}
@@ -253,7 +264,7 @@ func (ev evaluator) equal(l, r Value) bool {
 	if ev.sem.StrictTypes {
 		return false
 	}
-	return toNumber(l) == toNumber(r)
+	return ev.toNumber(l) == ev.toNumber(r)
 }
 
 func (ev evaluator) order(op string, l, r Value) (Value, error) {
@@ -268,7 +279,7 @@ func (ev evaluator) order(op string, l, r Value) (Value, error) {
 	if !sameType(l, r) && ev.sem.StrictTypes {
 		return nil, fmt.Errorf("cannot order %T and %T under strict types", l, r)
 	}
-	a, b := toNumber(l), toNumber(r)
+	a, b := ev.toNumber(l), ev.toNumber(r)
 	if math.IsNaN(a) || math.IsNaN(b) {
 		return false, nil
 	}
