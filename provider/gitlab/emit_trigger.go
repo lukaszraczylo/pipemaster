@@ -167,7 +167,9 @@ func (e *emitter) workflow(pl *ir.Pipeline) (*yaml.Node, error) {
 			return nil, err
 		}
 		s := newState(&report.Report{})
-		if ts, ok, _ := s.workflowTriggers(n); ok && sameTriggers(ts, pl.Triggers) {
+		ts, ok, _ := s.workflowTriggers(n)
+		// Parse gives the default triggers to a block it cannot model, so the block is still the source.
+		if (ok && sameTriggers(ts, pl.Triggers)) || (!ok && sameTriggers(pl.Triggers, defaultTriggers())) {
 			return n, nil
 		}
 	}
