@@ -2,7 +2,6 @@ package gitlab
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -11,6 +10,8 @@ import (
 	"strings"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -21,7 +22,7 @@ const (
 	tagInt  = "!!int"
 
 	lostPrefix = "# pipemaster:lost "
-	argPrefix  = "# pipemaster:arg "
+	stepPrefix = "# pipemaster:step "
 	indentStep = 2
 )
 
@@ -152,11 +153,7 @@ func marshalDoc(root *yaml.Node) ([]byte, error) {
 // markerArg writes v as one marker argument line. JSON keeps it on one line; the open brace of "${{" is
 // escaped so a comment never holds a raw expression, and the parser decodes the escape.
 func markerArg(v any) (string, error) {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return "", err
-	}
-	return argPrefix + strings.ReplaceAll(string(b), "${{", `$\u007b{`), nil
+	return emitkit.ArgLine(v)
 }
 
 // commentSafe makes s fit on one comment line and removes every "${{", which GitLab would never expand.

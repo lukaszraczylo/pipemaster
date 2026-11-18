@@ -219,6 +219,12 @@ func varAt(s string, i int) (name string, end int) {
 // scriptLines flattens a script value, canonicalises every entry and splits it into lines.
 func (s *state) scriptLines(n *yaml.Node, what string) ([]string, error) {
 	var out []string
+	err := s.eachScriptItem(n, what, func(_ *yaml.Node, lines []string) { out = append(out, lines...) })
+	return out, err
+}
+
+// eachScriptItem calls fn with every script item node and the lines it holds.
+func (s *state) eachScriptItem(n *yaml.Node, what string, fn func(item *yaml.Node, lines []string)) error {
 	var walk func(*yaml.Node) error
 	walk = func(c *yaml.Node) error {
 		switch c.Kind {
@@ -235,15 +241,12 @@ func (s *state) scriptLines(n *yaml.Node, what string) ([]string, error) {
 			if err != nil {
 				return s.errf(c, "%v", err)
 			}
-			out = append(out, strings.Split(strings.TrimSuffix(canon, "\n"), "\n")...)
+			fn(c, strings.Split(strings.TrimSuffix(canon, "\n"), "\n"))
 			return nil
 		}
 		return s.errf(c, "%s entries must be strings; quote a command that contains a colon", what)
 	}
-	if err := walk(n); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return walk(n)
 }
 
 // text reads a scalar as a canonical template.

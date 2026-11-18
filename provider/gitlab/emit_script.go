@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -17,9 +18,7 @@ const (
 	secScript = "script"
 	secAfter  = "after_script"
 
-	shellBash = "bash"
-	shellSh   = "sh"
-	noopLine  = "true"
+	noopLine = "true"
 )
 
 var sectionOrder = []string{secBefore, secScript, secAfter}
@@ -33,9 +32,11 @@ type jobPrep struct {
 	vars     []ir.Var
 	caches   []*omap
 	pending  []string
+	marks    []string
 	uploads  []string
 	downs    []download
 	art      artAcc
+	toAfter  bool
 }
 
 type download struct{ name string }
@@ -61,6 +62,12 @@ func stepPath(jp, sid string) string { return jp + "/step/" + sid }
 func (p *jobPrep) add(sec string, item *yaml.Node, head ...string) {
 	lines := append(append([]string{}, p.pending...), head...)
 	p.pending = nil
+	if sec == secAfter {
+		p.toAfter = true
+	} else {
+		lines = append(p.marks, lines...)
+		p.marks = nil
+	}
 	if len(lines) > 0 {
 		item.HeadComment = strings.Join(lines, "\n")
 	}
@@ -81,11 +88,16 @@ func sectionOf(st *ir.Step) string {
 // prepSteps turns every step into script items or job keywords.
 func (e *emitter) prepSteps(p *jobPrep) error {
 	e.foreignExt(p.path, p.j.Ext)
+	markSteps := needsStepMarks(p.j)
 	for _, st := range p.j.Steps {
 		if st == nil {
 			continue
 		}
 		e.foreignExt(stepPath(p.path, st.ID), st.Ext)
+		mark := stepPrefix + commentSafe(st.ID)
+		if markSteps {
+			p.marks = append(p.marks, mark)
+		}
 		var err error
 		if st.Kind == ir.StepScript {
 			err = e.scriptStep(p, st)
@@ -95,6 +107,11 @@ func (e *emitter) prepSteps(p *jobPrep) error {
 		if err != nil {
 			return fmt.Errorf("%s: %w", stepPath(p.path, st.ID), err)
 		}
+		// A step that moved to after_script is rebuilt from its own marker there, not from a step marker.
+		if p.toAfter && len(p.marks) > 0 && p.marks[len(p.marks)-1] == mark {
+			p.marks = p.marks[:len(p.marks)-1]
+		}
+		p.toAfter = false
 	}
 	return nil
 }
@@ -102,15 +119,15 @@ func (e *emitter) prepSteps(p *jobPrep) error {
 // stepGuard decides the shell condition around a step and the section it runs in. guard is empty when
 // the step runs unconditionally; arg is the canonical text of an emulated condition. moved is true when an
 // always() step leaves the job's script for after_script.
-func (e *emitter) stepGuard(sp string, st *ir.Step, sec string) (guard, arg, section string, moved bool) {
+func (e *emitter) stepGuard(sp string, st *ir.Step, sec string) (guard, arg, src, section string, moved bool) {
 	section = sec
 	if st.If == nil {
-		return "", "", sec, false
+		return "", "", "", sec, false
 	}
 	rest, status, ok := splitStatus(st.If)
 	if !ok || status == "failure" {
 		e.disable(sp, caps.StepIf, st.If, "step")
-		return "false", "", sec, false
+		return "false", "", "", sec, false
 	}
 	if status == "always" && sec != secAfter {
 		section, moved = secAfter, true
@@ -120,18 +137,18 @@ func (e *emitter) stepGuard(sp string, st *ir.Step, sec string) (guard, arg, sec
 		e.led.Note(e.use(sp, caps.StepIf), caps.Support{Level: caps.Native, Strategy: "success() is the default"}, "")
 	}
 	if rest == nil {
-		return "", "", section, moved
+		return "", "", "", section, moved
 	}
 	c, ok := e.condition(sp, caps.StepIf, rest, "step")
 	if !ok {
-		return "false", "", sec, false
+		return "false", "", "", sec, false
 	}
 	g, ok := shellCond(c)
 	if !ok {
 		e.disable(sp, caps.StepIf, st.If, "step")
-		return "false", "", sec, false
+		return "false", "", "", sec, false
 	}
-	return g, expr.String(c), section, moved
+	return g, expr.String(c), expr.String(rest), section, moved
 }
 
 // stepLosses reports the step fields a GitLab script cannot carry at all.
@@ -139,7 +156,7 @@ func (e *emitter) stepLosses(sp string, st *ir.Step) {
 	if st.Image != nil {
 		e.lose(sp, caps.StepImage, "GitLab sets the image per job, not per step")
 	}
-	if st.Shell != "" && st.Shell != shellBash && st.Shell != shellSh {
+	if st.Shell != "" {
 		e.lose(sp, caps.StepShell, "GitLab runs scripts in the runner's configured shell, not "+st.Shell)
 	}
 	if st.Timeout != nil {
@@ -161,10 +178,16 @@ func (e *emitter) scriptStep(p *jobPrep, st *ir.Step) error {
 // movedArg is the marker argument of an always() step that moved to after_script: where its lines start in
 // that section, how many there are, and the continue-on-error flag the section forces on.
 type movedArg struct {
+	Pos    *int   `json:"pos,omitempty"`
 	Moved  string `json:"moved"`
 	Offset int    `json:"offset"`
 	Lines  int    `json:"lines"`
 	COE    bool   `json:"coe"`
+}
+
+// srcArg carries the condition as the source dialect wrote it, which the emitted guard only approximates.
+type srcArg struct {
+	Src string `json:"src"`
 }
 
 func lineCount(text string) int { return strings.Count(strings.TrimRight(text, "\n"), "\n") + 1 }
@@ -173,7 +196,7 @@ func lineCount(text string) int { return strings.Count(strings.TrimRight(text, "
 // continue-on-error fields call for. The collapsers in collapse.go invert each wrapper from its marker.
 func (e *emitter) placeLines(p *jobPrep, st *ir.Step, lines []string) error {
 	sp := stepPath(p.path, st.ID)
-	guard, arg, sec, moved := e.stepGuard(sp, st, sectionOf(st))
+	guard, arg, src, sec, moved := e.stepGuard(sp, st, sectionOf(st))
 	if len(lines) == 0 {
 		p.pending = append(p.pending, e.drain()...)
 		return nil
@@ -198,6 +221,13 @@ func (e *emitter) placeLines(p *jobPrep, st *ir.Step, lines []string) error {
 			return err
 		}
 		marks = append(marks, a)
+		if e.from != nil && src != arg {
+			a, err := markerArg(srcArg{Src: src})
+			if err != nil {
+				return err
+			}
+			marks = append(marks, a)
+		}
 	}
 	if dir != "" {
 		marks = append(marks, emitkit.Marker(caps.StepWorkdir, sp))
@@ -214,7 +244,8 @@ func (e *emitter) placeLines(p *jobPrep, st *ir.Step, lines []string) error {
 	}
 	items, targets := wrapLines(st, sec, lines, guard, dir, exports)
 	if moved {
-		mv := movedArg{Moved: "always", Offset: p.lineCount(secAfter), COE: st.ContinueOnError}
+		pos := slices.Index(p.j.Steps, st)
+		mv := movedArg{Moved: "always", Offset: p.lineCount(secAfter), COE: st.ContinueOnError, Pos: &pos}
 		for _, it := range items {
 			mv.Lines += lineCount(it)
 		}
@@ -308,7 +339,7 @@ func (e *emitter) exports(sp string, st *ir.Step) ([]string, error) {
 			e.lose(sp, caps.StepEnv, "variable name "+v.Name+" is not a shell identifier")
 			continue
 		}
-		t, ok, err := e.value(sp, v.Value)
+		t, ok, err := e.value(sp, caps.StepEnv, v.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -322,4 +353,21 @@ func (e *emitter) exports(sp string, st *ir.Step) ([]string, error) {
 		out = append(out, "export "+v.Name+"="+dq(t))
 	}
 	return out, nil
+}
+
+// needsStepMarks is false when Parse's one-step reading of the script already gives the job's steps back.
+func needsStepMarks(j *ir.Job) bool {
+	scripts := 0
+	for _, st := range j.Steps {
+		if st == nil {
+			continue
+		}
+		if sectionOf(st) == secScript {
+			scripts++
+			if st.ID != "script" {
+				return true
+			}
+		}
+	}
+	return scripts > 1
 }

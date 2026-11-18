@@ -81,6 +81,9 @@ func (e *emitter) document(pl *ir.Pipeline) (*yaml.Node, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := e.markDeadOutputs(pl); err != nil {
+		return nil, err
+	}
 	e.foreignExt("pipeline/"+pl.ID, pl.Ext)
 	ext := extOf(pl.Ext)
 	c := &pipeCtx{pl: pl, plan: plan, preps: map[string]*jobPrep{}, defKeys: defaultKeySet(ext), keys: jobKeys(pl, e.from != nil)}
@@ -172,7 +175,7 @@ func (e *emitter) headerKeys(m *omap, pl *ir.Pipeline, ext map[string]any, c *pi
 		return nil, err
 	}
 	if len(vars) > 0 {
-		n, err := e.vars(pp, vars, extras)
+		n, err := e.vars(pp, caps.PipelineEnv, vars, extras)
 		if err != nil {
 			return nil, err
 		}
@@ -185,6 +188,11 @@ func (e *emitter) headerKeys(m *omap, pl *ir.Pipeline, ext map[string]any, c *pi
 		return nil, err
 	}
 	m.set(extWorkflow, w)
+	tm, err := e.triggerMarks(pl, w)
+	if err != nil {
+		return nil, err
+	}
+	marks = append(marks, tm...)
 	if d, ok := ext[extDefault]; ok {
 		n, err := plainNode(d)
 		if err != nil {
@@ -209,6 +217,7 @@ func (e *emitter) headerKeys(m *omap, pl *ir.Pipeline, ext map[string]any, c *pi
 			g = pl.ID
 		}
 		c.group = g
+		e.cancelLost(pp, pl.Concurrency)
 		marks = append(marks, emitkit.Marker(caps.PipelineConcurrency, pp))
 	}
 	return marks, nil

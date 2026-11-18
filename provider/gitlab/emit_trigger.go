@@ -12,6 +12,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
@@ -239,4 +240,51 @@ func (e *emitter) triggerNotes(tp string, t *ir.Trigger) {
 	if t.Kind == ir.TriggerPush && hasFilter(t.Tags) {
 		e.lose(tp, caps.TriggerFilterTags, "a push trigger with tag filters has no GitLab form; use a tag trigger")
 	}
+}
+
+var triggerFeatures = map[ir.TriggerKind]caps.Feature{
+	ir.TriggerPush: caps.TriggerPush, ir.TriggerPR: caps.TriggerPullRequest, ir.TriggerTag: caps.TriggerTag,
+	ir.TriggerSchedule: caps.TriggerSchedule, ir.TriggerManual: caps.TriggerManual, ir.TriggerAPI: caps.TriggerAPI,
+	ir.TriggerPipelineDone: caps.TriggerPipelineDone, ir.TriggerResource: caps.TriggerResource,
+}
+
+// triggerMarks carries the pipeline's triggers in the file when workflow:rules would not read back as them.
+func (e *emitter) triggerMarks(pl *ir.Pipeline, w *yaml.Node) ([]string, error) {
+	if len(pl.Triggers) == 0 {
+		return nil, nil
+	}
+	got, ok := defaultTriggers(), true
+	if w != nil {
+		got, ok, _ = newState(&report.Report{}).workflowTriggers(w)
+	}
+	if ok && sameTriggers(got, pl.Triggers) {
+		return nil, nil
+	}
+	var out []string
+	for i, t := range pl.Triggers {
+		line, err := markerArg(triggerWire(t))
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, emitkit.Marker(triggerFeatures[t.Kind], triggerPath(pl.ID, i)), line)
+	}
+	return out, nil
+}
+
+// wireTrigger is a trigger as a marker carries it: no Ext, which round-trip metadata keeps.
+type wireTrigger struct {
+	Resource *ir.ResourceRef `json:"resource,omitempty"`
+	Kind     ir.TriggerKind  `json:"kind"`
+	Cron     string          `json:"cron,omitempty"`
+	Branches ir.Filter       `json:"branches,omitzero"`
+	Tags     ir.Filter       `json:"tags,omitzero"`
+	Paths    ir.Filter       `json:"paths,omitzero"`
+}
+
+func triggerWire(t ir.Trigger) wireTrigger {
+	return wireTrigger{Resource: t.Resource, Kind: t.Kind, Cron: t.Cron, Branches: t.Branches, Tags: t.Tags, Paths: t.Paths}
+}
+
+func (w wireTrigger) trigger() ir.Trigger {
+	return ir.Trigger{Resource: w.Resource, Kind: w.Kind, Cron: w.Cron, Branches: w.Branches, Tags: w.Tags, Paths: w.Paths}
 }

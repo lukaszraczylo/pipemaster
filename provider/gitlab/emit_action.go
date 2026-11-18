@@ -153,6 +153,7 @@ func (e *emitter) actionStep(p *jobPrep, st *ir.Step) error {
 		e.unappliedFields(sp, st, "the step is lost")
 		return nil
 	}
+	e.lose(sp, caps.ExtPassthrough, "the action reference "+ghaRef(st.Action)+" is not in the GitLab file; it is kept in round-trip metadata")
 	e.canonTarget(sp, &t)
 	return e.applyTarget(p, sp, st, t)
 }
@@ -189,13 +190,20 @@ func (e *emitter) applyTarget(p *jobPrep, sp string, st *ir.Step, t actions.Targ
 	e.unappliedFields(sp, st, "the action becomes a job keyword")
 	switch t.Kind {
 	case actions.KindImplicit:
+		var names []string
 		for _, k := range []string{"GIT_DEPTH", "GIT_SUBMODULE_STRATEGY"} {
 			if v, ok := t.With[k].(string); ok {
 				p.vars = append(p.vars, ir.Var{Name: k, Value: ir.Value{Lit: v}})
+				names = append(names, k)
 			}
 		}
+		return e.markAction(p, sp, actionArg{Vars: names})
 	case actions.KindImage:
-		return e.setImage(p, sp, t.Image)
+		before := p.image
+		if err := e.setImage(p, sp, t.Image); err != nil || p.image == before {
+			return err
+		}
+		return e.markAction(p, sp, actionArg{Image: p.image})
 	case actions.KindCache:
 		return e.cacheAction(p, sp, t)
 	case actions.KindDownload:
@@ -419,4 +427,22 @@ func (e *emitter) hashKey(path, key string) (files []string, prefix string, ok b
 		text = strings.TrimLeft(text, "-")
 	}
 	return files, text, true, nil
+}
+
+// actionArg names what an action step added to the job, so Parse can remove it again.
+type actionArg struct {
+	Image string   `json:"image,omitempty"`
+	Vars  []string `json:"vars,omitempty"`
+}
+
+func (e *emitter) markAction(p *jobPrep, sp string, a actionArg) error {
+	if a.Image == "" && len(a.Vars) == 0 {
+		return nil
+	}
+	line, err := markerArg(a)
+	if err != nil {
+		return err
+	}
+	p.pending = append(p.pending, emitkit.Marker(caps.StepAction, sp), line)
+	return nil
 }

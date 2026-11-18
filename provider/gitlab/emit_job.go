@@ -257,7 +257,7 @@ func (e *emitter) variablesKey(m *omap, p *jobPrep, ext map[string]any, skip map
 	if len(vars) == 0 {
 		return nil
 	}
-	n, err := e.vars(p.path, vars, ext[extVariables])
+	n, err := e.vars(p.path, caps.JobEnv, vars, ext[extVariables])
 	if err != nil {
 		return err
 	}
@@ -291,13 +291,16 @@ func (e *emitter) scriptKeys(m *omap, p *jobPrep, ext map[string]any) error {
 		hasAny = hasAny || len(p.sections[s]) > 0
 	}
 	if !hasAny && !isTrigger {
+		held := p.marks
+		p.marks = nil
 		p.add(secScript, str(noopLine))
+		p.marks = held
 	}
-	if len(p.pending) > 0 {
+	if len(p.pending) > 0 || len(p.marks) > 0 {
 		if items := p.sections[secScript]; len(items) > 0 {
 			last := items[len(items)-1]
-			last.FootComment = joinLines(last.FootComment, p.pending)
-			p.pending = nil
+			last.FootComment = joinLines(last.FootComment, append(p.marks, p.pending...))
+			p.pending, p.marks = nil, nil
 		}
 	}
 	for _, sec := range sectionOrder {

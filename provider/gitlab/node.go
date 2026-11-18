@@ -63,7 +63,7 @@ func (s *state) clone(n *yaml.Node, file string, depth int) (*yaml.Node, error) 
 	case yaml.MappingNode:
 		return s.cloneMapping(n, file, depth)
 	case yaml.SequenceNode:
-		out := s.stamp(&yaml.Node{Kind: n.Kind, Tag: n.Tag, Style: n.Style, Line: n.Line, Column: n.Column}, file)
+		out := s.stamp(&yaml.Node{Kind: n.Kind, Tag: n.Tag, Style: n.Style, Line: n.Line, Column: n.Column, HeadComment: n.HeadComment, FootComment: n.FootComment}, file)
 		for _, c := range n.Content {
 			cc, err := s.clone(c, file, depth+1)
 			if err != nil {
@@ -73,7 +73,8 @@ func (s *state) clone(n *yaml.Node, file string, depth int) (*yaml.Node, error) 
 		}
 		return out, nil
 	}
-	return s.stamp(&yaml.Node{Kind: n.Kind, Tag: n.Tag, Value: n.Value, Style: n.Style, Line: n.Line, Column: n.Column}, file), nil
+	// Step markers ride in the comments of script items.
+	return s.stamp(&yaml.Node{Kind: n.Kind, Tag: n.Tag, Value: n.Value, Style: n.Style, Line: n.Line, Column: n.Column, HeadComment: n.HeadComment, FootComment: n.FootComment}, file), nil
 }
 
 func (s *state) stamp(n *yaml.Node, file string) *yaml.Node {

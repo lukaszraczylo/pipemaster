@@ -1,7 +1,6 @@
 package gitlab
 
 import (
-	"bytes"
 	"regexp"
 	"slices"
 	"strings"
@@ -33,31 +32,23 @@ var collapsers = map[caps.Feature]collapser{
 	caps.JobMatrix:           collapseMatrix,
 	caps.PipelineConcurrency: collapseConcurrency,
 	caps.PipelineInputs:      collapseInputs,
+	caps.StepAction:          collapseAction,
 }
 
 // stepFeatures are the emulations that rewrite one step's lines; they collapse together because they nest.
 var stepFeatures = []caps.Feature{caps.StepIf, caps.StepWorkdir, caps.StepEnv, caps.StepContinueOnError}
 
-// markerArgs collects the "# pipemaster:arg" lines that follow each marker.
-func markerArgs(src []byte) map[ir.FeatureUse][]string {
-	out := map[ir.FeatureUse][]string{}
-	var last []ir.FeatureUse
-	for _, raw := range bytes.Split(src, []byte("\n")) {
-		line := strings.TrimSpace(string(raw))
-		if rest, ok := strings.CutPrefix(line, argPrefix); ok && len(last) == 1 {
-			out[last[0]] = append(out[last[0]], rest)
-			continue
-		}
-		last = emitkit.ParseMarkers(raw)
-	}
-	return out
-}
+func markerArgs(src []byte) map[ir.FeatureUse][]string { return emitkit.ParseArgs(src) }
 
 // collapseMarkers restores the IR feature behind each emulation marker; a marker it cannot restore is reported.
 func (s *state) collapseMarkers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string) {
 	extractMoved(pl, uses, args)
+	restoreTriggers(pl, uses, args)
 	stepDone := map[string]map[caps.Feature]bool{}
 	for _, u := range uses {
+		if isTriggerMark(u) {
+			continue
+		}
 		if isStepFeature(u.Feature) {
 			if _, ok := stepDone[u.IRPath]; !ok {
 				stepDone[u.IRPath] = collapseStep(pl, u.IRPath, uses, args)

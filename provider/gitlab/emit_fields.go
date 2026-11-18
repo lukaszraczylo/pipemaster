@@ -5,7 +5,6 @@ import (
 	"maps"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -81,7 +80,7 @@ func (e *emitter) servicesNode(path string, svcs []ir.Service, extra any) (*yaml
 			m.set("entrypoint", strSeq(sv.Image.Entrypoint))
 		}
 		if len(sv.Env) > 0 {
-			v, err := e.vars(sp, sv.Env, rest[extVariables])
+			v, err := e.vars(sp, caps.JobServices, sv.Env, rest[extVariables])
 			if err != nil {
 				return nil, err
 			}
@@ -339,7 +338,7 @@ func (e *emitter) artifactsNode(path string, p *jobPrep, extra any) (*yaml.Node,
 		}
 	}
 	em, _ := extra.(map[string]any)
-	dotenv := len(p.j.Outputs) > 0
+	dotenv := e.hasDotenv(p.j)
 	if !acc.seen && len(em) == 0 && !dotenv {
 		return nil, nil
 	}
@@ -380,19 +379,26 @@ func (e *emitter) artifactExtras(m *omap, em map[string]any, dotenv bool) error 
 func (e *emitter) outputLines(p *jobPrep) ([]string, error) {
 	var out []string
 	for _, o := range p.j.Outputs {
-		if !isIdent(o.Name) {
-			e.lose(p.path, caps.JobOutputs, "output name "+o.Name+" is not a dotenv variable name")
-			continue
-		}
-		v, err := e.field(p.path, caps.JobOutputs, o.Value)
+		v, ok, why, err := e.outputText(o)
 		if err != nil {
 			return nil, err
 		}
-		if strings.Contains(v, "\n") {
-			e.lose(p.path, caps.JobOutputs, "output "+o.Name+" holds a newline, which dotenv cannot carry")
+		if !ok {
+			e.lose(p.path, caps.JobOutputs, why)
+			e.comment("job.outputs " + p.path + ": output " + o.Name + " is not written")
 			continue
 		}
 		out = append(out, "echo "+dq(o.Name+"="+v)+" >> "+dotenvFile)
 	}
 	return out, nil
+}
+
+// hasDotenv is true when at least one output of j can be written to the dotenv file.
+func (e *emitter) hasDotenv(j *ir.Job) bool {
+	for _, o := range j.Outputs {
+		if _, ok, _, err := e.outputText(o); ok && err == nil {
+			return true
+		}
+	}
+	return false
 }

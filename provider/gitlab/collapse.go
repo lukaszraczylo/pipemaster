@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"reflect"
 	"regexp"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
@@ -48,7 +50,7 @@ func collapseStep(pl *ir.Pipeline, path string, uses []ir.FeatureUse, args map[i
 	out := *st
 	var ok bool
 	if guard := guardArg(byFeature[caps.StepIf]); set[caps.StepIf] && guard != "" {
-		if lines, ok = unguard(&out, lines, guard); !ok {
+		if lines, ok = unguard(&out, lines, guard, sourceArg(byFeature[caps.StepIf])); !ok {
 			return fail
 		}
 	}
@@ -82,7 +84,18 @@ func guardArg(args []string) string {
 	return ""
 }
 
-func unguard(st *ir.Step, lines []string, arg string) ([]string, bool) {
+// sourceArg is the condition text in the source dialect, when the emitter translated it.
+func sourceArg(args []string) string {
+	for _, a := range args {
+		var s srcArg
+		if strings.HasPrefix(a, `{"src"`) && json.Unmarshal([]byte(a), &s) == nil {
+			return s.Src
+		}
+	}
+	return ""
+}
+
+func unguard(st *ir.Step, lines []string, arg, src string) ([]string, bool) {
 	var text string
 	if json.Unmarshal([]byte(arg), &text) != nil || len(lines) < 3 || lines[len(lines)-1] != "fi" {
 		return nil, false
@@ -98,6 +111,11 @@ func unguard(st *ir.Step, lines []string, arg string) ([]string, bool) {
 	want, err := canonText("if " + guard + "; then")
 	if err != nil || lines[0] != want {
 		return nil, false
+	}
+	if src != "" {
+		if x, err = expr.ParseCanonical(src); err != nil {
+			return nil, false
+		}
 	}
 	if st.If != nil {
 		x = expr.Binary{Op: expr.OpAnd, L: st.If, R: x}
@@ -138,6 +156,7 @@ func extractMoved(pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse]
 	type made struct {
 		job  *ir.Job
 		step *ir.Step
+		pos  *int
 	}
 	var out []made
 	for _, m := range moves {
@@ -149,13 +168,17 @@ func extractMoved(pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse]
 		moved := &ir.Step{ID: m.step, Kind: ir.StepScript, If: expr.Call{Name: "always"}, ContinueOnError: m.arg.COE}
 		moved.Script = append([]string{}, after.Script[m.arg.Offset:end]...)
 		after.Script = append(append([]string{}, after.Script[:m.arg.Offset]...), after.Script[end:]...)
-		out = append(out, made{job: m.job, step: moved})
+		out = append(out, made{job: m.job, step: moved, pos: m.arg.Pos})
 		if len(after.Script) == 0 {
 			m.job.Steps = removeStep(m.job.Steps, after)
 		}
 	}
 	for i := len(out) - 1; i >= 0; i-- {
-		out[i].job.Steps = append(out[i].job.Steps, out[i].step)
+		j, at := out[i].job, len(out[i].job.Steps)
+		if out[i].pos != nil {
+			at = min(max(*out[i].pos, 0), at)
+		}
+		j.Steps = slices.Insert(j.Steps, at, out[i].step)
 	}
 }
 
@@ -227,12 +250,41 @@ func collapseOutputs(c *collapseCtx) bool {
 		return false
 	}
 	j.Outputs = outs
+	outputRefs(c.pl, j)
 	st.Script = st.Script[:n]
 	if n == 0 {
 		j.Steps = removeStep(j.Steps, st)
 	}
 	dropExt(&j.Ext, extArtifacts, reportsKey, dotenvKey)
+	// The dotenv report was the only artifact a consumer's need could have fetched.
+	if !declaresArtifacts(j) {
+		for _, o := range allJobs(c.pl) {
+			for i := range o.Needs {
+				if o.Needs[i].JobID == j.ID {
+					o.Needs[i].Artifacts = false
+				}
+			}
+		}
+	}
 	return true
+}
+
+// outputRefs turns the $name variables a consumer reads from a producer's dotenv file back into needs references.
+func outputRefs(pl *ir.Pipeline, producer *ir.Job) {
+	for _, j := range allJobs(pl) {
+		if !slices.ContainsFunc(j.Needs, func(n ir.Need) bool { return n.JobID == producer.ID }) {
+			continue
+		}
+		for _, o := range producer.Outputs {
+			re := regexp.MustCompile(`\$(?:\{` + regexp.QuoteMeta(o.Name) + `\}|` + regexp.QuoteMeta(o.Name) + `\b)`)
+			ref := "${{ needs." + producer.ID + ".outputs." + o.Name + " }}"
+			for _, st := range j.Steps {
+				for i, l := range st.Script {
+					st.Script[i] = re.ReplaceAllLiteralString(l, ref)
+				}
+			}
+		}
+	}
 }
 
 func dotenvDeclared(j *ir.Job) bool {
@@ -294,7 +346,24 @@ func collapseMatrix(c *collapseCtx) bool {
 		return false
 	}
 	j.Matrix = orig
+	matrixRefs(j, orig)
 	return true
+}
+
+// matrixRefs turns the $axis variables GitLab sets for each parallel:matrix entry back into matrix references.
+func matrixRefs(j *ir.Job, m *ir.Matrix) {
+	for _, a := range m.Axes {
+		re := regexp.MustCompile(`\$(?:\{` + regexp.QuoteMeta(a.Name) + `\}|` + regexp.QuoteMeta(a.Name) + `\b)`)
+		ref := "${{ matrix." + a.Name + " }}"
+		for i, l := range j.Runner.Labels {
+			j.Runner.Labels[i] = re.ReplaceAllLiteralString(l, ref)
+		}
+		for _, st := range j.Steps {
+			for i, l := range st.Script {
+				st.Script[i] = re.ReplaceAllLiteralString(l, ref)
+			}
+		}
+	}
 }
 
 // collapseConcurrency restores the pipeline concurrency group from the resource_group every job carries.
@@ -370,4 +439,67 @@ func dropVar(vs []ir.Var, name string) []ir.Var {
 		}
 	}
 	return out
+}
+
+// collapseAction removes the image and variables an action step added to its job.
+func collapseAction(c *collapseCtx) bool {
+	if len(c.args) != 1 {
+		return false
+	}
+	var a actionArg
+	if json.Unmarshal([]byte(c.args[0]), &a) != nil {
+		return false
+	}
+	jobPath, _, ok := strings.Cut(c.path, stepSep)
+	if !ok {
+		return false
+	}
+	j := findJobAt(c.pl, jobPath)
+	if j == nil {
+		return false
+	}
+	if a.Image != "" && j.Container != nil && j.Container.Ref == a.Image {
+		j.Container = nil
+	}
+	var env []ir.Var
+	for _, v := range j.Env {
+		if !slices.Contains(a.Vars, v.Name) {
+			env = append(env, v)
+		}
+	}
+	j.Env = env
+	return true
+}
+
+var triggerPathRE = regexp.MustCompile(`^pipeline/[^/]+/trigger/(\d+)$`)
+
+func isTriggerMark(u ir.FeatureUse) bool { return triggerPathRE.MatchString(u.IRPath) }
+
+// restoreTriggers replaces the parsed triggers with the ones the emitter carried in trigger markers, in index order.
+func restoreTriggers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string) {
+	byIndex := map[int]ir.Trigger{}
+	for _, u := range uses {
+		m := triggerPathRE.FindStringSubmatch(u.IRPath)
+		if m == nil || !strings.HasPrefix(u.IRPath, "pipeline/"+pl.ID+"/") || len(args[u]) != 1 {
+			continue
+		}
+		var w wireTrigger
+		if json.Unmarshal([]byte(args[u][0]), &w) != nil {
+			continue
+		}
+		i, _ := strconv.Atoi(m[1])
+		byIndex[i] = w.trigger()
+	}
+	if len(byIndex) == 0 {
+		return
+	}
+	var out []ir.Trigger
+	for i := 0; i < len(byIndex); i++ {
+		t, ok := byIndex[i]
+		if !ok {
+			return
+		}
+		out = append(out, t)
+	}
+	pl.Triggers = out
 }

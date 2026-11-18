@@ -90,3 +90,29 @@ func restoreJobIDs(pl *ir.Pipeline, ids map[string]string) {
 		}
 	}
 }
+
+// EmittedIDs lists what Emit renames in a single-pipeline project: the pipeline, which Parse always calls
+// gitlab-ci, and each job under a reserved key. Several pipelines fold into one and carry markers instead.
+func (adapter) EmittedIDs(p *ir.Project) map[string]string {
+	if p == nil {
+		return nil
+	}
+	var pls []*ir.Pipeline
+	for _, pl := range p.Pipelines {
+		if pl != nil {
+			pls = append(pls, pl)
+		}
+	}
+	if len(pls) != 1 {
+		return nil
+	}
+	pl := pls[0]
+	out := map[string]string{}
+	if pl.ID != pipelineID {
+		out["pipeline/"+pipelineID] = pl.ID
+	}
+	for id, key := range jobKeys(pl, sourceDialect(p.Origin.Provider) != nil) {
+		out["pipeline/"+pipelineID+"/job/"+key] = id
+	}
+	return out
+}

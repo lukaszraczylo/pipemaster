@@ -2,6 +2,8 @@ package gitlab
 
 import (
 	"go.yaml.in/yaml/v3"
+	"slices"
+	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
@@ -144,29 +146,34 @@ const ExtBeforeLines = "before_lines"
 
 // jobScripts maps before_script and script to ONE step, because GitLab runs them in one shell and an export or
 // cd in before_script must reach script. after_script runs in a fresh shell, always, and its exit status
-// is ignored, so it is a separate step with If always() and ContinueOnError.
+// is ignored, so it is a separate step with If always() and ContinueOnError. Step markers the emitter wrote
+// split the one shell into the steps it came from.
 func (s *state) jobScripts(j *ir.Job, r *reader) error {
-	var before, body, after []string
-	for _, sec := range []struct {
-		to   *[]string
-		name string
-	}{{&before, "before_script"}, {&body, "script"}, {&after, "after_script"}} {
-		n := r.take(sec.name)
-		if n == nil {
-			continue
-		}
-		lines, err := s.scriptLines(n, sec.name)
+	var secs [3]*yaml.Node
+	for i, name := range []string{"before_script", "script", "after_script"} {
+		secs[i] = r.take(name)
+	}
+	var after []string
+	if secs[2] != nil {
+		lines, err := s.scriptLines(secs[2], "after_script")
 		if err != nil {
 			return err
 		}
-		*sec.to = lines
+		after = lines
 	}
-	if lines := append(append([]string{}, before...), body...); len(lines) > 0 {
-		x := map[string]any{ExtSection: "script"}
-		if len(before) > 0 {
-			x[ExtBeforeLines] = len(before)
+	segs, marked, err := s.scriptSegments(secs[0], secs[1])
+	if err != nil {
+		return err
+	}
+	for _, g := range segs {
+		if len(g.lines) == 0 && !marked {
+			continue
 		}
-		j.Steps = append(j.Steps, &ir.Step{ID: "script", Kind: ir.StepScript, Script: lines, Ext: ir.Ext{dialect: x}})
+		x := map[string]any{ExtSection: "script"}
+		if g.before > 0 {
+			x[ExtBeforeLines] = g.before
+		}
+		j.Steps = append(j.Steps, &ir.Step{ID: g.id, Kind: ir.StepScript, Script: g.lines, Ext: ir.Ext{dialect: x}})
 	}
 	if len(after) > 0 {
 		j.Steps = append(j.Steps, &ir.Step{
@@ -175,6 +182,66 @@ func (s *state) jobScripts(j *ir.Job, r *reader) error {
 		})
 	}
 	return nil
+}
+
+// segment is the script text of one step: the lines after its step marker.
+type segment struct {
+	id     string
+	lines  []string
+	before int
+}
+
+const defaultStepID = "script"
+
+// scriptSegments splits before_script and script at step markers. Without a marker it returns one segment
+// holding every line, and marked is false.
+func (s *state) scriptSegments(before, body *yaml.Node) (segs []segment, marked bool, err error) {
+	var pending []string
+	flush := func() {
+		for _, id := range pending {
+			segs, marked = append(segs, segment{id: id}), true
+		}
+		pending = nil
+	}
+	for i, n := range []*yaml.Node{before, body} {
+		if n == nil {
+			continue
+		}
+		pending = append(pending, stepMarks(n.HeadComment)...)
+		err = s.eachScriptItem(n, "script", func(item *yaml.Node, lines []string) {
+			pending = append(pending, stepMarks(item.HeadComment)...)
+			flush()
+			if len(segs) == 0 {
+				segs = append(segs, segment{id: defaultStepID})
+			}
+			last := &segs[len(segs)-1]
+			last.lines = append(last.lines, lines...)
+			if i == 0 {
+				last.before += len(lines)
+			}
+			pending = append(pending, stepMarks(item.FootComment)...)
+		})
+		if err != nil {
+			return nil, false, err
+		}
+		pending = append(pending, stepMarks(n.FootComment)...)
+	}
+	flush()
+	if marked && len(segs) > 1 && segs[0].id == defaultStepID && slices.Equal(segs[0].lines, []string{noopLine}) {
+		segs = segs[1:]
+	}
+	return segs, marked, nil
+}
+
+// stepMarks returns the step ids named by step marker lines of a comment.
+func stepMarks(comment string) []string {
+	var out []string
+	for _, l := range strings.Split(comment, "\n") {
+		if id, ok := strings.CutPrefix(strings.TrimSpace(l), stepPrefix); ok {
+			out = append(out, strings.TrimSpace(id))
+		}
+	}
+	return out
 }
 
 func (s *state) jobEnv(j *ir.Job, r *reader) error {

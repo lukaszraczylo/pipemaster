@@ -181,6 +181,7 @@ func (e *emitter) foldShared(pp string, pl *ir.Pipeline) (vars []ir.Var, group s
 			return nil, "", err
 		}
 		e.emulate(pp, caps.PipelineConcurrency, "resource_group on every job of the pipeline", "queues, does not cancel")
+		e.cancelLost(pp, pl.Concurrency)
 	}
 	return vars, group, nil
 }

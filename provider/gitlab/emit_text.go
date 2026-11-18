@@ -22,6 +22,7 @@ type emitter struct {
 	led      *emitkit.Ledger
 	from     *expr.Dialect
 	fold     *folded
+	deadOut  map[string]bool
 	comments []string
 }
 
@@ -46,11 +47,7 @@ func (e *emitter) lose(path string, f caps.Feature, detail string) {
 
 // foreignExt reports Ext data of other providers: it is not in the GitLab file, only in the round-trip metadata.
 func (e *emitter) foreignExt(path string, x ir.Ext) {
-	for _, k := range sortedKeys(x) {
-		if k != dialect {
-			e.lose(path, caps.ExtPassthrough, "Ext of provider "+k+" is not written to the GitLab file; it is kept in round-trip metadata")
-		}
-	}
+	emitkit.ForeignExt(e.led, dialect, "GitLab", path, x)
 }
 
 func (e *emitter) emulate(path string, f caps.Feature, strategy, detail string) {
@@ -122,7 +119,7 @@ func convertParts(parts []expr.Part) (string, []string, error) {
 			sb.WriteString(litText(l))
 			continue
 		}
-		r, ok := p.Expr.(expr.Ref)
+		r, ok := foldRef(p.Expr).(expr.Ref)
 		name := ""
 		if ok {
 			name, ok = refVar(r.Path)
@@ -180,6 +177,9 @@ func (e *emitter) scriptLine(path, s string) (out string, keep bool, err error) 
 	if err != nil {
 		return "", false, err
 	}
+	if dead := e.deadOutputRefs(s); len(dead) > 0 {
+		lost = append(lost, dead...)
+	}
 	if len(lost) == 0 {
 		return out, true, nil
 	}
@@ -189,13 +189,14 @@ func (e *emitter) scriptLine(path, s string) (out string, keep bool, err error) 
 }
 
 // value renders an env value; ok is false when it was lost and must be omitted.
-func (e *emitter) value(path string, v ir.Value) (text string, ok bool, err error) {
+func (e *emitter) value(path string, f caps.Feature, v ir.Value) (text string, ok bool, err error) {
 	switch v.Kind {
 	case ir.ValueSecret:
 		if !isIdent(v.Secret) {
 			e.lose(path, caps.ExprOpaque, "secret name "+v.Secret+" is not a GitLab variable name")
 			return "", false, nil
 		}
+		e.lose(path, f, "secret "+v.Secret+" is written as the variable $"+v.Secret+"; a GitLab file cannot mark it as a secret")
 		return "$" + v.Secret, true, nil
 	case ir.ValueExpr:
 		return e.exprValue(path, v.Expr)
@@ -235,11 +236,11 @@ func (e *emitter) reportLostExpr(path string, lost []string) {
 }
 
 // vars renders a variables mapping in order; extras holds the hash-form keys by variable name.
-func (e *emitter) vars(path string, vs []ir.Var, extras any) (*yaml.Node, error) {
+func (e *emitter) vars(path string, f caps.Feature, vs []ir.Var, extras any) (*yaml.Node, error) {
 	ex, _ := extras.(map[string]any)
 	m := newMap()
 	for _, v := range vs {
-		t, ok, err := e.value(path, v.Value)
+		t, ok, err := e.value(path, f, v.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -357,4 +358,95 @@ func (e *emitter) condition(path string, f caps.Feature, x expr.Expr, what strin
 func (e *emitter) disable(path string, f caps.Feature, x expr.Expr, what string) {
 	e.lose(path, f, "condition not expressible in GitLab CI; "+what+" disabled")
 	e.comment(string(f) + " " + path + ": " + expr.String(x))
+}
+
+// cancelLost reports cancel-in-progress, which a resource_group cannot do; the group only queues runs.
+func (e *emitter) cancelLost(pp string, c *ir.Concurrency) {
+	if c.CancelInProgress {
+		e.lose(pp, caps.PipelineConcurrency, "cancel-in-progress has no GitLab form; a resource_group queues runs")
+	}
+}
+
+// outputText is the dotenv value of a job output. ok is false for an output no dotenv file can carry; why says so.
+func (e *emitter) outputText(o ir.Output) (text string, ok bool, why string, err error) {
+	if !isIdent(o.Name) {
+		return "", false, "output name " + o.Name + " is not a dotenv variable name", nil
+	}
+	text, lost, err := convert(o.Value)
+	if err != nil {
+		return "", false, "", err
+	}
+	if len(lost) > 0 {
+		return "", false, "no GitLab variable for expression " + strings.Join(lost, ", "), nil
+	}
+	if strings.Contains(text, "\n") {
+		return "", false, "output " + o.Name + " holds a newline, which dotenv cannot carry", nil
+	}
+	return text, true, "", nil
+}
+
+// markDeadOutputs records the outputs of pl that never reach a dotenv file, so a consumer line that reads one is not emitted.
+func (e *emitter) markDeadOutputs(pl *ir.Pipeline) error {
+	e.deadOut = map[string]bool{}
+	for _, j := range allJobs(pl) {
+		for _, o := range j.Outputs {
+			_, ok, _, err := e.outputText(o)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				e.deadOut[j.ID+"."+o.Name] = true
+			}
+		}
+	}
+	return nil
+}
+
+// deadOutputRefs lists the needs.<job>.outputs.<name> references in s whose producer cannot write them.
+func (e *emitter) deadOutputRefs(s string) []string {
+	parts, err := expr.ParseScriptTemplate(s)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, p := range parts {
+		r, ok := p.Expr.(expr.Ref)
+		if ok && len(r.Path) == 4 && r.Path[0] == expr.PrefixNeeds && r.Path[2] == "outputs" && e.deadOut[r.Path[1]+"."+r.Path[3]] {
+			out = append(out, expr.String(r))
+		}
+	}
+	return out
+}
+
+// foldRef reads the ref_type test GHA needs for a branch or tag name back as the canonical branch or tag ref.
+func foldRef(x expr.Expr) expr.Expr {
+	b, ok := x.(expr.Binary)
+	if ok && b.Op == expr.OpOr {
+		if l, isLit := b.R.(expr.Lit); isLit && l.Kind == expr.LitStr && l.Str == "" {
+			b, ok = b.L.(expr.Binary)
+		}
+	}
+	if !ok || b.Op != expr.OpAnd {
+		return x
+	}
+	name, ok := b.R.(expr.Ref)
+	if !ok || strings.Join(name.Path, ".") != expr.CtxRefName {
+		return x
+	}
+	g, ok := b.L.(expr.Binary)
+	if !ok || g.Op != expr.OpEq {
+		return x
+	}
+	ref, ok := g.L.(expr.Ref)
+	lit, isLit := g.R.(expr.Lit)
+	if !ok || !isLit || strings.Join(ref.Path, ".") != expr.CtxRefType {
+		return x
+	}
+	switch lit.Str {
+	case "branch":
+		return expr.Ref{Path: []string{expr.CtxBranch}}
+	case "tag":
+		return expr.Ref{Path: []string{expr.CtxTag}}
+	}
+	return x
 }
