@@ -80,3 +80,12 @@ func ref(name string) expr.Ref {
 	}
 	return expr.Ref{Path: []string{Dialect, name}}
 }
+
+// Lang is the GitLab dialect for expr.Translate.
+var Lang = expr.Dialect{
+	ID:       Dialect,
+	Vocab:    Vocab,
+	Sem:      Semantics,
+	Events:   Events,
+	Supports: func(e expr.Expr) bool { _, err := Print(e); return err == nil },
+}

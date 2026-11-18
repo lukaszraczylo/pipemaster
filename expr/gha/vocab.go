@@ -62,3 +62,14 @@ func ref(path []string) expr.Ref {
 }
 
 func isCanonRef(path []string, name string) bool { return strings.Join(path, ".") == name }
+
+// Lang is the GHA dialect for expr.Translate. GHA names events canonically, so its event table is the identity.
+var Lang = expr.Dialect{
+	ID:    Dialect,
+	Vocab: Vocab,
+	Sem:   Semantics,
+	Events: map[string]string{
+		"push": "push", "pull_request": "pull_request", "schedule": "schedule", "workflow_dispatch": "workflow_dispatch",
+	},
+	Supports: func(e expr.Expr) bool { _, err := Print(e); return err == nil },
+}
