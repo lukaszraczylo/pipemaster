@@ -518,3 +518,26 @@ func TestDuplicateMarkersDoNotMultiplyArguments(t *testing.T) {
 		t.Errorf("a repeated marker must collapse like one marker:\n%s", diff)
 	}
 }
+
+func TestCapsDeclareDisplayNameLost(t *testing.T) {
+	s := newProvider().(interface{ Caps() caps.Matrix }).Caps()[caps.DisplayName]
+	if s.Level != caps.Lost || s.Caveat == "" {
+		t.Fatalf("display.name caps = %+v, want lost with a caveat", s)
+	}
+	j := glJob("build", glStep("make"))
+	j.Name = "build"
+	p := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "ci", Name: "CI", Jobs: []*ir.Job{j}}}}
+	_, rep := emitFiles(t, p)
+	got := map[string]bool{}
+	for _, e := range rep.Entries {
+		if e.Feature == caps.DisplayName {
+			got[e.IRPath] = e.Level == caps.Lost
+		}
+	}
+	if !got["pipeline/ci"] {
+		t.Errorf("pipeline name must be reported lost: %+v", rep.Entries)
+	}
+	if lost, ok := got["pipeline/ci/job/build"]; ok && !lost {
+		t.Errorf("a reported job name must be lost, got %+v", got)
+	}
+}

@@ -29,6 +29,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.StepTimeout:            {Level: caps.Lost, Caveat: "GitLab has only a job timeout"},
 		caps.StepWorkdir:            {Level: caps.Emulated, Strategy: "cd in a subshell around the step"},
 		caps.StepShell:              {Level: caps.Native, Caveat: "bash and sh only; the runner's shell runs other scripts"},
+		caps.DisplayName:            {Level: caps.Lost, Caveat: "step and pipeline names have no GitLab field; a job name survives only as its key"},
 		caps.ExprOpaque:             {Level: caps.Native, Caveat: "only opaque expressions of the gitlab dialect; others are lost"},
 	} {
 		m[f] = s
