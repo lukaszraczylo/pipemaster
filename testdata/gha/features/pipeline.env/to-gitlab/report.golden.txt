@@ -1,3 +1,4 @@
 Loss report: gha -> gitlab
+[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [lost] pipeline/ci expr.opaque (no GitLab variable for expression gha.github.run_number)
 [lost] pipeline/ci pipeline.env (secret DEPLOY_TOKEN is written as the variable $DEPLOY_TOKEN; a GitLab file cannot mark it as a secret)

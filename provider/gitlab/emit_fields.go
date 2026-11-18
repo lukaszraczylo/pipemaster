@@ -183,11 +183,12 @@ type matrixArg struct {
 	Axes    []ir.Axis
 	Include []ir.Combo
 	Exclude []ir.Combo
+	Lines   []string `json:"lines,omitempty"`
 }
 
 // parallelNode writes parallel:matrix. Include and exclude have no GitLab form, so such a matrix is expanded
 // into one entry per combination, with the original in a marker argument so Parse can collapse it.
-func (e *emitter) parallelNode(path string, m *ir.Matrix, extra any) (node *yaml.Node, marks []string, err error) {
+func (e *emitter) parallelNode(path string, m *ir.Matrix, lines []string, extra any) (node *yaml.Node, marks []string, err error) {
 	if m.FailFast != nil || m.MaxParallel > 0 {
 		e.lose(path, caps.JobMatrix, "fail-fast and max-parallel have no GitLab equivalent")
 	}
@@ -236,7 +237,7 @@ func (e *emitter) parallelNode(path string, m *ir.Matrix, extra any) (node *yaml
 			break
 		}
 		var arg string
-		if arg, err = markerArg(matrixArg{Axes: m.Axes, Include: m.Include, Exclude: m.Exclude}); err != nil {
+		if arg, err = markerArg(matrixArg{Axes: m.Axes, Include: m.Include, Exclude: m.Exclude, Lines: lines}); err != nil {
 			break
 		}
 		e.emulate(path, caps.JobMatrix, "expanded into one parallel:matrix entry per combination", "include and exclude have no GitLab form")

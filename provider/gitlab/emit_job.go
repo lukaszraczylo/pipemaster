@@ -278,9 +278,19 @@ func (e *emitter) scriptKeys(m *omap, p *jobPrep, ext map[string]any) error {
 	if err != nil {
 		return err
 	}
+	var consumers []string
+	for _, o := range allJobs(e.pl) {
+		if slices.ContainsFunc(o.Needs, func(n ir.Need) bool { return n.JobID == p.j.ID }) {
+			consumers = append(consumers, jobRefLines(o)...)
+		}
+	}
+	arg, err := markerArg(refArg{Lines: consumers})
+	if err != nil {
+		return err
+	}
 	for i, l := range lines {
 		if i == 0 {
-			p.add(secScript, str(l), emitkit.Marker(caps.JobOutputs, p.path))
+			p.add(secScript, str(l), emitkit.Marker(caps.JobOutputs, p.path), arg)
 		} else {
 			p.add(secScript, str(l))
 		}
@@ -359,7 +369,7 @@ func (e *emitter) artifactsKey(m *omap, p *jobPrep, ext map[string]any, skip map
 func (e *emitter) limitKeys(m *omap, p *jobPrep, t jobTiming, ext map[string]any, skip map[string]bool, marks *[]string) error {
 	j := p.j
 	if j.Matrix != nil {
-		n, mk, err := e.parallelNode(p.path, j.Matrix, ext[extParallel])
+		n, mk, err := e.parallelNode(p.path, j.Matrix, jobRefLines(j), ext[extParallel])
 		if err != nil {
 			return err
 		}

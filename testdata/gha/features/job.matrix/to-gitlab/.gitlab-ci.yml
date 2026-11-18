@@ -2,7 +2,7 @@ workflow:
   rules:
     - if: $CI_COMMIT_BRANCH
 # pipemaster:emulated job.matrix pipeline/ci/job/test
-# pipemaster:arg {"Axes":[{"Name":"os","Values":["ubuntu-latest","macos-latest"]},{"Name":"go","Values":["1.24","1.25"]}],"Include":[[{"Key":"experimental","Value":"true"},{"Key":"go","Value":"1.25"},{"Key":"os","Value":"ubuntu-latest"}]],"Exclude":[[{"Key":"go","Value":"1.24"},{"Key":"os","Value":"macos-latest"}]]}
+# pipemaster:arg {"Axes":[{"Name":"os","Values":["ubuntu-latest","macos-latest"]},{"Name":"go","Values":["1.24","1.25"]}],"Include":[[{"Key":"experimental","Value":"true"},{"Key":"go","Value":"1.25"},{"Key":"os","Value":"ubuntu-latest"}]],"Exclude":[[{"Key":"go","Value":"1.24"},{"Key":"os","Value":"macos-latest"}]],"lines":["$os","echo $go"]}
 test:
   tags:
     - $os

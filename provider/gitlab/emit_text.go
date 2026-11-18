@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -20,6 +21,7 @@ var identRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 // emitter carries the state of one Emit call: the ledger and the lost-text comments waiting for a node.
 type emitter struct {
 	led      *emitkit.Ledger
+	pl       *ir.Pipeline
 	from     *expr.Dialect
 	fold     *folded
 	deadOut  map[string]bool
@@ -48,6 +50,13 @@ func (e *emitter) lose(path string, f caps.Feature, detail string) {
 // foreignExt reports Ext data of other providers: it is not in the GitLab file, only in the round-trip metadata.
 func (e *emitter) foreignExt(path string, x ir.Ext) {
 	emitkit.ForeignExt(e.led, dialect, "GitLab", path, x)
+}
+
+// loseName reports a display name the file cannot hold; only a job name equal to its key is written.
+func (e *emitter) loseName(path, name, key string) {
+	if name != "" && name != key {
+		e.lose(path, caps.DisplayName, "GitLab CI has no display name here; the name is kept in round-trip metadata")
+	}
 }
 
 func (e *emitter) emulate(path string, f caps.Feature, strategy, detail string) {
@@ -149,6 +158,38 @@ func litText(l expr.Lit) string {
 		return ""
 	}
 	return expr.String(l)
+}
+
+// refLines lists the GitLab text of each source line whose expressions convert to variables. Collapsing
+// rewrites only these lines, so a literal $name in a line the emitter left alone stays literal.
+func refLines(src []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, l := range src {
+		if !strings.Contains(l, "${{") {
+			continue
+		}
+		if t, _, err := convert(l); err == nil && t != l && !seen[t] {
+			seen[t] = true
+			out = append(out, t)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// refArg is the marker argument that names the lines whose variables came from references.
+type refArg struct {
+	Lines []string `json:"lines"`
+}
+
+// jobRefLines is refLines over a job's runner labels and step scripts.
+func jobRefLines(j *ir.Job) []string {
+	src := slices.Clone(j.Runner.Labels)
+	for _, st := range j.Steps {
+		src = append(src, st.Script...)
+	}
+	return refLines(src)
 }
 
 // field converts text that sits inside a YAML value; expressions with no GitLab variable are omitted and reported.

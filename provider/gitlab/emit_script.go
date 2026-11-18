@@ -88,12 +88,14 @@ func sectionOf(st *ir.Step) string {
 // prepSteps turns every step into script items or job keywords.
 func (e *emitter) prepSteps(p *jobPrep) error {
 	e.foreignExt(p.path, p.j.Ext)
+	e.loseName(p.path, p.j.Name, p.j.ID)
 	markSteps := needsStepMarks(p.j)
 	for _, st := range p.j.Steps {
 		if st == nil {
 			continue
 		}
 		e.foreignExt(stepPath(p.path, st.ID), st.Ext)
+		e.loseName(stepPath(p.path, st.ID), st.Name, "")
 		mark := stepPrefix + commentSafe(st.ID)
 		if markSteps {
 			p.marks = append(p.marks, mark)

@@ -12,6 +12,8 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 const quoted = `((?:[^"\\\x60]|\\.)*)`
@@ -250,7 +252,7 @@ func collapseOutputs(c *collapseCtx) bool {
 		return false
 	}
 	j.Outputs = outs
-	outputRefs(c.pl, j)
+	outputRefs(c.pl, j, markedLines(c.args))
 	st.Script = st.Script[:n]
 	if n == 0 {
 		j.Steps = removeStep(j.Steps, st)
@@ -270,7 +272,7 @@ func collapseOutputs(c *collapseCtx) bool {
 }
 
 // outputRefs turns the $name variables a consumer reads from a producer's dotenv file back into needs references.
-func outputRefs(pl *ir.Pipeline, producer *ir.Job) {
+func outputRefs(pl *ir.Pipeline, producer *ir.Job, lines map[string]bool) {
 	for _, j := range allJobs(pl) {
 		if !slices.ContainsFunc(j.Needs, func(n ir.Need) bool { return n.JobID == producer.ID }) {
 			continue
@@ -279,12 +281,33 @@ func outputRefs(pl *ir.Pipeline, producer *ir.Job) {
 			re := regexp.MustCompile(`\$(?:\{` + regexp.QuoteMeta(o.Name) + `\}|` + regexp.QuoteMeta(o.Name) + `\b)`)
 			ref := "${{ needs." + producer.ID + ".outputs." + o.Name + " }}"
 			for _, st := range j.Steps {
-				for i, l := range st.Script {
-					st.Script[i] = re.ReplaceAllLiteralString(l, ref)
-				}
+				rewriteLines(st.Script, lines, re, ref)
 			}
 		}
 	}
+}
+
+// rewriteLines replaces re with ref in the lines the emitter marked as converted references.
+func rewriteLines(script []string, marked map[string]bool, re *regexp.Regexp, ref string) {
+	for i, l := range script {
+		if marked[l] {
+			script[i] = re.ReplaceAllLiteralString(l, ref)
+		}
+	}
+}
+
+// markedLines reads the lines a marker argument names; a marker without the argument names none.
+func markedLines(args []string) map[string]bool {
+	out := map[string]bool{}
+	for _, a := range args {
+		var r refArg
+		if json.Unmarshal([]byte(a), &r) == nil {
+			for _, l := range r.Lines {
+				out[l] = true
+			}
+		}
+	}
+	return out
 }
 
 func dotenvDeclared(j *ir.Job) bool {
@@ -346,22 +369,18 @@ func collapseMatrix(c *collapseCtx) bool {
 		return false
 	}
 	j.Matrix = orig
-	matrixRefs(j, orig)
+	matrixRefs(j, orig, markedLines(c.args))
 	return true
 }
 
 // matrixRefs turns the $axis variables GitLab sets for each parallel:matrix entry back into matrix references.
-func matrixRefs(j *ir.Job, m *ir.Matrix) {
+func matrixRefs(j *ir.Job, m *ir.Matrix, lines map[string]bool) {
 	for _, a := range m.Axes {
 		re := regexp.MustCompile(`\$(?:\{` + regexp.QuoteMeta(a.Name) + `\}|` + regexp.QuoteMeta(a.Name) + `\b)`)
 		ref := "${{ matrix." + a.Name + " }}"
-		for i, l := range j.Runner.Labels {
-			j.Runner.Labels[i] = re.ReplaceAllLiteralString(l, ref)
-		}
+		rewriteLines(j.Runner.Labels, lines, re, ref)
 		for _, st := range j.Steps {
-			for i, l := range st.Script {
-				st.Script[i] = re.ReplaceAllLiteralString(l, ref)
-			}
+			rewriteLines(st.Script, lines, re, ref)
 		}
 	}
 }
@@ -476,7 +495,7 @@ var triggerPathRE = regexp.MustCompile(`^pipeline/[^/]+/trigger/(\d+)$`)
 func isTriggerMark(u ir.FeatureUse) bool { return triggerPathRE.MatchString(u.IRPath) }
 
 // restoreTriggers replaces the parsed triggers with the ones the emitter carried in trigger markers, in index order.
-func restoreTriggers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string) {
+func (s *state) restoreTriggers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string) {
 	byIndex := map[int]ir.Trigger{}
 	for _, u := range uses {
 		m := triggerPathRE.FindStringSubmatch(u.IRPath)
@@ -501,5 +520,24 @@ func restoreTriggers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureU
 		}
 		out = append(out, t)
 	}
+	if !triggersDerive(pl.ID, out, pl.Triggers) {
+		s.note("pipeline/"+pl.ID, caps.TriggerPush, "marker ignored", "marker ignored: the workflow rules were edited after conversion, so the parsed triggers stand", nil)
+		return
+	}
 	pl.Triggers = out
+}
+
+// triggersDerive is true when writing marked as workflow rules and reading them back gives parsed: the
+// marker still describes the file. A hand-edited rule block fails the check.
+func triggersDerive(pid string, marked, parsed []ir.Trigger) bool {
+	e := &emitter{led: emitkit.NewLedger("", dialect, adapter{}.Caps())}
+	w, err := e.workflow(&ir.Pipeline{ID: pid, Triggers: marked})
+	if err != nil {
+		return false
+	}
+	got, ok, _ := newState(&report.Report{}).workflowTriggers(w)
+	if !ok {
+		got = defaultTriggers()
+	}
+	return sameTriggers(got, parsed)
 }

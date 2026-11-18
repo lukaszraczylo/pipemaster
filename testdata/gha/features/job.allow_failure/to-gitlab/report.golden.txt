@@ -1,2 +1,2 @@
 Loss report: gha -> gitlab
-No losses: every feature converted natively.
+[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)

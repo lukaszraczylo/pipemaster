@@ -1,3 +1,4 @@
 Loss report: gha -> gitlab
+[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [lost] pipeline/ci pipeline.concurrency (cancel-in-progress has no GitLab form; a resource_group queues runs)
 [lost] pipeline/ci script.interpolation (no GitLab variable for expression ref)

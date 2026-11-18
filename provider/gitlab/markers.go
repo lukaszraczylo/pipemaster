@@ -43,7 +43,7 @@ func markerArgs(src []byte) map[ir.FeatureUse][]string { return emitkit.ParseArg
 // collapseMarkers restores the IR feature behind each emulation marker; a marker it cannot restore is reported.
 func (s *state) collapseMarkers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string) {
 	extractMoved(pl, uses, args)
-	restoreTriggers(pl, uses, args)
+	s.restoreTriggers(pl, uses, args)
 	stepDone := map[string]map[caps.Feature]bool{}
 	for _, u := range uses {
 		if isTriggerMark(u) {
