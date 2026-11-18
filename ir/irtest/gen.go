@@ -101,7 +101,10 @@ func (g *gen) duration() *ir.Duration {
 
 func (g *gen) pipeline(id string) *ir.Pipeline {
 	f := g.frag
-	pl := &ir.Pipeline{ID: id, Name: g.str()}
+	pl := &ir.Pipeline{ID: id}
+	if f(caps.DisplayName) {
+		pl.Name = "n" + g.str()
+	}
 	if f(caps.PipelineEnv) {
 		pl.Env = g.vars()
 	}
@@ -191,7 +194,10 @@ func (g *gen) filters(t *ir.Trigger) {
 
 func (g *gen) job(id string, prior []string) *ir.Job {
 	f := g.frag
-	j := &ir.Job{ID: id, Name: g.str()}
+	j := &ir.Job{ID: id}
+	if f(caps.DisplayName) {
+		j.Name = "n" + g.str()
+	}
 	wantNeeds := f(caps.JobNeeds) || f(caps.JobNeedsArtifacts)
 	if wantNeeds && len(prior) > 0 {
 		j.Needs = []ir.Need{{JobID: prior[0], Artifacts: f(caps.JobNeedsArtifacts), Optional: g.flag()}}
@@ -253,7 +259,10 @@ func (g *gen) job(id string, prior []string) *ir.Job {
 
 func (g *gen) step(id string) *ir.Step {
 	f := g.frag
-	s := &ir.Step{ID: id, Name: g.str(), Kind: ir.StepScript}
+	s := &ir.Step{ID: id, Kind: ir.StepScript}
+	if f(caps.DisplayName) {
+		s.Name = "n" + g.str()
+	}
 	if f(caps.StepScript) {
 		s.Script = g.strs()
 	}

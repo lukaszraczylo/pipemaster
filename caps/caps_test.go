@@ -48,8 +48,8 @@ func TestLookupMissingIsLost(t *testing.T) {
 
 func TestAllFeaturesSortedUnique(t *testing.T) {
 	fs := AllFeatures()
-	if len(fs) != 46 {
-		t.Fatalf("want 46 features, got %d", len(fs))
+	if len(fs) != 47 {
+		t.Fatalf("want 47 features, got %d", len(fs))
 	}
 	if !sort.SliceIsSorted(fs, func(i, j int) bool { return fs[i] < fs[j] }) {
 		t.Fatal("not sorted")

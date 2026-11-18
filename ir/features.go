@@ -77,6 +77,7 @@ func pipelineFeatures(s *featureSet, pl *Pipeline) {
 	s.when(pl.Permissions != nil, path, caps.PipelinePermissions)
 	s.when(len(pl.Finally) > 0, path, caps.PipelineFinally)
 	s.when(len(pl.Ext) > 0, path, caps.ExtPassthrough)
+	s.when(pl.Name != "", path, caps.DisplayName)
 	for i := range pl.Triggers {
 		triggerUse(s, triggerPath(pl.ID, i), &pl.Triggers[i])
 	}
@@ -115,6 +116,7 @@ func triggerUse(s *featureSet, path string, t *Trigger) {
 func jobFeatures(s *featureSet, pid string, j *Job) {
 	path := jobPath(pid, j.ID)
 	s.when(len(j.Needs) > 0, path, caps.JobNeeds)
+	s.when(j.Name != "", path, caps.DisplayName)
 	for _, n := range j.Needs {
 		s.when(n.Artifacts, path, caps.JobNeedsArtifacts)
 	}
@@ -149,6 +151,7 @@ func jobFeatures(s *featureSet, pid string, j *Job) {
 
 func stepFeatures(s *featureSet, path string, st *Step) {
 	s.when(len(st.Script) > 0, path, caps.StepScript)
+	s.when(st.Name != "", path, caps.DisplayName)
 	s.when(st.Action != nil || len(st.With) > 0, path, caps.StepAction)
 	s.when(st.Image != nil, path, caps.StepImage)
 	s.when(st.If != nil, path, caps.StepIf)
