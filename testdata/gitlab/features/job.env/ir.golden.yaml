@@ -24,4 +24,4 @@ pipelines:
                 lit: "0"
             - name: TAG
               value:
-                lit: $CI_COMMIT_TAG
+                expr: tag

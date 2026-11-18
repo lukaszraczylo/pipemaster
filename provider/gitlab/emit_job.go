@@ -71,6 +71,7 @@ func (e *emitter) needsNode(c *pipeCtx, p *jobPrep) *yaml.Node {
 			}
 		}
 	}
+	extras, _ := ext[ExtNeedsExtra].(map[string]any)
 	deps, hasDeps := stageList(ext[extDeps])
 	finally := c.isFinally(j.ID)
 	downloaded := e.downloadedFrom(c, p)
@@ -83,7 +84,7 @@ func (e *emitter) needsNode(c *pipeCtx, p *jobPrep) *yaml.Node {
 			e.lose(p.path, caps.JobNeeds, "finally job needs another finally job "+n.JobID+", which share the last stage")
 			continue
 		}
-		out.Content = append(out.Content, needEntry(n, c.declares(n.JobID), downloaded[n.JobID], hasDeps, deps))
+		out.Content = append(out.Content, needEntry(n, c.declares(n.JobID), downloaded[n.JobID], hasDeps, deps, extras[n.JobID]))
 	}
 	for _, r := range raw {
 		if n, err := plainNode(r); err == nil {
@@ -98,7 +99,7 @@ func (e *emitter) needsNode(c *pipeCtx, p *jobPrep) *yaml.Node {
 
 // needEntry writes one needs entry. GitLab downloads the producer's artifacts by default when it has any
 // (and dependencies lists it), so the map form appears only when the IR says otherwise or an action asked for them.
-func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps []string) *yaml.Node {
+func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps []string, extra any) *yaml.Node {
 	m := newMap()
 	m.set("job", str(n.JobID))
 	explicit := false
@@ -113,6 +114,11 @@ func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps [
 	if n.Optional {
 		m.set("optional", boolNodeOf(true))
 		explicit = true
+	}
+	if x, ok := extra.(map[string]any); ok && len(x) > 0 {
+		if err := m.addExtra(x, nil); err == nil {
+			explicit = true
+		}
 	}
 	if !explicit {
 		return str(n.JobID)
@@ -144,7 +150,7 @@ func (e *emitter) jobNode(c *pipeCtx, p *jobPrep) (*yaml.Node, []string, error) 
 	ext := extOf(j.Ext)
 	finally := c.isFinally(j.ID)
 	m := newMap()
-	skip := map[string]bool{"stage": true, ExtDerivedNeeds: true, extNeedsKey: true, "rules": true}
+	skip := map[string]bool{"stage": true, ExtDerivedNeeds: true, extNeedsKey: true, ExtNeedsExtra: true, "rules": true}
 	if s := c.plan.stage[j.ID]; s != "" {
 		m.set("stage", str(s))
 	}

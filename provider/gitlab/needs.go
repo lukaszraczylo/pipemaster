@@ -12,15 +12,20 @@ const (
 	stagePre  = ".pre"
 	stagePost = ".post"
 	extNeeds  = "needs"
+
+	// ExtNeedsExtra holds, per needed job, the needs keys the IR has no field for (parallel:matrix).
+	ExtNeedsExtra = "needs_extra"
 )
 
 type needSpec struct {
+	extra      map[string]any
 	job        string
 	noArtifact bool
 	optional   bool
 }
 
-// jobNeeds reads needs. Entries for other projects or pipelines, and entries with keys the IR lacks, stay raw in Ext[gitlab][needs].
+// jobNeeds reads needs. Entries for other projects or pipelines stay raw in Ext[gitlab][needs]; keys the IR lacks on
+// a same-pipeline entry go to Ext[gitlab][needs_extra] by job name, so nothing the IR holds is duplicated.
 func (s *state) jobNeeds(info *jobInfo, r *reader) error {
 	if d := r.peek("dependencies"); d != nil {
 		l, ok := stringList(d)
@@ -38,30 +43,38 @@ func (s *state) jobNeeds(info *jobInfo, r *reader) error {
 	}
 	info.hasNeeds = true
 	var raw []any
+	extras := map[string]any{}
 	for _, it := range n.Content {
-		spec, keep, err := s.needEntry(it)
+		spec, whole, err := s.needEntry(it)
 		if err != nil {
 			return err
 		}
-		if keep {
+		if whole {
 			v, err := s.plain(it)
 			if err != nil {
 				return err
 			}
 			raw = append(raw, v)
+			continue
 		}
-		if spec != nil {
-			info.needs = append(info.needs, *spec)
+		info.needs = append(info.needs, *spec)
+		if spec.extra != nil {
+			extras[spec.job] = spec.extra
 		}
 	}
 	if raw != nil {
 		r.keep(extNeeds, raw)
-		s.note(s.jobPath(info.name), "job.needs", "kept in Ext[gitlab][needs]", "needs entries for other projects or with parallel keys are not modelled", n)
+		s.note(s.jobPath(info.name), "job.needs", "kept in Ext[gitlab][needs]", "needs entries for other projects or pipelines are not modelled", n)
+	}
+	if len(extras) > 0 {
+		r.keep(ExtNeedsExtra, extras)
+		s.note(s.jobPath(info.name), "job.needs", "kept in Ext[gitlab][needs_extra]", "needs keys without an IR field (parallel) are kept per job", n)
 	}
 	return nil
 }
 
-func (s *state) needEntry(it *yaml.Node) (spec *needSpec, keep bool, err error) {
+// needEntry returns whole=true for an entry the IR cannot model at all.
+func (s *state) needEntry(it *yaml.Node) (spec *needSpec, whole bool, err error) {
 	if it.Kind == yaml.ScalarNode {
 		return &needSpec{job: it.Value}, false, nil
 	}
@@ -97,9 +110,17 @@ func (s *state) needEntry(it *yaml.Node) (spec *needSpec, keep bool, err error) 
 		}
 	}
 	for _, e := range r.ents {
-		if !r.used[e.name] {
-			return spec, true, nil
+		if r.used[e.name] {
+			continue
 		}
+		v, err := s.plain(e.val)
+		if err != nil {
+			return nil, false, err
+		}
+		if spec.extra == nil {
+			spec.extra = map[string]any{}
+		}
+		spec.extra[e.name] = v
 	}
 	return spec, false, nil
 }
@@ -139,8 +160,13 @@ func declaresArtifacts(j *ir.Job) bool {
 	}
 	x, _ := j.Ext[dialect].(map[string]any)
 	a, _ := x[extArtifacts].(map[string]any)
-	u, _ := a["untracked"].(bool)
-	return u
+	if u, _ := a["untracked"].(bool); u {
+		return true
+	}
+	// A dotenv report reaches later jobs through needs and dependencies, so it counts as an artifact.
+	reports, _ := a["reports"].(map[string]any)
+	_, dotenv := reports["dotenv"]
+	return dotenv
 }
 
 func (s *state) jobEdges(i *jobInfo, all []*jobInfo, idx map[string]int, artifacts map[string]bool) {

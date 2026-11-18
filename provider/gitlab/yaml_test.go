@@ -97,13 +97,10 @@ job:
     - !reference [.rules_a]
 `)
 	j := job(t, pl, "job")
-	if len(j.Steps) != 2 {
+	if len(j.Steps) != 1 {
 		t.Fatalf("steps = %d", len(j.Steps))
 	}
-	if got := j.Steps[0].Script; !reflect.DeepEqual(got, []string{"echo before"}) {
-		t.Errorf("before = %v", got)
-	}
-	if got := j.Steps[1].Script; !reflect.DeepEqual(got, []string{"echo setup", "echo body"}) {
+	if got := j.Steps[0].Script; !reflect.DeepEqual(got, []string{"echo before", "echo setup", "echo body"}) {
 		t.Errorf("script = %v", got)
 	}
 	if j.If == nil {

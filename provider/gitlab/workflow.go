@@ -14,12 +14,13 @@ import (
 )
 
 // CI_PIPELINE_SOURCE values workflow:rules can map to triggers.
-var sourceTriggers = map[string]ir.TriggerKind{
-	"merge_request_event": ir.TriggerPR,
-	"schedule":            ir.TriggerSchedule,
-	"web":                 ir.TriggerManual,
-	"push":                ir.TriggerPush,
-	"api":                 ir.TriggerAPI,
+// "push" also covers tag pushes: GitLab runs a tag pipeline with source push.
+var sourceTriggers = map[string][]ir.TriggerKind{
+	"merge_request_event": {ir.TriggerPR},
+	"schedule":            {ir.TriggerSchedule},
+	"web":                 {ir.TriggerManual},
+	"push":                {ir.TriggerPush, ir.TriggerTag},
+	"api":                 {ir.TriggerAPI},
 }
 
 var (
@@ -151,8 +152,12 @@ func compareTrigger(b expr.Binary) ([]ir.Trigger, bool) {
 	}
 	switch ref.Path[0] {
 	case expr.CtxEvent:
-		k, kok := sourceTriggers[lit.Str]
-		return []ir.Trigger{{Kind: k}}, kok && b.Op == expr.OpEq
+		kinds, kok := sourceTriggers[lit.Str]
+		var ts []ir.Trigger
+		for _, k := range kinds {
+			ts = append(ts, ir.Trigger{Kind: k})
+		}
+		return ts, kok && b.Op == expr.OpEq
 	case expr.CtxBranch:
 		return []ir.Trigger{{Kind: ir.TriggerPush, Branches: ir.Filter{Include: []string{pattern}}}}, true
 	case expr.CtxTag:

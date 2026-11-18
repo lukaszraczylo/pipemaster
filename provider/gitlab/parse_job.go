@@ -81,13 +81,35 @@ func (s *state) parseJob(name string, merged, raw *yaml.Node, def []entry) (*job
 		}
 		r.keep(extExtends, list)
 	}
+	if err := s.jobInherit(r); err != nil {
+		return nil, err
+	}
 	s.noteExtKeys(j, r)
 	j.Ext, err = r.ext()
 	return info, err
 }
 
 // structuralKeys stay in Ext because the emitter restores them, not because the IR lost them.
-var structuralKeys = map[string]bool{stageKey: true, "inherit": true, "dependencies": true, extendsKey: true}
+// jobInherit keeps the parts of inherit that applyDefaults did not act on; inherit:default is already applied.
+func (s *state) jobInherit(r *reader) error {
+	n := r.take("inherit")
+	if n == nil {
+		return nil
+	}
+	v, err := s.plain(n)
+	if err != nil {
+		return err
+	}
+	if m, ok := v.(map[string]any); ok {
+		delete(m, "default")
+		if len(m) > 0 {
+			r.keep("inherit", m)
+		}
+	}
+	return nil
+}
+
+var structuralKeys = map[string]bool{stageKey: true, "dependencies": true, extendsKey: true}
 
 // extNotes explains the keys the IR has no field for; any other leftover key gets a generic note.
 var extNotes = map[string]struct {
@@ -117,27 +139,40 @@ func (s *state) noteExtKeys(j *ir.Job, r *reader) {
 	}
 }
 
+// ExtBeforeLines is the count of leading step lines that came from before_script.
+const ExtBeforeLines = "before_lines"
+
+// jobScripts maps before_script and script to ONE step, because GitLab runs them in one shell and an export or
+// cd in before_script must reach script. after_script runs in a fresh shell, always, and its exit status
+// is ignored, so it is a separate step with If always() and ContinueOnError.
 func (s *state) jobScripts(j *ir.Job, r *reader) error {
-	for _, sec := range []string{"before_script", "script", "after_script"} {
-		n := r.take(sec)
+	var before, body, after []string
+	for _, sec := range []struct {
+		to   *[]string
+		name string
+	}{{&before, "before_script"}, {&body, "script"}, {&after, "after_script"}} {
+		n := r.take(sec.name)
 		if n == nil {
 			continue
 		}
-		lines, err := s.scriptLines(n, sec)
+		lines, err := s.scriptLines(n, sec.name)
 		if err != nil {
 			return err
 		}
-		if len(lines) == 0 {
-			continue
+		*sec.to = lines
+	}
+	if lines := append(append([]string{}, before...), body...); len(lines) > 0 {
+		x := map[string]any{ExtSection: "script"}
+		if len(before) > 0 {
+			x[ExtBeforeLines] = len(before)
 		}
-		st := &ir.Step{
-			ID: sec, Kind: ir.StepScript, Script: lines,
-			Ext: ir.Ext{dialect: map[string]any{ExtSection: sec}},
-		}
-		if sec == "after_script" {
-			st.If = expr.Call{Name: "always"}
-		}
-		j.Steps = append(j.Steps, st)
+		j.Steps = append(j.Steps, &ir.Step{ID: "script", Kind: ir.StepScript, Script: lines, Ext: ir.Ext{dialect: x}})
+	}
+	if len(after) > 0 {
+		j.Steps = append(j.Steps, &ir.Step{
+			ID: "after_script", Kind: ir.StepScript, Script: after, If: expr.Call{Name: "always"}, ContinueOnError: true,
+			Ext: ir.Ext{dialect: map[string]any{ExtSection: "after_script"}},
+		})
 	}
 	return nil
 }
@@ -147,7 +182,7 @@ func (s *state) jobEnv(j *ir.Job, r *reader) error {
 	if n == nil {
 		return nil
 	}
-	vars, extras, err := s.variables(n)
+	vars, extras, err := s.variables(s.jobPath(j.ID), n)
 	if err != nil {
 		return err
 	}

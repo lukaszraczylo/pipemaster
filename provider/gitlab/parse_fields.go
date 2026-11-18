@@ -148,7 +148,7 @@ func (s *state) service(n *yaml.Node) (sv ir.Service, rest map[string]any, err e
 		sv.Image.Entrypoint = l
 	}
 	if v := r.take("variables"); v != nil {
-		vars, extras, err := s.variables(v)
+		vars, extras, err := s.variables("pipeline/"+pipelineID, v)
 		if err != nil {
 			return sv, nil, err
 		}

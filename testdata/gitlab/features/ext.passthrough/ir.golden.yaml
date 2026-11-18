@@ -7,9 +7,6 @@ origin:
 pipelines:
     - ext:
         gitlab:
-            default:
-                image: alpine:3
-                retry: 1
             hidden:
                 .deploy:
                     script:

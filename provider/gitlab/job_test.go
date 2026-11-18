@@ -15,36 +15,47 @@ import (
 func TestScriptsAreCanonicalTemplates(t *testing.T) {
 	pl, _ := pipeline(t, "j:\n  before_script:\n    - echo ${CI_COMMIT_BRANCH}\n  script:\n    - echo $CI_COMMIT_SHA $HOME ${HOME} $$CI_COMMIT_SHA\n    - echo '${{ x }}' $CI_COMMIT_SHA_SHORT\n    - |\n      if [ -n \"$CI_COMMIT_TAG\" ]; then\n        echo tagged\n      fi\n  after_script:\n    - echo done $GITLAB_USER_LOGIN\n")
 	j := job(t, pl, "j")
-	if len(j.Steps) != 3 {
-		t.Fatalf("steps = %d", len(j.Steps))
-	}
-	if got := j.Steps[0].Script; !reflect.DeepEqual(got, []string{"echo ${{ branch }}"}) {
-		t.Errorf("before = %v", got)
+	if len(j.Steps) != 2 {
+		t.Fatalf("steps = %d, want before_script and script in one step plus after_script", len(j.Steps))
 	}
 	want := []string{
+		"echo ${{ branch }}",
 		"echo ${{ sha }} $HOME ${HOME} $$CI_COMMIT_SHA",
 		"echo '${{ '${{' }} x }}' $CI_COMMIT_SHA_SHORT",
 		`if [ -n "${{ tag }}" ]; then`,
 		"  echo tagged",
 		"fi",
 	}
-	if got := j.Steps[1].Script; !reflect.DeepEqual(got, want) {
-		t.Errorf("script = %q\nwant     %q", got, want)
+	s0 := j.Steps[0]
+	if s0.ID != "script" || !reflect.DeepEqual(s0.Script, want) {
+		t.Errorf("script step = %+v\nwant lines %q", s0, want)
 	}
-	a := j.Steps[2]
+	if ext(s0.Ext)["before_lines"] != 1 {
+		t.Errorf("split index = %v, want 1", ext(s0.Ext)["before_lines"])
+	}
+	a := j.Steps[1]
 	if a.ID != "after_script" || !reflect.DeepEqual(a.Script, []string{"echo done ${{ actor }}"}) {
 		t.Errorf("after = %+v", a)
 	}
-	if got := expr.String(a.If); got != "always()" {
-		t.Errorf("after_script If = %s", got)
+	if got := expr.String(a.If); got != "always()" || !a.ContinueOnError {
+		t.Errorf("after_script runs on failure and ignores its status: If=%s continue=%v", got, a.ContinueOnError)
 	}
-	for i, id := range []string{"before_script", "script", "after_script"} {
-		if j.Steps[i].ID != id || ext(j.Steps[i].Ext)["section"] != id {
-			t.Errorf("step %d = %+v", i, j.Steps[i])
-		}
+	if ext(a.Ext)["section"] != "after_script" {
+		t.Errorf("after_script section = %v", a.Ext)
 	}
-	if j.Steps[1].If != nil || j.Steps[0].If != nil {
-		t.Errorf("only after_script is conditional")
+	if s0.If != nil || s0.ContinueOnError {
+		t.Errorf("the script step is unconditional and failing")
+	}
+}
+
+func TestBeforeScriptOnlyAndNone(t *testing.T) {
+	pl, _ := pipeline(t, "a:\n  before_script: [echo b]\nb:\n  script: [echo s]\n")
+	a := job(t, pl, "a")
+	if len(a.Steps) != 1 || ext(a.Steps[0].Ext)["before_lines"] != 1 {
+		t.Errorf("before_script only: %+v", a.Steps)
+	}
+	if b := job(t, pl, "b"); ext(b.Steps[0].Ext)["before_lines"] != nil {
+		t.Errorf("no before_script, no split index: %v", b.Steps[0].Ext)
 	}
 }
 
@@ -79,7 +90,7 @@ d:
     default: [image]
 `)
 	a := job(t, pl, "a")
-	if a.Container.Ref != "ruby:3" || a.Retry == nil || a.Retry.Attempts != 3 || !reflect.DeepEqual(a.Runner.Labels, []string{"shared"}) || len(a.Steps) != 2 {
+	if a.Container.Ref != "ruby:3" || a.Retry == nil || a.Retry.Attempts != 3 || !reflect.DeepEqual(a.Runner.Labels, []string{"shared"}) || len(a.Steps) != 1 || len(a.Steps[0].Script) != 2 {
 		t.Errorf("a did not inherit: %+v retry=%+v", a, a.Retry)
 	}
 	if ext(a.Ext)["interruptible"] != true {
@@ -93,26 +104,26 @@ d:
 	if c.Container != nil || c.Retry != nil || len(c.Runner.Labels) != 0 {
 		t.Errorf("inherit false: %+v", c)
 	}
-	if ext(c.Ext)["inherit"] == nil {
-		t.Errorf("inherit must stay in Ext")
+	if ext(c.Ext)["inherit"] != nil {
+		t.Errorf("inherit:default is applied, so it is not kept: %v", c.Ext)
 	}
 	d := job(t, pl, "d")
 	if d.Container == nil || d.Retry != nil {
 		t.Errorf("inherit list: %+v", d)
 	}
-	if ext(pl.Ext)["default"] == nil {
-		t.Errorf("the default block must stay in pipeline Ext")
+	if ext(pl.Ext) != nil {
+		t.Errorf("default is expanded into the jobs, so Ext keeps nothing: %v", pl.Ext)
 	}
 }
 
 func TestDeprecatedGlobalsAreDefaults(t *testing.T) {
 	pl, _ := pipeline(t, "image: node:20\nbefore_script: [echo hi]\nj:\n  script: [x]\n")
 	j := job(t, pl, "j")
-	if j.Container == nil || j.Container.Ref != "node:20" || len(j.Steps) != 2 {
+	if j.Container == nil || j.Container.Ref != "node:20" || len(j.Steps) != 1 || len(j.Steps[0].Script) != 2 {
 		t.Errorf("job = %+v", j)
 	}
-	if ext(pl.Ext)["image"] != "node:20" {
-		t.Errorf("global image stays in Ext: %v", pl.Ext)
+	if ext(pl.Ext) != nil {
+		t.Errorf("a global image is a default and is expanded into the jobs: %v", pl.Ext)
 	}
 }
 
@@ -199,8 +210,8 @@ j:
 	if ext(j.Ext)["resource_group"] != "deploy" {
 		t.Errorf("resource_group must stay in Ext")
 	}
-	if len(j.Env) != 1 || j.Env[0].Value.Lit != "$CI_COMMIT_SHA" {
-		t.Errorf("job env keeps GitLab text: %+v", j.Env)
+	if len(j.Env) != 1 || j.Env[0].Value.Kind != ir.ValueExpr || expr.String(j.Env[0].Value.Expr) != "sha" {
+		t.Errorf("a predefined variable in job env is a canonical ref: %+v", j.Env)
 	}
 	if len(j.Cache) != 1 || j.Cache[0].Key != "k-$CI_COMMIT_REF_SLUG" || j.Cache[0].Policy != "pull" || !reflect.DeepEqual(j.Cache[0].Paths, []string{"vendor/"}) {
 		t.Errorf("cache = %+v", j.Cache)
@@ -407,4 +418,77 @@ func FuzzParse(f *testing.F) {
 	f.Fuzz(func(_ *testing.T, src string) {
 		_, _, _ = gitlab.New().Parse(repo(map[string]string{rootFile: src, "a.yml": src}))
 	})
+}
+
+func TestVariablesCanonical(t *testing.T) {
+	pl, rep := pipeline(t, `
+variables:
+  PLAIN: text
+  ONE: $CI_COMMIT_SHA
+  BRACED: ${CI_COMMIT_BRANCH}
+  MIXED: "img:$CI_COMMIT_SHA-${CI_COMMIT_BRANCH} {x}"
+  UNKNOWN: $OTHER_VAR
+  ESC: $$CI_COMMIT_SHA
+j:
+  script: [x]
+`)
+	by := map[string]ir.Value{}
+	for _, v := range pl.Env {
+		by[v.Name] = v.Value
+	}
+	if by["PLAIN"].Kind != ir.ValueLit || by["PLAIN"].Lit != "text" {
+		t.Errorf("PLAIN = %+v", by["PLAIN"])
+	}
+	if by["ONE"].Kind != ir.ValueExpr || expr.String(by["ONE"].Expr) != "sha" || by["BRACED"].Kind != ir.ValueExpr || expr.String(by["BRACED"].Expr) != "branch" {
+		t.Errorf("single refs = %+v %+v", by["ONE"], by["BRACED"])
+	}
+	m := by["MIXED"]
+	if m.Kind != ir.ValueExpr || expr.String(m.Expr) != "format('img:{0}-{1} {{x}}', sha, branch)" {
+		t.Errorf("MIXED = %+v (%s)", m, expr.String(m.Expr))
+	}
+	if by["UNKNOWN"].Kind != ir.ValueLit || by["UNKNOWN"].Lit != "$OTHER_VAR" {
+		t.Errorf("UNKNOWN = %+v", by["UNKNOWN"])
+	}
+	if by["ESC"].Kind != ir.ValueLit || by["ESC"].Lit != "$$CI_COMMIT_SHA" {
+		t.Errorf("ESC = %+v", by["ESC"])
+	}
+	if !hasEntry(rep, "OTHER_VAR") {
+		t.Errorf("an unknown variable in a value needs a report note: %+v", rep.Entries)
+	}
+	if hasEntry(rep, "CI_COMMIT_SHA") {
+		t.Errorf("known variables are not reported: %+v", rep.Entries)
+	}
+}
+
+func TestConsumedKeysNotInExt(t *testing.T) {
+	pl, _ := pipeline(t, `
+stages: [a, b]
+image: x
+services: [pg]
+cache: {paths: [p]}
+before_script: [echo]
+after_script: [echo]
+default:
+  retry: 1
+j:
+  stage: a
+  script: [x]
+`)
+	x := ext(pl.Ext)
+	for _, k := range []string{"default", "image", "services", "cache", "before_script", "after_script"} {
+		if _, bad := x[k]; bad {
+			t.Errorf("%s is expanded into the jobs and must not be in pipeline Ext: %v", k, x)
+		}
+	}
+	if x["stages"] == nil {
+		t.Errorf("stages has no IR field and stays in Ext for the emitter")
+	}
+}
+
+func TestInheritVariablesKept(t *testing.T) {
+	pl, _ := pipeline(t, "j:\n  script: [x]\n  inherit:\n    default: false\n    variables: false\n")
+	in, _ := ext(job(t, pl, "j").Ext)["inherit"].(map[string]any)
+	if in["variables"] != false || in["default"] != nil {
+		t.Errorf("only the unapplied part of inherit stays: %v", in)
+	}
 }

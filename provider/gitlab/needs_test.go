@@ -212,3 +212,60 @@ func TestOptionalMissingNeedIsAllowed(t *testing.T) {
 		t.Errorf("an optional need on a missing job is kept")
 	}
 }
+
+func TestDotenvOnlyJobDeclaresArtifacts(t *testing.T) {
+	pl, _ := pipeline(t, `
+stages: [build, test]
+env:
+  stage: build
+  script: [echo A=1 > build.env]
+  artifacts:
+    reports:
+      dotenv: build.env
+junit:
+  stage: build
+  script: [x]
+  artifacts:
+    reports:
+      junit: r.xml
+use:
+  stage: test
+  script: [x]
+`)
+	got := map[string]bool{}
+	for _, n := range job(t, pl, "use").Needs {
+		got[n.JobID] = n.Artifacts
+	}
+	if !got["env"] || got["junit"] {
+		t.Errorf("dotenv reports are passed to later jobs, other reports are not: %v", got)
+	}
+}
+
+func TestNeedsExtrasKeepOnlyUnconsumed(t *testing.T) {
+	pl, _ := pipeline(t, `
+stages: [build, test]
+a:
+  stage: build
+  script: [x]
+b:
+  stage: test
+  script: [x]
+  needs:
+    - job: a
+      artifacts: false
+      parallel:
+        matrix: [{X: [1]}]
+    - job: other
+      project: grp/p
+`)
+	b := job(t, pl, "b")
+	x := ext(b.Ext)
+	extra, _ := x["needs_extra"].(map[string]any)
+	if !reflect.DeepEqual(extra, map[string]any{"a": map[string]any{"parallel": map[string]any{"matrix": []any{map[string]any{"X": []any{1}}}}}}) {
+		t.Errorf("needs_extra = %v", x["needs_extra"])
+	}
+	raw, _ := x["needs"].([]any)
+	if len(raw) != 1 {
+		t.Errorf("only the cross-project entry stays raw in needs: %v", raw)
+	}
+}

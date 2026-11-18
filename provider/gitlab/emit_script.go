@@ -160,7 +160,8 @@ func (e *emitter) scriptStep(p *jobPrep, st *ir.Step) error {
 	if len(exports) > 0 {
 		marks = append(marks, emitkit.Marker(caps.StepEnv, sp))
 	}
-	if st.ContinueOnError {
+	// after_script ignores its own exit status, so GitLab carries continue-on-error natively there.
+	if st.ContinueOnError && sec != secAfter {
 		marks = append(marks, emitkit.Marker(caps.StepContinueOnError, sp))
 		for i, l := range lines {
 			lines[i] = orTrue(l)
@@ -169,11 +170,16 @@ func (e *emitter) scriptStep(p *jobPrep, st *ir.Step) error {
 	head := append(marks, e.drain()...)
 	sub := dir != "" || len(exports) > 0
 	if !sub && guard == "" {
+		before := beforeLines(st, sec, len(lines))
 		for i, l := range lines {
+			target := sec
+			if i < before {
+				target = secBefore
+			}
 			if i == 0 {
-				p.add(sec, block(l), head...)
+				p.add(target, block(l), head...)
 			} else {
-				p.add(sec, block(l))
+				p.add(target, block(l))
 			}
 		}
 		return nil
@@ -192,6 +198,19 @@ func (e *emitter) scriptStep(p *jobPrep, st *ir.Step) error {
 	}
 	p.add(sec, block(strings.Join(body, "\n")), head...)
 	return nil
+}
+
+// beforeLines is how many leading lines return to before_script; only plain script-section lines split, because a
+// wrapped step is one block that must stay in one shell.
+func beforeLines(st *ir.Step, sec string, n int) int {
+	v, _ := extOf(st.Ext)[ExtBeforeLines].(int)
+	if f, ok := extOf(st.Ext)[ExtBeforeLines].(float64); ok {
+		v = int(f)
+	}
+	if sec != secScript || v < 0 {
+		return 0
+	}
+	return min(v, n)
 }
 
 // orTrue appends the continue-on-error guard; a line with a comment or a newline goes inside braces so the guard is not swallowed.

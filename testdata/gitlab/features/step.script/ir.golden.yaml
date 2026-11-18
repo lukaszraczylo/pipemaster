@@ -13,17 +13,12 @@ pipelines:
           steps:
             - ext:
                 gitlab:
-                    section: before_script
-              id: before_script
-              kind: script
-              script:
-                - echo prepare
-            - ext:
-                gitlab:
+                    before_lines: 1
                     section: script
               id: script
               kind: script
               script:
+                - echo prepare
                 - make build
                 - make test
             - if: always()
@@ -34,3 +29,4 @@ pipelines:
               kind: script
               script:
                 - echo cleanup
+              continue_on_error: true

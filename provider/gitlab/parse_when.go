@@ -29,6 +29,8 @@ func (s *state) jobWhenRules(info *jobInfo, r *reader) error {
 		res, ok := s.compileRules(rulesNode, when)
 		if ok {
 			cond, manualFromRules = res.cond, res.manual
+			// The keyword when only supplies the rules' default, already applied by compileRules.
+			when = whenOnSuccess
 		} else {
 			r.release("rules")
 			op, err := s.opaqueRules(rulesNode)

@@ -70,7 +70,7 @@ func (s *state) parsePipeline(root *yaml.Node, remote []any) (*ir.Pipeline, []*j
 	}
 	pl := &ir.Pipeline{ID: pipelineID}
 	if v := r.take("variables"); v != nil {
-		vars, extras, err := s.variables(v)
+		vars, extras, err := s.variables("pipeline/"+pipelineID, v)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -79,6 +79,7 @@ func (s *state) parsePipeline(root *yaml.Node, remote []any) (*ir.Pipeline, []*j
 			r.keep(extVariables, extras)
 		}
 	}
+	s.takeDefaults(r)
 	if len(remote) > 0 {
 		r.keep(extInclude, remote)
 	}

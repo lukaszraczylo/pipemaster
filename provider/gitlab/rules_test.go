@@ -240,3 +240,34 @@ func TestOnlyExceptToExt(t *testing.T) {
 }
 
 var _ = fmt.Sprint
+
+func TestKeywordWhenDoesNotOverrideCompiledRules(t *testing.T) {
+	pl, _ := pipeline(t, `
+a:
+  script: [x]
+  when: manual
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      when: on_success
+b:
+  script: [x]
+  when: always
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      when: on_success
+c:
+  script: [x]
+  when: manual
+  rules:
+    - if: $CI_COMMIT_BRANCH
+`)
+	if job(t, pl, "a").Manual {
+		t.Errorf("rules say on_success: the keyword must not force Manual")
+	}
+	if len(pl.Finally) != 0 {
+		t.Errorf("rules say on_success: when: always must not move the job to Finally")
+	}
+	if !job(t, pl, "c").Manual {
+		t.Errorf("a rule without when takes the keyword when, which is manual")
+	}
+}

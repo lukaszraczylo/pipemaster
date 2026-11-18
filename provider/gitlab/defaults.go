@@ -1,6 +1,8 @@
 package gitlab
 
 import (
+	"slices"
+
 	"go.yaml.in/yaml/v3"
 )
 
@@ -85,4 +87,28 @@ func (s *state) inheritedDefaults(job *yaml.Node) (map[string]bool, error) {
 		set[k] = true
 	}
 	return set, nil
+}
+
+// takeDefaults consumes `default:` and the deprecated globals: applyDefaults expands them into every job, so
+// keeping them in Ext would duplicate what the IR already holds. Only default keys no job can inherit stay.
+func (s *state) takeDefaults(r *reader) {
+	for k := range deprecatedGlobals {
+		r.take(k)
+	}
+	d := r.take("default")
+	if d == nil || d.Kind != yaml.MappingNode {
+		return
+	}
+	rest := map[string]any{}
+	for _, e := range entries(d) {
+		if slices.Contains(defaultKeys, e.name) {
+			continue
+		}
+		if v, err := s.plain(e.val); err == nil {
+			rest[e.name] = v
+		}
+	}
+	if len(rest) > 0 {
+		r.keep("default", rest)
+	}
 }

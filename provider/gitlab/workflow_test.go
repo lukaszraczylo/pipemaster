@@ -49,6 +49,7 @@ func TestWorkflowTriggers(t *testing.T) {
 	}{
 		"mr":       {rules: `- if: $CI_PIPELINE_SOURCE == "merge_request_event"`, want: []ir.TriggerKind{ir.TriggerPR}},
 		"schedule": {rules: `- if: $CI_PIPELINE_SOURCE == "schedule"`, want: []ir.TriggerKind{ir.TriggerSchedule}},
+		"push":     {rules: `- if: $CI_PIPELINE_SOURCE == "push"`, want: sortedKinds(ir.TriggerPush, ir.TriggerTag)},
 		"web":      {rules: `- if: $CI_PIPELINE_SOURCE == "web"`, want: []ir.TriggerKind{ir.TriggerManual}},
 		"branch": {rules: `- if: $CI_COMMIT_BRANCH == "main"`, want: []ir.TriggerKind{ir.TriggerPush}, check: func(t *testing.T, pl *ir.Pipeline) {
 			if got := trigger(t, pl, ir.TriggerPush).Branches.Include; !reflect.DeepEqual(got, []string{"main"}) {
