@@ -2,14 +2,11 @@
 package gha
 
 import (
-	"errors"
 	"io/fs"
 	"path"
 	"strings"
 
-	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
-	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 // Dialect is the delta table that distinguishes one GitHub Actions family member from another.
@@ -36,11 +33,6 @@ func (a *adapter) ID() string { return a.d.ID }
 func (a *adapter) Detect(fsys fs.FS) bool {
 	files, err := workflowFiles(fsys, a.d.Dir)
 	return err == nil && len(files) > 0
-}
-
-// Emit is not available until the GHA emitter is added.
-func (a *adapter) Emit(*ir.Project) (map[string][]byte, *report.Report, error) {
-	return nil, nil, errors.New(a.d.ID + ": emit is not implemented")
 }
 
 // workflowFiles lists the .yml and .yaml files directly inside dir, sorted by name.
