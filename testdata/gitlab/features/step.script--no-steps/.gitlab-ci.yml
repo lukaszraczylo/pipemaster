@@ -1,0 +1,14 @@
+stages:
+  - build
+  - downstream
+
+build:
+  stage: build
+  script:
+    - make build
+
+downstream:
+  stage: downstream
+  trigger:
+    project: group/other
+    strategy: depend

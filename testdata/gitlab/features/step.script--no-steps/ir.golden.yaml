@@ -1,0 +1,38 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - ext:
+        gitlab:
+            stages:
+                - build
+                - downstream
+      id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - ext:
+            gitlab:
+                stage: build
+          id: build
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make build
+        - ext:
+            gitlab:
+                _derived_needs: true
+                stage: downstream
+                trigger:
+                    project: group/other
+                    strategy: depend
+          id: downstream
+          needs:
+            - job: build

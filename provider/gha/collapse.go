@@ -24,6 +24,10 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			continue
 		}
 		switch u.Feature {
+		case caps.StepScript:
+			if j := markedJob(pl, u.IRPath); j != nil && len(j.Steps) == 1 && slices.Equal(j.Steps[0].Script, []string{noopScript}) {
+				j.Steps = nil
+			}
 		case caps.JobRunner:
 			if j := markedJob(pl, u.IRPath); j != nil && slices.Equal(j.Runner.Labels, []string{defaultRunner}) {
 				j.Runner.Labels = nil

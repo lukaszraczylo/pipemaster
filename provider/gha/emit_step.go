@@ -266,7 +266,12 @@ func (e *emitter) jobSteps(c jobCtx, j *ir.Job) (*yaml.Node, error) {
 		return nil, err
 	}
 	if len(seq.Content) == 0 {
-		return nil, fmt.Errorf("%s: job has no steps", jp)
+		// A trigger job or an override of an included job has no script, and a GHA job needs a step.
+		n := newMap()
+		n.set("run", str(noopScript))
+		seq.Content = append(seq.Content, n.n)
+		e.lose(stepPath(jp, "script"), caps.StepScript, "the job has no steps; a no-op step keeps the workflow valid")
+		e.mark(caps.StepScript, jp)
 	}
 	return seq, nil
 }

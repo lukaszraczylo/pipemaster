@@ -58,7 +58,7 @@ var fieldFeatures = map[string][]caps.Feature{
 	"WorkDir":         {caps.StepWorkdir},
 	"Image":           {caps.StepImage},
 	"ContinueOnError": {caps.StepContinueOnError},
-	"<node>":          {caps.StepAction, caps.PipelineFinally, caps.ProjectMultiPipeline},
+	"<node>":          {caps.StepAction, caps.StepScript, caps.PipelineFinally, caps.ProjectMultiPipeline},
 }
 
 // diffNodes lists the fields that differ per node path; a node present on one side only differs as "<node>".
