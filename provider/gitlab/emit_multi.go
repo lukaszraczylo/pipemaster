@@ -185,7 +185,6 @@ func (e *emitter) foldShared(pp string, pl *ir.Pipeline) (vars []ir.Var, group s
 	return vars, group, nil
 }
 
-// add copies a job under its folded ID. The copy shares steps and fields with the original and never writes back.
 // folded1 is the trigger guard shared by the jobs of one pipeline.
 type folded1 struct {
 	cond     expr.Expr
@@ -193,6 +192,7 @@ type folded1 struct {
 	disabled bool
 }
 
+// add copies a job under its folded ID. The copy shares steps and fields with the original and never writes back.
 func (f *folded) add(pl *ir.Pipeline, j *ir.Job, shared []ir.Var, group string, g folded1, finally bool) *ir.Job {
 	cp := *j
 	cp.ID = pl.ID + foldSep + j.ID

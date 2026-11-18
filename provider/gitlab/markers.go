@@ -3,6 +3,7 @@ package gitlab
 import (
 	"bytes"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
@@ -79,13 +80,25 @@ var markerPipelineRE = regexp.MustCompile(`^pipeline/[^/]+`)
 // retargetMarkers points every marker at the one pipeline Parse builds. The emitter writes the IR pipeline ID
 // into marker paths, but the parser's pipeline is always gitlab-ci, so the prefix is the only part that differs.
 func retargetMarkers(uses []ir.FeatureUse, args map[ir.FeatureUse][]string, pid string) ([]ir.FeatureUse, map[ir.FeatureUse][]string) {
-	out := make([]ir.FeatureUse, len(uses))
+	var out []ir.FeatureUse
 	moved := map[ir.FeatureUse][]string{}
-	for i, u := range uses {
+	for _, u := range uses {
 		n := u
 		n.IRPath = markerPipelineRE.ReplaceAllLiteralString(u.IRPath, "pipeline/"+pid)
-		out[i] = n
-		moved[n] = append(moved[n], args[u]...)
+		if _, seen := moved[n]; seen {
+			continue
+		}
+		out = append(out, n)
+		moved[n] = []string{}
+	}
+	for u, a := range args {
+		n := u
+		n.IRPath = markerPipelineRE.ReplaceAllLiteralString(u.IRPath, "pipeline/"+pid)
+		for _, line := range a {
+			if !slices.Contains(moved[n], line) {
+				moved[n] = append(moved[n], line)
+			}
+		}
 	}
 	return out, moved
 }

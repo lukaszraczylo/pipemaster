@@ -50,10 +50,10 @@ func (e *emitter) timing(jp string, j *ir.Job, finally bool) (jobTiming, error) 
 		e.lose(jp, caps.JobIf, "pipeline "+fj.pid+" has no trigger GitLab can express; job disabled")
 		disabled = true
 	}
-	if fj.cond != nil {
+	if fj.cond != nil || len(fj.parts) > 0 {
 		if _, opaque := cond.(expr.Opaque); opaque {
-			e.lose(jp, caps.ExprOpaque, "opaque gitlab rules cannot join the pipeline trigger condition, which is dropped for this job")
-		} else {
+			e.lose(jp, caps.ExprOpaque, "the job's opaque gitlab rules no longer include its pipeline's trigger condition or path filter, so the job runs on every trigger of the file")
+		} else if fj.cond != nil {
 			cond = andAll(fj.cond, cond)
 		}
 	}

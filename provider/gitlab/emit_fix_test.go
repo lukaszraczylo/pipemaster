@@ -475,3 +475,46 @@ func TestMarkersCollapseForAnyPipelineID(t *testing.T) {
 		})
 	}
 }
+
+func TestFoldedOpaqueRulesLoseTriggerConditionLoudly(t *testing.T) {
+	p := gitlabFixture(t, "expr.opaque")
+	first := p.Pipelines[0]
+	first.ID = "ci"
+	first.Triggers = []ir.Trigger{{Kind: ir.TriggerPush, Paths: ir.Filter{Include: []string{"src/**"}}}}
+	second := &ir.Pipeline{ID: "rel", Triggers: []ir.Trigger{{Kind: ir.TriggerTag}}}
+	cp := *first.Jobs[0]
+	cp.ID = "other"
+	second.Jobs = append(second.Jobs, &cp)
+	p.Pipelines = append(p.Pipelines, second)
+	_, rep := emitFiles(t, p)
+	found := false
+	for _, e := range rep.Entries {
+		found = found || (e.Level == caps.Lost && strings.HasPrefix(e.IRPath, "pipeline/ci/job/") &&
+			strings.Contains(e.Detail, "no longer include") && strings.Contains(e.Detail, "trigger condition"))
+	}
+	if !found {
+		t.Errorf("an opaque rules job loses its pipeline's trigger condition and path filter; the ledger must say so: %+v", rep.Entries)
+	}
+}
+
+func TestDuplicateMarkersDoNotMultiplyArguments(t *testing.T) {
+	c := emulCases()["job.matrix"]
+	p := c.build()
+	files, _ := emitFiles(t, p)
+	lines := strings.Split(string(files[rootFile]), "\n")
+	var out []string
+	for i, l := range lines {
+		out = append(out, l)
+		if strings.HasPrefix(l, "# pipemaster:emulated job.matrix") && i+1 < len(lines) {
+			out = append(out, l, lines[i+1])
+		}
+	}
+	files[rootFile] = []byte(strings.Join(out, "\n"))
+	back, _, err := gitlabParse(files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok, diff := ir.Equal(p, back); !ok {
+		t.Errorf("a repeated marker must collapse like one marker:\n%s", diff)
+	}
+}
