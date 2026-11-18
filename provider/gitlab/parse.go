@@ -55,7 +55,7 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		Origin:    ir.Origin{Provider: dialect, Dialect: dialect, Files: ld.files},
 		Pipelines: []*ir.Pipeline{pl},
 	}
-	s.collapseMarkers(pl, ld.markers)
+	s.collapseMarkers(pl, ld.markers, ld.args)
 	if err := ir.Validate(proj); err != nil {
 		return nil, nil, s.locate(err, infos)
 	}

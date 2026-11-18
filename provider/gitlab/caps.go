@@ -3,6 +3,7 @@ package gitlab
 import "github.com/lukaszraczylo/pipemaster/caps"
 
 // Caps declares what GitLab CI does for each feature; the emitter implements every non-native verdict listed here.
+// A native entry can still be downgraded per use: the emitter notes lost parts (unknown actions, retry caps, other shells).
 func (adapter) Caps() caps.Matrix {
 	m := caps.Matrix{}
 	for _, f := range caps.AllFeatures() {
@@ -11,23 +12,22 @@ func (adapter) Caps() caps.Matrix {
 	for f, s := range map[caps.Feature]caps.Support{
 		caps.TriggerSchedule:        {Level: caps.External, Strategy: "pipeline schedule in project settings", Caveat: "GitLab keeps the cron string outside the CI file"},
 		caps.TriggerAPI:             {Level: caps.External, Strategy: "pipeline trigger token or API call"},
-		caps.TriggerPipelineDone:    {Level: caps.Lost, Caveat: "GitLab CI has no workflow_run equivalent"},
+		caps.TriggerPipelineDone:    {Level: caps.Lost, Caveat: "a GitLab downstream pipeline starts from a trigger job in the upstream project"},
 		caps.TriggerResource:        {Level: caps.Lost, Caveat: "GitLab CI has no resource triggers"},
-		caps.TriggerFilterPaths:     {Level: caps.Emulated, Strategy: "rules:changes"},
-		caps.PipelineInputs:         {Level: caps.Emulated, Strategy: "variables with description"},
-		caps.PipelineConcurrency:    {Level: caps.Emulated, Strategy: "resource_group on every job"},
-		caps.PipelinePermissions:    {Level: caps.External, Strategy: "job token scope in project settings"},
-		caps.PipelineFinally:        {Level: caps.Emulated, Strategy: "when: always job in the .post stage"},
-		caps.JobEnvironmentApproval: {Level: caps.External, Strategy: "protected environment in project settings"},
-		caps.JobOutputs:             {Level: caps.Emulated, Strategy: "dotenv report artifact"},
-		caps.StepAction:             {Level: caps.Emulated, Strategy: "mapped to script lines where the actions table has a mapping"},
-		caps.StepImage:              {Level: caps.Emulated, Strategy: "docker run in the script"},
-		caps.StepIf:                 {Level: caps.Emulated, Strategy: "shell guard around the step's lines"},
-		caps.StepEnv:                {Level: caps.Emulated, Strategy: "export before the step's lines"},
-		caps.StepContinueOnError:    {Level: caps.Emulated, Strategy: "|| true after the step's lines"},
-		caps.StepTimeout:            {Level: caps.Emulated, Strategy: "timeout command around the step's lines"},
-		caps.StepWorkdir:            {Level: caps.Emulated, Strategy: "cd in a subshell"},
-		caps.StepShell:              {Level: caps.Lost, Caveat: "GitLab runs scripts in the runner's configured shell"},
+		caps.PipelineInputs:         {Level: caps.Emulated, Strategy: "variables with description", Caveat: "input types and required flags are not enforced"},
+		caps.PipelineConcurrency:    {Level: caps.Emulated, Strategy: "resource_group on every job", Caveat: "queues, does not cancel"},
+		caps.PipelinePermissions:    {Level: caps.Lost, Caveat: "job token scope is a project setting"},
+		caps.JobEnvironmentApproval: {Level: caps.External, Strategy: "protected environment approval rules in project settings"},
+		caps.JobMatrix:              {Level: caps.Native, Strategy: "parallel:matrix", Caveat: "include and exclude are expanded into explicit entries"},
+		caps.JobOutputs:             {Level: caps.Emulated, Strategy: "dotenv artifact report"},
+		caps.StepAction:             {Level: caps.Native, Strategy: "per actions.Lookup verdict", Caveat: "unknown actions are lost"},
+		caps.StepImage:              {Level: caps.Lost, Caveat: "GitLab sets the image per job, not per step"},
+		caps.StepIf:                 {Level: caps.Emulated, Strategy: "shell guard around the step's lines", Caveat: "step reports success instead of skipped"},
+		caps.StepEnv:                {Level: caps.Emulated, Strategy: "export lines inside a subshell around the step"},
+		caps.StepContinueOnError:    {Level: caps.Emulated, Strategy: "|| true after each line of the step"},
+		caps.StepTimeout:            {Level: caps.Lost, Caveat: "GitLab has only a job timeout"},
+		caps.StepWorkdir:            {Level: caps.Emulated, Strategy: "cd in a subshell around the step"},
+		caps.StepShell:              {Level: caps.Native, Caveat: "bash and sh only; the runner's shell runs other scripts"},
 		caps.ExprOpaque:             {Level: caps.Native, Caveat: "only opaque expressions of the gitlab dialect; others are lost"},
 	} {
 		m[f] = s

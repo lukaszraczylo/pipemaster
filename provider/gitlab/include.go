@@ -29,13 +29,14 @@ type loader struct {
 	*state
 	fsys    fs.FS
 	seen    map[string]bool
+	args    map[ir.FeatureUse][]string
 	files   []string
 	remote  []any
 	markers []ir.FeatureUse
 }
 
 func newLoader(fsys fs.FS, s *state) *loader {
-	return &loader{state: s, fsys: fsys, seen: map[string]bool{}}
+	return &loader{state: s, fsys: fsys, seen: map[string]bool{}, args: map[ir.FeatureUse][]string{}}
 }
 
 // load returns the merged configuration of name: included files first in order, then name itself on top.
@@ -57,6 +58,9 @@ func (l *loader) load(name string, chain []string, from *yaml.Node) (*yaml.Node,
 		l.seen[name] = true
 		l.files = append(l.files, name)
 		l.markers = append(l.markers, emitkit.ParseMarkers(src)...)
+		for u, a := range markerArgs(src) {
+			l.args[u] = append(l.args[u], a...)
+		}
 	}
 	root, err := l.parseDoc(name, src)
 	if err != nil {

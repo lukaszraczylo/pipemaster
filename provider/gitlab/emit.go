@@ -1,0 +1,252 @@
+package gitlab
+
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"go.yaml.in/yaml/v3"
+
+	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/report"
+)
+
+const (
+	extWorkflow = "workflow"
+	extDefault  = "default"
+	scheme      = "://"
+)
+
+// Emit writes the project as one .gitlab-ci.yml. Every feature use goes through the ledger; Finish
+// fails the call when one was never accounted for. Local include files are not re-emitted: Parse
+// merged them into the jobs, so the emitted file stands alone.
+func (adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	origin := ""
+	if p != nil {
+		origin = p.Origin.Provider
+	}
+	e := &emitter{from: sourceDialect(origin), led: emitkit.NewLedger("ir", dialect, adapter{}.Caps())}
+	uses := ir.Features(p)
+	for _, u := range uses {
+		e.led.Decide(u)
+	}
+	files := map[string][]byte{}
+	if p != nil {
+		var pls []*ir.Pipeline
+		for _, pl := range p.Pipelines {
+			if pl != nil {
+				pls = append(pls, pl)
+			}
+		}
+		if len(pls) > 1 {
+			return nil, nil, fmt.Errorf("%s: %d pipelines cannot share one %s", dialect, len(pls), rootFile)
+		}
+		for _, pl := range pls {
+			data, err := e.pipelineFile(pl)
+			if err != nil {
+				return nil, nil, fmt.Errorf("%s: %w", dialect, err)
+			}
+			files[rootFile] = data
+		}
+	}
+	rep, err := e.led.Finish(uses)
+	if err != nil {
+		return nil, rep, fmt.Errorf("%s: %w", dialect, err)
+	}
+	return files, rep, nil
+}
+
+func (e *emitter) pipelineFile(pl *ir.Pipeline) ([]byte, error) {
+	root, err := e.document(pl)
+	if err != nil {
+		return nil, fmt.Errorf("pipeline %s: %w", pl.ID, err)
+	}
+	return marshalDoc(root)
+}
+
+func (e *emitter) document(pl *ir.Pipeline) (*yaml.Node, error) {
+	plan, err := planStages(pl)
+	if err != nil {
+		return nil, err
+	}
+	ext := extOf(pl.Ext)
+	c := &pipeCtx{pl: pl, plan: plan, preps: map[string]*jobPrep{}, defKeys: defaultKeySet(ext)}
+	for _, j := range allJobs(pl) {
+		if _, dup := c.preps[j.ID]; dup {
+			return nil, fmt.Errorf("job id %q is used twice", j.ID)
+		}
+		p := newJobPrep(pl.ID, j)
+		if err := e.prepSteps(p); err != nil {
+			return nil, err
+		}
+		c.preps[j.ID] = p
+	}
+	m := newMap()
+	if inc := localFreeIncludes(ext["include"]); len(inc) > 0 {
+		m.set("include", mustNode(inc))
+	}
+	if len(plan.list) > 0 {
+		m.set("stages", strSeq(plan.list))
+	}
+	marks, err := e.headerKeys(m, pl, ext, c)
+	if err != nil {
+		return nil, err
+	}
+	if err := e.jobEntries(m, c); err != nil {
+		return nil, err
+	}
+	skip := map[string]bool{"include": true, extStages: true, extVariables: true, extWorkflow: true, extDefault: true, extHidden: true}
+	if err := m.addExtra(ext, skip); err != nil {
+		return nil, err
+	}
+	if len(m.n.Content) == 0 {
+		return nil, fmt.Errorf("pipeline has no jobs")
+	}
+	head := strings.Join(append(marks, e.drain()...), "\n")
+	if first := m.n.Content[0]; head != "" {
+		first.HeadComment = strings.TrimPrefix(head+"\n"+first.HeadComment, "\n")
+		first.HeadComment = strings.TrimSuffix(first.HeadComment, "\n")
+	}
+	return m.n, nil
+}
+
+func mustNode(v any) *yaml.Node {
+	n, err := plainNode(v)
+	if err != nil {
+		return nil
+	}
+	return n
+}
+
+// localFreeIncludes drops include entries that name local files, which Parse already merged.
+func localFreeIncludes(v any) []any {
+	l, _ := v.([]any)
+	var out []any
+	for _, it := range l {
+		switch x := it.(type) {
+		case string:
+			if strings.Contains(x, scheme) {
+				out = append(out, it)
+			}
+		case map[string]any:
+			if _, local := x["local"]; !local {
+				out = append(out, it)
+			}
+		}
+	}
+	return out
+}
+
+func defaultKeySet(ext map[string]any) map[string]bool {
+	set := map[string]bool{}
+	d, _ := ext[extDefault].(map[string]any)
+	for _, k := range defaultKeyOrder {
+		if _, ok := d[k]; ok {
+			set[k] = true
+		} else if _, ok := ext[k]; ok && deprecatedGlobals[k] {
+			set[k] = true
+		}
+	}
+	return set
+}
+
+// headerKeys writes variables, workflow, default and the hidden jobs, and returns the pipeline-level markers.
+func (e *emitter) headerKeys(m *omap, pl *ir.Pipeline, ext map[string]any, c *pipeCtx) ([]string, error) {
+	pp := "pipeline/" + pl.ID
+	vars, extras, marks, err := e.pipelineVars(pp, pl, ext)
+	if err != nil {
+		return nil, err
+	}
+	if len(vars) > 0 {
+		n, err := e.vars(pp, vars, extras)
+		if err != nil {
+			return nil, err
+		}
+		if len(n.Content) > 0 {
+			m.set("variables", n)
+		}
+	}
+	w, err := e.workflow(pl)
+	if err != nil {
+		return nil, err
+	}
+	m.set(extWorkflow, w)
+	if d, ok := ext[extDefault]; ok {
+		n, err := plainNode(d)
+		if err != nil {
+			return nil, err
+		}
+		m.set(extDefault, n)
+	}
+	hidden, _ := ext[extHidden].(map[string]any)
+	for _, name := range sortedAny(hidden) {
+		n, err := plainNode(hidden[name])
+		if err != nil {
+			return nil, err
+		}
+		m.set(name, n)
+	}
+	if pl.Concurrency != nil {
+		g, err := e.field(pp, caps.ScriptInterpolation, pl.Concurrency.Group)
+		if err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(g) == "" {
+			g = pl.ID
+		}
+		c.group = g
+		marks = append(marks, emitkit.Marker(caps.PipelineConcurrency, pp))
+	}
+	return marks, nil
+}
+
+// pipelineVars joins pipeline env with the inputs, which GitLab can only carry as variables with a description.
+func (e *emitter) pipelineVars(pp string, pl *ir.Pipeline, ext map[string]any) ([]ir.Var, map[string]any, []string, error) {
+	vars := append([]ir.Var{}, pl.Env...)
+	extras := map[string]any{}
+	if raw, ok := ext[extVariables].(map[string]any); ok {
+		for k, v := range raw {
+			extras[k] = v
+		}
+	}
+	if len(pl.Inputs) == 0 {
+		return vars, extras, nil, nil
+	}
+	var kept []ir.Input
+	for _, in := range pl.Inputs {
+		if !isIdent(in.Name) || hasVar(vars, in.Name) {
+			e.lose(pp, caps.PipelineInputs, "input "+in.Name+" is not a unique variable name")
+			continue
+		}
+		vars = append(vars, ir.Var{Name: in.Name, Value: ir.Value{Lit: in.Default}})
+		if in.Description != "" {
+			extras[in.Name] = map[string]any{"description": in.Description}
+		}
+		kept = append(kept, in)
+	}
+	if len(kept) == 0 {
+		return vars, extras, nil, nil
+	}
+	arg, err := json.Marshal(kept)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return vars, extras, []string{emitkit.Marker(caps.PipelineInputs, pp), argPrefix + string(arg)}, nil
+}
+
+func (e *emitter) jobEntries(m *omap, c *pipeCtx) error {
+	for _, j := range allJobs(c.pl) {
+		p := c.preps[j.ID]
+		n, comments, err := e.jobNode(c, p)
+		if err != nil {
+			return fmt.Errorf("job %s: %w", j.ID, err)
+		}
+		if m.has(j.ID) {
+			return fmt.Errorf("job id %q collides with a top-level key", j.ID)
+		}
+		m.setComment(j.ID, n, comments)
+	}
+	return nil
+}

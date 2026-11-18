@@ -2,12 +2,9 @@
 package gitlab
 
 import (
-	"errors"
 	"io/fs"
 
-	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
-	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 const (
@@ -29,9 +26,4 @@ func (adapter) ID() string { return dialect }
 func (adapter) Detect(fsys fs.FS) bool {
 	st, err := fs.Stat(fsys, rootFile)
 	return err == nil && !st.IsDir()
-}
-
-// Emit is not available until the GitLab emitter lands.
-func (adapter) Emit(*ir.Project) (map[string][]byte, *report.Report, error) {
-	return nil, nil, errors.New("gitlab: emit is not implemented")
 }
