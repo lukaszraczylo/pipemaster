@@ -1,12 +1,14 @@
 package ir
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 )
 
 // Normalize puts every order-insensitive collection into canonical order in place.
-// Steps, Env, Script, Matrix axes and Matrix include/exclude keep their order.
+// Steps, Env, Script, Matrix axes, Matrix include/exclude and Filter lists keep their order:
+// a later "!" pattern overrides an earlier one, so filter order is semantic.
 func Normalize(p *Project) {
 	if p == nil {
 		return
@@ -61,11 +63,6 @@ func normalizeJob(j *Job) {
 	}
 }
 
-func normalizeFilter(f *Filter) {
-	sort.Strings(f.Include)
-	sort.Strings(f.Exclude)
-}
-
 // triggerKey makes the sort total so equal sets in any input order normalise identically.
 func triggerKey(t *Trigger) string {
 	var b strings.Builder
@@ -77,6 +74,9 @@ func triggerKey(t *Trigger) string {
 		b.WriteString(strings.Join(f.Exclude, "\x01"))
 	}
 	b.WriteString("\x00" + t.Cron)
+	if len(t.Ext) > 0 {
+		b.WriteString("\x00" + fmt.Sprint(t.Ext))
+	}
 	if t.Resource != nil {
 		b.WriteString("\x00" + t.Resource.Type + "\x01" + t.Resource.Name)
 	}
@@ -84,10 +84,5 @@ func triggerKey(t *Trigger) string {
 }
 
 func normalizeTriggers(ts []Trigger) {
-	for i := range ts {
-		normalizeFilter(&ts[i].Branches)
-		normalizeFilter(&ts[i].Tags)
-		normalizeFilter(&ts[i].Paths)
-	}
 	sort.SliceStable(ts, func(a, b int) bool { return triggerKey(&ts[a]) < triggerKey(&ts[b]) })
 }

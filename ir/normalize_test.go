@@ -61,8 +61,8 @@ func TestNormalizeSortsJobsKeepsSteps(t *testing.T) {
 	if a.Triggers[0].Kind != ir.TriggerPR { // "pr" < "push"
 		t.Fatalf("triggers not sorted by kind: %v", a.Triggers[0].Kind)
 	}
-	if got := a.Triggers[1].Branches.Include; !reflect.DeepEqual(got, []string{"dev", "main"}) {
-		t.Fatalf("filter not sorted: %v", got)
+	if got := a.Triggers[1].Branches.Include; !reflect.DeepEqual(got, []string{"main", "dev"}) {
+		t.Fatalf("filter order must be kept: %v", got)
 	}
 }
 
@@ -84,4 +84,17 @@ func TestNormalizeKeepsMatrixAxisOrder(t *testing.T) {
 func TestNormalizeNilSafe(_ *testing.T) {
 	ir.Normalize(nil)
 	ir.Normalize(&ir.Project{Pipelines: []*ir.Pipeline{nil, {ID: "a", Jobs: []*ir.Job{nil}}}})
+}
+
+func TestNormalizeTriggerTieBreakOnExt(t *testing.T) {
+	mk := func(ev string) ir.Trigger {
+		return ir.Trigger{Kind: ir.TriggerAPI, Ext: ir.Ext{"gha": map[string]any{"event": ev}}}
+	}
+	a := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "p", Triggers: []ir.Trigger{mk("workflow_call"), mk("repository_dispatch")}}}}
+	b := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "p", Triggers: []ir.Trigger{mk("repository_dispatch"), mk("workflow_call")}}}}
+	ir.Normalize(a)
+	ir.Normalize(b)
+	if ok, diff := ir.Equal(a, b); !ok {
+		t.Fatalf("trigger order differs after Normalize: %s", diff)
+	}
 }
