@@ -1,0 +1,38 @@
+{
+  "source": "gha",
+  "target": "gitlab",
+  "entries": [
+    {
+      "ir_path": "jobs.deploy",
+      "feature": "job.environment.approval",
+      "strategy": "dropped",
+      "detail": "no approvals | pipes",
+      "source_loc": "ci.yml:30",
+      "level": "lost"
+    },
+    {
+      "ir_path": "jobs.build",
+      "feature": "job.artifacts",
+      "strategy": "upload step",
+      "detail": "",
+      "source_loc": "",
+      "level": "external"
+    },
+    {
+      "ir_path": "jobs.build",
+      "feature": "job.cache",
+      "strategy": "cache keyword",
+      "detail": "key mapped",
+      "source_loc": "ci.yml:12",
+      "level": "emulated"
+    },
+    {
+      "ir_path": "jobs.build",
+      "feature": "job.matrix",
+      "strategy": "",
+      "detail": "",
+      "source_loc": "",
+      "level": "native"
+    }
+  ]
+}

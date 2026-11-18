@@ -1,0 +1,5 @@
+Loss report: gha -> gitlab
+[lost] jobs.deploy job.environment.approval: dropped (no approvals | pipes) @ ci.yml:30
+[external] jobs.build job.artifacts: upload step
+[emulated] jobs.build job.cache: cache keyword (key mapped) @ ci.yml:12
+[native] jobs.build job.matrix
