@@ -1,0 +1,6 @@
+docs/superpowers/
+/dist/
+/pipemaster
+lean4/.lake/
+.superpowers/
+.worktrees/
