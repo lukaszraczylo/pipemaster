@@ -29,7 +29,7 @@ func TestLookupCheckout(t *testing.T) {
 	if got.Kind != "implicit" || got.Support.Level != caps.Native {
 		t.Fatalf("kind/support = %q/%v", got.Kind, got.Support.Level)
 	}
-	want := map[string]string{"GIT_DEPTH": "0", "GIT_SUBMODULE_STRATEGY": "recursive"}
+	want := map[string]any{"GIT_DEPTH": "0", "GIT_SUBMODULE_STRATEGY": "recursive"}
 	if !reflect.DeepEqual(got.With, want) {
 		t.Fatalf("With = %v, want %v", got.With, want)
 	}
@@ -121,11 +121,11 @@ func TestSetupVersionFileIsLost(t *testing.T) {
 
 func TestCacheAndArtifacts(t *testing.T) {
 	c, _ := Lookup(repo("actions", "cache", ""), provider.GitLab, map[string]string{"key": "k", "path": "~/.cache", "restore-keys": "r"})
-	if c.Kind != "cache" || c.With["key"] != "k" || c.With["paths"] != "~/.cache" || !reflect.DeepEqual(c.Unmapped, []string{"restore-keys"}) {
+	if c.Kind != "cache" || c.With["key"] != "k" || !reflect.DeepEqual(c.With["paths"], []string{"~/.cache"}) || !reflect.DeepEqual(c.Unmapped, []string{"restore-keys"}) {
 		t.Fatalf("cache: %+v", c)
 	}
 	u, _ := Lookup(repo("actions", "upload-artifact", ""), provider.GitLab, map[string]string{"name": "n", "path": "dist", "retention-days": "3"})
-	if u.Kind != "artifact_upload" || u.With["expire_in"] != "3" || u.With["name"] != "n" || u.With["path"] != "dist" {
+	if u.Kind != "artifact_upload" || u.With["expire_in"] != "3 days" || u.With["name"] != "n" || !reflect.DeepEqual(u.With["path"], []string{"dist"}) {
 		t.Fatalf("upload: %+v", u)
 	}
 	d, _ := Lookup(repo("actions", "download-artifact", ""), provider.GitLab, nil)
@@ -140,7 +140,7 @@ func TestGHAPassthrough(t *testing.T) {
 	if !ok || got.Kind != "passthrough" || got.Support.Level != caps.Native {
 		t.Fatalf("got %+v, %v", got, ok)
 	}
-	if !reflect.DeepEqual(got.With, in) || len(got.Unmapped) != 0 {
+	if !reflect.DeepEqual(got.With, map[string]any{"a": "1", "b": "2"}) || len(got.Unmapped) != 0 {
 		t.Fatalf("with/unmapped = %v / %v", got.With, got.Unmapped)
 	}
 }
@@ -220,5 +220,116 @@ func TestReversePins(t *testing.T) {
 	}
 	if _, ok := Reverse("nope"); ok {
 		t.Error("unknown reverse kind matched")
+	}
+}
+
+func lookupWith(t *testing.T, name string, with map[string]string) Target {
+	t.Helper()
+	got, ok := Lookup(repo("actions", name, ""), provider.GitLab, with)
+	if !ok {
+		t.Fatalf("%s not found", name)
+	}
+	return got
+}
+
+func TestImageValueValidation(t *testing.T) {
+	cases := []struct{ name, val, caveat string }{
+		{"matrix expr", "${{ matrix.node }}", "version is an expression"},
+		{"lts glob", "lts/*", "not a plain tag"},
+		{"caret", "^1.22", "not a plain tag"},
+		{"space", "20 x", "not a plain tag"},
+		{"newline", "20\n21", "not a plain tag"},
+		{"leading dot", ".5", "not a plain tag"},
+		{"too long", strings.Repeat("a", 129), "not a plain tag"},
+	}
+	for _, c := range cases {
+		got := lookupWith(t, "setup-node", map[string]string{"node-version": c.val})
+		if got.Image != "" || got.Support.Level != caps.Lost ||
+			!strings.Contains(got.Support.Caveat, "node-version") || !strings.Contains(got.Support.Caveat, c.caveat) {
+			t.Errorf("%s: %+v", c.name, got)
+		}
+	}
+	for _, ok := range []string{"20", "1.27.3", "20-alpine", "v_1", strings.Repeat("a", 128)} {
+		if got := lookupWith(t, "setup-node", map[string]string{"node-version": ok}); got.Support.Level != caps.Emulated {
+			t.Errorf("%q rejected: %+v", ok, got)
+		}
+	}
+}
+
+func TestRetentionDays(t *testing.T) {
+	for in, want := range map[string]string{"3": "3 days", "1": "1 day", "90": "90 days"} {
+		got := lookupWith(t, "upload-artifact", map[string]string{"retention-days": in})
+		if got.With["expire_in"] != want || got.Support.Level != caps.Native {
+			t.Errorf("%s: %+v", in, got)
+		}
+	}
+	for _, bad := range []string{"0", "-1", "x", "1.5", "${{ inputs.d }}"} {
+		got := lookupWith(t, "upload-artifact", map[string]string{"retention-days": bad})
+		if got.Support.Level != caps.Lost || !strings.Contains(got.Support.Caveat, "retention-days") {
+			t.Errorf("%q: %+v", bad, got)
+		}
+		if _, set := got.With["expire_in"]; set {
+			t.Errorf("%q passed through: %+v", bad, got.With)
+		}
+	}
+}
+
+func TestSubmodules(t *testing.T) {
+	for in, want := range map[string]string{"true": "normal", "false": "none", "recursive": "recursive", "TRUE": "normal"} {
+		got := lookupWith(t, "checkout", map[string]string{"submodules": in})
+		if got.With["GIT_SUBMODULE_STRATEGY"] != want || got.Support.Level != caps.Native {
+			t.Errorf("%s: %+v", in, got)
+		}
+	}
+	got := lookupWith(t, "checkout", map[string]string{"submodules": "yes"})
+	if got.Support.Level != caps.Lost || !strings.Contains(got.Support.Caveat, "submodules") {
+		t.Errorf("yes: %+v", got)
+	}
+}
+
+func TestFetchDepth(t *testing.T) {
+	// GHA 0 and GitLab GIT_DEPTH 0 both mean full history.
+	for _, in := range []string{"0", "1", "50"} {
+		got := lookupWith(t, "checkout", map[string]string{"fetch-depth": in})
+		if got.With["GIT_DEPTH"] != in {
+			t.Errorf("%s: %+v", in, got)
+		}
+	}
+	for _, bad := range []string{"-1", "abc", ""} {
+		got := lookupWith(t, "checkout", map[string]string{"fetch-depth": bad})
+		if got.Support.Level != caps.Lost || !strings.Contains(got.Support.Caveat, "fetch-depth") {
+			t.Errorf("%q: %+v", bad, got)
+		}
+	}
+}
+
+func TestPathLines(t *testing.T) {
+	c := lookupWith(t, "cache", map[string]string{"path": "~/.cache\n  node_modules \n\n./dist/\n"})
+	if want := []string{"~/.cache", "node_modules", "./dist/"}; !reflect.DeepEqual(c.With["paths"], want) {
+		t.Errorf("cache paths = %v", c.With["paths"])
+	}
+	u := lookupWith(t, "upload-artifact", map[string]string{"path": "a\nb"})
+	if want := []string{"a", "b"}; !reflect.DeepEqual(u.With["path"], want) {
+		t.Errorf("upload path = %v", u.With["path"])
+	}
+	empty := lookupWith(t, "cache", map[string]string{"path": " \n "})
+	if empty.Support.Level != caps.Lost {
+		t.Errorf("empty path list: %+v", empty)
+	}
+}
+
+func TestUnknownTransformFailsParse(t *testing.T) {
+	_, err := parse([]byte(`
+actions:
+  - match: a/b
+    targets:
+      gitlab:
+        kind: cache
+        with: {x: {to: y, transform: bogus}}
+        support: {level: native}
+reverse: {checkout: a/b@v1, cache: a/b@v1, upload: a/b@v1, download: a/b@v1}
+`))
+	if err == nil || !strings.Contains(err.Error(), "bogus") {
+		t.Fatalf("err = %v", err)
 	}
 }

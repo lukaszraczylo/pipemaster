@@ -10,11 +10,20 @@
 #         image: "golang:{{go-version}}"   {{input}} is replaced from the step's `with`
 #         defaults: {input: value}         used when the step omits the input
 #         script: [lines]                  script kind only
-#         with: {in-key: out-key}          maps a `with` input to the target's key;
-#                                          unlisted inputs are reported as Unmapped
+#         with:                            maps a `with` input to the target's key;
+#           in-key: out-key                unlisted inputs are reported as Unmapped
+#           in-key: {to: out-key, transform: name}
+#             transform (closed set; unknown name fails Load; default identity):
+#               days        N -> "N days" (GitLab expire_in has no unit = seconds)
+#               submodules  true|false|recursive -> normal|none|recursive
+#               depth       non-negative integer, kept (0 = full history on both)
+#               lines       multi-line string -> list of trimmed non-empty lines
+#             A value a transform cannot convert (or an expression) makes
+#             the target lost with a caveat; it is never passed through.
 #         support: {level: native|emulated|external|lost, strategy: "", caveat: ""}
 #
-# A missing image input (or only <input>-file) makes Lookup return level lost.
+# A missing image input (or only <input>-file) makes Lookup return level lost,
+# as does an image input that is an expression or not a plain Docker tag.
 # gha targets use kind passthrough: every input is kept verbatim.
 #
 # reverse: pinned GitHub actions emitted when converting GitLab to GHA.
@@ -26,7 +35,9 @@ actions:
       gha: {kind: passthrough, support: {level: native}}
       gitlab:
         kind: implicit
-        with: {fetch-depth: GIT_DEPTH, submodules: GIT_SUBMODULE_STRATEGY}
+        with:
+          fetch-depth: {to: GIT_DEPTH, transform: depth}
+          submodules: {to: GIT_SUBMODULE_STRATEGY, transform: submodules}
         support: {level: native, strategy: runner clones the repository before the job}
 
   - match: actions/cache
@@ -34,7 +45,9 @@ actions:
       gha: {kind: passthrough, support: {level: native}}
       gitlab:
         kind: cache
-        with: {key: key, path: paths}
+        with:
+          key: key
+          path: {to: paths, transform: lines}
         support: {level: native, strategy: gitlab cache keyword}
 
   - match: actions/upload-artifact
@@ -42,7 +55,10 @@ actions:
       gha: {kind: passthrough, support: {level: native}}
       gitlab:
         kind: artifact_upload
-        with: {name: name, path: path, retention-days: expire_in}
+        with:
+          name: name
+          path: {to: path, transform: lines}
+          retention-days: {to: expire_in, transform: days}
         support: {level: native, strategy: gitlab artifacts keyword}
 
   - match: actions/download-artifact
