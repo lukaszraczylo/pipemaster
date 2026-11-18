@@ -27,7 +27,8 @@ type gen struct {
 
 // GenProject draws a valid project that uses exactly the features frag allows.
 // Allowing job.needs.artifacts implies job.needs, and job.environment.approval implies job.environment.
-// expr.opaque and script.interpolation have no IR field, so they are never generated.
+// expr.opaque is generated only when allowed and needs a carrier (job.if, step.if or any env/with feature);
+// script.interpolation is derived from script text, so it is never generated.
 func GenProject(t *rapid.T, frag Fragment) *ir.Project {
 	g := &gen{t: t, frag: frag}
 	p := &ir.Project{Origin: ir.Origin{Provider: "gha", Dialect: "gha", Files: []string{"a.yml"}}}
@@ -59,7 +60,10 @@ func (g *gen) ext() ir.Ext {
 func (g *gen) value() ir.Value {
 	switch rapid.IntRange(0, 2).Draw(g.t, g.label("k")) {
 	case 1:
-		return ir.Value{Kind: ir.ValueExpr, Expr: g.expr()}
+		if g.frag(caps.ExprOpaque) {
+			return ir.Value{Kind: ir.ValueExpr, Expr: g.expr()}
+		}
+		return ir.Value{Lit: g.str()}
 	case 2:
 		return ir.Value{Kind: ir.ValueSecret, Secret: g.str()}
 	}
@@ -67,7 +71,11 @@ func (g *gen) value() ir.Value {
 }
 
 func (g *gen) vars() []ir.Var {
-	return []ir.Var{{Name: g.str(), Value: g.value()}, {Name: g.str(), Value: g.value()}}
+	first := ir.Value{Kind: ir.ValueSecret, Secret: g.str()}
+	if g.frag(caps.ExprOpaque) {
+		first = ir.Value{Kind: ir.ValueExpr, Expr: g.expr()}
+	}
+	return []ir.Var{{Name: g.str(), Value: first}, {Name: g.str(), Value: g.value()}}
 }
 
 func (g *gen) image() ir.Image {
@@ -176,7 +184,7 @@ func (g *gen) job(id string, prior []string) *ir.Job {
 	if wantNeeds && len(prior) > 0 {
 		j.Needs = []ir.Need{{JobID: prior[0], Artifacts: f(caps.JobNeedsArtifacts), Optional: g.flag()}}
 	}
-	if f(caps.JobIf) {
+	if f(caps.JobIf) && f(caps.ExprOpaque) {
 		j.If = g.expr()
 	}
 	if f(caps.JobRunner) {
@@ -240,13 +248,17 @@ func (g *gen) step(id string) *ir.Step {
 	if f(caps.StepAction) {
 		s.Kind = ir.StepAction
 		s.Action = &ir.ActionRef{Kind: ir.ActionRepo, Owner: g.str(), Repo: g.str(), Path: g.str(), Ref: g.str()}
-		s.With = map[string]ir.Value{g.str(): g.value()}
+		w := ir.Value{Lit: g.str()}
+		if f(caps.ExprOpaque) {
+			w = ir.Value{Kind: ir.ValueExpr, Expr: g.expr()}
+		}
+		s.With = map[string]ir.Value{g.str(): w}
 	}
 	if f(caps.StepImage) {
 		img := g.image()
 		s.Image = &img
 	}
-	if f(caps.StepIf) {
+	if f(caps.StepIf) && f(caps.ExprOpaque) {
 		s.If = g.expr()
 	}
 	if f(caps.StepEnv) {

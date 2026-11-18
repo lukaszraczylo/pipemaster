@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
 )
 
 // FeatureUse records one feature used at one IR path.
@@ -67,6 +68,7 @@ func Features(p *Project) []FeatureUse {
 func pipelineFeatures(s *featureSet, pl *Pipeline) {
 	path := pipelinePath(pl.ID)
 	s.when(len(pl.Env) > 0, path, caps.PipelineEnv)
+	s.when(varsOpaque(pl.Env), path, caps.ExprOpaque)
 	s.when(len(pl.Inputs) > 0, path, caps.PipelineInputs)
 	s.when(pl.Concurrency != nil, path, caps.PipelineConcurrency)
 	s.when(pl.Permissions != nil, path, caps.PipelinePermissions)
@@ -80,6 +82,20 @@ func pipelineFeatures(s *featureSet, pl *Pipeline) {
 			jobFeatures(s, pl.ID, j)
 		}
 	}
+}
+
+func isOpaque(e expr.Expr) bool {
+	_, ok := e.(expr.Opaque)
+	return ok
+}
+
+func varsOpaque(vs []Var) bool {
+	for _, v := range vs {
+		if v.Value.Kind == ValueExpr && isOpaque(v.Value.Expr) {
+			return true
+		}
+	}
+	return false
 }
 
 func hasFilter(f Filter) bool { return len(f.Include) > 0 || len(f.Exclude) > 0 }
@@ -103,6 +119,11 @@ func jobFeatures(s *featureSet, pid string, j *Job) {
 		s.when(n.Artifacts, path, caps.JobNeedsArtifacts)
 	}
 	s.when(j.If != nil, path, caps.JobIf)
+	opaque := isOpaque(j.If) || varsOpaque(j.Env)
+	for _, sv := range j.Services {
+		opaque = opaque || varsOpaque(sv.Env)
+	}
+	s.when(opaque, path, caps.ExprOpaque)
 	r := j.Runner
 	s.when(len(r.Labels) > 0 || r.Platform != "" || len(r.Selector) > 0, path, caps.JobRunner)
 	s.when(j.Container != nil, path, caps.JobContainer)
@@ -131,6 +152,11 @@ func stepFeatures(s *featureSet, path string, st *Step) {
 	s.when(st.Action != nil || len(st.With) > 0, path, caps.StepAction)
 	s.when(st.Image != nil, path, caps.StepImage)
 	s.when(st.If != nil, path, caps.StepIf)
+	opaque := isOpaque(st.If) || varsOpaque(st.Env)
+	for _, v := range st.With {
+		opaque = opaque || (v.Kind == ValueExpr && isOpaque(v.Expr))
+	}
+	s.when(opaque, path, caps.ExprOpaque)
 	s.when(len(st.Env) > 0, path, caps.StepEnv)
 	s.when(st.ContinueOnError, path, caps.StepContinueOnError)
 	s.when(st.Timeout != nil, path, caps.StepTimeout)

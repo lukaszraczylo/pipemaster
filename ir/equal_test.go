@@ -57,3 +57,15 @@ func TestEqualNilProjects(t *testing.T) {
 		t.Fatal("nil != non-nil")
 	}
 }
+
+func TestEqualIgnoresOrigin(t *testing.T) {
+	a, b := twoJobs("a"), twoJobs("a")
+	a.Origin = ir.Origin{Provider: "gha", Dialect: "gha", Files: []string{"x.yml"}}
+	b.Origin = ir.Origin{Provider: "gitlab", Dialect: "gitlab", Files: []string{".gitlab-ci.yml"}}
+	if ok, d := ir.Equal(a, b); !ok {
+		t.Fatalf("origin must be ignored: %s", d)
+	}
+	if a.Origin.Provider != "gha" {
+		t.Fatal("Equal must not mutate its inputs")
+	}
+}

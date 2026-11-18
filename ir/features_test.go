@@ -12,8 +12,13 @@ import (
 	"pgregory.net/rapid"
 )
 
-// notCarried are vocabulary features no IR field carries; emitters and the ledger derive them.
-var notCarried = map[caps.Feature]bool{caps.ExprOpaque: true, caps.ScriptInterpolation: true}
+// notCarried are vocabulary features no IR field carries; the ledger derives them from script text.
+var notCarried = map[caps.Feature]bool{caps.ScriptInterpolation: true}
+
+// opaqueCarriers are the features whose generated fields can hold an expr.Opaque.
+var opaqueCarriers = []caps.Feature{
+	caps.JobIf, caps.StepIf, caps.PipelineEnv, caps.JobEnv, caps.StepEnv, caps.StepAction, caps.JobServices,
+}
 
 // implied lists parent features a child feature always drags in.
 var implied = map[caps.Feature]caps.Feature{
@@ -35,14 +40,20 @@ func TestFeaturesCoversEveryField(t *testing.T) {
 				want[parent] = true
 			}
 		}
+		// Opaque is the only Expr type, so if-features need it and it needs a carrier.
+		if !want[caps.ExprOpaque] {
+			want[caps.JobIf], want[caps.StepIf] = false, false
+		}
+		carried := false
+		for _, c := range opaqueCarriers {
+			carried = carried || want[c]
+		}
+		if !carried {
+			want[caps.ExprOpaque] = false
+		}
 		p := irtest.GenProject(t, func(f caps.Feature) bool { return want[f] })
 		got := map[caps.Feature]bool{}
-		seen := map[ir.FeatureUse]bool{}
 		for _, u := range ir.Features(p) {
-			if seen[u] {
-				t.Fatalf("duplicate entry %+v", u)
-			}
-			seen[u] = true
 			got[u.Feature] = true
 		}
 		for f, w := range want {
@@ -185,5 +196,40 @@ func TestFeaturesPathsAndOneEntryPerPair(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got\n%v\nwant\n%v", got, want)
+	}
+}
+
+func TestFeaturesOneEntryPerPathFeaturePair(t *testing.T) {
+	op := ir.Value{Kind: ir.ValueExpr, Expr: expr.Opaque{Dialect: "gha", Text: "x"}}
+	p := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "p", Env: []ir.Var{{Name: "A", Value: op}}, Jobs: []*ir.Job{
+		{ID: "a"},
+		{
+			ID: "b", If: expr.Opaque{Dialect: "gha", Text: "y"},
+			Needs: []ir.Need{{JobID: "a"}, {JobID: "a", Artifacts: true}},
+			Steps: []*ir.Step{{ID: "s", Env: []ir.Var{{Name: "X", Value: op}, {Name: "Y", Value: op}}, With: map[string]ir.Value{"k": op, "l": op}}},
+		},
+	}}}}
+	counts := map[ir.FeatureUse]int{}
+	for _, u := range ir.Features(p) {
+		counts[u]++
+	}
+	want := []ir.FeatureUse{
+		{IRPath: "pipeline/p", Feature: caps.PipelineEnv},
+		{IRPath: "pipeline/p", Feature: caps.ExprOpaque},
+		{IRPath: "pipeline/p/job/b", Feature: caps.JobNeeds},
+		{IRPath: "pipeline/p/job/b", Feature: caps.JobNeedsArtifacts},
+		{IRPath: "pipeline/p/job/b", Feature: caps.JobIf},
+		{IRPath: "pipeline/p/job/b", Feature: caps.ExprOpaque},
+		{IRPath: "pipeline/p/job/b/step/s", Feature: caps.StepEnv},
+		{IRPath: "pipeline/p/job/b/step/s", Feature: caps.StepAction},
+		{IRPath: "pipeline/p/job/b/step/s", Feature: caps.ExprOpaque},
+	}
+	if len(counts) != len(want) {
+		t.Fatalf("got %v, want %d distinct entries", counts, len(want))
+	}
+	for _, w := range want {
+		if counts[w] != 1 {
+			t.Errorf("%+v reported %d times", w, counts[w])
+		}
 	}
 }

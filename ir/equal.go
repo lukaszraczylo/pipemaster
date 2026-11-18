@@ -7,10 +7,16 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
-// Equal reports whether two projects are the same after normalisation and returns a diff when not.
-// Inputs are not modified; nil and empty collections compare equal.
+// Equal reports whether two projects are semantically the same after normalisation and returns a diff when not.
+// Origin is provenance and is ignored. Inputs are not modified; nil and empty collections compare equal.
 func Equal(a, b *Project) (bool, string) {
 	ca, cb := clone(a), clone(b)
+	if ca != nil {
+		ca.Origin = Origin{}
+	}
+	if cb != nil {
+		cb.Origin = Origin{}
+	}
 	Normalize(ca)
 	Normalize(cb)
 	d := cmp.Diff(ca, cb, cmpopts.EquateEmpty())
