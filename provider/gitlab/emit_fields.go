@@ -5,6 +5,7 @@ import (
 	"maps"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -128,7 +129,14 @@ func (e *emitter) tags(path string, r ir.Runner) (*yaml.Node, error) {
 		if err != nil {
 			return nil, err
 		}
+		if strings.TrimSpace(t) == "" {
+			e.lose(path, caps.JobRunner, "label "+l+" has no GitLab text and becomes no tag")
+			continue
+		}
 		out.Content = append(out.Content, str(t))
+	}
+	if len(out.Content) == 0 {
+		return nil, nil
 	}
 	return out, nil
 }

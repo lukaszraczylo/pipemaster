@@ -1,0 +1,13 @@
+name: expression label
+on: push
+jobs:
+  test:
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    strategy:
+      matrix:
+        include:
+          - python: '3.13'
+          - python: '3.14'
+            os: macos-latest
+    steps:
+      - run: echo test

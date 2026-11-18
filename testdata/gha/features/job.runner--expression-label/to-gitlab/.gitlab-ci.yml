@@ -1,0 +1,17 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+# pipemaster:lost script.interpolation pipeline/ci/job/test: {{ matrix.os || 'ubuntu-latest' }}
+test:
+  needs: []
+  script:
+    # pipemaster:step test-step-1
+    - echo test
+  parallel:
+    matrix:
+      - python:
+          - "3.13"
+      - os:
+          - macos-latest
+        python:
+          - "3.14"

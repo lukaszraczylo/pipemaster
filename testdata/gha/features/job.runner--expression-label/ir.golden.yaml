@@ -1,0 +1,31 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/ci.yml
+pipelines:
+    - id: ci
+      name: expression label
+      triggers:
+        - kind: push
+      jobs:
+        - matrix:
+            include:
+                - - key: python
+                    value: "3.13"
+                - - key: os
+                    value: macos-latest
+                  - key: python
+                    value: "3.14"
+          id: test
+          runner:
+            labels:
+                - ${{ matrix.os || 'ubuntu-latest' }}
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: test-step-1
+              kind: script
+              script:
+                - echo test
