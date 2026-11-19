@@ -68,7 +68,11 @@ func (e *emitter) preSteps(c jobCtx, jp string, j *ir.Job) ([]*yaml.Node, error)
 			m := newMap()
 			m.set("uses", str(actionString(ref)))
 			if name != "" {
-				m.set("with", withOf("name", str(name)))
+				nn, err := e.templateNode(jp, name)
+				if err != nil {
+					return nil, err
+				}
+				m.set("with", withOf("name", nn))
 			}
 			out = append(out, marked(m, emitkit.Marker(caps.JobNeedsArtifacts, jp)))
 		}
@@ -153,7 +157,11 @@ func (e *emitter) postSteps(jp string, j *ir.Job) ([]*yaml.Node, error) {
 			return nil, err
 		}
 		with := newMap()
-		with.set("name", str(artifactName(j, i, a)))
+		nn, err := e.templateNode(jp, artifactName(j, i, a))
+		if err != nil {
+			return nil, err
+		}
+		with.set("name", nn)
 		with.set("path", pathNode(a.Paths))
 		if a.Expire != "" {
 			if days, ok := retentionDays(a.Expire); ok {

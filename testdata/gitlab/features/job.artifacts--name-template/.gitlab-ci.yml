@@ -1,0 +1,7 @@
+build:
+  script:
+    - make
+  artifacts:
+    name: pkg-$CI_COMMIT_SHA
+    paths:
+      - out/
