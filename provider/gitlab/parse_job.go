@@ -158,7 +158,7 @@ func (s *state) jobScripts(j *ir.Job, r *reader) error {
 			secs[i] = nil
 		}
 	}
-	if secs[0] == nil && secs[1] == nil && secs[2] == nil {
+	if secs[1] == nil {
 		r.keep(ExtNoScript, true)
 	}
 	var after []string

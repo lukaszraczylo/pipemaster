@@ -539,3 +539,21 @@ func TestEmptyScriptSectionOverrideRoundTrips(t *testing.T) {
 		t.Errorf("second parse differs: %s", diff)
 	}
 }
+
+// A job that adds a before_script to a template job has no script key, and Emit must not add one.
+func TestBeforeScriptWithoutScriptRoundTrips(t *testing.T) {
+	src := "include:\n  - template: Security/SAST.gitlab-ci.yml\nsast:\n  before_script:\n    - bundle install\n"
+	proj, _ := parseFiles(t, map[string]string{".gitlab-ci.yml": src})
+	files, _, err := gitlab.New().Emit(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(files[".gitlab-ci.yml"])
+	if strings.Contains(out, "\n  script:") {
+		t.Errorf("emitted a script key:\n%s", out)
+	}
+	again, _ := parseFiles(t, map[string]string{".gitlab-ci.yml": out})
+	if eq, diff := ir.Equal(proj, again); !eq {
+		t.Errorf("second parse differs: %s", diff)
+	}
+}
