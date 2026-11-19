@@ -241,3 +241,62 @@ func TestPlaceholderJobAloneIsCollapsed(t *testing.T) {
 		t.Errorf("jobs = %d, want 0", n)
 	}
 }
+
+func finallyProject(t *testing.T) *ir.Project {
+	t.Helper()
+	p := baseProject(t)
+	p.Origin = ir.Origin{Provider: "gitlab", Dialect: "gitlab"}
+	p.Pipelines[0].Finally = []*ir.Job{{
+		ID: "cleanup", Runner: ir.Runner{Labels: []string{"ubuntu-latest"}},
+		Steps: []*ir.Step{{ID: "c1", Kind: ir.StepScript, Script: []string{"make clean"}}},
+	}}
+	return p
+}
+
+func emitFinally(t *testing.T, edit func(string) string) (*ir.Project, *report.Report) {
+	t.Helper()
+	files, _, err := gha.New(gha.GHA).Emit(finallyProject(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string][]byte{}
+	for n, b := range files {
+		out[n] = []byte(edit(string(b)))
+	}
+	return parseGHAText(t, out)
+}
+
+func finallyNeeds(p *ir.Project) []string {
+	for _, j := range p.Pipelines[0].Finally {
+		var ids []string
+		for _, n := range j.Needs {
+			ids = append(ids, n.JobID)
+		}
+		return ids
+	}
+	return nil
+}
+
+func TestFinallyNeedsRestoreWhenUnedited(t *testing.T) {
+	back, _ := emitFinally(t, func(s string) string { return s })
+	if got := finallyNeeds(back); len(got) != 0 {
+		t.Errorf("needs = %v, want the original empty list", got)
+	}
+}
+
+func TestEditedFinallyNeedsKeepParsedAndNote(t *testing.T) {
+	back, rep := emitFinally(t, func(s string) string {
+		i := strings.Index(s, "\n  cleanup:")
+		return s[:i] + strings.Replace(s[i:], "      - deploy\n", "", 1)
+	})
+	if got := finallyNeeds(back); len(got) == 0 {
+		t.Errorf("needs = %v, want the edited list kept", got)
+	}
+	found := false
+	for _, e := range rep.Entries {
+		found = found || strings.Contains(e.Detail, "marker ignored")
+	}
+	if !found {
+		t.Error("no marker ignored note")
+	}
+}

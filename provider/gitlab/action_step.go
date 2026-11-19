@@ -166,22 +166,20 @@ func collapseActionStep(c *collapseCtx, a actionStepArg) bool {
 	}
 	at := slices.IndexFunc(j.Steps, func(o *ir.Step) bool { return o.ID == st.ID })
 	if at >= 0 && len(j.Steps[at].Script) > 0 {
+		c.ignore(editedNote(st.ID, "script"))
 		return false
 	}
+	var done bool
 	switch a.Kind {
 	case actCache:
-		if a.Cache == nil || !removeCache(j, *a.Cache) {
-			return false
-		}
+		done = a.Cache != nil && removeCache(j, *a.Cache)
 	case actUpload:
-		if a.Art == nil || !removeUpload(j, *a.Art) {
-			return false
-		}
+		done = a.Art != nil && removeUpload(j, *a.Art)
 	case actDownload:
-		if !restoreNeeds(j, a.Jobs) {
-			return false
-		}
-	default:
+		done = restoreNeeds(j, a.Jobs)
+	}
+	if !done {
+		c.ignore(editedNote(st.ID, a.Kind))
 		return false
 	}
 	if at >= 0 {
@@ -191,6 +189,10 @@ func collapseActionStep(c *collapseCtx, a actionStepArg) bool {
 	}
 	j.Steps = slices.Insert(j.Steps, min(max(a.Pos, 0), len(j.Steps)), st)
 	return true
+}
+
+func editedNote(step, what string) string {
+	return "marker ignored: file edited, so the parsed " + what + " stands and step " + step + " is not restored"
 }
 
 func cutStepPath(path string) (jobPath, stepID string, ok bool) {
