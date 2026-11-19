@@ -224,3 +224,20 @@ func TestStatusGuardedConditionRestoresUnedited(t *testing.T) {
 		}
 	}
 }
+
+// A placeholder job that gained a real step is the author's job now and must stay.
+func TestPlaceholderJobWithRealStepIsKept(t *testing.T) {
+	src := "# pipemaster:emulated step.script pipeline/ci\non: push\njobs:\n  pipemaster-empty:\n    runs-on: ubuntu-latest\n    steps:\n      - run: \"true\"\n      - run: make build\n"
+	proj, _ := parse(t, map[string]string{"ci.yml": src})
+	if n := len(proj.Pipelines[0].Jobs); n != 1 {
+		t.Errorf("jobs = %d, want the edited placeholder kept", n)
+	}
+}
+
+func TestPlaceholderJobAloneIsCollapsed(t *testing.T) {
+	src := "# pipemaster:emulated step.script pipeline/ci\non: push\njobs:\n  pipemaster-empty:\n    runs-on: ubuntu-latest\n    steps:\n      - run: \"true\"\n"
+	proj, _ := parse(t, map[string]string{"ci.yml": src})
+	if n := len(proj.Pipelines[0].Jobs); n != 0 {
+		t.Errorf("jobs = %d, want 0", n)
+	}
+}
