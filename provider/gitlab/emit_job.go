@@ -172,7 +172,7 @@ func (e *emitter) jobNode(c *pipeCtx, p *jobPrep) (*yaml.Node, []string, error) 
 	ext := extOf(j.Ext)
 	finally := c.isFinally(j.ID)
 	m := newMap()
-	skip := map[string]bool{"stage": true, ExtDerivedNeeds: true, extNeedsKey: true, ExtNeedsExtra: true, "rules": true}
+	skip := map[string]bool{"stage": true, ExtDerivedNeeds: true, ExtNoScript: true, extNeedsKey: true, ExtNeedsExtra: true, "rules": true}
 	if s := c.plan.stage[j.ID]; s != "" {
 		m.set("stage", str(s))
 	}
@@ -300,6 +300,8 @@ func (e *emitter) scriptKeys(m *omap, p *jobPrep, ext map[string]any) error {
 		}
 	}
 	_, isTrigger := ext["trigger"]
+	noScript, _ := ext[ExtNoScript].(bool)
+	isTrigger = isTrigger || noScript
 	hasAny := false
 	for _, s := range sectionOrder {
 		hasAny = hasAny || len(p.sections[s]) > 0

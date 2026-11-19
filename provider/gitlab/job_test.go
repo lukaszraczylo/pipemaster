@@ -503,3 +503,21 @@ func TestCacheNestedListIsFlattened(t *testing.T) {
 		t.Errorf("cache = %+v, want %+v", got, want)
 	}
 }
+
+// A job that overrides a job from a remote template has no script, and GitLab merges the template's in.
+func TestScriptlessJobStaysScriptless(t *testing.T) {
+	src := "include:\n  - template: Security/Container-Scanning.gitlab-ci.yml\ncontainer_scanning:\n  stage: test\n  variables:\n    TAG: edge\n"
+	proj, _ := parseFiles(t, map[string]string{".gitlab-ci.yml": src})
+	files, _, err := gitlab.New().Emit(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(files[".gitlab-ci.yml"])
+	if strings.Contains(out, "script:") {
+		t.Errorf("emitted a script for a job that has none:\n%s", out)
+	}
+	again, _ := parseFiles(t, map[string]string{".gitlab-ci.yml": out})
+	if eq, diff := ir.Equal(proj, again); !eq {
+		t.Errorf("second parse differs: %s", diff)
+	}
+}

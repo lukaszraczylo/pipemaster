@@ -153,6 +153,9 @@ func (s *state) jobScripts(j *ir.Job, r *reader) error {
 	for i, name := range []string{"before_script", "script", "after_script"} {
 		secs[i] = r.take(name)
 	}
+	if secs[0] == nil && secs[1] == nil && secs[2] == nil {
+		r.keep(ExtNoScript, true)
+	}
 	var after []string
 	if secs[2] != nil {
 		lines, err := s.scriptLines(secs[2], "after_script")

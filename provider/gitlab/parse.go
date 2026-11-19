@@ -18,6 +18,7 @@ import (
 const (
 	ExtDerivedNeeds = "_derived_needs"
 	ExtSection      = "section"
+	ExtNoScript     = "_no_script"
 
 	extHidden    = "hidden"
 	extInclude   = "include"
