@@ -34,7 +34,7 @@ func TestStaleRefuses(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := meta.Load(os.DirFS(gl), nil)
+	m, err := loadTop(os.DirFS(gl), nil)
 	if err != nil || m == nil {
 		t.Fatalf("load meta: %v %v", m, err)
 	}
@@ -138,7 +138,7 @@ func TestForeignEmbeddedBlockInAnotherFileIsIgnored(t *testing.T) {
 	src := t.TempDir()
 	workflow := "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make\n"
 	// The block lists a file this repository lacks, so applying it would report the run as stale.
-	foreign := meta.Embed(map[string][]byte{"docs/example-converted.yml": []byte("a: 1\n"), "other/ci.yml": []byte("b: 1\n")},
+	foreign := embedOne(map[string][]byte{"docs/example-converted.yml": []byte("a: 1\n"), "other/ci.yml": []byte("b: 1\n")},
 		&meta.Meta{Version: meta.Version, Source: "gitlab", Dialect: "gitlab"})
 	for name, body := range map[string][]byte{".github/workflows/ci.yml": []byte(workflow), "docs/example-converted.yml": foreign["docs/example-converted.yml"]} {
 		path := filepath.Join(src, name)

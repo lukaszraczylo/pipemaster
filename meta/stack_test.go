@@ -93,8 +93,8 @@ func TestLoadV1AsOneLayer(t *testing.T) {
 	}
 }
 
-func TestLoadWrapperReadsV1(t *testing.T) {
-	m, err := Load(os.DirFS("../testdata/meta/v1-sidecar"), nil)
+func TestLoadStackTopReadsV1(t *testing.T) {
+	m, err := load(os.DirFS("../testdata/meta/v1-sidecar"), nil)
 	if err != nil || m == nil || m.Source != "gha" {
 		t.Fatalf("got %+v, %v", m, err)
 	}

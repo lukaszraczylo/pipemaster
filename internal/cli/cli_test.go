@@ -239,14 +239,14 @@ func TestConvertOrphanReported(t *testing.T) {
 	}
 }
 
-func TestConvertMetaIgnoredForOtherTarget(t *testing.T) {
+func TestConvertStaleExit4ForOtherTarget(t *testing.T) {
 	src, mid, back := t.TempDir(), t.TempDir(), t.TempDir()
 	write(t, src, "fake.cfg", "job build\n")
 	run(t, "convert", src, "--to", "fake2", "-o", mid)
-	write(t, mid, "fake2.cfg", "job build\njob extra\n") // stale, but target != source
-	// meta says source=fake; converting fake2 -> fake2 is not a return trip
-	code, _, errs := run(t, "convert", mid, "--to", "fake2", "-o", back)
-	if code != 0 {
+	write(t, mid, "fake2.cfg", "job build\njob extra\n")
+	// The edited file is stale whatever the target, so a hop that is not a return refuses it too.
+	code, _, errs := run(t, "convert", mid, "--to", "fake3", "-o", back)
+	if code != 4 || !strings.Contains(errs, "fake2.cfg") {
 		t.Fatalf("code=%d stderr=%q", code, errs)
 	}
 }

@@ -17,11 +17,6 @@ const (
 	wrapWidth   = 76
 )
 
-// Embed appends the metadata block to the lexically first file and returns a new map.
-func Embed(files map[string][]byte, m *Meta) map[string][]byte {
-	return EmbedStack(files, &Stack{Layers: []*Meta{m}})
-}
-
 // EmbedStack appends the stack block to the lexically first file and returns a new map. It writes no block
 // for an empty stack. A first file without a trailing newline gains one, and the top layer's hash covers that form.
 func EmbedStack(files map[string][]byte, s *Stack) map[string][]byte {

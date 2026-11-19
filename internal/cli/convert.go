@@ -9,11 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
-	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/meta"
 	"github.com/lukaszraczylo/pipemaster/report"
 	"github.com/lukaszraczylo/pipemaster/validate"
@@ -66,25 +64,39 @@ func runConvert(args []string, _, stderr io.Writer) int {
 	if rep == nil {
 		rep = &report.Report{}
 	}
-	if code := applyStoredMeta(proj, rep, srcFS, tgt.ID(), *force, stderr); code != exitOK {
-		return code
+	stack, err := meta.LoadStack(srcFS, proj.Origin.Files)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "load metadata: %v\n", err)
+		return exitError
+	}
+	res, err := roundtrip.Hop(proj, stack, srcFS, src.ID(), tgt.ID(), *force, rep)
+	if errors.Is(err, meta.ErrStale) {
+		_, _ = fmt.Fprintf(stderr, "%v\nuse --force to convert anyway\n", err)
+		return exitStale
+	}
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "%v\n", err)
+		return exitError
 	}
 	files, emitRep, err := tgt.Emit(proj)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "emit %s: %v\n", tgt.ID(), err)
 		return exitError
 	}
-	m := roundtrip.NewMeta(src.ID(), proj, tgt, emitRep)
-	if err := roundtrip.RecordEmitted(m, tgt, files); err != nil {
-		addMetaGap(emitRep, err)
+	if !res.Restored {
+		m := roundtrip.NewMeta(src.ID(), proj, tgt, emitRep)
+		if err := roundtrip.RecordEmitted(m, tgt, files); err != nil {
+			addMetaGap(emitRep, err)
+		}
+		res.Out.Layers = append(res.Out.Layers, m)
 	}
 	rep.Merge(emitRep)
 	rep.Source, rep.Target = src.ID(), tgt.ID()
 
 	if *embed {
-		files = meta.Embed(files, m)
+		files = meta.EmbedStack(files, res.Out)
 	} else {
-		files = meta.Attach(files, m)
+		files = meta.AttachStack(files, res.Out)
 	}
 	if !validateAll(tgt.ID(), files, stderr) {
 		return exitError
@@ -103,47 +115,6 @@ func runConvert(args []string, _, stderr io.Writer) int {
 	return exitOK
 }
 
-// applyStoredMeta restores round-trip metadata into proj when converting
-// back to the provider that wrote it. Orphaned paths are added to rep.
-func applyStoredMeta(proj *ir.Project, rep *report.Report, srcFS fs.FS, targetID string, force bool, stderr io.Writer) int {
-	m, err := meta.Load(srcFS, proj.Origin.Files)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "load metadata: %v\n", err)
-		return exitError
-	}
-	if m == nil || m.Source != targetID {
-		return exitOK
-	}
-	stale, err := m.Stale(srcFS)
-	switch {
-	case errors.Is(err, meta.ErrStale) && !force:
-		_, _ = fmt.Fprintf(stderr, "round-trip metadata is stale; files changed since conversion: %s\nuse --force to convert anyway\n", strings.Join(stale, ", "))
-		return exitStale
-	case err != nil && !errors.Is(err, meta.ErrStale):
-		_, _ = fmt.Fprintf(stderr, "check metadata: %v\n", err)
-		return exitError
-	}
-	if len(stale) > 0 {
-		orphans, kept := roundtrip.RestoreKeepingEdits(proj, m)
-		addOrphans(rep, orphans)
-		addEdited(rep, kept)
-		return exitOK
-	}
-	addOrphans(rep, roundtrip.Restore(proj, m))
-	return exitOK
-}
-
-func addOrphans(rep *report.Report, orphans []string) {
-	for _, path := range orphans {
-		rep.Add(report.Entry{
-			IRPath:  path,
-			Feature: caps.ExtPassthrough,
-			Level:   caps.Lost,
-			Detail:  fmt.Sprintf("stored metadata for %s matches no node in the converted pipeline", path),
-		})
-	}
-}
-
 // addMetaGap reports that the metadata lacks its emitted-form record, so --force cannot restore lost fields
 // over an edited file.
 func addMetaGap(rep *report.Report, err error) {
@@ -153,18 +124,6 @@ func addMetaGap(rep *report.Report, err error) {
 		Level:   caps.Lost,
 		Detail:  fmt.Sprintf("round-trip metadata has no record of the emitted form (%v); a later --force run keeps the edited file and restores no lost fields", err),
 	})
-}
-
-// addEdited reports each node where stored metadata differed from the edited file and the file won.
-func addEdited(rep *report.Report, paths []string) {
-	for _, path := range paths {
-		rep.Add(report.Entry{
-			IRPath:  path,
-			Feature: caps.ExtPassthrough,
-			Level:   caps.Lost,
-			Detail:  fmt.Sprintf("%s was edited after conversion; stored metadata not applied (--force keeps the edited file)", path),
-		})
-	}
 }
 
 // validateAll checks every emitted file except the sidecar. A provider with

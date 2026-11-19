@@ -129,11 +129,6 @@ func reattach(p *ir.Project, m *Meta, keepEdits bool) (orphans, kept []string) {
 	return orphans, sortedKeys(keptSet)
 }
 
-// Attach records hashes of files in m and returns a copy of files plus the sidecar.
-func Attach(files map[string][]byte, m *Meta) map[string][]byte {
-	return AttachStack(files, &Stack{Layers: []*Meta{m}})
-}
-
 // Stale lists files in m that are missing or whose content changed, wrapping ErrStale when any exist.
 func (m *Meta) Stale(fsys fs.FS) ([]string, error) {
 	var stale []string
@@ -153,15 +148,6 @@ func (m *Meta) Stale(fsys fs.FS) ([]string, error) {
 		return stale, fmt.Errorf("%w: %v", ErrStale, stale)
 	}
 	return nil, nil
-}
-
-// Load reads the top layer of the stack, or nil when there is none.
-func Load(fsys fs.FS, parsed []string) (*Meta, error) {
-	s, err := LoadStack(fsys, parsed)
-	if err != nil {
-		return nil, err
-	}
-	return s.Top(), nil
 }
 
 func hash(b []byte) string {

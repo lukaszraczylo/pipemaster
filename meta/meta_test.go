@@ -68,7 +68,7 @@ func TestCollect(t *testing.T) {
 func TestAttachWritesSidecar(t *testing.T) {
 	in := map[string][]byte{"a.yml": []byte("a: 1\n"), "b.yml": []byte("b: 2\n")}
 	m := testMeta()
-	out := Attach(in, m)
+	out := attach(in, m)
 	if _, ok := in[SidecarPath]; ok {
 		t.Fatal("input map mutated")
 	}
@@ -88,8 +88,8 @@ func TestAttachWritesSidecar(t *testing.T) {
 
 func TestLoadSidecar(t *testing.T) {
 	m := testMeta()
-	out := Attach(map[string][]byte{"a.yml": []byte("a: 1\n")}, m)
-	got, err := Load(asFS(out), []string{"a.yml", "b.yml"})
+	out := attach(map[string][]byte{"a.yml": []byte("a: 1\n")}, m)
+	got, err := load(asFS(out), []string{"a.yml", "b.yml"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestLoadSidecar(t *testing.T) {
 }
 
 func TestLoadAbsent(t *testing.T) {
-	got, err := Load(asFS(map[string][]byte{"a.yml": []byte("a: 1\n")}), []string{"a.yml"})
+	got, err := load(asFS(map[string][]byte{"a.yml": []byte("a: 1\n")}), []string{"a.yml"})
 	if got != nil || err != nil {
 		t.Fatalf("got %v, %v; want nil, nil", got, err)
 	}
@@ -107,7 +107,7 @@ func TestLoadAbsent(t *testing.T) {
 
 func TestLoadRejectsBadVersion(t *testing.T) {
 	fsys := asFS(map[string][]byte{SidecarPath: []byte("version: 3\n")})
-	if _, err := Load(fsys, nil); err == nil {
+	if _, err := load(fsys, nil); err == nil {
 		t.Fatal("want version error")
 	}
 }
@@ -119,7 +119,7 @@ func TestLoadMalformedEmbedded(t *testing.T) {
 		"bad yaml":   "a: 1\n# pipemaster:meta:begin\n# " + "Zm9vOiBbMQ==" + "\n# pipemaster:meta:end\n",
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, err := Load(asFS(map[string][]byte{"a.yml": []byte(body)}), []string{"a.yml"}); err == nil {
+			if _, err := load(asFS(map[string][]byte{"a.yml": []byte(body)}), []string{"a.yml"}); err == nil {
 				t.Fatal("want error")
 			}
 		})
@@ -129,7 +129,7 @@ func TestLoadMalformedEmbedded(t *testing.T) {
 func TestEmbedExtractRoundTrip(t *testing.T) {
 	in := map[string][]byte{"z.yml": []byte("z: 1\n"), "a.yml": []byte("a: 1")}
 	m := testMeta()
-	out := Embed(in, m)
+	out := embed(in, m)
 	if len(out) != 2 {
 		t.Fatalf("Embed must not add files, got %d", len(out))
 	}
@@ -145,7 +145,7 @@ func TestEmbedExtractRoundTrip(t *testing.T) {
 			t.Errorf("bad line %q (%d)", l, len(l))
 		}
 	}
-	got, err := Load(asFS(out), []string{"a.yml", "b.yml"})
+	got, err := load(asFS(out), []string{"a.yml", "b.yml"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +166,7 @@ func TestStripEmbeddedNoBlock(t *testing.T) {
 
 func TestStaleDetectsEdit(t *testing.T) {
 	m := testMeta()
-	out := Attach(map[string][]byte{"a.yml": []byte("a: 1\n"), "b.yml": []byte("b: 2\n"), "c.yml": []byte("c: 3\n")}, m)
+	out := attach(map[string][]byte{"a.yml": []byte("a: 1\n"), "b.yml": []byte("b: 2\n"), "c.yml": []byte("c: 3\n")}, m)
 	if stale, err := m.Stale(asFS(out)); err != nil || len(stale) != 0 {
 		t.Fatalf("clean tree: %v, %v", stale, err)
 	}
@@ -183,8 +183,8 @@ func TestStaleDetectsEdit(t *testing.T) {
 
 func TestStaleIgnoresEmbeddedBlock(t *testing.T) {
 	m := testMeta()
-	out := Embed(map[string][]byte{"a.yml": []byte("a: 1\n"), "b.yml": []byte("b: 2\n")}, m)
-	loaded, err := Load(asFS(out), []string{"a.yml", "b.yml"})
+	out := embed(map[string][]byte{"a.yml": []byte("a: 1\n"), "b.yml": []byte("b: 2\n")}, m)
+	loaded, err := load(asFS(out), []string{"a.yml", "b.yml"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,18 +247,18 @@ func TestReattachKeepingEditsNeverOverwrites(t *testing.T) {
 }
 
 func TestLoadScansOnlyParsedFiles(t *testing.T) {
-	foreign := Embed(map[string][]byte{"docs/example-converted.yml": []byte("a: 1\n")}, testMeta())
+	foreign := embed(map[string][]byte{"docs/example-converted.yml": []byte("a: 1\n")}, testMeta())
 	files := map[string][]byte{".github/workflows/ci.yml": []byte("on: push\n")}
 	for k, v := range foreign {
 		files[k] = v
 	}
 	fsys := asFS(files)
 
-	got, err := Load(fsys, []string{".github/workflows/ci.yml"})
+	got, err := load(fsys, []string{".github/workflows/ci.yml"})
 	if err != nil || got != nil {
 		t.Fatalf("a block in a file the provider did not parse must be ignored: %v, %v", got, err)
 	}
-	got, err = Load(fsys, []string{"docs/example-converted.yml"})
+	got, err = load(fsys, []string{"docs/example-converted.yml"})
 	if err != nil || got == nil {
 		t.Fatalf("a block in a parsed file must load: %v, %v", got, err)
 	}
@@ -266,10 +266,10 @@ func TestLoadScansOnlyParsedFiles(t *testing.T) {
 
 func TestLoadIgnoresBlockThatDoesNotListItsFile(t *testing.T) {
 	m := testMeta()
-	files := Embed(map[string][]byte{"a.yml": []byte("a: 1\n")}, m)
+	files := embed(map[string][]byte{"a.yml": []byte("a: 1\n")}, m)
 	// The same block pasted into another parsed file is not metadata for that file.
 	files["b.yml"] = append([]byte("b: 1\n"), files["a.yml"][len("a: 1\n"):]...)
-	got, err := Load(asFS(files), []string{"b.yml"})
+	got, err := load(asFS(files), []string{"b.yml"})
 	if err != nil || got != nil {
 		t.Fatalf("a block whose files omit the holder must be ignored: %v, %v", got, err)
 	}

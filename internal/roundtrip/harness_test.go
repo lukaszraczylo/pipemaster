@@ -13,7 +13,6 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/ir"
-	"github.com/lukaszraczylo/pipemaster/meta"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/gha"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gitlab"
@@ -195,9 +194,9 @@ func hops(t *testing.T, fsA fs.FS, a, b provider.Provider, embed bool, withMeta 
 	switch {
 	case !withMeta:
 	case embed:
-		r.toFiles = meta.Embed(r.toFiles, m)
+		r.toFiles = embedOne(r.toFiles, m)
 	default:
-		r.toFiles = meta.Attach(r.toFiles, m)
+		r.toFiles = attachOne(r.toFiles, m)
 	}
 	r.toFS = toFS(r.toFiles)
 	mid, _, err := b.Parse(r.toFS)
@@ -205,7 +204,7 @@ func hops(t *testing.T, fsA fs.FS, a, b provider.Provider, embed bool, withMeta 
 		t.Fatalf("parse %s: %v", b.ID(), err)
 	}
 	if withMeta {
-		lm, err := meta.Load(r.toFS, mid.Origin.Files)
+		lm, err := loadTop(r.toFS, mid.Origin.Files)
 		if err != nil || lm == nil {
 			t.Fatalf("load meta: %v %v", lm, err)
 		}

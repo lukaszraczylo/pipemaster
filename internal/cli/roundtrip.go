@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"strings"
 	"testing/fstest"
 
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
@@ -14,11 +15,11 @@ import (
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
-const roundtripUsage = "usage: pipemaster roundtrip <dir> --via <provider> [--from <provider>]\n"
+const roundtripUsage = "usage: pipemaster roundtrip <dir> --via <provider>[,<provider>...] [--from <provider>]\n"
 
 func runRoundtrip(args []string, stdout, stderr io.Writer) int {
 	fset := flag.NewFlagSet("roundtrip", flag.ContinueOnError)
-	via := fset.String("via", "", "intermediate provider")
+	via := fset.String("via", "", "intermediate providers, comma separated")
 	from := fset.String("from", "", "source provider")
 	pos, ok := parseArgs(fset, args, 1, roundtripUsage, stderr)
 	if !ok {
@@ -32,9 +33,13 @@ func runRoundtrip(args []string, stdout, stderr io.Writer) int {
 	if !ok {
 		return code
 	}
-	mid, ok := getProvider(*via, stderr)
-	if !ok {
-		return exitUsage
+	var mids []provider.Provider
+	for _, id := range strings.Split(*via, ",") {
+		mid, ok := getProvider(strings.TrimSpace(id), stderr)
+		if !ok {
+			return exitUsage
+		}
+		mids = append(mids, mid)
 	}
 
 	rep := &report.Report{Source: src.ID(), Target: src.ID()}
@@ -45,39 +50,21 @@ func runRoundtrip(args []string, stdout, stderr io.Writer) int {
 	}
 	rep.Merge(r)
 
-	midFS, err := hop(orig, nil, src.ID(), mid, rep, true)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "%v\n", err)
-		return exitError
+	cur, curFS, stack, prev := orig, srcFS, &meta.Stack{}, src
+	for _, next := range append(mids, src) {
+		cur, curFS, stack, err = hop(cur, curFS, stack, prev, next, rep)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "%v\n", err)
+			return exitError
+		}
+		prev = next
 	}
-	midProj, r, err := mid.Parse(midFS)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "parse %s: %v\n", mid.ID(), err)
-		return exitError
-	}
-	rep.Merge(r)
-	m, err := meta.Load(midFS, midProj.Origin.Files)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "load metadata: %v\n", err)
-		return exitError
-	}
-	backFS, err := hop(midProj, m, "", src, rep, false)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "%v\n", err)
-		return exitError
-	}
-	back, r, err := src.Parse(backFS)
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "parse %s: %v\n", src.ID(), err)
-		return exitError
-	}
-	rep.Merge(r)
 
 	if err := rep.Render(stderr, "text"); err != nil {
 		_, _ = fmt.Fprintf(stderr, "render report: %v\n", err)
 		return exitError
 	}
-	if same, diff := ir.Equal(orig, back); !same {
+	if same, diff := ir.Equal(orig, cur); !same {
 		_, _ = fmt.Fprint(stdout, diff)
 		return exitError
 	}
@@ -85,27 +72,37 @@ func runRoundtrip(args []string, stdout, stderr io.Writer) int {
 	return exitOK
 }
 
-// hop emits proj through p into memory. Going out it attaches fresh metadata
-// from sourceID; coming back it restores m, whose Source is the target.
-func hop(proj *ir.Project, m *meta.Meta, sourceID string, p provider.Provider, rep *report.Report, attach bool) (fs.FS, error) {
-	if m != nil {
-		addOrphans(rep, roundtrip.Restore(proj, m))
-	}
-	files, r, err := p.Emit(proj)
+// hop converts proj, parsed from fsys as from, to the provider to in memory. It returns the project that
+// to's parser reads back and the metadata stack read back with it.
+func hop(proj *ir.Project, fsys fs.FS, in *meta.Stack, from, to provider.Provider, rep *report.Report) (*ir.Project, fs.FS, *meta.Stack, error) {
+	res, err := roundtrip.Hop(proj, in, fsys, from.ID(), to.ID(), false, rep)
 	if err != nil {
-		return nil, fmt.Errorf("emit %s: %w", p.ID(), err)
+		return nil, nil, nil, err
+	}
+	files, r, err := to.Emit(res.Proj)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("emit %s: %w", to.ID(), err)
 	}
 	rep.Merge(r)
-	if attach {
-		m := roundtrip.NewMeta(sourceID, proj, p, r)
-		if err := roundtrip.RecordEmitted(m, p, files); err != nil {
+	if !res.Restored {
+		m := roundtrip.NewMeta(from.ID(), res.Proj, to, r)
+		if err := roundtrip.RecordEmitted(m, to, files); err != nil {
 			addMetaGap(rep, err)
 		}
-		files = meta.Attach(files, m)
+		res.Out.Layers = append(res.Out.Layers, m)
 	}
 	out := fstest.MapFS{}
-	for name, b := range files {
+	for name, b := range meta.AttachStack(files, res.Out) {
 		out[name] = &fstest.MapFile{Data: b}
 	}
-	return out, nil
+	parsed, r, err := to.Parse(out)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("parse %s: %w", to.ID(), err)
+	}
+	rep.Merge(r)
+	stack, err := meta.LoadStack(out, parsed.Origin.Files)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("load metadata: %w", err)
+	}
+	return parsed, out, stack, nil
 }
