@@ -73,7 +73,23 @@ func (e *emitter) pipelineFile(pls []*ir.Pipeline) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("pipeline %s: %w", pl.ID, err)
 	}
-	return marshalDoc(root)
+	body, err := marshalDoc(root)
+	if err != nil || len(pls) > 1 {
+		return body, err
+	}
+	spec, ok := extOf(pl.Ext)[extSpec].(map[string]any)
+	if !ok {
+		return body, nil
+	}
+	hn, err := specNode(spec, pl.Inputs)
+	if err != nil {
+		return nil, err
+	}
+	head, err := marshalDoc(hn)
+	if err != nil {
+		return nil, err
+	}
+	return append(append(head, "---\n"...), body...), nil
 }
 
 func (e *emitter) document(pl *ir.Pipeline) (*yaml.Node, error) {
@@ -121,7 +137,7 @@ func (e *emitter) document(pl *ir.Pipeline) (*yaml.Node, error) {
 	if err := e.jobEntries(m, c); err != nil {
 		return nil, err
 	}
-	skip := map[string]bool{"include": true, extStages: true, extVariables: true, extWorkflow: true, extDefault: true, extHidden: true}
+	skip := map[string]bool{"include": true, extSpec: true, extStages: true, extVariables: true, extWorkflow: true, extDefault: true, extHidden: true}
 	if err := m.addExtra(ext, skip); err != nil {
 		return nil, err
 	}
@@ -237,7 +253,7 @@ func (e *emitter) pipelineVars(pp string, pl *ir.Pipeline, ext map[string]any) (
 			extras[k] = v
 		}
 	}
-	if len(pl.Inputs) == 0 {
+	if _, header := ext[extSpec]; len(pl.Inputs) == 0 || header {
 		return vars, extras, nil, nil
 	}
 	var kept []ir.Input

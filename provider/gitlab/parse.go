@@ -46,6 +46,7 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		return nil, nil, err
 	}
 	s.remote = len(ld.remote) > 0
+	s.spec = ld.spec
 	if root, err = s.resolveRefs(root); err != nil {
 		return nil, nil, err
 	}
@@ -88,6 +89,9 @@ func (s *state) parsePipeline(root *yaml.Node, remote []any) (*ir.Pipeline, []*j
 		if extras != nil {
 			r.keep(extVariables, extras)
 		}
+	}
+	if err := s.specHeader(pl, r); err != nil {
+		return nil, nil, err
 	}
 	s.takeDefaults(r)
 	if len(remote) > 0 {
@@ -205,4 +209,22 @@ func sortedKeys[V any](m map[string]V) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// specHeader maps the inputs of a spec header document to pipeline inputs and keeps the header in Ext.
+func (s *state) specHeader(pl *ir.Pipeline, r *reader) error {
+	if s.spec == nil {
+		return nil
+	}
+	raw, err := s.plain(s.spec.Content[0])
+	if err != nil {
+		return err
+	}
+	spec, _ := raw.(map[string]any)[extSpec].(map[string]any)
+	if spec == nil {
+		return s.errf(s.spec.Content[0], "spec must be a mapping")
+	}
+	pl.Inputs = specInputList(spec)
+	r.keep(extSpec, spec)
+	return nil
 }

@@ -1,0 +1,50 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - ext:
+        gitlab:
+            spec:
+                inputs:
+                    dry_run:
+                        default: false
+                        type: boolean
+                    env:
+                        default: staging
+                        options:
+                            - staging
+                            - production
+                    image_tag:
+                        default: latest
+                        description: Image tag to deploy
+                        type: string
+      id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      env:
+        - name: TAG
+          value:
+            lit: $[[ inputs.image_tag ]]
+      inputs:
+        - name: dry_run
+          type: boolean
+          default: "false"
+        - name: env
+          default: staging
+        - name: image_tag
+          type: string
+          default: latest
+          description: Image tag to deploy
+      jobs:
+        - id: deploy
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - echo deploy

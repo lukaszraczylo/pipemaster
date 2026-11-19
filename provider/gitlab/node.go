@@ -22,6 +22,7 @@ type state struct {
 	org      map[*yaml.Node]string
 	rep      *report.Report
 	lines    map[string]position
+	spec     *yaml.Node
 	nodes    int
 	includes int
 	remote   bool

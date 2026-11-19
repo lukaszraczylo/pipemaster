@@ -44,6 +44,8 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			collapseFinally(pl, u.IRPath)
 		case caps.JobManual:
 			collapseManual(markedJob(pl, u.IRPath))
+		case caps.PipelineInputs:
+			pl.Triggers = slices.DeleteFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerManual })
 		case caps.TriggerManual:
 			pl.Triggers = slices.DeleteFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerManual })
 		case caps.JobIf:

@@ -1,0 +1,21 @@
+spec:
+  inputs:
+    image_tag:
+      type: string
+      default: latest
+      description: Image tag to deploy
+    dry_run:
+      type: boolean
+      default: false
+    env:
+      options:
+        - staging
+        - production
+      default: staging
+---
+variables:
+  TAG: $[[ inputs.image_tag ]]
+
+deploy:
+  script:
+    - echo deploy

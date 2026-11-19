@@ -1,0 +1,29 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/deploy
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+  # pipemaster:emulated pipeline.inputs pipeline/gitlab-ci
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        default: false
+        type: boolean
+      env:
+        default: staging
+      image_tag:
+        description: Image tag to deploy
+        default: latest
+        type: string
+env:
+  TAG: $[[ inputs.image_tag ]]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: echo deploy

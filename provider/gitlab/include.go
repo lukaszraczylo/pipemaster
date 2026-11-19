@@ -33,6 +33,7 @@ type loader struct {
 	ids     map[string]string
 	files   []string
 	remote  []any
+	spec    *yaml.Node
 	markers []ir.FeatureUse
 }
 
@@ -111,7 +112,18 @@ func (l *loader) parseDoc(name string, src []byte) (*yaml.Node, error) {
 	}
 	var extra yaml.Node
 	if err := dec.Decode(&extra); err == nil {
-		return nil, fmt.Errorf("%s:%d: a CI file holds one YAML document", name, extra.Line)
+		if name != rootFile || !isSpecHeader(&doc) {
+			return nil, fmt.Errorf("%s:%d: a CI file holds one YAML document", name, extra.Line)
+		}
+		header := doc
+		l.spec = &header
+		doc = extra
+		var more yaml.Node
+		if err := dec.Decode(&more); err == nil {
+			return nil, fmt.Errorf("%s:%d: a CI file holds a header document and one configuration document", name, more.Line)
+		} else if !errors.Is(err, io.EOF) {
+			return nil, yamlErr(name, err)
+		}
 	} else if !errors.Is(err, io.EOF) {
 		return nil, yamlErr(name, err)
 	}
@@ -299,4 +311,13 @@ func globRegexp(pat string) (*regexp.Regexp, error) {
 	}
 	sb.WriteString("$")
 	return regexp.Compile(sb.String())
+}
+
+// isSpecHeader is true for a document that holds only the spec keyword, which GitLab reads as a header.
+func isSpecHeader(d *yaml.Node) bool {
+	if d.Kind != yaml.DocumentNode || len(d.Content) != 1 || d.Content[0].Kind != yaml.MappingNode {
+		return false
+	}
+	m := d.Content[0]
+	return len(m.Content) == 2 && m.Content[0].Value == extSpec
 }
