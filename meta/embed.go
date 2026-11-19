@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"slices"
 	"strings"
 )
 
@@ -90,37 +91,30 @@ func lineIndex(b []byte, marker string, from int) int {
 	return -1
 }
 
-func loadEmbedded(fsys fs.FS) (*Meta, error) {
-	var found *Meta
-	var ferr error
-	walkErr := fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			if d.Name() == ".git" {
-				return fs.SkipDir
-			}
-			return nil
-		}
+func loadEmbedded(fsys fs.FS, parsed []string) (*Meta, error) {
+	files := slices.Clone(parsed)
+	slices.Sort(files)
+	for _, path := range files {
 		b, err := fs.ReadFile(fsys, path)
-		if err != nil {
-			return err
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			continue
+		case err != nil:
+			return nil, fmt.Errorf("scan for embedded metadata: %w", err)
 		}
 		start, end, ok := findBlock(b)
 		if !ok {
-			return nil
+			continue
 		}
-		found, ferr = decodeBlock(b[start:end])
-		if ferr != nil {
-			ferr = fmt.Errorf("%s: %w", path, ferr)
+		m, err := decodeBlock(b[start:end])
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
 		}
-		return fs.SkipAll
-	})
-	if walkErr != nil {
-		return nil, fmt.Errorf("scan for embedded metadata: %w", walkErr)
+		if _, ok := m.Files[path]; ok {
+			return m, nil
+		}
 	}
-	return found, ferr
+	return nil, nil
 }
 
 func decodeBlock(blk []byte) (*Meta, error) {

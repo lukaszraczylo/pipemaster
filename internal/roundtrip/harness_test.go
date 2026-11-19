@@ -117,7 +117,7 @@ func hops(t *testing.T, fsA fs.FS, a, b provider.Provider, embed bool, withMeta 
 		t.Fatalf("parse %s: %v", b.ID(), err)
 	}
 	if withMeta {
-		lm, err := meta.Load(r.toFS)
+		lm, err := meta.Load(r.toFS, mid.Origin.Files)
 		if err != nil || lm == nil {
 			t.Fatalf("load meta: %v %v", lm, err)
 		}

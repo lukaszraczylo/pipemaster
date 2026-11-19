@@ -140,8 +140,9 @@ func (m *Meta) Stale(fsys fs.FS) ([]string, error) {
 	return nil, nil
 }
 
-// Load reads the sidecar, else the first embedded block in sorted file order. It returns nil, nil when neither exists.
-func Load(fsys fs.FS) (*Meta, error) {
+// Load reads the sidecar, else the first embedded block in the parsed files, in sorted order. A block counts
+// only when its files list names the file that holds it. It returns nil, nil when neither exists.
+func Load(fsys fs.FS, parsed []string) (*Meta, error) {
 	b, err := fs.ReadFile(fsys, SidecarPath)
 	switch {
 	case err == nil:
@@ -149,7 +150,7 @@ func Load(fsys fs.FS) (*Meta, error) {
 	case !errors.Is(err, fs.ErrNotExist):
 		return nil, fmt.Errorf("read %s: %w", SidecarPath, err)
 	}
-	return loadEmbedded(fsys)
+	return loadEmbedded(fsys, parsed)
 }
 
 func parse(b []byte) (*Meta, error) {

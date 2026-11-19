@@ -56,7 +56,7 @@ func runRoundtrip(args []string, stdout, stderr io.Writer) int {
 		return exitError
 	}
 	rep.Merge(r)
-	m, err := meta.Load(midFS)
+	m, err := meta.Load(midFS, midProj.Origin.Files)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "load metadata: %v\n", err)
 		return exitError

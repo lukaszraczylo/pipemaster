@@ -103,7 +103,7 @@ func runConvert(args []string, _, stderr io.Writer) int {
 // applyStoredMeta restores round-trip metadata into proj when converting
 // back to the provider that wrote it. Orphaned paths are added to rep.
 func applyStoredMeta(proj *ir.Project, rep *report.Report, srcFS fs.FS, targetID string, force bool, stderr io.Writer) int {
-	m, err := meta.Load(srcFS)
+	m, err := meta.Load(srcFS, proj.Origin.Files)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "load metadata: %v\n", err)
 		return exitError
