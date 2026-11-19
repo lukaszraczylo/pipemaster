@@ -115,3 +115,14 @@ func TestPatterns(t *testing.T) {
 		t.Fatalf("drone = %v", got)
 	}
 }
+
+func TestEveryYAMLDocumentIsValidated(t *testing.T) {
+	header := "spec:\n  inputs:\n    t:\n      default: x\n---\n"
+	if err := File(provider.GitLab, ".gitlab-ci.yml", []byte(header+"build:\n  script:\n    - echo hi\n")); err != nil {
+		t.Fatalf("valid header and body: %v", err)
+	}
+	err := File(provider.GitLab, ".gitlab-ci.yml", []byte(header+"build:\n  script: 5\n"))
+	if err == nil || !strings.Contains(err.Error(), "script") {
+		t.Fatalf("an invalid body after a spec header must be rejected, got %v", err)
+	}
+}

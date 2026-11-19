@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"strconv"
 	"sync"
@@ -81,23 +82,55 @@ func File(providerID, name string, data []byte) error {
 		}
 		return fmt.Errorf("compile %s schema: %w", providerID, err)
 	}
-	v, err := toJSONValue(data)
+	docs, err := toJSONValues(data)
 	if err != nil {
 		return fmt.Errorf("%s: %w", name, err)
 	}
+	for _, v := range docs {
+		if err := validateDoc(sch, v); err != nil {
+			return fmt.Errorf("%s: invalid for %s schema: %w", name, providerID, err)
+		}
+	}
+	return nil
+}
+
+// validateDoc checks one decoded YAML document against sch.
+func validateDoc(sch *jsonschema.Schema, v any) error {
 	// Round-trip so numbers take the json.Number form the library requires.
 	b, err := json.Marshal(v)
 	if err != nil {
-		return fmt.Errorf("%s: %w", name, err)
+		return err
 	}
 	inst, err := jsonschema.UnmarshalJSON(bytes.NewReader(b))
 	if err != nil {
-		return fmt.Errorf("%s: %w", name, err)
+		return err
 	}
-	if err := sch.Validate(inst); err != nil {
-		return fmt.Errorf("%s: invalid for %s schema: %w", name, providerID, err)
+	return sch.Validate(inst)
+}
+
+// toJSONValues decodes every document of a multi-document YAML stream.
+func toJSONValues(data []byte) ([]any, error) {
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	var out []any
+	for {
+		var v any
+		err := dec.Decode(&v)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("parse yaml: %w", err)
+		}
+		n, err := normalize(v)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, n)
 	}
-	return nil
+	if len(out) == 0 {
+		return toJSONValues([]byte("null\n"))
+	}
+	return out, nil
 }
 
 func toJSONValue(data []byte) (any, error) {
