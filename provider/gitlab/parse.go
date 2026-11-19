@@ -46,7 +46,7 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	s.remote = len(ld.remote) > 0
+	s.remote = remoteNames(ld.remote)
 	s.spec = ld.spec
 	if root, err = s.resolveRefs(root); err != nil {
 		return nil, nil, err
@@ -228,4 +228,25 @@ func (s *state) specHeader(pl *ir.Pipeline, r *reader) error {
 	pl.Inputs = specInputList(spec)
 	r.keep(extSpec, spec)
 	return nil
+}
+
+// remoteNames names each remote include as "kind: value", the way the file spells it.
+func remoteNames(entries []any) []string {
+	var out []string
+	for _, e := range entries {
+		switch v := e.(type) {
+		case string:
+			out = append(out, "remote: "+v)
+		case map[string]any:
+			name := "include"
+			for _, k := range remoteKinds {
+				if x, ok := v[k]; ok {
+					name = fmt.Sprintf("%s: %v", k, x)
+					break
+				}
+			}
+			out = append(out, name)
+		}
+	}
+	return out
 }

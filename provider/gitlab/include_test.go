@@ -181,3 +181,18 @@ func TestMissingRootFile(t *testing.T) {
 		t.Errorf("error = %v", err)
 	}
 }
+
+// The report names the remote includes a missing target may come from.
+func TestRemoteDependenceNamesTheIncludes(t *testing.T) {
+	src := "include:\n  - project: group/templates\n    file: ci.yml\n  - template: Security/SAST.gitlab-ci.yml\nbuild:\n  extends: .from-remote\n  script: [make]\n"
+	_, rep := parseFiles(t, map[string]string{".gitlab-ci.yml": src})
+	for _, e := range rep.Entries {
+		if strings.Contains(e.Detail, "depends on remote include") {
+			if !strings.Contains(e.Detail, "project: group/templates") || !strings.Contains(e.Detail, "template: Security/SAST.gitlab-ci.yml") || !strings.Contains(e.Detail, ".from-remote") {
+				t.Errorf("detail = %q", e.Detail)
+			}
+			return
+		}
+	}
+	t.Error("no remote dependence entry")
+}

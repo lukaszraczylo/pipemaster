@@ -67,7 +67,7 @@ func (s *state) followRef(n, root *yaml.Node, stack []string) (*yaml.Node, error
 		keys = append(keys, c.Value)
 		cur = get(cur, c.Value)
 		if cur == nil {
-			if s.remote {
+			if len(s.remote) > 0 {
 				return s.remoteRef(n), nil
 			}
 			return nil, s.errf(n, "!reference [%s] points at nothing", strings.Join(keys, ", "))
@@ -103,7 +103,7 @@ func (s *state) extend(name string, jobs jobSet, stack []string) (*yaml.Node, er
 	}
 	for _, p := range parents {
 		if _, ok := jobs[p]; !ok {
-			if s.remote {
+			if len(s.remote) > 0 {
 				s.dependsOnRemote(get(n, extendsKey), "extends "+p)
 				continue
 			}
@@ -180,6 +180,6 @@ func (s *state) remoteRef(n *yaml.Node) *yaml.Node {
 func (s *state) dependsOnRemote(n *yaml.Node, what string) {
 	s.rep.Add(report.Entry{
 		IRPath: "pipeline/" + pipelineID, Feature: caps.ExtPassthrough, Level: caps.Lost, Strategy: "kept as written",
-		Detail: "depends on remote include: " + what, SourceLoc: s.org[n],
+		Detail: "depends on remote include " + strings.Join(s.remote, " or ") + ": " + what, SourceLoc: s.org[n],
 	})
 }

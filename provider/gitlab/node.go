@@ -23,9 +23,9 @@ type state struct {
 	rep      *report.Report
 	lines    map[string]position
 	spec     *yaml.Node
+	remote   []string
 	nodes    int
 	includes int
-	remote   bool
 }
 
 type position struct {

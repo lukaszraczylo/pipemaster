@@ -160,7 +160,7 @@ func (s *state) wire(pl *ir.Pipeline, infos []*jobInfo, stages []string) error {
 	}
 	artifacts := map[string]bool{}
 	for _, i := range infos {
-		if _, ok := idx[i.stage]; !ok && s.remote {
+		if _, ok := idx[i.stage]; !ok && len(s.remote) > 0 {
 			// A remote template declares the stage; it runs after the stages written here.
 			idx[i.stage] = len(order) - 1
 			order = append(order[:len(order)-1], i.stage, stagePost)
