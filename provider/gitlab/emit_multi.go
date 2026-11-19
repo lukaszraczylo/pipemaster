@@ -27,16 +27,18 @@ type foldPipelineArg struct {
 }
 
 type foldedJob struct {
-	cond    expr.Expr
-	origIf  expr.Expr
-	parts   []foldPart
-	path    string
-	pid     string
-	jid     string
-	needs   []ir.Need
-	finally bool
+	cond   expr.Expr
+	origIf expr.Expr
+	// shared names the pipeline variables the copy received, so their losses are reported on the pipeline.
+	shared map[string]bool
+	path   string
+	pid    string
+	jid    string
+	parts  []foldPart
+	needs  []ir.Need
 	// disabled marks a pipeline whose triggers GitLab cannot express: its jobs must not run on another pipeline's trigger.
 	disabled bool
+	finally  bool
 }
 
 // foldPart is the condition and path filter of one trigger.
@@ -215,15 +217,17 @@ func (f *folded) add(pl *ir.Pipeline, j *ir.Job, shared []ir.Var, group string, 
 		cp.Needs[i].JobID = pl.ID + foldSep + n.JobID
 	}
 	cp.Env = append([]ir.Var{}, j.Env...)
+	received := map[string]bool{}
 	for _, v := range shared {
 		if !hasVar(cp.Env, v.Name) {
 			cp.Env = append(cp.Env, v)
+			received[v.Name] = hasVar(pl.Env, v.Name)
 		}
 	}
 	if group != "" {
 		cp.Ext = withGroup(j.Ext, group)
 	}
-	f.jobs[&cp] = foldedJob{needs: j.Needs, pid: pl.ID, jid: j.ID, path: jobPath(pl.ID, j.ID), cond: g.cond, parts: g.parts, disabled: g.disabled, origIf: j.If, finally: finally}
+	f.jobs[&cp] = foldedJob{shared: received, needs: j.Needs, pid: pl.ID, jid: j.ID, path: jobPath(pl.ID, j.ID), cond: g.cond, parts: g.parts, disabled: g.disabled, origIf: j.If, finally: finally}
 	return &cp
 }
 

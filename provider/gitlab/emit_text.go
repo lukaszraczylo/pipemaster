@@ -278,9 +278,15 @@ func (e *emitter) reportLostExpr(path string, lost []string) {
 
 // vars renders a variables mapping in order; extras holds the hash-form keys by variable name.
 func (e *emitter) vars(path string, f caps.Feature, vs []ir.Var, extras any) (*yaml.Node, error) {
+	return e.varsAt(func(ir.Var) (string, caps.Feature) { return path, f }, vs, extras)
+}
+
+// varsAt is vars with a report path and feature chosen per variable.
+func (e *emitter) varsAt(at func(ir.Var) (string, caps.Feature), vs []ir.Var, extras any) (*yaml.Node, error) {
 	ex, _ := extras.(map[string]any)
 	m := newMap()
 	for _, v := range vs {
+		path, f := at(v)
 		t, ok, err := e.value(path, f, v.Value)
 		if err != nil {
 			return nil, err

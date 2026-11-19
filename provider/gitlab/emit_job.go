@@ -285,7 +285,13 @@ func (e *emitter) variablesKey(m *omap, p *jobPrep, ext map[string]any, skip map
 	if len(vars) == 0 {
 		return nil
 	}
-	n, err := e.vars(p.path, caps.JobEnv, vars, ext[extVariables])
+	fj := e.foldJob(p.j)
+	n, err := e.varsAt(func(v ir.Var) (string, caps.Feature) {
+		if fj.shared[v.Name] {
+			return "pipeline/" + fj.pid, caps.PipelineEnv
+		}
+		return p.path, caps.JobEnv
+	}, vars, ext[extVariables])
 	if err != nil {
 		return err
 	}
