@@ -1,0 +1,15 @@
+stages: [build, test]
+
+compile:
+  stage: build
+  script:
+    - make build
+
+cleanup:
+  stage: test
+  when: always
+  needs: [compile]
+  script:
+    - make clean
+  rules:
+    - if: $PIPELINE_TYPE =~ /_MR_PIPELINE$/

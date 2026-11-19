@@ -263,6 +263,8 @@ func collapseFinally(pl *ir.Pipeline, rep *report.Report, u ir.FeatureUse, args 
 	switch b, isAnd := j.If.(expr.Binary); {
 	case j.If == nil:
 		return
+	case j.If == expr.Lit{Kind: expr.LitBool}:
+		// A condition GHA cannot state disables the job and drops the guard; the job condition marker restores it.
 	case expr.String(j.If) == expr.String(always):
 		j.If = nil
 	case isAnd && b.Op == expr.OpAnd && expr.String(b.L) == expr.String(always):

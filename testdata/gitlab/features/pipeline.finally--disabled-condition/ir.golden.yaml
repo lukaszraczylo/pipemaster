@@ -1,0 +1,47 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - ext:
+        gitlab:
+            stages:
+                - build
+                - test
+      id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - ext:
+            gitlab:
+                stage: build
+          id: compile
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make build
+      finally:
+        - if: |
+            opaque(gitlab): - if: $PIPELINE_TYPE =~ /_MR_PIPELINE$/
+          ext:
+            gitlab:
+                rules:
+                    - if: $PIPELINE_TYPE =~ /_MR_PIPELINE$/
+                stage: test
+          id: cleanup
+          needs:
+            - job: compile
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make clean
