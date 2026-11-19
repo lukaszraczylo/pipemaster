@@ -109,7 +109,7 @@ func runConvert(args []string, _, stderr io.Writer) int {
 	} else {
 		files = meta.AttachStack(files, res.Out)
 	}
-	if !validateAll(tgt.ID(), files, stderr) {
+	if !validateAll(tgt.ID(), files, fullReturn, stderr) {
 		return exitError
 	}
 	if err := writeFiles(*outDir, files); err != nil {
@@ -178,9 +178,9 @@ func removeStaleSidecar(dir, why string, rep *report.Report) error {
 	return os.Remove(sub)
 }
 
-// validateAll checks every emitted file except the sidecar. A provider with
-// no pinned schema only warns.
-func validateAll(providerID string, files map[string][]byte, stderr io.Writer) bool {
+// validateAll checks every emitted file except the sidecar. A provider with no pinned schema only warns. A full
+// return only warns too: it restores the file the user started from, and the pinned schema can lag real syntax.
+func validateAll(providerID string, files map[string][]byte, fullReturn bool, stderr io.Writer) bool {
 	ok := true
 	for _, name := range sortedNames(files) {
 		if name == meta.SidecarPath {
@@ -190,6 +190,8 @@ func validateAll(providerID string, files map[string][]byte, stderr io.Writer) b
 		switch {
 		case errors.Is(err, validate.ErrNoSchema):
 			_, _ = fmt.Fprintf(stderr, "warning: no schema for %s; %s not validated\n", providerID, name)
+		case err != nil && fullReturn:
+			_, _ = fmt.Fprintf(stderr, "warning: restored origin does not validate against the pinned schema: %v\n", err)
 		case err != nil:
 			_, _ = fmt.Fprintf(stderr, "invalid output: %v\n", err)
 			ok = false

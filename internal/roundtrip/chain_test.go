@@ -455,3 +455,15 @@ func TestFullReturnIntoDialectKeepsWhatItCannotWrite(t *testing.T) {
 	}
 	checkReturn(t, provider.Gitea, src, a)
 }
+
+func TestFullReturnWarnsWhenOriginFailsSchema(t *testing.T) {
+	src := filepath.Join(corpusRoot, "24-gitlab-release-cli")
+	b, a := t.TempDir(), t.TempDir()
+	if code, _, msg := runOut("convert", src, "--from", "gitlab", "--to", "gha", "-o", b); code != 0 {
+		t.Fatalf("out = %d\n%s", code, msg)
+	}
+	code, _, msg := runOut("convert", b, "--from", "gha", "--to", "gitlab", "-o", a)
+	if code != 0 || !strings.Contains(msg, "warning: restored origin does not validate against the pinned schema") {
+		t.Fatalf("return = %d, want 0 with a schema warning\n%s", code, msg)
+	}
+}
