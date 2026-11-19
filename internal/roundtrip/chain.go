@@ -14,7 +14,8 @@ import (
 )
 
 // HopResult is the outcome of one conversion step. Out holds the layers the output keeps. Unless Restored is
-// true, the caller must append a layer built with NewMeta for the files it emits.
+// true, the caller must append a layer built with NewMeta for the files it emits. When Restored is true, the
+// caller appends a layer only if the emit into the target drops a pipeline feature that no kept layer holds.
 type HopResult struct {
 	Proj     *ir.Project
 	Out      *meta.Stack
@@ -22,8 +23,9 @@ type HopResult struct {
 }
 
 // Hop applies the stored layers to proj for a conversion from source to target. Restored is true when the
-// step unwinds to an older provider: the output is then a deterministic emit of the layers below, so it
-// gets no new layer. The source parameter is unused and kept for the call-site signature.
+// step unwinds to an older provider: the output is then a deterministic emit of the layers below. It needs a
+// new layer only for what the target dialect cannot write, which the caller records. The source parameter is
+// unused and kept for the call-site signature.
 func Hop(proj *ir.Project, in *meta.Stack, srcFS fs.FS, _, target string, force bool, rep *report.Report) (HopResult, error) {
 	if in == nil || len(in.Layers) == 0 {
 		return HopResult{Proj: proj, Out: &meta.Stack{}}, nil
