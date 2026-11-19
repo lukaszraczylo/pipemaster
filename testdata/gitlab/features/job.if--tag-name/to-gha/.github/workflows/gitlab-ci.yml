@@ -1,6 +1,8 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/release
 # pipemaster:arg {"src":"tag"}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/release
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/release
+# pipemaster:arg {"pre":1,"post":0}
 on:
   push:
 jobs:
@@ -8,5 +10,6 @@ jobs:
     if: github.ref_type == 'tag' && github.ref_name
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - id: script
         run: make release

@@ -1,11 +1,16 @@
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/deploy
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/deploy
+# pipemaster:arg {"pre":1,"post":0}
 on:
   push:
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - id: script
         run: make
   deploy:
@@ -14,6 +19,7 @@ jobs:
     if: false
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:lost job.if pipeline/gitlab-ci/job/deploy: opaque(gitlab): - changes: '!reference [.remote-patterns]'\n  if: $CI_COMMIT_TAG\n
       - id: script
         run: make deploy

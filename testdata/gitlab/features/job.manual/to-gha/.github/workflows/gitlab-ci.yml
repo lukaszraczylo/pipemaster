@@ -1,5 +1,7 @@
 # pipemaster:emulated trigger.manual pipeline/gitlab-ci
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/deploy
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/deploy
+# pipemaster:arg {"pre":1,"post":0}
 on:
   push:
   # pipemaster:emulated job.manual pipeline/gitlab-ci/job/deploy
@@ -11,5 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
+      - uses: actions/checkout@v7
       - id: script
         run: make deploy

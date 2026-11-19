@@ -1,6 +1,8 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/build
 # pipemaster:arg {"src":"(branch == 'main') || ((event == 'schedule') \u0026\u0026 !(branch == 'main'))"}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
 on:
   push:
 jobs:
@@ -8,5 +10,6 @@ jobs:
     if: github.ref_type == 'branch' && github.ref_name == 'main' || github.event_name == 'schedule' && !(github.ref_type == 'branch' && github.ref_name == 'main')
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - id: script
         run: make

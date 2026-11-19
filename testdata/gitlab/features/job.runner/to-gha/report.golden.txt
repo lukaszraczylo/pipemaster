@@ -1,2 +1,2 @@
 Loss report: gitlab -> gha
-No losses: every feature converted natively.
+[emulated] pipeline/gitlab-ci/job/build step.action: actions/checkout step (GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs)

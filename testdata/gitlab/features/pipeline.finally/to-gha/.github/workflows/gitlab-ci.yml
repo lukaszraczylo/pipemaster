@@ -1,8 +1,14 @@
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/alert
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/alert
+# pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/alert
 # pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}]}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/report
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/report
+# pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/report
 # pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}]}
 on:
@@ -11,6 +17,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - id: script
         run: make build
   # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
@@ -20,6 +27,7 @@ jobs:
     if: always() && failure()
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - id: script
         run: ./page.sh
   # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
@@ -29,5 +37,6 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - id: script
         run: ./notify.sh

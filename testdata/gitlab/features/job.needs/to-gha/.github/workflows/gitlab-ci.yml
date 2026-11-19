@@ -1,18 +1,28 @@
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/compile
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
+# pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/lint
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/lint
+# pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/ship
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/ship
+# pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/unit
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/unit
+# pipemaster:arg {"pre":1,"post":0}
 on:
   push:
 jobs:
   compile:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - id: script
         run: make
   lint:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - id: script
         run: make lint
   ship:
@@ -22,6 +32,7 @@ jobs:
       - unit
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - id: script
         run: make ship
   unit:
@@ -29,5 +40,6 @@ jobs:
       - compile
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - id: script
         run: make test

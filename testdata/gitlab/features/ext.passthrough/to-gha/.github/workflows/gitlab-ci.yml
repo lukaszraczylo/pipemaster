@@ -1,12 +1,18 @@
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
 # pipemaster:arg {"On":null,"Attempts":2}
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/common
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/common
 # pipemaster:arg {"On":null,"Attempts":2}
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/common
+# pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/prod
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/prod
 # pipemaster:arg {"On":null,"Attempts":2}
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/prod
+# pipemaster:arg {"pre":1,"post":0}
 on:
   push:
 env:
@@ -16,6 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     container: alpine:3
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
       - id: script
         run: |
@@ -35,6 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     container: alpine:3
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated job.retry pipeline/gitlab-ci/job/common
       - id: script
         run: |
@@ -57,6 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     container: alpine:3
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated job.retry pipeline/gitlab-ci/job/prod
       - id: script
         run: |

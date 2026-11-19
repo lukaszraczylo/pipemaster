@@ -9,6 +9,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/actions"
 	"github.com/lukaszraczylo/pipemaster/caps"
+	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
@@ -49,9 +50,14 @@ func (e *emitter) templateNode(path, s string) (*yaml.Node, error) {
 	return str(t), err
 }
 
-// preSteps are the steps that run before the job's own: artifact downloads, then the cache restore.
+// preSteps are the steps that run before the job's own: the checkout, artifact downloads, then the cache restore.
 func (e *emitter) preSteps(c jobCtx, jp string, j *ir.Job) ([]*yaml.Node, error) {
 	var out []*yaml.Node
+	if n, err := e.checkoutStep(c, jp, j); err != nil {
+		return nil, err
+	} else if n != nil {
+		out = append(out, n)
+	}
 	for _, n := range j.Needs {
 		if !n.Artifacts {
 			continue
@@ -227,4 +233,54 @@ func (e *emitter) markCarried(jp string, j *ir.Job, pre, post int) error {
 		f = caps.JobCache
 	}
 	return e.markArg(f, jp, c)
+}
+
+const (
+	gitStrategyVar   = "GIT_STRATEGY"
+	gitStrategyNone  = "none"
+	gitDepthVar      = "GIT_DEPTH"
+	gitSubmodulesVar = "GIT_SUBMODULE_STRATEGY"
+	submodulesNormal = "normal"
+	submodulesDeep   = "recursive"
+)
+
+// envLit is the literal value of a variable the job or its pipeline sets; the job wins.
+func envLit(c jobCtx, j *ir.Job, name string) string {
+	for _, vars := range [][]ir.Var{j.Env, c.pl.Env} {
+		for _, v := range vars {
+			if v.Name == name && v.Value.Kind == ir.ValueLit {
+				return v.Value.Lit
+			}
+		}
+	}
+	return ""
+}
+
+// checkoutStep is the clone GitLab runs before every job, which a GHA job must ask for. It is nil for any other
+// origin, for a job with no steps and for GIT_STRATEGY none. The step is counted as a pre step, so Parse removes it again.
+func (e *emitter) checkoutStep(c jobCtx, jp string, j *ir.Job) (*yaml.Node, error) {
+	if e.from == nil || e.from.ID != exprgitlab.Dialect || len(j.Steps) == 0 || envLit(c, j, gitStrategyVar) == gitStrategyNone {
+		return nil, nil
+	}
+	ref, err := reverseAction("checkout", "")
+	if err != nil {
+		return nil, err
+	}
+	m := newMap()
+	m.set("uses", str(actionString(ref)))
+	with := newMap()
+	if d, err := strconv.Atoi(envLit(c, j, gitDepthVar)); err == nil {
+		with.set("fetch-depth", intNode(d))
+	}
+	switch envLit(c, j, gitSubmodulesVar) {
+	case submodulesNormal:
+		with.set("submodules", boolNodeOf(true))
+	case submodulesDeep:
+		with.set("submodules", str(submodulesDeep))
+	}
+	if len(with.n.Content) > 0 {
+		m.set("with", with.n)
+	}
+	e.emulate(jp, caps.StepAction, "actions/checkout step", "GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs")
+	return m.n, nil
 }

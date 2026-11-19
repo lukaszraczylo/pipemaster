@@ -1,12 +1,15 @@
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
 # pipemaster:arg {"On":["script_failure","runner_external_dependency_failure","runner_interrupted"],"Attempts":3}
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
 on:
   push:
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
       - id: script
         run: |

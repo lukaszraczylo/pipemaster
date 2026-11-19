@@ -1,4 +1,6 @@
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/nightly
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/nightly
+# pipemaster:arg {"pre":1,"post":0}
 on:
   # pipemaster:emulated trigger.manual pipeline/gitlab-ci
   workflow_dispatch:
@@ -6,5 +8,6 @@ jobs:
   nightly:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - id: script
         run: make nightly

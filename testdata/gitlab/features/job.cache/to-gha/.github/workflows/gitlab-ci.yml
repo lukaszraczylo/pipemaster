@@ -1,12 +1,13 @@
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
 # pipemaster:emulated job.cache pipeline/gitlab-ci/job/build
-# pipemaster:arg {"cache":[{"Key":"$\u007b{ hashFiles('go.sum') }}","Policy":"pull-push","Paths":[".cache/go-build"]}],"pre":1,"post":0}
+# pipemaster:arg {"cache":[{"Key":"$\u007b{ hashFiles('go.sum') }}","Policy":"pull-push","Paths":[".cache/go-build"]}],"pre":2,"post":0}
 on:
   push:
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated job.cache pipeline/gitlab-ci/job/build
       - uses: actions/cache@v6
         with:

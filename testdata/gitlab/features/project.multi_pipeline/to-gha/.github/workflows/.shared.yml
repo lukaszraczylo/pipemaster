@@ -1,3 +1,5 @@
+# pipemaster:emulated job.artifacts pipeline/.shared/job/run
+# pipemaster:arg {"pre":1,"post":0}
 name: shared
 on:
   workflow_call:
@@ -5,5 +7,6 @@ jobs:
   run:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - id: run-step-1
         run: echo run

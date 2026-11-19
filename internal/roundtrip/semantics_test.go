@@ -177,3 +177,45 @@ deploy:
 		t.Errorf("a push source is a bare GHA push, which fires for branches and tags:\n%s", doc)
 	}
 }
+
+func TestGitlabImplicitCloneBecomesCheckout(t *testing.T) {
+	const src = `variables:
+  GIT_DEPTH: "5"
+  GIT_SUBMODULE_STRATEGY: recursive
+build:
+  script: [make]
+nofetch:
+  variables:
+    GIT_STRATEGY: none
+  script: [echo hi]
+`
+	doc, rep := convert(t, provider.GitLab, provider.GHA, gitlabCI, src)
+	build := jobBlock(doc, "build")
+	for _, want := range []string{"uses: actions/checkout@", "fetch-depth: 5", "submodules: recursive"} {
+		if !strings.Contains(build, want) {
+			t.Errorf("build job lacks %q:\n%s", want, doc)
+		}
+	}
+	if strings.Contains(jobBlock(doc, "nofetch"), "actions/checkout") {
+		t.Errorf("GIT_STRATEGY none must not clone:\n%s", doc)
+	}
+	found := false
+	for _, e := range rep.Entries {
+		found = found || (strings.Contains(e.IRPath, "job/build") && strings.Contains(e.Detail, "clone"))
+	}
+	if !found {
+		t.Errorf("the report does not mention the added clone step: %+v", rep.Entries)
+	}
+}
+
+func TestCheckoutStepDoesNotSurviveReturnToGitlab(t *testing.T) {
+	const src = `build:
+  script: [make]
+`
+	files := map[string]string{gitlabCI: src}
+	r := hops(t, toFS(map[string][]byte{gitlabCI: []byte(files[gitlabCI])}), prov(t, provider.GitLab), prov(t, provider.GHA), false, false)
+	steps := r.back.Pipelines[0].Jobs[0].Steps
+	if len(steps) != 1 || len(steps[0].Script) != 1 {
+		t.Errorf("the return trip kept the clone step: %+v", steps)
+	}
+}

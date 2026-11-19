@@ -1,4 +1,6 @@
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/deploy
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/deploy
+# pipemaster:arg {"pre":1,"post":0}
 on:
   push:
 jobs:
@@ -8,5 +10,6 @@ jobs:
       name: production
       url: https://example.com
     steps:
+      - uses: actions/checkout@v7
       - id: script
         run: make deploy

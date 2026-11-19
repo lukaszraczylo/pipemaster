@@ -1,3 +1,4 @@
 Loss report: gitlab -> gha
 [lost] pipeline/gitlab-ci/job/build job.if (condition not expressible in GitHub Actions; job disabled)
 [emulated] pipeline/gitlab-ci/job/build job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/gitlab-ci/job/build step.action: actions/checkout step (GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs)

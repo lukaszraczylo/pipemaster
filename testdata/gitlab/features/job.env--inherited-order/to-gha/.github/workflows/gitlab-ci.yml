@@ -1,4 +1,6 @@
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/lint
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/lint
+# pipemaster:arg {"pre":1,"post":0}
 on:
   push:
 jobs:
@@ -8,5 +10,6 @@ jobs:
       GOCACHE: $CI_PROJECT_DIR/.cache/go-build
       GOMODCACHE: $CI_PROJECT_DIR/.cache/go-mod
     steps:
+      - uses: actions/checkout@v7
       - id: script
         run: make lint

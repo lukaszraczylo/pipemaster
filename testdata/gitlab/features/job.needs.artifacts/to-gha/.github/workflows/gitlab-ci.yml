@@ -1,16 +1,19 @@
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/compile
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
-# pipemaster:arg {"artifacts":[{"Name":"","Expire":"","Paths":["bin/"]}],"pre":0,"post":1}
+# pipemaster:arg {"artifacts":[{"Name":"","Expire":"","Paths":["bin/"]}],"pre":1,"post":1}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/docs
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/docs
+# pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/unit
 # pipemaster:emulated job.needs.artifacts pipeline/gitlab-ci/job/unit
-# pipemaster:arg {"needs":["compile"],"pre":1,"post":0}
+# pipemaster:arg {"needs":["compile"],"pre":2,"post":0}
 on:
   push:
 jobs:
   compile:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - id: script
         run: make
       # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
@@ -23,6 +26,7 @@ jobs:
       - compile
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - id: script
         run: make docs
   unit:
@@ -30,6 +34,7 @@ jobs:
       - compile
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated job.needs.artifacts pipeline/gitlab-ci/job/unit
       - uses: actions/download-artifact@v8
         with:
