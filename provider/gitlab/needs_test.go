@@ -291,3 +291,21 @@ func TestEmitNeedsArtifactsWithoutProducerArtifactsIsLost(t *testing.T) {
 		t.Errorf("needs.artifacts entries = %v, want %v", got, want)
 	}
 }
+
+func TestEmitManualFinallyJobIsLost(t *testing.T) {
+	step := []*ir.Step{{ID: "s", Kind: ir.StepScript, Script: []string{"x"}}}
+	p := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "ci",
+		Jobs:    []*ir.Job{{ID: "a", Steps: step}},
+		Finally: []*ir.Job{{ID: "f", Steps: step, Manual: true}, {ID: "g", Steps: step}},
+	}}}
+	_, rep := emitFiles(t, p)
+	var got []string
+	for _, e := range rep.Entries {
+		if e.Feature == caps.PipelineFinally {
+			got = append(got, e.IRPath+" "+e.Level.String())
+		}
+	}
+	if want := []string{"pipeline/ci/job/f lost"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("pipeline.finally entries = %v, want %v", got, want)
+	}
+}

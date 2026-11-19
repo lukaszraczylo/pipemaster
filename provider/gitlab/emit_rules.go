@@ -40,6 +40,9 @@ func (e *emitter) timing(jp string, j *ir.Job, finally bool) (jobTiming, error) 
 	switch {
 	case j.Manual:
 		base = whenManual
+		if finally {
+			e.lose(jp, caps.PipelineFinally, "a finally job is manual, and GitLab has one when key: the job starts by hand and no longer runs after the other jobs")
+		}
 	case status == "always" || (finally && status == ""):
 		base = whenAlways
 	case status == "failure":

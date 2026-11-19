@@ -251,7 +251,8 @@ instance (p : Pipe) : Decidable (noNeeds p) := by unfold noNeeds; exact inferIns
 
 def varNames (vs : List Var) : List String := vs.map Var.name
 
-/-- Structure both adapters need: unique valid IDs, needs on main jobs forming a DAG (Dag.layers succeeds),
+/-- A manual finally job is excluded because the GitLab emitter reports it as lost (see RoundTrip.lean).
+Structure both adapters need: unique valid IDs, needs on main jobs forming a DAG (Dag.layers succeeds),
 finally jobs waiting only for main jobs, unique env and step IDs, `onFailure` only on finally jobs. -/
 def Wf (p : Pipe) : Prop :=
   validId p.id ∧

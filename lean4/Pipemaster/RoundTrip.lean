@@ -29,8 +29,14 @@ Left out, each on purpose:
 `metaOf` models what the round-trip metadata of Go carries and nothing else: the pipeline ID that GitLab renames,
 the display names (`meta.Residual`), and the needs list of a job whose artifacts flag GitLab cannot keep
 (`meta.Lost`, recorded by the GitLab emitter since Task 23). The fragments `InGha` and `InGitlab` come from the
-capability matrices (provider/gha/caps.go, provider/gitlab/caps.go): GitLab caps retry at three runs and
-drops a manual finally job, and GHA needs a runner label and a script per job. -/
+capability matrices (provider/gha/caps.go, provider/gitlab/caps.go): GitLab caps retry at three runs, and GHA
+needs a runner label and a script per job.
+
+A manual finally job is outside the fragment because it is a reported loss, not a silent one. The GitLab
+emitter (Mirrors gitlab.New (provider/gitlab/emit_rules.go), method timing) lets `when: manual` win over the
+finally branch and records a `lost` entry for `pipeline.finally` at the job path; the parser then returns a main
+job. The GHA emitter keeps both guards (`always() && github.event_name == 'workflow_dispatch'`) and the parser
+restores the job, but the model `Gha.finJob` does not state that, so `Wf` excludes the case for both providers. -/
 
 /-- A pipeline that survives GHA, then GitLab, then GHA again. -/
 theorem cross_roundtrip (p : Pipe) (h : InGha p) :
