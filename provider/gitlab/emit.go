@@ -264,6 +264,7 @@ func (e *emitter) pipelineVars(pp string, pl *ir.Pipeline, ext map[string]any) (
 		}
 		vars = append(vars, ir.Var{Name: in.Name, Value: ir.Value{Lit: in.Default}})
 		if in.Description != "" {
+			e.flattenedNote(pp+"/input/"+in.Name, caps.PipelineInputs, in.Description)
 			d, err := e.field(pp, caps.PipelineInputs, in.Description)
 			if err != nil {
 				return nil, nil, nil, err

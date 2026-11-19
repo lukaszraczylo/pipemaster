@@ -90,3 +90,29 @@ func TestRefsEditedTextIsNotRestored(t *testing.T) {
 		t.Error("no marker ignored note")
 	}
 }
+
+// A flattening site that refPairs does not record is never silent.
+func TestUnrecordedFlatteningSitesAreReported(t *testing.T) {
+	j := glJob("build", glStep("make"))
+	j.Outputs = []ir.Output{{Name: "v", Value: "${{ matrix.os }}-x"}}
+	p := glProject("gitlab", j)
+	p.Pipelines[0].Inputs = []ir.Input{{Name: "t", Default: "a", Description: "d ${{ matrix.os }}"}}
+	_, rep := func() (string, *report.Report) {
+		_, rep, err := gitlab.New().Emit(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return "", rep
+	}()
+	paths := map[string]bool{}
+	for _, e := range rep.Entries {
+		if strings.Contains(e.Detail, "namespace flattened; restored only with round-trip metadata") {
+			paths[e.IRPath] = true
+		}
+	}
+	for _, want := range []string{"pipeline/gitlab-ci/job/build/output/v", "pipeline/gitlab-ci/input/t"} {
+		if !paths[want] {
+			t.Errorf("no entry at %s; got %v", want, paths)
+		}
+	}
+}

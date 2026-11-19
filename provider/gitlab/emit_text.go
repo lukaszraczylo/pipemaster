@@ -491,3 +491,11 @@ func foldRef(x expr.Expr) expr.Expr {
 	}
 	return x
 }
+
+// flattenedNote reports text whose reference namespaces print the same in GitLab (matrix.x and env.x are both
+// $x) at a site refPairs does not record, so only round-trip metadata can restore them.
+func (e *emitter) flattenedNote(path string, f caps.Feature, s string) {
+	if parts, err := expr.ParseScriptTemplate(s); err == nil && flattens(parts) {
+		e.emulate(path, f, "namespace flattened", "namespace flattened; restored only with round-trip metadata")
+	}
+}

@@ -400,6 +400,7 @@ func (e *emitter) outputLines(p *jobPrep) ([]string, error) {
 			e.comment("job.outputs " + p.path + ": output " + o.Name + " is not written")
 			continue
 		}
+		e.flattenedNote(p.path+"/output/"+o.Name, caps.JobOutputs, o.Value)
 		out = append(out, "echo "+dq(o.Name+"="+v)+" >> "+dotenvFile)
 	}
 	return out, nil
