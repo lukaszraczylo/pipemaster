@@ -1,0 +1,89 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/ci.yml
+pipelines:
+    - id: ci
+      triggers:
+        - kind: push
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - action:
+                kind: repo
+                owner: actions
+                repo: checkout
+                ref: v4
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: action
+            - action:
+                kind: repo
+                owner: actions
+                repo: cache
+                ref: v4
+              with:
+                key:
+                    lit: go-mod
+                path:
+                    lit: ~/go/pkg/mod
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-2
+              kind: action
+            - ext:
+                gha:
+                    _derived_id: true
+              id: build-step-3
+              kind: script
+              script:
+                - make build
+            - action:
+                kind: repo
+                owner: actions
+                repo: upload-artifact
+                ref: v4
+              with:
+                name:
+                    lit: dist
+                path:
+                    lit: dist/
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-4
+              kind: action
+        - id: test
+          runner:
+            labels:
+                - ubuntu-latest
+          needs:
+            - job: build
+          steps:
+            - action:
+                kind: repo
+                owner: actions
+                repo: download-artifact
+                ref: v4
+              with:
+                name:
+                    lit: dist
+              ext:
+                gha:
+                    _derived_id: true
+              id: test-step-1
+              kind: action
+            - ext:
+                gha:
+                    _derived_id: true
+              id: test-step-2
+              kind: script
+              script:
+                - make test

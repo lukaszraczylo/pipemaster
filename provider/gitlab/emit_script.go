@@ -39,7 +39,11 @@ type jobPrep struct {
 	toAfter  bool
 }
 
-type download struct{ name string }
+type download struct {
+	step *ir.Step
+	name string
+	sp   string
+}
 
 func newJobPrep(path string, j *ir.Job) *jobPrep {
 	return &jobPrep{j: j, path: path, sections: map[string][]*yaml.Node{}}

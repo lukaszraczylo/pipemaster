@@ -465,6 +465,9 @@ func collapseAction(c *collapseCtx) bool {
 	if len(c.args) != 1 {
 		return false
 	}
+	if as, ok := decodeActionStep(c.args[0]); ok {
+		return collapseActionStep(c, as)
+	}
 	var a actionArg
 	if json.Unmarshal([]byte(c.args[0]), &a) != nil {
 		return false

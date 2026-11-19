@@ -148,15 +148,19 @@ func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps [
 func (e *emitter) downloadedFrom(c *pipeCtx, p *jobPrep) map[string]bool {
 	out := map[string]bool{}
 	for _, d := range p.downs {
-		matched := false
+		var jobs []downJob
 		for _, n := range p.j.Needs {
 			names := c.artifactNames(n.JobID)
 			if d.name == "" && c.declares(n.JobID) || slices.Contains(names, d.name) {
-				out[n.JobID], matched = true, true
+				out[n.JobID] = true
+				jobs = append(jobs, downJob{ID: n.JobID, Was: n.Artifacts})
 			}
 		}
-		if !matched {
+		if len(jobs) == 0 {
 			e.lose(p.path, caps.JobNeedsArtifacts, "download of artifact "+d.name+" matches no job in needs")
+		}
+		if err := e.markDownload(d, p, jobs); err != nil {
+			e.comment("download source not carried: " + err.Error())
 		}
 	}
 	return out

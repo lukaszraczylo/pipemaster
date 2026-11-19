@@ -153,7 +153,9 @@ func (e *emitter) actionStep(p *jobPrep, st *ir.Step) error {
 		e.unappliedFields(sp, st, "the step is lost")
 		return nil
 	}
-	e.lose(sp, caps.ExtPassthrough, "the action reference "+ghaRef(st.Action)+" is not in the GitLab file; it is kept in round-trip metadata")
+	if !carriedKind(t.Kind) {
+		e.lose(sp, caps.ExtPassthrough, "the action reference "+ghaRef(st.Action)+" is not in the GitLab file; it is kept in round-trip metadata")
+	}
 	e.canonTarget(sp, &t)
 	return e.applyTarget(p, sp, st, t)
 }
@@ -185,7 +187,11 @@ func (e *emitter) applyTarget(p *jobPrep, sp string, st *ir.Step, t actions.Targ
 		return e.placeLines(p, st, t.Script)
 	case actions.KindUpload:
 		e.unappliedEnvFields(sp, st, "the upload becomes the job's artifacts block")
-		return e.uploadAction(p, sp, st, t)
+		art, err := e.uploadAction(p, sp, st, t)
+		if err != nil {
+			return err
+		}
+		return e.markActionStep(p, sp, st, actionStepArg{Kind: actUpload, Art: art})
 	}
 	e.unappliedFields(sp, st, "the action becomes a job keyword")
 	switch t.Kind {
@@ -205,10 +211,14 @@ func (e *emitter) applyTarget(p *jobPrep, sp string, st *ir.Step, t actions.Targ
 		}
 		return e.markAction(p, sp, actionArg{Image: p.image})
 	case actions.KindCache:
-		return e.cacheAction(p, sp, t)
+		c, err := e.cacheAction(p, sp, t)
+		if err != nil {
+			return err
+		}
+		return e.markActionStep(p, sp, st, actionStepArg{Kind: actCache, Cache: c})
 	case actions.KindDownload:
 		name, _ := t.With["name"].(string)
-		p.downs = append(p.downs, download{name: name})
+		p.downs = append(p.downs, download{name: name, step: st, sp: sp})
 		if _, ok := t.With["path"]; ok {
 			e.lose(sp, caps.StepAction, "download path has no GitLab equivalent; artifacts restore to the project directory")
 		}
@@ -259,7 +269,7 @@ func (e *emitter) artifactWhen(sp string, st *ir.Step) string {
 	return ""
 }
 
-func (e *emitter) uploadAction(p *jobPrep, sp string, st *ir.Step, t actions.Target) error {
+func (e *emitter) uploadAction(p *jobPrep, sp string, st *ir.Step, t actions.Target) (*wireArt, error) {
 	text := func(v any) (string, error) {
 		s, _ := v.(string)
 		return e.field(sp, caps.StepAction, s)
@@ -278,22 +288,22 @@ func (e *emitter) uploadAction(p *jobPrep, sp string, st *ir.Step, t actions.Tar
 	}
 	name, err := text(t.With["name"])
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if name == "" {
 		name = defaultArtName
 	}
 	expire, err := text(t.With["expire_in"])
 	if err != nil {
-		return err
+		return nil, err
 	}
 	paths, err := list(t.With["path"])
 	if err != nil {
-		return err
+		return nil, err
 	}
 	excl, err := list(t.With["exclude"])
 	if err != nil {
-		return err
+		return nil, err
 	}
 	when := e.artifactWhen(sp, st)
 	if p.art.seen && p.art.name != name {
@@ -302,14 +312,16 @@ func (e *emitter) uploadAction(p *jobPrep, sp string, st *ir.Step, t actions.Tar
 	if p.art.seen && when != p.art.when {
 		e.lose(sp, caps.StepIf, "a GitLab job has one artifacts:when; the first upload's value applies")
 	}
-	if !p.art.seen {
+	first := !p.art.seen
+	if first {
 		p.art.name, p.art.expire, p.art.when = name, expire, when
 	}
 	p.art.seen = true
 	p.art.paths = appendNew(p.art.paths, paths)
 	p.art.exclude = appendNew(p.art.exclude, excl)
 	p.uploads = append(p.uploads, name)
-	return nil
+	art := &wireArt{Name: p.art.name, Expire: p.art.expire, When: p.art.when, Paths: paths, First: first}
+	return art, nil
 }
 
 func appendNew(dst, src []string) []string {
@@ -322,24 +334,28 @@ func appendNew(dst, src []string) []string {
 }
 
 // cacheAction maps actions/cache to a cache block; hashFiles keys become cache:key:files.
-func (e *emitter) cacheAction(p *jobPrep, sp string, t actions.Target) error {
+func (e *emitter) cacheAction(p *jobPrep, sp string, t actions.Target) (*ir.Cache, error) {
 	key, _ := t.With["key"].(string)
 	paths, _ := t.With["paths"].([]string)
 	c := newMap()
 	if err := e.cacheKey(sp, c, key); err != nil {
-		return err
+		return nil, err
 	}
 	cp := make([]string, 0, len(paths))
 	for _, pa := range paths {
 		t, err := e.field(sp, caps.StepAction, pa)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		cp = append(cp, t)
 	}
 	c.set("paths", strSeq(cp))
 	p.caches = append(p.caches, c)
-	return nil
+	parsed, _, err := newState(nil).cacheEntry(c.n)
+	if err != nil {
+		return nil, nil
+	}
+	return &parsed, nil
 }
 
 // cacheKey writes the key of a cache block: key:files when the key ends in a hashFiles call over at most
