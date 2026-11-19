@@ -16,8 +16,22 @@ var noSourceForm = map[string]string{
 	provider.GitLab + "/" + string(caps.JobEnvironmentApproval): "approval rules live in project settings and no parser sets Environment.Approval",
 }
 
-// hasFixtureDir reports whether dir holds a directory named after the feature, optionally followed by "--<variant>".
-func hasFixtureDir(t *testing.T, dir string, f caps.Feature) bool {
+// fixtureComplete reports whether a fixture directory holds a source file for the provider and its IR golden, so
+// an empty directory named after a feature does not count as coverage.
+func fixtureComplete(id, dir string) bool {
+	if _, err := os.Stat(filepath.Join(dir, "ir.golden.yaml")); err != nil {
+		return false
+	}
+	if id == provider.GitLab {
+		_, err := os.Stat(filepath.Join(dir, ".gitlab-ci.yml"))
+		return err == nil
+	}
+	files, _ := filepath.Glob(filepath.Join(dir, ".github", "workflows", "*.y*ml"))
+	return len(files) > 0
+}
+
+// hasFixtureDir reports whether dir holds a complete fixture named after the feature, optionally followed by "--<variant>".
+func hasFixtureDir(t *testing.T, id, dir string, f caps.Feature) bool {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -25,11 +39,38 @@ func hasFixtureDir(t *testing.T, dir string, f caps.Feature) bool {
 	}
 	for _, e := range entries {
 		n := e.Name()
-		if e.IsDir() && (n == string(f) || strings.HasPrefix(n, string(f)+"--")) {
+		if e.IsDir() && (n == string(f) || strings.HasPrefix(n, string(f)+"--")) && fixtureComplete(id, filepath.Join(dir, n)) {
 			return true
 		}
 	}
 	return false
+}
+
+func TestCoverageRejectsEmptyFixtureDir(t *testing.T) {
+	for _, id := range []string{provider.GHA, provider.GitLab} {
+		dir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(dir, string(caps.JobEnv)), 0o750); err != nil { // #nosec G301 -- temp dir
+			t.Fatal(err)
+		}
+		if hasFixtureDir(t, id, dir, caps.JobEnv) {
+			t.Errorf("%s: an empty fixture directory counted as coverage", id)
+		}
+		src := filepath.Join(dir, string(caps.JobEnv), ".gitlab-ci.yml")
+		if id == provider.GHA {
+			src = filepath.Join(dir, string(caps.JobEnv), ".github", "workflows", "ci.yml")
+			if err := os.MkdirAll(filepath.Dir(src), 0o750); err != nil { // #nosec G301 -- temp dir
+				t.Fatal(err)
+			}
+		}
+		for _, name := range []string{src, filepath.Join(dir, string(caps.JobEnv), "ir.golden.yaml")} {
+			if err := os.WriteFile(name, []byte("x: 1\n"), 0o600); err != nil { // #nosec G306 G703 -- temp dir
+				t.Fatal(err)
+			}
+		}
+		if !hasFixtureDir(t, id, dir, caps.JobEnv) {
+			t.Errorf("%s: a complete fixture directory did not count", id)
+		}
+	}
 }
 
 // TestFeatureFixtureCoverage requires a fixture directory for every feature a provider can write.
@@ -44,7 +85,7 @@ func TestFeatureFixtureCoverage(t *testing.T) {
 			}
 			key := id + "/" + string(f)
 			t.Run(key, func(t *testing.T) {
-				has := hasFixtureDir(t, dir, f)
+				has := hasFixtureDir(t, id, dir, f)
 				if reason, exempt := noSourceForm[key]; exempt {
 					if has {
 						t.Errorf("%s has a fixture; drop its noSourceForm entry (%s)", key, reason)
