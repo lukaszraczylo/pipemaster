@@ -6,6 +6,9 @@ import (
 	"github.com/lukaszraczylo/pipemaster/provider"
 )
 
+// whyDisabled is the detail for a condition the output replaces with false because the step's host has no form here.
+const whyDisabled = "the condition is replaced by false because the action host has no form in this dialect"
+
 // hostArg is the marker argument that carries the host a bare ref resolved against in its source.
 type hostArg struct {
 	Host string `json:"host"`
@@ -27,7 +30,7 @@ func (e *emitter) uses(sp string, a *ir.ActionRef) (text string, ok bool, err er
 	case h == ir.HostSelf || h == ir.HostBuiltin:
 		if e.d.ID != provider.Gitea {
 			e.lose(sp, caps.StepAction, h+" actions exist only in Gitea; the step is disabled")
-			e.comment(string(caps.StepAction) + " " + sp + ": " + h + a.Owner + "/" + a.Repo)
+			e.comment(string(caps.StepAction) + " " + sp + ": " + h + sourceName(a))
 			return "", false, nil
 		}
 		if h == ir.HostBuiltin {
@@ -49,4 +52,12 @@ func (e *emitter) uses(sp string, a *ir.ActionRef) (text string, ok bool, err er
 	e.emulate(sp, caps.StepAction, "bare ref",
 		"resolved against "+a.Host+" in the source; GitHub resolves it on github.com, where the action can differ")
 	return repoString(a), true, e.markArg(caps.StepAction, sp, hostArg{Host: a.Host})
+}
+
+// sourceName is the part of a self: or builtin: ref after the prefix.
+func sourceName(a *ir.ActionRef) string {
+	if a.Host == ir.HostBuiltin {
+		return a.Repo
+	}
+	return repoString(a)
 }

@@ -73,11 +73,25 @@ func (e *emitter) jobNode(c jobCtx, j *ir.Job) (*yaml.Node, []string, error) {
 	if ids := e.needIDs(c, j); len(ids) > 0 {
 		m.set("needs", strSeq(ids))
 	}
-	cond, mk := e.jobCondition(c, jp, j, call)
+	var usesText string
+	usesOK := true
+	if call != nil {
+		var err error
+		if usesText, usesOK, err = e.uses(stepPath(jp, call.ID), call.Action); err != nil {
+			return nil, nil, err
+		}
+	}
+	var cond *yaml.Node
+	var mk []string
+	if usesOK {
+		cond, mk = e.jobCondition(c, jp, j, call)
+	} else {
+		cond, mk = e.disableCall(jp, j, call)
+	}
 	markers = append(markers, mk...)
 	m.set("if", cond)
 	if call != nil {
-		if err := e.callKeys(m, jp, call); err != nil {
+		if err := e.callKeys(m, jp, call, usesText, usesOK); err != nil {
 			return nil, nil, err
 		}
 	} else if err := e.runsOn(m, jp, j, ext, consumed); err != nil {
@@ -213,7 +227,18 @@ func andExpr(l, r expr.Expr) expr.Expr {
 	return expr.Binary{Op: expr.OpAnd, L: l, R: r}
 }
 
-func (e *emitter) callKeys(m *omap, jp string, call *ir.Step) error {
+// disableCall guards a call job whose host GHA cannot express; the lost conditions go to the metadata with the call.
+func (e *emitter) disableCall(jp string, j *ir.Job, call *ir.Step) (*yaml.Node, []string) {
+	if j.If != nil {
+		e.lose(jp, caps.JobIf, whyDisabled)
+	}
+	if call.If != nil {
+		e.lose(stepPath(jp, call.ID), caps.StepIf, whyDisabled)
+	}
+	return boolNodeOf(false), e.manualMarker(jp, j)
+}
+
+func (e *emitter) callKeys(m *omap, jp string, call *ir.Step, text string, ok bool) error {
 	sp := stepPath(jp, call.ID)
 	const why = "a reusable workflow call job accepts no such key"
 	for _, l := range []struct {
@@ -226,10 +251,6 @@ func (e *emitter) callKeys(m *omap, jp string, call *ir.Step) error {
 		if l.on {
 			e.lose(sp, l.f, why)
 		}
-	}
-	text, ok, err := e.uses(sp, call.Action)
-	if err != nil {
-		return err
 	}
 	if !ok {
 		text = actionString(call.Action)

@@ -5,12 +5,14 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/internal/golden"
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 func TestIdentityDialects(t *testing.T) {
@@ -89,4 +91,41 @@ func TestDialectFixtureGoldens(t *testing.T) {
 			})
 		}
 	}
+}
+
+const giteaSelfWorkflow = `on: push
+jobs:
+  b:
+    runs-on: r
+    steps:
+      - id: s
+        if: github.ref_name == 'main'
+        uses: self:o/r@v1
+`
+
+func TestGiteaSelfRoundTrip(t *testing.T) {
+	fsA := fstest.MapFS{".gitea/workflows/ci.yml": &fstest.MapFile{Data: []byte(giteaSelfWorkflow)}}
+	for _, embed := range []bool{false, true} {
+		r := hops(t, fsA, prov(t, provider.Gitea), prov(t, provider.GHA), embed, true)
+		if same, diff := ir.Equal(r.src, r.back); !same {
+			t.Errorf("embed=%v: Gitea->GHA->Gitea with metadata differs:\n%s", embed, diff)
+		}
+		st := r.back.Pipelines[0].Jobs[0].Steps[0]
+		if st.If == nil || st.Action == nil || st.Action.Host != ir.HostSelf {
+			t.Errorf("embed=%v: want the original if and host back, got %+v", embed, st)
+		}
+	}
+	r := hops(t, fsA, prov(t, provider.Gitea), prov(t, provider.GHA), false, false)
+	if e := reportEntry(r.toRep, caps.StepAction); e == nil || e.Level != caps.Lost {
+		t.Errorf("without metadata the lost step.action must be reported: %+v", r.toRep.Entries)
+	}
+}
+
+func reportEntry(rep *report.Report, f caps.Feature) *report.Entry {
+	for i := range rep.Entries {
+		if rep.Entries[i].Feature == f {
+			return &rep.Entries[i]
+		}
+	}
+	return nil
 }

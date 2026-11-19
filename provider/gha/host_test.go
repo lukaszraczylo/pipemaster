@@ -157,3 +157,32 @@ func TestGiteaSelfToGha(t *testing.T) {
 		t.Errorf("gitea keeps self: natively:\n%s %+v", gitea, grep.Entries)
 	}
 }
+
+func TestGiteaSelfJobCallToGha(t *testing.T) {
+	const wf = "on: push\njobs:\n  call:\n    if: github.ref_name == 'main'\n    uses: self:o/r/.github/workflows/x.yml@v1\n"
+	src, _, err := gha.New(gha.Gitea).Parse(fstest.MapFS{".gitea/workflows/ci.yml": &fstest.MapFile{Data: []byte(wf)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	text, rep := emitText(t, gha.GHA, src)
+	if !strings.Contains(text, "if: false") {
+		t.Errorf("want a disabled call job:\n%s", text)
+	}
+	if e := entry(rep, caps.StepAction); e == nil || e.Level != caps.Lost {
+		t.Errorf("want lost step.action, got %+v", rep.Entries)
+	}
+	if e := entry(rep, caps.JobIf); e == nil || e.Level != caps.Lost {
+		t.Errorf("want the replaced condition reported, got %+v", rep.Entries)
+	}
+}
+
+func TestBuiltinLostComment(t *testing.T) {
+	src, err := parseUses(t, gha.Gitea, "builtin:checkout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text, _ := emitText(t, gha.GHA, src)
+	if !strings.Contains(text, ": builtin:checkout") {
+		t.Errorf("want builtin:checkout in the lost comment:\n%s", text)
+	}
+}
