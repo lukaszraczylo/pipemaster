@@ -315,7 +315,7 @@ func TestCapsLedger(t *testing.T) {
 	want := map[caps.Feature]caps.Level{
 		caps.TriggerSchedule: caps.External, caps.TriggerFilterPaths: caps.Native, caps.StepIf: caps.Emulated,
 		caps.StepContinueOnError: caps.Emulated, caps.JobMatrix: caps.Native, caps.JobOutputs: caps.Emulated,
-		caps.PipelinePermissions: caps.Lost, caps.PipelineConcurrency: caps.Emulated, caps.StepTimeout: caps.Lost,
+		caps.PipelinePermissions: caps.Lost, caps.PipelineConcurrency: caps.Emulated, caps.StepTimeout: caps.Lost, caps.StepShell: caps.Lost,
 		caps.StepEnv: caps.Emulated, caps.StepWorkdir: caps.Emulated, caps.PipelineFinally: caps.Native,
 		caps.JobManual: caps.Native, caps.JobRetry: caps.Native, caps.JobEnvironmentApproval: caps.External,
 		caps.TriggerManual: caps.Native, caps.TriggerPullRequest: caps.Native, caps.TriggerPipelineDone: caps.Lost,
