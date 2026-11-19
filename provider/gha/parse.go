@@ -8,10 +8,12 @@ import (
 	"io/fs"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
@@ -30,35 +32,84 @@ func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		return nil, nil, err
 	}
 	rep := &report.Report{Source: a.d.ID}
+	proj, scan, err := a.parseFiles(fsys, files, rep, true)
+	if err != nil {
+		return nil, nil, err
+	}
+	switch {
+	case !scan.restored():
+	case scan.mixed():
+		// Restored conditions read in GitLab's dialect and native ones in GHA's, and the project holds one
+		// dialect, so no file restores its source conditions.
+		*rep = report.Report{Source: a.d.ID}
+		if proj, _, err = a.parseFiles(fsys, files, rep, false); err != nil {
+			return nil, nil, err
+		}
+		for _, f := range scan.restoredFiles {
+			rep.Add(report.Entry{
+				Feature: caps.ExprOpaque,
+				Level:   caps.Lost,
+				Detail:  fmt.Sprintf("source conditions of %s not restored: the directory also holds native %s conditions", f, a.d.ID),
+			})
+		}
+	default:
+		// A restored condition reads in GitLab's dialect, so a later emit must translate it again.
+		proj.Origin.Provider, proj.Origin.Dialect = provider.GitLab, provider.GitLab
+	}
+	return proj, rep, nil
+}
+
+// condScan records which files restored their source conditions and which hold conditions that stayed native.
+type condScan struct {
+	restoredFiles []string
+	nativeConds   bool
+}
+
+func (c condScan) restored() bool { return len(c.restoredFiles) > 0 }
+func (c condScan) mixed() bool    { return c.restored() && c.nativeConds }
+
+// parseFiles parses each file into one pipeline. With restoreConds false, source condition markers are ignored.
+func (a *adapter) parseFiles(fsys fs.FS, files []string, rep *report.Report, restoreConds bool) (*ir.Project, condScan, error) {
+	var scan condScan
 	proj := &ir.Project{Origin: ir.Origin{Provider: a.d.ID, Dialect: a.d.ID, Files: files}}
 	byStem := map[string]string{}
 	lines := map[string]int{}
 	for _, f := range files {
 		stem := strings.TrimSuffix(path.Base(f), path.Ext(f))
 		if prev, dup := byStem[stem]; dup {
-			return nil, nil, fmt.Errorf("%s: %s and %s share the pipeline id %q", a.d.ID, prev, f, stem)
+			return nil, scan, fmt.Errorf("%s: %s and %s share the pipeline id %q", a.d.ID, prev, f, stem)
 		}
 		byStem[stem] = f
 		src, err := fs.ReadFile(fsys, f)
 		if err != nil {
-			return nil, nil, fmt.Errorf("%s: %w", a.d.ID, err)
+			return nil, scan, fmt.Errorf("%s: %w", a.d.ID, err)
 		}
 		fp := &fileParser{d: a.d, dialect: provider.Family(a.d.ID), stem: stem, file: f, rep: rep, lines: lines}
 		pl, err := fp.parseWorkflow(src)
 		if err != nil {
-			return nil, nil, err
+			return nil, scan, err
 		}
-		if collapseMarkers(&emitter{d: a.d, led: emitkit.NewLedger("", a.d.ID, a.Caps())}, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src), rep) {
-			// A restored condition reads in GitLab's dialect, so a later emit must translate it again.
-			proj.Origin.Provider, proj.Origin.Dialect = provider.GitLab, provider.GitLab
+		if collapseMarkers(&emitter{d: a.d, led: emitkit.NewLedger("", a.d.ID, a.Caps())}, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src), rep, restoreConds) {
+			scan.restoredFiles = append(scan.restoredFiles, f)
+		} else if hasConds(pl) {
+			scan.nativeConds = true
 		}
 		proj.Pipelines = append(proj.Pipelines, pl)
 	}
 	if err := ir.Validate(proj); err != nil {
-		return nil, nil, locate(err, byStem, lines)
+		return nil, scan, locate(err, byStem, lines)
 	}
 	ir.Normalize(proj)
-	return proj, rep, nil
+	return proj, scan, nil
+}
+
+func hasConds(pl *ir.Pipeline) bool {
+	for _, j := range append(slices.Clone(pl.Jobs), pl.Finally...) {
+		if j != nil && (j.If != nil || slices.ContainsFunc(j.Steps, func(st *ir.Step) bool { return st.If != nil })) {
+			return true
+		}
+	}
+	return false
 }
 
 // locate prefixes each validation error with the file and line of the job it names.

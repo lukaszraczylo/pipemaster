@@ -343,3 +343,64 @@ func TestParseRestoredConditionReadsInSourceDialect(t *testing.T) {
 		t.Errorf("origin = %+v, want provider and dialect %q: the restored condition reads in GitLab's dialect", back.Origin, provider.GitLab)
 	}
 }
+
+// A directory that mixes a file restored from GitLab with a native GHA file reads in one dialect: the native
+// file's conditions are GHA, so the restored file must not flip the project to GitLab.
+func TestParseMixedDirKeepsNativeConditionsInGHA(t *testing.T) {
+	const native = `name: native
+on: push
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - run: make deploy
+`
+	p := baseProject(t)
+	p.Origin.Provider = provider.GitLab
+	cond, err := expr.ParseCanonical("branch == 'main'")
+	if err != nil {
+		t.Fatal(err)
+	}
+	job(p, "build").If = cond
+	files, _, err := gha.New(gha.GHA).Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fsys := fstest.MapFS{".github/workflows/native.yml": {Data: []byte(native)}}
+	for n, b := range files {
+		fsys[n] = &fstest.MapFile{Data: b}
+	}
+	alone, _, err := gha.New(gha.GHA).Parse(fstest.MapFS{".github/workflows/native.yml": {Data: []byte(native)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mixed, rep, err := gha.New(gha.GHA).Parse(fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mixed.Origin.Provider != provider.GHA || mixed.Origin.Dialect != provider.GHA {
+		t.Errorf("origin = %+v, want %q: native conditions in the directory read in GHA's dialect", mixed.Origin, provider.GHA)
+	}
+	again, _, err := gha.New(gha.GHA).Emit(mixed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(again[".github/workflows/native.yml"]), "github.ref == 'refs/heads/main'") {
+		t.Errorf("native condition changed on re-emit:\n%s", again[".github/workflows/native.yml"])
+	}
+	var got expr.Expr
+	for _, pl := range mixed.Pipelines {
+		if pl.ID == "native" {
+			got = pl.Jobs[0].If
+		}
+	}
+	if expr.String(got) != expr.String(alone.Pipelines[0].Jobs[0].If) {
+		t.Errorf("native condition = %s, want %s", expr.String(got), expr.String(alone.Pipelines[0].Jobs[0].If))
+	}
+	if !slices.ContainsFunc(rep.Entries, func(e report.Entry) bool {
+		return e.Level == caps.Lost && strings.Contains(e.Detail, "source condition")
+	}) {
+		t.Errorf("no lost entry for the unrestored condition: %+v", rep.Entries)
+	}
+}
