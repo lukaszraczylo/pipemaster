@@ -165,3 +165,17 @@ func TestRefsRestoreInsideExpandedMatrix(t *testing.T) {
 		}
 	}
 }
+
+func TestMultiAxisScriptLineRestoresFully(t *testing.T) {
+	const line = "echo ${{ matrix.q }} ${{ matrix.r }}"
+	j := glJob("build", glStep(line))
+	j.Matrix = &ir.Matrix{
+		Axes:    []ir.Axis{{Name: "q", Values: []string{"a", "b"}}, {Name: "r", Values: []string{"1", "2"}}},
+		Exclude: []ir.Combo{{{Key: "q", Value: "a"}, {Key: "r", Value: "1"}}},
+	}
+	_, back, rep := emitParse(t, glProject("gitlab", j), nil)
+	if got := back.Pipelines[0].Jobs[0].Steps[0].Script[0]; got != line {
+		t.Errorf("script = %q", got)
+	}
+	noIgnoredNotes(t, rep)
+}

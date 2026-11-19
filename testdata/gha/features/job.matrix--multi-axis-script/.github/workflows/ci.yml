@@ -1,0 +1,14 @@
+name: matrix multi axis
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [linux, mac]
+        go: ['1.24', '1.25']
+        exclude:
+          - os: mac
+            go: '1.24'
+    steps:
+      - run: echo ${{ matrix.os }} ${{ matrix.go }}

@@ -277,22 +277,29 @@ func outputRefs(pl *ir.Pipeline, producer *ir.Job, lines map[string]bool) {
 		if !slices.ContainsFunc(j.Needs, func(n ir.Need) bool { return n.JobID == producer.ID }) {
 			continue
 		}
+		var res []*regexp.Regexp
+		var refs []string
 		for _, o := range producer.Outputs {
-			re := regexp.MustCompile(`\$(?:\{` + regexp.QuoteMeta(o.Name) + `\}|` + regexp.QuoteMeta(o.Name) + `\b)`)
-			ref := "${{ needs." + producer.ID + ".outputs." + o.Name + " }}"
-			for _, st := range j.Steps {
-				rewriteLines(st.Script, lines, re, ref)
-			}
+			res = append(res, varRE(o.Name))
+			refs = append(refs, "${{ needs."+producer.ID+".outputs."+o.Name+" }}")
+		}
+		for _, st := range j.Steps {
+			rewriteLines(st.Script, lines, res, refs)
 		}
 	}
 }
 
-// rewriteLines replaces re with ref in the lines the emitter marked as converted references.
-func rewriteLines(script []string, marked map[string]bool, re *regexp.Regexp, ref string) {
+// rewriteLines applies every rewrite, in order, to each line the emitter marked as converted references. The
+// marked set holds the lines as emitted, so all rewrites of one line must happen in this one pass.
+func rewriteLines(script []string, marked map[string]bool, res []*regexp.Regexp, refs []string) {
 	for i, l := range script {
-		if marked[l] {
-			script[i] = re.ReplaceAllLiteralString(l, ref)
+		if !marked[l] {
+			continue
 		}
+		for k, re := range res {
+			l = re.ReplaceAllLiteralString(l, refs[k])
+		}
+		script[i] = l
 	}
 }
 
@@ -412,14 +419,21 @@ func flatMatrix(m *ir.Matrix) *ir.Matrix {
 
 // matrixRefs turns the $axis variables GitLab sets for each parallel:matrix entry back into matrix references.
 func matrixRefs(j *ir.Job, m *ir.Matrix, lines map[string]bool) {
+	var res []*regexp.Regexp
+	var refs []string
 	for _, a := range m.Axes {
-		re := regexp.MustCompile(`\$(?:\{` + regexp.QuoteMeta(a.Name) + `\}|` + regexp.QuoteMeta(a.Name) + `\b)`)
-		ref := "${{ matrix." + a.Name + " }}"
-		rewriteLines(j.Runner.Labels, lines, re, ref)
-		for _, st := range j.Steps {
-			rewriteLines(st.Script, lines, re, ref)
-		}
+		res = append(res, varRE(a.Name))
+		refs = append(refs, "${{ matrix."+a.Name+" }}")
 	}
+	rewriteLines(j.Runner.Labels, lines, res, refs)
+	for _, st := range j.Steps {
+		rewriteLines(st.Script, lines, res, refs)
+	}
+}
+
+// varRE matches $name and ${name}.
+func varRE(name string) *regexp.Regexp {
+	return regexp.MustCompile(`\$(?:\{` + regexp.QuoteMeta(name) + `\}|` + regexp.QuoteMeta(name) + `\b)`)
 }
 
 // collapseConcurrency restores the pipeline concurrency group from the resource_group every job carries.
