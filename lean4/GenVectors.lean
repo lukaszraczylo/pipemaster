@@ -374,21 +374,236 @@ def exprCases : List (Json × Json) := ghaCases ++ gitlabCases
 
 def exprEnvsJson : Json := Json.arr (exprEnvs.map envJson).toArray
 
+
+/-! ## Adapter vectors (Task 23)
+
+Core pipelines are enumerated bounded-exhaustively and kept when they lie in the fragments:
+- triggers: every push, tag, pr combination over {absent, no filter, [x, y]} with one plain and one manual job;
+- one job: 17 single-feature and combined variants;
+- two main jobs: 6 variants each, with needs none, plain, or artifacts (108 cases);
+- finally: 4 main layouts (none, a, a and b in parallel, chain a then b) times 8 finally layouts;
+- pipeline name and ID: three cases.
+At most 2 main and 2 finally jobs, 2 steps per job. -/
+
+open Pipemaster.Core in
+def vJson (v : Var) : Json := Json.mkObj [("name", v.name), ("value", v.value)]
+
+def strsJson (l : List String) : Json := Json.arr (l.map Json.str).toArray
+
+def optNat (o : Option Nat) : Json := match o with | some n => Lean.toJson n | none => Json.null
+
+def optStrs (o : Option (List String)) : Json := match o with | some l => strsJson l | none => Json.null
+
+def optBool (o : Option Bool) : Json := match o with | some b => Json.bool b | none => Json.null
+
+open Pipemaster.Core in
+def varsJson (l : List Var) : Json := Json.arr (l.map vJson).toArray
+
+open Pipemaster.Core in
+def needJ (n : Core.Need) : Json := Json.mkObj [("job", n.job), ("artifacts", n.artifacts)]
+
+open Pipemaster.Core in
+def coreStepJson (s : Core.Step) : Json :=
+  Json.mkObj [("id", s.id), ("name", s.name), ("script", strsJson s.script), ("env", varsJson s.env)]
+
+open Pipemaster.Core in
+def coreJobJson (j : Core.Job) : Json :=
+  Json.mkObj [("id", j.id), ("name", j.name), ("needs", Json.arr (j.needs.map needJ).toArray),
+    ("env", varsJson j.env), ("runner", strsJson j.runner),
+    ("steps", Json.arr (j.steps.map coreStepJson).toArray), ("retry", Lean.toJson j.retry),
+    ("timeout_min", Lean.toJson j.timeout), ("manual", j.manual), ("allow_failure", j.allowFailure),
+    ("on_failure", j.onFailure)]
+
+def filterJson (f : Option (List String)) : Json :=
+  Json.mkObj [("set", f.isSome), ("include", strsJson (f.getD []))]
+
+open Pipemaster.Core in
+def coreJson (p : Core.Pipe) : Json :=
+  Json.mkObj [("id", p.id), ("name", p.name), ("push", filterJson p.push), ("tag", filterJson p.tag),
+    ("pr", filterJson p.pr), ("jobs", Json.arr (p.jobs.map coreJobJson).toArray),
+    ("finally", Json.arr (p.fin.map coreJobJson).toArray)]
+
+open Pipemaster.Gha in
+def ghaStepJson (s : Gha.Step) : Json :=
+  Json.mkObj [("id", s.id), ("name", s.name), ("uses", optionalStr s.uses), ("run", strsJson s.run),
+    ("env", varsJson s.env)]
+where optionalStr (o : Option String) : Json := match o with | some x => Json.str x | none => Json.null
+
+open Pipemaster.Gha in
+def ghaJobJson (j : Gha.Job) : Json :=
+  Json.mkObj [("key", j.key), ("name", j.name), ("needs", strsJson j.needs),
+    ("cond", match j.cond with | some c => Json.str c | none => Json.null),
+    ("runs_on", strsJson j.runsOn), ("timeout", optNat j.timeout), ("continue_on_error", j.continueOnError),
+    ("env", varsJson j.env), ("steps", Json.arr (j.steps.map ghaStepJson).toArray)]
+
+open Pipemaster.Gha in
+def ghaMarkJson : Gha.Mark → Json
+  | .trigPush i => Json.mkObj [("kind", "trig_push"), ("idx", Lean.toJson i)]
+  | .trigTag i => Json.mkObj [("kind", "trig_tag"), ("idx", Lean.toJson i)]
+  | .trigManual => Json.mkObj [("kind", "trig_manual")]
+  | .jobManual j => Json.mkObj [("kind", "job_manual"), ("job", j)]
+  | .jobRetry j n => Json.mkObj [("kind", "job_retry"), ("job", j), ("attempts", Lean.toJson n)]
+  | .jobNeedsArt j ns pre =>
+    Json.mkObj [("kind", "job_needs_art"), ("job", j), ("needs", strsJson ns), ("pre", Lean.toJson pre)]
+  | .finally j ns =>
+    Json.mkObj [("kind", "finally"), ("job", j), ("need_list", Json.arr (ns.map needJ).toArray)]
+  | .finallyRoot => Json.mkObj [("kind", "finally_root")]
+
+open Pipemaster.Gha in
+/-- The sort key both sides use for the marker list: kind, job, index. -/
+def ghaMarkKey : Gha.Mark → String
+  | .trigPush i => "trig_push\u0000\u0000" ++ toString i
+  | .trigTag i => "trig_tag\u0000\u0000" ++ toString i
+  | .trigManual => "trig_manual\u0000\u0000"
+  | .jobManual j => "job_manual\u0000" ++ j ++ "\u0000"
+  | .jobRetry j _ => "job_retry\u0000" ++ j ++ "\u0000"
+  | .jobNeedsArt j _ _ => "job_needs_art\u0000" ++ j ++ "\u0000"
+  | .finally j _ => "finally\u0000" ++ j ++ "\u0000"
+  | .finallyRoot => "finally_root\u0000\u0000"
+
+open Pipemaster.Gha in
+def ghaJson (g : Gha.Workflow) : Json :=
+  let marks := g.marks.mergeSort fun a b => decide (ghaMarkKey a ≤ ghaMarkKey b)
+  Json.mkObj [("id", g.id), ("name", g.name),
+    ("on", Json.mkObj [("pr", optStrs g.on.pr),
+      ("push", match g.on.push with
+        | some (b, t) => Json.mkObj [("branches", optStrs b), ("tags", optStrs t)]
+        | none => Json.null),
+      ("dispatch", g.on.dispatch)]),
+    ("jobs", Json.arr (g.jobs.map ghaJobJson).toArray),
+    ("marks", Json.arr (marks.map ghaMarkJson).toArray)]
+
+open Pipemaster.Gitlab in
+def glBlockJson (b : Gitlab.Block) : Json :=
+  Json.mkObj [("id", b.id), ("env", varsJson b.env), ("lines", strsJson b.lines)]
+
+open Pipemaster.Gitlab in
+def glJobJson (j : Gitlab.Job) : Json :=
+  Json.mkObj [("key", j.key), ("stage", match j.stage with | some s => Json.str s | none => Json.null),
+    ("tags", strsJson j.tags), ("needs", optStrs j.needs), ("variables", varsJson j.vars),
+    ("script", Json.arr (j.script.map glBlockJson).toArray), ("retry", optNat j.retry),
+    ("timeout", optNat j.timeout), ("allow_failure", optBool j.allowFailure),
+    ("when", match j.whenKey with | some s => Json.str s | none => Json.null)]
+
+open Pipemaster.Gitlab in
+def gitlabJson (g : Gitlab.Pipeline) : Json :=
+  let trig (m : Gitlab.TrigMark) : Json :=
+    Json.mkObj [("idx", Lean.toJson m.idx), ("kind", m.kind), ("include", strsJson m.incl)]
+  Json.mkObj [("stages", strsJson g.stages),
+    ("rules", match g.rules with | some rs => Json.arr (rs.map trig).toArray | none => Json.null),
+    ("jobs", Json.arr (g.jobs.map glJobJson).toArray), ("marks", Json.arr (g.marks.map trig).toArray)]
+
+section Adapters
+open Pipemaster.Core
+
+def cstep (id : String) (script : List String) : Core.Step := ⟨id, "", script, []⟩
+
+def cj (id : String) : Core.Job :=
+  ⟨id, "", [], [], ["r1"], [cstep "s1" ["echo 1"]], 0, 0, false, false, false⟩
+
+def twoSteps : List Core.Step :=
+  [cstep "s1" ["echo 1", "echo 2"], { cstep "s2" ["echo 3"] with name := "n", env := [⟨"S", "x"⟩] }]
+
+def sinkJob (id : String) : Core.Job :=
+  { cj id with name := "Sink", runner := ["r1", "r2"], env := [⟨"K", "v"⟩, ⟨"L", "a b"⟩], steps := twoSteps,
+               retry := 2, timeout := 5, manual := true, allowFailure := true }
+
+/-- Single-feature variants of a main job, then a combination of all features. -/
+def jobVariants (id : String) : List Core.Job :=
+  let b := cj id
+  [b, { b with name := "Build" }, { b with runner := ["r1", "r2"] }, { b with env := [⟨"K", "v"⟩] },
+   { b with env := [⟨"K", "v"⟩, ⟨"L", "a b"⟩] }, { b with steps := twoSteps },
+   { b with steps := [{ cstep "s1" ["echo 1"] with env := [⟨"S", "x"⟩] }] },
+   { b with steps := [{ cstep "s1" ["echo 1"] with env := [⟨"S", "q\"b\\c"⟩, ⟨"T", ""⟩] }] },
+   { b with steps := [{ cstep "s1" ["echo 1"] with name := "one" }] },
+   { b with timeout := 30 }, { b with timeout := 90 }, { b with retry := 1 }, { b with retry := 3 },
+   { b with allowFailure := true }, { b with manual := true }, { b with manual := true, allowFailure := true },
+   sinkJob id]
+
+def smallVariants (id : String) : List Core.Job :=
+  let b := cj id
+  [b, { b with retry := 2 }, { b with timeout := 30 }, { b with manual := true },
+   { b with env := [⟨"K", "v"⟩] }, { b with allowFailure := true }]
+
+def pipeOf (jobs fin : List Core.Job) (push tag pr : Option (List String) := none) : Core.Pipe :=
+  ⟨"ci", "", push, tag, pr, jobs, fin⟩
+
+def pushAll (jobs fin : List Core.Job) : Core.Pipe := pipeOf jobs fin (some [])
+
+def triggerFilters : List (Option (List String)) := [none, some [], some ["x", "y"]]
+
+def triggerPipes : List Core.Pipe :=
+  triggerFilters.flatMap fun push => triggerFilters.flatMap fun tag => triggerFilters.flatMap fun pr =>
+    [pipeOf [cj "a"] [] push tag pr, pipeOf [{ cj "a" with manual := true }] [] push tag pr]
+
+def needOn (id : String) (art : Bool) : List Core.Need := [⟨id, art⟩]
+
+def twoJobPipes : List Core.Pipe :=
+  (smallVariants "a").flatMap fun a => (smallVariants "b").flatMap fun b =>
+    [[], needOn "a" false, needOn "a" true].map fun ns => pushAll [a, { b with needs := ns }] []
+
+def mainLayouts : List (List Core.Job) :=
+  [[], [cj "a"], [cj "a", cj "b"], [cj "a", { cj "b" with needs := needOn "a" false }]]
+
+def finLayouts : List (List Core.Job) :=
+  let f := cj "f"
+  [[f], [{ f with onFailure := true }], [{ f with needs := needOn "a" false }],
+   [{ f with needs := needOn "a" true }],
+   [{ f with needs := [⟨"a", false⟩, ⟨"b", true⟩], onFailure := true }],
+   [{ f with name := "Fin", allowFailure := true, steps := twoSteps, retry := 1, timeout := 7 }],
+   [f, cj "g"], [{ f with onFailure := true }, { cj "g" with needs := needOn "a" false }]]
+
+def finPipes : List Core.Pipe :=
+  mainLayouts.flatMap fun ms => finLayouts.map fun fs => pushAll ms fs
+
+def namePipes : List Core.Pipe :=
+  [{ pushAll [sinkJob "a"] [] with name := "Pipe" }, { pushAll [cj "a"] [] with id := "gitlab-ci" },
+   { pushAll [cj "a"] [{ cj "f" with name := "Fin" }] with id := "x_y", name := "P", tag := some ["v1"] }]
+
+def allPipes : List Core.Pipe :=
+  triggerPipes ++ (jobVariants "a").map (fun a => pushAll [a] []) ++ twoJobPipes ++ finPipes ++ namePipes
+
+def ghaPipes : List Core.Pipe := allPipes.filter fun p => decide (InGha p)
+def gitlabPipes : List Core.Pipe := allPipes.filter fun p => decide (InGitlab p)
+
+def ghaAdapterCases : List (Json × Json) :=
+  ghaPipes.map fun p =>
+    (coreJson p, Json.mkObj [("gha", ghaJson (Gha.toGha p)), ("core", coreJson (Gha.fromGha (Gha.toGha p)))])
+
+def gitlabAdapterCases : List (Json × Json) :=
+  gitlabPipes.map fun p =>
+    (coreJson p, Json.mkObj [("gitlab", gitlabJson (Gitlab.toGitlab p)),
+      ("core", coreJson (Gitlab.fromGitlab (Gitlab.toGitlab p) (metaOf p)))])
+
+def crossAdapterCases : List (Json × Json) :=
+  ghaPipes.map fun p =>
+    let viaGitlab := Gha.fromGha (Gha.toGha (Gitlab.fromGitlab (Gitlab.toGitlab p) (metaOf p)))
+    let viaGha := Gitlab.fromGitlab (Gitlab.toGitlab (Gha.fromGha (Gha.toGha p) (metaOf p))) (metaOf p)
+    (coreJson p, Json.mkObj [("cross", coreJson viaGitlab), ("rev", coreJson viaGha)])
+
+end Adapters
+
 end GenVectors
 
 def main (args : List String) : IO UInt32 := do
-  let dir ← match args with
-    | [d] => pure d
-    | _ => do IO.eprintln "usage: gen-vectors <output-dir>"; return 2
+  let (dir, only) ← match args with
+    | d :: rest => pure (d, rest)
+    | _ => do IO.eprintln "usage: gen-vectors <output-dir> [name...]"; return 2
   IO.FS.createDirAll dir
+  let want (name : String) : Bool := only.isEmpty || only.contains name
   let files : List (String × String × List (Json × Json)) :=
     [("dag", "Pipemaster.Dag.layers_respect_needs", GenVectors.dagCases),
      ("matrix", "Pipemaster.Matrix.expand_mem", GenVectors.matrixCases),
-     ("ledger", "Pipemaster.Ledger.complete", GenVectors.ledgerCases)]
+     ("ledger", "Pipemaster.Ledger.complete", GenVectors.ledgerCases),
+     ("gha", "Pipemaster.Gha.gha_from_to", GenVectors.ghaAdapterCases),
+     ("gitlab", "Pipemaster.Gitlab.gitlab_from_to", GenVectors.gitlabAdapterCases),
+     ("cross", "Pipemaster.RoundTrip.cross_roundtrip", GenVectors.crossAdapterCases)]
   for (name, thm, cases) in files do
-    IO.FS.writeFile s!"{dir}/{name}.json" (GenVectors.emit thm cases)
-    IO.println s!"{name}: {cases.length} cases"
-  IO.FS.writeFile s!"{dir}/expr.json"
-    (GenVectors.emit "Pipemaster.Translate.tr_sound" GenVectors.exprCases (some GenVectors.exprEnvsJson))
-  IO.println s!"expr: {GenVectors.exprCases.length} cases"
+    if want name then
+      IO.FS.writeFile s!"{dir}/{name}.json" (GenVectors.emit thm cases)
+      IO.println s!"{name}: {cases.length} cases"
+  if want "expr" then
+    IO.FS.writeFile s!"{dir}/expr.json"
+      (GenVectors.emit "Pipemaster.Translate.tr_sound" GenVectors.exprCases (some GenVectors.exprEnvsJson))
+    IO.println s!"expr: {GenVectors.exprCases.length} cases"
   return 0

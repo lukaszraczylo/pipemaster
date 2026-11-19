@@ -31,6 +31,10 @@ required=(
   Pipemaster.Translate.tr_none_iff_rev
   Pipemaster.Translate.naive_eq_unsound
   Pipemaster.Translate.naive_and_unsound
+  Pipemaster.Gha.gha_from_to
+  Pipemaster.Gitlab.gitlab_from_to
+  Pipemaster.RoundTrip.cross_roundtrip
+  Pipemaster.RoundTrip.cross_roundtrip_rev
 )
 required_lean="$(printf '`%s, ' "${required[@]}")"
 required_lean="[${required_lean%, }]"
