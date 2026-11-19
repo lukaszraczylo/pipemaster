@@ -29,11 +29,21 @@ var (
 )
 
 // workflow maps workflow:rules to triggers. The block stays in Ext whole; without one, or when a rule has no
-// trigger form, the pipeline gets GitLab's default of a push to any branch or tag.
-func (s *state) workflow(pl *ir.Pipeline, r *reader) error {
+// trigger form, the pipeline gets GitLab's default of a push to any branch or tag, and the returned guard
+// is an opaque condition for every job, because the default triggers are wider than the rules.
+func (s *state) workflow(pl *ir.Pipeline, r *reader) (guard expr.Expr, err error) {
 	w := r.peek("workflow")
 	trigs, ok, why := s.workflowTriggers(w)
 	if w != nil && !ok {
+		v, err := s.plain(w)
+		if err != nil {
+			return nil, err
+		}
+		b, err := yaml.Marshal(map[string]any{"workflow": v})
+		if err != nil {
+			return nil, s.errf(w, "%v", err)
+		}
+		guard = expr.Opaque{Dialect: dialect, Text: string(b)}
 		s.rep.Add(report.Entry{
 			IRPath: "pipeline/" + pipelineID, Feature: caps.ExtPassthrough, Level: caps.Lost,
 			Strategy: "kept in Ext[gitlab][workflow]; default push and tag triggers used",
@@ -52,7 +62,7 @@ func (s *state) workflow(pl *ir.Pipeline, r *reader) error {
 		}
 	}
 	pl.Triggers = trigs
-	return nil
+	return guard, nil
 }
 
 func (s *state) workflowTriggers(w *yaml.Node) ([]ir.Trigger, bool, string) {
@@ -83,7 +93,7 @@ func (s *state) workflowTriggers(w *yaml.Node) ([]ir.Trigger, bool, string) {
 			out = mergeTriggers(out, ts)
 		}
 	}
-	return out, len(out) > 0, "the rules start no pipeline"
+	return out, true, ""
 }
 
 func (s *state) workflowRule(n *yaml.Node) (cond expr.Expr, when string, ok bool) {
@@ -220,4 +230,15 @@ func mergeFilter(a, b ir.Filter) ir.Filter {
 		}
 	}
 	return out
+}
+
+// guardJobs ANDs the opaque workflow condition into every job unless trigger markers restored the triggers, because
+// the default triggers are wider than the rules the file declares.
+func (s *state) guardJobs(pl *ir.Pipeline) {
+	if s.guard == nil || s.restored {
+		return
+	}
+	for _, j := range append(append([]*ir.Job{}, pl.Jobs...), pl.Finally...) {
+		j.If = and(j.If, s.guard)
+	}
 }

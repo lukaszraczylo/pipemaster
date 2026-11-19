@@ -3,8 +3,8 @@ package gitlab
 import (
 	"fmt"
 	"maps"
-	"slices"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 

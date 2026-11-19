@@ -24,8 +24,8 @@ func (e *emitter) timing(jp string, j *ir.Job, finally bool) (jobTiming, error) 
 	disabled := false
 	var cond expr.Expr
 	status := ""
-	if j.If != nil {
-		rest, st, ok := splitStatus(j.If)
+	if ifx := withoutNative(j.If); ifx != nil {
+		rest, st, ok := splitStatus(ifx)
 		status = st
 		switch {
 		case !ok:

@@ -68,6 +68,9 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	for _, p := range pls {
 		s.collapseMarkers(p, marksFor(uses, p, len(pls) > 1), args)
 	}
+	if len(pls) == 1 {
+		s.guardJobs(pls[0])
+	}
 	if err := ir.Validate(proj); err != nil {
 		return nil, nil, s.locate(err, infos)
 	}
@@ -102,7 +105,7 @@ func (s *state) parsePipeline(root *yaml.Node, remote []any) (*ir.Pipeline, []*j
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := s.workflow(pl, r); err != nil {
+	if s.guard, err = s.workflow(pl, r); err != nil {
 		return nil, nil, err
 	}
 	jobs, hidden, err := s.splitJobs(r)

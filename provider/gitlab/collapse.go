@@ -620,6 +620,8 @@ func (s *state) restoreTriggers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[
 		return
 	}
 	pl.Triggers = out
+	// Markers that only restate the default triggers leave the rules as unreadable as before.
+	s.restored = !sameTriggers(out, defaultTriggers())
 }
 
 // triggersDerive is true when writing marked as workflow rules and reading them back gives parsed: the
