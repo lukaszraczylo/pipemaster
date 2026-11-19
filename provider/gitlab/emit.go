@@ -221,7 +221,11 @@ func (e *emitter) headerKeys(m *omap, pl *ir.Pipeline, ext map[string]any, c *pi
 		e.cancelLost(pp, pl.Concurrency)
 		marks = append(marks, emitkit.Marker(caps.PipelineConcurrency, pp))
 	}
-	return marks, nil
+	rm, err := refMarks(pp, pl)
+	if err != nil {
+		return nil, err
+	}
+	return append(marks, rm...), nil
 }
 
 // pipelineVars joins pipeline env with the inputs, which GitLab can only carry as variables with a description.

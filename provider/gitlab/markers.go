@@ -35,6 +35,11 @@ var collapsers = map[caps.Feature]collapser{
 	caps.StepAction:          collapseAction,
 }
 
+// lastCollapsers run after every other marker, because they read the lines the others restore.
+var lastCollapsers = map[caps.Feature]collapser{
+	caps.ScriptInterpolation: collapseRefs,
+}
+
 // stepFeatures are the emulations that rewrite one step's lines; they collapse together because they nest.
 var stepFeatures = []caps.Feature{caps.StepIf, caps.StepWorkdir, caps.StepEnv, caps.StepContinueOnError}
 
@@ -56,6 +61,8 @@ func (s *state) collapseMarkers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[
 			if stepDone[u.IRPath][u.Feature] {
 				continue
 			}
+		} else if _, last := lastCollapsers[u.Feature]; last {
+			continue
 		} else if c, ok := collapsers[u.Feature]; ok && c(&collapseCtx{pl: pl, path: u.IRPath, args: args[u]}) {
 			continue
 		}
@@ -63,6 +70,14 @@ func (s *state) collapseMarkers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[
 			IRPath: u.IRPath, Feature: u.Feature, Level: caps.Emulated, Strategy: "kept as shell text",
 			Detail: "marker not collapsed: no parser rule restores " + string(u.Feature) + " at this path",
 		})
+	}
+	for _, u := range uses {
+		if c, ok := lastCollapsers[u.Feature]; ok && !c(&collapseCtx{pl: pl, path: u.IRPath, args: args[u]}) {
+			s.rep.Add(report.Entry{
+				IRPath: u.IRPath, Feature: u.Feature, Level: caps.Emulated, Strategy: "kept as shell text",
+				Detail: "marker not collapsed: its argument is not a list of converted texts",
+			})
+		}
 	}
 }
 

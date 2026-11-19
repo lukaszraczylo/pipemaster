@@ -1,0 +1,24 @@
+# pipemaster:emulated pipeline.inputs pipeline/ci
+# pipemaster:arg [{"Name":"target","Type":"","Default":"staging","Description":"Deploy target","Required":false}]
+# pipemaster:emulated script.interpolation pipeline/ci
+# pipemaster:arg [{"k":"t","g":"$os","s":"$\u007b{ matrix.os }}"},{"k":"t","g":"echo $os $target $REGION $LEVEL","s":"echo $\u007b{ matrix.os }} $\u007b{ inputs.target }} $\u007b{ env.REGION }} $\u007b{ vars.LEVEL }}"}]
+variables:
+  REGION: eu
+  target:
+    value: staging
+    description: Deploy target
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+test:
+  tags:
+    - $os
+  needs: []
+  script:
+    # pipemaster:step test-step-1
+    - echo $os $target $REGION $LEVEL
+  parallel:
+    matrix:
+      - os:
+          - ubuntu-latest
+          - macos-latest

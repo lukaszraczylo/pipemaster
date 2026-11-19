@@ -163,6 +163,11 @@ func (e *emitter) foldPipelines(pls []*ir.Pipeline) (*ir.Pipeline, error) {
 			return nil, err
 		}
 		f.marks = append(f.marks, emitkit.Marker(caps.ProjectMultiPipeline, pp), a)
+		rm, err := refMarks(pp, pl)
+		if err != nil {
+			return nil, err
+		}
+		f.marks = append(f.marks, rm...)
 	}
 	return merged, nil
 }
