@@ -19,6 +19,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/meta"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/validate"
 )
 
 func layer(source, key string, val any) *meta.Meta {
@@ -403,6 +404,53 @@ func TestEmbedConversionRemovesOldSidecar(t *testing.T) {
 	}
 }
 
+// chainsFrom lists every A to B to C to A chain that starts at a: B differs from A, C from B and A.
+func chainsFrom(a string) [][2]string {
+	var out [][2]string
+	for _, b := range targets(a) {
+		for _, c := range targets(b) {
+			if c != a {
+				out = append(out, [2]string{b, c})
+			}
+		}
+	}
+	return out
+}
+
+// chainInputs is every feature fixture and corpus entry written in provider a.
+func chainInputs(t *testing.T, a string) []fixture {
+	t.Helper()
+	out := fixtures(t, a)
+	for _, e := range corpusEntries(t) {
+		if e.provider == a {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// outputFiles reads every converted file, leaving out the sidecar directory.
+func outputFiles(t *testing.T, dir string) map[string][]byte {
+	t.Helper()
+	files := map[string][]byte{}
+	root := os.DirFS(dir)
+	err := fs.WalkDir(root, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		if strings.HasPrefix(p, ".pipemaster/") {
+			return nil
+		}
+		b, rerr := fs.ReadFile(root, p)
+		files[p] = b
+		return rerr
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return files
+}
+
 // checkReturn asserts that dir, the output of a full return into a, holds the pipeline parsed from src. A
 // dialect that cannot write every key keeps the rest in metadata of its own, which the check applies;
 // GHA writes every key, so its return carries no metadata at all.
@@ -428,6 +476,55 @@ func checkReturn(t *testing.T, a, src, dir string) {
 	}
 	if same, diff := ir.Equal(parseDir(t, a, src), final); !same {
 		t.Fatalf("chain changed the pipeline:\n%s", diff)
+	}
+}
+
+// checkValid fails when a hop's output does not pass the pinned schema of its provider.
+func checkValid(t *testing.T, id string, files map[string][]byte) {
+	t.Helper()
+	for name, data := range files {
+		if err := validate.File(id, name, data); err != nil && !errors.Is(err, validate.ErrNoSchema) {
+			t.Errorf("validate %s %s: %v", id, name, err)
+		}
+	}
+}
+
+func TestChainMatrix(t *testing.T) {
+	total := 0
+	for _, a := range provider.IDs() {
+		chains := chainsFrom(a)
+		inputs := chainInputs(t, a)
+		for _, f := range inputs {
+			for _, ch := range chains {
+				route := []string{a, ch[0], ch[1], a}
+				for _, embed := range []bool{false, true} {
+					total++
+					name := fmt.Sprintf("%s/embed=%t/%s", strings.Join(route, "-"), embed, f.name)
+					t.Run(name, func(t *testing.T) {
+						t.Parallel()
+						prev := f.dir
+						for i := 1; i < len(route); i++ {
+							out := t.TempDir()
+							args := []string{"convert", prev, "--from", route[i-1], "--to", route[i], "-o", out}
+							if embed {
+								args = append(args, "--embed-meta")
+							}
+							if code, _, msg := runOut(args...); code != 0 {
+								t.Fatalf("hop %d to %s = %d\n%s", i, route[i], code, msg)
+							}
+							if i < len(route)-1 {
+								checkValid(t, route[i], outputFiles(t, out))
+							}
+							prev = out
+						}
+						checkReturn(t, a, f.dir, prev)
+					})
+				}
+			}
+		}
+	}
+	if total == 0 {
+		t.Fatal("no chains ran")
 	}
 }
 
