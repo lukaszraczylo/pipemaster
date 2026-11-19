@@ -8,6 +8,7 @@ pipelines:
       name: container
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - container:
             ref: golang:1.24

@@ -188,8 +188,8 @@ func (e *emitter) implicitDispatch(b *onBuilder, pl *ir.Pipeline, jobManual stri
 
 const matchAll = "**"
 
-// pushEvent writes the push trigger and the tag trigger it pairs with as one push: event. GHA fires a
-// push only for the ref kinds a filter names, so an unfiltered side is written as '**'.
+// pushEvent writes the push trigger and the tag trigger it pairs with as one push: event. A push event with a
+// filter for one ref kind fires only for the kinds a filter names, so an unfiltered side is written as '**'.
 func (e *emitter) pushEvent(b *onBuilder, pl *ir.Pipeline, i int, used map[int]bool) error {
 	if used[i] {
 		return nil
@@ -212,12 +212,14 @@ func (e *emitter) pushEvent(b *onBuilder, pl *ir.Pipeline, i int, used map[int]b
 	}
 	m := newMap()
 	paths := ir.Filter{}
+	// An unfiltered push and tag pair is a bare push event, which GHA fires for both ref kinds.
+	bare := push != nil && tag != nil && !hasFilter(push.Branches) && !hasFilter(tag.Tags)
 	if push != nil {
 		if hasFilter(push.Tags) {
 			e.lose(pp, caps.TriggerFilterTags, "a push trigger has no tag filter; tags belong to a tag trigger")
 		}
-		if tag != nil && !hasFilter(push.Branches) {
-			e.emulate(pp, caps.TriggerPush, "branches: '**'", "GHA fires push only for named ref kinds; branches are named explicitly beside tags")
+		if !hasFilter(push.Branches) && !bare {
+			e.emulate(pp, caps.TriggerPush, "branches: '**'", "GHA fires a push without filters for branches and tags; branches are named explicitly to leave tags out or beside a tag filter")
 			m.set("branches", strSeq([]string{matchAll}))
 			e.mark(caps.TriggerPush, pp)
 		}
@@ -231,7 +233,7 @@ func (e *emitter) pushEvent(b *onBuilder, pl *ir.Pipeline, i int, used map[int]b
 		if push != nil && !sameFilter(push.Paths, tag.Paths) {
 			e.lose(tp, caps.TriggerFilterPaths, "the push trigger's paths filter applies to tags too; GHA has one per push event")
 		}
-		if !hasFilter(tag.Tags) {
+		if !hasFilter(tag.Tags) && !bare {
 			e.emulate(tp, caps.TriggerTag, "tags: '**'", "GHA fires tag pushes only when a tags filter names them")
 			m.set("tags", strSeq([]string{matchAll}))
 			e.mark(caps.TriggerTag, tp)

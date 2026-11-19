@@ -1,5 +1,3 @@
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
 # pipemaster:arg {"On":null,"Attempts":2}
@@ -11,10 +9,6 @@
 # pipemaster:arg {"On":null,"Attempts":2}
 on:
   push:
-    branches:
-      - '**'
-    tags:
-      - '**'
 env:
   SHARED: "1"
 jobs:

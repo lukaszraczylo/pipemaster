@@ -160,10 +160,12 @@ func (fp *fileParser) parsePush(res *onResult, m *mapping) error {
 	tags, hasT := fp.filter(m, "tags")
 	paths, _ := fp.filter(m, "paths")
 	first := len(res.triggers)
-	if hasB || !hasT {
+	// GHA fires a push with neither filter for branches and tags.
+	bare := !hasB && !hasT
+	if hasB || bare {
 		res.triggers = append(res.triggers, ir.Trigger{Kind: ir.TriggerPush, Branches: branches, Paths: paths})
 	}
-	if hasT {
+	if hasT || bare {
 		res.triggers = append(res.triggers, ir.Trigger{Kind: ir.TriggerTag, Tags: tags, Paths: paths})
 	}
 	return finishTrigger(&res.triggers[first], m)

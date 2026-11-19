@@ -29,6 +29,7 @@ pipelines:
       name: CI
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - id: build
           runner:

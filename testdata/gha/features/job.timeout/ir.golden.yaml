@@ -8,6 +8,7 @@ pipelines:
       name: timeout
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - timeout: 15m0s
           id: build

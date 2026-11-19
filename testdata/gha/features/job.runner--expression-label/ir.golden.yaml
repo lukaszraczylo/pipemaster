@@ -8,6 +8,7 @@ pipelines:
       name: expression label
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - matrix:
             include:

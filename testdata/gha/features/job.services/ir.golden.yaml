@@ -8,6 +8,7 @@ pipelines:
       name: services
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - ext:
             gha:

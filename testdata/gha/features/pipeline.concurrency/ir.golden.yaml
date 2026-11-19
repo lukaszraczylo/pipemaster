@@ -11,6 +11,7 @@ pipelines:
       name: conc
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - id: build
           runner:

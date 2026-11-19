@@ -121,7 +121,7 @@ func emulCases() map[string]emulCase {
 			want: []string{"# pipemaster:emulated step.image " + jobBuild + "/step/build-step-1", "uses: docker://alpine:3", "entrypoint: /bin/sh", "make build"},
 		},
 		"trigger.resource": {
-			feature: caps.TriggerResource, path: "pipeline/ci/trigger/1", level: caps.Lost,
+			feature: caps.TriggerResource, path: "pipeline/ci/trigger/2", level: caps.Lost,
 			mutate: func(p *ir.Project) {
 				p.Pipelines[0].Triggers = append(p.Pipelines[0].Triggers, ir.Trigger{Kind: ir.TriggerResource, Resource: &ir.ResourceRef{Name: "r", Type: "git"}})
 			},

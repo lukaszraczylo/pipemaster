@@ -18,6 +18,7 @@ pipelines:
       name: ext
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - ext:
             gha:

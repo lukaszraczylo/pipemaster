@@ -8,6 +8,7 @@ pipelines:
       name: allow
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - id: flaky
           runner:

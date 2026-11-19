@@ -1,7 +1,4 @@
 # pipemaster:emulated pipeline.concurrency pipeline/ci
-workflow:
-  rules:
-    - if: $CI_COMMIT_BRANCH
 # pipemaster:lost script.interpolation pipeline/ci: {{ ref }}
 build:
   tags:

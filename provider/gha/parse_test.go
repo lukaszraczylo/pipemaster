@@ -97,7 +97,8 @@ func TestOnShorthandForms(t *testing.T) {
 			}
 		}
 	}
-	if tr := one(t, "on: push\n"+jobs).Triggers; len(tr) != 1 || tr[0].Kind != ir.TriggerPush {
+	// GHA fires a push without filters for branches and tags.
+	if tr := one(t, "on: push\n"+jobs).Triggers; len(tr) != 2 || tr[0].Kind != ir.TriggerPush || tr[1].Kind != ir.TriggerTag {
 		t.Fatalf("triggers = %+v", tr)
 	}
 }

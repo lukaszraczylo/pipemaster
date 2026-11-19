@@ -5,5 +5,3 @@ Loss report: gitlab -> gha
 [emulated] pipeline/gitlab-ci/job/lint job.runner: default runner label ubuntu-latest (the pipeline named no runner)
 [emulated] pipeline/gitlab-ci/job/summary job.runner: default runner label ubuntu-latest (the pipeline named no runner)
 [emulated] pipeline/gitlab-ci/job/unit job.runner: default runner label ubuntu-latest (the pipeline named no runner)
-[emulated] pipeline/gitlab-ci/trigger/0 trigger.push: branches: '**' (GHA fires push only for named ref kinds; branches are named explicitly beside tags)
-[emulated] pipeline/gitlab-ci/trigger/1 trigger.tag: tags: '**' (GHA fires tag pushes only when a tags filter names them)

@@ -1,5 +1,3 @@
 Loss report: gitlab -> gha
 [lost] pipeline/gitlab-ci ext.passthrough (Ext of provider gitlab is not written to the GHA file; it is kept in round-trip metadata)
 [emulated] pipeline/gitlab-ci step.script: placeholder job pipemaster-empty (a GHA workflow needs at least one job)
-[emulated] pipeline/gitlab-ci/trigger/0 trigger.push: branches: '**' (GHA fires push only for named ref kinds; branches are named explicitly beside tags)
-[emulated] pipeline/gitlab-ci/trigger/1 trigger.tag: tags: '**' (GHA fires tag pushes only when a tags filter names them)

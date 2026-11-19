@@ -119,16 +119,18 @@ def mainJob (j : Core.Job) : Job :=
 def finJob (mains : List String) (j : Core.Job) : Job :=
   emitJob mains (some (if j.onFailure then condAlwaysFailure else condAlways)) j
 
+/-- An unfiltered push and tag pair is a bare push event, which GHA fires for branches and tags. Any other
+unfiltered side is written as the match-all glob, so the event fires for the ref kinds the pipeline names. -/
 def pushBranches (p : Pipe) : Option (List String) :=
   match p.push with
   | none => none
-  | some [] => if p.tag.isSome then some [matchAll] else none
+  | some [] => if p.tag = some [] then none else some [matchAll]
   | some bs => some bs
 
 def pushTags (p : Pipe) : Option (List String) :=
   match p.tag with
   | none => none
-  | some [] => some [matchAll]
+  | some [] => if p.push = some [] then none else some [matchAll]
   | some ts => some ts
 
 def toOn (p : Pipe) : On where
@@ -143,8 +145,8 @@ def jobMarks (j : Core.Job) : List Mark :=
 
 def marksOf (p : Pipe) : List Mark :=
   let off := if p.pr.isSome then 1 else 0
-  (if p.push = some [] ∧ p.tag.isSome then [Mark.trigPush off] else []) ++
-  (if p.tag = some [] then [Mark.trigTag (off + if p.push.isSome then 1 else 0)] else []) ++
+  (if p.push = some [] ∧ p.tag ≠ some [] then [Mark.trigPush off] else []) ++
+  (if p.tag = some [] ∧ p.push ≠ some [] then [Mark.trigTag (off + if p.push.isSome then 1 else 0)] else []) ++
   (if p.all.any (·.manual) then [Mark.trigManual] else []) ++
   p.all.flatMap jobMarks ++
   p.fin.map (fun j => Mark.finally j.id j.needs) ++
@@ -256,10 +258,9 @@ def finishFin (g : Workflow) (gj : Job) (ob : Bool) (ns : List Core.Need) : Core
 def parseOnPush (g : Workflow) : Option (List String) × Option (List String) :=
   match g.on.push with
   | none => (none, none)
+  | some (none, none) => (some [], some [])
   | some (b, t) =>
-    (match b with
-     | some bs => some (if bs = [matchAll] ∧ g.hasTrig false then [] else bs)
-     | none => if t.isNone then some [] else none,
+    (b.map fun bs => if bs = [matchAll] ∧ g.hasTrig false then [] else bs,
      t.map fun ts => if ts = [matchAll] ∧ g.hasTrig true then [] else ts)
 
 def mainPick (g : Workflow) (gj : Job) : Option Core.Job :=
@@ -313,7 +314,7 @@ theorem any_ite {α : Type} (c : Prop) [Decidable c] (m : α) (q : α → Bool) 
   split <;> simp_all
 
 theorem hasTrig_toGha (p : Pipe) (tag : Bool) :
-    (toGha p).hasTrig tag = (if tag then decide (p.tag = some []) else decide (p.push = some [] ∧ p.tag.isSome = true)) := by
+    (toGha p).hasTrig tag = (if tag then decide (p.tag = some [] ∧ p.push ≠ some []) else decide (p.push = some [] ∧ p.tag ≠ some [])) := by
   have hf : (p.all.flatMap jobMarks).any (trigQ tag) = false := by
     rw [List.any_flatMap, List.any_eq_false]
     intro j _; simpa using jobMarks_no_trig j tag
@@ -331,8 +332,8 @@ theorem find_ite {α γ : Type} (c : Prop) [Decidable c] (m : α) (q : α → Op
   split <;> simp_all
 
 theorem marks_split (p : Pipe) :
-    (toGha p).marks = ((if p.push = some [] ∧ p.tag.isSome = true then [Mark.trigPush (if p.pr.isSome = true then 1 else 0)] else []) ++
-      (if p.tag = some [] then [Mark.trigTag ((if p.pr.isSome = true then 1 else 0) + if p.push.isSome = true then 1 else 0)] else []) ++
+    (toGha p).marks = ((if p.push = some [] ∧ p.tag ≠ some [] then [Mark.trigPush (if p.pr.isSome = true then 1 else 0)] else []) ++
+      (if p.tag = some [] ∧ p.push ≠ some [] then [Mark.trigTag ((if p.pr.isSome = true then 1 else 0) + if p.push.isSome = true then 1 else 0)] else []) ++
       (if (p.all.any fun x => x.manual) = true then [Mark.trigManual] else [])) ++
       p.all.flatMap jobMarks ++ p.fin.map (fun j => Mark.finally j.id j.needs) ++
       (if p.fin.isEmpty = true then [] else [Mark.finallyRoot]) := rfl
@@ -553,7 +554,7 @@ theorem parseOnPush_toGha (p : Pipe) :
   have ht := hasTrig_toGha p true
   have hf := hasTrig_toGha p false
   unfold parseOnPush
-  show (match (toOn p).push with | none => (none, none) | some (b, t) => _) = _
+  show (match (toOn p).push with | none => (none, none) | some (none, none) => (some [], some []) | some (b, t) => _) = _
   simp only [toOn, ht, hf]
   rcases hp : p.push with _ | _ | ⟨b, bs⟩ <;> rcases htg : p.tag with _ | _ | ⟨t, ts⟩ <;>
     simp [pushBranches, pushTags, hp, htg, matchAll]

@@ -120,3 +120,60 @@ workflow:
 		t.Errorf("job gained a never rule:\n%s", out)
 	}
 }
+
+func onBlock(doc string) string {
+	_, after, ok := strings.Cut(doc, "\non:\n")
+	if !ok {
+		return ""
+	}
+	var out []string
+	for _, l := range strings.Split(after, "\n") {
+		if l != "" && !strings.HasPrefix(l, " ") {
+			break
+		}
+		out = append(out, l)
+	}
+	return strings.Join(out, "\n")
+}
+
+func TestUnfilteredGHAPushKeepsTagsInGitlab(t *testing.T) {
+	const src = `on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: make
+`
+	doc, _ := convert(t, provider.GHA, provider.GitLab, ghaWorkflow, src)
+	if strings.Contains(doc, "workflow:") {
+		t.Errorf("a push without filters must run on branches and tags; GitLab's default does, a workflow rule would narrow it:\n%s", doc)
+	}
+}
+
+func TestGitlabBranchOnlyRuleStaysBranchOnlyInGHA(t *testing.T) {
+	const src = `workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+deploy:
+  script: [./deploy.sh]
+`
+	doc, _ := convert(t, provider.GitLab, provider.GHA, gitlabCI, src)
+	on := onBlock(doc)
+	if !strings.Contains(on, "branches:") || strings.Contains(on, "tags:") {
+		t.Errorf("branch-only pipeline must name branches and no tags:\n%s", doc)
+	}
+}
+
+func TestGitlabPushSourceRunsOnTagsInGHA(t *testing.T) {
+	const src = `workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+deploy:
+  script: [./deploy.sh]
+`
+	doc, _ := convert(t, provider.GitLab, provider.GHA, gitlabCI, src)
+	on := onBlock(doc)
+	if !strings.Contains(on, "push:") || strings.Contains(on, "branches:") || strings.Contains(on, "tags:") {
+		t.Errorf("a push source is a bare GHA push, which fires for branches and tags:\n%s", doc)
+	}
+}

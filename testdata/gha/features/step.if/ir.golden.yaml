@@ -8,6 +8,7 @@ pipelines:
       name: stepif
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - id: build
           runner:

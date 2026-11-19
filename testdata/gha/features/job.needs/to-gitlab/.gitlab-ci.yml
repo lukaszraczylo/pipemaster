@@ -1,9 +1,6 @@
 stages:
   - stage-0
   - stage-1
-workflow:
-  rules:
-    - if: $CI_COMMIT_BRANCH
 lint:
   stage: stage-0
   tags:

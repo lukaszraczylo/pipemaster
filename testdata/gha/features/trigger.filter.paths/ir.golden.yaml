@@ -16,6 +16,11 @@ pipelines:
             include:
                 - src/**
                 - '!src/docs/**'
+        - kind: tag
+          paths:
+            include:
+                - src/**
+                - '!src/docs/**'
       jobs:
         - id: build
           runner:

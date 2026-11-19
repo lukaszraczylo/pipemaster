@@ -8,6 +8,7 @@ pipelines:
       name: runner
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - id: build
           runner:

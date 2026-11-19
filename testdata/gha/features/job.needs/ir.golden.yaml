@@ -8,6 +8,7 @@ pipelines:
       name: needs
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - id: lint
           runner:

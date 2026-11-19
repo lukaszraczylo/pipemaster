@@ -1,7 +1,10 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated step.if pipeline/gitlab-ci/job/build/step/build-step-2
 # pipemaster:arg {"src":"event == 'push'"}
 on:
   push:
+    branches:
+      - '**'
 jobs:
   build:
     runs-on: ubuntu-latest

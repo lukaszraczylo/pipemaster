@@ -1,11 +1,5 @@
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 on:
   push:
-    branches:
-      - '**'
-    tags:
-      - '**'
 jobs:
   build:
     runs-on:

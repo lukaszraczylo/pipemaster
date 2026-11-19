@@ -8,6 +8,7 @@ pipelines:
       name: opaque
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - if: 'opaque(gha): fromJSON(''{"a":1}'').a == 1'
           id: build

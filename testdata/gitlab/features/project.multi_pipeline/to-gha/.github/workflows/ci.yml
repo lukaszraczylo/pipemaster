@@ -1,6 +1,9 @@
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
 name: CI
 on:
   push:
+    branches:
+      - '**'
 jobs:
   build:
     runs-on: ubuntu-latest

@@ -8,6 +8,7 @@ pipelines:
       name: cond
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - if: (ref == 'refs/heads/main') && (event == 'push')
           id: deploy

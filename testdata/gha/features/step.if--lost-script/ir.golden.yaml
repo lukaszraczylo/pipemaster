@@ -8,6 +8,7 @@ pipelines:
       name: ci
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - id: check
           runner:

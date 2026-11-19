@@ -8,6 +8,7 @@ pipelines:
       name: env
       triggers:
         - kind: push
+        - kind: tag
       env:
         - name: CGO_ENABLED
           value:

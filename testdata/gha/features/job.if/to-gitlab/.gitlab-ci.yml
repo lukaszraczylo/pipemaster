@@ -1,6 +1,3 @@
-workflow:
-  rules:
-    - if: $CI_COMMIT_BRANCH
 # pipemaster:lost job.if pipeline/ci/job/deploy: (ref == 'refs/heads/main') && (event == 'push')
 deploy:
   tags:

@@ -8,6 +8,7 @@ pipelines:
       name: Build and test
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - id: build
           name: Build the binary

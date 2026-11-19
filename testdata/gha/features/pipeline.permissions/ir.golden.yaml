@@ -13,6 +13,7 @@ pipelines:
       name: perms
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - id: build
           runner:

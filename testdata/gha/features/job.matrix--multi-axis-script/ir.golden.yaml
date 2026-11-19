@@ -8,6 +8,7 @@ pipelines:
       name: matrix multi axis
       triggers:
         - kind: push
+        - kind: tag
       jobs:
         - id: prod
           runner:

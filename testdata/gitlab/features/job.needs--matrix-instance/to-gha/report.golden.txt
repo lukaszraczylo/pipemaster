@@ -6,5 +6,3 @@ Loss report: gitlab -> gha
 [emulated] pipeline/gitlab-ci/job/package job.runner: default runner label ubuntu-latest (the pipeline named no runner)
 [emulated] pipeline/gitlab-ci/job/package-all job.needs: needs the whole job (waits for every matrix instance of images)
 [emulated] pipeline/gitlab-ci/job/package-all job.runner: default runner label ubuntu-latest (the pipeline named no runner)
-[emulated] pipeline/gitlab-ci/trigger/0 trigger.push: branches: '**' (GHA fires push only for named ref kinds; branches are named explicitly beside tags)
-[emulated] pipeline/gitlab-ci/trigger/1 trigger.tag: tags: '**' (GHA fires tag pushes only when a tags filter names them)

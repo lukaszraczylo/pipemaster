@@ -1,8 +1,11 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/1
 on:
   pull_request:
     paths-ignore:
       - '**.md'
   push:
+    branches:
+      - '**'
     paths:
       - src/**
       - '!src/docs/**'
