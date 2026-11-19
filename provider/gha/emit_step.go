@@ -58,7 +58,7 @@ func retryable(shell string) bool { return shell == "" || shell == shellBash || 
 // stepNode builds one step; attempts > 0 wraps a script step in the retry loop.
 func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bool, error) {
 	sp := stepPath(jp, st.ID)
-	ext := extMap(st.Ext, e.d.ID)
+	ext := e.ext(st.Ext)
 	e.foreignExt(sp, st.Ext)
 	derived, _ := ext[ExtDerivedID].(bool)
 	m := newMap()

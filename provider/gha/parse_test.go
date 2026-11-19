@@ -499,13 +499,13 @@ func TestDetectAndRegistered(t *testing.T) {
 	_ = p.Caps()
 }
 
-func TestOtherDialectUsesOwnExtKey(t *testing.T) {
+func TestOtherDialectSharesFamilyExtKey(t *testing.T) {
 	fsys := fstest.MapFS{".gitea/workflows/ci.yml": &fstest.MapFile{Data: []byte("on: push\nrun-name: x\njobs: {}\n")}}
-	p, _, err := gha.New(gha.Dialect{ID: provider.Gitea, Dir: ".gitea/workflows"}).Parse(fsys)
+	p, _, err := gha.New(gha.Gitea).Parse(fsys)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := p.Pipelines[0].Ext[provider.Gitea]; !ok || p.Origin.Dialect != provider.Gitea {
+	if _, ok := p.Pipelines[0].Ext[provider.GHA]; !ok || p.Origin.Dialect != provider.Gitea {
 		t.Fatalf("origin %+v ext %#v", p.Origin, p.Pipelines[0].Ext)
 	}
 }

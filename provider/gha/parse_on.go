@@ -150,7 +150,7 @@ func (fp *fileParser) filter(m *mapping, key string) (f ir.Filter, present bool)
 }
 
 func finishTrigger(t *ir.Trigger, m *mapping) error {
-	ext, err := m.ext()
+	ext, err := m.ext(nil)
 	t.Ext = ext
 	return err
 }

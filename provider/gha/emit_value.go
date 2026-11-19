@@ -122,7 +122,13 @@ func (e *emitter) comment(s string) {
 
 // foreignExt reports Ext data of other providers: it is not in the GHA file, only in the round-trip metadata.
 func (e *emitter) foreignExt(path string, x ir.Ext) {
-	emitkit.ForeignExt(e.led, e.d.ID, "GHA", path, x)
+	foreign := make(ir.Ext, len(x))
+	for k, v := range x {
+		if k != e.d.ID && k != provider.Family(e.d.ID) {
+			foreign[k] = v
+		}
+	}
+	emitkit.ForeignExt(e.led, "", "GHA", path, foreign)
 }
 
 // mark queues a marker line for the file head, where the parser finds it whatever the construct's position.

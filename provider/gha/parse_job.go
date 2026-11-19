@@ -36,7 +36,7 @@ func (fp *fileParser) parseJob(id string, n *yaml.Node, defaults runDefaults) (*
 		return nil, err
 	}
 	defaults.over(jobDefaults).apply(j.Steps)
-	j.Ext, err = m.ext()
+	j.Ext, err = m.ext(fp.d.Extra[NodeJob])
 	return j, err
 }
 

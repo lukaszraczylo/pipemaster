@@ -13,6 +13,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -22,14 +23,11 @@ var (
 	irPathRE   = regexp.MustCompile(`^pipeline/([^/]+)(?:/job/([^/]+))?`)
 )
 
-// Parse reads every workflow file in the dialect's directory into one pipeline each; the pipeline ID is the file stem.
+// Parse reads every workflow file in the dialect's first existing directory into one pipeline each; the pipeline ID is the file stem.
 func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
-	files, err := workflowFiles(fsys, a.d.Dir)
+	files, err := a.readDir(fsys)
 	if err != nil {
-		return nil, nil, fmt.Errorf("%s: read %s: %w", a.d.ID, a.d.Dir, err)
-	}
-	if len(files) == 0 {
-		return nil, nil, fmt.Errorf("%s: no workflow files in %s", a.d.ID, a.d.Dir)
+		return nil, nil, err
 	}
 	rep := &report.Report{Source: a.d.ID}
 	proj := &ir.Project{Origin: ir.Origin{Provider: a.d.ID, Dialect: a.d.ID, Files: files}}
@@ -45,7 +43,7 @@ func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("%s: %w", a.d.ID, err)
 		}
-		fp := &fileParser{dialect: a.d.ID, stem: stem, file: f, rep: rep, lines: lines}
+		fp := &fileParser{d: a.d, dialect: provider.Family(a.d.ID), stem: stem, file: f, rep: rep, lines: lines}
 		pl, err := fp.parseWorkflow(src)
 		if err != nil {
 			return nil, nil, err
@@ -139,7 +137,7 @@ func (fp *fileParser) parseWorkflow(src []byte) (*ir.Pipeline, error) {
 			return nil, err
 		}
 	}
-	pl.Ext, err = m.ext()
+	pl.Ext, err = m.ext(fp.d.Extra[NodeWorkflow])
 	return pl, err
 }
 

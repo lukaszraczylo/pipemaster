@@ -171,7 +171,7 @@ func TestEmitDeterministic(t *testing.T) {
 
 func TestEmitDialectDir(t *testing.T) {
 	p := parseFixture(t, "step.script")
-	d := gha.Dialect{ID: "gitea", Dir: ".gitea/workflows"}
+	d := gha.Gitea
 	files, _, err := gha.New(d).Emit(p)
 	if err != nil {
 		t.Fatal(err)

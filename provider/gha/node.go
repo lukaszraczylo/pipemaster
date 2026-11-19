@@ -3,6 +3,7 @@ package gha
 import (
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 
 	"go.yaml.in/yaml/v3"
@@ -13,13 +14,14 @@ import (
 
 const maxAliasHops = 32
 
-// fileParser carries the per-file state every node helper needs; dialect is the Ext key.
+// fileParser carries the per-file state every node helper needs; dialect is the family Ext key.
 type fileParser struct {
 	rep     *report.Report
 	lines   map[string]int
 	dialect string
 	stem    string
 	file    string
+	d       Dialect
 }
 
 func (fp *fileParser) errf(n *yaml.Node, format string, a ...any) error {
@@ -92,21 +94,30 @@ func (m *mapping) release(key string) { delete(m.used, key) }
 
 // rest decodes every unconsumed key as plain Go values, or nil when there are none.
 func (m *mapping) rest() (map[string]any, error) {
-	var out map[string]any
+	r, _, err := m.split(nil)
+	return r, err
+}
+
+// split decodes every unconsumed key as plain Go values, apart into the family keys and those in own.
+func (m *mapping) split(own []string) (family, dialect map[string]any, err error) {
 	for _, e := range m.entries {
 		if m.used[e.key] {
 			continue
 		}
 		v, err := m.fp.plain(e.val)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		if out == nil {
-			out = map[string]any{}
+		dst := &family
+		if slices.Contains(own, e.key) {
+			dst = &dialect
 		}
-		out[e.key] = v
+		if *dst == nil {
+			*dst = map[string]any{}
+		}
+		(*dst)[e.key] = v
 	}
-	return out, nil
+	return family, dialect, nil
 }
 
 // keep records a provider-native value for Ext that has no unconsumed key behind it.
@@ -117,22 +128,30 @@ func (m *mapping) keep(key string, v any) {
 	m.native[key] = v
 }
 
-// ext returns the unconsumed keys plus kept values wrapped for Ext, or nil.
-func (m *mapping) ext() (ir.Ext, error) {
-	r, err := m.rest()
+// ext returns the unconsumed keys plus kept values wrapped for Ext, or nil. Keys named in own belong to
+// the dialect alone and go under its ID; the rest go under the family key.
+func (m *mapping) ext(own []string) (ir.Ext, error) {
+	family, dialect, err := m.split(own)
 	if err != nil {
 		return nil, err
 	}
-	if r == nil && m.native == nil {
-		return nil, nil
-	}
-	if r == nil {
-		r = map[string]any{}
+	if family == nil && m.native != nil {
+		family = map[string]any{}
 	}
 	for k, v := range m.native {
-		r[k] = v
+		family[k] = v
 	}
-	return ir.Ext{m.fp.dialect: r}, nil
+	out := ir.Ext{}
+	if family != nil {
+		out[m.fp.dialect] = family
+	}
+	if dialect != nil {
+		out[m.fp.d.ID] = dialect
+	}
+	if len(out) == 0 {
+		return nil, nil
+	}
+	return out, nil
 }
 
 // plain decodes n into maps, slices and scalars that survive a meta round trip.

@@ -11,6 +11,7 @@ import (
 	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
 	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
@@ -47,7 +48,7 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			}
 		case caps.JobCache, caps.JobArtifacts, caps.JobNeedsArtifacts:
 			if !carriedDone[u.IRPath] && len(args[u]) == 1 {
-				carriedDone[u.IRPath] = collapseCarried(e.d.ID, markedJob(pl, u.IRPath), args[u][0])
+				carriedDone[u.IRPath] = collapseCarried(provider.Family(e.d.ID), markedJob(pl, u.IRPath), args[u][0])
 			}
 		case caps.PipelineFinally:
 			collapseFinally(pl, rep, u, args[u], finallyPaths)

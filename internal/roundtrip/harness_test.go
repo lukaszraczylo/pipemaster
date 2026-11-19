@@ -12,7 +12,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/meta"
 	"github.com/lukaszraczylo/pipemaster/provider"
-	_ "github.com/lukaszraczylo/pipemaster/provider/gha"
+	"github.com/lukaszraczylo/pipemaster/provider/gha"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gitlab"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -27,7 +27,15 @@ type fixture struct {
 
 func fixtures(t *testing.T, id string) []fixture {
 	t.Helper()
-	root := filepath.Join(featuresRoot, id, "features")
+	if provider.Family(id) == provider.GHA && id != provider.GHA {
+		return dialectFixtures(t, id)
+	}
+	return readFixtures(t, id, id)
+}
+
+func readFixtures(t *testing.T, id, dir string) []fixture {
+	t.Helper()
+	root := filepath.Join(featuresRoot, dir, "features")
 	ents, err := os.ReadDir(root)
 	if err != nil {
 		t.Fatal(err)
@@ -39,6 +47,46 @@ func fixtures(t *testing.T, id string) []fixture {
 		}
 	}
 	return out
+}
+
+// dialectFixtures returns the GHA fixtures remapped to the dialect's emit directory, then the
+// dialect-only fixtures under testdata/<id>/features when that directory exists.
+func dialectFixtures(t *testing.T, id string) []fixture {
+	t.Helper()
+	d, ok := gha.Dialects[id]
+	if !ok {
+		t.Fatalf("no dialect %s", id)
+	}
+	base := readFixtures(t, id, provider.GHA)
+	out := make([]fixture, 0, len(base))
+	for _, f := range base {
+		out = append(out, fixture{id, f.name, remapDir(t, f.dir, d.Dirs[0])})
+	}
+	if _, err := os.Stat(filepath.Join(featuresRoot, id, "features")); err == nil {
+		out = append(out, readFixtures(t, id, id)...)
+	}
+	return out
+}
+
+// remapDir copies a GHA fixture into a temp dir with .github/workflows moved to dir.
+func remapDir(t *testing.T, src, dir string) string {
+	t.Helper()
+	dst := t.TempDir()
+	if err := os.CopyFS(dst, os.DirFS(src)); err != nil {
+		t.Fatal(err)
+	}
+	from := filepath.Join(dst, ".github", "workflows")
+	if _, err := os.Stat(from); err != nil {
+		return dst
+	}
+	to := filepath.Join(dst, filepath.FromSlash(dir))
+	if err := os.MkdirAll(filepath.Dir(to), 0o750); err != nil { // #nosec G301 -- temp dir
+		t.Fatal(err)
+	}
+	if err := os.Rename(from, to); err != nil { // #nosec G703 -- paths are under t.TempDir
+		t.Fatal(err)
+	}
+	return dst
 }
 
 func allFixtures(t *testing.T) []fixture {
@@ -56,8 +104,15 @@ func targets(id string) []string {
 	return out
 }
 
-// other picks one target for tests that compare a single pair.
-func other(id string) string { return targets(id)[0] }
+// other picks the base-adapter target of another family; dialects wait for the per-target tests.
+func other(id string) string {
+	for _, p := range targets(id) {
+		if !provider.SameFamily(p, id) && provider.Family(p) == p {
+			return p
+		}
+	}
+	return targets(id)[0]
+}
 
 func prov(t *testing.T, id string) provider.Provider {
 	t.Helper()

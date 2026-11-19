@@ -15,7 +15,7 @@ import (
 
 const workflowExt = ".yml"
 
-// Emit writes one workflow file per pipeline at <Dir>/<pipeline id>.yml. Every feature use goes
+// Emit writes one workflow file per pipeline at <Dirs[0]>/<pipeline id>.yml. Every feature use goes
 // through the ledger; Finish fails the call when one was never accounted for.
 func (a *adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
 	p, idRenames := withValidJobIDs(p)
@@ -63,12 +63,12 @@ func (e *emitter) pipelineFile(pl *ir.Pipeline) (string, []byte, error) {
 	if err != nil {
 		return "", nil, fmt.Errorf("pipeline %s: %w", pl.ID, err)
 	}
-	return path.Join(e.d.Dir, pl.ID+workflowExt), data, nil
+	return path.Join(e.d.Dirs[0], pl.ID+workflowExt), data, nil
 }
 
 func (e *emitter) workflow(pl *ir.Pipeline) (*yaml.Node, error) {
 	pp := "pipeline/" + pl.ID
-	ext := extMap(pl.Ext, e.d.ID)
+	ext := e.ext(pl.Ext)
 	e.foreignExt(pp, pl.Ext)
 	m := newMap()
 	if pl.Name != "" {

@@ -106,7 +106,7 @@ func orNull(m *omap) *yaml.Node {
 // on builds the on: mapping; jobManual names a job.manual path that needs a workflow_dispatch trigger.
 func (e *emitter) on(pl *ir.Pipeline, jobManual string) (*yaml.Node, error) {
 	b := &onBuilder{e: e, events: newMap()}
-	pext := extMap(pl.Ext, e.d.ID)
+	pext := e.ext(pl.Ext)
 	used := map[int]bool{}
 	var schedule *yaml.Node
 	hasManual := false
@@ -248,11 +248,11 @@ func (e *emitter) pushEvent(b *onBuilder, pl *ir.Pipeline, i int, used map[int]b
 		if t == nil {
 			continue
 		}
-		if err := m.addExtra(extMap(t.Ext, e.d.ID), nil); err != nil {
+		if err := m.addExtra(e.ext(t.Ext), nil); err != nil {
 			return err
 		}
 	}
-	if push != nil && tag != nil && len(extMap(tag.Ext, e.d.ID)) > 0 {
+	if push != nil && tag != nil && len(e.ext(tag.Ext)) > 0 {
 		e.emulate(tp, caps.ExtPassthrough, "merged into the push event", "the tag trigger's native keys sit on the shared push event")
 	}
 	b.add(firstNonEmpty(pp, tp), caps.TriggerPush, "push", orNull(m))
@@ -267,7 +267,7 @@ func firstNonEmpty(a, b string) string {
 }
 
 func (e *emitter) prEvent(b *onBuilder, path string, t *ir.Trigger) error {
-	ext := extMap(t.Ext, e.d.ID)
+	ext := e.ext(t.Ext)
 	name := evPR
 	if ext[extEvent] == evPRTarget {
 		name = evPRTarget
@@ -292,7 +292,7 @@ func (e *emitter) scheduleEntry(seq *yaml.Node, path string, t *ir.Trigger) (*ya
 	}
 	m := newMap()
 	m.set("cron", str(t.Cron))
-	if err := m.addExtra(extMap(t.Ext, e.d.ID), nil); err != nil {
+	if err := m.addExtra(e.ext(t.Ext), nil); err != nil {
 		return nil, err
 	}
 	seq.Content = append(seq.Content, m.n)
@@ -300,7 +300,7 @@ func (e *emitter) scheduleEntry(seq *yaml.Node, path string, t *ir.Trigger) (*ya
 }
 
 func (e *emitter) dispatchEvent(b *onBuilder, path string, pl *ir.Pipeline, t *ir.Trigger) error {
-	m, err := e.dispatchBody(path, pl, extMap(t.Ext, e.d.ID))
+	m, err := e.dispatchBody(path, pl, e.ext(t.Ext))
 	if err != nil {
 		return err
 	}
@@ -363,7 +363,7 @@ func typedScalar(s, typ string) *yaml.Node {
 }
 
 func (e *emitter) apiEvent(b *onBuilder, path string, t *ir.Trigger) error {
-	ext := extMap(t.Ext, e.d.ID)
+	ext := e.ext(t.Ext)
 	name, _ := ext[extEvent].(string)
 	if name == "" {
 		name = evRepoDisp
@@ -379,7 +379,7 @@ func (e *emitter) apiEvent(b *onBuilder, path string, t *ir.Trigger) error {
 
 // workflowRun needs the upstream workflow names; the IR holds none for a pipeline from another provider.
 func (e *emitter) workflowRun(b *onBuilder, path string, t *ir.Trigger) error {
-	ext := extMap(t.Ext, e.d.ID)
+	ext := e.ext(t.Ext)
 	raw, ok := ext["workflows"]
 	if !ok {
 		e.lose(path, caps.TriggerPipelineDone, "no upstream workflow named")

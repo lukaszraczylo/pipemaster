@@ -52,7 +52,7 @@ func minutesNode(d ir.Duration) *yaml.Node {
 
 func (e *emitter) jobNode(c jobCtx, j *ir.Job) (*yaml.Node, []string, error) {
 	jp := jobPath(c.pl.ID, j.ID)
-	ext := extMap(j.Ext, e.d.ID)
+	ext := e.ext(j.Ext)
 	e.foreignExt(jp, j.Ext)
 	consumed := map[string]bool{}
 	call := callStep(j)
@@ -235,7 +235,7 @@ func (e *emitter) callKeys(m *omap, jp string, call *ir.Step) error {
 		}
 		m.set("with", w)
 	}
-	if sec, ok := extMap(call.Ext, e.d.ID)["secrets"]; ok {
+	if sec, ok := e.ext(call.Ext)["secrets"]; ok {
 		n, err := plainNode(sec)
 		if err != nil {
 			return err

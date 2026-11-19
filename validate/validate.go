@@ -32,9 +32,14 @@ type entry struct {
 	once   sync.Once
 }
 
+var ghaEntry = &entry{file: "schemas/github-workflow.json", id: "https://json.schemastore.org/github-workflow.json"}
+
+// Gitea and Forgejo share the GHA schema entry: neither project publishes a workflow schema.
 var schemas = map[string]*entry{
-	provider.GHA:    {file: "schemas/github-workflow.json", id: "https://json.schemastore.org/github-workflow.json"},
-	provider.GitLab: {file: "schemas/gitlab-ci.json", id: "https://gitlab.com/.gitlab-ci.yml"},
+	provider.GHA:     ghaEntry,
+	provider.Gitea:   ghaEntry,
+	provider.Forgejo: ghaEntry,
+	provider.GitLab:  {file: "schemas/gitlab-ci.json", id: "https://gitlab.com/.gitlab-ci.yml"},
 }
 
 // offlineLoader makes any reference outside the embedded schema an error.
@@ -87,6 +92,12 @@ func File(providerID, name string, data []byte) error {
 		return fmt.Errorf("%s: %w", name, err)
 	}
 	for _, v := range docs {
+		if rules, ok := dialects[providerID]; ok {
+			var err error
+			if v, err = stripDialect(v, rules); err != nil {
+				return fmt.Errorf("%s: %w", name, err)
+			}
+		}
 		if err := validateDoc(sch, v); err != nil {
 			return fmt.Errorf("%s: invalid for %s schema: %w", name, providerID, err)
 		}
@@ -200,8 +211,10 @@ func keyString(k any) (string, error) {
 }
 
 var patterns = map[string][]string{
-	provider.GHA:    {".github/workflows/*.yml", ".github/workflows/*.yaml"},
-	provider.GitLab: {".gitlab-ci.yml"},
+	provider.GHA:     {".github/workflows/*.yml", ".github/workflows/*.yaml"},
+	provider.Gitea:   {".gitea/workflows/*.yml", ".gitea/workflows/*.yaml"},
+	provider.Forgejo: {".forgejo/workflows/*.yml", ".forgejo/workflows/*.yaml"},
+	provider.GitLab:  {".gitlab-ci.yml"},
 }
 
 // Patterns returns the fs.Glob patterns of the files validated as providerID, or nil when none are pinned.

@@ -3,12 +3,16 @@ package gha
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"math"
 	"sort"
 	"strconv"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 )
 
 const (
@@ -110,6 +114,18 @@ func sortedKeys(m map[string]any) []string {
 func extMap(ext map[string]any, id string) map[string]any {
 	m, _ := ext[id].(map[string]any)
 	return m
+}
+
+// ext returns the Ext entries this emitter writes back: the family's, then its own dialect's.
+func (e *emitter) ext(x ir.Ext) map[string]any {
+	fam, own := extMap(x, provider.Family(e.d.ID)), extMap(x, e.d.ID)
+	if e.d.ID == provider.Family(e.d.ID) || len(own) == 0 {
+		return fam
+	}
+	out := make(map[string]any, len(fam)+len(own))
+	maps.Copy(out, fam)
+	maps.Copy(out, own)
+	return out
 }
 
 // addExtra appends every Ext key not in skip and not already set, sorted by key.
