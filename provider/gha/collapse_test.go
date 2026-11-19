@@ -297,3 +297,31 @@ func TestEditedFinallyNeedsKeepParsedAndNote(t *testing.T) {
 		t.Error("no marker ignored note")
 	}
 }
+
+func TestCollapseHostMarkerFindsExplicitIDNotSynthesisedCheckout(t *testing.T) {
+	const wf = `# pipemaster:emulated step.action pipeline/p/job/test/step/test-step-1
+# pipemaster:arg {"host":"https://data.forgejo.org"}
+# pipemaster:emulated job.artifacts pipeline/p/job/test
+# pipemaster:arg {"pre":1,"post":0}
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: test-step-1
+        uses: actions/download-artifact@v4
+      - run: make test
+`
+	p, _, err := gha.New(gha.GHA).Parse(fstest.MapFS{".github/workflows/p.yml": {Data: []byte(wf)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	steps := p.Pipelines[0].Jobs[0].Steps
+	if len(steps) != 2 || steps[0].Action == nil || steps[0].Action.Repo != "download-artifact" {
+		t.Fatalf("steps after collapse = %+v", steps)
+	}
+	if got := steps[0].Action.Host; got != "https://data.forgejo.org" {
+		t.Errorf("host = %q, want the marked source host", got)
+	}
+}

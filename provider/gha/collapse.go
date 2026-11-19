@@ -233,14 +233,28 @@ func markedStep(pl *ir.Pipeline, path string) *ir.Step {
 	if !ok {
 		return nil
 	}
-	if j := markedJob(pl, "pipeline/"+pl.ID+"/job/"+jobID); j != nil {
-		for _, st := range j.Steps {
-			if st.ID == stepID {
-				return st
-			}
+	j := markedJob(pl, "pipeline/"+pl.ID+"/job/"+jobID)
+	if j == nil {
+		return nil
+	}
+	// A step without an id gets a derived one that can equal an explicit id (a synthesised checkout and the
+	// step after it), and the marker names the explicit one.
+	var derived *ir.Step
+	for _, st := range j.Steps {
+		switch {
+		case st.ID != stepID:
+		case !isDerivedID(st):
+			return st
+		case derived == nil:
+			derived = st
 		}
 	}
-	return nil
+	return derived
+}
+
+func isDerivedID(st *ir.Step) bool {
+	d, _ := extMap(st.Ext, provider.GHA)[ExtDerivedID].(bool)
+	return d
 }
 
 // collapseManual turns the dispatch guard back into the manual flag.
