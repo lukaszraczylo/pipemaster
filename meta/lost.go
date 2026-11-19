@@ -73,6 +73,7 @@ var recorded = map[kind]map[caps.Feature][]string{
 		caps.JobAllowFailure: {"AllowFailure"}, caps.JobEnvironment: {"Environment"},
 		caps.JobEnvironmentApproval: {"Environment"}, caps.JobManual: {"Manual"}, caps.JobCache: {"Cache"},
 		caps.JobArtifacts: {"Artifacts"}, caps.JobOutputs: {"Outputs"}, caps.JobEnv: {"Env"},
+		caps.PipelinePermissions: {recordViaExt},
 		caps.ExprOpaque:          {"If", "Env", "Services"},
 		caps.ScriptInterpolation: {"Runner", "Container", "Services", "Matrix", "Environment", "Cache", "Artifacts", "Outputs", "Env"},
 		caps.DisplayName:         {"Name"},
@@ -113,7 +114,8 @@ func notApplicable(k kind, f caps.Feature) bool {
 	case kindPipeline:
 		return strings.HasPrefix(string(f), "job.") || strings.HasPrefix(string(f), "step.")
 	case kindJob:
-		return f == caps.ConfigName || strings.HasPrefix(string(f), "trigger.") || strings.HasPrefix(string(f), "pipeline.") ||
+		return f == caps.ConfigName || strings.HasPrefix(string(f), "trigger.") ||
+			(strings.HasPrefix(string(f), "pipeline.") && f != caps.PipelinePermissions) ||
 			strings.HasPrefix(string(f), "step.") || f == caps.ProjectMultiPipeline
 	default:
 		return f == caps.ConfigName || strings.HasPrefix(string(f), "trigger.") || strings.HasPrefix(string(f), "pipeline.") ||

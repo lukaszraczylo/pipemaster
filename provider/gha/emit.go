@@ -227,7 +227,7 @@ func (e *emitter) permissions(pp string, p *ir.Permissions) *yaml.Node {
 		case k == scopeAll:
 			e.lose(pp, caps.PipelinePermissions, `scope "*" cannot sit beside other permissions`)
 		case !e.hasScope(k):
-			e.lose(pp+scopeSeg+k, caps.PipelinePermissions, "scope "+k+" is not a "+e.d.title()+" permission; dropped")
+			e.dropScope(pp, k)
 		default:
 			scopes[k] = v
 		}
@@ -250,6 +250,55 @@ func (e *emitter) permissions(pp string, p *ir.Permissions) *yaml.Node {
 		return &yaml.Node{Kind: yaml.MappingNode, Tag: tagMap, Style: yaml.FlowStyle}
 	}
 	return m.n
+}
+
+func (e *emitter) dropScope(pp, k string) {
+	e.lose(pp+scopeSeg+k, caps.PipelinePermissions, "scope "+k+" is not a "+e.d.title()+" permission; dropped")
+}
+
+// jobPermissions writes the job's permissions Ext filtered like the workflow-level mapping. The unfiltered value
+// stays in the round-trip Ext record, so a return to the source dialect restores the dropped scopes.
+func (e *emitter) jobPermissions(m *omap, jp string, ext map[string]any, consumed map[string]bool) error {
+	v, ok := ext["permissions"]
+	if !ok {
+		return nil
+	}
+	consumed["permissions"] = true
+	for _, ig := range e.d.Ignored {
+		if ig.Feature == caps.PipelinePermissions {
+			e.lose(jp, caps.PipelinePermissions, ig.Caveat)
+		}
+	}
+	scopes, isMap := v.(map[string]any)
+	if !isMap {
+		n, err := plainNode(v)
+		if err != nil {
+			return err
+		}
+		m.set("permissions", n)
+		return nil
+	}
+	out := newMap()
+	for _, k := range sortedKeys(scopes) {
+		switch {
+		case k == idToken && !e.hasScope(k):
+			e.lose(jp+scopeSeg+k, caps.PipelinePermissions, e.d.NoOIDC)
+		case !e.hasScope(k):
+			e.dropScope(jp, k)
+		default:
+			n, err := plainNode(scopes[k])
+			if err != nil {
+				return err
+			}
+			out.set(k, n)
+		}
+	}
+	if out.empty() {
+		m.set("permissions", &yaml.Node{Kind: yaml.MappingNode, Tag: tagMap, Style: yaml.FlowStyle})
+		return nil
+	}
+	m.set("permissions", out.n)
+	return nil
 }
 
 func (e *emitter) hasScope(name string) bool {

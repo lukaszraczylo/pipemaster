@@ -113,6 +113,9 @@ func (e *emitter) jobNode(c jobCtx, j *ir.Job) (*yaml.Node, []string, error) {
 			m.set("env", env)
 		}
 	}
+	if err := e.jobPermissions(m, jp, ext, consumed); err != nil {
+		return nil, nil, err
+	}
 	if err := m.addExtra(ext, consumed); err != nil {
 		return nil, nil, err
 	}

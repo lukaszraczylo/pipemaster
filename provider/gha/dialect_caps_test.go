@@ -455,3 +455,61 @@ jobs:
 		{"pipeline/ci/ref/vars.GITHUB_PG", "create variable GITHUB_PG" + reason, caps.ConfigName, caps.External},
 	})
 }
+
+const jobPermSrc = "on: push\njobs:\n  b:\n    runs-on: r\n    permissions:\n      contents: read\n      id-token: write\n    steps:\n      - run: echo\n"
+
+func TestJobScopesFilteredToDialect(t *testing.T) {
+	perms := []caps.Feature{caps.PipelinePermissions}
+	t.Run("gitea drops id-token and reports it", func(t *testing.T) {
+		text, rep := emitText(t, gha.Gitea, parseWF(t, gha.GHA, jobPermSrc))
+		if strings.Contains(text, "id-token") || !strings.Contains(text, "contents: read") {
+			t.Fatalf("a GHA-only job scope must not reach Gitea output:\n%s", text)
+		}
+		checkEntries(t, rep, perms,
+			[]wantEntry{{"pipeline/ci/job/b/scope/id-token", "id-token is unsupported in Gitea v28", caps.PipelinePermissions, caps.Lost}})
+	})
+	t.Run("forgejo keeps the scopes and reports the ignored permissions", func(t *testing.T) {
+		text, rep := emitText(t, gha.Forgejo, parseWF(t, gha.GHA, jobPermSrc))
+		if !strings.Contains(text, "contents: read") || !strings.Contains(text, "id-token: write") {
+			t.Fatalf("forgejo must keep the job scopes:\n%s", text)
+		}
+		checkEntries(t, rep, perms, []wantEntry{{"pipeline/ci/job/b", "Forgejo does not document permissions", caps.PipelinePermissions, caps.Lost}})
+	})
+	t.Run("gha keeps everything silently", func(t *testing.T) {
+		text, rep := emitText(t, gha.GHA, parseWF(t, gha.GHA, jobPermSrc))
+		if !strings.Contains(text, "id-token: write") {
+			t.Fatalf("gha must keep the job scopes:\n%s", text)
+		}
+		checkEntries(t, rep, perms, nil)
+	})
+	t.Run("gitea round trip restores the dropped scope", func(t *testing.T) {
+		src := parseWF(t, gha.GHA, jobPermSrc)
+		target := gha.New(gha.Gitea)
+		files, rep, err := target.Emit(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m := roundtrip.NewMeta(gha.GHA.ID, src, target, rep)
+		for _, e := range rep.Entries {
+			if strings.Contains(e.Detail, "not kept in round-trip metadata") {
+				t.Errorf("the scope must be recorded: %+v", e)
+			}
+		}
+		mid, _, err := target.Parse(fstest.MapFS{".gitea/workflows/ci.yml": &fstest.MapFile{Data: files[".gitea/workflows/ci.yml"]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		roundtrip.Restore(mid, m)
+		back, _, err := gha.New(gha.GHA).Emit(mid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, _, err := gha.New(gha.GHA).Emit(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if g, w := string(back[".github/workflows/ci.yml"]), string(want[".github/workflows/ci.yml"]); g != w {
+			t.Fatalf("round trip differs:\n%s\nwant:\n%s", g, w)
+		}
+	})
+}
