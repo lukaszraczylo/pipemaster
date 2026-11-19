@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/lukaszraczylo/pipemaster/internal/golden"
 	"github.com/lukaszraczylo/pipemaster/provider"
@@ -99,5 +100,34 @@ func lintFile(t *testing.T, name string, data []byte) {
 	cmd := exec.Command("actionlint", "-no-color", "-ignore", lintIgnore, p) // #nosec G204 -- fixed binary, temp path
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Errorf("actionlint %s: %v\n%s", name, err, out)
+	}
+}
+
+// An unedited emitted file never reports "marker ignored": that note means the user edited the file.
+func TestUneditedFilesNeverIgnoreMarkers(t *testing.T) {
+	for _, f := range fixtures(t, provider.GHA) {
+		t.Run(f.name, func(t *testing.T) {
+			proj, _, err := prov(t, provider.GHA).Parse(os.DirFS(f.dir))
+			if err != nil {
+				t.Fatal(err)
+			}
+			files, _, err := prov(t, provider.GitLab).Emit(proj)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fsys := fstest.MapFS{}
+			for n, b := range files {
+				fsys[n] = &fstest.MapFile{Data: b}
+			}
+			_, rep, err := prov(t, provider.GitLab).Parse(fsys)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, e := range rep.Entries {
+				if strings.Contains(e.Detail, "marker ignored") {
+					t.Errorf("%s: %s", e.IRPath, e.Detail)
+				}
+			}
+		})
 	}
 }
