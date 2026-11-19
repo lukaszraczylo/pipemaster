@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
@@ -83,8 +84,18 @@ func runConvert(args []string, _, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stderr, "emit %s: %v\n", tgt.ID(), err)
 		return exitError
 	}
-	if !res.Restored {
-		m := roundtrip.NewMeta(src.ID(), proj, tgt, emitRep)
+	fullReturn := res.Restored && len(res.Out.Layers) == 0
+	// A full return emits into the origin dialect, which can still lack a key the pipeline holds; no older layer
+	// keeps that key, so this output records it.
+	if !res.Restored || (fullReturn && dialectLoss(emitRep)) {
+		owner := src.ID()
+		if res.Restored {
+			owner = tgt.ID()
+		}
+		m := roundtrip.NewMeta(owner, proj, tgt, emitRep)
+		if res.Restored {
+			m.Ext, m.Residual, m.IDs = nil, nil, nil
+		}
 		if err := roundtrip.RecordEmitted(m, tgt, files); err != nil {
 			addMetaGap(emitRep, err)
 		}
@@ -123,6 +134,14 @@ func runConvert(args []string, _, stderr io.Writer) int {
 		return exitStrict
 	}
 	return exitOK
+}
+
+// dialectLoss reports whether the emit dropped a pipeline feature. Foreign Ext that the output never holds is not
+// one: it never belonged to the origin. An external verdict asks for setup, it drops nothing.
+func dialectLoss(rep *report.Report) bool {
+	return slices.ContainsFunc(rep.Entries, func(e report.Entry) bool {
+		return e.Level == caps.Lost && e.Feature != caps.ExtPassthrough
+	})
 }
 
 // addMetaGap reports that the metadata lacks its emitted-form record, so --force cannot restore lost fields

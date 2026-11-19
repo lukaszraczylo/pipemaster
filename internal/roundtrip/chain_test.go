@@ -402,3 +402,56 @@ func TestEmbedConversionRemovesOldSidecar(t *testing.T) {
 		t.Fatalf("next load = %v, want the embedded stack [gha]", got)
 	}
 }
+
+// checkReturn asserts that dir, the output of a full return into a, holds the pipeline parsed from src. A
+// dialect that cannot write every key keeps the rest in metadata of its own, which the check applies;
+// GHA writes every key, so its return carries no metadata at all.
+func checkReturn(t *testing.T, a, src, dir string) {
+	t.Helper()
+	final := parseDir(t, a, dir)
+	stack, err := meta.LoadStack(os.DirFS(dir), final.Origin.Files)
+	if err != nil {
+		t.Fatalf("load stack: %v", err)
+	}
+	if len(stack.Layers) > 0 {
+		if a == provider.GHA {
+			t.Fatal("a full return into GHA must carry no metadata")
+		}
+		if got := stackSources(t, a, dir); !slices.Equal(got, slices.Repeat([]string{a}, 1)) {
+			t.Fatalf("a full return keeps one layer of its own provider, got %v", got)
+		}
+		res, err := roundtrip.Hop(final, stack, os.DirFS(dir), a, a, false, &report.Report{})
+		if err != nil {
+			t.Fatalf("restore own layer: %v", err)
+		}
+		final = res.Proj
+	}
+	if same, diff := ir.Equal(parseDir(t, a, src), final); !same {
+		t.Fatalf("chain changed the pipeline:\n%s", diff)
+	}
+}
+
+func TestFullReturnIntoDialectKeepsWhatItCannotWrite(t *testing.T) {
+	src := t.TempDir()
+	wf := filepath.Join(src, ".gitea", "workflows")
+	if err := os.MkdirAll(wf, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	const body = "on: push\npermissions:\n  contents: read\n  id-token: write\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n"
+	if err := os.WriteFile(filepath.Join(wf, "ci.yml"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	b, a := t.TempDir(), t.TempDir()
+	for _, step := range [][]string{
+		{src, "--from", "gitea", "--to", "gitlab", "-o", b},
+		{b, "--from", "gitlab", "--to", "gitea", "-o", a},
+	} {
+		if code, _, msg := runOut(append([]string{"convert"}, step...)...); code != 0 {
+			t.Fatalf("convert %v = %d\n%s", step, code, msg)
+		}
+	}
+	if got := stackSources(t, provider.Gitea, a); !slices.Equal(got, []string{provider.Gitea}) {
+		t.Fatalf("Gitea cannot write id-token, so the return keeps a layer of its own: got %v", got)
+	}
+	checkReturn(t, provider.Gitea, src, a)
+}
