@@ -5,6 +5,7 @@ origin:
         - .github/workflows/ci.yml
 pipelines:
     - id: ci
+      name: base
       triggers:
         - kind: push
       jobs:
@@ -13,16 +14,28 @@ pipelines:
             labels:
                 - ubuntu-latest
           steps:
-            - action:
-                kind: docker
-                image: alpine:3.20
-              with:
-                args:
-                    lit: -c "echo ok"
+            - image:
+                ref: alpine:3.20
                 entrypoint:
-                    lit: /bin/sh
+                    - ""
               ext:
                 gha:
                     _derived_id: true
               id: build-step-1
-              kind: action
+              kind: script
+              script:
+                - make build
+        - id: deploy
+          runner:
+            labels:
+                - ubuntu-latest
+          needs:
+            - job: build
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: deploy-step-1
+              kind: script
+              script:
+                - make deploy

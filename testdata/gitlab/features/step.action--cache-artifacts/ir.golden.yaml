@@ -1,0 +1,84 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - ext:
+        gitlab:
+            stages:
+                - stage-0
+                - stage-1
+            workflow:
+                rules:
+                    - if: $CI_COMMIT_BRANCH
+      id: gitlab-ci
+      triggers:
+        - kind: push
+      jobs:
+        - ext:
+            gitlab:
+                stage: stage-0
+          id: build
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - action:
+                kind: repo
+                owner: actions
+                repo: cache
+                ref: v4
+              with:
+                key:
+                    lit: go-mod
+                path:
+                    lit: ~/go/pkg/mod
+              id: build-step-1
+              kind: action
+            - ext:
+                gitlab:
+                    section: script
+              id: build-step-2
+              kind: script
+              script:
+                - make build
+            - action:
+                kind: repo
+                owner: actions
+                repo: upload-artifact
+                ref: v4
+              with:
+                name:
+                    lit: dist
+                path:
+                    lit: dist/
+              id: build-step-3
+              kind: action
+        - ext:
+            gitlab:
+                stage: stage-1
+          id: test
+          runner:
+            labels:
+                - ubuntu-latest
+          needs:
+            - job: build
+          steps:
+            - action:
+                kind: repo
+                owner: actions
+                repo: download-artifact
+                ref: v4
+              with:
+                name:
+                    lit: dist
+              id: test-step-1
+              kind: action
+            - ext:
+                gitlab:
+                    section: script
+              id: test-step-2
+              kind: script
+              script:
+                - make test

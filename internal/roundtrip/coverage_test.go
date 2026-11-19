@@ -14,7 +14,6 @@ import (
 var noSourceForm = map[string]string{
 	provider.GHA + "/" + string(caps.JobEnvironmentApproval):    "approval rules live in repository settings and no parser sets Environment.Approval",
 	provider.GitLab + "/" + string(caps.JobEnvironmentApproval): "approval rules live in project settings and no parser sets Environment.Approval",
-	provider.GitLab + "/" + string(caps.StepAction):             "a GitLab file holds no action step; the action reference lives only in round-trip metadata",
 }
 
 // hasFixtureDir reports whether dir holds a directory named after the feature, optionally followed by "--<variant>".

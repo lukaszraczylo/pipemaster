@@ -1,0 +1,29 @@
+on:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - id: build-step-1
+        uses: actions/cache@v4
+        with:
+          key: go-mod
+          path: ~/go/pkg/mod
+      - id: build-step-2
+        run: make build
+      - id: build-step-3
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+  test:
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - id: test-step-1
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+      - id: test-step-2
+        run: make test

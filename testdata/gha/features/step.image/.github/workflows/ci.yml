@@ -1,9 +1,20 @@
-on: push
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"image":{"Ref":"alpine:3.20","Entrypoint":[""]},"script":["make build"]}
+name: base
+on:
+  push:
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
       - uses: docker://alpine:3.20
         with:
           entrypoint: /bin/sh
-          args: -c "echo ok"
+          args: -ec 'make build'
+  deploy:
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - run: make deploy
