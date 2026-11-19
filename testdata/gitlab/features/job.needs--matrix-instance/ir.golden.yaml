@@ -1,0 +1,48 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - ext:
+        gitlab:
+            stages:
+                - build
+                - package
+      id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - matrix:
+            axes:
+                - name: TARGET
+                  values:
+                    - alpine
+                    - ubuntu
+          ext:
+            gitlab:
+                stage: build
+          id: images
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make images
+        - ext:
+            gitlab:
+                needs:
+                    - 'images: [alpine]'
+                stage: package
+          id: package
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make package

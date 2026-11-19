@@ -45,7 +45,8 @@ func (s *state) applyDefaults(job *yaml.Node, def []entry) (*yaml.Node, error) {
 	}
 	out := s.stamp(&yaml.Node{Kind: yaml.MappingNode, Tag: job.Tag, Style: job.Style, Line: job.Line, Column: job.Column}, s.org[job])
 	for _, e := range entries(job) {
-		if !isNull(e.val) {
+		// A null on a default keyword only opts out of the default; any other null unsets what a parent job set, so it stays.
+		if !isNull(e.val) || !slices.Contains(defaultKeys, e.name) {
 			out.Content = append(out.Content, e.key, e.val)
 		}
 	}

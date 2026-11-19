@@ -21,6 +21,8 @@ type reader struct {
 	used map[string]bool
 	kept map[string]any
 	ents []entry
+	// nulls are keys set to null, which unset what a parent job gave; they go to Ext untouched.
+	nulls []string
 }
 
 func (s *state) reader(n *yaml.Node, what string) (*reader, error) {
@@ -41,7 +43,25 @@ func (r *reader) take(key string) *yaml.Node {
 	return nil
 }
 
-func (r *reader) peek(key string) *yaml.Node { return get(r.n, key) }
+func (r *reader) peek(key string) *yaml.Node {
+	if n := get(r.n, key); !isNull(n) {
+		return n
+	}
+	return nil
+}
+
+// setNullsAside moves the null-valued keys out of the entries a parser reads.
+func (r *reader) setNullsAside() {
+	live := r.ents[:0:0]
+	for _, e := range r.ents {
+		if isNull(e.val) {
+			r.nulls = append(r.nulls, e.name)
+			continue
+		}
+		live = append(live, e)
+	}
+	r.ents = live
+}
 
 func (r *reader) release(key string) { delete(r.used, key) }
 
@@ -67,6 +87,12 @@ func (r *reader) ext() (ir.Ext, error) {
 			out = map[string]any{}
 		}
 		out[e.name] = v
+	}
+	for _, k := range r.nulls {
+		if out == nil {
+			out = map[string]any{}
+		}
+		out[k] = nil
 	}
 	for k, v := range r.kept {
 		if out == nil {

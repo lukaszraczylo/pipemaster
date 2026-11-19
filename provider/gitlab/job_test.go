@@ -572,3 +572,22 @@ func TestEmptyCacheListOverrideRoundTrips(t *testing.T) {
 		t.Errorf("second parse differs: %s\n%s", diff, out)
 	}
 }
+
+// A null that unsets a key of an extended job must survive Emit, or the parent's value comes back. The CI schema
+// rejects parallel: null, so this cannot be a fixture.
+func TestNullOverrideOfInheritedKeyRoundTrips(t *testing.T) {
+	src := ".unit:\n  parallel: 2\n  script: [make]\ncompile:\n  extends: .unit\n  parallel: null\n  script: [make compile]\n"
+	proj, _ := parseFiles(t, map[string]string{".gitlab-ci.yml": src})
+	files, _, err := gitlab.New().Emit(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(files[".gitlab-ci.yml"])
+	if !strings.Contains(out, "parallel: null") {
+		t.Fatalf("null override dropped:\n%s", out)
+	}
+	again, _ := parseFiles(t, map[string]string{".gitlab-ci.yml": out})
+	if eq, diff := ir.Equal(proj, again); !eq {
+		t.Errorf("second parse differs: %s", diff)
+	}
+}

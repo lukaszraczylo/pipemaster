@@ -52,6 +52,7 @@ func (s *state) parseJob(name string, merged, raw *yaml.Node, def []entry) (*job
 	if err != nil {
 		return nil, err
 	}
+	r.setNullsAside()
 	j := &ir.Job{ID: name}
 	info := &jobInfo{job: j, name: name, stage: defaultStage}
 	if sn := r.peek(stageKey); sn != nil {

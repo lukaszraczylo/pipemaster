@@ -1,0 +1,16 @@
+stages: [build, package]
+
+images:
+  stage: build
+  script:
+    - make images
+  parallel:
+    matrix:
+      - TARGET: [alpine, ubuntu]
+
+package:
+  stage: package
+  needs:
+    - "images: [alpine]"
+  script:
+    - make package

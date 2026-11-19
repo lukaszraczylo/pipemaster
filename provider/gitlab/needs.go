@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"fmt"
+	"regexp"
 
 	"go.yaml.in/yaml/v3"
 
@@ -16,6 +17,10 @@ const (
 	// ExtNeedsExtra holds, per needed job, the needs keys the IR has no field for (parallel:matrix).
 	ExtNeedsExtra = "needs_extra"
 )
+
+// matrixInstanceRE matches the name GitLab gives one instance of a parallel:matrix job, such as "build: [linux, amd64]".
+// The IR needs name whole jobs, so such an entry stays in Ext.
+var matrixInstanceRE = regexp.MustCompile(`^[^:\[]+: \[.*\]$`)
 
 type needSpec struct {
 	extra      map[string]any
@@ -73,10 +78,10 @@ func (s *state) jobNeeds(info *jobInfo, r *reader) error {
 	return nil
 }
 
-// needEntry returns whole=true for an entry the IR cannot model at all.
+// needEntry returns whole=true for an entry the IR cannot model at all: another project or pipeline, or one matrix instance.
 func (s *state) needEntry(it *yaml.Node) (spec *needSpec, whole bool, err error) {
 	if it.Kind == yaml.ScalarNode {
-		return &needSpec{job: it.Value}, false, nil
+		return &needSpec{job: it.Value}, matrixInstanceRE.MatchString(it.Value), nil
 	}
 	r, err := s.reader(it, "needs entry")
 	if err != nil {
@@ -94,6 +99,9 @@ func (s *state) needEntry(it *yaml.Node) (spec *needSpec, whole bool, err error)
 	spec = &needSpec{}
 	if spec.job, err = s.scalar(jn, "needs job"); err != nil {
 		return nil, false, err
+	}
+	if matrixInstanceRE.MatchString(spec.job) {
+		return nil, true, nil
 	}
 	if a := r.take("artifacts"); a != nil {
 		if b, ok := boolNode(a); ok {
