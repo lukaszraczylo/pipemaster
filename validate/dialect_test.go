@@ -27,6 +27,11 @@ func TestValidateDialect(t *testing.T) {
 		{name: "gha rejects openid-connect", id: "gha", data: wf("enable-openid-connect: true\n", ""), wantErr: "enable-openid-connect"},
 		{name: "forgejo job openid-connect", id: "forgejo", data: []byte("on: push\njobs:\n  a:\n    runs-on: r\n    enable-openid-connect: true\n    steps:\n      - run: echo\n"), wantErr: ""},
 		{name: "gitea unknown scope", id: "gitea", data: wf("", "permissions:\n  bogus: read\n"), wantErr: "bogus"},
+		{name: "gitea bad scope value", id: "gitea", data: wf("", "permissions:\n  code: banana\n"), wantErr: "banana"},
+		{name: "gitea scope level none", id: "gitea", data: wf("", "permissions:\n  code: none\n")},
+		{name: "forgejo non-bool openid-connect", id: "forgejo", data: wf("enable-openid-connect: \"x\"\n", ""), wantErr: "enable-openid-connect"},
+		{name: "forgejo non-bool email notifications", id: "forgejo", data: wf("enable-email-notifications: 3\n", ""), wantErr: "enable-email-notifications"},
+		{name: "forgejo non-bool job openid-connect", id: "forgejo", data: []byte("on: push\njobs:\n  a:\n    runs-on: r\n    enable-openid-connect: \"x\"\n    steps:\n      - run: echo\n"), wantErr: "enable-openid-connect"},
 		{name: "gitea plain file", id: "gitea", data: wf("", ""), wantErr: ""},
 	}
 	for _, c := range cases {

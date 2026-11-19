@@ -38,6 +38,7 @@ type Dialect struct {
 	Dirs        []string
 	Scopes      []string
 	Events      []string
+	BoolKeys    []string
 	Ignored     []IgnoredKey
 }
 
@@ -78,7 +79,8 @@ var Forgejo = Dialect{
 		NodeWorkflow: {"enable-email-notifications", "enable-openid-connect"},
 		NodeJob:      {"enable-openid-connect"},
 	},
-	Scopes: GHA.Scopes,
+	BoolKeys: []string{"enable-email-notifications", "enable-openid-connect"},
+	Scopes:   GHA.Scopes,
 	Events: []string{
 		"push", "issues", "issue_comment", "pull_request", "pull_request_target", "release", "schedule",
 		"workflow_call", "workflow_dispatch",
@@ -100,7 +102,7 @@ func init() {
 		provider.Register(New(d))
 		if d.ID != provider.GHA {
 			validate.RegisterDialect(d.ID, validate.DialectRules{
-				Workflow: d.Extra[NodeWorkflow], Job: d.Extra[NodeJob], Step: d.Extra[NodeStep], Scopes: d.Scopes,
+				Workflow: d.Extra[NodeWorkflow], Job: d.Extra[NodeJob], Step: d.Extra[NodeStep], Scopes: d.Scopes, Bools: d.BoolKeys,
 			})
 		}
 	}
@@ -127,7 +129,7 @@ func (a *adapter) readDir(fsys fs.FS) ([]string, error) {
 		if len(files) > 0 {
 			return files, nil
 		}
-		break
+		return nil, fmt.Errorf("%s: no workflow files in %s", a.d.ID, d)
 	}
 	return nil, fmt.Errorf("%s: no workflow files in %s", a.d.ID, strings.Join(a.d.Dirs, ", "))
 }

@@ -163,3 +163,15 @@ func TestOtherDialectExtDroppedAndReported(t *testing.T) {
 		t.Fatalf("forgejo emit lost its own key:\n%s", files[".forgejo/workflows/ci.yml"])
 	}
 }
+
+func TestParseEmptyFirstDirNamesIt(t *testing.T) {
+	fsys := fstest.MapFS{
+		".gitea/workflows/readme.md": &fstest.MapFile{},
+		".github/workflows/b.yml":    &fstest.MapFile{Data: []byte(dialectCI)},
+	}
+	p, _ := provider.Get(provider.Forgejo)
+	_, _, err := p.Parse(fsys)
+	if err == nil || !strings.Contains(err.Error(), ".gitea/workflows") {
+		t.Fatalf("error does not name the directory read: %v", err)
+	}
+}

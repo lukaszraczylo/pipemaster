@@ -14,12 +14,24 @@ type DialectRules struct {
 	Job      []string
 	Step     []string
 	Scopes   []string
+	Bools    []string
 }
 
 var (
 	dialectMu sync.RWMutex
 	dialects  = map[string]DialectRules{}
 )
+
+// permissionLevels are the values the GHA schema accepts for one permission scope.
+var permissionLevels = []string{"read", "write", "none"}
+
+// rulesFor returns the rules registered for id.
+func rulesFor(id string) (DialectRules, bool) {
+	dialectMu.RLock()
+	defer dialectMu.RUnlock()
+	r, ok := dialects[id]
+	return r, ok
+}
 
 // RegisterDialect records the rules File applies, before the GHA schema, to a dialect's files.
 func RegisterDialect(id string, r DialectRules) {
@@ -62,7 +74,9 @@ func stripDialect(doc any, r DialectRules) (any, error) {
 	if err := stripScopes(wf, r.Scopes); err != nil {
 		return nil, err
 	}
-	dropKeys(wf, r.Workflow)
+	if err := dropKeys(wf, r.Workflow, r.Bools); err != nil {
+		return nil, err
+	}
 	jobs, _ := wf["jobs"].(map[string]any)
 	for id, raw := range jobs {
 		job, ok := raw.(map[string]any)
@@ -72,21 +86,34 @@ func stripDialect(doc any, r DialectRules) (any, error) {
 		if err := stripScopes(job, r.Scopes); err != nil {
 			return nil, fmt.Errorf("job %s: %w", id, err)
 		}
-		dropKeys(job, r.Job)
+		if err := dropKeys(job, r.Job, r.Bools); err != nil {
+			return nil, fmt.Errorf("job %s: %w", id, err)
+		}
 		steps, _ := job["steps"].([]any)
 		for _, s := range steps {
 			if step, ok := s.(map[string]any); ok {
-				dropKeys(step, r.Step)
+				if err := dropKeys(step, r.Step, r.Bools); err != nil {
+					return nil, fmt.Errorf("job %s: %w", id, err)
+				}
 			}
 		}
 	}
 	return wf, nil
 }
 
-func dropKeys(m map[string]any, keys []string) {
+// dropKeys removes the dialect-only keys from m once each key in bools holds a boolean.
+func dropKeys(m map[string]any, keys, bools []string) error {
 	for _, k := range keys {
+		v, ok := m[k]
+		if !ok {
+			continue
+		}
+		if _, isBool := v.(bool); slices.Contains(bools, k) && !isBool {
+			return fmt.Errorf("key %q must be a boolean, got %v", k, v)
+		}
 		delete(m, k)
 	}
+	return nil
 }
 
 // stripScopes removes the scopes of m's permissions map that GHA lacks and the dialect accepts.
@@ -102,6 +129,9 @@ func stripScopes(m map[string]any, dialect []string) error {
 		}
 		if !slices.Contains(dialect, k) {
 			return fmt.Errorf("permission scope %q is not accepted by the dialect", k)
+		}
+		if lvl, _ := perms[k].(string); !slices.Contains(permissionLevels, lvl) {
+			return fmt.Errorf("permission scope %q must be one of %v, got %v", k, permissionLevels, perms[k])
 		}
 		delete(perms, k)
 	}

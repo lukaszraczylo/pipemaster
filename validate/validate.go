@@ -92,7 +92,7 @@ func File(providerID, name string, data []byte) error {
 		return fmt.Errorf("%s: %w", name, err)
 	}
 	for _, v := range docs {
-		if rules, ok := dialects[providerID]; ok {
+		if rules, ok := rulesFor(providerID); ok {
 			var err error
 			if v, err = stripDialect(v, rules); err != nil {
 				return fmt.Errorf("%s: %w", name, err)

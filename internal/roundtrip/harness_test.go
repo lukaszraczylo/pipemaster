@@ -104,7 +104,7 @@ func targets(id string) []string {
 	return out
 }
 
-// other picks the base-adapter target of another family; dialects wait for the per-target tests.
+// other picks a base-adapter target so the pair keeps the golden directory names of the two-provider days.
 func other(id string) string {
 	for _, p := range targets(id) {
 		if !provider.SameFamily(p, id) && provider.Family(p) == p {
