@@ -1,0 +1,16 @@
+# pipemaster:emulated script.interpolation pipeline/ci
+# pipemaster:arg [{"k":"t","p":"job/build/step/build-step-1/script/0","g":"echo \"$REGION\"","s":"echo \"$\u007b{ vars.REGION }}\""}]
+variables:
+  API_TOKEN: $API_TOKEN
+build:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    # pipemaster:emulated step.env pipeline/ci/job/build/step/build-step-1
+    - |
+      (
+      export KEY="$DEPLOY_KEY"
+      echo "$REGION"
+      )

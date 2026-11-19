@@ -1,0 +1,37 @@
+# pipemaster:emulated script.interpolation pipeline/ci
+# pipemaster:arg [{"k":"t","p":"job/build/step/build-step-1/script/0","g":"echo \"$REGION\"","s":"echo \"$\u007b{ vars.REGION }}\""}]
+variables:
+  API_TOKEN: $API_TOKEN
+build:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    # pipemaster:emulated step.env pipeline/ci/job/build/step/build-step-1
+    - |
+      (
+      export KEY="$DEPLOY_KEY"
+      echo "$REGION"
+      )
+# pipemaster:meta:begin
+# ZmlsZXM6CiAgICAuZ2l0bGFiLWNpLnltbDogOTkzOGIzYWQzNTVjNTE2ZGIwMjk5MGYyMjA0N2Yx
+# MzNlMTlmZDU4ODllMTg2Y2M1OWRlZDQzZWVmNmRiZWE0MgpleHQ6CiAgICBwaXBlbGluZS9jaS9q
+# b2IvYnVpbGQvc3RlcC9idWlsZC1zdGVwLTE6CiAgICAgICAgZ2hhOgogICAgICAgICAgICBfZGVy
+# aXZlZF9pZDogdHJ1ZQppZHM6CiAgICBwaXBlbGluZS9naXRsYWItY2k6IGNpCnJlc2lkdWFsOgog
+# ICAgcGlwZWxpbmUvY2k6CiAgICAgICAgbmFtZTogY29uZmlnCmxvc3Q6CiAgICBwaXBlbGluZS9j
+# aToKICAgICAgICBwaXBlbGluZToKICAgICAgICAgICAgaWQ6IGNpCiAgICAgICAgICAgIG5hbWU6
+# IGNvbmZpZwogICAgICAgICAgICBlbnY6CiAgICAgICAgICAgICAgICAtIG5hbWU6IEFQSV9UT0tF
+# TgogICAgICAgICAgICAgICAgICB2YWx1ZToKICAgICAgICAgICAgICAgICAgICBzZWNyZXQ6IEFQ
+# SV9UT0tFTgogICAgcGlwZWxpbmUvY2kvam9iL2J1aWxkL3N0ZXAvYnVpbGQtc3RlcC0xOgogICAg
+# ICAgIHN0ZXA6CiAgICAgICAgICAgIGlkOiBidWlsZC1zdGVwLTEKICAgICAgICAgICAgZW52Ogog
+# ICAgICAgICAgICAgICAgLSBuYW1lOiBLRVkKICAgICAgICAgICAgICAgICAgdmFsdWU6CiAgICAg
+# ICAgICAgICAgICAgICAgc2VjcmV0OiBERVBMT1lfS0VZCmVtaXR0ZWQ6CiAgICBwaXBlbGluZS9j
+# aToKICAgICAgICBwaXBlbGluZToKICAgICAgICAgICAgaWQ6IGNpCiAgICAgICAgICAgIGVudjoK
+# ICAgICAgICAgICAgICAgIC0gbmFtZTogQVBJX1RPS0VOCiAgICAgICAgICAgICAgICAgIHZhbHVl
+# OgogICAgICAgICAgICAgICAgICAgIGxpdDogJEFQSV9UT0tFTgogICAgcGlwZWxpbmUvY2kvam9i
+# L2J1aWxkL3N0ZXAvYnVpbGQtc3RlcC0xOgogICAgICAgIHN0ZXA6CiAgICAgICAgICAgIGlkOiBi
+# dWlsZC1zdGVwLTEKICAgICAgICAgICAgZW52OgogICAgICAgICAgICAgICAgLSBuYW1lOiBLRVkK
+# ICAgICAgICAgICAgICAgICAgdmFsdWU6CiAgICAgICAgICAgICAgICAgICAgbGl0OiAkREVQTE9Z
+# X0tFWQpzb3VyY2U6IGdoYQpkaWFsZWN0OiBnaGEKdmVyc2lvbjogMQo=
+# pipemaster:meta:end

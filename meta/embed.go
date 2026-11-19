@@ -18,22 +18,27 @@ const (
 )
 
 // Embed appends the metadata block to the lexically first file and returns a new map.
-// A first file without a trailing newline gains one, and the hash covers that form.
 func Embed(files map[string][]byte, m *Meta) map[string][]byte {
+	return EmbedStack(files, &Stack{Layers: []*Meta{m}})
+}
+
+// EmbedStack appends the stack block to the lexically first file and returns a new map. It writes no block
+// for an empty stack. A first file without a trailing newline gains one, and the top layer's hash covers that form.
+func EmbedStack(files map[string][]byte, s *Stack) map[string][]byte {
 	out := make(map[string][]byte, len(files))
 	for k, v := range files {
 		out[k] = StripEmbedded(v)
 	}
-	if len(out) == 0 {
+	if len(out) == 0 || len(s.Layers) == 0 {
 		return out
 	}
 	first := sortedKeys(out)[0]
 	if b := out[first]; len(b) > 0 && b[len(b)-1] != '\n' {
 		out[first] = append(append([]byte{}, b...), '\n')
 	}
-	m.Files = hashAll(out)
+	s.Top().Files = hashAll(out)
 
-	enc := base64.StdEncoding.EncodeToString(mustMarshal(m))
+	enc := base64.StdEncoding.EncodeToString(marshalStack(s))
 	var blk strings.Builder
 	blk.WriteString(beginMarker + "\n")
 	for len(enc) > 0 {
@@ -91,7 +96,7 @@ func lineIndex(b []byte, marker string, from int) int {
 	return -1
 }
 
-func loadEmbedded(fsys fs.FS, parsed []string) (*Meta, error) {
+func loadEmbedded(fsys fs.FS, parsed []string) (*Stack, error) {
 	files := slices.Clone(parsed)
 	slices.Sort(files)
 	for _, path := range files {
@@ -106,18 +111,20 @@ func loadEmbedded(fsys fs.FS, parsed []string) (*Meta, error) {
 		if !ok {
 			continue
 		}
-		m, err := decodeBlock(b[start:end])
+		s, err := decodeBlock(b[start:end])
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", path, err)
 		}
-		if _, ok := m.Files[path]; ok {
-			return m, nil
+		if top := s.Top(); top != nil {
+			if _, ok := top.Files[path]; ok {
+				return s, nil
+			}
 		}
 	}
-	return nil, nil
+	return &Stack{}, nil
 }
 
-func decodeBlock(blk []byte) (*Meta, error) {
+func decodeBlock(blk []byte) (*Stack, error) {
 	lines := strings.Split(strings.TrimSuffix(string(blk), "\n"), "\n")
 	if len(lines) < 2 || lines[len(lines)-1] != endMarker {
 		return nil, errors.New("embedded metadata block has no end marker")
@@ -134,5 +141,5 @@ func decodeBlock(blk []byte) (*Meta, error) {
 	if err != nil {
 		return nil, fmt.Errorf("decode embedded metadata: %w", err)
 	}
-	return parse(raw)
+	return parseStack(raw)
 }

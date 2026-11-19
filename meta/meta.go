@@ -11,13 +11,14 @@ import (
 	"slices"
 	"sort"
 
-	"go.yaml.in/yaml/v3"
-
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
-// Version is the only metadata schema version this package reads.
-const Version = 1
+// Version is the metadata schema version this package writes.
+const Version = 2
+
+// legacyVersion is the Phase 1 schema: one Meta at the document root.
+const legacyVersion = 1
 
 // SidecarPath is where Attach writes the metadata file.
 const SidecarPath = ".pipemaster/meta.yaml"
@@ -39,7 +40,7 @@ type Meta struct {
 	Emitted map[string]Lost `yaml:"emitted,omitempty"`
 	Source  string          `yaml:"source,omitempty"`
 	Dialect string          `yaml:"dialect,omitempty"`
-	Version int             `yaml:"version"`
+	Version int             `yaml:"version,omitempty"`
 }
 
 // Collect copies the Ext of every IR node that has one, keyed by IR path.
@@ -130,14 +131,7 @@ func reattach(p *ir.Project, m *Meta, keepEdits bool) (orphans, kept []string) {
 
 // Attach records hashes of files in m and returns a copy of files plus the sidecar.
 func Attach(files map[string][]byte, m *Meta) map[string][]byte {
-	out := make(map[string][]byte, len(files)+1)
-	for k, v := range files {
-		out[k] = v
-	}
-	delete(out, SidecarPath)
-	m.Files = hashAll(out)
-	out[SidecarPath] = mustMarshal(m)
-	return out
+	return AttachStack(files, &Stack{Layers: []*Meta{m}})
 }
 
 // Stale lists files in m that are missing or whose content changed, wrapping ErrStale when any exist.
@@ -161,41 +155,13 @@ func (m *Meta) Stale(fsys fs.FS) ([]string, error) {
 	return nil, nil
 }
 
-// Load reads the sidecar, else the first embedded block in the parsed files, in sorted order. A block counts
-// only when its files list names the file that holds it. It returns nil, nil when neither exists.
+// Load reads the top layer of the stack, or nil when there is none.
 func Load(fsys fs.FS, parsed []string) (*Meta, error) {
-	b, err := fs.ReadFile(fsys, SidecarPath)
-	switch {
-	case err == nil:
-		return parse(b)
-	case !errors.Is(err, fs.ErrNotExist):
-		return nil, fmt.Errorf("read %s: %w", SidecarPath, err)
-	}
-	return loadEmbedded(fsys, parsed)
-}
-
-func parse(b []byte) (*Meta, error) {
-	var m Meta
-	if err := yaml.Unmarshal(b, &m); err != nil {
-		return nil, fmt.Errorf("parse metadata: %w", err)
-	}
-	if m.Version != Version {
-		return nil, fmt.Errorf("unsupported metadata version %d, want %d", m.Version, Version)
-	}
-	// yaml decodes values nested under an ir.Ext key as ir.Ext; normalise so a loaded Meta equals a collected one.
-	for path, e := range m.Ext {
-		m.Ext[path] = copyExt(e)
-	}
-	return &m, nil
-}
-
-func mustMarshal(m *Meta) []byte {
-	b, err := yaml.Marshal(m)
+	s, err := LoadStack(fsys, parsed)
 	if err != nil {
-		// Meta holds only maps, strings and YAML-decoded values, so this cannot fail.
-		panic(fmt.Sprintf("meta: marshal: %v", err))
+		return nil, err
 	}
-	return b
+	return s.Top(), nil
 }
 
 func hash(b []byte) string {

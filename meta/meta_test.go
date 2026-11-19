@@ -81,7 +81,7 @@ func TestAttachWritesSidecar(t *testing.T) {
 	if _, ok := m.Files[SidecarPath]; ok {
 		t.Error("sidecar must not hash itself")
 	}
-	if !strings.Contains(string(out[SidecarPath]), "version: 1") {
+	if !strings.Contains(string(out[SidecarPath]), "version: 2") {
 		t.Errorf("sidecar = %s", out[SidecarPath])
 	}
 }
@@ -106,7 +106,7 @@ func TestLoadAbsent(t *testing.T) {
 }
 
 func TestLoadRejectsBadVersion(t *testing.T) {
-	fsys := asFS(map[string][]byte{SidecarPath: []byte("version: 2\n")})
+	fsys := asFS(map[string][]byte{SidecarPath: []byte("version: 3\n")})
 	if _, err := Load(fsys, nil); err == nil {
 		t.Fatal("want version error")
 	}

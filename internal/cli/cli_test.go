@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v3"
 )
 
 func run(t *testing.T, args ...string) (code int, stdout, stderr string) {
@@ -228,7 +231,7 @@ func TestConvertOrphanReported(t *testing.T) {
 	run(t, "convert", src, "--to", "fake2", "-o", mid)
 	// Rewrite meta to add a path no node matches; files hash stays valid.
 	m := read(t, mid, ".pipemaster/meta.yaml")
-	m = strings.Replace(m, "ext:\n", "ext:\n    gone/path:\n        fake: x\n", 1)
+	m = strings.Replace(m, "ext:\n", "ext:\n        gone/path:\n            fake: x\n", 1)
 	write(t, mid, ".pipemaster/meta.yaml", m)
 	code, _, errs := run(t, "convert", mid, "--to", "fake", "-o", back)
 	if code != 0 || !strings.Contains(errs, "[lost]") || !strings.Contains(errs, "gone/path") || !strings.Contains(errs, "ext.passthrough") {
@@ -371,5 +374,39 @@ func TestConvertNoSchemaWarnsOncePerFile(t *testing.T) {
 	}
 	if strings.Contains(errs, "meta.yaml") {
 		t.Fatalf("sidecar must not be validated: %q", errs)
+	}
+}
+
+// The fixtures were written by the Phase 1 binary (commit 38d7f59) from testdata/gha/features/config.name.
+func TestConvertBackFromPhase1Metadata(t *testing.T) {
+	want, err := os.ReadFile("../../testdata/gha/features/config.name/.github/workflows/ci.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"v1-sidecar", "v1-embedded"} {
+		t.Run(name, func(t *testing.T) {
+			src, out := t.TempDir(), t.TempDir()
+			if err := os.CopyFS(src, os.DirFS("../../testdata/meta/"+name)); err != nil {
+				t.Fatal(err)
+			}
+			code, _, errs := run(t, "convert", "--to", "gha", "-o", out, src)
+			if code != 0 {
+				t.Fatalf("code=%d stderr=%q", code, errs)
+			}
+			var got, wantDoc any
+			if err := yaml.Unmarshal([]byte(read(t, out, ".github/workflows/ci.yml")), &got); err != nil {
+				t.Fatal(err)
+			}
+			if err := yaml.Unmarshal(want, &wantDoc); err != nil {
+				t.Fatal(err)
+			}
+			// The emitter writes the bare trigger `on: push` as a map, so the return is exact as a document, not as bytes.
+			if doc, ok := wantDoc.(map[string]any); ok && doc["on"] == "push" {
+				doc["on"] = map[string]any{"push": nil}
+			}
+			if !reflect.DeepEqual(got, wantDoc) {
+				t.Errorf("not an exact return:\n got %v\nwant %v", got, wantDoc)
+			}
+		})
 	}
 }

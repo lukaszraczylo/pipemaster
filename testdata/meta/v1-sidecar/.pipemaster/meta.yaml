@@ -1,0 +1,45 @@
+files:
+    .gitlab-ci.yml: 9938b3ad355c516db02990f22047f133e19fd5889e186cc59ded43eef6dbea42
+ext:
+    pipeline/ci/job/build/step/build-step-1:
+        gha:
+            _derived_id: true
+ids:
+    pipeline/gitlab-ci: ci
+residual:
+    pipeline/ci:
+        name: config
+lost:
+    pipeline/ci:
+        pipeline:
+            id: ci
+            name: config
+            env:
+                - name: API_TOKEN
+                  value:
+                    secret: API_TOKEN
+    pipeline/ci/job/build/step/build-step-1:
+        step:
+            id: build-step-1
+            env:
+                - name: KEY
+                  value:
+                    secret: DEPLOY_KEY
+emitted:
+    pipeline/ci:
+        pipeline:
+            id: ci
+            env:
+                - name: API_TOKEN
+                  value:
+                    lit: $API_TOKEN
+    pipeline/ci/job/build/step/build-step-1:
+        step:
+            id: build-step-1
+            env:
+                - name: KEY
+                  value:
+                    lit: $DEPLOY_KEY
+source: gha
+dialect: gha
+version: 1
