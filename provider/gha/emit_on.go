@@ -27,6 +27,10 @@ type onBuilder struct {
 }
 
 func (b *onBuilder) add(path string, f caps.Feature, name string, n *yaml.Node) {
+	if !b.e.d.accepts(name) {
+		b.e.lose(path, f, "event "+name+" is not supported by "+b.e.d.title()+"; the trigger is dropped")
+		return
+	}
 	if b.events.has(name) {
 		b.e.lose(path, f, "event "+name+" already has a trigger; GHA allows one filter set per event")
 		return

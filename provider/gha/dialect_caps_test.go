@@ -360,3 +360,72 @@ func TestNativeCaveatsAreReported(t *testing.T) {
 		})
 	}
 }
+
+// viaMetadata emits src through d, reads the file back, restores the metadata and returns the project.
+func viaMetadata(t *testing.T, src *ir.Project, d gha.Dialect) (string, *report.Report, *ir.Project) {
+	t.Helper()
+	target := gha.New(d)
+	files, rep, err := target.Emit(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := roundtrip.NewMeta(provider.GHA, src, target, rep)
+	mid, _, err := target.Parse(toMapFS(files))
+	if err != nil {
+		t.Fatal(err)
+	}
+	roundtrip.Restore(mid, m)
+	return string(files[d.Dirs[0]+"/ci.yml"]), rep, mid
+}
+
+func toMapFS(files map[string][]byte) fstest.MapFS {
+	out := fstest.MapFS{}
+	for n, b := range files {
+		out[n] = &fstest.MapFile{Data: b}
+	}
+	return out
+}
+
+func TestModelledTriggersOutsideDialectEvents(t *testing.T) {
+	const (
+		runSrc  = "on:\n  workflow_run:\n    workflows: [ci]\n    types: [completed]\n" + pushJob
+		dispSrc = "on: repository_dispatch\n" + pushJob
+	)
+	for _, c := range []struct {
+		name    string
+		src     string
+		event   string
+		dropped string
+		feature caps.Feature
+		d       gha.Dialect
+		kept    bool
+	}{
+		{"workflow_run to forgejo", runSrc, "workflow_run", "Forgejo", caps.TriggerPipelineDone, gha.Forgejo, false},
+		{"repository_dispatch to forgejo", dispSrc, "repository_dispatch", "Forgejo", caps.TriggerAPI, gha.Forgejo, false},
+		{"repository_dispatch to gitea", dispSrc, "repository_dispatch", "Gitea", caps.TriggerAPI, gha.Gitea, false},
+		{"workflow_run to gitea", runSrc, "workflow_run", "", caps.TriggerPipelineDone, gha.Gitea, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			src := parseWF(t, gha.GHA, c.src)
+			text, rep, back := viaMetadata(t, src, c.d)
+			if c.kept {
+				if !strings.Contains(text, c.event+":") {
+					t.Errorf("%s must stay:\n%s", c.event, text)
+				}
+				checkEntries(t, rep, []caps.Feature{c.feature}, nil)
+				return
+			}
+			if strings.Contains(text, c.event+":") {
+				t.Errorf("%s must be dropped:\n%s", c.event, text)
+			}
+			if !strings.Contains(text, "workflow_dispatch") || strings.Contains(text, "push") {
+				t.Errorf("a pipeline with no runnable trigger must be manual only:\n%s", text)
+			}
+			checkEntries(t, rep, []caps.Feature{c.feature},
+				[]wantEntry{{"pipeline/ci/trigger/0", c.dropped, c.feature, caps.Lost}})
+			if !reflect.DeepEqual(back.Pipelines[0].Triggers, src.Pipelines[0].Triggers) {
+				t.Errorf("triggers after the metadata return = %+v, want %+v", back.Pipelines[0].Triggers, src.Pipelines[0].Triggers)
+			}
+		})
+	}
+}
