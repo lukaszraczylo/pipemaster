@@ -217,7 +217,11 @@ func unsub(st *ir.Step, lines []string, workdir, env bool) ([]string, bool) {
 			if m == nil {
 				break
 			}
-			st.Env = append(st.Env, ir.Var{Name: m[1], Value: ir.Value{Lit: unquote(m[2])}})
+			v, ok := envValue(unquote(m[2]))
+			if !ok {
+				return nil, false
+			}
+			st.Env = append(st.Env, ir.Var{Name: m[1], Value: v})
 			n++
 		}
 		if n == 0 {
@@ -226,6 +230,28 @@ func unsub(st *ir.Step, lines []string, workdir, env bool) ([]string, bool) {
 		inner = inner[n:]
 	}
 	return inner, len(inner) > 0
+}
+
+// envValue reads an exported value back as the IR holds a variable: text, a secret reference, or an
+// expression when the canonical script text carries ${{ }} references. Text it cannot parse is not restored.
+func envValue(text string) (ir.Value, bool) {
+	if !strings.Contains(text, "${{") {
+		return ir.Value{Lit: text}, true
+	}
+	parts, err := expr.ParseScriptTemplate(text)
+	if err != nil {
+		return ir.Value{}, false
+	}
+	if len(parts) == 1 && parts[0].Expr != nil {
+		if r, ok := parts[0].Expr.(expr.Ref); ok && len(r.Path) == 2 && r.Path[0] == expr.PrefixSecrets {
+			return ir.Value{Kind: ir.ValueSecret, Secret: r.Path[1]}, true
+		}
+	}
+	x := mixFormat(parts)
+	if expr.Check(x) != nil {
+		return ir.Value{}, false
+	}
+	return ir.Value{Kind: ir.ValueExpr, Expr: x}, true
 }
 
 // collapseOutputs turns the trailing dotenv writer lines back into job outputs.

@@ -59,7 +59,7 @@ func emulCases() map[string]emulCase {
 	}
 	env := func() *ir.Project {
 		st := glStep("make test")
-		st.Env = []ir.Var{{Name: "A", Value: ir.Value{Lit: "one"}}, {Name: "SHA", Value: ir.Value{Lit: "${{ sha }}"}}}
+		st.Env = []ir.Var{{Name: "A", Value: ir.Value{Lit: "one"}}, {Name: "SHA", Value: ir.Value{Kind: ir.ValueExpr, Expr: expr.Ref{Path: []string{expr.CtxSHA}}}}}
 		return glProject("gitlab", glJob("build", st))
 	}
 	workdir := func() *ir.Project {
