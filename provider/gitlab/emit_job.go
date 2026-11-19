@@ -98,7 +98,7 @@ func (e *emitter) needsNode(c *pipeCtx, p *jobPrep) (*yaml.Node, error) {
 		}
 		shown := n
 		shown.JobID = c.key(n.JobID)
-		entry, bad, err := needEntry(shown, c.declares(n.JobID), downloaded[n.JobID], hasDeps, deps, extras[n.JobID])
+		entry, bad, err := needEntry(shown, n.JobID, c.declares(n.JobID), downloaded[n.JobID], hasDeps, deps, extras[n.JobID])
 		if err != nil {
 			return nil, err
 		}
@@ -122,7 +122,7 @@ func (e *emitter) needsNode(c *pipeCtx, p *jobPrep) (*yaml.Node, error) {
 
 // needEntry writes one needs entry. GitLab downloads the producer's artifacts by default when it has any
 // (and dependencies lists it), so the map form appears only when the IR says otherwise or an action asked for them.
-func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps []string, extra any) (node *yaml.Node, badInstance string, err error) {
+func needEntry(n ir.Need, origID string, producerHasArtifacts, downloaded, hasDeps bool, deps []string, extra any) (node *yaml.Node, badInstance string, err error) {
 	x, _ := extra.(map[string]any)
 	job := n.JobID
 	if inst, _ := x[ExtNeedsInstance].(string); inst != "" {
@@ -132,8 +132,8 @@ func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps [
 		switch at := strings.Index(inst, ": ["); {
 		case at > 0:
 			job = n.JobID + inst[at:]
-		case validNeedName(inst):
-			job = inst
+		case inst == origID || inst == n.JobID:
+			job = n.JobID
 		default:
 			badInstance = inst
 		}
@@ -163,11 +163,6 @@ func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps [
 		return str(job), badInstance, nil
 	}
 	return m.n, badInstance, nil
-}
-
-// validNeedName accepts a non-empty single-line name; GitLab matches it against job names.
-func validNeedName(s string) bool {
-	return strings.TrimSpace(s) != "" && !strings.ContainsAny(s, "\n\r")
 }
 
 // downloadedFrom maps each needed job whose artifacts an action downloads, and reports downloads that match no needed job.

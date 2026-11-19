@@ -646,16 +646,35 @@ func instanceNeedEmit(t *testing.T, inst string) (string, *report.Report) {
 	return string(files[".gitlab-ci.yml"]), rep
 }
 
-// An instance value without a bracket selector is written as the need name when GitLab can take it.
-func TestInstanceNeedWithoutSelectorIsEmittedVerbatim(t *testing.T) {
-	out, _ := instanceNeedEmit(t, "on-custom")
-	if !strings.Contains(out, "- on-custom") {
-		t.Errorf("instance dropped:\n%s", out)
+// An instance value that names the needed job is the plain need.
+func TestInstanceNeedNamingTheJobIsEmitted(t *testing.T) {
+	out, rep := instanceNeedEmit(t, "on")
+	if !strings.Contains(out, "- on") {
+		t.Errorf("need dropped:\n%s", out)
+	}
+	for _, e := range rep.Entries {
+		if e.Level == caps.Lost {
+			t.Errorf("unexpected lost entry %q", e.Detail)
+		}
 	}
 }
 
+// An instance value that names another job must not retarget the need.
+func TestInstanceNeedNamingAnotherJobIsReportedLost(t *testing.T) {
+	out, rep := instanceNeedEmit(t, "other-job")
+	if strings.Contains(out, "other-job") {
+		t.Errorf("need retargeted:\n%s", out)
+	}
+	for _, e := range rep.Entries {
+		if e.Level == caps.Lost && strings.Contains(e.Detail, "other-job") {
+			return
+		}
+	}
+	t.Error("no lost entry naming the instance")
+}
+
 // A value GitLab cannot take as a need name is reported with its text.
-func TestInstanceNeedInvalidIsReportedLost(t *testing.T) {
+func TestInstanceNeedMultilineIsReportedLost(t *testing.T) {
 	out, rep := instanceNeedEmit(t, "bad\nname")
 	if strings.Contains(out, "bad") {
 		t.Errorf("invalid instance written:\n%s", out)
