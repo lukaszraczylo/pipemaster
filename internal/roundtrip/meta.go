@@ -21,6 +21,7 @@ func NewMeta(sourceID string, proj *ir.Project, target provider.Provider, rep *r
 		IDs:      ids,
 		Lost:     lost,
 		Source:   sourceID,
+		Target:   target.ID(),
 		Dialect:  proj.Origin.Dialect,
 		Ext:      meta.Collect(proj),
 		Residual: meta.CollectResidual(proj),

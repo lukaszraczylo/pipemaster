@@ -24,10 +24,19 @@ type HopResult struct {
 
 // Hop applies the stored layers to proj for a conversion from source to target. Restored is true when the
 // step unwinds to an older provider: the output is then a deterministic emit of the layers below. It needs a
-// new layer only for what the target dialect cannot write, which the caller records. The source parameter is
-// unused and kept for the call-site signature.
-func Hop(proj *ir.Project, in *meta.Stack, srcFS fs.FS, _, target string, force bool, rep *report.Report) (HopResult, error) {
+// new layer only for what the target dialect cannot write, which the caller records. The stack applies only if
+// its top layer describes the files read: it targets source, and it hashes every file in proj.Origin.Files.
+// Any other stack counts as empty and the report says so.
+func Hop(proj *ir.Project, in *meta.Stack, srcFS fs.FS, source, target string, force bool, rep *report.Report) (HopResult, error) {
 	if in == nil || len(in.Layers) == 0 {
+		return HopResult{Proj: proj, Out: &meta.Stack{}}, nil
+	}
+	if why := describes(in, proj.Origin.Files, source); why != "" {
+		rep.Add(report.Entry{
+			Feature: caps.ExtPassthrough,
+			Level:   caps.Lost,
+			Detail:  fmt.Sprintf("stored metadata %s, not the %s files read; not applied and is replaced", why, source),
+		})
 		return HopResult{Proj: proj, Out: &meta.Stack{}}, nil
 	}
 	if stale, err := in.Top().Stale(srcFS); err != nil {
@@ -51,6 +60,24 @@ func Hop(proj *ir.Project, in *meta.Stack, srcFS fs.FS, _, target string, force 
 		})
 	}
 	return HopResult{Proj: proj, Out: &meta.Stack{Layers: slices.Clone(in.Layers)}}, nil
+}
+
+// describes returns why in does not describe the files read from source, or "" when it does. A chain whose
+// layers do not link by provider is also refused: unwinding it would stamp hashes on a layer of another provider.
+func describes(in *meta.Stack, files []string, source string) string {
+	top := in.Top()
+	if top.Target != "" && top.Target != source {
+		return fmt.Sprintf("describes %s files", top.Target)
+	}
+	if missing := slices.DeleteFunc(slices.Clone(files), func(f string) bool { _, ok := top.Files[f]; return ok }); len(missing) > 0 {
+		return fmt.Sprintf("does not list %s", strings.Join(missing, ", "))
+	}
+	for i := 1; i < len(in.Layers); i++ {
+		if prev := in.Layers[i-1].Target; prev != "" && prev != in.Layers[i].Source {
+			return fmt.Sprintf("holds layers that do not link (%s then %s)", prev, in.Layers[i].Source)
+		}
+	}
+	return ""
 }
 
 func staleHop(proj *ir.Project, in *meta.Stack, stale []string, err error, target string, force bool, rep *report.Report) (HopResult, error) {

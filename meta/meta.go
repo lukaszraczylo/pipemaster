@@ -39,7 +39,9 @@ type Meta struct {
 	// stored field only where the file still reads as emitted.
 	Emitted map[string]Lost `yaml:"emitted,omitempty"`
 	Source  string          `yaml:"source,omitempty"`
-	Dialect string          `yaml:"dialect,omitempty"`
+	// Target is the provider whose files Files hashes. A layer written before this field existed has none.
+	Target  string `yaml:"target,omitempty"`
+	Dialect string `yaml:"dialect,omitempty"`
 	// SourceInvalid holds the schema findings of the files the first conversion read, so a full return that
 	// restores them can tell a finding the user already had from a new one.
 	SourceInvalid []string `yaml:"source_invalid,omitempty"`
