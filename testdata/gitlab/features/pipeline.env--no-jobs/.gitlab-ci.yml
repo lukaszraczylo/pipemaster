@@ -1,0 +1,6 @@
+variables:
+  REGION: eu
+
+.template:
+  script:
+    - echo template

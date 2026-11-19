@@ -25,6 +25,10 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 		}
 		switch u.Feature {
 		case caps.StepScript:
+			if u.IRPath == "pipeline/"+pl.ID {
+				pl.Jobs = slices.DeleteFunc(pl.Jobs, func(j *ir.Job) bool { return j.ID == emptyJobID })
+				break
+			}
 			if j := markedJob(pl, u.IRPath); j != nil && len(j.Steps) == 1 && slices.Equal(j.Steps[0].Script, []string{noopScript}) {
 				j.Steps = nil
 			}

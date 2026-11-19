@@ -1,0 +1,20 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - ext:
+        gitlab:
+            hidden:
+                .template:
+                    script:
+                        - echo template
+      id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      env:
+        - name: REGION
+          value:
+            lit: eu

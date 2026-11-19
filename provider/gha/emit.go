@@ -144,7 +144,24 @@ func (e *emitter) jobs(pl *ir.Pipeline) (*yaml.Node, error) {
 			jm.setComment(j.ID, n, comments)
 		}
 	}
+	if jm.empty() {
+		e.placeholderJob(jm, pl)
+	}
 	return jm.n, nil
+}
+
+// emptyJobID names the job that keeps a workflow with no jobs valid.
+const emptyJobID = "pipemaster-empty"
+
+func (e *emitter) placeholderJob(jm *omap, pl *ir.Pipeline) {
+	pp := "pipeline/" + pl.ID
+	job, step := newMap(), newMap()
+	job.set("runs-on", str(defaultRunner))
+	step.set("run", str(noopScript))
+	job.set("steps", seqOf(step.n))
+	jm.set(emptyJobID, job.n)
+	e.emulate(pp, caps.StepScript, "placeholder job "+emptyJobID, "a GHA workflow needs at least one job")
+	e.mark(caps.StepScript, pp)
 }
 
 // permissions writes the read-all and write-all shorthands for Scopes["*"], else a scope mapping.
