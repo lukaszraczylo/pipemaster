@@ -4,9 +4,9 @@
 02-gha-django gha->forgejo native=121 emulated=1 external=0 lost=5
 02-gha-django gha->gitea native=121 emulated=0 external=0 lost=0
 02-gha-django gha->gitlab native=54 emulated=11 external=1 lost=78
-03-gha-build-push-action gha->forgejo native=651 emulated=2 external=0 lost=4
-03-gha-build-push-action gha->gitea native=652 emulated=0 external=0 lost=0
-03-gha-build-push-action gha->gitlab native=305 emulated=8 external=3 lost=468
+03-gha-build-push-action gha->forgejo native=661 emulated=2 external=0 lost=4
+03-gha-build-push-action gha->gitea native=662 emulated=0 external=0 lost=0
+03-gha-build-push-action gha->gitlab native=315 emulated=8 external=3 lost=468
 04-gha-gin gha->forgejo native=81 emulated=4 external=0 lost=3
 04-gha-gin gha->gitea native=81 emulated=0 external=0 lost=1
 04-gha-gin gha->gitlab native=43 emulated=4 external=2 lost=53

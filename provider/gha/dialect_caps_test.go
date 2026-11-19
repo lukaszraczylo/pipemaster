@@ -429,3 +429,29 @@ func TestModelledTriggersOutsideDialectEvents(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigNameInExtAndImages(t *testing.T) {
+	const wf = `on: push
+jobs:
+  b:
+    runs-on: r
+    container:
+      image: ghcr.io/o/${{ secrets.GITHUB_IMG }}:1
+      credentials:
+        username: u
+        password: ${{ secrets.GITHUB_PAT }}
+    services:
+      db:
+        image: postgres:${{ vars.GITHUB_PG }}
+    steps:
+      - run: echo '${{ secrets.GITHUB_OTHER }}'
+`
+	_, rep := emitText(t, gha.Gitea, parseWF(t, gha.GHA, wf))
+	const reason = ": Gitea rejects names that start with GITHUB_; rename it and update the reference"
+	checkEntries(t, rep, []caps.Feature{caps.ConfigName}, []wantEntry{
+		{"pipeline/ci/ref/secrets.GITHUB_IMG", "create secret GITHUB_IMG" + reason, caps.ConfigName, caps.External},
+		{"pipeline/ci/ref/secrets.GITHUB_OTHER", "create secret GITHUB_OTHER" + reason, caps.ConfigName, caps.External},
+		{"pipeline/ci/ref/secrets.GITHUB_PAT", "create secret GITHUB_PAT" + reason, caps.ConfigName, caps.External},
+		{"pipeline/ci/ref/vars.GITHUB_PG", "create variable GITHUB_PG" + reason, caps.ConfigName, caps.External},
+	})
+}

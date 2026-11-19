@@ -80,7 +80,43 @@ func (r *refScan) vars(vs []Var) {
 	}
 }
 
+// ext scans the strings an Ext value holds, at any depth. Ext keeps provider keys the IR does not model, such as
+// container credentials, and they can name a secret.
+func (r *refScan) ext(v any) {
+	switch x := v.(type) {
+	case string:
+		r.text(x)
+	case Ext:
+		for _, e := range x {
+			r.ext(e)
+		}
+	case map[string]any:
+		for _, e := range x {
+			r.ext(e)
+		}
+	case []any:
+		for _, e := range x {
+			r.ext(e)
+		}
+	case []string:
+		r.text(x...)
+	case map[string]string:
+		for _, e := range x {
+			r.text(e)
+		}
+	}
+}
+
+func (r *refScan) image(img *Image) {
+	if img != nil {
+		r.text(img.Ref)
+	}
+}
+
 func (r *refScan) pipeline(pl *Pipeline) {
+	for _, n := range ExtNodes(&Project{Pipelines: []*Pipeline{pl}}) {
+		r.ext(*n.Ext)
+	}
 	r.vars(pl.Env)
 	if pl.Concurrency != nil {
 		r.text(pl.Concurrency.Group)
@@ -95,7 +131,9 @@ func (r *refScan) pipeline(pl *Pipeline) {
 func (r *refScan) job(j *Job) {
 	r.expr(j.If)
 	r.vars(j.Env)
+	r.image(j.Container)
 	for _, sv := range j.Services {
+		r.image(&sv.Image)
 		r.vars(sv.Env)
 	}
 	if j.Environment != nil {
@@ -115,6 +153,7 @@ func (r *refScan) job(j *Job) {
 			continue
 		}
 		r.expr(st.If)
+		r.image(st.Image)
 		r.vars(st.Env)
 		for _, v := range st.With {
 			r.value(v)
