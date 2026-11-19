@@ -222,3 +222,26 @@ func TestReattachOrphans(t *testing.T) {
 		t.Errorf("stored value must win, got %v", pe["gha"])
 	}
 }
+
+func TestReattachKeepingEditsNeverOverwrites(t *testing.T) {
+	m := testMeta()
+	m.Ext["pipeline/ci/job/gone"] = ir.Ext{"gha": 1}
+
+	p := project()
+	p.Pipelines[0].Jobs[0].Steps[0].Ext = nil
+	p.Pipelines[0].Ext = ir.Ext{"gha": "edited", "other": "keep"}
+	orphans, kept := ReattachKeepingEdits(p, m)
+
+	if !reflect.DeepEqual(orphans, []string{"pipeline/ci/job/gone"}) {
+		t.Errorf("orphans = %v", orphans)
+	}
+	if !reflect.DeepEqual(kept, []string{"pipeline/ci"}) {
+		t.Errorf("kept = %v, want the pipeline whose Ext was edited", kept)
+	}
+	if got := p.Pipelines[0].Ext["gha"]; got != "edited" {
+		t.Errorf("edited Ext was overwritten: %v", got)
+	}
+	if got := p.Pipelines[0].Jobs[0].Steps[0].Ext["gha"].(map[string]any)["id"]; got != "one" {
+		t.Errorf("an absent key must still be filled: %v", got)
+	}
+}

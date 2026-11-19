@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"reflect"
 	"slices"
 	"sort"
 
@@ -53,7 +54,20 @@ func Collect(p *ir.Project) map[string]ir.Ext {
 // Residual fills only what the parsed node left empty. It returns the sorted paths in m that match no node.
 // IDs are not applied here.
 func Reattach(p *ir.Project, m *Meta) []string {
+	orphans, _ := reattach(p, m, false)
+	return orphans
+}
+
+// ReattachKeepingEdits is Reattach for a file that changed after conversion: a stored value never replaces a
+// value the parsed node already holds. It returns the orphaned paths and the sorted paths where a stored
+// value differed from the parsed one and was not applied.
+func ReattachKeepingEdits(p *ir.Project, m *Meta) (orphans, kept []string) {
+	return reattach(p, m, true)
+}
+
+func reattach(p *ir.Project, m *Meta, keepEdits bool) (orphans, kept []string) {
 	found := map[string]bool{}
+	keptSet := map[string]bool{}
 	for _, n := range ir.ExtNodes(p) {
 		stored, ok := m.Ext[n.Path]
 		if !ok {
@@ -64,15 +78,24 @@ func Reattach(p *ir.Project, m *Meta) []string {
 			*n.Ext = ir.Ext{}
 		}
 		for k, v := range stored {
+			if cur, has := (*n.Ext)[k]; keepEdits && has {
+				if !reflect.DeepEqual(cur, copyValue(v)) {
+					keptSet[n.Path] = true
+				}
+				continue
+			}
 			(*n.Ext)[k] = copyValue(v)
 		}
 	}
-	for _, applied := range []map[string]bool{applyResidual(p, m.Residual), applyLost(p, m.Lost)} {
+	lostApplied, lostKept := applyLost(p, m.Lost, keepEdits)
+	for path := range lostKept {
+		keptSet[path] = true
+	}
+	for _, applied := range []map[string]bool{applyResidual(p, m.Residual), lostApplied} {
 		for path := range applied {
 			found[path] = true
 		}
 	}
-	var orphans []string
 	for _, paths := range []map[string]bool{keySet(m.Ext), keySet(m.Residual), keySet(m.Lost)} {
 		for path := range paths {
 			if !found[path] && !slices.Contains(orphans, path) {
@@ -81,7 +104,7 @@ func Reattach(p *ir.Project, m *Meta) []string {
 		}
 	}
 	sort.Strings(orphans)
-	return orphans
+	return orphans, sortedKeys(keptSet)
 }
 
 // Attach records hashes of files in m and returns a copy of files plus the sidecar.

@@ -192,53 +192,66 @@ func copyFields[T any](dst, src *T, fields []string, f caps.Feature) *T {
 	return dst
 }
 
-// applyLost writes each stored field group over the parsed node. It returns the paths that match no node.
-func applyLost(p *ir.Project, m map[string]Lost) map[string]bool {
-	found := map[string]bool{}
+// applyLost writes each stored field group over the parsed node. With keepEdits a field the node already holds
+// stays, and a path whose stored field differs from it is returned in kept. It returns the paths that match a node.
+func applyLost(p *ir.Project, m map[string]Lost, keepEdits bool) (found, kept map[string]bool) {
+	found, kept = map[string]bool{}, map[string]bool{}
 	for _, n := range ir.Nodes(p) {
 		l, ok := m[n.Path]
 		if !ok {
 			continue
 		}
 		found[n.Path] = true
+		var differs bool
 		switch {
 		case n.Pipeline != nil && l.Pipeline != nil:
-			restorePipeline(n.Pipeline, l.Pipeline)
+			differs = restorePipeline(n.Pipeline, l.Pipeline, keepEdits)
 		case n.Job != nil && l.Job != nil:
-			restoreJob(n.Job, l.Job)
+			differs = restoreJob(n.Job, l.Job, keepEdits)
 		case n.Step != nil && l.Step != nil:
-			restoreStep(n.Step, l.Step)
+			differs = restoreStep(n.Step, l.Step, keepEdits)
+		}
+		if differs {
+			kept[n.Path] = true
 		}
 	}
-	return found
+	return found, kept
 }
 
-func restorePipeline(dst, src *ir.Pipeline) {
-	copyNonZero(dst, src)
+func restorePipeline(dst, src *ir.Pipeline, keepEdits bool) bool {
+	differs := copyNonZero(dst, src, keepEdits)
 	// Triggers decoded from metadata hold their Ext as named maps; providers read plain ones.
 	for i := range dst.Triggers {
 		dst.Triggers[i].Ext = copyExt(dst.Triggers[i].Ext)
 	}
+	return differs
 }
-func restoreJob(dst, src *ir.Job) { copyNonZero(dst, src) }
-func restoreStep(dst, src *ir.Step) {
-	if src.Action != nil {
+func restoreJob(dst, src *ir.Job, keepEdits bool) bool { return copyNonZero(dst, src, keepEdits) }
+func restoreStep(dst, src *ir.Step, keepEdits bool) bool {
+	if src.Action != nil && !keepEdits {
 		dst.Script = nil
 	}
-	copyNonZero(dst, src)
+	return copyNonZero(dst, src, keepEdits)
 }
 
 // copyNonZero copies every set field of a sparse src over dst. The ID and Ext fields are identity and
-// stay with dst; Ext has its own record.
-func copyNonZero[T any](dst, src *T) {
+// stay with dst; Ext has its own record. With keepEdits a field dst already holds stays, and the result says
+// whether any such field differed from src.
+func copyNonZero[T any](dst, src *T, keepEdits bool) (differs bool) {
 	d, s := reflect.ValueOf(dst).Elem(), reflect.ValueOf(src).Elem()
 	for i := 0; i < s.NumField(); i++ {
 		switch s.Type().Field(i).Name {
 		case "ID", "Ext":
 			continue
 		}
-		if !s.Field(i).IsZero() {
-			d.Field(i).Set(s.Field(i))
+		if s.Field(i).IsZero() {
+			continue
 		}
+		if keepEdits && !d.Field(i).IsZero() {
+			differs = differs || !reflect.DeepEqual(d.Field(i).Interface(), s.Field(i).Interface())
+			continue
+		}
+		d.Field(i).Set(s.Field(i))
 	}
+	return differs
 }

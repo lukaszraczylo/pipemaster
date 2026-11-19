@@ -30,11 +30,25 @@ func NewMeta(sourceID string, proj *ir.Project, target provider.Provider, rep *r
 // paths that match no node. The target file was emitted from the source project, so every expression in
 // proj, stored or parsed, now reads in the source dialect and the emitter must not translate it again.
 func Restore(proj *ir.Project, m *meta.Meta) []string {
+	orphans, _ := restore(proj, m, false)
+	return orphans
+}
+
+// RestoreKeepingEdits is Restore for a file edited after conversion, where the edited content wins: stored
+// values fill only what the parsed node lacks. It also returns the paths where a stored value was not applied.
+func RestoreKeepingEdits(proj *ir.Project, m *meta.Meta) (orphans, kept []string) {
+	return restore(proj, m, true)
+}
+
+func restore(proj *ir.Project, m *meta.Meta, keepEdits bool) (orphans, kept []string) {
 	RestoreIDs(proj, m.IDs)
 	if m.Source != "" {
 		proj.Origin.Provider, proj.Origin.Dialect = m.Source, m.Dialect
 	}
-	return meta.Reattach(proj, m)
+	if keepEdits {
+		return meta.ReattachKeepingEdits(proj, m)
+	}
+	return meta.Reattach(proj, m), nil
 }
 
 // sourceEntries rewrites report paths under a renamed job to the source job ID.

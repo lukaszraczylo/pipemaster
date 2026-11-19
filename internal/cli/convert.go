@@ -120,6 +120,12 @@ func applyStoredMeta(proj *ir.Project, rep *report.Report, srcFS fs.FS, targetID
 		_, _ = fmt.Fprintf(stderr, "check metadata: %v\n", err)
 		return exitError
 	}
+	if len(stale) > 0 {
+		orphans, kept := roundtrip.RestoreKeepingEdits(proj, m)
+		addOrphans(rep, orphans)
+		addEdited(rep, kept)
+		return exitOK
+	}
 	addOrphans(rep, roundtrip.Restore(proj, m))
 	return exitOK
 }
@@ -131,6 +137,18 @@ func addOrphans(rep *report.Report, orphans []string) {
 			Feature: caps.ExtPassthrough,
 			Level:   caps.Lost,
 			Detail:  fmt.Sprintf("stored metadata for %s matches no node in the converted pipeline", path),
+		})
+	}
+}
+
+// addEdited reports each node where stored metadata differed from the edited file and the file won.
+func addEdited(rep *report.Report, paths []string) {
+	for _, path := range paths {
+		rep.Add(report.Entry{
+			IRPath:  path,
+			Feature: caps.ExtPassthrough,
+			Level:   caps.Lost,
+			Detail:  fmt.Sprintf("%s was edited after conversion; stored metadata not applied (--force keeps the edited file)", path),
 		})
 	}
 }
