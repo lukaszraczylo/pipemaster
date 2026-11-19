@@ -1,0 +1,16 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+version:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step version-step-1
+    - make version
+    # pipemaster:emulated job.outputs pipeline/gitlab-ci/job/version
+    # pipemaster:arg {"lines":null}
+    - echo "tag=v1-$CI_COMMIT_SHA" >> outputs.env
+  artifacts:
+    reports:
+      dotenv: outputs.env

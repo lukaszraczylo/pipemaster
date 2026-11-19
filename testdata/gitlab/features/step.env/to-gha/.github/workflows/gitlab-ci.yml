@@ -1,0 +1,11 @@
+on:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - id: build-step-1
+        run: echo "$GREETING"
+        env:
+          GREETING: hello
+          MODE: fast

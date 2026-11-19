@@ -1,0 +1,14 @@
+on:
+  pull_request:
+    paths-ignore:
+      - '**.md'
+  push:
+    paths:
+      - src/**
+      - '!src/docs/**'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - id: build-step-1
+        run: echo ok

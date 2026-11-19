@@ -1,0 +1,37 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/gitlab-ci.yml
+pipelines:
+    - id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - id: compile
+          steps:
+            - id: script
+              kind: script
+              script:
+                - make
+          artifacts:
+            - paths:
+                - bin/
+        - id: docs
+          needs:
+            - job: compile
+          steps:
+            - id: script
+              kind: script
+              script:
+                - make docs
+        - id: unit
+          needs:
+            - job: compile
+              artifacts: true
+          steps:
+            - id: script
+              kind: script
+              script:
+                - make test

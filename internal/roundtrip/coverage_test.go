@@ -1,0 +1,61 @@
+package roundtrip_test
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/provider"
+)
+
+// noSourceForm lists supported features that a fixture cannot exercise, with the reason.
+var noSourceForm = map[string]string{
+	provider.GHA + "/" + string(caps.JobEnvironmentApproval):    "approval rules live in repository settings and no parser sets Environment.Approval",
+	provider.GitLab + "/" + string(caps.JobEnvironmentApproval): "approval rules live in project settings and no parser sets Environment.Approval",
+	provider.GitLab + "/" + string(caps.StepAction):             "a GitLab file holds no action step; the action reference lives only in round-trip metadata",
+}
+
+// hasFixtureDir reports whether dir holds a directory named after the feature, optionally followed by "--<variant>".
+func hasFixtureDir(t *testing.T, dir string, f caps.Feature) bool {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		n := e.Name()
+		if e.IsDir() && (n == string(f) || strings.HasPrefix(n, string(f)+"--")) {
+			return true
+		}
+	}
+	return false
+}
+
+// TestFeatureFixtureCoverage requires a fixture directory for every feature a provider can write.
+// A lost feature has no syntax in the provider, so it has no fixture.
+func TestFeatureFixtureCoverage(t *testing.T) {
+	for _, id := range []string{provider.GHA, provider.GitLab} {
+		m := prov(t, id).Caps()
+		dir := filepath.Join(featuresRoot, id, "features")
+		for _, f := range caps.AllFeatures() {
+			if m.Lookup(f).Level == caps.Lost {
+				continue
+			}
+			key := id + "/" + string(f)
+			t.Run(key, func(t *testing.T) {
+				has := hasFixtureDir(t, dir, f)
+				if reason, exempt := noSourceForm[key]; exempt {
+					if has {
+						t.Errorf("%s has a fixture; drop its noSourceForm entry (%s)", key, reason)
+					}
+					return
+				}
+				if !has {
+					t.Errorf("no fixture directory %s/%s", dir, f)
+				}
+			})
+		}
+	}
+}

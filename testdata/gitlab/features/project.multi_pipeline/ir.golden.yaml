@@ -1,0 +1,43 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - id: .shared
+      name: shared
+      triggers:
+        - ext:
+            gha:
+                event: workflow_call
+          kind: api
+      jobs:
+        - id: run
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: run-step-1
+              kind: script
+              script:
+                - echo run
+    - id: ci
+      name: CI
+      triggers:
+        - kind: push
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: build-step-1
+              kind: script
+              script:
+                - echo build

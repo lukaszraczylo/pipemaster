@@ -1,0 +1,19 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/gitlab-ci.yml
+pipelines:
+    - id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - id: deploy
+          steps:
+            - id: script
+              kind: script
+              script:
+                - make deploy
+          allow_failure: true
+          manual: true

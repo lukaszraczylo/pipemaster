@@ -1,0 +1,11 @@
+build:
+  needs: []
+  script:
+    - make
+  cache:
+    - key:
+        files:
+          - go.sum
+      paths:
+        - .cache/go-build
+      policy: pull-push

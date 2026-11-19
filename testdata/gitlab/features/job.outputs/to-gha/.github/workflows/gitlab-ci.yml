@@ -1,0 +1,10 @@
+on:
+  push:
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - id: version-step-1
+        run: make version
+    outputs:
+      tag: v1-${{ github.sha }}

@@ -1,0 +1,9 @@
+name: shared
+on:
+  workflow_call:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - id: run-step-1
+        run: echo run

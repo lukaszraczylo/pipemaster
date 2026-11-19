@@ -1,0 +1,18 @@
+build:
+  needs: []
+  script:
+    - make build
+alert:
+  stage: .post
+  needs:
+    - build
+  script:
+    - ./page.sh
+  when: on_failure
+report:
+  stage: .post
+  needs:
+    - build
+  script:
+    - ./notify.sh
+  when: always

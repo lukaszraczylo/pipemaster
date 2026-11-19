@@ -1,0 +1,2 @@
+Loss report: gha -> gitlab
+[lost] pipeline/ci/job/build/step/build-step-1 step.action (no GitLab mapping for action docker://alpine:3.20)

@@ -1,0 +1,30 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - ext:
+        gitlab:
+            workflow:
+                rules:
+                    - if: $CI_COMMIT_BRANCH
+      id: gitlab-ci
+      triggers:
+        - kind: push
+      jobs:
+        - id: version
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: version-step-1
+              kind: script
+              script:
+                - make version
+          outputs:
+            - name: tag
+              value: v1-${{ sha }}

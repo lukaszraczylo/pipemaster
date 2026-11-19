@@ -1,0 +1,18 @@
+# pipemaster:emulated trigger.pull_request pipeline/gitlab-ci/trigger/0
+# pipemaster:arg {"kind":"pr","paths":{"Include":null,"Exclude":["**.md"]}}
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/1
+# pipemaster:arg {"kind":"push","paths":{"Include":["src/**","!src/docs/**"],"Exclude":null}}
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        - src/**
+        - '!src/docs/**'
+build:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - echo ok

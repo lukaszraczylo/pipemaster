@@ -1,0 +1,2 @@
+Loss report: gitlab -> gha
+[emulated] pipeline/gitlab-ci/job/build/step/build-step-2 step.if: approximate expression translation (GitHub compares strings case-insensitively)

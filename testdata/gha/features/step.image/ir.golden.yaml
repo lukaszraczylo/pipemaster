@@ -1,0 +1,28 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/ci.yml
+pipelines:
+    - id: ci
+      triggers:
+        - kind: push
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - action:
+                kind: docker
+                image: alpine:3.20
+              with:
+                args:
+                    lit: -c "echo ok"
+                entrypoint:
+                    lit: /bin/sh
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: action

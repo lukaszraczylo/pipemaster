@@ -1,0 +1,25 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/ci.yml
+pipelines:
+    - id: ci
+      name: Build and test
+      triggers:
+        - kind: push
+      jobs:
+        - id: build
+          name: Build the binary
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              name: Compile
+              kind: script
+              script:
+                - go build ./...

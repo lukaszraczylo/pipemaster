@@ -1,0 +1,44 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/compile
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
+# pipemaster:arg {"artifacts":[{"Name":"","Expire":"","Paths":["bin/"]}],"pre":0,"post":1}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/docs
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/unit
+# pipemaster:emulated job.needs.artifacts pipeline/gitlab-ci/job/unit
+# pipemaster:arg {"needs":["compile"],"pre":1,"post":0}
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: make
+      # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
+      - uses: actions/upload-artifact@v7
+        with:
+          name: compile
+          path: bin/
+  docs:
+    needs:
+      - compile
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: make docs
+  unit:
+    needs:
+      - compile
+    runs-on: ubuntu-latest
+    steps:
+      # pipemaster:emulated job.needs.artifacts pipeline/gitlab-ci/job/unit
+      - uses: actions/download-artifact@v8
+        with:
+          name: compile
+      - id: script
+        run: make test
