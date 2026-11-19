@@ -180,3 +180,39 @@ func TestLedgerCompleteness(t *testing.T) {
 		}
 	})
 }
+
+func TestLedgerReportsNotedNativeCaveat(t *testing.T) {
+	m := caps.Matrix{caps.StepAction: {Level: caps.Native, Caveat: "matrix caveat"}, caps.TriggerPush: {Level: caps.Native}}
+	l := NewLedger("gha", "gitea", m)
+	noted, plain, silent := use("a", caps.StepAction), use("b", caps.StepAction), use("c", caps.TriggerPush)
+	l.Decide(noted)
+	l.Decide(plain)
+	l.Decide(silent)
+	l.Note(noted, caps.Support{Level: caps.Native}, "resolves against the default host")
+	l.Note(silent, caps.Support{Level: caps.Native}, "")
+	if plainRep, _ := l.Finish([]ir.FeatureUse{noted, plain, silent}); len(plainRep.Entries) != 0 {
+		t.Fatalf("Finish reports non-native uses only, got %+v", plainRep.Entries)
+	}
+	r, err := l.FinishNoted([]ir.FeatureUse{noted, plain, silent})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Entries) != 1 || r.Entries[0].IRPath != "a" || r.Entries[0].Level != caps.Native || r.Entries[0].Detail != "resolves against the default host" {
+		t.Fatalf("want one native entry for the noted use, got %+v", r.Entries)
+	}
+	if r.Worst() != caps.Native {
+		t.Fatalf("a native entry must not raise the worst level, got %v", r.Worst())
+	}
+}
+
+func TestLedgerDecideAfterNoteDropsNativeCaveat(t *testing.T) {
+	m := caps.Matrix{caps.StepAction: {Level: caps.Lost, Caveat: "gone"}}
+	l := NewLedger("a", "b", m)
+	u := use("p", caps.StepAction)
+	l.Note(u, caps.Support{Level: caps.Native}, "caveat")
+	l.Decide(u)
+	r, _ := l.FinishNoted([]ir.FeatureUse{u})
+	if len(r.Entries) != 1 || r.Entries[0].Level != caps.Lost || r.Entries[0].Detail != "gone" {
+		t.Fatalf("want the lost entry, got %+v", r.Entries)
+	}
+}

@@ -23,5 +23,14 @@ func (a *adapter) Caps() caps.Matrix {
 	} {
 		m[f] = s
 	}
+	for _, c := range a.d.Caveats {
+		m[c.Feature] = caps.Support{Level: caps.Native, Caveat: c.Caveat}
+	}
+	for _, ig := range a.d.Ignored {
+		m[ig.Feature] = caps.Support{Level: caps.Lost, Caveat: ig.Caveat}
+	}
+	if len(a.d.SecretPrefixes)+len(a.d.VarPrefixes)+len(a.d.VarNames) > 0 {
+		m[caps.ConfigName] = caps.Support{Level: caps.Native, Caveat: "a name the target rejects is external; create it under another name"}
+	}
 	return m
 }

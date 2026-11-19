@@ -40,12 +40,32 @@ func (fp *fileParser) pipelineFields(pl *ir.Pipeline, m *mapping) (err error) {
 			m.release("permissions")
 		}
 	}
+	if key := fp.d.OIDCKey; key != "" {
+		fp.oidcKey(pl, m, key)
+	}
 	if v := m.take("concurrency"); v != nil {
 		if pl.Concurrency, err = fp.concurrency(m, v); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// oidcKey reads the dialect's workflow-level OIDC switch as Permissions.OIDC. Only an explicit true is modelled;
+// any other value stays in Ext so it returns as written.
+func (fp *fileParser) oidcKey(pl *ir.Pipeline, m *mapping, key string) {
+	v := m.take(key)
+	if v == nil {
+		return
+	}
+	if on, ok := boolNode(v); !ok || !on {
+		m.release(key)
+		return
+	}
+	if pl.Permissions == nil {
+		pl.Permissions = &ir.Permissions{}
+	}
+	pl.Permissions.OIDC = true
 }
 
 // permissions maps the read-all/write-all shorthands to Scopes["*"] and id-token: write to OIDC.

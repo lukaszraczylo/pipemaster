@@ -3,17 +3,26 @@ package gha
 import (
 	"fmt"
 	"path"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
-const workflowExt = ".yml"
+const (
+	workflowExt = ".yml"
+	scopeSeg    = "/scope/"
+	eventSeg    = "/event/"
+	// runGroup is the concurrency group of the per-run default; defaultGroup is how the parser reads it.
+	runGroup     = "${{ github.run_id }}"
+	defaultGroup = "${{ gha.github.run_id }}"
+)
 
 // Emit writes one workflow file per pipeline at <Dirs[0]>/<pipeline id>.yml. Every feature use goes
 // through the ledger; Finish fails the call when one was never accounted for.
@@ -23,6 +32,7 @@ func (a *adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error)
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)
+		e.dialectNotes(u)
 	}
 	for _, r := range idRenames {
 		e.emulate(r.path, caps.ExtPassthrough, "job id renamed",
@@ -44,11 +54,42 @@ func (a *adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error)
 			files[name] = data
 		}
 	}
-	rep, err := e.led.Finish(uses)
+	rep, err := e.led.FinishNoted(uses)
 	if err != nil {
 		return nil, rep, fmt.Errorf("%s: %w", a.d.ID, err)
 	}
 	return files, rep, nil
+}
+
+// dialectNotes records what the dialect says about one use: a native caveat, or a name it rejects.
+func (e *emitter) dialectNotes(u ir.FeatureUse) {
+	for _, c := range e.d.Caveats {
+		if c.Feature == u.Feature {
+			e.led.Note(u, caps.Support{Level: caps.Native}, c.Caveat)
+		}
+	}
+	if u.Feature != caps.ConfigName {
+		return
+	}
+	family, name, ok := ir.ConfigRef(u.IRPath)
+	if !ok {
+		return
+	}
+	rule, exact := e.d.nameRule(family, name)
+	if rule == "" {
+		return
+	}
+	kind, why := "secret", "names that start with "+rule
+	if family == expr.PrefixVars {
+		kind = "variable"
+	}
+	if exact {
+		why = "the name " + rule
+	}
+	e.led.Note(u, caps.Support{
+		Level:    caps.External,
+		Strategy: "create " + kind + " " + name + ": " + e.d.title() + " rejects " + why + "; rename it and update the reference",
+	}, "")
 }
 
 func (e *emitter) pipelineFile(pl *ir.Pipeline) (string, []byte, error) {
@@ -86,7 +127,12 @@ func (e *emitter) workflow(pl *ir.Pipeline) (*yaml.Node, error) {
 	}
 	m.set("on", on)
 	if pl.Permissions != nil {
-		m.set("permissions", e.permissions(pp, pl.Permissions))
+		if n := e.permissions(pp, pl.Permissions); n != nil {
+			m.set("permissions", n)
+		}
+		if pl.Permissions.OIDC && e.d.OIDCKey != "" {
+			m.set(e.d.OIDCKey, boolNodeOf(true))
+		}
 	}
 	if len(pl.Env) > 0 {
 		env, err := e.vars(pp, pl.Env)
@@ -103,6 +149,8 @@ func (e *emitter) workflow(pl *ir.Pipeline) (*yaml.Node, error) {
 			return nil, err
 		}
 		m.set("concurrency", c)
+	} else if e.d.DefaultCancel && cancelsByDefault(pl) {
+		m.set("concurrency", e.runGroupConcurrency(pp))
 	}
 	if err := m.addExtra(ext, map[string]bool{extEvents: true, extConcurrency: pl.Concurrency != nil}); err != nil {
 		return nil, err
@@ -166,29 +214,66 @@ func (e *emitter) placeholderJob(jm *omap, pl *ir.Pipeline) {
 	e.mark(caps.StepScript, pp)
 }
 
-// permissions writes the read-all and write-all shorthands for Scopes["*"], else a scope mapping.
+// permissions writes the read-all and write-all shorthands for Scopes["*"], else a scope mapping. A scope the
+// dialect has no name for is dropped with a lost entry per scope; the result is nil when the dialect carries the
+// whole grant in another key.
 func (e *emitter) permissions(pp string, p *ir.Permissions) *yaml.Node {
 	if lvl, ok := p.Scopes[scopeAll]; ok && len(p.Scopes) == 1 && !p.OIDC {
 		return str(lvl + "-all")
 	}
 	scopes := map[string]any{}
 	for k, v := range p.Scopes {
-		if k == scopeAll {
+		switch {
+		case k == scopeAll:
 			e.lose(pp, caps.PipelinePermissions, `scope "*" cannot sit beside other permissions`)
-			continue
+		case !e.hasScope(k):
+			e.lose(pp+scopeSeg+k, caps.PipelinePermissions, "scope "+k+" is not a "+e.d.title()+" permission; dropped")
+		default:
+			scopes[k] = v
 		}
-		scopes[k] = v
+	}
+	if p.OIDC && e.d.OIDCKey == "" {
+		if e.hasScope(idToken) {
+			scopes[idToken] = "write"
+		} else {
+			e.lose(pp+scopeSeg+idToken, caps.PipelinePermissions, e.d.NoOIDC)
+		}
 	}
 	m := newMap()
-	if p.OIDC {
-		scopes[idToken] = "write"
-	}
 	for _, k := range sortedKeys(scopes) {
 		m.set(k, str(scopes[k].(string)))
 	}
 	if m.empty() {
+		if p.OIDC && e.d.OIDCKey != "" {
+			return nil
+		}
 		return &yaml.Node{Kind: yaml.MappingNode, Tag: tagMap, Style: yaml.FlowStyle}
 	}
+	return m.n
+}
+
+func (e *emitter) hasScope(name string) bool {
+	return len(e.d.Scopes) == 0 || slices.Contains(e.d.Scopes, name)
+}
+
+// cancelsByDefault reports whether the dialect would cancel earlier runs of pl: it has a push or pull_request event.
+func cancelsByDefault(pl *ir.Pipeline) bool {
+	for _, t := range pl.Triggers {
+		if t.Kind == ir.TriggerPush || t.Kind == ir.TriggerTag || t.Kind == ir.TriggerPR {
+			return true
+		}
+	}
+	return false
+}
+
+// runGroupConcurrency gives every run its own group, which switches the dialect's default cancelling off.
+func (e *emitter) runGroupConcurrency(pp string) *yaml.Node {
+	m := newMap()
+	m.set("group", str(runGroup))
+	m.set("cancel-in-progress", boolNodeOf(false))
+	e.emulate(pp, caps.PipelineConcurrency, "concurrency group per run",
+		e.d.title()+" cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group")
+	e.mark(caps.PipelineConcurrency, pp)
 	return m.n
 }
 

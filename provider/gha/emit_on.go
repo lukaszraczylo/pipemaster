@@ -147,6 +147,10 @@ func (e *emitter) on(pl *ir.Pipeline, jobManual string) (*yaml.Node, error) {
 	}
 	if raw, ok := pext[extEvents].(map[string]any); ok {
 		for _, k := range sortedKeys(raw) {
+			if !e.d.accepts(k) {
+				e.lose("pipeline/"+pl.ID+eventSeg+k, caps.ExtPassthrough, "event "+k+" is not supported by "+e.d.title()+"; dropped")
+				continue
+			}
 			n, err := plainNode(raw[k])
 			if err != nil {
 				return nil, err

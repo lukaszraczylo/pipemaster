@@ -1,0 +1,28 @@
+origin:
+    provider: forgejo
+    dialect: forgejo
+    files:
+        - .forgejo/workflows/ci.yml
+pipelines:
+    - permissions:
+        scopes:
+            contents: read
+        oidc: true
+      id: ci
+      name: perms
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - docker
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: script
+              script:
+                - echo ok

@@ -19,6 +19,10 @@ type Lost struct {
 
 const triggerSeg = "/trigger/"
 
+// subSegs mark entry paths that name a part of a pipeline, such as one trigger, permission scope, event or
+// config reference; the part's record is the pipeline's own.
+var subSegs = []string{triggerSeg, "/scope/", "/event/", ir.RefSeg}
+
 // Unrecorded is a lost or external feature the metadata cannot store, so it will not return on the way back.
 type Unrecorded struct {
 	Path    string
@@ -35,7 +39,7 @@ const (
 	kindStep
 )
 
-// recordViaExt marks a feature whose data the Ext record already holds.
+// recordViaExt marks a feature that needs no stored field: the Ext record holds its data, or the output keeps it.
 const recordViaExt = "Ext"
 
 var triggerFeatureNames = []caps.Feature{
@@ -56,6 +60,7 @@ var recorded = map[kind]map[caps.Feature][]string{
 		caps.ExprOpaque:          {"Env"},
 		caps.DisplayName:         {"Name"},
 		caps.ExtPassthrough:      {recordViaExt},
+		caps.ConfigName:          {recordViaExt},
 	}),
 	kindJob: {
 		caps.JobNeeds: {"Needs"}, caps.JobNeedsArtifacts: {"Needs"}, caps.JobIf: {"If"},
@@ -104,10 +109,10 @@ func notApplicable(k kind, f caps.Feature) bool {
 	case kindPipeline:
 		return strings.HasPrefix(string(f), "job.") || strings.HasPrefix(string(f), "step.")
 	case kindJob:
-		return strings.HasPrefix(string(f), "trigger.") || strings.HasPrefix(string(f), "pipeline.") ||
+		return f == caps.ConfigName || strings.HasPrefix(string(f), "trigger.") || strings.HasPrefix(string(f), "pipeline.") ||
 			strings.HasPrefix(string(f), "step.") || f == caps.ProjectMultiPipeline
 	default:
-		return strings.HasPrefix(string(f), "trigger.") || strings.HasPrefix(string(f), "pipeline.") ||
+		return f == caps.ConfigName || strings.HasPrefix(string(f), "trigger.") || strings.HasPrefix(string(f), "pipeline.") ||
 			strings.HasPrefix(string(f), "job.") || f == caps.ProjectMultiPipeline
 	}
 }
@@ -127,8 +132,10 @@ func CollectLost(p *ir.Project, entries []report.Entry) (map[string]Lost, []Unre
 			continue
 		}
 		path := e.IRPath
-		if i := strings.Index(path, triggerSeg); i >= 0 {
-			path = path[:i]
+		for _, seg := range subSegs {
+			if i := strings.Index(path, seg); i >= 0 {
+				path = path[:i]
+			}
 		}
 		n, ok := idx[path]
 		if !ok {

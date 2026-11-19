@@ -1,0 +1,27 @@
+origin:
+    provider: gitea
+    dialect: gitea
+    files:
+        - .gitea/workflows/ci.yml
+pipelines:
+    - id: ci
+      name: env
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - environment:
+            name: production
+            url: https://example.com
+          id: deploy
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: deploy-step-1
+              kind: script
+              script:
+                - echo deploy

@@ -6,7 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/internal/golden"
+	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 )
@@ -20,13 +22,18 @@ func TestIdentityDialects(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				files, _, err := p.Emit(src)
+				files, rep, err := p.Emit(src)
 				if err != nil {
 					t.Fatal(err)
 				}
 				back, _, err := p.Parse(toFS(files))
 				if err != nil {
 					t.Fatal(err)
+				}
+				// A key the dialect rejects is dropped from the file and kept in the metadata, so a lost entry means
+				// the exact return needs the metadata.
+				if rep.Worst() >= caps.External {
+					roundtrip.Restore(back, roundtrip.NewMeta(id, src, p, rep))
 				}
 				if same, diff := ir.Equal(src, back); !same {
 					t.Errorf("Parse->Emit->Parse differs:\n%s", diff)
@@ -65,20 +72,21 @@ func TestDialectAliasRoundTrip(t *testing.T) {
 	}
 }
 
-func TestDialectHostFixtures(t *testing.T) {
+// TestDialectFixtureGoldens pins the IR of every fixture written in a dialect's own directory.
+func TestDialectFixtureGoldens(t *testing.T) {
 	for _, id := range []string{provider.Gitea, provider.Forgejo} {
-		t.Run(id, func(t *testing.T) {
-			dir := filepath.Join(featuresRoot, id, "features", "step.action--host")
-			p := prov(t, id)
-			src, _, err := p.Parse(os.DirFS(dir))
-			if err != nil {
-				t.Fatal(err)
-			}
-			got, err := ir.Marshal(src)
-			if err != nil {
-				t.Fatal(err)
-			}
-			golden.Assert(t, filepath.Join(dir, "ir.golden.yaml"), got)
-		})
+		for _, f := range readFixtures(t, id, id) {
+			t.Run(id+"/"+f.name, func(t *testing.T) {
+				src, _, err := prov(t, id).Parse(os.DirFS(f.dir))
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := ir.Marshal(src)
+				if err != nil {
+					t.Fatal(err)
+				}
+				golden.Assert(t, filepath.Join(f.dir, "ir.golden.yaml"), got)
+			})
+		}
 	}
 }

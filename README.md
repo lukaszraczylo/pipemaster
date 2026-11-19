@@ -82,6 +82,7 @@ The following table comes from `pipemaster caps --from gha --to gitlab --format 
 
 | Feature | Gha | Gitlab | Strategy |
 | --- | --- | --- | --- |
+| config.name | native | native |  |
 | display.name | native | lost | (step and pipeline names have no GitLab field; a job name survives only as its key) |
 | expr.opaque | native | native | (only opaque expressions of the gitlab dialect; others are lost) |
 | ext.passthrough | native | native |  |

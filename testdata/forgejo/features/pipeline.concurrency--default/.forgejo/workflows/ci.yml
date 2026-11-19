@@ -1,0 +1,9 @@
+name: default
+on:
+  push:
+  pull_request:
+jobs:
+  build:
+    runs-on: docker
+    steps:
+      - run: echo ok

@@ -56,6 +56,11 @@ func (g *gen) strs() []string {
 }
 func (g *gen) flag() bool { return rapid.Bool().Draw(g.t, g.label("b")) }
 
+// scopeNames are permission scopes that GHA, Gitea and Forgejo all accept, so a generated grant survives their emitters.
+var scopeNames = []string{"actions", "contents", "issues", "packages", "pull-requests"}
+
+func (g *gen) scope() string { return rapid.SampledFrom(scopeNames).Draw(g.t, g.label("sc")) }
+
 func (g *gen) opaque() expr.Expr {
 	return expr.Opaque{Dialect: rapid.SampledFrom([]string{"gha", "gitlab"}).Draw(g.t, g.label("d")), Text: g.str()}
 }
@@ -115,7 +120,7 @@ func (g *gen) pipeline(id string) *ir.Pipeline {
 		pl.Concurrency = &ir.Concurrency{Group: g.str(), CancelInProgress: g.flag()}
 	}
 	if f(caps.PipelinePermissions) {
-		pl.Permissions = &ir.Permissions{Scopes: map[string]string{g.str(): g.str()}, OIDC: g.flag()}
+		pl.Permissions = &ir.Permissions{Scopes: map[string]string{g.scope(): g.str()}, OIDC: g.flag()}
 	}
 	if f(caps.ExtPassthrough) {
 		pl.Ext = g.ext()

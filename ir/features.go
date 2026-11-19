@@ -81,6 +81,7 @@ func pipelineFeatures(s *featureSet, pl *Pipeline) {
 	for i := range pl.Triggers {
 		triggerUse(s, triggerPath(pl.ID, i), &pl.Triggers[i])
 	}
+	(&refScan{s: s, base: path}).pipeline(pl)
 	for _, j := range append(append([]*Job{}, pl.Jobs...), pl.Finally...) {
 		if j != nil {
 			jobFeatures(s, pl.ID, j)

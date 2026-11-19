@@ -1,0 +1,26 @@
+origin:
+    provider: forgejo
+    dialect: forgejo
+    files:
+        - .forgejo/workflows/ci.yml
+pipelines:
+    - id: ci
+      name: env
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - environment:
+            name: production
+          id: deploy
+          runner:
+            labels:
+                - docker
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: deploy-step-1
+              kind: script
+              script:
+                - echo deploy

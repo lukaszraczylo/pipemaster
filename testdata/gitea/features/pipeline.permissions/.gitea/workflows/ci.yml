@@ -1,0 +1,11 @@
+name: perms
+on: push
+permissions:
+  code: read
+  contents: read
+  pull-requests: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok

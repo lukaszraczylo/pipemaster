@@ -1,0 +1,29 @@
+origin:
+    provider: gitea
+    dialect: gitea
+    files:
+        - .gitea/workflows/ci.yml
+pipelines:
+    - permissions:
+        scopes:
+            code: read
+            contents: read
+            pull-requests: write
+      id: ci
+      name: perms
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: script
+              script:
+                - echo ok

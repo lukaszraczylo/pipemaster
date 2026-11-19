@@ -38,6 +38,13 @@ type errNoReverse string
 
 func (k errNoReverse) Error() string { return "actions: no pinned action for " + string(k) }
 
+// synthUses renders the uses: text of an action the emitter adds, which the source never named. It is keyed
+// under the job path so the dialect's host note has its own report entry.
+func (e *emitter) synthUses(jp, kind string, ref *ir.ActionRef) (string, error) {
+	text, _, err := e.uses(jp+"/synth/"+kind, ref)
+	return text, err
+}
+
 func marked(m *omap, marker string) *yaml.Node {
 	m.n.HeadComment = marker
 	return m.n
@@ -72,7 +79,11 @@ func (e *emitter) preSteps(c jobCtx, jp string, j *ir.Job) ([]*yaml.Node, error)
 				return nil, err
 			}
 			m := newMap()
-			m.set("uses", str(actionString(ref)))
+			uses, err := e.synthUses(jp, "download", ref)
+			if err != nil {
+				return nil, err
+			}
+			m.set("uses", str(uses))
 			if name != "" {
 				nn, err := e.templateNode(jp, name)
 				if err != nil {
@@ -125,7 +136,11 @@ func (e *emitter) cacheStep(jp string, j *ir.Job, ch ir.Cache) (*yaml.Node, erro
 		return nil, err
 	}
 	m := newMap()
-	m.set("uses", str(actionString(ref)))
+	uses, err := e.synthUses(jp, "cache", ref)
+	if err != nil {
+		return nil, err
+	}
+	m.set("uses", str(uses))
 	m.set("with", withOf("path", pathNode(ch.Paths), "key", kn))
 	return marked(m, emitkit.Marker(caps.JobCache, jp)), nil
 }
@@ -177,7 +192,11 @@ func (e *emitter) postSteps(jp string, j *ir.Job) ([]*yaml.Node, error) {
 			}
 		}
 		m := newMap()
-		m.set("uses", str(actionString(ref)))
+		uses, err := e.synthUses(jp, "upload", ref)
+		if err != nil {
+			return nil, err
+		}
+		m.set("uses", str(uses))
 		m.set("with", with.n)
 		out = append(out, marked(m, emitkit.Marker(caps.JobArtifacts, jp)))
 	}
@@ -267,7 +286,11 @@ func (e *emitter) checkoutStep(c jobCtx, jp string, j *ir.Job) (*yaml.Node, erro
 		return nil, err
 	}
 	m := newMap()
-	m.set("uses", str(actionString(ref)))
+	uses, err := e.synthUses(jp, "checkout", ref)
+	if err != nil {
+		return nil, err
+	}
+	m.set("uses", str(uses))
 	with := newMap()
 	if d, err := strconv.Atoi(envLit(c, j, gitDepthVar)); err == nil {
 		with.set("fetch-depth", intNode(d))

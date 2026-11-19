@@ -1,0 +1,31 @@
+origin:
+    provider: gitea
+    dialect: gitea
+    files:
+        - .gitea/workflows/ci.yml
+pipelines:
+    - id: ci
+      name: config
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: script
+              script:
+                - echo "${{ vars.CI_MODE }}"
+              env:
+                - name: KEY
+                  value:
+                    secret: GITEA_DEPLOY
+                - name: TOKEN
+                  value:
+                    secret: GITHUB_TOKEN

@@ -48,8 +48,11 @@ func TestFeaturesCoversEveryField(t *testing.T) {
 		if got[caps.ExprOpaque] != opaque {
 			t.Fatalf("expr.opaque reported=%v but generated=%v", got[caps.ExprOpaque], opaque)
 		}
+		if got[caps.ConfigName] != hasConfigRef(reflect.ValueOf(p)) {
+			t.Fatalf("config.name reported=%v but generated=%v", got[caps.ConfigName], hasConfigRef(reflect.ValueOf(p)))
+		}
 		for f, w := range want {
-			if f == caps.ExprOpaque {
+			if f == caps.ExprOpaque || f == caps.ConfigName {
 				continue
 			}
 			if w && !got[f] {
@@ -285,6 +288,75 @@ func hasOpaque(v reflect.Value) bool {
 		}
 	}
 	return false
+}
+
+// hasConfigRef reports whether v holds a secrets.X or vars.X reference, in an expression or as a secret value.
+func hasConfigRef(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Interface, reflect.Pointer:
+		return !v.IsNil() && hasConfigRef(v.Elem())
+	case reflect.Slice:
+		for i := 0; i < v.Len(); i++ {
+			if hasConfigRef(v.Index(i)) {
+				return true
+			}
+		}
+	case reflect.Map:
+		for _, k := range v.MapKeys() {
+			if hasConfigRef(v.MapIndex(k)) {
+				return true
+			}
+		}
+	case reflect.Struct:
+		switch x := v.Interface().(type) {
+		case expr.Ref:
+			return len(x.Path) >= 2 && (x.Path[0] == expr.PrefixSecrets || x.Path[0] == expr.PrefixVars)
+		case ir.Value:
+			if x.Kind == ir.ValueSecret {
+				return true
+			}
+		}
+		for i := 0; i < v.NumField(); i++ {
+			if v.Type().Field(i).IsExported() && hasConfigRef(v.Field(i)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func TestFeaturesConfigRefsOnePerNamePerPipeline(t *testing.T) {
+	ref := func(family, name string) expr.Expr { return expr.Ref{Path: []string{family, name}} }
+	p := &ir.Project{Pipelines: []*ir.Pipeline{{
+		ID:  "ci",
+		Env: []ir.Var{{Name: "A", Value: ir.Value{Kind: ir.ValueSecret, Secret: "TOKEN"}}},
+		Jobs: []*ir.Job{{
+			ID: "b", If: expr.Binary{Op: expr.OpEq, L: ref(expr.PrefixVars, "MODE"), R: expr.Lit{Kind: expr.LitStr, Str: "x"}},
+			Steps: []*ir.Step{{
+				ID: "s", Script: []string{"echo ${{ secrets.TOKEN }} ${{ vars.MODE }} ${{ secrets.OTHER }}"},
+				Env: []ir.Var{{Name: "B", Value: ir.Value{Kind: ir.ValueExpr, Expr: ref(expr.PrefixSecrets, "OTHER")}}},
+			}},
+		}},
+	}}}
+	var got []string
+	for _, u := range ir.Features(p) {
+		if u.Feature == caps.ConfigName {
+			got = append(got, u.IRPath)
+		}
+	}
+	want := []string{"pipeline/ci/ref/secrets.OTHER", "pipeline/ci/ref/secrets.TOKEN", "pipeline/ci/ref/vars.MODE"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v want %v", got, want)
+	}
+	for _, path := range want {
+		family, name, ok := ir.ConfigRef(path)
+		if !ok || path != "pipeline/ci/ref/"+family+"."+name {
+			t.Errorf("ConfigRef(%q) = %q %q %v", path, family, name, ok)
+		}
+	}
+	if _, _, ok := ir.ConfigRef("pipeline/ci/job/b"); ok {
+		t.Error("a node path is not a config reference")
+	}
 }
 
 func TestFeaturesReportsMultiPipelineOncePerExtraPipeline(t *testing.T) {

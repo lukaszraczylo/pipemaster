@@ -18,16 +18,19 @@ import (
 //   - Note(u, s, d) raises u's effective level to max(current, s.Level); it never lowers it.
 //   - A use has at most one entry; a higher level replaces the earlier entry.
 //   - Finish(uses) errors for every use never passed to Decide or Note.
+//
+// FinishNoted extends Finish beyond the model: a native use that Note gave a detail also appears in the report.
 type Ledger struct {
 	m      caps.Matrix
 	state  map[ir.FeatureUse]report.Entry
+	noted  map[ir.FeatureUse]bool
 	source string
 	target string
 }
 
 // NewLedger starts a ledger for a source-to-target conversion against target matrix m.
 func NewLedger(source, target string, m caps.Matrix) *Ledger {
-	return &Ledger{source: source, target: target, m: m, state: map[ir.FeatureUse]report.Entry{}}
+	return &Ledger{source: source, target: target, m: m, state: map[ir.FeatureUse]report.Entry{}, noted: map[ir.FeatureUse]bool{}}
 }
 
 func entryFor(u ir.FeatureUse, s caps.Support, detail string) report.Entry {
@@ -41,6 +44,7 @@ func (l *Ledger) Decide(u ir.FeatureUse) caps.Support {
 	if !ok || s.Level > cur.Level {
 		cur = entryFor(u, s, s.Caveat)
 		l.state[u] = cur
+		delete(l.noted, u)
 	}
 	return caps.Support{Level: cur.Level, Strategy: cur.Strategy, Caveat: cur.Detail}
 }
@@ -54,6 +58,7 @@ func (l *Ledger) Note(u ir.FeatureUse, s caps.Support, detail string) {
 	}
 	if s.Level >= cur.Level {
 		cur = entryFor(u, s, detail)
+		l.noted[u] = true
 	}
 	l.state[u] = cur
 }
@@ -71,10 +76,18 @@ func (l *Ledger) Emitted() []ir.FeatureUse {
 }
 
 // Finish returns the report, and an error naming every use in uses that was never accounted.
-func (l *Ledger) Finish(uses []ir.FeatureUse) (*report.Report, error) {
+func (l *Ledger) Finish(uses []ir.FeatureUse) (*report.Report, error) { return l.finish(uses, false) }
+
+// FinishNoted is Finish plus an entry for every native use that Note gave a detail, such as a target caveat.
+// Those entries are native, so they never raise the report's worst level.
+func (l *Ledger) FinishNoted(uses []ir.FeatureUse) (*report.Report, error) {
+	return l.finish(uses, true)
+}
+
+func (l *Ledger) finish(uses []ir.FeatureUse, withNotes bool) (*report.Report, error) {
 	r := &report.Report{Source: l.source, Target: l.target}
-	for _, e := range l.state {
-		if e.Level != caps.Native {
+	for u, e := range l.state {
+		if e.Level != caps.Native || (withNotes && l.noted[u] && e.Detail != "") {
 			r.Add(e)
 		}
 	}

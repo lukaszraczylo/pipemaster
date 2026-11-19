@@ -56,6 +56,10 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			collapseManual(markedJob(pl, u.IRPath))
 		case caps.PipelineInputs:
 			pl.Triggers = slices.DeleteFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerManual })
+		case caps.PipelineConcurrency:
+			if u.IRPath == "pipeline/"+pl.ID && pl.Concurrency != nil && *pl.Concurrency == (ir.Concurrency{Group: defaultGroup}) {
+				pl.Concurrency = nil
+			}
 		case caps.TriggerManual:
 			pl.Triggers = slices.DeleteFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerManual })
 		case caps.JobIf:

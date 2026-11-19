@@ -24,9 +24,9 @@ const (
 type emitter struct {
 	led      *emitkit.Ledger
 	from     *expr.Dialect
-	d        Dialect
 	comments []string
 	marks    []string
+	d        Dialect
 }
 
 // sourceDialect is the expression dialect of a project's origin; nil means GHA semantics already hold.
