@@ -6,14 +6,16 @@ Status: pre-alpha.
 
 ## Supported providers
 
-The tool supports two providers. The provider ID is the value that you pass to `--from`, `--to`, `--via` and `--as`.
+The provider ID is the value that you pass to `--from`, `--to`, `--via` and `--as`.
 
 | ID | Provider | Pipeline files |
 | --- | --- | --- |
 | `gha` | GitHub Actions | `.yml` and `.yaml` files in `.github/workflows` |
+| `gitea` | Gitea Actions | `.yml` and `.yaml` files in `.gitea/workflows`, then `.github/workflows` |
+| `forgejo` | Forgejo Actions | `.yml` and `.yaml` files in `.forgejo/workflows`, then `.gitea/workflows`, then `.github/workflows` |
 | `gitlab` | GitLab CI | `.gitlab-ci.yml` and its local includes |
 
-No other provider is available.
+The parser reads the first directory of the list that exists and does not merge directories. The emitter writes only the first directory. If a repository holds both `.github/workflows` and `.gitea/workflows`, `detect` lists `gha` and `gitea`. Then `convert` needs `--from`. The pinned versions and the default action hosts are in [docs/versions.md](docs/versions.md).
 
 ## Installing
 
@@ -67,6 +69,30 @@ The command prints `no differences` when the pipeline survives the conversion to
 | 3 | You set `--strict` and at least one feature is not native. |
 | 4 | The round-trip metadata is stale. Use `--force` to convert anyway. |
 
+## Chained conversions
+
+You can convert the output of one conversion again. The metadata file holds one layer for each conversion, oldest first, so a chain through several providers can return to the first provider. Metadata `version: 2` holds the layers. A `version: 1` file from an earlier release reads as one layer.
+
+This example converts GHA to GitLab CI to Gitea Actions and back to GHA. Each step reads the previous output.
+
+```sh
+pipemaster convert ./repo --from gha --to gitlab -o ./b
+pipemaster convert ./b --from gitlab --to gitea -o ./c
+pipemaster convert ./c --from gitea --to gha -o ./d
+```
+
+The last step returns to the first provider. It restores the first pipeline and writes no sidecar file. If the first provider cannot write a key, the return writes a layer that holds only that key. Gitea cannot write `id-token`, for example.
+
+If you edit a converted file and convert it again, the command exits with code 4. With `--force`, the command drops the older layers and reports each one. It never restores a stale layer.
+
+To check a chain, pass several providers to `roundtrip`:
+
+```sh
+pipemaster roundtrip ./repo --from gha --via gitlab,gitea
+```
+
+The command prints `no differences` when the pipeline survives the whole chain.
+
 ## Reading the loss report
 
 The report gives one verdict for each feature that the pipeline uses. The verdicts, from best to worst, are:
@@ -75,6 +101,116 @@ The report gives one verdict for each feature that the pipeline uses. The verdic
 - `emulated`: the target gets an equivalent built from other features. The converted file marks it with a `# pipemaster:emulated` comment.
 - `external`: the target must configure the feature outside the pipeline file.
 - `lost`: the target cannot express the feature.
+
+## Feature support from GHA to Gitea and Forgejo
+
+The following tables come from `pipemaster caps --from gha --to gitea --format md` and `pipemaster caps --from gha --to forgejo --format md`.
+
+### Gitea
+
+| Feature | Gha | Gitea | Strategy |
+| --- | --- | --- | --- |
+| config.name | native | native | (a name the target rejects is external; create it under another name) |
+| display.name | native | native |  |
+| expr.opaque | native | native | (only opaque expressions of the gha dialect; others are lost) |
+| ext.passthrough | native | native |  |
+| job.allow_failure | native | native |  |
+| job.artifacts | emulated | emulated | upload-artifact step at job end |
+| job.cache | emulated | emulated | actions/cache step |
+| job.container | native | native |  |
+| job.env | native | native |  |
+| job.environment | native | lost | (Gitea ignores jobs.<id>.environment) |
+| job.environment.approval | external | external | configure required reviewers on the environment in repository settings |
+| job.if | native | native |  |
+| job.manual | emulated | emulated | workflow_dispatch trigger |
+| job.matrix | native | native |  |
+| job.needs | native | native |  |
+| job.needs.artifacts | emulated | emulated | download-artifact step at job start |
+| job.outputs | native | native |  |
+| job.retry | emulated | emulated | step-level retry loop via shell (Retry.Attempts is the total number of runs, so GitLab retry: N is Attempts N+1) |
+| job.runner | native | native |  |
+| job.services | native | native |  |
+| job.timeout | native | native |  |
+| pipeline.concurrency | native | native |  |
+| pipeline.env | native | native |  |
+| pipeline.finally | emulated | emulated | job with if: always() that needs every other job |
+| pipeline.inputs | native | native |  |
+| pipeline.permissions | native | native |  |
+| project.multi_pipeline | native | native |  |
+| script.interpolation | native | native |  |
+| step.action | native | native |  |
+| step.continue_on_error | native | native |  |
+| step.env | native | native |  |
+| step.if | native | native |  |
+| step.image | emulated | emulated | uses: docker://<image> with entrypoint and args |
+| step.script | native | native |  |
+| step.shell | native | native |  |
+| step.timeout | native | native |  |
+| step.workdir | native | native |  |
+| trigger.api | native | native |  |
+| trigger.filter.branches | native | native |  |
+| trigger.filter.paths | native | native |  |
+| trigger.filter.tags | native | native |  |
+| trigger.manual | native | native |  |
+| trigger.pipeline_done | native | native | workflow_run |
+| trigger.pull_request | native | native | (the ref is refs/pull/N/head, not the merge ref) |
+| trigger.push | native | native |  |
+| trigger.resource | lost | lost | (GitHub Actions has no resource triggers) |
+| trigger.schedule | native | native |  |
+| trigger.tag | native | native |  |
+
+### Forgejo
+
+| Feature | Gha | Forgejo | Strategy |
+| --- | --- | --- | --- |
+| config.name | native | native | (a name the target rejects is external; create it under another name) |
+| display.name | native | native |  |
+| expr.opaque | native | native | (only opaque expressions of the gha dialect; others are lost) |
+| ext.passthrough | native | native |  |
+| job.allow_failure | native | native |  |
+| job.artifacts | emulated | emulated | upload-artifact step at job end |
+| job.cache | emulated | emulated | actions/cache step |
+| job.container | native | native |  |
+| job.env | native | native |  |
+| job.environment | native | lost | (Forgejo does not document environment) |
+| job.environment.approval | external | external | configure required reviewers on the environment in repository settings |
+| job.if | native | native |  |
+| job.manual | emulated | emulated | workflow_dispatch trigger |
+| job.matrix | native | native |  |
+| job.needs | native | native |  |
+| job.needs.artifacts | emulated | emulated | download-artifact step at job start |
+| job.outputs | native | native |  |
+| job.retry | emulated | emulated | step-level retry loop via shell (Retry.Attempts is the total number of runs, so GitLab retry: N is Attempts N+1) |
+| job.runner | native | native |  |
+| job.services | native | native |  |
+| job.timeout | native | native |  |
+| pipeline.concurrency | native | native |  |
+| pipeline.env | native | native |  |
+| pipeline.finally | emulated | emulated | job with if: always() that needs every other job |
+| pipeline.inputs | native | native |  |
+| pipeline.permissions | native | lost | (Forgejo does not document permissions; the token has write access except on fork pull requests) |
+| project.multi_pipeline | native | native |  |
+| script.interpolation | native | native |  |
+| step.action | native | native |  |
+| step.continue_on_error | native | native |  |
+| step.env | native | native |  |
+| step.if | native | native |  |
+| step.image | emulated | emulated | uses: docker://<image> with entrypoint and args |
+| step.script | native | native |  |
+| step.shell | native | native |  |
+| step.timeout | native | native |  |
+| step.workdir | native | native |  |
+| trigger.api | native | native |  |
+| trigger.filter.branches | native | native |  |
+| trigger.filter.paths | native | native |  |
+| trigger.filter.tags | native | native |  |
+| trigger.manual | native | native |  |
+| trigger.pipeline_done | native | native | workflow_run |
+| trigger.pull_request | native | native |  |
+| trigger.push | native | native |  |
+| trigger.resource | lost | lost | (GitHub Actions has no resource triggers) |
+| trigger.schedule | native | native |  |
+| trigger.tag | native | native |  |
 
 ## Feature support from GHA to GitLab
 
