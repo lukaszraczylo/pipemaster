@@ -23,11 +23,14 @@ const (
 	secondsLabel = " seconds"
 )
 
-// retryWhen is the failure list of retry:when in the GitLab docs.
+// retryWhen is the retry_errors enum of the GitLab CI schema.
 var retryWhen = []string{
 	"always", "unknown_failure", "script_failure", "api_failure", "stuck_or_timeout_failure",
-	"runner_system_failure", "runner_unsupported", "stale_schedule", "job_execution_timeout",
-	"archived_failure", "unmet_prerequisites", "scheduler_failure", "data_integrity_failure",
+	"stuck_pending_with_matching_runners", "stuck_pending_no_matching_runners", "no_updates_running",
+	"no_updates_canceling", "runner_system_failure", "runner_configuration_error",
+	"runner_external_dependency_failure", "runner_interrupted", "runner_unsupported", "stale_schedule",
+	"job_execution_timeout", "server_timeout_running", "server_timeout_canceling", "archived_failure",
+	"unmet_prerequisites", "scheduler_failure", "data_integrity_failure",
 }
 
 func (e *emitter) imageNode(path string, img ir.Image, extra any) (*yaml.Node, error) {

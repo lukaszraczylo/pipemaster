@@ -1,0 +1,9 @@
+build:
+  script:
+    - make
+  retry:
+    max: 2
+    when:
+      - script_failure
+      - runner_external_dependency_failure
+      - runner_interrupted
