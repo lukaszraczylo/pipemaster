@@ -1,6 +1,7 @@
 package gitlab_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -142,3 +143,25 @@ func TestRefsRestoreServiceEnvAndHashedCacheKey(t *testing.T) {
 	noIgnoredNotes(t, rep)
 }
 
+func TestRefsRestoreInsideExpandedMatrix(t *testing.T) {
+	j := glJob("build", glStep("echo ${{ matrix.q }}"))
+	j.Matrix = &ir.Matrix{
+		Axes:    []ir.Axis{{Name: "q", Values: []string{"a-${{ inputs.x }}", "b"}}},
+		Include: []ir.Combo{{{Key: "q", Value: "c-${{ env.v }}"}}},
+		Exclude: []ir.Combo{{{Key: "q", Value: "b"}}},
+	}
+	_, back, rep := emitParse(t, glProject("gitlab", j), nil)
+	got := back.Pipelines[0].Jobs[0]
+	if !reflect.DeepEqual(got.Matrix, j.Matrix) {
+		t.Errorf("matrix = %+v, want %+v", got.Matrix, j.Matrix)
+	}
+	if s := got.Steps[0].Script[0]; s != "echo ${{ matrix.q }}" {
+		t.Errorf("script = %q", s)
+	}
+	noIgnoredNotes(t, rep)
+	for _, e := range rep.Entries {
+		if strings.Contains(e.Detail, "no parser rule restores job.matrix") {
+			t.Errorf("matrix marker not collapsed")
+		}
+	}
+}

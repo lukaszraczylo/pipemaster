@@ -254,6 +254,9 @@ func collapseRefs(c *collapseCtx) bool {
 		case st.val.Kind == ir.ValueLit:
 			cur = st.val.Lit
 		}
+		if cur == p.S {
+			continue
+		}
 		if cur != p.G {
 			if canon, err := canonText(p.G); err != nil || cur != canon {
 				c.ignore("marker ignored: the text at " + p.P + " was edited after conversion, so the file's text stands")

@@ -365,12 +365,49 @@ func collapseMatrix(c *collapseCtx) bool {
 		return false
 	}
 	orig := &ir.Matrix{Axes: arg.Axes, Include: arg.Include, Exclude: arg.Exclude}
-	if !reflect.DeepEqual(ir.Expand(orig), ir.Expand(j.Matrix)) {
+	// The parsed entries hold the GitLab text of each value, so compare the original in that form too.
+	got := ir.Expand(j.Matrix)
+	if !reflect.DeepEqual(ir.Expand(orig), got) && !reflect.DeepEqual(ir.Expand(flatMatrix(orig)), got) {
 		return false
 	}
 	j.Matrix = orig
 	matrixRefs(j, orig, markedLines(c.args))
 	return true
+}
+
+// flatMatrix returns m with each value as the parser reads it back from the GitLab text.
+func flatMatrix(m *ir.Matrix) *ir.Matrix {
+	flat := func(v string) string {
+		t, lost, err := convert(v)
+		if err != nil || len(lost) > 0 {
+			return v
+		}
+		if c, err := canonText(t); err == nil {
+			return c
+		}
+		return v
+	}
+	out := &ir.Matrix{}
+	for _, a := range m.Axes {
+		vals := make([]string, len(a.Values))
+		for i, v := range a.Values {
+			vals[i] = flat(v)
+		}
+		out.Axes = append(out.Axes, ir.Axis{Name: a.Name, Values: vals})
+	}
+	combos := func(cs []ir.Combo) []ir.Combo {
+		var res []ir.Combo
+		for _, c := range cs {
+			n := make(ir.Combo, len(c))
+			for i, kv := range c {
+				n[i] = ir.KV{Key: kv.Key, Value: flat(kv.Value)}
+			}
+			res = append(res, n)
+		}
+		return res
+	}
+	out.Include, out.Exclude = combos(m.Include), combos(m.Exclude)
+	return out
 }
 
 // matrixRefs turns the $axis variables GitLab sets for each parallel:matrix entry back into matrix references.
