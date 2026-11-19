@@ -22,7 +22,7 @@ func fixtureComplete(id, dir string) bool {
 	if _, err := os.Stat(filepath.Join(dir, "ir.golden.yaml")); err != nil {
 		return false
 	}
-	if id == provider.GitLab {
+	if provider.Family(id) != provider.GHA {
 		_, err := os.Stat(filepath.Join(dir, ".gitlab-ci.yml"))
 		return err == nil
 	}

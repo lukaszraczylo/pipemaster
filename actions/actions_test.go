@@ -398,3 +398,20 @@ func TestParseRejectsBadWithDoc(t *testing.T) {
 		t.Errorf("valid exclude rejected: %v", err)
 	}
 }
+
+func TestActionsPassthroughFamily(t *testing.T) {
+	with := map[string]string{"fetch-depth": "0"}
+	want, ok := Lookup(repo("actions", "checkout", ""), provider.GHA, with)
+	if !ok {
+		t.Fatal("checkout not found for gha")
+	}
+	for _, id := range []string{provider.Gitea, provider.Forgejo} {
+		got, ok := Lookup(repo("actions", "checkout", ""), id, with)
+		if !ok {
+			t.Fatalf("checkout not found for %s", id)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: %+v, want %+v", id, got, want)
+		}
+	}
+}

@@ -226,7 +226,7 @@ func (r *registry) lookup(ref ir.ActionRef, target string, with map[string]strin
 		if !strings.EqualFold(e.owner, ref.Owner) || !strings.EqualFold(e.repo, ref.Repo) || e.path != ref.Path {
 			continue
 		}
-		c, ok := e.targets[target]
+		c, ok := e.targets[provider.Family(target)]
 		if !ok {
 			return Target{}, false
 		}
@@ -237,7 +237,7 @@ func (r *registry) lookup(ref ir.ActionRef, target string, with map[string]strin
 
 func resolve(c compiled, target string, with map[string]string) Target {
 	out := Target{Kind: c.doc.Kind, Script: c.doc.Script, Support: c.support, With: map[string]any{}}
-	if target == provider.GHA || c.doc.Kind == KindPassthrough {
+	if provider.Family(target) == provider.GHA || c.doc.Kind == KindPassthrough {
 		for k, v := range with {
 			out.With[k] = v
 		}

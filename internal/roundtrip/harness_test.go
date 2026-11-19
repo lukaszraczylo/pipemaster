@@ -45,12 +45,19 @@ func allFixtures(t *testing.T) []fixture {
 	return append(fixtures(t, provider.GHA), fixtures(t, provider.GitLab)...)
 }
 
-func other(id string) string {
-	if id == provider.GHA {
-		return provider.GitLab
+// targets returns every registered provider except id.
+func targets(id string) []string {
+	var out []string
+	for _, p := range provider.IDs() {
+		if p != id {
+			out = append(out, p)
+		}
 	}
-	return provider.GHA
+	return out
 }
+
+// other picks one target for tests that compare a single pair.
+func other(id string) string { return targets(id)[0] }
 
 func prov(t *testing.T, id string) provider.Provider {
 	t.Helper()

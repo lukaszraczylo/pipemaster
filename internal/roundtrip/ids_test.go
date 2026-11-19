@@ -252,3 +252,14 @@ func TestRenamedJobIDIsReported(t *testing.T) {
 	}
 	t.Errorf("no emulated entry reports the rename of 1build: %+v", r.toRep.Entries)
 }
+
+func TestSanitizeIDFamily(t *testing.T) {
+	for _, id := range []string{provider.GHA, provider.Gitea, provider.Forgejo} {
+		if got := roundtrip.SanitizeID(id, "build linux"); got != "build-linux" {
+			t.Errorf("%s: got %q", id, got)
+		}
+	}
+	if got := roundtrip.SanitizeID(provider.GitLab, "build linux"); got != "build linux" {
+		t.Errorf("gitlab: got %q", got)
+	}
+}

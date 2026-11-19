@@ -23,10 +23,10 @@ func IDsFor(t provider.Provider, p *ir.Project) map[string]string {
 	return nil
 }
 
-// SanitizeID makes id valid for target. GHA job ids match ^[A-Za-z_][A-Za-z0-9_-]*$; other targets keep id.
+// SanitizeID makes id valid for target. GHA job ids match ^[A-Za-z_][A-Za-z0-9_-]*$; other targets keep id; Gitea and Forgejo share the GHA rule.
 // It does not dedupe; AssignIDs does.
 func SanitizeID(target, id string) string {
-	if target != provider.GHA {
+	if provider.Family(target) != provider.GHA {
 		return id
 	}
 	out := make([]byte, 0, len(id)+1)
