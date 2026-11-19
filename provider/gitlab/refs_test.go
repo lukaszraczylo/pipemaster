@@ -116,3 +116,29 @@ func TestUnrecordedFlatteningSitesAreReported(t *testing.T) {
 		}
 	}
 }
+
+func noIgnoredNotes(t *testing.T, rep *report.Report) {
+	t.Helper()
+	for _, e := range rep.Entries {
+		if strings.Contains(e.Detail, "marker ignored") {
+			t.Errorf("unedited file produced %q at %s", e.Detail, e.IRPath)
+		}
+	}
+}
+
+func TestRefsRestoreServiceEnvAndHashedCacheKey(t *testing.T) {
+	const tpl = "${{ matrix.os }}"
+	j := glJob("build", glStep("make"))
+	j.Services = []ir.Service{{Image: ir.Image{Ref: "pg:15"}, Name: "db", Env: []ir.Var{{Name: "K", Value: ir.Value{Lit: "v-" + tpl}}}}}
+	j.Cache = []ir.Cache{{Key: "k-" + tpl + "-${{ hashFiles('go.sum') }}", Paths: []string{"vendor"}}}
+	_, back, rep := emitParse(t, glProject("gitlab", j), nil)
+	got := back.Pipelines[0].Jobs[0]
+	if v := got.Services[0].Env[0].Value.Lit; v != "v-"+tpl {
+		t.Errorf("service env = %q", v)
+	}
+	if k := got.Cache[0].Key; k != j.Cache[0].Key {
+		t.Errorf("cache key = %q", k)
+	}
+	noIgnoredNotes(t, rep)
+}
+

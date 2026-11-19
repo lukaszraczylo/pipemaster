@@ -401,26 +401,24 @@ func (e *emitter) cacheKey(path string, c *omap, key string) error {
 	return nil
 }
 
-// hashKey recognises `[parts-]${{ hashFiles('f', ...) }}` in canonical template text. A part GitLab has no
-// variable for (runner.os) leaves the prefix and is reported; any other kind of part makes the key not a hash key.
-func (e *emitter) hashKey(path, key string) (files []string, prefix string, ok bool, err error) {
+// hashKeyParts splits `[parts-]${{ hashFiles('f', ...) }}` in canonical template text into the hashed files, the
+// parts before the call that GitLab can print, and the expressions it cannot. ok is false for any other key.
+func hashKeyParts(key string) (files []string, kept []expr.Part, dropped []string, ok bool) {
 	parts, perr := expr.ParseScriptTemplate(key)
 	if perr != nil || len(parts) == 0 {
-		return nil, "", false, nil
+		return nil, nil, nil, false
 	}
 	call, isCall := parts[len(parts)-1].Expr.(expr.Call)
 	if !isCall || call.Name != hashFilesFn {
-		return nil, "", false, nil
+		return nil, nil, nil, false
 	}
 	for _, a := range call.Args {
 		l, isLit := a.(expr.Lit)
 		if !isLit || l.Kind != expr.LitStr {
-			return nil, "", false, nil
+			return nil, nil, nil, false
 		}
 		files = append(files, l.Str)
 	}
-	var kept []expr.Part
-	var dropped []string
 	for _, p := range parts[:len(parts)-1] {
 		if p.Expr == nil {
 			kept = append(kept, p)
@@ -428,13 +426,23 @@ func (e *emitter) hashKey(path, key string) (files []string, prefix string, ok b
 		}
 		r, isRef := p.Expr.(expr.Ref)
 		if !isRef {
-			return nil, "", false, nil
+			return nil, nil, nil, false
 		}
 		if _, has := refVar(r.Path); has {
 			kept = append(kept, p)
 		} else {
 			dropped = append(dropped, expr.String(p.Expr))
 		}
+	}
+	return files, kept, dropped, true
+}
+
+// hashKey recognises a hashFiles cache key. A part GitLab has no variable for (runner.os) leaves the prefix and
+// is reported; any other kind of part makes the key not a hash key.
+func (e *emitter) hashKey(path, key string) (files []string, prefix string, ok bool, err error) {
+	files, kept, dropped, ok := hashKeyParts(key)
+	if !ok {
+		return nil, "", false, nil
 	}
 	text, lost, err := convertParts(kept)
 	if err != nil || len(lost) > 0 {

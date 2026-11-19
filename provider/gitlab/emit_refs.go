@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
@@ -32,6 +33,8 @@ type refSite struct {
 	val   *ir.Value
 	after func()
 	pos   string
+	// key marks a cache key, which GitLab may split into files and prefix.
+	key bool
 }
 
 // refSites lists every field the GitLab emitter writes through the text conversion, in a fixed order with a
@@ -39,6 +42,7 @@ type refSite struct {
 func refSites(pl *ir.Pipeline) []refSite {
 	var out []refSite
 	str := func(pos string, s *string) { out = append(out, refSite{pos: pos, text: s}) }
+	key := func(pos string, s *string) { out = append(out, refSite{pos: pos, text: s, key: true}) }
 	strs := func(pos string, l []string) {
 		for i := range l {
 			str(pos+"/"+strconv.Itoa(i), &l[i])
@@ -64,10 +68,11 @@ func refSites(pl *ir.Pipeline) []refSite {
 			sp := jp + "/service/" + strconv.Itoa(i)
 			str(sp+"/image", &j.Services[i].Image.Ref)
 			str(sp+"/name", &j.Services[i].Name)
+			vars(sp+"/env", j.Services[i].Env)
 		}
 		for i := range j.Cache {
 			cp := jp + "/cache/" + strconv.Itoa(i)
-			str(cp+"/key", &j.Cache[i].Key)
+			key(cp+"/key", &j.Cache[i].Key)
 			strs(cp+"/paths", j.Cache[i].Paths)
 		}
 		for i := range j.Artifacts {
@@ -111,6 +116,35 @@ func refSites(pl *ir.Pipeline) []refSite {
 	return out
 }
 
+// hashedKeyText is the key text Parse reads back from the key:files form the emitter writes for a hashFiles key.
+func hashedKeyText(key string) (string, bool) {
+	files, kept, dropped, ok := hashKeyParts(key)
+	if !ok || len(dropped) > 0 || len(files) == 0 || len(files) > maxKeyFiles {
+		return "", false
+	}
+	parts, err := expr.ParseScriptTemplate(key)
+	if err != nil || !flattens(kept) {
+		return "", false
+	}
+	prefix, lost, err := convertParts(kept)
+	if err != nil || len(lost) > 0 {
+		return "", false
+	}
+	prefix = strings.TrimSuffix(prefix, "-")
+	canon, err := canonText(prefix)
+	if err != nil {
+		return "", false
+	}
+	hash, err := expr.PrintScriptTemplate(parts[len(parts)-1:])
+	if err != nil {
+		return "", false
+	}
+	if canon == "" {
+		return hash, true
+	}
+	return canon + "-" + hash, true
+}
+
 // refPairs lists every flattening conversion in the pipeline: references such as matrix.x, inputs.x or
 // env.x all print as $x, so the namespace cannot be read back from the text alone.
 func refPairs(pl *ir.Pipeline) []refPair {
@@ -125,6 +159,12 @@ func refPairs(pl *ir.Pipeline) []refPair {
 	}
 	for _, st := range refSites(pl) {
 		switch {
+		case st.text != nil && st.key:
+			if g, ok := hashedKeyText(*st.text); ok {
+				out = append(out, refPair{pairText, st.pos, g, *st.text})
+				continue
+			}
+			text(st.pos, *st.text)
 		case st.text != nil:
 			text(st.pos, *st.text)
 		case st.val.Kind == ir.ValueLit:
