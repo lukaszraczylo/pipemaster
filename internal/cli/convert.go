@@ -8,8 +8,10 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
@@ -85,6 +87,10 @@ func runConvert(args []string, _, stderr io.Writer) int {
 		return exitError
 	}
 	fullReturn := res.Restored && len(res.Out.Layers) == 0
+	var originInvalid []string
+	if fullReturn {
+		originInvalid = stack.Layers[stack.Find(tgt.ID())].SourceInvalid
+	}
 	// A full return emits into the origin dialect, which can still lack a key the pipeline holds; no older layer
 	// keeps that key, so this output records it.
 	if !res.Restored || (fullReturn && dialectLoss(emitRep)) {
@@ -93,8 +99,12 @@ func runConvert(args []string, _, stderr io.Writer) int {
 			owner = tgt.ID()
 		}
 		m := roundtrip.NewMeta(owner, proj, tgt, emitRep)
-		if res.Restored {
+		switch {
+		case res.Restored:
 			m.Ext, m.Residual, m.IDs = nil, nil, nil
+			m.SourceInvalid = originInvalid
+		case len(stack.Layers) == 0:
+			m.SourceInvalid = sourceFindings(src.ID(), srcFS, proj.Origin.Files)
 		}
 		if err := roundtrip.RecordEmitted(m, tgt, files); err != nil {
 			addMetaGap(emitRep, err)
@@ -109,7 +119,7 @@ func runConvert(args []string, _, stderr io.Writer) int {
 	} else {
 		files = meta.AttachStack(files, res.Out)
 	}
-	if !validateAll(tgt.ID(), files, fullReturn, stderr) {
+	if !validateAll(tgt.ID(), files, fullReturn, originInvalid, stderr) {
 		return exitError
 	}
 	if err := writeFiles(*outDir, files); err != nil {
@@ -178,9 +188,45 @@ func removeStaleSidecar(dir, why string, rep *report.Report) error {
 	return os.Remove(sub)
 }
 
+// braceVar matches ${NAME}. The GitLab emitter prints it as $NAME where both spell the same variable.
+var braceVar = regexp.MustCompile(`\$\{(\w+)\}`)
+
+// schemaFindings lists the schema complaints in err without the file name, so findings compare across names.
+// A braced variable reads as the bare one.
+func schemaFindings(name string, err error) []string {
+	text := braceVar.ReplaceAllString(strings.ReplaceAll(err.Error(), name, ""), "$$$1")
+	lines := strings.Split(text, "\n")
+	if len(lines) > 1 {
+		lines = lines[1:]
+	}
+	var out []string
+	for _, l := range lines {
+		if l = strings.TrimSpace(l); l != "" {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// sourceFindings validates the files of the first conversion against the schema of their own provider.
+func sourceFindings(providerID string, fsys fs.FS, files []string) []string {
+	var out []string
+	for _, f := range files {
+		data, err := fs.ReadFile(fsys, f)
+		if err != nil {
+			continue
+		}
+		if verr := validateEmitted(providerID, f, data); verr != nil && !errors.Is(verr, validate.ErrNoSchema) {
+			out = append(out, schemaFindings(f, verr)...)
+		}
+	}
+	return slices.Compact(slices.Sorted(slices.Values(out)))
+}
+
 // validateAll checks every emitted file except the sidecar. A provider with no pinned schema only warns. A full
-// return only warns too: it restores the file the user started from, and the pinned schema can lag real syntax.
-func validateAll(providerID string, files map[string][]byte, fullReturn bool, stderr io.Writer) bool {
+// return only warns about findings that the origin files already had: it restores them, and the pinned schema can
+// lag real syntax.
+func validateAll(providerID string, files map[string][]byte, fullReturn bool, originInvalid []string, stderr io.Writer) bool {
 	ok := true
 	for _, name := range sortedNames(files) {
 		if name == meta.SidecarPath {
@@ -190,7 +236,7 @@ func validateAll(providerID string, files map[string][]byte, fullReturn bool, st
 		switch {
 		case errors.Is(err, validate.ErrNoSchema):
 			_, _ = fmt.Fprintf(stderr, "warning: no schema for %s; %s not validated\n", providerID, name)
-		case err != nil && fullReturn:
+		case err != nil && fullReturn && coveredBy(schemaFindings(name, err), originInvalid):
 			_, _ = fmt.Fprintf(stderr, "warning: restored origin does not validate against the pinned schema: %v\n", err)
 		case err != nil:
 			_, _ = fmt.Fprintf(stderr, "invalid output: %v\n", err)
@@ -198,6 +244,11 @@ func validateAll(providerID string, files map[string][]byte, fullReturn bool, st
 		}
 	}
 	return ok
+}
+
+// coveredBy is true when found holds at least one finding and every finding is in known.
+func coveredBy(found, known []string) bool {
+	return len(found) > 0 && !slices.ContainsFunc(found, func(f string) bool { return !slices.Contains(known, f) })
 }
 
 func writeFiles(dir string, files map[string][]byte) error {

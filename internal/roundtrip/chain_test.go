@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -562,5 +563,41 @@ func TestFullReturnWarnsWhenOriginFailsSchema(t *testing.T) {
 	code, _, msg := runOut("convert", b, "--from", "gha", "--to", "gitlab", "-o", a)
 	if code != 0 || !strings.Contains(msg, "warning: restored origin does not validate against the pinned schema") {
 		t.Fatalf("return = %d, want 0 with a schema warning\n%s", code, msg)
+	}
+}
+
+// returnVia converts the corpus entry to gha and back with extra flags on the return. It edits the sidecar of
+// the middle output with edit when edit is not nil.
+func returnVia(t *testing.T, edit func(string) string, flags ...string) (code int, stdout, stderr string) {
+	t.Helper()
+	b, a := t.TempDir(), t.TempDir()
+	if c, _, msg := runOut("convert", filepath.Join(corpusRoot, "24-gitlab-release-cli"), "--from", "gitlab", "--to", "gha", "-o", b); c != 0 {
+		t.Fatalf("out = %d\n%s", c, msg)
+	}
+	if edit != nil {
+		p := filepath.Join(b, meta.SidecarPath)
+		raw, err := os.ReadFile(p) // #nosec G304 -- temp dir
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(edit(string(raw))), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return runOut(append([]string{"convert", b, "--from", "gha", "--to", "gitlab", "-o", a}, flags...)...)
+}
+
+func TestFullReturnSchemaFailureNeedsTheOriginToHaveFailed(t *testing.T) {
+	dropRecord := func(s string) string {
+		return regexp.MustCompile(`(?m)^      source_invalid:\n(?:        - .*\n)+`).ReplaceAllString(s, "")
+	}
+	if code, _, msg := returnVia(t, dropRecord); code != 1 || !strings.Contains(msg, "invalid output") {
+		t.Fatalf("no recorded origin failure: code = %d, want 1\n%s", code, msg)
+	}
+	bogus := func(s string) string {
+		return strings.Replace(dropRecord(s), "      source: gitlab\n", "      source_invalid:\n        - '- at ''/nowhere'': unrelated'\n      source: gitlab\n", 1)
+	}
+	if code, _, msg := returnVia(t, bogus); code != 1 || !strings.Contains(msg, "invalid output") {
+		t.Fatalf("a different recorded failure: code = %d, want 1\n%s", code, msg)
 	}
 }
