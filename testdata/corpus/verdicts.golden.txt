@@ -17,7 +17,7 @@
 17-gitlab-gitaly gitlab->gha native=277 emulated=39 external=0 lost=62
 18-gitlab-gitlab-docs gitlab->gha native=2 emulated=3 external=0 lost=0
 19-gitlab-gitlab-pages gitlab->gha native=85 emulated=12 external=0 lost=24
-20-gitlab-gitlab-runner gitlab->gha native=925 emulated=204 external=0 lost=184
+20-gitlab-gitlab-runner gitlab->gha native=935 emulated=209 external=0 lost=184
 21-gitlab-gitlab-shell gitlab->gha native=147 emulated=14 external=0 lost=38
 22-gitlab-gitlab-vscode-extension gitlab->gha native=154 emulated=36 external=0 lost=37
 24-gitlab-release-cli gitlab->gha native=131 emulated=56 external=0 lost=40

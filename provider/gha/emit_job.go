@@ -143,6 +143,9 @@ func (e *emitter) needIDs(c jobCtx, j *ir.Job) []string {
 			e.lose(jp, caps.JobNeeds, "optional need "+n.JobID+" has no GHA form; it is a hard dependency")
 		}
 		add(n.JobID)
+		if narrowsMatrix(j, n.JobID) {
+			e.emulate(jp, caps.JobNeeds, "needs the whole job", "waits for every matrix instance of "+n.JobID)
+		}
 	}
 	return ids
 }
@@ -476,4 +479,14 @@ func actionString(a *ir.ActionRef) string {
 // finallyArg carries the needs a finally job had before the emitter added every main job to them.
 type finallyArg struct {
 	Needs []ir.Need `json:"needs,omitempty"`
+}
+
+// narrowsMatrix reports whether the source need picked matrix instances of the job, which GHA needs cannot do.
+func narrowsMatrix(j *ir.Job, id string) bool {
+	g, _ := j.Ext["gitlab"].(map[string]any)
+	x, _ := g["needs_extra"].(map[string]any)
+	n, _ := x[id].(map[string]any)
+	_, inst := n["_instance"]
+	_, par := n["parallel"]
+	return inst || par
 }

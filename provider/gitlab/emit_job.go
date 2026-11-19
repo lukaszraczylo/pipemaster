@@ -1,7 +1,9 @@
 package gitlab
 
 import (
+	"maps"
 	"slices"
+	"strings"
 
 	"go.yaml.in/yaml/v3"
 
@@ -132,7 +134,18 @@ func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps [
 		m.set("optional", boolNodeOf(true))
 		explicit = true
 	}
-	if x, ok := extra.(map[string]any); ok && len(x) > 0 {
+	x, _ := extra.(map[string]any)
+	if inst, _ := x[ExtNeedsInstance].(string); inst != "" {
+		x = maps.Clone(x)
+		delete(x, ExtNeedsInstance)
+		if strings.HasPrefix(inst, n.JobID+": [") {
+			m.set("job", str(inst))
+			if len(x) == 0 && !explicit {
+				return str(inst), nil
+			}
+		}
+	}
+	if len(x) > 0 {
 		if err := m.addExtra(x, nil); err != nil {
 			return nil, err
 		}

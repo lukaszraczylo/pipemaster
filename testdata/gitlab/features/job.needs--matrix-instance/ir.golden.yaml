@@ -34,10 +34,13 @@ pipelines:
                 - make images
         - ext:
             gitlab:
-                needs:
-                    - 'images: [alpine]'
+                needs_extra:
+                    images:
+                        _instance: 'images: [alpine]'
                 stage: package
           id: package
+          needs:
+            - job: images
           steps:
             - ext:
                 gitlab:
@@ -46,3 +49,23 @@ pipelines:
               kind: script
               script:
                 - make package
+        - ext:
+            gitlab:
+                needs_extra:
+                    images:
+                        parallel:
+                            matrix:
+                                - TARGET:
+                                    - ubuntu
+                stage: package
+          id: package-all
+          needs:
+            - job: images
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make package-all

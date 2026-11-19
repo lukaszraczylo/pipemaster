@@ -19,8 +19,11 @@ const (
 )
 
 // matrixInstanceRE matches the name GitLab gives one instance of a parallel:matrix job, such as "build: [linux, amd64]".
-// The IR needs name whole jobs, so such an entry stays in Ext.
-var matrixInstanceRE = regexp.MustCompile(`^[^:\[]+: \[.*\]$`)
+// The IR needs name whole jobs, so the need waits for every instance and the instance name stays in Ext.
+var matrixInstanceRE = regexp.MustCompile(`^([^:\[]+): \[.*\]$`)
+
+// ExtNeedsInstance is the needs_extra key that holds the matrix instance name a need selected.
+const ExtNeedsInstance = "_instance"
 
 type needSpec struct {
 	extra      map[string]any
@@ -62,6 +65,14 @@ func (s *state) jobNeeds(info *jobInfo, r *reader) error {
 			raw = append(raw, v)
 			continue
 		}
+		if _, inst := spec.extra[ExtNeedsInstance]; inst && extras[spec.job] != nil {
+			v, err := s.plain(it)
+			if err != nil {
+				return err
+			}
+			raw = append(raw, v)
+			continue
+		}
 		info.needs = append(info.needs, *spec)
 		if spec.extra != nil {
 			extras[spec.job] = spec.extra
@@ -78,10 +89,13 @@ func (s *state) jobNeeds(info *jobInfo, r *reader) error {
 	return nil
 }
 
-// needEntry returns whole=true for an entry the IR cannot model at all: another project or pipeline, or one matrix instance.
+// needEntry returns whole=true for an entry the IR cannot model at all: another project or pipeline.
 func (s *state) needEntry(it *yaml.Node) (spec *needSpec, whole bool, err error) {
 	if it.Kind == yaml.ScalarNode {
-		return &needSpec{job: it.Value}, matrixInstanceRE.MatchString(it.Value), nil
+		if m := matrixInstanceRE.FindStringSubmatch(it.Value); m != nil {
+			return &needSpec{job: m[1], extra: map[string]any{ExtNeedsInstance: it.Value}}, false, nil
+		}
+		return &needSpec{job: it.Value}, false, nil
 	}
 	r, err := s.reader(it, "needs entry")
 	if err != nil {
@@ -100,8 +114,9 @@ func (s *state) needEntry(it *yaml.Node) (spec *needSpec, whole bool, err error)
 	if spec.job, err = s.scalar(jn, "needs job"); err != nil {
 		return nil, false, err
 	}
-	if matrixInstanceRE.MatchString(spec.job) {
-		return nil, true, nil
+	if m := matrixInstanceRE.FindStringSubmatch(spec.job); m != nil {
+		spec.extra = map[string]any{ExtNeedsInstance: spec.job}
+		spec.job = m[1]
 	}
 	if a := r.take("artifacts"); a != nil {
 		if b, ok := boolNode(a); ok {

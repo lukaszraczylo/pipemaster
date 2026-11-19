@@ -14,3 +14,13 @@ package:
     - "images: [alpine]"
   script:
     - make package
+
+package-all:
+  stage: package
+  needs:
+    - job: images
+      parallel:
+        matrix:
+          - TARGET: [ubuntu]
+  script:
+    - make package-all
