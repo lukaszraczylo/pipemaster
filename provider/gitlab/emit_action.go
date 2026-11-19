@@ -11,6 +11,7 @@ import (
 	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"go.yaml.in/yaml/v3"
 )
 
 const (
@@ -336,6 +337,13 @@ func appendNew(dst, src []string) []string {
 	return dst
 }
 
+// readCacheBlock reads an emitted cache block the way Parse does. A variable so a test can make the read fail,
+// which no cache action input can.
+var readCacheBlock = func(n *yaml.Node) (ir.Cache, error) {
+	c, _, err := newState(nil).cacheEntry(n)
+	return c, err
+}
+
 // cacheAction maps actions/cache to a cache block; hashFiles keys become cache:key:files.
 func (e *emitter) cacheAction(p *jobPrep, sp string, t actions.Target) (*ir.Cache, error) {
 	key, _ := t.With["key"].(string)
@@ -353,7 +361,7 @@ func (e *emitter) cacheAction(p *jobPrep, sp string, t actions.Target) (*ir.Cach
 		cp = append(cp, t)
 	}
 	c.set("paths", strSeq(cp))
-	parsed, _, err := newState(nil).cacheEntry(c.n)
+	parsed, err := readCacheBlock(c.n)
 	if err != nil {
 		// Without the parsed block no marker can restore the step, so the action must not vanish unreported.
 		e.lose(sp, caps.StepAction, "the cache block cannot be read back: "+err.Error())
