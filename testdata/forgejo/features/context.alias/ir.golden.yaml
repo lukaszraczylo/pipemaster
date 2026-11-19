@@ -1,0 +1,33 @@
+origin:
+    provider: forgejo
+    dialect: forgejo
+    files:
+        - .forgejo/workflows/ci.yml
+pipelines:
+    - id: ci
+      name: alias
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - docker
+          steps:
+            - if: ref_name == 'main'
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: script
+              script:
+                - echo ${{ ref_name }}
+            - if: sha != ''
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-2
+              kind: script
+              script:
+                - echo ${{ sha }}

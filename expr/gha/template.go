@@ -12,8 +12,11 @@ type Part = expr.Part
 
 // ParseTemplate splits s into text and ${{ }} parts. Empty text is dropped; a string with no
 // ${{ yields one text part. An unterminated ${{ is an error.
-func ParseTemplate(s string) ([]Part, error) {
-	parts, err := expr.SplitTemplate(s, Parse)
+func ParseTemplate(s string) ([]Part, error) { return ParseTemplateWith(s, nil) }
+
+// ParseTemplateWith is ParseTemplate that also reads each aliases context name as the github context.
+func ParseTemplateWith(s string, aliases []string) ([]Part, error) {
+	parts, err := expr.SplitTemplate(s, func(body string) (expr.Expr, error) { return ParseWith(body, aliases) })
 	if err != nil {
 		return nil, fmt.Errorf("gha template: %w", err)
 	}

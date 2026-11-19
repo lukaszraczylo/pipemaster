@@ -1,0 +1,10 @@
+name: alias
+on: push
+jobs:
+  build:
+    runs-on: docker
+    steps:
+      - if: ${{ forgejo.ref_name == 'main' }}
+        run: echo ${{ forgejo.ref_name }}
+      - if: forge.sha != ''
+        run: echo ${{ forge.sha }}

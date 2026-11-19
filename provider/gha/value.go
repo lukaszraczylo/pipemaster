@@ -17,7 +17,7 @@ const (
 )
 
 func (fp *fileParser) parts(n *yaml.Node, s string) ([]expr.Part, error) {
-	parts, err := gha.ParseTemplate(s)
+	parts, err := gha.ParseTemplateWith(s, fp.d.Contexts)
 	if err != nil {
 		return nil, fp.errf(n, "%v", err)
 	}
@@ -106,7 +106,7 @@ func (fp *fileParser) cond(n *yaml.Node) (expr.Expr, error) {
 			return nil, perr
 		}
 		e = mixed(trimBlank(parts))
-	} else if e, err = gha.Parse(s); err != nil {
+	} else if e, err = gha.ParseWith(s, fp.d.Contexts); err != nil {
 		return nil, fp.errf(n, "if: %v", err)
 	}
 	if err := expr.Check(e); err != nil {

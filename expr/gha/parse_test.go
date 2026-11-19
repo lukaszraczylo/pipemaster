@@ -328,3 +328,49 @@ func TestLongOperatorChainsAreCheckValid(t *testing.T) {
 		}
 	}
 }
+
+func TestParseAliases(t *testing.T) {
+	want, err := gha.Parse("github.sha == 'x'")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		src     string
+		aliases []string
+	}{{"gitea.sha == 'x'", []string{"gitea"}}, {"forge.sha == 'x'", []string{"forgejo", "forge"}}} {
+		got, err := gha.ParseWith(c.src, c.aliases)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !equalExpr(got, want) {
+			t.Errorf("ParseWith(%q) = %#v, want %#v", c.src, got, want)
+		}
+	}
+	got, err := gha.ParseWith("forgejo.ref_name", []string{"gitea"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !equalExpr(got, r("gha", "forgejo", "ref_name")) {
+		t.Errorf("alias outside the list must stay provider-native, got %#v", got)
+	}
+}
+
+func TestAliasRejectedInGha(t *testing.T) {
+	got, err := gha.Parse("gitea.sha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !equalExpr(got, r("gha", "gitea", "sha")) {
+		t.Errorf("got %#v", got)
+	}
+}
+
+func TestParseTemplateWithAliases(t *testing.T) {
+	parts, err := gha.ParseTemplateWith("echo ${{ forgejo.ref_name }}", []string{"forgejo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parts) != 2 || !equalExpr(parts[1].Expr, r("ref_name")) {
+		t.Errorf("got %#v", parts)
+	}
+}

@@ -1,6 +1,7 @@
 package gha
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/expr"
@@ -8,6 +9,9 @@ import (
 
 // Dialect is the Opaque dialect name and the root of provider-native refs.
 const Dialect = "gha"
+
+// githubContext is the context name that every dialect alias maps to.
+const githubContext = "github"
 
 // maxDepth mirrors the GitHub expression parser's nesting limit.
 const maxDepth = expr.MaxDepth
@@ -25,21 +29,25 @@ func init() {
 }
 
 type parser struct {
-	toks   []token
-	i      int
-	depth  int
-	opaque bool
+	aliases []string
+	toks    []token
+	i       int
+	depth   int
+	opaque  bool
 }
 
 // Parse parses a bare GitHub Actions expression (no ${{ }}). Valid syntax the AST cannot model
 // (dynamic index, object filter, access on a call result or literal, unknown function, NaN/Infinity)
 // yields an Opaque holding the source text.
-func Parse(src string) (expr.Expr, error) {
+func Parse(src string) (expr.Expr, error) { return ParseWith(src, nil) }
+
+// ParseWith is Parse that also reads each aliases context name as the github context.
+func ParseWith(src string, aliases []string) (expr.Expr, error) {
 	toks, err := lex(src)
 	if err != nil {
 		return nil, err
 	}
-	p := &parser{toks: toks}
+	p := &parser{toks: toks, aliases: aliases}
 	e, err := p.expression(1)
 	if err != nil {
 		return nil, err
@@ -177,6 +185,9 @@ func (p *parser) identStart(t token) (expr.Expr, error) {
 	path := []string{t.text}
 	if err := p.suffixes(&path); err != nil {
 		return nil, err
+	}
+	if slices.Contains(p.aliases, path[0]) {
+		path[0] = githubContext
 	}
 	return ref(path), nil
 }

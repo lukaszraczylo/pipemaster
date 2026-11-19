@@ -32,6 +32,7 @@ type IgnoredKey struct {
 // ID names the provider; Dirs[0] is the emit directory and the others are read-only fallbacks.
 type Dialect struct {
 	Extra       map[NodeLevel][]string
+	Contexts    []string
 	ID          string
 	DefaultHost string
 	Dirs        []string
@@ -65,6 +66,7 @@ var Gitea = Dialect{
 		"issues", "issue_comment", "pull_request", "pull_request_target", "pull_request_review",
 		"pull_request_review_comment", "release", "registry_package", "workflow_run",
 	},
+	Contexts:    []string{"gitea"},
 	DefaultHost: ghaHost,
 }
 
@@ -81,6 +83,7 @@ var Forgejo = Dialect{
 		"push", "issues", "issue_comment", "pull_request", "pull_request_target", "release", "schedule",
 		"workflow_call", "workflow_dispatch",
 	},
+	Contexts:    []string{"forgejo", "forge"},
 	DefaultHost: forgejoHost,
 }
 
