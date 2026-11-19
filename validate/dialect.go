@@ -71,7 +71,7 @@ func stripDialect(doc any, r DialectRules) (any, error) {
 	if !ok {
 		return doc, nil
 	}
-	if err := stripScopes(wf, r.Scopes); err != nil {
+	if err := stripScopes(wf, r.Scopes, true); err != nil {
 		return nil, err
 	}
 	if err := dropKeys(wf, r.Workflow, r.Bools); err != nil {
@@ -83,7 +83,7 @@ func stripDialect(doc any, r DialectRules) (any, error) {
 		if !ok {
 			continue
 		}
-		if err := stripScopes(job, r.Scopes); err != nil {
+		if err := stripScopes(job, r.Scopes, false); err != nil {
 			return nil, fmt.Errorf("job %s: %w", id, err)
 		}
 		if err := dropKeys(job, r.Job, r.Bools); err != nil {
@@ -116,8 +116,10 @@ func dropKeys(m map[string]any, keys, bools []string) error {
 	return nil
 }
 
-// stripScopes removes the scopes of m's permissions map that GHA lacks and the dialect accepts.
-func stripScopes(m map[string]any, dialect []string) error {
+// stripScopes removes the scopes of m's permissions map that GHA lacks and the dialect accepts. With strict, a
+// scope outside the dialect's list is an error even when GHA knows it. Only the workflow-level map is strict:
+// the emitter filters it, while a job-level map is Ext the emitter passes through unchanged.
+func stripScopes(m map[string]any, dialect []string, strict bool) error {
 	perms, ok := m["permissions"].(map[string]any)
 	if !ok {
 		return nil
@@ -125,6 +127,9 @@ func stripScopes(m map[string]any, dialect []string) error {
 	gha := ghaScopes()
 	for k := range perms {
 		if slices.Contains(gha, k) {
+			if strict && !slices.Contains(dialect, k) {
+				return fmt.Errorf("permission scope %q is not accepted by the dialect", k)
+			}
 			continue
 		}
 		if !slices.Contains(dialect, k) {
