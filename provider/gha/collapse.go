@@ -17,7 +17,7 @@ import (
 
 // collapseMarkers undoes the emulations another provider's emitter marked in the file, so a pipeline that
 // travelled through GHA and came back carries no trace of the detour.
-func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string, rep *report.Report) {
+func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string, rep *report.Report) (condsRestored bool) {
 	carriedDone := map[string]bool{}
 	finallyPaths := map[string]bool{}
 	for _, u := range uses {
@@ -64,11 +64,11 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			pl.Triggers = slices.DeleteFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerManual })
 		case caps.JobIf:
 			if j := markedJob(pl, u.IRPath); j != nil {
-				j.If = sourceCond(rep, u, args[u], j.If)
+				j.If, condsRestored = restoreSourceCond(rep, u, args[u], j.If, condsRestored)
 			}
 		case caps.StepIf:
 			if st := markedStep(pl, u.IRPath); st != nil {
-				st.If = sourceCond(rep, u, args[u], st.If)
+				st.If, condsRestored = restoreSourceCond(rep, u, args[u], st.If, condsRestored)
 			}
 		case caps.StepImage:
 			collapseImage(e, pl, rep, u, args[u])
@@ -82,6 +82,13 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			dropMatchAll(pl, ir.TriggerTag, func(t *ir.Trigger) *ir.Filter { return &t.Tags })
 		}
 	}
+	return condsRestored
+}
+
+// restoreSourceCond applies sourceCond and ORs whether it replaced the parsed condition into done.
+func restoreSourceCond(rep *report.Report, u ir.FeatureUse, args []string, parsed expr.Expr, done bool) (expr.Expr, bool) {
+	out := sourceCond(rep, u, args, parsed)
+	return out, done || (parsed != nil && expr.String(out) != expr.String(parsed))
 }
 
 func markedJob(pl *ir.Pipeline, path string) *ir.Job {

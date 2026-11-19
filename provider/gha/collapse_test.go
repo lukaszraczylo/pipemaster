@@ -9,6 +9,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/gha"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -323,5 +324,22 @@ jobs:
 	}
 	if got := steps[0].Action.Host; got != "https://data.forgejo.org" {
 		t.Errorf("host = %q, want the marked source host", got)
+	}
+}
+
+func TestParseRestoredConditionReadsInSourceDialect(t *testing.T) {
+	p := baseProject(t)
+	p.Origin.Provider = provider.GitLab
+	cond, err := expr.ParseCanonical("branch == 'main'")
+	if err != nil {
+		t.Fatal(err)
+	}
+	job(p, "build").If = cond
+	back, text := viaGHA(t, p)
+	if got := expr.String(back.Pipelines[0].Jobs[0].If); got != expr.String(cond) {
+		t.Fatalf("condition = %s, want %s\n%s", got, expr.String(cond), text)
+	}
+	if back.Origin.Provider != provider.GitLab {
+		t.Errorf("origin = %q, want %q: the restored condition reads in GitLab's dialect", back.Origin.Provider, provider.GitLab)
 	}
 }

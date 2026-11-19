@@ -48,7 +48,10 @@ func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		collapseMarkers(&emitter{d: a.d, led: emitkit.NewLedger("", a.d.ID, a.Caps())}, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src), rep)
+		if collapseMarkers(&emitter{d: a.d, led: emitkit.NewLedger("", a.d.ID, a.Caps())}, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src), rep) {
+			// A restored condition reads in GitLab's dialect, so a later emit must translate it again.
+			proj.Origin.Provider = provider.GitLab
+		}
 		proj.Pipelines = append(proj.Pipelines, pl)
 	}
 	if err := ir.Validate(proj); err != nil {
