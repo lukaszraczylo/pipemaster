@@ -116,7 +116,9 @@ func (e *emitter) jobNode(c jobCtx, j *ir.Job) (*yaml.Node, []string, error) {
 	}
 	if c.finally {
 		markers = append(markers, emitkit.Marker(caps.PipelineFinally, "pipeline/"+c.pl.ID))
-		e.mark(caps.PipelineFinally, jp)
+		if err := e.markArg(caps.PipelineFinally, jp, finallyArg{Needs: j.Needs}); err != nil {
+			return nil, nil, err
+		}
 	}
 	return m.n, append(markers, e.drain()...), nil
 }
@@ -469,4 +471,9 @@ func actionString(a *ir.ActionRef) string {
 		s += "/" + a.Path
 	}
 	return fmt.Sprintf("%s@%s", s, a.Ref)
+}
+
+// finallyArg carries the needs a finally job had before the emitter added every main job to them.
+type finallyArg struct {
+	Needs []ir.Need `json:"needs,omitempty"`
 }

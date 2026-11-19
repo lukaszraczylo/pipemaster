@@ -1,0 +1,88 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - ext:
+        gitlab:
+            stages:
+                - build
+                - test
+                - report
+      id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - ext:
+            gitlab:
+                stage: build
+          id: compile
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make build
+        - ext:
+            gitlab:
+                stage: build
+          id: lint
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make lint
+        - ext:
+            gitlab:
+                _derived_needs: true
+                stage: report
+          id: summary
+          needs:
+            - job: compile
+            - job: lint
+            - job: unit
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make report
+        - ext:
+            gitlab:
+                stage: test
+          id: unit
+          needs:
+            - job: compile
+            - job: lint
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make test
+      finally:
+        - ext:
+            gitlab:
+                stage: test
+          id: cleanup
+          needs:
+            - job: compile
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make clean

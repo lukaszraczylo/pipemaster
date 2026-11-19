@@ -3,8 +3,10 @@
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/alert
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/alert
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}]}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/report
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/report
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}]}
 on:
   push:
     branches:

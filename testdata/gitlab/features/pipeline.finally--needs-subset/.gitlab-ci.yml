@@ -1,0 +1,29 @@
+stages: [build, test, report]
+
+compile:
+  stage: build
+  script:
+    - make build
+
+lint:
+  stage: build
+  script:
+    - make lint
+
+cleanup:
+  stage: test
+  when: always
+  needs: [compile]
+  script:
+    - make clean
+
+unit:
+  stage: test
+  needs: [compile, lint]
+  script:
+    - make test
+
+summary:
+  stage: report
+  script:
+    - make report

@@ -1,0 +1,55 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/compile
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/lint
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/summary
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/unit
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/cleanup
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/cleanup
+# pipemaster:arg {"needs":[{"JobID":"compile","Artifacts":false,"Optional":false}]}
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: make build
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: make lint
+  summary:
+    needs:
+      - compile
+      - lint
+      - unit
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: make report
+  unit:
+    needs:
+      - compile
+      - lint
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: make test
+  # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+  cleanup:
+    needs:
+      - compile
+      - lint
+      - summary
+      - unit
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: make clean

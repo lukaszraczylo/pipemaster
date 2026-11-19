@@ -2,6 +2,7 @@ package gha
 
 import (
 	"encoding/json"
+	"maps"
 	"slices"
 	"strings"
 
@@ -17,6 +18,12 @@ import (
 // travelled through GHA and came back carries no trace of the detour.
 func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string, rep *report.Report) {
 	carriedDone := map[string]bool{}
+	finallyPaths := map[string]bool{}
+	for _, u := range uses {
+		if u.Feature == caps.PipelineFinally {
+			finallyPaths[u.IRPath] = true
+		}
+	}
 	// Condition markers run last: they compare against the condition once the guards are gone.
 	slices.SortStableFunc(uses, func(a, b ir.FeatureUse) int { return condRank(a.Feature) - condRank(b.Feature) })
 	for _, u := range uses {
@@ -41,7 +48,7 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 				carriedDone[u.IRPath] = collapseCarried(e.d.ID, markedJob(pl, u.IRPath), args[u][0])
 			}
 		case caps.PipelineFinally:
-			collapseFinally(pl, u.IRPath)
+			collapseFinally(pl, rep, u, args[u], finallyPaths)
 		case caps.JobManual:
 			collapseManual(markedJob(pl, u.IRPath))
 		case caps.PipelineInputs:
@@ -247,8 +254,8 @@ func collapseManual(j *ir.Job) {
 }
 
 // collapseFinally moves a job the emitter wrote as an always() job back to the pipeline's finally list.
-func collapseFinally(pl *ir.Pipeline, path string) {
-	j := markedJob(pl, path)
+func collapseFinally(pl *ir.Pipeline, rep *report.Report, u ir.FeatureUse, args []string, finallyPaths map[string]bool) {
+	j := markedJob(pl, u.IRPath)
 	if j == nil || !slices.Contains(pl.Jobs, j) {
 		return
 	}
@@ -263,8 +270,40 @@ func collapseFinally(pl *ir.Pipeline, path string) {
 	default:
 		return
 	}
+	restoreFinallyNeeds(pl, rep, u, args, j, finallyPaths)
 	pl.Jobs = slices.DeleteFunc(pl.Jobs, func(o *ir.Job) bool { return o == j })
 	pl.Finally = append(pl.Finally, j)
+}
+
+// restoreFinallyNeeds puts back the needs a finally job had before the emitter added every main job. The
+// parsed needs must be exactly what the emitter writes for the marked ones; an edited list stays as parsed.
+func restoreFinallyNeeds(pl *ir.Pipeline, rep *report.Report, u ir.FeatureUse, args []string, j *ir.Job, finallyPaths map[string]bool) {
+	for _, a := range args {
+		var f finallyArg
+		if json.Unmarshal([]byte(a), &f) != nil {
+			continue
+		}
+		want := map[string]bool{}
+		for _, o := range pl.Jobs {
+			if !finallyPaths[jobPath(pl.ID, o.ID)] {
+				want[o.ID] = true
+			}
+		}
+		for _, n := range f.Needs {
+			want[n.JobID] = true
+		}
+		got := map[string]bool{}
+		for _, n := range j.Needs {
+			got[n.JobID] = true
+		}
+		if !maps.Equal(want, got) {
+			rep.Add(report.Entry{IRPath: u.IRPath, Feature: u.Feature, Level: caps.Lost, Strategy: "marker ignored",
+				Detail: "marker ignored: the job's needs were edited after conversion, so the parsed needs stand"})
+			return
+		}
+		j.Needs = f.Needs
+		return
+	}
 }
 
 // collapseImage turns a docker action back into an image step when writing the marked step again gives the
