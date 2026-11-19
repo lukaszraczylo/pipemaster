@@ -1,0 +1,5 @@
+Loss report: gha -> gitlab
+[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
+[lost] pipeline/ci/job/check/step/check-step-2 display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
+[lost] pipeline/ci/job/check/step/check-step-2 script.interpolation (no GitLab variable for expression steps.meta.outputs.version; the line is commented out)
+[lost] pipeline/ci/job/check/step/check-step-2 step.if (the step has no line left to guard)

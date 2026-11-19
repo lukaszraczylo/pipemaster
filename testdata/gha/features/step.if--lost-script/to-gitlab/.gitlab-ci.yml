@@ -1,0 +1,12 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+check:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step meta
+    - echo "version=1" >> "$GITHUB_OUTPUT"
+    # pipemaster:step check-step-2
+    # pipemaster:lost script.interpolation pipeline/ci/job/check/step/check-step-2: docker inspect {{ steps.meta.outputs.version }}

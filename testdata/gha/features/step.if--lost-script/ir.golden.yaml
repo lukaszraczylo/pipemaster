@@ -1,0 +1,29 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/ci.yml
+pipelines:
+    - id: ci
+      name: ci
+      triggers:
+        - kind: push
+      jobs:
+        - id: check
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - id: meta
+              kind: script
+              script:
+                - echo "version=1" >> "$GITHUB_OUTPUT"
+            - if: event != 'pull_request'
+              ext:
+                gha:
+                    _derived_id: true
+              id: check-step-2
+              name: Inspect
+              kind: script
+              script:
+                - docker inspect ${{ steps.meta.outputs.version }}

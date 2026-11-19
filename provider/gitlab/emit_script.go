@@ -205,11 +205,14 @@ func lineCount(text string) int { return strings.Count(strings.TrimRight(text, "
 // continue-on-error fields call for. The collapsers in collapse.go invert each wrapper from its marker.
 func (e *emitter) placeLines(p *jobPrep, st *ir.Step, lines []string) error {
 	sp := stepPath(p.path, st.ID)
-	guard, arg, src, sec, moved := e.stepGuard(sp, st, sectionOf(st))
 	if len(lines) == 0 {
+		if st.If != nil {
+			e.lose(sp, caps.StepIf, "the step has no line left to guard")
+		}
 		p.pending = append(p.pending, e.drain()...)
 		return nil
 	}
+	guard, arg, src, sec, moved := e.stepGuard(sp, st, sectionOf(st))
 	exports, err := e.exports(sp, st)
 	if err != nil {
 		return err
