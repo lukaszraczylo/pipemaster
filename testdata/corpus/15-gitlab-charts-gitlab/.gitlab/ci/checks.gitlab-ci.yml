@@ -1,0 +1,280 @@
+
+rubocop:
+  image: ${RUBY_IMAGE}
+  stage: prepare
+  dependencies: []
+  before_script:
+    - apk add make gcc libc-dev
+  script:
+    - bundle config set --local path 'gems'
+    - bundle config set --local frozen 'true'
+    - bundle config set --local without 'development'
+    - bundle install -j $(nproc)
+    - bundle exec rubocop --parallel
+  cache:
+    key: "debian-${DEBIAN_VERSION}-ruby-${RUBY_VERSION}-${CI_JOB_NAME}"
+    paths:
+    - gems
+  rules:
+    - if: '$PIPELINE_TYPE =~ /MR_PIPELINE$/'
+    - if: '$PIPELINE_TYPE =~ /BRANCH_PIPELINE$/'
+    - if: '$PIPELINE_TYPE =~ /DOCS_PIPELINE/'
+
+# Perform content linting on documentation Markdown files
+check_docs_content:
+  image: ${DOCS_LINT_IMAGE}
+  stage: prepare
+  cache: {}
+  dependencies: []
+  before_script: []
+  script:
+    # Lint prose
+    - vale --minAlertLevel error doc
+  rules:
+    - !reference [.rule:skip_if_dev]
+    - if: '$PIPELINE_TYPE =~ /DOCS_PIPELINE/'
+    - if: '$PIPELINE_TYPE =~ /MR_PIPELINE$/'
+    - if: '$PIPELINE_TYPE =~ /BRANCH_PIPELINE$/'
+
+# Perform linting on documentation Markdown files
+check_docs_markdown:
+  image: ${DOCS_LINT_IMAGE}
+  stage: prepare
+  cache: {}
+  dependencies: []
+  before_script: []
+  script:
+    # Lint Markdown
+    - markdownlint-cli2 'doc/**/*.md'
+    - rumdl check --config doc/.rumdl/rumdl.toml doc
+  rules:
+    - !reference [.rule:skip_if_dev]
+    - if: '$PIPELINE_TYPE =~ /DOCS_PIPELINE/'
+    - if: '$PIPELINE_TYPE =~ /MR_PIPELINE$/'
+    - if: '$PIPELINE_TYPE =~ /BRANCH_PIPELINE$/'
+
+# Perform link checking on documentation Markdown files
+check_docs_links:
+  image: ${DOCS_LINT_IMAGE}
+  stage: prepare
+  cache: {}
+  dependencies: []
+  before_script: []
+  script:
+    # Check Markdown links
+    - lychee --offline --include-fragments doc
+  rules:
+    - !reference [.rule:skip_if_dev]
+    - if: '$PIPELINE_TYPE =~ /DOCS_PIPELINE/'
+    - if: '$PIPELINE_TYPE =~ /MR_PIPELINE$/'
+    - if: '$PIPELINE_TYPE =~ /BRANCH_PIPELINE$/'
+
+# Perform content linting on i18n documentation Markdown files
+check_docs_i18n_content:
+  image: ${DOCS_LINT_IMAGE}
+  stage: prepare
+  cache: {}
+  dependencies: []
+  before_script: []
+  script:
+    # Lint prose
+    - vale --minAlertLevel error --filter='.Name matches "gitlab_docs"' doc-locale
+  rules:
+    - !reference [.rule:skip_if_dev]
+    - if: '$PIPELINE_TYPE == "DOCS_PIPELINE_LOCALIZATION"'
+
+# Perform linting on i18n documentation Markdown files
+check_docs_i18n_markdown:
+  image: ${DOCS_LINT_IMAGE}
+  stage: prepare
+  cache: {}
+  dependencies: []
+  before_script: []
+  script:
+    # Lint Markdown
+    - cd doc-locale && markdownlint-cli2 --config .markdownlint/.markdownlint-cli2.yaml '**/*.md'
+  rules:
+    - !reference [.rule:skip_if_dev]
+    - if: '$PIPELINE_TYPE == "DOCS_PIPELINE_LOCALIZATION"'
+
+# Reports on broken links in the localized docs (doc-locale). The localization
+# team is building up translations incrementally, so many crosslinks point to
+# pages that are not translated yet. This job is therefore a report rather than
+# a lint check: it is a manual job that writes the lychee output to an artifact
+# that can be reviewed when needed.
+report_i18n_docs_links:
+  image: ${DOCS_LINT_IMAGE}
+  stage: prepare
+  cache: {}
+  dependencies: []
+  before_script: []
+  when: manual
+  script:
+    # Check Markdown links
+    - lychee --offline --include-fragments --exclude "\.(png|jpg|gif|svg)$" --exclude "ja-jp/development.*#" doc-locale | tee docs-i18n-links-report.txt
+  artifacts:
+    when: always
+    expire_in: 2 weeks
+    paths:
+      - docs-i18n-links-report.txt
+  rules:
+    - !reference [.rule:skip_if_dev]
+    - if: '$PIPELINE_TYPE == "DOCS_PIPELINE_LOCALIZATION"'
+
+# Verify localized documentation files have corresponding English versions
+docs-i18n-lint paths:
+  image: ${DOCS_LINT_IMAGE}
+  stage: prepare
+  cache: {}
+  dependencies: []
+  before_script: []
+  allow_failure: true
+  script:
+    - scripts/docs_i18n_verify_paths
+  rules:
+    - !reference [.rule:skip_if_dev]
+    - if: '$PIPELINE_TYPE == "DOCS_PIPELINE_LOCALIZATION"'
+
+docs-test hugo:
+  image: ${DOCS_HUGO_IMAGE}
+  stage: prepare
+  variables:
+    DOCS_BRANCH: "main"
+  before_script:
+    # Check if this a release branch, which would be the case for a backport.
+    # If this is a backport MR, we need to checkout the appropriate version
+    # of the Docs website.
+    - |
+      if [[ $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ [0-9]+-[0-9]+-stable ]]; then
+        BRANCH_NAME=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+        echo "Detected merge request to stable branch: $BRANCH_NAME"
+      # Check if we're directly on a stable branch (direct push/commit)
+      elif [[ $CI_COMMIT_BRANCH =~ [0-9]+-[0-9]+-stable ]]; then
+        BRANCH_NAME=$CI_COMMIT_BRANCH
+        echo "Detected direct commit to stable branch: $BRANCH_NAME"
+      fi
+
+      # Extract version info if we found a stable branch
+      if [[ -n $BRANCH_NAME ]]; then
+        MAJOR=$(echo $BRANCH_NAME | cut -d '-' -f 1)
+        MINOR=$(echo $BRANCH_NAME | cut -d '-' -f 2)
+        # Convert GitLab chart style (8-9-stable-ee) to Docs style (17.9)
+        MAJOR=$((MAJOR+9))
+        DOCS_BRANCH_CANDIDATE="$MAJOR.$MINOR"
+
+        # Check if the branch exists in the Docs website repo, fallback to main if not
+        if git ls-remote --heads --exit-code https://gitlab.com/gitlab-org/technical-writing/docs-gitlab-com.git "refs/heads/$DOCS_BRANCH_CANDIDATE" >/dev/null 2>&1; then
+          DOCS_BRANCH="$DOCS_BRANCH_CANDIDATE"
+          echo "Using docs-gitlab-com branch $DOCS_BRANCH for release branch"
+        else
+          DOCS_BRANCH="main"
+          echo "Branch $DOCS_BRANCH_CANDIDATE does not exist, falling back to main"
+        fi
+      fi
+    # Clone the GitLab Docs project
+    - echo "Cloning Docs site $DOCS_BRANCH branch..."
+    - git clone --depth 1 --filter=tree:0 --branch $DOCS_BRANCH https://gitlab.com/gitlab-org/technical-writing/docs-gitlab-com.git
+    - cd docs-gitlab-com
+    - make add-latest-icons
+  script:
+    # Test that full i18n Hugo will build
+    - hugo --gc --printPathWarnings --environment test
+    # Test for invalid index pages
+    # See https://gitlab.com/gitlab-org/technical-writing/docs-gitlab-com/-/blob/main/scripts/check-index-filenames.sh
+    - make check-index-pages SEARCH_DIR="../doc"
+    - make check-index-pages SEARCH_DIR="../doc-locale"
+  rules:
+    - !reference [.rule:skip_if_fork]
+    - if: '$PIPELINE_TYPE =~ /DOCS_PIPELINE/'
+    - if: '$PIPELINE_TYPE =~ /MR_PIPELINE$/'
+    - if: '$PIPELINE_TYPE =~ /BRANCH_PIPELINE$/'
+
+# https://github.com/zegl/kube-score
+# Initially motivated to detect duplicated environment variable definitions
+kube-score:
+  extends: .chart_deps_cache
+  image:
+    name: ${KUBE_SCORE_IMAGE}
+    entrypoint: [""]
+  stage: test
+  script:
+    - bash ./scripts/ci/ensure_chart_deps.sh
+    - echo "$HELM_DEFAULT_SETTINGS" | tee ./template_settings.yaml
+    - helm template . -f ./template_settings.yaml > /tmp/test.yaml
+    - >
+      /kube-score score
+      --ignore-container-cpu-limit
+      --ignore-container-memory-limit
+      --ignore-test "container-image-pull-policy,container-security-context-user-group-id,container-ephemeral-storage-request-and-limit,container-security-context-readonlyrootfilesystem,pod-probes,pod-networkpolicy,container-resources,deployment-has-poddisruptionbudget,deployment-replicas,deployment-has-host-podantiaffinity,cronjob-has-deadline"
+      /tmp/test.yaml
+  rules:
+    - if: '$PIPELINE_TYPE =~ /DOCS_PIPELINE/'
+    - if: '$PIPELINE_TYPE =~ /MR_PIPELINE$/'
+    - if: '$PIPELINE_TYPE =~ /BRANCH_PIPELINE$/'
+
+lint_chart:
+  extends: .chart_deps_cache
+  stage: test
+  when: always
+  script:
+    - kubectl version --client=true --output=json
+    - helm version --template='Helm Version - {{.Version}}'
+    - bash ./scripts/ci/ensure_chart_deps.sh
+    - echo "$HELM_DEFAULT_SETTINGS" | tee ./template_settings.yaml
+    - echo "$HELM_SETTINGS" | tee -a ./template_settings.yaml
+    - helm lint -f ./template_settings.yaml .
+    - mkdir -p build
+    - helm package -d build .
+  artifacts:
+    expire_in: 3d
+    paths:
+    - build
+  rules:
+    - if: '$PIPELINE_TYPE =~ /_MR_PIPELINE$/'
+    - if: '$PIPELINE_TYPE =~ /_BRANCH_PIPELINE$/'
+    - if: '$PIPELINE_TYPE == "NIGHTLY_PIPELINE"'
+    - if: '$PIPELINE_TYPE == "AUTO_DEPLOY_PIPELINE"'
+    - if: '$PIPELINE_TYPE == "RELEASE_PIPELINE"'
+
+# Render the chart and fail if any CNG image it would deploy is missing from the
+# registry, so a component bump cannot merge ahead of the image being published.
+# See https://gitlab.com/gitlab-org/charts/gitlab/-/work_items/6733
+verify_component_image_tags:
+  extends: .chart_deps_cache
+  stage: test
+  before_script:
+    - apt-get update -qq && apt-get install -y skopeo
+  script:
+    - bash ./scripts/ci/ensure_chart_deps.sh
+    - echo "$HELM_DEFAULT_SETTINGS" | tee ./template_settings.yaml
+    - helm template . -f ./template_settings.yaml -f ./scripts/ci/values/verify-images.yaml > rendered.yaml
+    - ruby ./scripts/ci/verify_component_image_tags.rb rendered.yaml
+  rules:
+    # Run on MR and default-branch pipelines when anything that can change a
+    # rendered image tag is touched. Release pipelines are excluded: chart
+    # release pipelines run before the CNG images are synced to GitLab.com.
+    - if: '$PIPELINE_TYPE =~ /MR_PIPELINE$/'
+      changes: &image_tag_paths
+        - Chart.yaml
+        - Chart.lock
+        - charts/**/Chart.yaml
+        - values.yaml
+        - charts/**/values.yaml
+        # Image refs are computed in templates, so template edits can change the
+        # rendered tags the job checks.
+        - templates/**/*
+        - charts/**/templates/**/*
+        - scripts/ci/verify_component_image_tags.rb
+        - scripts/ci/values/verify-images.yaml
+    - if: '$PIPELINE_TYPE =~ /DEFAULT_BRANCH_PIPELINE$/'
+      changes: *image_tag_paths
+
+rspec_without_cluster:
+  extends: .specs
+  variables:
+    RSPEC_TAGS: ~type:feature
+  parallel: 9
+  rules:
+    - !reference [.specs, rules]
+    - if: '$PIPELINE_TYPE == "AUTO_DEPLOY_PIPELINE"'
+    - if: '$PIPELINE_TYPE == "RELEASE_PIPELINE"'

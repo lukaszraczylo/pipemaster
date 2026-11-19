@@ -1,0 +1,54 @@
+release-from-tag:
+  image: registry.gitlab.com/gitlab-org/release-cli
+  stage: release
+  needs:
+    - 'generate_description'
+    - 'upload binaries to generic package for tag'
+  rules:
+    - if: '$CI_COMMIT_TAG'                    # Run this job when a tag is created manually
+  script:
+    - echo "Creating a release for $CI_COMMIT_TAG"
+  release:
+    name: "Release $CI_COMMIT_TAG"
+    description: '$DESCRIPTION'
+    tag_name: '$CI_COMMIT_TAG'
+    ref: '$CI_COMMIT_TAG'
+    # darwin/amd64 darwin/arm64 freebsd/386 freebsd/amd64 freebsd/arm linux/386 linux/amd64 linux/arm linux/arm64 linux/ppc64le windows/386 windows/amd64
+    assets:
+      links:
+        - name: 'darwin/amd64'
+          url: "$PACKAGE_REGISTRY_URL/$CI_COMMIT_TAG/release-cli-darwin-amd64"
+          direct_asset_path: '/bin/release-cli-darwin-amd64'
+        - name: 'darwin/arm64'
+          url: "$PACKAGE_REGISTRY_URL/$CI_COMMIT_TAG/release-cli-darwin-arm64"
+          direct_asset_path: '/bin/release-cli-darwin-arm64'
+        - name: 'freebsd/386'
+          url: "$PACKAGE_REGISTRY_URL/$CI_COMMIT_TAG/release-cli-freebsd-386"
+          direct_asset_path: '/bin/release-cli-freebsd-386'
+        - name: 'freebsd/amd64'
+          url: "$PACKAGE_REGISTRY_URL/$CI_COMMIT_TAG/release-cli-freebsd-amd64"
+          direct_asset_path: '/bin/release-cli-freebsd-amd64'
+        - name: 'freebsd/arm'
+          url: "$PACKAGE_REGISTRY_URL/$CI_COMMIT_TAG/release-cli-freebsd-arm"
+          direct_asset_path: '/bin/release-cli-freebsd-arm'
+        - name: 'linux/386'
+          url: "$PACKAGE_REGISTRY_URL/$CI_COMMIT_TAG/release-cli-linux-386"
+          direct_asset_path: '/bin/release-cli-linux-386'
+        - name: 'linux/amd64'
+          url: "$PACKAGE_REGISTRY_URL/$CI_COMMIT_TAG/release-cli-linux-amd64"
+          direct_asset_path: '/bin/release-cli-linux-amd64'
+        - name: 'linux/arm'
+          url: "$PACKAGE_REGISTRY_URL/$CI_COMMIT_TAG/release-cli-linux-arm"
+          direct_asset_path: '/bin/release-cli-linux-arm'
+        - name: 'linux/arm64'
+          url: "$PACKAGE_REGISTRY_URL/$CI_COMMIT_TAG/release-cli-linux-arm64"
+          direct_asset_path: '/bin/release-cli-linux-arm64'
+        - name: 'linux/ppc64le'
+          url: "$PACKAGE_REGISTRY_URL/$CI_COMMIT_TAG/release-cli-linux-ppc64le"
+          direct_asset_path: '/bin/release-cli-linux-ppc64le'
+        - name: 'windows/386'
+          url: "$PACKAGE_REGISTRY_URL/$CI_COMMIT_TAG/release-cli-windows-386.exe"
+          direct_asset_path: '/bin/release-cli-windows-386.exe'
+        - name: 'windows/amd64'
+          url: "$PACKAGE_REGISTRY_URL/$CI_COMMIT_TAG/release-cli-windows-amd64.exe"
+          direct_asset_path: '/bin/release-cli-windows-amd64.exe'

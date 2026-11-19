@@ -1,0 +1,190 @@
+variables:
+  GO_VERSION: "1.26"
+  GOLANGCI_LINT_VERSION: "v2.11.3"
+  REPORT_FILENAME: gl-sast-report.json
+  MAX_IMAGE_SIZE_MB: 200
+  MAX_IMAGE_SIZE_MB_FIPS: 1090
+  DS_EXCLUDED_ANALYZERS: "gemnasium-maven,gemnasium-python"
+  SAST_EXCLUDED_ANALYZERS: "bandit,eslint,flawfinder,nodejs-scan,phpcs-security-audit,security-code-scan,spotbugs"
+  SAST_EXCLUDED_PATHS: "qa, spec, test, tests, tmp, testdata"
+  SEARCH_MAX_DEPTH: 20
+  BUILD_MULTI_ARCHITECTURE_IMAGE: true
+
+include:
+  - project: 'gitlab-org/security-products/ci-templates'
+    ref: 'master'
+    file: '/includes-dev/analyzer.yml'
+
+# The shared go lint job only selects golangci-lint v2 when GO_VERSION == "1.25".
+# We run GO_VERSION "1.26", so override the job to always use the v2 linter,
+# config and flags.
+go lint:
+  image: golangci/golangci-lint:$GOLANGCI_LINT_VERSION
+  script:
+    - wget "https://gitlab.com/${CI_TEMPLATES_PROJECT_PATH:-gitlab-org/security-products/ci-templates}/-/raw/${CI_TEMPLATES_PROJECT_REF:-master}/.golangci-v2.yml" -O .golangci.yml
+    - golangci-lint run --verbose --output.code-climate.path=codequality.json --output.text.path=stdout --output.text.colors=true
+
+prevent semgrep version downgrade:
+  stage: pre-build
+  image: registry.gitlab.com/gitlab-org/security-products/analyzers/changelog-parser:1
+  script:
+    - |
+      set -e
+
+      if [ "$ALLOW_SEMGREP_DOWNGRADE" = "true" ]; then
+        echo "ALLOW_SEMGREP_DOWNGRADE is configured, skipping version downgrade check"
+        exit 0
+      fi
+
+      apk add git
+
+      # Fetch main branch
+      TARGET_BRANCH="main"
+      echo "Fetching $TARGET_BRANCH..."
+      git fetch origin "$TARGET_BRANCH" || {
+        echo "Warning: Could not fetch $TARGET_BRANCH, skipping version check"
+        exit 0
+      }
+
+      for dockerfile in Dockerfile Dockerfile.fips; do
+        # Check if this MR modifies SCANNER_VERSION in the dockerfile
+        SCANNER_VERSION_CHANGED=$(git diff origin/$TARGET_BRANCH...HEAD -- $dockerfile | grep -c "^[+-]ARG SCANNER_VERSION=" || true)
+
+        if [ "$SCANNER_VERSION_CHANGED" -eq 0 ]; then
+          echo "SCANNER_VERSION not modified in $dockerfile by this MR, skipping check"
+          continue
+        fi
+
+        # Extract current SCANNER_VERSION from Dockerfile
+        CURRENT_VERSION=$(sed -n 's/^ARG SCANNER_VERSION=//p' $dockerfile)
+
+        if [ -z "$CURRENT_VERSION" ]; then
+          echo "Error: Could not find SCANNER_VERSION in $dockerfile"
+          exit 1
+        fi
+
+        # Get previous SCANNER_VERSION from main branch
+        PREVIOUS_VERSION=$(git show origin/$TARGET_BRANCH:$dockerfile | sed -n 's/^ARG SCANNER_VERSION=//p')
+
+        if [ -z "$PREVIOUS_VERSION" ]; then
+          echo "Warning: Could not find previous SCANNER_VERSION in $dockerfile, skipping version check"
+          continue
+        fi
+
+        set +e
+        # Compare versions using changelog-parser
+        "/changelog-parser" compare "$CURRENT_VERSION" "$PREVIOUS_VERSION"
+        RESULT=$?
+        set -e
+
+        case $RESULT in
+          0)
+            echo "Warning: SCANNER_VERSION modified but unchanged in $dockerfile: $CURRENT_VERSION"
+            echo "Consider removing unnecessary changes"
+            ;;
+          10)
+            echo "Error: SCANNER_VERSION downgrade detected in $dockerfile!"
+            echo "  Previous: $PREVIOUS_VERSION"
+            echo "  Current:  $CURRENT_VERSION"
+            echo "SCANNER_VERSION must not decrease"
+            echo "To bypass this check, set the environment variable ALLOW_SEMGREP_DOWNGRADE=true as follows:"
+            echo '  git commit --amend --no-edit && git push -o ci.variable="ALLOW_SEMGREP_DOWNGRADE=true" -f'
+            exit 1
+            ;;
+          11)
+            echo "SCANNER_VERSION upgraded in $dockerfile: $PREVIOUS_VERSION -> $CURRENT_VERSION"
+            ;;
+          *)
+            echo "Error: Unexpected result from changelog-parser: $RESULT"
+            exit 1
+            ;;
+        esac
+      done
+
+semgrep-rules-yaml-validation:
+  stage: test
+  image:
+    name: $TMP_IMAGE$IMAGE_TAG_SUFFIX
+  script:
+    - ./scripts/validate-rules.sh /rules
+
+# This test ensures that we are shipping all rules
+semgrep-rules-complete:
+  stage: test
+  image:
+    name: $TMP_IMAGE$IMAGE_TAG_SUFFIX
+  script:
+    - mkdir /tmp/test; touch /tmp/test/test.rb
+    - /analyzer run --target-dir /tmp/test/ 2>&1 | grep "Using the GitLab SAST default ruleset" || exit 1
+
+rule-unit-test:
+  stage: test
+  image: $TMP_IMAGE$IMAGE_TAG_SUFFIX
+  before_script:
+    - echo "run test suite for SAST rules version $SAST_RULES_VERSION using semgrep $(semgrep --version)"
+  script:
+    - git clone --branch "v${SAST_RULES_VERSION}" --depth 1 https://gitlab.com/gitlab-org/security-products/sast-rules.git
+    - cd sast-rules && semgrep --metrics=off --test ./
+
+integration-test:
+  image:
+    name: registry.gitlab.com/gitlab-org/security-products/analyzers/integration-test:2
+  services:
+    - docker:27-dind
+  variables:
+    TMP_IMAGE: $CI_REGISTRY_IMAGE/tmp:$CI_COMMIT_SHA$IMAGE_TAG_SUFFIX
+  script:
+    - rspec --format documentation --force-color
+  artifacts:
+    when: always
+    paths:
+      - tmp/**/gl-sast-report.json
+    expire_in: 1 week
+
+integration-test-fips:
+  extends: integration-test
+  variables:
+    IMAGE_TAG_SUFFIX: "-fips"
+    PRIVILEGED: 'true'
+
+# semgrep <= 1.127.0 fails the following test, which is added to ensure that we don't
+# encounter a regression with newer versions of semgrep
+memory-consumption-test:
+  stage: test
+  timeout: "2 hours"
+  variables:
+    CI_PROJECT_DIR: "/code"
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  tags:
+    - saas-linux-small-amd64
+  before_script:
+    - apk add --no-cache git
+  script:
+    - |
+      export TMP_ANALYZER_IMAGE="$TMP_IMAGE$IMAGE_TAG_SUFFIX"
+      git clone --recurse-submodules --shallow-submodules https://gitlab.com/gitlab-org/secure/static-analysis/experiments/testprojects.git
+      docker pull "$TMP_ANALYZER_IMAGE"
+      docker run \
+        -u root \
+        --memory="1g" \
+        --ulimit memlock=64:64 \
+        -v ${PWD}/testprojects:/code \
+        -e "SECURE_LOG_LEVEL=debug" \
+        -e "CI_PROJECT_DIR=/code" \
+        -e "SAST_SCANNER_ALLOWED_CLI_OPTS=--max-memory 0" \
+        -w "/code" \
+        -t "$TMP_ANALYZER_IMAGE" 2>&1 | tee /tmp/docker_output.txt || true
+      if grep -q 'semgrep-core exited with -11!' /tmp/docker_output.txt; then
+        echo "FAIL: 'semgrep-core exited with -11!' detected in output. Please downgrade semgrep to a version that passes this test"
+        exit 1
+      fi
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: always
+    - when: manual
+      allow_failure: true
+  artifacts:
+    access: 'developer'
+    paths: [gl-sast-report.json]

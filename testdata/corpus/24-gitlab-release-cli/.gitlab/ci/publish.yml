@@ -1,0 +1,103 @@
+.docker-push:
+  stage: publish
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - echo "pushing to $DESTINATION"
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor
+      --context $CI_PROJECT_DIR
+      --dockerfile $CI_PROJECT_DIR/Dockerfile
+      --build-arg GLAB_VERSION=${GLAB_VERSION}
+      $DESTINATION
+      --cache-dir .docker-cache
+  needs:
+    - job: docker-build
+      artifacts: true
+    - job: check-glab-version
+
+docker-push-mr:
+  extends: .docker-push
+  rules:
+    - if: '$CI_MERGE_REQUEST_IID'
+  variables:
+    DESTINATION: --destination $CI_REGISTRY_IMAGE/merge-requests:mr-$CI_MERGE_REQUEST_IID
+
+docker-push-edge:
+  extends: .docker-push
+  rules:
+    - if: '$CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH'
+  variables:
+    DESTINATION: --destination $CI_REGISTRY_IMAGE:edge
+
+docker-push-tag:
+  extends: .docker-push
+  needs:
+    - job: is-latest
+      artifacts: true
+    - job: docker-build
+      artifacts: true
+    - job: check-glab-version
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  variables:
+    DESTINATION: --destination $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
+  before_script:
+    - echo $IS_LATEST
+    - if [ "$IS_LATEST" = "true" ]; then export DESTINATION="$DESTINATION --destination $CI_REGISTRY_IMAGE:latest"; fi
+
+generate_description:
+  # generate_description needs to run in a previous stage before release
+  stage: publish
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  script:
+    # generate description from annotated tag's subject
+    - echo "DESCRIPTION=$(git tag --format="%(contents:subject)" --list ${CI_COMMIT_TAG} | sed 's|\r |\n|g')" > description.env
+  artifacts:
+    reports:
+      dotenv: description.env
+
+.upload to generic package:
+  stage: publish
+  image: curlimages/curl:latest
+  needs:
+    - 'binaries darwin/amd64'
+    - 'binaries darwin/arm64'
+    - 'binaries freebsd/386 freebsd/amd64 freebsd/arm'
+    - 'binaries linux/386 linux/amd64 linux/arm linux/arm64 linux/ppc64le'
+    - 'binaries windows/386 windows/amd64'
+
+# TODO: upload binaries for development to the generic packages once we can remove them via CI
+# https://gitlab.com/gitlab-org/gitlab/-/issues/337707
+upload binaries to generic package for default branch:
+  extends: .upload to generic package
+  rules:
+    - if: '$CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH'
+  script:
+    - cd bin/binaries/
+    - |
+      for FILE in *; do
+        curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${FILE} ${PACKAGE_REGISTRY_URL}/${CI_COMMIT_REF_NAME}/${FILE} ;
+        curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${FILE} ${PACKAGE_REGISTRY_URL}/edge/${FILE} ;
+      done
+
+upload binaries to generic package for tag:
+  extends: .upload to generic package
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  needs:
+    - 'binaries darwin/amd64'
+    - 'binaries darwin/arm64'
+    - 'binaries freebsd/386 freebsd/amd64 freebsd/arm'
+    - 'binaries linux/386 linux/amd64 linux/arm linux/arm64 linux/ppc64le'
+    - 'binaries windows/386 windows/amd64'
+    - 'is-latest'
+  script:
+    - cd bin/binaries/
+    - |
+      for FILE in *; do
+        curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${FILE} ${PACKAGE_REGISTRY_URL}/${CI_COMMIT_TAG}/${FILE} ;
+        if [ "$IS_LATEST" = "true" ]; then curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${FILE} ${PACKAGE_REGISTRY_URL}/latest/${FILE} ; fi
+      done

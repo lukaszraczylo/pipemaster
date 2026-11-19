@@ -1,0 +1,130 @@
+name: Code Checks
+
+on:
+  push:
+    branches:
+      - main
+      - 3.1.x
+  pull_request:
+    branches:
+      - main
+      - 3.1.x
+    paths-ignore:
+      - "doc/**"
+      - "web/**"
+      # code-scanning workflows; checked by zizmor in security.yml
+      - ".github/workflows/codeql.yml"
+      - ".github/workflows/scorecard.yml"
+      - ".github/workflows/security.yml"
+
+defaults:
+  run:
+    shell: bash -euox pipefail {0}
+
+permissions: {}
+
+jobs:
+  doctest:
+    name: Doctests
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    concurrency:
+      # https://github.community/t/concurrecy-not-work-for-push/183068/7
+      group: ${{ github.event_name == 'push' && github.run_number || github.ref }}-doctests
+      cancel-in-progress: true
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+
+    - name: Create virtual environment with Pixi
+      uses: ./.github/actions/setup-pixi
+      with:
+        environment: "doctests"
+
+    - name: Build pandas
+      run: |
+        pixi run \
+          --environment doctests \
+          build-pandas \
+          --editable \
+          -Csetup-args="--werror"
+
+    - name: Run doctests
+      run: pixi run --environment doctests ci-doctests
+
+    - name: Run scripts tests
+      run: pixi run --environment doctests ci-scripts-tests
+
+  type-checking:
+    name: Type Checking
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    concurrency:
+      # https://github.community/t/concurrecy-not-work-for-push/183068/7
+      group: ${{ github.event_name == 'push' && github.run_number || github.ref }}-typechecking
+      cancel-in-progress: true
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+
+    - name: Create virtual environment with Pixi
+      uses: ./.github/actions/setup-pixi
+      with:
+        environment: "typing"
+
+    - name: Build pandas
+      run: |
+        pixi run \
+          --environment typing \
+          build-pandas \
+          --editable \
+          -Csetup-args="--werror"
+
+    - name: Typing Checks
+      run: pixi run --environment typing ci-typing
+
+  asv-benchmarks:
+    name: ASV Benchmarks
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    concurrency:
+      # https://github.community/t/concurrecy-not-work-for-push/183068/7
+      group: ${{ github.event_name == 'push' && github.run_number || github.ref }}-asv-benchmarks
+      cancel-in-progress: true
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+
+    - name: Create virtual environment with Pixi
+      uses: ./.github/actions/setup-pixi
+      with:
+        environment: "asv"
+
+    - name: Build pandas
+      run: |
+        pixi run \
+          --environment asv \
+          build-pandas \
+          --editable \
+          -Csetup-args="--werror"
+
+    - name: Run ASV benchmarks
+      run: pixi run --environment asv ci-asv

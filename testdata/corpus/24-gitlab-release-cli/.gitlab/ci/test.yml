@@ -1,0 +1,83 @@
+.test-common:
+  extends: .go-cache
+  stage: test
+  before_script:
+    # Unset all dependent environment variables to satisfy the test expectations
+    - unset CI_COMMIT_TAG # expect empty by TestApp/get_failed_missing_tag_name
+  artifacts:
+    reports:
+      junit: out/junit/test-report.xml
+
+test:
+  extends: .test-common
+  script:
+    - make test
+
+test-race:
+  extends: .test-common
+  variables:
+    CGO_ENABLED: 1
+  script:
+    - make test-race
+
+lint:
+  extends: .go-cache
+  image: golangci/golangci-lint:v1.64.8
+  stage: test
+  script:
+    - apt-get update && apt-get install --yes --no-install-recommends jq
+    # Use default .golangci.yml file from the image if one is not present in the project root.
+    - "[ -e .golangci.yml ] || cp /golangci/.golangci.yml ."
+    # Write the code coverage report to gl-code-quality-report.json
+    # and print linting issues to stdout in the format: path/to/file:line description
+    - golangci-lint run --out-format code-climate | tee gl-code-quality-report.json | jq -r '.[] | "\(.location.path):\(.location.lines.begin) \(.description)"'
+  artifacts:
+    reports:
+      codequality: gl-code-quality-report.json
+    paths:
+      - gl-code-quality-report.json
+    expire_in: 7 days
+  allow_failure: true
+
+cover:
+  extends: .go-cache
+  stage: test
+  before_script:
+    # Unset all dependent environment variables to satisfy the test expectations
+    - unset CI_COMMIT_TAG # expect empty by TestApp/get_failed_missing_tag_name
+  script:
+    - make cover
+  coverage: '/total:.+\(statements\).+\d+\.\d+/'
+  artifacts:
+    paths:
+      - out/cover/coverage.html
+    expire_in: 7 days
+
+.shared_windows_runners:
+  tags:
+    - saas-windows-medium-amd64
+
+test-windows:
+  extends:
+   - .shared_windows_runners
+   - .test-common
+  variables:
+    CGO_ENABLED: 0
+  before_script:
+    - choco install -r --no-progress golang --version=$GO_VERSION -y
+    - choco install -r --no-progress git.install -y --params "/GitAndUnixToolsOnPath /NoGitLfs"
+    - choco install -r --no-progress make -y
+    - '$env:Path += ";C:\Program Files\Git\usr\bin"'
+    - '$env:Path += ";C:\Program Files\Go\bin"'
+    - '$env:GOPATH = (cygpath -m $env:GOPATH)' # Make doesn't like backslashes
+    # Unset all dependent environment variables to satisfy the test expectations
+    - $env:CI_COMMIT_TAG = ""
+  script:
+    - make test
+
+deps-mocks:
+  extends: .go-cache
+  stage: test
+  script:
+    - make mocks-check
+    - make deps-check

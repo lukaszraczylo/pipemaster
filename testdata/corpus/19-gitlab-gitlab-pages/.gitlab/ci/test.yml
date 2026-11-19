@@ -1,0 +1,136 @@
+# The Go toolchains every matrix job is expanded over. Shared by `.tests-matrix`
+# and `fips-build` so a Go bump is a single edit.
+.go-versions: &go-versions ["1.26", "1.27"]
+
+.tests-common:
+  extends: .common
+  stage: test
+  needs: ['download deps']
+  artifacts:
+    reports:
+      junit: junit-test-report.xml
+
+.tests-matrix:
+  extends: .tests-common
+  image: golang:${GO_VERSION}
+  parallel:
+    matrix:
+      - GO_VERSION: *go-versions
+
+tests:
+  extends: .tests-matrix
+  script:
+    - echo "Running all unit tests..."
+    - make unit-test
+
+tests-acceptance:
+  extends: .tests-matrix
+  script:
+    - echo "Running just the acceptance tests...."
+    - make acceptance
+
+race:
+  extends: .tests-common
+  script:
+    - echo "Running race detector"
+    - make race
+
+cover:
+  extends: .tests-common
+  script:
+    - echo "Running coverage testing"
+    - make cover
+  coverage: '/total:.+\(statements\).+\d+\.\d+/'
+  artifacts:
+    paths:
+      - coverage.html
+
+code_quality:
+  extends: .tests-common
+  image: golangci/golangci-lint:v2.12.2
+  variables:
+    REPORT_FILE: gl-code-quality-report.json
+    LINT_FLAGS: "--color never --timeout=15m"
+  # Runs golangci-lint v2 (Go 1.25-capable). Strict again now that the v2
+  # findings have been resolved.
+  script:
+    - golangci-lint run ./... --output.text.path=stdout --output.code-climate.path=${REPORT_FILE} ${LINT_FLAGS}
+  timeout: 15 minutes
+  cache: []
+  artifacts:
+    reports:
+      codequality: ${REPORT_FILE}
+    paths:
+      - ${REPORT_FILE}
+
+check deps:
+  extends: .tests-common
+  before_script:
+    # overwrites the before_script in .common since we don't need to run make cisetup for this job
+    - echo skipping
+  script:
+    - make deps-check
+
+check mocks:
+  extends: .tests-common
+  cache: []
+  script:
+    - make mocks-check
+
+# Guards the FIPS build so breakage is caught here rather than downstream in CNG.
+# Extends `.common` rather than `.tests-common`: this job runs no tests and so
+# produces none of the junit artifacts that template declares.
+fips-build:
+  extends: .common
+  stage: test
+  needs: ['download deps']
+  image: golang:${GO_VERSION}
+  parallel:
+    matrix:
+      # off    -> Makefile falls back to GOEXPERIMENT=boringcrypto (legacy golang-fips path)
+      # v1.0.0 -> native Go Cryptographic Module (GOFIPS140); boringcrypto must be skipped
+      - GO_VERSION: *go-versions
+        GOFIPS140: ["off", "v1.0.0"]
+  script:
+    - echo "Building with FIPS_MODE=1 (go${GO_VERSION}, GOFIPS140=${GOFIPS140})..."
+    - make build FIPS_MODE=1
+
+build-package-and-qa:
+  stage: test
+  trigger:
+    project: 'gitlab-org/build/omnibus-gitlab-mirror'
+    branch: 'master'
+    strategy: depend
+  inherit:
+    variables: false
+  variables:
+    GITLAB_PAGES_VERSION: $CI_MERGE_REQUEST_SOURCE_BRANCH_SHA
+    TOP_UPSTREAM_SOURCE_PROJECT: $CI_PROJECT_PATH
+    TOP_UPSTREAM_SOURCE_REF: $CI_COMMIT_REF_NAME
+    TOP_UPSTREAM_SOURCE_JOB: $CI_JOB_URL
+    ee: "true"
+  rules:
+    # For MRs that change dependencies, we want to automatically ensure builds
+    # aren't broken. In such cases, we don't want the QA tests to be run
+    # automatically, but still available for developers to manually run.
+    - if: '$CI_MERGE_REQUEST_IID'
+      changes:
+        - go.mod
+        - go.sum
+      variables:
+        BUILD_ON_ALL_OS: "true"
+        MANUAL_QA_TEST: "true"
+      allow_failure: false
+    # For other MRs, we still provide this job as a manual job for developers
+    # to obtain a package for testing and run QA tests.
+    - if: '$CI_MERGE_REQUEST_IID'
+      when: manual
+      allow_failure: true
+    - when: never
+  needs: []
+
+logging-field-validator:
+  stage: test
+  extends: .tests-common
+  script:
+    - make validate-log-fields

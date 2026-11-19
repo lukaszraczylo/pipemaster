@@ -1,0 +1,45 @@
+workflow:
+  rules:
+    # For merge requests, create a pipeline.
+    - if: '$CI_MERGE_REQUEST_IID'
+    # For `master` branch, create a pipeline (this includes on schedules, pushes, merges, etc.).
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    # For tags, create a pipeline.
+    - if: '$CI_COMMIT_TAG'
+    # For stable, and security branches, create a pipeline.
+    - if: '$CI_COMMIT_BRANCH =~ /^[\d-]+-stable(-ee)?$/'
+    - if: '$CI_COMMIT_BRANCH =~ /^security\//'
+
+.go-cache:
+  variables:
+    GOPATH: $CI_PROJECT_DIR/.go
+  before_script:
+    - mkdir -p .go
+  cache:
+    paths:
+      - .go/pkg/mod/
+
+include:
+  - local: .gitlab/ci/test.yml
+  - local: .gitlab/ci/analyze.yml
+  - local: .gitlab/ci/build.yml
+  - local: .gitlab/ci/publish.yml
+  - local: .gitlab/ci/analyze-container.yml
+  - local: .gitlab/ci/release.yml
+  - component: ${CI_SERVER_FQDN}/gitlab-org/components/danger-review/danger-review@2.1.0
+
+variables:
+  GO_VERSION: "1.24.1"
+  GLAB_VERSION: "1.58.0"
+  # See https://docs.gitlab.com/ee/user/packages/generic_packages/#publish-a-package-file
+  PACKAGE_REGISTRY_URL: "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/release-cli"
+
+image: golang:${GO_VERSION}
+
+stages:
+  - test
+  - analyze
+  - build
+  - publish
+  - analyze-container
+  - release

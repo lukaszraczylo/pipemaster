@@ -1,0 +1,42 @@
+.kubeconform:
+  stage: test
+  when: always
+  # Downloaded schemas are cached per Kubernetes version so each run does not
+  # re-fetch them from the schema location, which is rate-limited.
+  cache:
+    - !reference [.chart_deps_cache, cache]
+    - key: "kubeconform-schemas-${KUBE_VERSION}"
+      paths:
+        - .kubeconform-cache/
+      when: always
+  script:
+    - kubectl version --client=true --output=json
+    - helm version --template='{{.Version}}'
+    - helm plugin list
+    - bash ./scripts/ci/ensure_chart_deps.sh
+    - echo "$HELM_DEFAULT_SETTINGS" | tee ./template_settings.yaml
+    - echo "${KUBECONFORM_SCHEMA_LOCATION:-default}"
+    - >
+      helm kubeconform --strict --summary
+      --cache --cache-dir .kubeconform-cache
+      -f ./template_settings.yaml
+      --kubernetes-version $KUBE_VERSION
+      --schema-location "${KUBECONFORM_SCHEMA_LOCATION:-default}"
+      --schema-location "$KUBE_CRD_SCHEMA_URL"
+      --output json
+      .
+  rules:
+    - if: '$PIPELINE_TYPE =~ /_MR_PIPELINE$/'
+    - if: '$PIPELINE_TYPE =~ /_BRANCH_PIPELINE$/'
+    - if: '$PIPELINE_TYPE == "NIGHTLY_PIPELINE"'
+kubeconform:
+  extends: .kubeconform
+  parallel:
+    matrix:
+      - KUBE_VERSION:
+        - 1.34.11
+        - 1.35.8
+        - 1.36.4
+        - 1.37.0
+      - KUBE_VERSION: "1.37.0"
+        HELM_MINOR_VERSION: "3.21"

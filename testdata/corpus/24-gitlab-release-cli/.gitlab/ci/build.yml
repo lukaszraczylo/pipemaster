@@ -1,0 +1,83 @@
+docker-build:
+  extends: .go-cache
+  stage: build
+  needs:
+    - test
+    - test-race
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - mkdir -p .docker-cache
+    - /kaniko/executor
+      --context $CI_PROJECT_DIR
+      --dockerfile $CI_PROJECT_DIR/Dockerfile
+      --no-push
+      --build-arg GLAB_VERSION=${GLAB_VERSION}
+      --tar-path image.tar
+      --cache-dir .docker-cache
+  artifacts:
+    paths:
+      - .docker-cache
+      - image.tar
+    expire_in: 1 day
+
+# is-latest checks if the current $CI_COMMIT_TAG is the latest git tag so that the `docker-push-tag`
+# job pushes the Docker image with the latest tag and is not overridden by backport tags.
+# E.g. v1.1.1 is latest over v1.0.1 even if v1.0.1 is pushed later
+is-latest:
+  stage: build
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  script:
+    - echo "IS_LATEST=false" > latest.env
+    - LATEST_GIT_TAG=$(git -c versionsort.prereleaseSuffix="-rc" -c versionsort.prereleaseSuffix="-RC" tag -l "v*.*.*" --sort=-v:refname | awk '!/rc/' | head -n 1)
+    - if [ "$CI_COMMIT_TAG" = "$LATEST_GIT_TAG" ]; then echo "IS_LATEST=true" > latest.env; fi
+    - echo "commit tag is $CI_COMMIT_TAG - latest git tag is $LATEST_GIT_TAG"
+  artifacts:
+    reports:
+      dotenv: latest.env
+
+check-glab-version:
+  stage: build
+  image: docker:stable
+  services:
+    - docker:dind
+  needs:
+    - docker-build
+  script:
+    - docker load < image.tar
+    - IMAGE_ID=$(docker images -q | head -n 1)
+    - |
+      docker run --rm $IMAGE_ID glab --version
+      if [ "$(printf "%s\n%s" "${GLAB_VERSION}" "$(docker run --rm $IMAGE_ID glab --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" | sort -V | head -n1)" = "${GLAB_VERSION}" ]; then
+        echo "Validating glab version. OK"
+      else
+        echo "Error: glab version does not match."
+        exit 1
+      fi
+
+.binaries: &binaries
+  extends: .go-cache
+  variables:
+    CGO_ENABLED: 0
+  stage: build
+  needs:
+    - test
+    - test-race
+  script:
+    - export platforms=$(echo $CI_JOB_NAME | sed 's|binaries ||')
+    - make build-binaries BUILD_PLATFORMS="-osarch='$platforms'"
+  artifacts:
+    paths:
+      - bin/binaries/
+    expire_in: 7d
+
+binaries darwin/amd64: *binaries
+binaries darwin/arm64: *binaries
+binaries freebsd/386 freebsd/amd64 freebsd/arm: *binaries
+binaries linux/386 linux/amd64 linux/arm linux/arm64 linux/ppc64le: *binaries
+binaries windows/386 windows/amd64:
+  extends: .binaries
+  needs:
+    - test-windows
