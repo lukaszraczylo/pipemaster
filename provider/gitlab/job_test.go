@@ -591,3 +591,42 @@ func TestNullOverrideOfInheritedKeyRoundTrips(t *testing.T) {
 		t.Errorf("second parse differs: %s", diff)
 	}
 }
+
+func needsText(t *testing.T, src string) string {
+	t.Helper()
+	proj, _ := parseFiles(t, map[string]string{".gitlab-ci.yml": src})
+	files, _, err := gitlab.New().Emit(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(files[".gitlab-ci.yml"])
+}
+
+// An instance need with explicit keys keeps the instance name and the keys.
+func TestMatrixInstanceNeedKeepsExplicitKeys(t *testing.T) {
+	src := "stages: [a, b]\nimages:\n  stage: a\n  script: [x]\n  artifacts:\n    paths: [o]\n  parallel:\n    matrix:\n      - T: [x, y]\npkg:\n  stage: b\n  needs:\n    - job: \"images: [x]\"\n      artifacts: false\n    - job: images\n      optional: true\n  script: [y]\n"
+	out := needsText(t, src)
+	if !strings.Contains(out, `job: 'images: [x]'`) && !strings.Contains(out, `job: "images: [x]"`) {
+		t.Errorf("instance name lost:\n%s", out)
+	}
+	if !strings.Contains(out, "artifacts: false") {
+		t.Errorf("artifacts key lost:\n%s", out)
+	}
+}
+
+// A need on a job the emitter renames keeps its instance selector under the new name.
+func TestMatrixInstanceNeedFollowsRename(t *testing.T) {
+	prod := glJob("on", glStep("x"))
+	prod.Matrix = &ir.Matrix{Axes: []ir.Axis{{Name: "T", Values: []string{"x", "y"}}}}
+	cons := glJob("pkg", glStep("y"))
+	cons.Needs = []ir.Need{{JobID: "on"}}
+	cons.Ext = ir.Ext{"gitlab": map[string]any{"needs_extra": map[string]any{"on": map[string]any{"_instance": "on: [x]"}}}}
+	files, _, err := gitlab.New().Emit(glProject("gitlab", prod, cons))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(files[".gitlab-ci.yml"])
+	if strings.Contains(out, "- on\n") || !strings.Contains(out, ": [x]") || strings.Contains(out, "- 'on: [x]'") {
+		t.Errorf("selector wrong after rename:\n%s", out)
+	}
+}

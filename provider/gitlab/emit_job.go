@@ -119,8 +119,18 @@ func (e *emitter) needsNode(c *pipeCtx, p *jobPrep) (*yaml.Node, error) {
 // needEntry writes one needs entry. GitLab downloads the producer's artifacts by default when it has any
 // (and dependencies lists it), so the map form appears only when the IR says otherwise or an action asked for them.
 func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps []string, extra any) (*yaml.Node, error) {
+	x, _ := extra.(map[string]any)
+	job := n.JobID
+	if inst, _ := x[ExtNeedsInstance].(string); inst != "" {
+		x = maps.Clone(x)
+		delete(x, ExtNeedsInstance)
+		// The instance name starts with the job name, which a fold prefix may have changed.
+		if at := strings.Index(inst, ": ["); at > 0 {
+			job = n.JobID + inst[at:]
+		}
+	}
 	m := newMap()
-	m.set("job", str(n.JobID))
+	m.set("job", str(job))
 	explicit := false
 	if producerHasArtifacts {
 		want := n.Artifacts || downloaded
@@ -134,17 +144,6 @@ func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps [
 		m.set("optional", boolNodeOf(true))
 		explicit = true
 	}
-	x, _ := extra.(map[string]any)
-	if inst, _ := x[ExtNeedsInstance].(string); inst != "" {
-		x = maps.Clone(x)
-		delete(x, ExtNeedsInstance)
-		if strings.HasPrefix(inst, n.JobID+": [") {
-			m.set("job", str(inst))
-			if len(x) == 0 && !explicit {
-				return str(inst), nil
-			}
-		}
-	}
 	if len(x) > 0 {
 		if err := m.addExtra(x, nil); err != nil {
 			return nil, err
@@ -152,7 +151,7 @@ func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps [
 		explicit = true
 	}
 	if !explicit {
-		return str(n.JobID), nil
+		return str(job), nil
 	}
 	return m.n, nil
 }
