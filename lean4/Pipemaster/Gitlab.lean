@@ -181,7 +181,13 @@ def rawGitlab (g : Pipeline) : Pipe :=
 
 /-- Mirrors gitlab.Parse (provider/gitlab/parse.go) on the core subset; the round-trip metadata `m`
 is applied last (roundtrip.Restore). -/
-def fromGitlab (g : Pipeline) (m : Meta) : Pipe := restore m (rawGitlab g)
+def fromGitlab (g : Pipeline) (m : Meta) : Pipe := restore (rawGitlab g) m
+
+/-- Go parses first and restores after (internal/cli/convert.go): the metadata acts on the parsed pipeline only. -/
+theorem _root_.Pipemaster.Core.fromGitlab_restore (g : Pipeline) (m : Meta) :
+    fromGitlab g m = restore (fromGitlab g Meta.empty) m := by
+  unfold fromGitlab
+  rw [restore_empty]
 
 /-! ## Theorem 2: parse inverts emit on the GitLab fragment -/
 

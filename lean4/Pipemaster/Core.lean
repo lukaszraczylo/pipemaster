@@ -118,7 +118,7 @@ def restoreJob (m : Meta) (pid : String) (j : Job) : Job :=
     steps := j.steps.map (restoreStep m pid j.id) }
 
 /-- Mirrors roundtrip.Restore (internal/roundtrip/meta.go): undo the renames, then re-attach names and lost fields. -/
-def restore (m : Meta) (q : Pipe) : Pipe :=
+def restore (q : Pipe) (m : Meta) : Pipe :=
   let pid := (m.ids q.id).getD q.id
   { q with
     id := pid
@@ -141,7 +141,7 @@ theorem map_self_mem {α : Type} (f : α → α) (l : List α) (h : ∀ x ∈ l,
 theorem fill_empty (cur : String) : fill cur none = cur := by
   unfold fill; split <;> simp_all
 
-theorem restore_empty (q : Pipe) : restore Meta.empty q = q := by
+theorem restore_empty (q : Pipe) : restore q Meta.empty = q := by
   have hs : ∀ (pid jid : String) (s : Step), restoreStep Meta.empty pid jid s = s := by
     intro pid jid s
     cases s; simp [restoreStep, Meta.empty, fill_empty]
@@ -329,7 +329,7 @@ theorem restoreJob_self (p : Pipe) (hn : (p.all.map Job.id).Nodup)
   · simp [hany]
 
 theorem restore_metaOf_self (p : Pipe) (hn : (p.all.map Job.id).Nodup)
-    (hs : ∀ j ∈ p.all, (j.steps.map Step.id).Nodup) : restore (metaOf p) p = p := by
+    (hs : ∀ j ∈ p.all, (j.steps.map Step.id).Nodup) : restore p (metaOf p) = p := by
   have hid : (metaOf p).ids p.id = none := by simp [metaOf]
   have hnm : (metaOf p).names (.pipe p.id) = nameOf p.name := by simp [metaOf]
   have e1 : p.jobs.map (restoreJob (metaOf p) p.id) = p.jobs :=

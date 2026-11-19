@@ -35,6 +35,9 @@ required=(
   Pipemaster.Gitlab.gitlab_from_to
   Pipemaster.RoundTrip.cross_roundtrip
   Pipemaster.RoundTrip.cross_roundtrip_rev
+  Pipemaster.Core.fromGitlab_restore
+  Pipemaster.Chain.chain_roundtrip
+  Pipemaster.Chain.chain_gha_gitlab_gitea
 )
 required_lean="$(printf '`%s, ' "${required[@]}")"
 required_lean="[${required_lean%, }]"

@@ -281,7 +281,7 @@ def rawGha (g : Workflow) : Pipe :=
 
 /-- Mirrors gha.Parse (provider/gha/parse.go) with collapseMarkers, on the core subset; the
 round-trip metadata `m` is applied last (roundtrip.Restore). -/
-def fromGha (g : Workflow) (m : Meta := Meta.empty) : Pipe := restore m (rawGha g)
+def fromGha (g : Workflow) (m : Meta := Meta.empty) : Pipe := restore (rawGha g) m
 
 /-! ## Theorem 1: parse inverts emit on the GHA fragment -/
 

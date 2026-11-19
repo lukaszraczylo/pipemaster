@@ -581,6 +581,46 @@ def crossAdapterCases : List (Json × Json) :=
     let viaGha := Gitlab.fromGitlab (Gitlab.toGitlab (Gha.fromGha (Gha.toGha p) (metaOf p))) (metaOf p)
     (coreJson p, Json.mkObj [("cross", coreJson viaGitlab), ("rev", coreJson viaGha)])
 
+/-! ## Chain vectors (Task 9)
+
+Every ordered choice of three distinct providers over gha, gitea, forgejo, gitlab (24 chains): the first is the
+origin, the other two are the hops. Each case holds the IR as the origin parsed it, the IR after each hop's parse
+with no metadata applied, and the IR after unwinding the stack. The pipelines are a reduced subset of `allPipes`
+that lie in the GHA fragment, which is the fragment of every adapter (`Chain.chainFrag_pair`):
+- triggers: push and pr over {absent, no filter, [x, y]} and a lone tag trigger, with one plain job;
+- one job: the 17 variants of `jobVariants`;
+- two main jobs: 3 variants of the first and 2 of the second, with needs none, plain or artifacts;
+- finally: 2 main layouts (a; a and b needing a) times the 8 finally layouts;
+- pipeline name and ID: three cases.
+The full `allPipes` set gives a 10 MB file; this subset keeps the file near the size of the largest other one. -/
+
+def chainPipes : List Core.Pipe :=
+  (triggerPipes.filter fun p => p.jobs.all (fun j => !j.manual) && (p.tag.isNone || (p.push.isNone && p.pr.isNone))) ++
+  (jobVariants "a").map (fun a => pushAll [a] []) ++
+  ((smallVariants "a").take 3).flatMap (fun a => ((smallVariants "b").take 2).flatMap fun b =>
+    [[], needOn "a" false, needOn "a" true].map fun ns => pushAll [a, { b with needs := ns }] []) ++
+  [[cj "a"], [cj "a", { cj "b" with needs := needOn "a" false }]].flatMap (fun ms => finLayouts.map fun fs => pushAll ms fs) ++
+  namePipes
+
+/-- The pipelines that satisfy `ChainFrag` for every chain: those of `ghaPipes` (decided once, in `ghaPipes`). -/
+def chainFragPipes : List Core.Pipe := chainPipes.filter fun p => decide (p ∈ ghaPipes)
+
+def chainAdapters : List (String × Chain.Adapter) :=
+  [("gha", Chain.gha), ("gitea", Chain.gitea), ("forgejo", Chain.forgejo), ("gitlab", Chain.gitlab)]
+
+def chainTriples : List ((String × Chain.Adapter) × (String × Chain.Adapter) × (String × Chain.Adapter)) :=
+  chainAdapters.flatMap fun a => chainAdapters.flatMap fun b => chainAdapters.flatMap fun c =>
+    if a.1 ≠ b.1 ∧ a.1 ≠ c.1 ∧ b.1 ≠ c.1 then [(a, b, c)] else []
+
+def chainCases : List (Json × Json) :=
+  chainTriples.flatMap fun (a, b, c) =>
+    chainFragPipes.map fun p =>
+      let p1 := b.2.parse (b.2.emit p)
+      let r := Chain.hops p [b.2, c.2]
+      (Json.mkObj [("chain", strsJson [a.1, b.1, c.1]), ("core", coreJson p)],
+        Json.mkObj [("stages", Json.arr #[coreJson p1, coreJson (c.2.parse (c.2.emit p1))]),
+          ("final", coreJson (Chain.unwind r.1 r.2))])
+
 end Adapters
 
 end GenVectors
@@ -597,7 +637,8 @@ def main (args : List String) : IO UInt32 := do
      ("ledger", "Pipemaster.Ledger.complete", GenVectors.ledgerCases),
      ("gha", "Pipemaster.Gha.gha_from_to", GenVectors.ghaAdapterCases),
      ("gitlab", "Pipemaster.Gitlab.gitlab_from_to", GenVectors.gitlabAdapterCases),
-     ("cross", "Pipemaster.RoundTrip.cross_roundtrip", GenVectors.crossAdapterCases)]
+     ("cross", "Pipemaster.RoundTrip.cross_roundtrip", GenVectors.crossAdapterCases),
+     ("chain", "Pipemaster.Chain.chain_roundtrip", GenVectors.chainCases)]
   for (name, thm, cases) in files do
     if want name then
       IO.FS.writeFile s!"{dir}/{name}.json" (GenVectors.emit thm cases)
