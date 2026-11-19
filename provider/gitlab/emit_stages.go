@@ -89,6 +89,15 @@ func restoreStages(pl *ir.Pipeline) (*stagePlan, bool) {
 	}
 	idx := stageIndex(declared)
 	jobs := allJobs(pl)
+	if inc, _ := ext[extInclude].([]any); len(inc) > 0 {
+		// A remote template declares the stages the file does not; they sort before .post, as Parse reads them.
+		for _, j := range jobs {
+			if st, _ := jobStage(j); idx[st] == 0 && st != stagePre {
+				idx[st] = idx[stagePost]
+				idx[stagePost]++
+			}
+		}
+	}
 	finally := map[string]bool{}
 	for _, f := range pl.Finally {
 		if f != nil {

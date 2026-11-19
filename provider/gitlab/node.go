@@ -24,6 +24,7 @@ type state struct {
 	lines    map[string]position
 	nodes    int
 	includes int
+	remote   bool
 }
 
 type position struct {

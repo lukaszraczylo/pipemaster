@@ -1,0 +1,21 @@
+include:
+  - project: group/templates
+    file: ci.yml
+
+stages:
+  - build
+
+build:
+  extends: .remote-base
+  stage: build
+  script:
+    - !reference [.remote-setup, script]
+    - make
+
+deploy:
+  stage: publish
+  script:
+    - make deploy
+  rules:
+    - if: $CI_COMMIT_TAG
+      changes: !reference [.remote-patterns]

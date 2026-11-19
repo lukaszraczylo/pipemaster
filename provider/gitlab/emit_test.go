@@ -248,6 +248,11 @@ func assertStagesOrder(t *testing.T, doc string, strict bool) {
 			st = s
 		}
 		i, ok := idx[st]
+		if !ok && root["include"] != nil {
+			// A remote template declares the stage, and it sorts before .post.
+			idx[st], idx[".post"] = idx[".post"], idx[".post"]+1
+			i, ok = idx[st], true
+		}
 		if !ok {
 			t.Fatalf("job %s uses stage %q outside stages %v", k, st, order)
 		}

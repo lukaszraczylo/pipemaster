@@ -3,6 +3,9 @@ package gitlab
 import (
 	"strings"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/report"
+
 	"go.yaml.in/yaml/v3"
 )
 
@@ -63,6 +66,9 @@ func (s *state) followRef(n, root *yaml.Node, stack []string) (*yaml.Node, error
 		keys = append(keys, c.Value)
 		cur = get(cur, c.Value)
 		if cur == nil {
+			if s.remote {
+				return s.remoteRef(n), nil
+			}
 			return nil, s.errf(n, "!reference [%s] points at nothing", strings.Join(keys, ", "))
 		}
 	}
@@ -96,6 +102,10 @@ func (s *state) extend(name string, jobs jobSet, stack []string) (*yaml.Node, er
 	}
 	for _, p := range parents {
 		if _, ok := jobs[p]; !ok {
+			if s.remote {
+				s.dependsOnRemote(get(n, extendsKey), "extends "+p)
+				continue
+			}
 			return nil, s.errf(get(n, extendsKey), "%s extends unknown job %q", name, p)
 		}
 		pm, err := s.extend(p, jobs, append(stack, name))
@@ -130,4 +140,26 @@ func (s *state) extendsNames(n *yaml.Node) ([]string, error) {
 		return out, nil
 	}
 	return nil, s.errf(v, "extends must be a job name or a list of job names")
+}
+
+// refText spells an unresolved !reference as a plain string, which Emit writes as the tagged list again.
+func refText(keys []string) string { return tagReference + " [" + strings.Join(keys, ", ") + "]" }
+
+// remoteRef keeps a !reference whose target a remote include would define.
+func (s *state) remoteRef(n *yaml.Node) *yaml.Node {
+	keys := make([]string, 0, len(n.Content))
+	for _, c := range n.Content {
+		keys = append(keys, c.Value)
+	}
+	text := refText(keys)
+	s.dependsOnRemote(n, text)
+	return s.stamp(&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: text, Line: n.Line, Column: n.Column}, s.org[n])
+}
+
+// dependsOnRemote reports a construct whose target only a remote include defines. The file keeps it as written.
+func (s *state) dependsOnRemote(n *yaml.Node, what string) {
+	s.rep.Add(report.Entry{
+		IRPath: "pipeline/" + pipelineID, Feature: caps.ExtPassthrough, Level: caps.Lost, Strategy: "kept as written",
+		Detail: "depends on remote include: " + what, SourceLoc: s.org[n],
+	})
 }

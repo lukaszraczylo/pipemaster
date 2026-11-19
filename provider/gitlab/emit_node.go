@@ -138,6 +138,9 @@ func (m *omap) mergeExtras(extra any) error {
 }
 
 func marshalDoc(root *yaml.Node) ([]byte, error) {
+	if get(root, "include") != nil {
+		restoreRefs(root)
+	}
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(indentStep)
@@ -163,3 +166,22 @@ func commentSafe(s string) string {
 }
 
 var errNotRulesList = errors.New("not a list of rules")
+
+// restoreRefs turns the plain strings that stand for unresolved !reference tags back into tagged lists.
+func restoreRefs(n *yaml.Node) {
+	if n.Kind == yaml.ScalarNode {
+		inner, ok := strings.CutPrefix(n.Value, tagReference+" [")
+		inner, ok2 := strings.CutSuffix(inner, "]")
+		if !ok || !ok2 || n.Style&(yaml.LiteralStyle|yaml.FoldedStyle) != 0 {
+			return
+		}
+		n.Kind, n.Tag, n.Value, n.Style = yaml.SequenceNode, tagReference, "", yaml.FlowStyle
+		for _, k := range strings.Split(inner, ", ") {
+			n.Content = append(n.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: k})
+		}
+		return
+	}
+	for _, c := range n.Content {
+		restoreRefs(c)
+	}
+}

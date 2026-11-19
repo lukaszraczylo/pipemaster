@@ -137,6 +137,13 @@ func (s *state) wire(pl *ir.Pipeline, infos []*jobInfo, stages []string) error {
 	}
 	artifacts := map[string]bool{}
 	for _, i := range infos {
+		if _, ok := idx[i.stage]; !ok && s.remote {
+			// A remote template declares the stage; it runs after the stages written here.
+			idx[i.stage] = len(order) - 1
+			order = append(order[:len(order)-1], i.stage, stagePost)
+			idx[stagePost] = len(order) - 1
+			s.dependsOnRemote(nil, "stage "+i.stage)
+		}
 		if _, ok := idx[i.stage]; !ok {
 			p := s.lines[i.name]
 			return fmt.Errorf("%s:%d: job %q uses stage %q, which is not in stages", p.file, p.line, i.name, i.stage)

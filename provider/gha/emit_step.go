@@ -83,7 +83,10 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 		markers = append(markers, emitkit.Marker(caps.StepImage, sp))
 		err = e.imageStep(m, sp, st)
 	case st.Kind == ir.StepScript && len(st.Script) > 0:
-		lines := st.Script
+		lines := e.withoutRemoteRefs(sp, st.Script)
+		if len(lines) == 0 {
+			lines = []string{noopScript}
+		}
 		if attempts > 0 && retryable(st.Shell) {
 			lines, wrapped = retryScript(lines, attempts), true
 			markers = append(markers, emitkit.Marker(caps.JobRetry, jp))
@@ -108,6 +111,22 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 	}
 	m.n.HeadComment = strings.Join(append(markers, e.drain()...), "\n")
 	return m.n, wrapped, nil
+}
+
+// remoteRefPrefix starts a script line that stands for a GitLab !reference into a remote include.
+const remoteRefPrefix = "!reference ["
+
+// withoutRemoteRefs drops the lines that only a GitLab remote include could fill; the metadata keeps them.
+func (e *emitter) withoutRemoteRefs(sp string, lines []string) []string {
+	var out []string
+	for _, l := range lines {
+		if strings.HasPrefix(l, remoteRefPrefix) {
+			e.lose(sp, caps.StepScript, "the line "+l+" depends on a remote GitLab include and has no GHA form")
+			continue
+		}
+		out = append(out, l)
+	}
+	return out
 }
 
 func (e *emitter) withKey(m *omap, sp string, w map[string]ir.Value, first *omap) error {

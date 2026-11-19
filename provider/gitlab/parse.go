@@ -45,6 +45,7 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	s.remote = len(ld.remote) > 0
 	if root, err = s.resolveRefs(root); err != nil {
 		return nil, nil, err
 	}
