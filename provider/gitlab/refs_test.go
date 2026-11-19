@@ -179,3 +179,56 @@ func TestMultiAxisScriptLineRestoresFully(t *testing.T) {
 	}
 	noIgnoredNotes(t, rep)
 }
+
+func producer(id string, outs ...string) *ir.Job {
+	j := glJob(id, glStep("make"))
+	for _, o := range outs {
+		j.Outputs = append(j.Outputs, ir.Output{Name: o, Value: "x"})
+	}
+	return j
+}
+
+func consumer(line string, needs ...string) *ir.Job {
+	j := glJob("use", glStep(line))
+	for _, n := range needs {
+		j.Needs = append(j.Needs, ir.Need{JobID: n})
+	}
+	return j
+}
+
+func roundTripLine(t *testing.T, line string, matrix bool, prods []*ir.Job, needs ...string) {
+	t.Helper()
+	c := consumer(line, needs...)
+	if matrix {
+		c.Matrix = &ir.Matrix{
+			Axes:    []ir.Axis{{Name: "q", Values: []string{"a", "b"}}},
+			Exclude: []ir.Combo{{{Key: "q", Value: "a"}}},
+		}
+	}
+	for _, order := range []bool{false, true} {
+		jobs := append([]*ir.Job{}, prods...)
+		jobs = append(jobs, c)
+		if order {
+			jobs = append([]*ir.Job{c}, prods...)
+		}
+		_, back, rep := emitParse(t, glProject("gitlab", jobs...), nil)
+		if got := jobNamed(back, "use").Steps[0].Script[0]; got != line {
+			t.Errorf("order %v: script = %q, want %q", order, got, line)
+		}
+		noIgnoredNotes(t, rep)
+	}
+}
+
+func TestMatrixAndOutputRefOnOneLine(t *testing.T) {
+	roundTripLine(t, "echo ${{ matrix.q }} ${{ needs.prod.outputs.v }}", true, []*ir.Job{producer("prod", "v")}, "prod")
+}
+
+func TestTwoProducersOnOneLine(t *testing.T) {
+	roundTripLine(t, "echo ${{ needs.p1.outputs.a }} ${{ needs.p2.outputs.b }}", false,
+		[]*ir.Job{producer("p1", "a"), producer("p2", "b")}, "p1", "p2")
+}
+
+func TestMatrixAndTwoProducersOnOneLine(t *testing.T) {
+	roundTripLine(t, "echo ${{ matrix.q }} ${{ needs.p1.outputs.a }} ${{ needs.p2.outputs.b }}", true,
+		[]*ir.Job{producer("p1", "a"), producer("p2", "b")}, "p1", "p2")
+}

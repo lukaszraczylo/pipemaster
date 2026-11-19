@@ -9,6 +9,21 @@ pipelines:
       triggers:
         - kind: push
       jobs:
+        - id: prod
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: prod-step-1
+              kind: script
+              script:
+                - make
+          outputs:
+            - name: ver
+              value: v1
         - matrix:
             axes:
                 - name: os
@@ -28,6 +43,8 @@ pipelines:
           runner:
             labels:
                 - ubuntu-latest
+          needs:
+            - job: prod
           steps:
             - ext:
                 gha:
@@ -35,4 +52,4 @@ pipelines:
               id: test-step-1
               kind: script
               script:
-                - echo ${{ matrix.os }} ${{ matrix.go }}
+                - echo ${{ matrix.os }} ${{ matrix.go }} ${{ needs.prod.outputs.ver }}

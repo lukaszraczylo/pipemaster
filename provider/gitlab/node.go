@@ -5,6 +5,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
@@ -23,6 +24,7 @@ type state struct {
 	rep      *report.Report
 	lines    map[string]position
 	spec     *yaml.Node
+	queue    map[*ir.Job][]lineRewrite
 	remote   []string
 	nodes    int
 	includes int

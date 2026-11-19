@@ -229,9 +229,10 @@ func collapseOutputs(c *collapseCtx) bool {
 	if j == nil {
 		return false
 	}
+	// The writer lines are the end of the script section, whose step may carry the id of the last original step.
 	var st *ir.Step
 	for _, s := range j.Steps {
-		if s.ID == secScript {
+		if s.ID == secScript || (len(s.Script) > 0 && s.Kind == ir.StepScript) {
 			st = s
 		}
 	}
@@ -252,9 +253,9 @@ func collapseOutputs(c *collapseCtx) bool {
 		return false
 	}
 	j.Outputs = outs
-	outputRefs(c.pl, j, markedLines(c.args))
+	outputRefs(c, j)
 	st.Script = st.Script[:n]
-	if n == 0 {
+	if n == 0 && st.ID == secScript {
 		j.Steps = removeStep(j.Steps, st)
 	}
 	dropExt(&j.Ext, extArtifacts, reportsKey, dotenvKey)
@@ -271,35 +272,46 @@ func collapseOutputs(c *collapseCtx) bool {
 	return true
 }
 
-// outputRefs turns the $name variables a consumer reads from a producer's dotenv file back into needs references.
-func outputRefs(pl *ir.Pipeline, producer *ir.Job, lines map[string]bool) {
-	for _, j := range allJobs(pl) {
+// lineRewrite turns one converted variable back into a reference, on the emitted lines that marker names.
+type lineRewrite struct {
+	marked map[string]bool
+	re     *regexp.Regexp
+	ref    string
+}
+
+// outputRefs queues the rewrites that turn the $name variables a consumer reads from a producer's dotenv file
+// back into needs references.
+func outputRefs(c *collapseCtx, producer *ir.Job) {
+	marked := markedLines(c.args)
+	for _, j := range allJobs(c.pl) {
 		if !slices.ContainsFunc(j.Needs, func(n ir.Need) bool { return n.JobID == producer.ID }) {
 			continue
 		}
-		var res []*regexp.Regexp
-		var refs []string
 		for _, o := range producer.Outputs {
-			res = append(res, varRE(o.Name))
-			refs = append(refs, "${{ needs."+producer.ID+".outputs."+o.Name+" }}")
-		}
-		for _, st := range j.Steps {
-			rewriteLines(st.Script, lines, res, refs)
+			c.rewrite(j, lineRewrite{marked, varRE(o.Name), "${{ needs." + producer.ID + ".outputs." + o.Name + " }}"})
 		}
 	}
 }
 
-// rewriteLines applies every rewrite, in order, to each line the emitter marked as converted references. The
-// marked set holds the lines as emitted, so all rewrites of one line must happen in this one pass.
-func rewriteLines(script []string, marked map[string]bool, res []*regexp.Regexp, refs []string) {
-	for i, l := range script {
-		if !marked[l] {
-			continue
+// applyRewrites is the only code that rewrites script lines from several collapsers. Each marker names the
+// lines as emitted, so every rewrite is matched against the emitted text and all apply in this one pass.
+func applyRewrites(queue map[*ir.Job][]lineRewrite) {
+	for j, rs := range queue {
+		apply := func(lines []string) {
+			for i, l := range lines {
+				out := l
+				for _, r := range rs {
+					if r.marked[l] {
+						out = r.re.ReplaceAllLiteralString(out, r.ref)
+					}
+				}
+				lines[i] = out
+			}
 		}
-		for k, re := range res {
-			l = re.ReplaceAllLiteralString(l, refs[k])
+		apply(j.Runner.Labels)
+		for _, st := range j.Steps {
+			apply(st.Script)
 		}
-		script[i] = l
 	}
 }
 
@@ -378,7 +390,7 @@ func collapseMatrix(c *collapseCtx) bool {
 		return false
 	}
 	j.Matrix = orig
-	matrixRefs(j, orig, markedLines(c.args))
+	matrixRefs(c, j, orig)
 	return true
 }
 
@@ -418,16 +430,10 @@ func flatMatrix(m *ir.Matrix) *ir.Matrix {
 }
 
 // matrixRefs turns the $axis variables GitLab sets for each parallel:matrix entry back into matrix references.
-func matrixRefs(j *ir.Job, m *ir.Matrix, lines map[string]bool) {
-	var res []*regexp.Regexp
-	var refs []string
+func matrixRefs(c *collapseCtx, j *ir.Job, m *ir.Matrix) {
+	marked := markedLines(c.args)
 	for _, a := range m.Axes {
-		res = append(res, varRE(a.Name))
-		refs = append(refs, "${{ matrix."+a.Name+" }}")
-	}
-	rewriteLines(j.Runner.Labels, lines, res, refs)
-	for _, st := range j.Steps {
-		rewriteLines(st.Script, lines, res, refs)
+		c.rewrite(j, lineRewrite{marked, varRE(a.Name), "${{ matrix." + a.Name + " }}"})
 	}
 }
 

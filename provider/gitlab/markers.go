@@ -21,8 +21,10 @@ type collapseCtx struct {
 	pl *ir.Pipeline
 	// ignore reports that the marker did not apply because the file was edited.
 	ignore func(detail string)
-	path   string
-	args   []string
+	// rewrite queues a line rewrite for the combined pass that runs after every marker.
+	rewrite func(j *ir.Job, r lineRewrite)
+	path    string
+	args    []string
 }
 
 // collapser undoes one emulation: it edits the pipeline and reports whether the marker's construct was found.
@@ -49,6 +51,8 @@ func markerArgs(src []byte) map[ir.FeatureUse][]string { return emitkit.ParseArg
 
 // collapseMarkers restores the IR feature behind each emulation marker; a marker it cannot restore is reported.
 func (s *state) collapseMarkers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string) {
+	queue := map[*ir.Job][]lineRewrite{}
+	s.queue = queue
 	extractMoved(pl, uses, args)
 	s.restoreTriggers(pl, uses, args)
 	stepDone := map[string]map[caps.Feature]bool{}
@@ -73,6 +77,7 @@ func (s *state) collapseMarkers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[
 			Detail: "marker not collapsed: no parser rule restores " + string(u.Feature) + " at this path",
 		})
 	}
+	applyRewrites(queue)
 	for _, u := range uses {
 		if c, ok := lastCollapsers[u.Feature]; ok && !c(s.ctx(pl, u, args)) {
 			s.rep.Add(report.Entry{
@@ -176,7 +181,7 @@ func findJobAt(pl *ir.Pipeline, path string) *ir.Job {
 }
 
 func (s *state) ctx(pl *ir.Pipeline, u ir.FeatureUse, args map[ir.FeatureUse][]string) *collapseCtx {
-	return &collapseCtx{pl: pl, path: u.IRPath, args: args[u], ignore: func(detail string) {
+	return &collapseCtx{pl: pl, path: u.IRPath, args: args[u], rewrite: func(j *ir.Job, r lineRewrite) { s.queue[j] = append(s.queue[j], r) }, ignore: func(detail string) {
 		s.rep.Add(report.Entry{IRPath: u.IRPath, Feature: u.Feature, Level: caps.Lost, Strategy: "marker ignored", Detail: detail})
 	}}
 }

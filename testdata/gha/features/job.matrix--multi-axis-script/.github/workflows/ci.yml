@@ -1,7 +1,14 @@
 name: matrix multi axis
 on: push
 jobs:
+  prod:
+    runs-on: ubuntu-latest
+    outputs:
+      ver: v1
+    steps:
+      - run: make
   test:
+    needs: prod
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -11,4 +18,4 @@ jobs:
           - os: mac
             go: '1.24'
     steps:
-      - run: echo ${{ matrix.os }} ${{ matrix.go }}
+      - run: echo ${{ matrix.os }} ${{ matrix.go }} ${{ needs.prod.outputs.ver }}
