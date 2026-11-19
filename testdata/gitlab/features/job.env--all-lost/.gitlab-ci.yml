@@ -1,0 +1,5 @@
+test:
+  variables:
+    IMAGE: $CI_REGISTRY_IMAGE/tmp:$CI_COMMIT_SHA
+  script:
+    - make test

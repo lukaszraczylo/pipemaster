@@ -95,7 +95,9 @@ func (e *emitter) jobNode(c jobCtx, j *ir.Job) (*yaml.Node, []string, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		m.set("env", env)
+		if len(env.Content) > 0 {
+			m.set("env", env)
+		}
 	}
 	if err := m.addExtra(ext, consumed); err != nil {
 		return nil, nil, err
@@ -366,7 +368,9 @@ func (e *emitter) servicesKey(m *omap, jp string, j *ir.Job, ext map[string]any,
 			if err != nil {
 				return err
 			}
-			n.set("env", env)
+			if len(env.Content) > 0 {
+				n.set("env", env)
+			}
 		}
 		if len(sv.Ports) > 0 {
 			n.set("ports", strSeq(sv.Ports))

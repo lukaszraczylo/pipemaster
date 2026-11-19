@@ -166,7 +166,9 @@ func (e *emitter) stepTail(m *omap, sp string, st *ir.Step, ext map[string]any) 
 		if err != nil {
 			return err
 		}
-		m.set("env", env)
+		if len(env.Content) > 0 {
+			m.set("env", env)
+		}
 	}
 	if st.ContinueOnError {
 		m.set("continue-on-error", boolNodeOf(true))

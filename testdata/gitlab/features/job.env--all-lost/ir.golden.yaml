@@ -1,0 +1,24 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - id: test
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make test
+          env:
+            - name: IMAGE
+              value:
+                expr: format('$CI_REGISTRY_IMAGE/tmp:{0}', sha)

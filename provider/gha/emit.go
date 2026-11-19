@@ -93,7 +93,9 @@ func (e *emitter) workflow(pl *ir.Pipeline) (*yaml.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		m.set("env", env)
+		if len(env.Content) > 0 {
+			m.set("env", env)
+		}
 	}
 	if pl.Concurrency != nil {
 		c, err := e.concurrency(pp, pl.Concurrency, ext)
