@@ -105,11 +105,15 @@ func runConvert(args []string, _, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stderr, "write output: %v\n", err)
 		return exitError
 	}
-	if !*embed && len(res.Out.Layers) == 0 {
-		if err := removeStaleSidecar(*outDir, rep); err != nil {
-			_, _ = fmt.Fprintf(stderr, "remove sidecar: %v\n", err)
-			return exitError
-		}
+	switch {
+	case *embed:
+		err = removeStaleSidecar(*outDir, "this conversion embeds its metadata", rep)
+	case len(res.Out.Layers) == 0:
+		err = removeStaleSidecar(*outDir, "the conversion restored the origin", rep)
+	}
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "remove sidecar: %v\n", err)
+		return exitError
 	}
 	if err := rep.Render(stderr, *format); err != nil {
 		_, _ = fmt.Fprintf(stderr, "render report: %v\n", err)
@@ -132,9 +136,9 @@ func addMetaGap(rep *report.Report, err error) {
 	})
 }
 
-// removeStaleSidecar deletes the sidecar a full return leaves behind in a reused output directory, since
-// its stack describes files the conversion no longer produces.
-func removeStaleSidecar(dir string, rep *report.Report) error {
+// removeStaleSidecar deletes a sidecar left in a reused output directory: its stack describes files the
+// conversion no longer produces, and on load it would shadow an embedded block.
+func removeStaleSidecar(dir, why string, rep *report.Report) error {
 	path := filepath.Join(dir, filepath.FromSlash(meta.SidecarPath))
 	if err := os.Remove(path); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -145,7 +149,7 @@ func removeStaleSidecar(dir string, rep *report.Report) error {
 	rep.Add(report.Entry{
 		Feature: caps.ExtPassthrough,
 		Level:   caps.Native,
-		Detail:  fmt.Sprintf("removed the stale round-trip sidecar %s: the conversion restored the origin", path),
+		Detail:  fmt.Sprintf("removed the stale round-trip sidecar %s: %s", path, why),
 	})
 	sub := filepath.Dir(path)
 	ents, err := os.ReadDir(sub)

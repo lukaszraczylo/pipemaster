@@ -381,3 +381,24 @@ func TestChainForceToTopSource(t *testing.T) {
 		t.Fatalf("stack = %v, want one layer from gitea", got)
 	}
 }
+
+func TestEmbedConversionRemovesOldSidecar(t *testing.T) {
+	src := filepath.Join(featuresRoot, "gha", "features", "job.env")
+	b, x := t.TempDir(), t.TempDir()
+	if code, _, msg := runOut("convert", src, "--to", "gitlab", "-o", b); code != 0 {
+		t.Fatalf("A to B = %d\n%s", code, msg)
+	}
+	if code, _, msg := runOut("convert", b, "--to", "gitea", "-o", x); code != 0 {
+		t.Fatalf("B to C = %d\n%s", code, msg)
+	}
+	code, _, msg := runOut("convert", src, "--to", "gitlab", "--embed-meta", "-o", x)
+	if code != 0 || !strings.Contains(msg, "this conversion embeds its metadata") {
+		t.Fatalf("embed into a dir with a sidecar = %d, want 0 and a removal entry\n%s", code, msg)
+	}
+	if _, err := os.Stat(filepath.Join(x, meta.SidecarPath)); err == nil {
+		t.Fatal("the old sidecar must go")
+	}
+	if got := stackSources(t, "gitlab", x); !slices.Equal(got, []string{"gha"}) {
+		t.Fatalf("next load = %v, want the embedded stack [gha]", got)
+	}
+}
