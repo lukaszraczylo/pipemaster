@@ -105,6 +105,12 @@ func runConvert(args []string, _, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stderr, "write output: %v\n", err)
 		return exitError
 	}
+	if !*embed && len(res.Out.Layers) == 0 {
+		if err := removeStaleSidecar(*outDir, rep); err != nil {
+			_, _ = fmt.Fprintf(stderr, "remove sidecar: %v\n", err)
+			return exitError
+		}
+	}
 	if err := rep.Render(stderr, *format); err != nil {
 		_, _ = fmt.Fprintf(stderr, "render report: %v\n", err)
 		return exitError
@@ -124,6 +130,29 @@ func addMetaGap(rep *report.Report, err error) {
 		Level:   caps.Lost,
 		Detail:  fmt.Sprintf("round-trip metadata has no record of the emitted form (%v); a later --force run keeps the edited file and restores no lost fields", err),
 	})
+}
+
+// removeStaleSidecar deletes the sidecar a full return leaves behind in a reused output directory, since
+// its stack describes files the conversion no longer produces.
+func removeStaleSidecar(dir string, rep *report.Report) error {
+	path := filepath.Join(dir, filepath.FromSlash(meta.SidecarPath))
+	if err := os.Remove(path); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	rep.Add(report.Entry{
+		Feature: caps.ExtPassthrough,
+		Level:   caps.Native,
+		Detail:  fmt.Sprintf("removed the stale round-trip sidecar %s: the conversion restored the origin", path),
+	})
+	sub := filepath.Dir(path)
+	ents, err := os.ReadDir(sub)
+	if err != nil || len(ents) > 0 {
+		return err
+	}
+	return os.Remove(sub)
 }
 
 // validateAll checks every emitted file except the sidecar. A provider with

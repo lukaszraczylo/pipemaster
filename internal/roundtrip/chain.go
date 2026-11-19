@@ -23,7 +23,7 @@ type HopResult struct {
 
 // Hop applies the stored layers to proj for a conversion from source to target. Restored is true when the
 // step unwinds to an older provider: the output is then a deterministic emit of the layers below, so it
-// gets no new layer.
+// gets no new layer. The source parameter is unused and kept for the call-site signature.
 func Hop(proj *ir.Project, in *meta.Stack, srcFS fs.FS, _, target string, force bool, rep *report.Report) (HopResult, error) {
 	if in == nil || len(in.Layers) == 0 {
 		return HopResult{Proj: proj, Out: &meta.Stack{}}, nil
@@ -38,10 +38,14 @@ func Hop(proj *ir.Project, in *meta.Stack, srcFS fs.FS, _, target string, force 
 		return HopResult{Proj: proj, Out: &meta.Stack{Layers: in.Layers[:i:i]}, Restored: true}, nil
 	}
 	for _, m := range in.Layers {
+		n := entryCount(m)
+		if n == 0 {
+			continue
+		}
 		rep.Add(report.Entry{
 			Feature: caps.ExtPassthrough,
 			Level:   caps.Native,
-			Detail:  fmt.Sprintf("kept %d metadata entries from %s; they restore on conversion to %s", entryCount(m), m.Source, m.Source),
+			Detail:  fmt.Sprintf("kept %d metadata %s from %s; they restore on conversion to %s", n, plural(n), m.Source, m.Source),
 		})
 	}
 	return HopResult{Proj: proj, Out: &meta.Stack{Layers: slices.Clone(in.Layers)}}, nil
@@ -52,7 +56,7 @@ func staleHop(proj *ir.Project, in *meta.Stack, stale []string, err error, targe
 		return HopResult{}, fmt.Errorf("check metadata: %w", err)
 	}
 	if !force {
-		return HopResult{}, fmt.Errorf("files changed since conversion: %s: %w", strings.Join(stale, ", "), err)
+		return HopResult{}, fmt.Errorf("files changed since conversion: %w", err)
 	}
 	dropped := in.Layers
 	if top := in.Top(); top.Source == target {
@@ -69,6 +73,13 @@ func staleHop(proj *ir.Project, in *meta.Stack, stale []string, err error, targe
 		})
 	}
 	return HopResult{Proj: proj, Out: &meta.Stack{}}, nil
+}
+
+func plural(n int) string {
+	if n == 1 {
+		return "entry"
+	}
+	return "entries"
 }
 
 func entryCount(m *meta.Meta) int {

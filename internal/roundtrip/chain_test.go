@@ -3,8 +3,11 @@ package roundtrip_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -41,7 +44,7 @@ func TestHopRules(t *testing.T) {
 		m.Files = map[string]string{"b.yml": "0000"}
 		return m
 	}
-	t.Run("1 empty stack makes one new layer", func(t *testing.T) {
+	t.Run("1 empty stack restores nothing and leaves the layers to the caller", func(t *testing.T) {
 		rep := &report.Report{}
 		res, err := roundtrip.Hop(chainProject(), &meta.Stack{}, fstest.MapFS{}, "gha", "gitlab", false, rep)
 		if err != nil || len(res.Out.Layers) != 0 || res.Restored || len(rep.Entries) != 0 {
@@ -115,7 +118,7 @@ func TestHopRules(t *testing.T) {
 			t.Fatalf("res=%+v err=%v ext=%v", res, err, p.Pipelines[0].Ext)
 		}
 		if !hasEntry(rep, caps.Native, "kept 2 metadata entries from gha; they restore on conversion to gha") ||
-			!hasEntry(rep, caps.Native, "kept 1 metadata entries from gitlab; they restore on conversion to gitlab") {
+			!hasEntry(rep, caps.Native, "kept 1 metadata entry from gitlab; they restore on conversion to gitlab") {
 			t.Fatalf("entries = %+v", rep.Entries)
 		}
 	})
@@ -212,5 +215,169 @@ func TestRoundtripViaList(t *testing.T) {
 				t.Fatalf("code=%d out=%q\n%s", code, out, msg)
 			}
 		})
+	}
+}
+
+func appendTo(t *testing.T, file, text string) {
+	t.Helper()
+	data, err := os.ReadFile(file) // #nosec G304 -- temp dir path
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, append(data, text...), 0o600); err != nil { // #nosec G703 -- path under t.TempDir
+		t.Fatal(err)
+	}
+}
+
+func TestReturnRemovesStaleSidecar(t *testing.T) {
+	x, z := t.TempDir(), t.TempDir()
+	src := filepath.Join(featuresRoot, "gha", "features", "job.env")
+	if code, _, msg := runOut("convert", src, "--to", "gitlab", "-o", x); code != 0 {
+		t.Fatalf("A to B = %d\n%s", code, msg)
+	}
+	code, _, msg := runOut("convert", x, "--to", "gha", "-o", x)
+	if code != 0 || !strings.Contains(msg, "removed the stale round-trip sidecar") {
+		t.Fatalf("in-place return = %d, want 0 and a removal entry\n%s", code, msg)
+	}
+	if _, err := os.Stat(filepath.Join(x, ".pipemaster")); err == nil {
+		t.Fatal("the empty .pipemaster directory must go with the sidecar")
+	}
+	appendTo(t, filepath.Join(x, ".gitlab-ci.yml"), "\n# edited by hand\n")
+	if code, _, msg := runOut("convert", x, "--from", "gha", "--to", "forgejo", "-o", z); code != 0 {
+		t.Fatalf("later gha conversion = %d, want 0 over an unrelated edit\n%s", code, msg)
+	}
+}
+
+func TestReturnKeepsOtherSidecarDirContent(t *testing.T) {
+	x := t.TempDir()
+	src := filepath.Join(featuresRoot, "gha", "features", "job.env")
+	if code, _, msg := runOut("convert", src, "--to", "gitlab", "-o", x); code != 0 {
+		t.Fatalf("A to B = %d\n%s", code, msg)
+	}
+	keep := filepath.Join(x, ".pipemaster", "notes.txt")
+	if err := os.WriteFile(keep, []byte("mine"), 0o600); err != nil { // #nosec G703 -- path under t.TempDir
+		t.Fatal(err)
+	}
+	if code, _, msg := runOut("convert", x, "--to", "gha", "-o", x); code != 0 {
+		t.Fatalf("return = %d\n%s", code, msg)
+	}
+	if _, err := os.Stat(keep); err != nil {
+		t.Fatalf("only the sidecar may go: %v", err)
+	}
+}
+
+func hasBlock(t *testing.T, dir string) bool {
+	t.Helper()
+	found := false
+	fsys := os.DirFS(dir)
+	err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		b, rerr := fs.ReadFile(fsys, p)
+		if rerr != nil {
+			return rerr
+		}
+		found = found || strings.Contains(string(b), "pipemaster:meta:begin")
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return found
+}
+
+func TestEmbeddedReturnLeavesNoBlock(t *testing.T) {
+	b, a := t.TempDir(), t.TempDir()
+	src := filepath.Join(featuresRoot, "gha", "features", "job.env")
+	if code, _, msg := runOut("convert", src, "--to", "gitlab", "--embed-meta", "-o", b); code != 0 {
+		t.Fatalf("A to B = %d\n%s", code, msg)
+	}
+	if !hasBlock(t, b) {
+		t.Fatal("the outbound hop must embed a block")
+	}
+	if code, _, msg := runOut("convert", b, "--to", "gha", "--embed-meta", "-o", a); code != 0 {
+		t.Fatalf("return = %d\n%s", code, msg)
+	}
+	if hasBlock(t, a) {
+		t.Fatal("a full return must leave no embedded block")
+	}
+}
+
+type chainStep struct {
+	to     string
+	layers []string // sources of the stack the step's output holds, oldest first
+}
+
+func stackSources(t *testing.T, id, dir string) []string {
+	t.Helper()
+	s, err := meta.LoadStack(os.DirFS(dir), parseDir(t, id, dir).Origin.Files)
+	if err != nil {
+		t.Fatalf("load stack %s: %v", dir, err)
+	}
+	out := []string{}
+	for _, m := range s.Layers {
+		out = append(out, m.Source)
+	}
+	return out
+}
+
+// Every hop must exit 0, so a partial unwind leaves a top layer whose hashes match the new output.
+func TestChainShapes(t *testing.T) {
+	chains := map[string][]chainStep{
+		"A-B-C-B-A":   {{"gitlab", []string{"gha"}}, {"gitea", []string{"gha", "gitlab"}}, {"gitlab", []string{"gha"}}, {"gha", nil}},
+		"A-B-A-B-A":   {{"gitlab", []string{"gha"}}, {"gha", nil}, {"gitlab", []string{"gha"}}, {"gha", nil}},
+		"A-gitea-F-A": {{"gitea", []string{"gha"}}, {"forgejo", []string{"gha", "gitea"}}, {"gha", nil}},
+	}
+	for name, steps := range chains {
+		for _, embed := range []bool{false, true} {
+			for _, f := range fixtures(t, provider.GHA) {
+				t.Run(fmt.Sprintf("%s/embed=%t/%s", name, embed, f.name), func(t *testing.T) {
+					prev, from := f.dir, provider.GHA
+					for i, st := range steps {
+						out := t.TempDir()
+						args := []string{"convert", prev, "--from", from, "--to", st.to, "-o", out}
+						if embed {
+							args = append(args, "--embed-meta")
+						}
+						if code, _, msg := runOut(args...); code != 0 {
+							t.Fatalf("step %d to %s = %d\n%s", i+1, st.to, code, msg)
+						}
+						if got := stackSources(t, st.to, out); !slices.Equal(got, st.layers) {
+							t.Fatalf("step %d stack = %v, want %v", i+1, got, st.layers)
+						}
+						prev, from = out, st.to
+					}
+					if same, diff := ir.Equal(parseDir(t, provider.GHA, f.dir), parseDir(t, provider.GHA, prev)); !same {
+						t.Fatalf("chain changed the pipeline:\n%s", diff)
+					}
+					if hasBlock(t, prev) {
+						t.Fatal("a full return must leave no embedded block")
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestChainForceToTopSource(t *testing.T) {
+	src := filepath.Join(featuresRoot, "gha", "features", "job.env")
+	b, c, d := t.TempDir(), t.TempDir(), t.TempDir()
+	for _, step := range [][]string{{src, "--to", "gitlab", "-o", b}, {b, "--to", "gitea", "-o", c}} {
+		if code, _, msg := runOut(append([]string{"convert"}, step...)...); code != 0 {
+			t.Fatalf("convert %v = %d\n%s", step, code, msg)
+		}
+	}
+	edited, err := filepath.Glob(filepath.Join(c, ".gitea", "workflows", "*.yml"))
+	if err != nil || len(edited) != 1 {
+		t.Fatalf("gitea workflow files = %v, %v", edited, err)
+	}
+	appendTo(t, edited[0], "\n# edited by hand\n")
+	code, _, msg := runOut("convert", c, "--to", "gitlab", "-o", d, "--force")
+	if code != 0 || !strings.Contains(msg, "metadata from gha dropped") || strings.Contains(msg, "metadata from gitlab dropped") {
+		t.Fatalf("force to the top layer's source = %d, want 0, the gha layer dropped and the gitlab layer applied\n%s", code, msg)
+	}
+	if got := stackSources(t, "gitlab", d); !slices.Equal(got, []string{"gitea"}) {
+		t.Fatalf("stack = %v, want one layer from gitea", got)
 	}
 }

@@ -151,3 +151,25 @@ func TestV1FixtureFilesExist(t *testing.T) {
 		}
 	}
 }
+
+// A partial unwind hands the older layer back as the new top, with hashes of the previous output.
+func TestStackWritersRehashTopLayer(t *testing.T) {
+	files := map[string][]byte{"a.yml": []byte("a: 1\n"), "b.yml": []byte("b: 2")}
+	for name, write := range map[string]func(map[string][]byte, *Stack) map[string][]byte{
+		"AttachStack": AttachStack,
+		"EmbedStack":  EmbedStack,
+	} {
+		t.Run(name, func(t *testing.T) {
+			top := testMeta()
+			top.Files = map[string]string{"a.yml": "hash of the previous output"}
+			s := &Stack{Layers: []*Meta{testMeta(), top}}
+			out := write(files, s)
+			if stale, err := top.Stale(asFS(out)); err != nil || len(stale) != 0 {
+				t.Fatalf("top layer is stale against the output it was written with: %v, %v", stale, err)
+			}
+			if len(top.Files) != 2 {
+				t.Fatalf("top layer files = %v, want both output files", top.Files)
+			}
+		})
+	}
+}
