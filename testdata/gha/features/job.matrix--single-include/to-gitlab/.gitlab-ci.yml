@@ -1,0 +1,18 @@
+# pipemaster:emulated script.interpolation pipeline/ci
+# pipemaster:arg [{"k":"t","g":"$os","s":"$\u007b{ matrix.os }}"}]
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"Axes":null,"Include":[[{"Key":"os","Value":"ubuntu-latest"}]],"Exclude":null,"lines":["$os"]}
+test:
+  tags:
+    - $os
+  needs: []
+  script:
+    # pipemaster:step test-step-1
+    - make test
+  parallel:
+    matrix:
+      - os:
+          - ubuntu-latest

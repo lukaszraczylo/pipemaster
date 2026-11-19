@@ -240,7 +240,7 @@ func (e *emitter) parallelNode(path string, m *ir.Matrix, lines []string, extra 
 			en.set(a.Name, strSeq(v))
 		}
 		entries.Content = append(entries.Content, en.n)
-	case len(m.Axes) == 0 && len(m.Exclude) == 0:
+	case len(m.Axes) == 0 && len(m.Exclude) == 0 && len(m.Include) != 1:
 		err = combos(m.Include)
 	default:
 		err = combos(ir.Expand(m))
@@ -251,7 +251,7 @@ func (e *emitter) parallelNode(path string, m *ir.Matrix, lines []string, extra 
 		if arg, err = markerArg(matrixArg{Axes: m.Axes, Include: m.Include, Exclude: m.Exclude, Lines: lines}); err != nil {
 			break
 		}
-		e.emulate(path, caps.JobMatrix, "expanded into one parallel:matrix entry per combination", "include and exclude have no GitLab form")
+		e.emulate(path, caps.JobMatrix, "expanded into one parallel:matrix entry per combination", "include and exclude have no GitLab form, and a single include combination reads back as an axis list")
 		marks = []string{emitkit.Marker(caps.JobMatrix, path), arg}
 	}
 	if err != nil {
