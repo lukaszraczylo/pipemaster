@@ -142,7 +142,10 @@ func (e *emitter) foldPipelines(pls []*ir.Pipeline) (*ir.Pipeline, error) {
 		if plain {
 			parts = nil
 		}
-		disabled := len(pl.Triggers) > 0 && len(triggerParts(pl)) == 0
+		disabled := (len(pl.Triggers) > 0 || e.noTriggers(pl)) && len(triggerParts(pl)) == 0
+		if e.noTriggers(pl) {
+			e.loseNoTriggers(pl)
+		}
 		for k := range pl.Triggers {
 			e.triggerNotes(triggerPath(pl.ID, k), &pl.Triggers[k])
 			e.foreignExt(triggerPath(pl.ID, k), pl.Triggers[k].Ext)
@@ -247,7 +250,7 @@ func (e *emitter) foldHeader(m *omap, _ *pipeCtx) ([]string, error) {
 	seen := map[string]bool{}
 	used := false
 	for _, pl := range e.fold.pls {
-		used = used || len(pl.Triggers) > 0
+		used = used || len(pl.Triggers) > 0 || e.noTriggers(pl)
 		for i := range pl.Triggers {
 			r, key := e.triggerRuleNode(pl.ID, i, &pl.Triggers[i])
 			if r != nil && !seen[key] {

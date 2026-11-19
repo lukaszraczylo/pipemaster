@@ -2,6 +2,8 @@ package gitlab
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"regexp"
 	"strconv"
 	"strings"
@@ -189,6 +191,12 @@ func (e *emitter) workflow(pl *ir.Pipeline) (*yaml.Node, error) {
 			return n, nil
 		}
 	}
+	if e.noTriggers(pl) {
+		e.loseNoTriggers(pl)
+		w := newMap()
+		w.set("rules", seqOf(ruleNever()))
+		return w.n, nil
+	}
 	if len(pl.Triggers) == 0 || (raw == nil && sameTriggers(pl.Triggers, defaultTriggers())) {
 		return nil, nil
 	}
@@ -314,4 +322,22 @@ func triggerWire(t ir.Trigger) wireTrigger {
 
 func (w wireTrigger) trigger() ir.Trigger {
 	return ir.Trigger{Resource: w.Resource, Kind: w.Kind, Cron: w.Cron, Branches: w.Branches, Tags: w.Tags, Paths: w.Paths}
+}
+
+// noTriggers is true for a pipeline from another provider that starts on no event GitLab models. Without a
+// workflow guard such a file would run on every push and tag.
+func (e *emitter) noTriggers(pl *ir.Pipeline) bool { return len(pl.Triggers) == 0 && e.from != nil }
+
+// loseNoTriggers reports the events a no-trigger pipeline had; GitLab has no pipeline source for them.
+func (e *emitter) loseNoTriggers(pl *ir.Pipeline) {
+	var events []string
+	foreign, _ := pl.Ext[e.from.ID].(map[string]any)
+	if m, ok := foreign["events"].(map[string]any); ok {
+		events = slices.Sorted(maps.Keys(m))
+	}
+	detail := "the pipeline has no trigger GitLab can express; workflow:rules never starts it"
+	if len(events) > 0 {
+		detail += " (source events: " + strings.Join(events, ", ") + ")"
+	}
+	e.lose("pipeline/"+pl.ID, caps.ExtPassthrough, detail)
 }
