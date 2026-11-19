@@ -212,7 +212,10 @@ func (e *emitter) applyTarget(p *jobPrep, sp string, st *ir.Step, t actions.Targ
 		return e.markAction(p, sp, actionArg{Image: p.image})
 	case actions.KindCache:
 		c, err := e.cacheAction(p, sp, t)
-		if err != nil {
+		if err != nil || c == nil {
+			if err == nil {
+				p.pending = append(p.pending, lostPrefix+commentSafe("step "+st.ID+" uses "+ghaRef(st.Action)))
+			}
 			return err
 		}
 		return e.markActionStep(p, sp, st, actionStepArg{Kind: actCache, Cache: c})
@@ -350,11 +353,13 @@ func (e *emitter) cacheAction(p *jobPrep, sp string, t actions.Target) (*ir.Cach
 		cp = append(cp, t)
 	}
 	c.set("paths", strSeq(cp))
-	p.caches = append(p.caches, c)
 	parsed, _, err := newState(nil).cacheEntry(c.n)
 	if err != nil {
+		// Without the parsed block no marker can restore the step, so the action must not vanish unreported.
+		e.lose(sp, caps.StepAction, "the cache block cannot be read back: "+err.Error())
 		return nil, nil
 	}
+	p.caches = append(p.caches, c)
 	return &parsed, nil
 }
 
