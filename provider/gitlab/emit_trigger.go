@@ -100,20 +100,36 @@ func patternTest(v expr.Expr, glob string, negate bool) expr.Expr {
 	return binary(op, v, strLit(globRegex(glob)))
 }
 
-// filterCond is "any include matches and no exclude matches" on v; with no include the ref itself must be set.
+const negPrefix = "!"
+
+// filterCond folds the ordered include list the way GHA does: a plain entry adds its matches, a "!" entry removes
+// them, and the last entry that names a ref wins. Excludes then remove their matches. With no plain entry the
+// ref itself must be set.
 func filterCond(v expr.Expr, f ir.Filter) expr.Expr {
-	var inc []expr.Expr
+	var cond expr.Expr
 	for _, p := range f.Include {
-		inc = append(inc, patternTest(v, p, false))
+		glob, neg := strings.CutPrefix(p, negPrefix)
+		switch {
+		case !neg && cond == nil:
+			cond = patternTest(v, glob, false)
+		case !neg:
+			cond = binary(expr.OpOr, cond, patternTest(v, glob, false))
+		case cond != nil:
+			cond = binary(expr.OpAnd, cond, patternTest(v, glob, true))
+		}
 	}
-	parts := []expr.Expr{orAny(inc)}
-	if len(inc) == 0 {
-		parts = []expr.Expr{v}
+	if cond == nil {
+		cond = v
+		for _, p := range f.Include {
+			if g, ok := strings.CutPrefix(p, negPrefix); ok {
+				cond = binary(expr.OpAnd, cond, patternTest(v, g, true))
+			}
+		}
 	}
 	for _, p := range f.Exclude {
-		parts = append(parts, patternTest(v, p, true))
+		cond = binary(expr.OpAnd, cond, patternTest(v, p, true))
 	}
-	return andAll(parts...)
+	return cond
 }
 
 // triggerRule builds the workflow rule for one trigger; ok is false when GitLab has no pipeline source for it.
@@ -220,12 +236,21 @@ func triggerFilterFeature(t *ir.Trigger) caps.Feature {
 	return caps.TriggerFilterBranch
 }
 
-// pathFilter returns the rules:changes list; excludes have no GitLab form.
+// pathFilter returns the rules:changes list; excludes, including "!" entries, have no GitLab form.
 func (e *emitter) pathFilter(_, tp string, t *ir.Trigger) []string {
-	if len(t.Paths.Exclude) > 0 {
+	var include []string
+	excluded := len(t.Paths.Exclude) > 0
+	for _, p := range t.Paths.Include {
+		if strings.HasPrefix(p, negPrefix) {
+			excluded = true
+			continue
+		}
+		include = append(include, p)
+	}
+	if excluded {
 		e.lose(tp, caps.TriggerFilterPaths, "rules:changes has no exclude patterns")
 	}
-	return t.Paths.Include
+	return include
 }
 
 func (e *emitter) triggerNotes(tp string, t *ir.Trigger) {
