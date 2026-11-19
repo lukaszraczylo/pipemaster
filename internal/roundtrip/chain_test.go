@@ -490,6 +490,32 @@ func checkValid(t *testing.T, id string, files map[string][]byte) {
 	}
 }
 
+// schemaLagEntries are the corpus entries whose own file fails the pinned GitLab schema, so their full return may
+// only warn.
+var schemaLagEntries = []string{"15-gitlab-charts-gitlab", "16-gitlab-cli", "20-gitlab-gitlab-runner", "24-gitlab-release-cli"}
+
+const schemaWarning = "warning: restored origin does not validate against the pinned schema"
+
+// checkFinalSchema asserts that the final output fails the pinned schema, and warns, only for a known entry.
+func checkFinalSchema(t *testing.T, a, name, dir, stderr string) {
+	t.Helper()
+	invalid := false
+	for file, data := range outputFiles(t, dir) {
+		if err := validate.File(a, file, data); err != nil && !errors.Is(err, validate.ErrNoSchema) {
+			invalid = true
+		}
+	}
+	known := a == provider.GitLab && slices.Contains(schemaLagEntries, name)
+	switch warned := strings.Contains(stderr, schemaWarning); {
+	case invalid && !known:
+		t.Fatalf("final output of %s fails the schema, and only %v may", name, schemaLagEntries)
+	case invalid && !warned:
+		t.Fatalf("final output fails the schema without a warning\n%s", stderr)
+	case !invalid && warned:
+		t.Fatalf("a warning for an output that validates\n%s", stderr)
+	}
+}
+
 func TestChainMatrix(t *testing.T) {
 	total := 0
 	for _, a := range provider.IDs() {
@@ -503,21 +529,24 @@ func TestChainMatrix(t *testing.T) {
 					name := fmt.Sprintf("%s/embed=%t/%s", strings.Join(route, "-"), embed, f.name)
 					t.Run(name, func(t *testing.T) {
 						t.Parallel()
-						prev := f.dir
+						prev, lastMsg := f.dir, ""
 						for i := 1; i < len(route); i++ {
 							out := t.TempDir()
 							args := []string{"convert", prev, "--from", route[i-1], "--to", route[i], "-o", out}
 							if embed {
 								args = append(args, "--embed-meta")
 							}
-							if code, _, msg := runOut(args...); code != 0 {
+							code, _, msg := runOut(args...)
+							if code != 0 {
 								t.Fatalf("hop %d to %s = %d\n%s", i, route[i], code, msg)
 							}
+							lastMsg = msg
 							if i < len(route)-1 {
 								checkValid(t, route[i], outputFiles(t, out))
 							}
 							prev = out
 						}
+						checkFinalSchema(t, a, f.name, prev, lastMsg)
 						checkReturn(t, a, f.dir, prev)
 					})
 				}
@@ -585,6 +614,16 @@ func returnVia(t *testing.T, edit func(string) string, flags ...string) (code in
 		}
 	}
 	return runOut(append([]string{"convert", b, "--from", "gha", "--to", "gitlab", "-o", a}, flags...)...)
+}
+
+func TestFullReturnSchemaWarningIsInTheReport(t *testing.T) {
+	code, _, msg := returnVia(t, nil, "--report", "json")
+	if code != 0 || !strings.Contains(msg, `"detail": "restored origin does not validate`) && !strings.Contains(msg, `"detail":"restored origin does not validate`) {
+		t.Fatalf("return = %d, want 0 and a report entry\n%s", code, msg)
+	}
+	if code, _, msg := returnVia(t, nil, "--strict"); code != 3 {
+		t.Fatalf("--strict = %d, want 3: the downgraded warning is not native\n%s", code, msg)
+	}
 }
 
 func TestFullReturnSchemaFailureNeedsTheOriginToHaveFailed(t *testing.T) {

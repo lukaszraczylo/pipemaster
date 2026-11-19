@@ -119,7 +119,7 @@ func runConvert(args []string, _, stderr io.Writer) int {
 	} else {
 		files = meta.AttachStack(files, res.Out)
 	}
-	if !validateAll(tgt.ID(), files, fullReturn, originInvalid, stderr) {
+	if !validateAll(tgt.ID(), files, fullReturn, originInvalid, rep, stderr) {
 		return exitError
 	}
 	if err := writeFiles(*outDir, files); err != nil {
@@ -225,8 +225,8 @@ func sourceFindings(providerID string, fsys fs.FS, files []string) []string {
 
 // validateAll checks every emitted file except the sidecar. A provider with no pinned schema only warns. A full
 // return only warns about findings that the origin files already had: it restores them, and the pinned schema can
-// lag real syntax.
-func validateAll(providerID string, files map[string][]byte, fullReturn bool, originInvalid []string, stderr io.Writer) bool {
+// lag real syntax. The warning goes into the report too.
+func validateAll(providerID string, files map[string][]byte, fullReturn bool, originInvalid []string, rep *report.Report, stderr io.Writer) bool {
 	ok := true
 	for _, name := range sortedNames(files) {
 		if name == meta.SidecarPath {
@@ -238,6 +238,12 @@ func validateAll(providerID string, files map[string][]byte, fullReturn bool, or
 			_, _ = fmt.Fprintf(stderr, "warning: no schema for %s; %s not validated\n", providerID, name)
 		case err != nil && fullReturn && coveredBy(schemaFindings(name, err), originInvalid):
 			_, _ = fmt.Fprintf(stderr, "warning: restored origin does not validate against the pinned schema: %v\n", err)
+			rep.Add(report.Entry{
+				Feature:  caps.ExtPassthrough,
+				Level:    caps.Emulated,
+				Strategy: "schema warning",
+				Detail:   fmt.Sprintf("restored origin does not validate against the pinned %s schema, as the original did: %s", providerID, name),
+			})
 		case err != nil:
 			_, _ = fmt.Fprintf(stderr, "invalid output: %v\n", err)
 			ok = false
