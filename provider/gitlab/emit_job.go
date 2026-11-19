@@ -96,6 +96,9 @@ func (e *emitter) needsNode(c *pipeCtx, p *jobPrep) (*yaml.Node, error) {
 			e.lose(p.path, caps.JobNeeds, "finally job needs another finally job "+n.JobID+", which share the last stage")
 			continue
 		}
+		if n.Artifacts && !c.declares(n.JobID) && !downloaded[n.JobID] {
+			e.lose(p.path, caps.JobNeedsArtifacts, "job "+n.JobID+" declares no artifacts, so GitLab has nothing for the need to download; the flag is kept in round-trip metadata")
+		}
 		shown := n
 		shown.JobID = c.key(n.JobID)
 		entry, bad, err := needEntry(shown, n.JobID, c.declares(n.JobID), downloaded[n.JobID], hasDeps, deps, extras[n.JobID])

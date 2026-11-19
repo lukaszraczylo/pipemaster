@@ -4,6 +4,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
 const stagedPipeline = `
@@ -267,5 +270,24 @@ b:
 	raw, _ := x["needs"].([]any)
 	if len(raw) != 1 {
 		t.Errorf("only the cross-project entry stays raw in needs: %v", raw)
+	}
+}
+
+func TestEmitNeedsArtifactsWithoutProducerArtifactsIsLost(t *testing.T) {
+	step := []*ir.Step{{ID: "s", Kind: ir.StepScript, Script: []string{"x"}}}
+	p := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "ci", Jobs: []*ir.Job{
+		{ID: "a", Steps: step},
+		{ID: "b", Steps: step, Needs: []ir.Need{{JobID: "a", Artifacts: true}}},
+		{ID: "c", Steps: step, Needs: []ir.Need{{JobID: "a"}}},
+	}}}}
+	_, rep := emitFiles(t, p)
+	var got []string
+	for _, e := range rep.Entries {
+		if e.Feature == caps.JobNeedsArtifacts {
+			got = append(got, e.IRPath+" "+e.Level.String())
+		}
+	}
+	if want := []string{"pipeline/ci/job/b lost"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("needs.artifacts entries = %v, want %v", got, want)
 	}
 }
