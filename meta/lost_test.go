@@ -108,9 +108,10 @@ func TestRestoreClearsDisabledStepCondition(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			src := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "ci", Jobs: []*ir.Job{{ID: "b", Steps: []*ir.Step{step(tc.srcIf)}}}}}}
-			entries := []report.Entry{{IRPath: "pipeline/ci/job/b/step/s", Feature: caps.StepAction, Level: caps.Lost}}
-			if tc.srcIf != nil {
-				entries = append(entries, report.Entry{IRPath: "pipeline/ci/job/b/step/s", Feature: caps.StepIf, Level: caps.Lost})
+			// The emitter reports the replaced condition lost whether the source had one or not.
+			entries := []report.Entry{
+				{IRPath: "pipeline/ci/job/b/step/s", Feature: caps.StepAction, Level: caps.Lost},
+				{IRPath: "pipeline/ci/job/b/step/s", Feature: caps.StepIf, Level: caps.Lost},
 			}
 			lost, _ := meta.CollectLost(src, entries)
 			parsed := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "ci", Jobs: []*ir.Job{{ID: "b", Steps: []*ir.Step{
@@ -139,9 +140,9 @@ func TestRestoreClearsDisabledCallJobCondition(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			src := call(tc.jobIf, tc.stepIf)
-			entries := []report.Entry{{IRPath: "pipeline/ci/job/b/step/c", Feature: caps.StepAction, Level: caps.Lost}}
-			if tc.jobIf != nil {
-				entries = append(entries, report.Entry{IRPath: "pipeline/ci/job/b", Feature: caps.JobIf, Level: caps.Lost})
+			entries := []report.Entry{
+				{IRPath: "pipeline/ci/job/b/step/c", Feature: caps.StepAction, Level: caps.Lost},
+				{IRPath: "pipeline/ci/job/b", Feature: caps.JobIf, Level: caps.Lost},
 			}
 			if tc.stepIf != nil {
 				entries = append(entries, report.Entry{IRPath: "pipeline/ci/job/b/step/c", Feature: caps.StepIf, Level: caps.Lost})
@@ -152,6 +153,48 @@ func TestRestoreClearsDisabledCallJobCondition(t *testing.T) {
 			meta.Reattach(parsed, &meta.Meta{Lost: lost})
 			if got := parsed.Pipelines[0].Jobs[0].If; !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("job If = %#v, want %#v", got, tc.want)
+			}
+		})
+	}
+}
+
+// A lost action whose authored if: false the target could still write stays false: only the emitter's
+// own marker, a recorded absent condition, may clear it.
+func TestRestoreKeepsAuthoredFalseOnLostAction(t *testing.T) {
+	off := expr.Lit{Kind: expr.LitBool}
+	src := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "ci", Jobs: []*ir.Job{{ID: "b", If: off, Steps: []*ir.Step{
+		{ID: "c", Kind: ir.StepAction, If: off, Action: &ir.ActionRef{Kind: ir.ActionRepo, Owner: "o", Repo: "r", Ref: "v1"}}}}}}}}
+	lost, _ := meta.CollectLost(src, []report.Entry{{IRPath: "pipeline/ci/job/b/step/c", Feature: caps.StepAction, Level: caps.Lost}})
+	parsed := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "ci", Jobs: []*ir.Job{{ID: "b", If: off, Steps: []*ir.Step{
+		{ID: "c", Kind: ir.StepScript, If: off, Script: []string{"true"}}}}}}}}
+	meta.Reattach(parsed, &meta.Meta{Lost: lost})
+	j := parsed.Pipelines[0].Jobs[0]
+	if !reflect.DeepEqual(j.If, off) || !reflect.DeepEqual(j.Steps[0].If, off) {
+		t.Errorf("authored if: false was dropped: job=%#v step=%#v", j.If, j.Steps[0].If)
+	}
+}
+
+func TestKeepingEditsKeepsConditionAddedToDisabledStep(t *testing.T) {
+	off := expr.Lit{Kind: expr.LitBool}
+	mk := func(cond expr.Expr) *ir.Project {
+		return &ir.Project{Pipelines: []*ir.Pipeline{{ID: "ci", Jobs: []*ir.Job{{ID: "b", Steps: []*ir.Step{
+			{ID: "s", Kind: ir.StepAction, If: cond, Action: &ir.ActionRef{Kind: ir.ActionRepo, Host: ir.HostSelf, Owner: "o", Repo: "r"}}}}}}}}
+	}
+	entries := []report.Entry{
+		{IRPath: "pipeline/ci/job/b/step/s", Feature: caps.StepAction, Level: caps.Lost},
+		{IRPath: "pipeline/ci/job/b/step/s", Feature: caps.StepIf, Level: caps.Lost},
+	}
+	lost, _ := meta.CollectLost(mk(nil), entries)
+	m := &meta.Meta{Lost: lost, Emitted: meta.CollectEmitted(mk(off), lost)}
+	for name, tc := range map[string]struct{ parsed, want expr.Expr }{
+		"still as emitted": {off, nil},
+		"edited by user":   {expr.Lit{Kind: expr.LitBool, Bool: true}, expr.Lit{Kind: expr.LitBool, Bool: true}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := mk(tc.parsed)
+			meta.ReattachKeepingEdits(p, m)
+			if got := p.Pipelines[0].Jobs[0].Steps[0].If; !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("If = %#v, want %#v", got, tc.want)
 			}
 		})
 	}

@@ -229,9 +229,7 @@ func andExpr(l, r expr.Expr) expr.Expr {
 
 // disableCall guards a call job whose host GHA cannot express; the lost conditions go to the metadata with the call.
 func (e *emitter) disableCall(jp string, j *ir.Job, call *ir.Step) (*yaml.Node, []string) {
-	if j.If != nil {
-		e.lose(jp, caps.JobIf, whyDisabled)
-	}
+	e.lose(jp, caps.JobIf, whyDisabled)
 	if call.If != nil {
 		e.lose(stepPath(jp, call.ID), caps.StepIf, whyDisabled)
 	}

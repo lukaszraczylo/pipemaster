@@ -16,6 +16,9 @@ type Lost struct {
 	Pipeline *ir.Pipeline `yaml:"pipeline,omitempty"`
 	Job      *ir.Job      `yaml:"job,omitempty"`
 	Step     *ir.Step     `yaml:"step,omitempty"`
+	// NoCond records that the source node had no condition although its if was reported lost, which a sparse
+	// record cannot say with a nil field.
+	NoCond bool `yaml:"no_cond,omitempty"`
 }
 
 const triggerSeg = "/trigger/"
@@ -157,6 +160,7 @@ func CollectLost(p *ir.Project, entries []report.Entry) (map[string]Lost, []Unre
 			continue
 		}
 		l := out[path]
+		l.NoCond = l.NoCond || noCondition(n, e.Feature)
 		switch {
 		case n.Pipeline != nil:
 			l.Pipeline = copyFields(l.Pipeline, n.Pipeline, fields, e.Feature)
@@ -168,6 +172,11 @@ func CollectLost(p *ir.Project, entries []report.Entry) (map[string]Lost, []Unre
 		out[path] = l
 	}
 	return out, skipped
+}
+
+// noCondition is true when the entry reports a lost condition on a node that had none.
+func noCondition(n ir.NodeRef, f caps.Feature) bool {
+	return (f == caps.StepIf && n.Step != nil && n.Step.If == nil) || (f == caps.JobIf && n.Job != nil && n.Job.If == nil)
 }
 
 func kindOf(n ir.NodeRef) kind {
@@ -219,37 +228,25 @@ func applyLost(p *ir.Project, m *Meta, keepEdits bool) (found, kept map[string]b
 			differs = restorePipeline(n.Pipeline, l.Pipeline, em.Pipeline, keepEdits)
 		case n.Job != nil && l.Job != nil:
 			differs = restoreJob(n.Job, l.Job, em.Job, keepEdits)
+			if l.NoCond && unedited(n.Job.If, em.Job, keepEdits, func(j *ir.Job) expr.Expr { return j.If }) {
+				n.Job.If = nil
+			}
 		case n.Step != nil && l.Step != nil:
 			differs = restoreStep(n.Step, l.Step, em.Step, keepEdits)
+			if l.NoCond && unedited(n.Step.If, em.Step, keepEdits, func(s *ir.Step) expr.Expr { return s.If }) {
+				n.Step.If = nil
+			}
 		}
 		if differs {
 			kept[n.Path] = true
 		}
 	}
-	clearDisabledJobConditions(p, m)
 	return found, kept
 }
 
-// isDisabledCond is the condition the emitter writes for a step or call job whose action host the target cannot express.
-func isDisabledCond(e expr.Expr) bool { return e == expr.Expr(expr.Lit{Kind: expr.LitBool}) }
-
-// clearDisabledJobConditions drops if: false from a job whose call step has a stored action and whose own condition
-// is not stored: the source had no job condition, so none is left to put back.
-func clearDisabledJobConditions(p *ir.Project, m *Meta) {
-	for _, n := range ir.Nodes(p) {
-		if n.Job == nil || !isDisabledCond(n.Job.If) {
-			continue
-		}
-		if l, ok := m.Lost[n.Path]; ok && l.Job != nil && l.Job.If != nil {
-			continue
-		}
-		for _, s := range n.Job.Steps {
-			if l, ok := m.Lost[n.Path+"/step/"+s.ID]; ok && l.Step != nil && l.Step.Action != nil {
-				n.Job.If = nil
-				break
-			}
-		}
-	}
+// unedited is true when the parsed condition still reads as the emitter wrote it. Without edit tracking it is always true.
+func unedited[T any](cond expr.Expr, em *T, keepEdits bool, get func(*T) expr.Expr) bool {
+	return !keepEdits || (em != nil && reflect.DeepEqual(cond, get(em)))
 }
 
 // skipLost matches the nodes that have a stored lost group without applying it; every such node is reported as kept.
@@ -280,10 +277,6 @@ func restoreJob(dst, src, em *ir.Job, keepEdits bool) bool {
 func restoreStep(dst, src, em *ir.Step, keepEdits bool) bool {
 	if src.Action != nil && (!keepEdits || (em != nil && reflect.DeepEqual(dst.Script, em.Script))) {
 		dst.Script = nil
-	}
-	// A disabled step is written with if: false, and a source without a condition has none to store back.
-	if src.Action != nil && src.If == nil && isDisabledCond(dst.If) {
-		dst.If = nil
 	}
 	return copyNonZero(dst, src, em, keepEdits)
 }
@@ -332,8 +325,14 @@ func CollectEmitted(parsed *ir.Project, lost map[string]Lost) map[string]Lost {
 			e.Pipeline = sparseLike(n.Pipeline, l.Pipeline)
 		case n.Job != nil && l.Job != nil:
 			e.Job = sparseLike(n.Job, l.Job)
+			if l.NoCond {
+				e.Job.If = n.Job.If
+			}
 		case n.Step != nil && l.Step != nil:
 			e.Step = sparseLike(n.Step, l.Step)
+			if l.NoCond {
+				e.Step.If = n.Step.If
+			}
 			if l.Step.Action != nil {
 				e.Step.Script = n.Step.Script
 			}

@@ -7,7 +7,7 @@ import (
 )
 
 // whyDisabled is the detail for a condition the output replaces with false because the step's host has no form here.
-const whyDisabled = "the condition is replaced by false because the action host has no form in this dialect"
+const whyDisabled = "the condition is replaced by false because the action host has no form in this dialect; an absent condition is recorded as absent"
 
 // hostArg is the marker argument that carries the host a bare ref resolved against in its source.
 type hostArg struct {

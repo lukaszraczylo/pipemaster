@@ -1,3 +1,4 @@
 Loss report: gitea -> forgejo
+[lost] pipeline/ci/job/call job.if (the condition is replaced by false because the action host has no form in this dialect; an absent condition is recorded as absent)
 [lost] pipeline/ci/job/call/step/call-step-1 step.action (self: actions exist only in Gitea; the step is disabled)
 [emulated] pipeline/ci pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)

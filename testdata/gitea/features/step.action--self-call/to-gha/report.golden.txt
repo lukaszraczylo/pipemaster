@@ -1,2 +1,3 @@
 Loss report: gitea -> gha
+[lost] pipeline/ci/job/call job.if (the condition is replaced by false because the action host has no form in this dialect; an absent condition is recorded as absent)
 [lost] pipeline/ci/job/call/step/call-step-1 step.action (self: actions exist only in Gitea; the step is disabled)

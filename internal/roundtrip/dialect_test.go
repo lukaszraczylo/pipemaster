@@ -129,3 +129,44 @@ func reportEntry(rep *report.Report, f caps.Feature) *report.Entry {
 	}
 	return nil
 }
+
+const giteaSelfConditions = `on: push
+jobs:
+  authored-step:
+    runs-on: r
+    steps:
+      - id: s
+        if: false
+        uses: self:o/r@v1
+  plain-step:
+    runs-on: r
+    steps:
+      - id: s
+        uses: self:o/r@v1
+  authored-call:
+    if: false
+    uses: self:o/shared/.gitea/workflows/w.yml@main
+  plain-call:
+    uses: self:o/shared/.gitea/workflows/w.yml@main
+`
+
+// An authored if: false and an absent condition must both survive a disabled self: step or call job.
+func TestGiteaSelfKeepsAuthoredCondition(t *testing.T) {
+	fsA := fstest.MapFS{".gitea/workflows/ci.yml": &fstest.MapFile{Data: []byte(giteaSelfConditions)}}
+	for _, embed := range []bool{false, true} {
+		r := hops(t, fsA, prov(t, provider.Gitea), prov(t, provider.GHA), embed, true)
+		if same, diff := ir.Equal(r.src, r.back); !same {
+			t.Errorf("embed=%v: Gitea->GHA->Gitea differs:\n%s", embed, diff)
+		}
+		jobs := map[string]*ir.Job{}
+		for _, j := range r.back.Pipelines[0].Jobs {
+			jobs[j.ID] = j
+		}
+		if jobs["authored-step"].Steps[0].If == nil || jobs["plain-step"].Steps[0].If != nil {
+			t.Errorf("embed=%v: step conditions not restored: %+v %+v", embed, jobs["authored-step"].Steps[0].If, jobs["plain-step"].Steps[0].If)
+		}
+		if jobs["authored-call"].If == nil || jobs["plain-call"].If != nil {
+			t.Errorf("embed=%v: job conditions not restored: %+v %+v", embed, jobs["authored-call"].If, jobs["plain-call"].If)
+		}
+	}
+}

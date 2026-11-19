@@ -82,9 +82,7 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 	}
 	switch {
 	case !usesOK:
-		if st.If != nil {
-			e.lose(sp, caps.StepIf, whyDisabled)
-		}
+		e.lose(sp, caps.StepIf, whyDisabled)
 		m.set("if", boolNodeOf(false))
 	case st.If != nil:
 		m.set("if", e.condition(sp, caps.StepIf, st.If, "step"))

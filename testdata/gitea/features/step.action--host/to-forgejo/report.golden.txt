@@ -1,6 +1,8 @@
 Loss report: gitea -> forgejo
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (self: actions exist only in Gitea; the step is disabled)
+[lost] pipeline/ci/job/build/step/build-step-3 step.if (the condition is replaced by false because the action host has no form in this dialect; an absent condition is recorded as absent)
 [lost] pipeline/ci/job/build/step/build-step-4 step.action (builtin: actions exist only in Gitea; the step is disabled)
+[lost] pipeline/ci/job/build/step/build-step-4 step.if (the condition is replaced by false because the action host has no form in this dialect; an absent condition is recorded as absent)
 [emulated] pipeline/ci pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)
 [native] pipeline/ci/job/build/step/build-step-1 step.action (printed as an absolute URL; an instance that cannot reach https://github.com needs the URL edited)
 [native] pipeline/ci/job/build/step/build-step-2 step.action (printed as an absolute URL; an instance that cannot reach https://git.example.com needs the URL edited)
