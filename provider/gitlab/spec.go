@@ -2,10 +2,13 @@ package gitlab
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/report"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -122,4 +125,20 @@ func typedDefault(in ir.Input) any {
 		}
 	}
 	return in.Default
+}
+
+// reportStructuredDefaults reports each input whose default is a list or mapping: Input.Default holds text only,
+// so the structure lives in the kept header and does not reach a provider that reads the IR.
+func (s *state) reportStructuredDefaults(spec map[string]any) {
+	raw, _ := spec[specInputs].(map[string]any)
+	for _, n := range slices.Sorted(maps.Keys(raw)) {
+		m, _ := raw[n].(map[string]any)
+		switch m[inputDef].(type) {
+		case map[string]any, []any:
+			s.rep.Add(report.Entry{
+				IRPath: "pipeline/" + pipelineID + "/input/" + n, Feature: caps.ExtPassthrough, Level: caps.Lost,
+				Strategy: "kept in Ext[gitlab][spec]", Detail: "spec input " + n + " has a list or mapping default; the IR default is flattened text",
+			})
+		}
+	}
 }

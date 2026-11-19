@@ -196,3 +196,17 @@ func TestRemoteDependenceNamesTheIncludes(t *testing.T) {
 	}
 	t.Error("no remote dependence entry")
 }
+
+func TestSpecStructuredDefaultIsReportedLost(t *testing.T) {
+	src := "spec:\n  inputs:\n    envs:\n      default: [a, b]\n    plain:\n      default: x\n---\nbuild:\n  script: [make]\n"
+	_, rep := parseFiles(t, map[string]string{".gitlab-ci.yml": src})
+	var got []string
+	for _, e := range rep.Entries {
+		if strings.Contains(e.Detail, "list or mapping default") {
+			got = append(got, e.Detail)
+		}
+	}
+	if len(got) != 1 || !strings.Contains(got[0], "envs") {
+		t.Errorf("entries = %q", got)
+	}
+}

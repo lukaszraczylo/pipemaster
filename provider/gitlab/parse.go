@@ -226,6 +226,7 @@ func (s *state) specHeader(pl *ir.Pipeline, r *reader) error {
 		return s.errf(s.spec.Content[0], "spec must be a mapping")
 	}
 	pl.Inputs = specInputList(spec)
+	s.reportStructuredDefaults(spec)
 	r.keep(extSpec, spec)
 	return nil
 }
