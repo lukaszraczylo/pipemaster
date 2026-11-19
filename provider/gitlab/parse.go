@@ -119,6 +119,8 @@ func (s *state) parsePipeline(root *yaml.Node, remote []any) (*ir.Pipeline, []*j
 	if err != nil {
 		return nil, nil, err
 	}
+	global := definedVars(nil, get(root, "variables"))
+	s.noteVariableInputs("pipeline/"+pipelineID, get(root, "variables"))
 	var infos []*jobInfo
 	for _, name := range jobs.order {
 		merged, err := s.extend(name, jobs.nodes, nil)
@@ -129,6 +131,7 @@ func (s *state) parsePipeline(root *yaml.Node, remote []any) (*ir.Pipeline, []*j
 		if err != nil {
 			return nil, nil, err
 		}
+		s.noteUnmappedRefs(s.jobPath(name), merged, definedVars(global, get(merged, "variables")))
 		infos = append(infos, info)
 	}
 	if err := s.wire(pl, infos, stages); err != nil {
