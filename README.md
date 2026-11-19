@@ -25,7 +25,7 @@ go build -o pipemaster ./cmd/pipemaster
 
 ## Using the command line
 
-Every command takes a directory that holds the pipeline files. If you omit `--from`, the tool detects the provider from the files in that directory.
+The commands `detect`, `inspect`, `convert`, `roundtrip` and `validate` take a directory that holds the pipeline files. The commands `version` and `caps` take no directory. If you omit `--from`, the commands `inspect`, `convert` and `roundtrip` detect the source provider from the files in that directory.
 
 | Command | Purpose |
 | --- | --- |
@@ -115,7 +115,7 @@ The following table comes from `pipemaster caps --from gha --to gitlab --format 
 | step.if | native | emulated | shell guard around the step's lines (step reports success instead of skipped) |
 | step.image | emulated | lost | (GitLab sets the image per job, not per step) |
 | step.script | native | native |  |
-| step.shell | native | native | (bash and sh only; the runner's shell runs other scripts) |
+| step.shell | native | lost | (GitLab runs scripts in the runner's configured shell) |
 | step.timeout | native | lost | (GitLab has only a job timeout) |
 | step.workdir | native | emulated | cd in a subshell around the step |
 | trigger.api | native | external | pipeline trigger token or API call |
