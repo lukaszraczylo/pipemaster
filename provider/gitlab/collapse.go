@@ -184,6 +184,11 @@ func extractMoved(pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse]
 	}
 }
 
+func movedAlways(st *ir.Step) bool {
+	c, ok := st.If.(expr.Call)
+	return ok && c.Name == "always" && len(extOf(st.Ext)) == 0
+}
+
 func stepByID(j *ir.Job, id string) *ir.Step {
 	for _, s := range j.Steps {
 		if s.ID == id {
@@ -229,10 +234,11 @@ func collapseOutputs(c *collapseCtx) bool {
 	if j == nil {
 		return false
 	}
-	// The writer lines are the end of the script section, whose step may carry the id of the last original step.
+	// The writer lines end the script section, never after_script. A step extractMoved rebuilt from after_script
+	// has no section in its Ext but keeps its always() condition.
 	var st *ir.Step
 	for _, s := range j.Steps {
-		if s.ID == secScript || (len(s.Script) > 0 && s.Kind == ir.StepScript) {
+		if sectionOf(s) == secScript && !movedAlways(s) && len(s.Script) > 0 && s.Kind == ir.StepScript {
 			st = s
 		}
 	}
@@ -295,10 +301,13 @@ func outputRefs(c *collapseCtx, producer *ir.Job) {
 
 // applyRewrites is the only code that rewrites script lines from several collapsers. Each marker names the
 // lines as emitted, so every rewrite is matched against the emitted text and all apply in this one pass.
-func applyRewrites(queue map[*ir.Job][]lineRewrite) {
+func applyRewrites(queue map[*ir.Job][]lineRewrite, owned map[*string]bool) {
 	for j, rs := range queue {
 		apply := func(lines []string) {
 			for i, l := range lines {
+				if owned[&lines[i]] {
+					continue
+				}
 				out := l
 				for _, r := range rs {
 					if r.marked[l] {

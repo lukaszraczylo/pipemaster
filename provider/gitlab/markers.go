@@ -77,7 +77,13 @@ func (s *state) collapseMarkers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[
 			Detail: "marker not collapsed: no parser rule restores " + string(u.Feature) + " at this path",
 		})
 	}
-	applyRewrites(queue)
+	owned := map[*string]bool{}
+	for _, u := range uses {
+		if u.Feature == caps.ScriptInterpolation {
+			restoreLines(s.ctx(pl, u, args), owned)
+		}
+	}
+	applyRewrites(queue, owned)
 	for _, u := range uses {
 		if c, ok := lastCollapsers[u.Feature]; ok && !c(s.ctx(pl, u, args)) {
 			s.rep.Add(report.Entry{

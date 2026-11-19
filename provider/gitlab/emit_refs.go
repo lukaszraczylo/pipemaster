@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"encoding/json"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -228,14 +229,58 @@ func refMarks(pp string, pl *ir.Pipeline) ([]string, error) {
 	return []string{emitkit.Marker(caps.ScriptInterpolation, pp), arg}, nil
 }
 
+var linePosRE = regexp.MustCompile(`/(runner|script)/\d+$`)
+
+// readPairs reads the conversion pairs a ScriptInterpolation marker carries.
+func readPairs(args []string) ([]refPair, bool) {
+	if len(args) != 1 {
+		return nil, false
+	}
+	var pairs []refPair
+	if json.Unmarshal([]byte(args[0]), &pairs) != nil {
+		return nil, false
+	}
+	return pairs, true
+}
+
+// restoreLines restores the script and runner lines the marker records, inside the one pass that owns every
+// line rewrite. A line whose text is not what the emitter wrote keeps the file's text and is reported.
+func restoreLines(c *collapseCtx, owned map[*string]bool) {
+	pairs, ok := readPairs(c.args)
+	if !ok {
+		return
+	}
+	at := map[string]refSite{}
+	for _, st := range refSites(c.pl) {
+		if st.text != nil && linePosRE.MatchString(st.pos) {
+			at[st.pos] = st
+		}
+	}
+	for _, p := range pairs {
+		st, ok := at[p.P]
+		if !ok {
+			continue
+		}
+		owned[st.text] = true
+		cur := *st.text
+		if cur == p.S {
+			continue
+		}
+		if cur != p.G {
+			if canon, err := canonText(p.G); err != nil || cur != canon {
+				c.ignore("marker ignored: the text at " + p.P + " was edited after conversion, so the file's text stands")
+				continue
+			}
+		}
+		*st.text = p.S
+	}
+}
+
 // collapseRefs puts the source text back at each recorded position whose text still equals what the emitter
 // wrote; a position whose text changed keeps the file's text and is reported.
 func collapseRefs(c *collapseCtx) bool {
-	if len(c.args) != 1 {
-		return false
-	}
-	var pairs []refPair
-	if json.Unmarshal([]byte(c.args[0]), &pairs) != nil {
+	pairs, ok := readPairs(c.args)
+	if !ok {
 		return false
 	}
 	at := map[string]refSite{}
@@ -244,7 +289,7 @@ func collapseRefs(c *collapseCtx) bool {
 	}
 	for _, p := range pairs {
 		st, ok := at[p.P]
-		if !ok {
+		if !ok || linePosRE.MatchString(p.P) {
 			continue
 		}
 		cur := ""
