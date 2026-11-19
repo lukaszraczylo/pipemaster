@@ -1,0 +1,16 @@
+build:
+  tags:
+    - linux
+    - self-hosted
+    - x64
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - echo ok
+grouped:
+  tags:
+    - linux
+  needs: []
+  script:
+    # pipemaster:step grouped-step-1
+    - echo ok

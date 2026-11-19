@@ -1,0 +1,11 @@
+name: stepif
+on:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - if: always()
+        run: echo cleanup
+      - if: github.event_name == 'push'
+        run: echo push

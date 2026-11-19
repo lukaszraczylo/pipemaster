@@ -1,0 +1,46 @@
+# pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/alert
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/alert
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/alert
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}]}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/report
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/report
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/report
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}]}
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: make build
+  # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+  alert:
+    needs:
+      - build
+    if: always() && failure()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: ./page.sh
+  # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+  report:
+    needs:
+      - build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: ./notify.sh

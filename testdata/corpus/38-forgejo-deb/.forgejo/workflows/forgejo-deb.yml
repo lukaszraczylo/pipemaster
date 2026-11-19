@@ -1,0 +1,283 @@
+on: [push, pull_request]
+jobs:
+  build-forgejo-deb:
+    runs-on: docker
+    container:
+      image: data.forgejo.org/oci/node:lts-bookworm
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          submodules: true
+          fetch-depth: 0
+          fetch-tags: true
+          filter: tree:0
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: "forgejo/.node-version"
+          check-latest: true
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "forgejo/go.mod"
+          check-latest: true
+
+      - name: "actions prep: build-forgejo-deb"
+        id: ciprep
+        run: ./.scripted-action.sh prep actions build-forgejo-deb
+
+      - uses: crystal/install-jq-action@v2.1.0
+
+      - run: ./.scripted-action.sh prep build
+
+      - run: ./.scripted-action.sh download-bin
+
+      - name: Build Forgejo for amd64
+        run: ./.scripted-action.sh bin-build
+
+      - run: ./.scripted-action.sh make-pkg
+
+      - run: ./.scripted-action.sh pkg-sha256
+
+      - run: ./.scripted-action.sh irt_quick ./forgejo-sqlite_*_amd64.deb
+
+      - uses: forgejo/upload-artifact@v4
+        with:
+          name: forgejo-deb-${{ steps.ciprep.outputs.artifactlabel }}
+          path: |
+            *.deb
+            *.deb.sha256
+
+  build-forgejo-deb_arm64:
+    runs-on: docker-arm64-big
+    container:
+      image: data.forgejo.org/oci/node:lts-bookworm
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          submodules: true
+          fetch-depth: 0
+          fetch-tags: true
+          filter: tree:0
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 22
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "forgejo/go.mod"
+
+      - name: "actions prep: build-forgejo-deb"
+        id: ciprep
+        run: ./.scripted-action.sh prep actions build-forgejo-deb
+
+      - uses: crystal/install-jq-action@v2.1.0
+
+      - run: ./.scripted-action.sh prep build
+
+      - run: ./.scripted-action.sh download-bin
+
+      - name: Build Forgejo for arm64
+        run: ./.scripted-action.sh bin-build
+
+      - run: ./.scripted-action.sh make-pkg
+
+      - run: ./.scripted-action.sh pkg-sha256
+
+      - run: ./.scripted-action.sh irt_quick ./forgejo-sqlite_*_arm64.deb
+
+      - uses: forgejo/upload-artifact@v4
+        with:
+          name: forgejo-deb-${{ steps.ciprep.outputs.artifactlabel }}_arm64
+          path: |
+            *.deb
+            *.deb.sha256
+
+  installtest-trixie-lxc-full:
+    runs-on: lxc-trixie
+    needs: [build-forgejo-deb]
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: "actions prep: installtest (full)"
+        id: ciprep
+        run: ./.scripted-action.sh prep actions installtest full
+
+      - uses: forgejo/download-artifact@v4
+        with:
+          name: forgejo-deb-${{ steps.ciprep.outputs.artifactlabel }}
+
+      - run: ./.scripted-action.sh installtest basic
+      - run: ./.scripted-action.sh installtest userinst
+      - run: ./.scripted-action.sh installtest repoupgrade stable
+      - run: ./.scripted-action.sh installtest repoupgrade lts
+
+  installtest-bookworm-lxc:
+    runs-on: lxc-bookworm
+    needs: [build-forgejo-deb]
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: "actions prep: installtest (full)"
+        id: ciprep
+        run: ./.scripted-action.sh prep actions installtest full
+
+      - uses: forgejo/download-artifact@v4
+        with:
+          name: forgejo-deb-${{ steps.ciprep.outputs.artifactlabel }}
+
+      - run: ./.scripted-action.sh installtest basic
+      - run: ./.scripted-action.sh installtest repoupgrade stable
+
+  installtest-bookworm-docker:
+    runs-on: docker
+    container:
+      image: data.forgejo.org/oci/node:lts-bookworm
+    needs: [build-forgejo-deb]
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: "actions prep: installtest"
+        id: ciprep
+        run: ./.scripted-action.sh prep actions installtest
+
+      - uses: forgejo/download-artifact@v4
+        with:
+          name: forgejo-deb-${{steps.ciprep.outputs.artifactlabel }}
+
+      - run: ./.scripted-action.sh installtest basic
+
+  installtest-trixie-arm64:
+    runs-on: docker-arm64
+    container:
+      image: data.forgejo.org/oci/node:lts-trixie
+    needs: [build-forgejo-deb_arm64]
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: "actions prep: installtest"
+        id: ciprep
+        run: ./.scripted-action.sh prep actions installtest
+
+      - uses: forgejo/download-artifact@v4
+        with:
+          name: forgejo-deb-${{steps.ciprep.outputs.artifactlabel }}_arm64
+
+      - run: ./.scripted-action.sh installtest basic
+
+  installtest-bookworm-arm64:
+    runs-on: docker-arm64
+    container:
+      image: data.forgejo.org/oci/node:lts-bookworm
+    needs: [build-forgejo-deb_arm64]
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: "actions prep: installtest"
+        id: ciprep
+        run: ./.scripted-action.sh prep actions installtest
+
+      - uses: forgejo/download-artifact@v4
+        with:
+          name: forgejo-deb-${{steps.ciprep.outputs.artifactlabel }}_arm64
+
+      - run: ./.scripted-action.sh installtest basic
+
+  publish-release-repo:
+    runs-on: trixie
+    needs: [installtest-trixie-lxc-full, installtest-bookworm-lxc, installtest-bookworm-docker]
+    if: forge.event_name == 'push' && contains(forge.ref, 'refs/tags/') && forge.repository == 'forgejo-contrib/forgejo-deb'
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: actions prep
+        id: ciprep
+        run: ./.scripted-action.sh prep actions
+
+      - uses: forgejo/download-artifact@v4
+        with:
+          name: forgejo-deb-${{ steps.ciprep.outputs.artifactlabel }}
+
+      - uses: crystal/install-jq-action@v2.1.0
+      - run: mkdir forgejo-release
+      - run: mv *.deb *.deb.sha256 forgejo-release/
+      
+      - uses: actions/forgejo-release@v1
+        with:
+          direction: upload
+          url: https://codeberg.org
+          token: ${{ secrets.codeberg_api_key }}
+          release-dir: forgejo-release
+
+      - uses: crystal/release-target-branch-action@v1
+        with:
+          url: https://codeberg.org
+          token: ${{ secrets.codeberg_api_key }}
+          branch: main
+
+      - uses: actions/forgejo-release@v1
+        with:
+          direction: upload
+          url: https://code.forgejo.org
+          token: ${{ secrets.cfo_api_key }}
+          release-dir: forgejo-release
+          
+      - uses: crystal/release-target-branch-action@v1
+        with:
+          url: https://code.forgejo.org
+          token: ${{ secrets.cfo_api_key }}
+          branch: main
+
+      - uses: crystal/debian-package-registry-action@v1
+        with:
+          url: https://code.forgejo.org
+          owner: apt
+          dist: stable
+          component: main
+          token: ${{ secrets.cfo_api_key }}
+          path: |
+            forgejo-release/*.deb
+
+  publish-release-repo_arm64:
+    runs-on: trixie
+    needs: [installtest-trixie-arm64, installtest-bookworm-arm64, publish-release-repo]
+    if: forge.event_name == 'push' && contains(forge.ref, 'refs/tags/') && forge.repository == 'forgejo-contrib/forgejo-deb'
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: actions prep
+        id: ciprep
+        run: ./.scripted-action.sh prep actions
+
+      - uses: forgejo/download-artifact@v4
+        with:
+          name: forgejo-deb-${{ steps.ciprep.outputs.artifactlabel }}_arm64
+
+      - uses: crystal/install-jq-action@v2.1.0
+      - run: mkdir forgejo-release
+      - run: mv *_arm64.deb *_arm64.deb.sha256 forgejo-release/
+      
+      - uses: crystal/release-add-assets-action@v1.0.2
+        with:
+          direction: upload
+          url: https://codeberg.org
+          token: ${{ secrets.codeberg_api_key }}
+          release-dir: forgejo-release
+
+      - uses: crystal/release-add-assets-action@v1.0.2
+        with:
+          direction: upload
+          url: https://code.forgejo.org
+          token: ${{ secrets.cfo_api_key }}
+          release-dir: forgejo-release
+
+      - uses: crystal/debian-package-registry-action@v1
+        with:
+          url: https://code.forgejo.org
+          owner: apt
+          dist: stable
+          component: main
+          token: ${{ secrets.cfo_api_key }}
+          path: |
+            forgejo-release/*.deb

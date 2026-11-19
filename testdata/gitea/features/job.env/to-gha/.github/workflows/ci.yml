@@ -1,0 +1,11 @@
+name: jobenv
+on:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GOFLAGS: -trimpath
+      API: ${{ secrets.API_KEY }}
+    steps:
+      - run: echo ok

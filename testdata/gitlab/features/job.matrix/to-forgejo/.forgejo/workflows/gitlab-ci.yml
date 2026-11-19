@@ -1,0 +1,29 @@
+# pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/test
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/test
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - GO: "1.21"
+            OS: linux
+          - GO: "1.21"
+            OS: mac
+          - GO: "1.22"
+            OS: linux
+          - GO: "1.22"
+            OS: mac
+          - GO: "1.20"
+            OS: linux
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: make test

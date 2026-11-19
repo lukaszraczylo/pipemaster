@@ -1,0 +1,4 @@
+Loss report: gitea -> gitlab
+[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider gha (types, workflows) is not written to the GitLab file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/0 trigger.pipeline_done (GitLab starts a downstream pipeline from a trigger job in the upstream project, which this file cannot declare)

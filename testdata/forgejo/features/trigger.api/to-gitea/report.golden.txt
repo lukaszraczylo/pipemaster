@@ -1,0 +1,2 @@
+Loss report: forgejo -> gitea
+[lost] pipeline/ci/trigger/0 trigger.api (event repository_dispatch is not supported by Gitea; the trigger is dropped)

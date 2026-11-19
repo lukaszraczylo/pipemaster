@@ -1,0 +1,13 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: allow
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  flaky:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - run: echo ok

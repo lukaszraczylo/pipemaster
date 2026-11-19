@@ -1,0 +1,15 @@
+# pipemaster:emulated script.interpolation pipeline/ci
+# pipemaster:arg [{"k":"t","p":"job/build/step/build-step-1/script/0","g":"echo \"$CI_MODE\"","s":"echo \"$\u007b{ vars.CI_MODE }}\""}]
+build:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    # pipemaster:emulated step.env pipeline/ci/job/build/step/build-step-1
+    - |
+      (
+      export KEY="$GITEA_DEPLOY"
+      export TOKEN="$GITHUB_TOKEN"
+      echo "$CI_MODE"
+      )

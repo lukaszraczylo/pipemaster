@@ -1,0 +1,11 @@
+name: env
+on:
+  push:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://example.com
+    steps:
+      - run: echo deploy

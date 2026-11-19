@@ -1,0 +1,4 @@
+Loss report: gitlab -> forgejo
+[lost] pipeline/gitlab-ci ext.passthrough (Ext of provider gitlab (hidden) is not written to the GHA file; it is kept in round-trip metadata)
+[emulated] pipeline/gitlab-ci pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)
+[emulated] pipeline/gitlab-ci step.script: placeholder job pipemaster-empty (a GHA workflow needs at least one job)

@@ -1,0 +1,19 @@
+# pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/release
+# pipemaster:arg {"src":"tag"}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/release
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/release
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.ref_type == 'tag' && github.ref_name
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: make release

@@ -1,0 +1,10 @@
+# pipemaster:emulated step.script pipeline/gitlab-ci
+on:
+  push:
+env:
+  REGION: eu
+jobs:
+  pipemaster-empty:
+    runs-on: ubuntu-latest
+    steps:
+      - run: "true"

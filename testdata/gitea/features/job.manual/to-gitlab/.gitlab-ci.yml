@@ -1,0 +1,5 @@
+deploy:
+  needs: []
+  script:
+    - make deploy
+  when: manual

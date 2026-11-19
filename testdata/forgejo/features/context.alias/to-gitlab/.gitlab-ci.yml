@@ -1,0 +1,21 @@
+build:
+  tags:
+    - docker
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-1
+    # pipemaster:arg "ref_name =~ '(?i)^main$'"
+    # pipemaster:arg {"src":"ref_name == 'main'"}
+    - |
+      if printf '%s\n' "$CI_COMMIT_REF_NAME" | grep -Eiq '^main$'; then
+      echo $CI_COMMIT_REF_NAME
+      fi
+    # pipemaster:step build-step-2
+    # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
+    # pipemaster:arg "false"
+    # pipemaster:lost step.if pipeline/ci/job/build/step/build-step-2: sha != ''
+    - |
+      if false; then
+      echo $CI_COMMIT_SHA
+      fi

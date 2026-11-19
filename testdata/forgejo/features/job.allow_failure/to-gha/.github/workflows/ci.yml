@@ -1,0 +1,9 @@
+name: allow
+on:
+  push:
+jobs:
+  flaky:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - run: echo ok

@@ -1,0 +1,16 @@
+# pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
+# pipemaster:arg {"host":"https://git.example.com"}
+on:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: org/tool@v2
+      # pipemaster:lost step.action pipeline/ci/job/build/step/build-step-3: self:org/local-action@main
+      - if: false
+        run: "true"
+      # pipemaster:lost step.action pipeline/ci/job/build/step/build-step-4: builtin:checkout
+      - if: false
+        run: "true"

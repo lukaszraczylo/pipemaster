@@ -1,0 +1,13 @@
+# pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"host":"https://data.forgejo.org"}
+# pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-3
+# pipemaster:arg {"host":"https://codeberg.org"}
+on:
+  push:
+jobs:
+  build:
+    runs-on: docker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+      - uses: org/tool/sub@v2

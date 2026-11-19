@@ -1,0 +1,59 @@
+name: build
+
+on:
+  push:
+
+jobs:
+  lint:
+    runs-on: docker
+    container:
+      image: ghcr.io/renovatebot/renovate:44.247.1@sha256:fab9f40d938f5651249b7f6cdb50bdb5c983eea060c5d631221c5153b0a58d88
+
+    strategy:
+      matrix:
+        file:
+          - default.json
+          - go.json
+          - renovate.json
+          - replacements.json
+          # Do not validate groups.
+          # `matchDepNames` are not allowed at root.
+          # - groups/go.json
+          # - groups/alpine.json
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          show-progress: false
+
+      - run: renovate-config-validator --no-global ${{ matrix.file }}
+        env:
+          LOG_LEVEL: debug
+          RENOVATE_PLATFORM: forgejo
+          RENOVATE_ENDPOINT: ${{ forge.server_url }}
+
+  mirror-codeberg:
+    needs:
+      - lint
+    runs-on: docker
+
+    if: forge.ref_name == 'main' && secrets.CODEBERG_HOST != '' && secrets.SSH_PK != '' && secrets.SSH_HOSTS != ''
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          show-progress: false
+          fetch-depth: 0
+
+      - name: init
+        run: bin/init.sh
+        env:
+          SSH_PK: ${{ secrets.SSH_PK }}
+          SSH_HOSTS: ${{ secrets.SSH_HOSTS }}
+
+      - name: mirror
+        run: git push ssh://git@${{ secrets.CODEBERG_HOST }}/forgejo/renovate-config.git main:main -f
+
+      - name: cleanup
+        if: ${{ always() }}
+        run: bin/cleanup.sh

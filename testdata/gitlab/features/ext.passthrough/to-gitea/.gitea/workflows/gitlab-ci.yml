@@ -1,0 +1,83 @@
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
+# pipemaster:arg {"On":null,"Attempts":2}
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/common
+# pipemaster:emulated job.retry pipeline/gitlab-ci/job/common
+# pipemaster:arg {"On":null,"Attempts":2}
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/common
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/prod
+# pipemaster:emulated job.retry pipeline/gitlab-ci/job/prod
+# pipemaster:arg {"On":null,"Attempts":2}
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/prod
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  push:
+env:
+  SHARED: "1"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: alpine:3
+    steps:
+      - uses: actions/checkout@v7
+      # pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
+      - id: script
+        run: |
+          for pipemaster_try in $(seq 1 2); do
+            echo "pipemaster: attempt ${pipemaster_try} of 2" >&2
+            set +e
+            (
+            set -e
+          make
+            )
+            pipemaster_rc=$?
+            set -e
+            [ "$pipemaster_rc" -eq 0 ] && exit 0
+          done
+          exit "$pipemaster_rc"
+  common:
+    runs-on: ubuntu-latest
+    container: alpine:3
+    steps:
+      - uses: actions/checkout@v7
+      # pipemaster:emulated job.retry pipeline/gitlab-ci/job/common
+      - id: script
+        run: |
+          for pipemaster_try in $(seq 1 2); do
+            echo "pipemaster: attempt ${pipemaster_try} of 2" >&2
+            set +e
+            (
+            set -e
+          echo common
+            )
+            pipemaster_rc=$?
+            set -e
+            [ "$pipemaster_rc" -eq 0 ] && exit 0
+          done
+          exit "$pipemaster_rc"
+  prod:
+    needs:
+      - build
+      - common
+    runs-on: ubuntu-latest
+    container: alpine:3
+    steps:
+      - uses: actions/checkout@v7
+      # pipemaster:emulated job.retry pipeline/gitlab-ci/job/prod
+      - id: script
+        run: |
+          for pipemaster_try in $(seq 1 2); do
+            echo "pipemaster: attempt ${pipemaster_try} of 2" >&2
+            set +e
+            (
+            set -e
+          ./deploy.sh
+            )
+            pipemaster_rc=$?
+            set -e
+            [ "$pipemaster_rc" -eq 0 ] && exit 0
+          done
+          exit "$pipemaster_rc"

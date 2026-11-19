@@ -1,0 +1,2 @@
+Loss report: gitea -> gitlab
+No losses: every feature converted natively.

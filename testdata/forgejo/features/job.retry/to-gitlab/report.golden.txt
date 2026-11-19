@@ -1,0 +1,2 @@
+Loss report: forgejo -> gitlab
+No losses: every feature converted natively.

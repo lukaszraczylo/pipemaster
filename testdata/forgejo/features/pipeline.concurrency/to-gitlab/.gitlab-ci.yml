@@ -1,0 +1,10 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+# pipemaster:lost script.interpolation pipeline/ci: {{ ref }}
+build:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - echo ok
+  resource_group: ci-

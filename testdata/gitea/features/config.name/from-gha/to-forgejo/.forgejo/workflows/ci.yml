@@ -1,0 +1,16 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: config
+on:
+  push:
+env:
+  API_TOKEN: ${{ secrets.API_TOKEN }}
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "${{ vars.REGION }}"
+        env:
+          KEY: ${{ secrets.DEPLOY_KEY }}

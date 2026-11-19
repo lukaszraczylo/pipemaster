@@ -1,0 +1,24 @@
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
+# pipemaster:arg {"On":["runner_system_failure"],"Attempts":3}
+on:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
+      - id: script
+        run: |
+          for pipemaster_try in $(seq 1 3); do
+            echo "pipemaster: attempt ${pipemaster_try} of 3" >&2
+            set +e
+            (
+            set -e
+          make
+            )
+            pipemaster_rc=$?
+            set -e
+            [ "$pipemaster_rc" -eq 0 ] && exit 0
+          done
+          exit "$pipemaster_rc"

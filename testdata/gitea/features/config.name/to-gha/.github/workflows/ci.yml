@@ -1,0 +1,11 @@
+name: config
+on:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "${{ vars.CI_MODE }}"
+        env:
+          KEY: ${{ secrets.GITEA_DEPLOY }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}

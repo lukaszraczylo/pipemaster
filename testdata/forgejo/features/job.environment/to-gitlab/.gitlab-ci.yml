@@ -1,0 +1,8 @@
+deploy:
+  tags:
+    - docker
+  needs: []
+  script:
+    # pipemaster:step deploy-step-1
+    - echo deploy
+  environment: production

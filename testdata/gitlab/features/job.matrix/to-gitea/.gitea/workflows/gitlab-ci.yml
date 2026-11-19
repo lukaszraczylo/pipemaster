@@ -1,0 +1,25 @@
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/test
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/test
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  push:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - GO: "1.21"
+            OS: linux
+          - GO: "1.21"
+            OS: mac
+          - GO: "1.22"
+            OS: linux
+          - GO: "1.22"
+            OS: mac
+          - GO: "1.20"
+            OS: linux
+    steps:
+      - uses: actions/checkout@v7
+      - id: script
+        run: make test

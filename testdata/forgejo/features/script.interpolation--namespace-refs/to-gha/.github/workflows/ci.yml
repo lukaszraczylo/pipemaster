@@ -1,0 +1,18 @@
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Deploy target
+        default: staging
+env:
+  REGION: eu
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - run: echo ${{ matrix.os }} ${{ inputs.target }} ${{ env.REGION }} ${{ vars.LEVEL }}

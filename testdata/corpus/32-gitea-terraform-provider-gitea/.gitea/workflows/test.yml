@@ -1,0 +1,48 @@
+name: 'Setup Terraform'
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+jobs:
+  terraform-versions:
+    name: 'Terraform Versions'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+    - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      with:
+        go-version-file: 'go.mod'
+
+    - name: Build Provider
+      run: |
+        go build -o terraform-provider-gitea
+        cat <<EOF > $HOME/.terraformrc
+        provider_installation {
+          dev_overrides {
+            "go-gitea/gitea" = "${{ github.workspace }}"
+          }
+          direct {}
+        }
+        EOF
+
+    - name: Terraform fmt
+      id: fmt
+      run: terraform fmt -check -diff -recursive
+      continue-on-error: true
+      working-directory: examples
+
+    - name: Terraform Init
+      id: init
+      run: terraform init
+      working-directory: examples
+
+    - name: Terraform Validate
+      id: validate
+      run: terraform validate -no-color
+      working-directory: examples

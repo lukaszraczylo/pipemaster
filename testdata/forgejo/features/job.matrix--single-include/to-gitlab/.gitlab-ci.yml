@@ -1,0 +1,15 @@
+# pipemaster:emulated script.interpolation pipeline/ci
+# pipemaster:arg [{"k":"t","p":"job/test/runner/0","g":"$os","s":"$\u007b{ matrix.os }}"}]
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"Axes":null,"Include":[[{"Key":"os","Value":"ubuntu-latest"}]],"Exclude":null,"lines":["$os"]}
+test:
+  tags:
+    - $os
+  needs: []
+  script:
+    # pipemaster:step test-step-1
+    - make test
+  parallel:
+    matrix:
+      - os:
+          - ubuntu-latest

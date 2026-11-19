@@ -1,0 +1,2 @@
+Loss report: gitea -> forgejo
+[lost] pipeline/ci/trigger/0 trigger.pipeline_done (event workflow_run is not supported by Forgejo; the trigger is dropped)

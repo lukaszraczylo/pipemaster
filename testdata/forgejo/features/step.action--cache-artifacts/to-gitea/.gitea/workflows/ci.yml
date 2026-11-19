@@ -1,0 +1,25 @@
+on:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v4
+      - uses: https://data.forgejo.org/actions/cache@v4
+        with:
+          key: go-mod
+          path: ~/go/pkg/mod
+      - run: make build
+      - uses: https://data.forgejo.org/actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+  test:
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://data.forgejo.org/actions/download-artifact@v4
+        with:
+          name: dist
+      - run: make test

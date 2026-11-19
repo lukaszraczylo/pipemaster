@@ -1,0 +1,2 @@
+Loss report: forgejo -> gitea
+No losses: every feature converted natively.

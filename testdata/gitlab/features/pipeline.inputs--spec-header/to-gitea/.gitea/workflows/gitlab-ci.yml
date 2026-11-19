@@ -1,0 +1,26 @@
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/deploy
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/deploy
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  push:
+  # pipemaster:emulated pipeline.inputs pipeline/gitlab-ci
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        default: false
+        type: boolean
+      env:
+        default: staging
+      image_tag:
+        description: Image tag to deploy
+        default: latest
+        type: string
+env:
+  TAG: $[[ inputs.image_tag ]]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: script
+        run: echo deploy

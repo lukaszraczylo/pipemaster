@@ -1,0 +1,21 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: outputs
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  use:
+    needs:
+      - version
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ needs.version.outputs.tag }}
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - id: tag
+        run: echo "value=v1" >> "$GITHUB_OUTPUT"
+    outputs:
+      tag: ${{ steps.tag.outputs.value }}

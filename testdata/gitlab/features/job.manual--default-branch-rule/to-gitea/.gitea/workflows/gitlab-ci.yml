@@ -1,0 +1,18 @@
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/publish
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/publish
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  push:
+  # pipemaster:emulated job.manual pipeline/gitlab-ci/job/publish
+  workflow_dispatch:
+jobs:
+  # pipemaster:emulated job.manual pipeline/gitlab-ci/job/publish
+  publish:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # pipemaster:lost job.if pipeline/gitlab-ci/job/publish: branch == gitlab.CI_DEFAULT_BRANCH
+      - id: script
+        run: make publish

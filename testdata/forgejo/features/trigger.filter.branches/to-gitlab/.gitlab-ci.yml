@@ -1,0 +1,15 @@
+# pipemaster:emulated trigger.pull_request pipeline/ci/trigger/0
+# pipemaster:arg {"kind":"pr","branches":{"Include":null,"Exclude":["wip/**"]}}
+# pipemaster:emulated trigger.push pipeline/ci/trigger/1
+# pipemaster:arg {"kind":"push","branches":{"Include":["main","release/**","!release/old"],"Exclude":null}}
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME !~ /^wip\/.*$/)
+    - if: ($CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^release\/.*$/) && $CI_COMMIT_BRANCH != "release/old"
+build:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - echo ok

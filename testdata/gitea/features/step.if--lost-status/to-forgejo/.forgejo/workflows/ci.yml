@@ -1,0 +1,18 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: lost status
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+      - if: failure()
+        run: echo cleanup
+      - id: config
+        run: echo "configured=true" >> "$GITHUB_OUTPUT"
+      - if: steps.config.outputs.configured == 'true'
+        run: echo configured

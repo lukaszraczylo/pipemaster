@@ -1,0 +1,18 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: expression label
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    strategy:
+      matrix:
+        include:
+          - python: "3.13"
+          - os: macos-latest
+            python: "3.14"
+    steps:
+      - run: echo test

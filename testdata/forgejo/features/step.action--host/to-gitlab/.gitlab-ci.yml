@@ -1,0 +1,11 @@
+build:
+  tags:
+    - docker
+  needs: []
+  script:
+    # pipemaster:lost step build-step-2 uses actions/setup-go@v5: missing input go-version
+    # pipemaster:lost step build-step-3 uses org/tool/sub@v2
+    - "true"
+    # pipemaster:step build-step-1
+    # pipemaster:step build-step-2
+    # pipemaster:step build-step-3

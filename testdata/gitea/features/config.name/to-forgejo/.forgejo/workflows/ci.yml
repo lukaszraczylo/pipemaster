@@ -1,0 +1,15 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: config
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "${{ vars.CI_MODE }}"
+        env:
+          KEY: ${{ secrets.GITEA_DEPLOY }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}

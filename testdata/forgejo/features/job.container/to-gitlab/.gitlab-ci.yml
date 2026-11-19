@@ -1,0 +1,8 @@
+build:
+  image: golang:1.24
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - go version

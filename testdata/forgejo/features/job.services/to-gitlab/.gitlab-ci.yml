@@ -1,0 +1,14 @@
+test:
+  services:
+    - name: postgres:16
+      alias: db
+      variables:
+        POSTGRES_PASSWORD: $DB_PASSWORD
+    - name: redis:7
+      alias: cache
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step test-step-1
+    - echo ok

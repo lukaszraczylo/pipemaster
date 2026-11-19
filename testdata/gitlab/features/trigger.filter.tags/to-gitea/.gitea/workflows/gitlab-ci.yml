@@ -1,0 +1,14 @@
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/release
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/release
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  push:
+    tags:
+      - v**
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: script
+        run: make release

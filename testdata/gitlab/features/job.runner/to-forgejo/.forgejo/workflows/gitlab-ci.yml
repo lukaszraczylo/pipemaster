@@ -1,0 +1,17 @@
+# pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on:
+      - docker
+      - linux
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: make

@@ -1,0 +1,2 @@
+Loss report: forgejo -> gitea
+[lost] pipeline/ci/job/deploy job.environment (Gitea ignores jobs.<id>.environment)

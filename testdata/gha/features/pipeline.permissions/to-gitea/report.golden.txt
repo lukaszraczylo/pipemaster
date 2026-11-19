@@ -1,0 +1,2 @@
+Loss report: gha -> gitea
+[lost] pipeline/ci/scope/id-token pipeline.permissions (id-token is unsupported in Gitea v28)

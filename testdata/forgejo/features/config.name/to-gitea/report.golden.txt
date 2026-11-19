@@ -1,0 +1,2 @@
+Loss report: forgejo -> gitea
+[external] pipeline/ci/ref/vars.CI config.name: create variable CI: Gitea rejects names that start with CI; rename it and update the reference

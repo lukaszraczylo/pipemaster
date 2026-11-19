@@ -1,0 +1,21 @@
+name: inputs
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Where to deploy
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
+      dry-run:
+        description: Skip the push
+        default: false
+        type: boolean
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok

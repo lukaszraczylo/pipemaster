@@ -1,0 +1,33 @@
+# pipemaster:emulated project.multi_pipeline pipeline/ci
+# pipemaster:arg {"name":"CI","triggers":[{"Resource":null,"Ext":null,"Kind":"push","Cron":"","Branches":{"Include":null,"Exclude":null},"Tags":{"Include":null,"Exclude":null},"Paths":{"Include":null,"Exclude":null}},{"Resource":null,"Ext":null,"Kind":"tag","Cron":"","Branches":{"Include":null,"Exclude":null},"Tags":{"Include":null,"Exclude":null},"Paths":{"Include":null,"Exclude":null}}]}
+# pipemaster:emulated project.multi_pipeline pipeline/deploy
+# pipemaster:arg {"name":"Deploy","inputs":[{"Name":"target","Type":"choice","Default":"staging","Description":"Where to deploy","Required":true}],"triggers":[{"Resource":null,"Ext":{"gha":{"inputs":{"target":{"options":["staging","production"]}}}},"Kind":"manual","Cron":"","Branches":{"Include":null,"Exclude":null},"Tags":{"Include":null,"Exclude":null},"Paths":{"Include":null,"Exclude":null}}]}
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+# pipemaster:emulated project.multi_pipeline pipeline/ci/job/test
+# pipemaster:arg {}
+ci:test:
+  tags:
+    - ubuntu-latest
+  needs: []
+  rules:
+    - if: $CI_COMMIT_BRANCH || $CI_COMMIT_TAG
+  script:
+    # pipemaster:step test-step-1
+    - echo test
+# pipemaster:emulated project.multi_pipeline pipeline/deploy/job/deploy
+# pipemaster:arg {}
+deploy:deploy:
+  tags:
+    - ubuntu-latest
+  needs: []
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+  variables:
+    target: staging
+  script:
+    # pipemaster:step deploy-step-1
+    - echo deploy

@@ -1,0 +1,83 @@
+name: build
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Builds and tests the images without publishing them: no job logs in to a registry or pushes.
+
+jobs:
+  build-default:
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-latest-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        major: [26, 24, 22]
+        arch: [amd64, arm64]
+    env:
+      IMAGE: runner-images-test:${{ github.run_id }}-ubuntu-${{ matrix.major }}.04-${{ matrix.arch }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Docker BuildX
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Build default ${{ matrix.major }}.04 ${{ matrix.arch }}
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          file: dockerfiles/ubuntu.dockerfile
+          platforms: linux/${{ matrix.arch }}
+          pull: true
+          push: false
+          load: true
+          build-args: BASE_IMAGE_TAG=${{ matrix.major }}.04
+          tags: ${{ env.IMAGE }}
+
+      - name: Smoke test default ${{ matrix.major }}.04 ${{ matrix.arch }}
+        run: docker run --rm -i "${IMAGE}" bash -s -- ${{ matrix.major }}.04 < tests/default.sh
+
+      - name: Remove test image
+        if: always()
+        run: docker image rm -f "${IMAGE}"
+
+  build-slim:
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-latest-arm' || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    env:
+      IMAGE: runner-images-test:${{ github.run_id }}-ubuntu-slim-${{ matrix.arch }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Docker BuildX
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Build slim ${{ matrix.arch }}
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          file: dockerfiles/ubuntu-slim.dockerfile
+          platforms: linux/${{ matrix.arch }}
+          pull: true
+          push: false
+          load: true
+          tags: ${{ env.IMAGE }}
+
+      - name: Smoke test slim ${{ matrix.arch }}
+        run: docker run --rm -i --user node "${IMAGE}" bash -s < tests/slim.sh
+
+      - name: Remove test image
+        if: always()
+        run: docker image rm -f "${IMAGE}"

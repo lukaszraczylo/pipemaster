@@ -1,0 +1,15 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: jobenv
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GOFLAGS: -trimpath
+      API: ${{ secrets.API_KEY }}
+    steps:
+      - run: echo ok

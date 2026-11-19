@@ -1,0 +1,14 @@
+# pipemaster:emulated script.interpolation pipeline/ci
+# pipemaster:arg [{"k":"t","p":"job/build/step/build-step-1/script/0","g":"echo \"$FORGEJO_REGION $CI\"","s":"echo \"$\u007b{ vars.FORGEJO_REGION }} $\u007b{ vars.CI }}\""}]
+build:
+  tags:
+    - docker
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    # pipemaster:emulated step.env pipeline/ci/job/build/step/build-step-1
+    - |
+      (
+      export KEY="$DEPLOY_KEY"
+      echo "$FORGEJO_REGION $CI"
+      )

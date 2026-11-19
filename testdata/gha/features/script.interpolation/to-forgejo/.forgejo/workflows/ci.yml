@@ -1,0 +1,14 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: interp
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "sha ${{ github.sha }} on ${{ github.ref_name }}"
+          echo "${{ github.workspace }}"

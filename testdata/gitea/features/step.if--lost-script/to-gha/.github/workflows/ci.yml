@@ -1,0 +1,12 @@
+name: ci
+on:
+  push:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - id: meta
+        run: echo "version=1" >> "$GITHUB_OUTPUT"
+      - name: Inspect
+        if: github.event_name != 'pull_request'
+        run: docker inspect ${{ steps.meta.outputs.version }}

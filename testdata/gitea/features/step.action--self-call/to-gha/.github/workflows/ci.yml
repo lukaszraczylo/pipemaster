@@ -1,0 +1,11 @@
+on:
+  push:
+jobs:
+  # pipemaster:lost step.action pipeline/ci/job/call/step/call-step-1: self:org/shared/.gitea/workflows/build.yml@main
+  call:
+    if: false
+    uses: org/shared/.gitea/workflows/build.yml@main
+  plain:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok

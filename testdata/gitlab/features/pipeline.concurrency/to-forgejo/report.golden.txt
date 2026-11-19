@@ -1,0 +1,4 @@
+Loss report: gitlab -> forgejo
+[emulated] pipeline/gitlab-ci/job/build step.action: actions/checkout step (GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs)
+[emulated] pipeline/gitlab-ci/trigger/0 trigger.push: branches: '**' (GHA fires a push without filters for branches and tags; branches are named explicitly to leave tags out or beside a tag filter)
+[native] pipeline/gitlab-ci/job/build/synth/checkout step.action (printed as an absolute URL; an instance that cannot reach https://github.com needs the URL edited)

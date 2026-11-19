@@ -1,0 +1,11 @@
+# pipemaster:lost expr.opaque pipeline/ci/job/build: opaque(gha): fromJSON('{"a":1}').a == 1
+build:
+  tags:
+    - ubuntu-latest
+  needs: []
+  rules:
+    - when: never
+  script:
+    # pipemaster:lost script.interpolation pipeline/ci/job/build/step/build-step-1: echo {{ opaque(gha): env[github.job] }}
+    - "true"
+    # pipemaster:step build-step-1

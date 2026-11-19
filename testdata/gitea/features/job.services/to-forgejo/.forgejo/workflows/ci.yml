@@ -1,0 +1,22 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: services
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready
+      cache:
+        image: redis:7
+    steps:
+      - run: echo ok

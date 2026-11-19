@@ -1,0 +1,9 @@
+build:
+  needs: []
+  script:
+    - make
+  artifacts:
+    name: bin
+    expire_in: 1 week
+    paths:
+      - bin/

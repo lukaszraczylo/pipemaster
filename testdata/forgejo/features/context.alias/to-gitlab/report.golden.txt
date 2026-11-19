@@ -1,0 +1,4 @@
+Loss report: forgejo -> gitlab
+[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
+[lost] pipeline/ci/job/build/step/build-step-2 step.if (condition not expressible in GitLab CI; step disabled)
+[emulated] pipeline/ci/job/build/step/build-step-1 step.if: shell guard around the step's lines (step reports success instead of skipped)

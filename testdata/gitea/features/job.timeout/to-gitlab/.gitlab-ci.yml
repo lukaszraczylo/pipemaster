@@ -1,0 +1,8 @@
+build:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - echo ok
+  timeout: 15 minutes

@@ -1,0 +1,8 @@
+build:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    # pipemaster:lost script.interpolation pipeline/ci/job/build/step/build-step-1: echo "{{ gha.github.workspace }}"
+    - echo "sha $CI_COMMIT_SHA on $CI_COMMIT_REF_NAME"

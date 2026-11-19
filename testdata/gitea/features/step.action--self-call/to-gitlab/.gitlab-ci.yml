@@ -1,0 +1,13 @@
+call:
+  needs: []
+  script:
+    # pipemaster:lost step call-step-1 kind pipeline_call
+    - "true"
+    # pipemaster:step call-step-1
+plain:
+  tags:
+    - ubuntu-latest
+  needs: []
+  script:
+    # pipemaster:step plain-step-1
+    - echo ok

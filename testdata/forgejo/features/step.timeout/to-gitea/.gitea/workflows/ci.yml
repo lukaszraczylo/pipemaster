@@ -1,0 +1,9 @@
+name: stepto
+on:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sleep 1
+        timeout-minutes: 2

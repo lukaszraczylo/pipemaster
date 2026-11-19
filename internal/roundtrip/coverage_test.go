@@ -12,9 +12,11 @@ import (
 
 // noSourceForm lists supported features that a fixture cannot exercise, with the reason.
 var noSourceForm = map[string]string{
-	provider.GHA + "/" + string(caps.JobEnvironmentApproval):    "approval rules live in repository settings and no parser sets Environment.Approval",
-	provider.GitLab + "/" + string(caps.JobEnvironmentApproval): "approval rules live in project settings and no parser sets Environment.Approval",
-	provider.GitLab + "/" + string(caps.ConfigName):             "GitLab variables parse as plain script text, so no gitlab source yields a secrets or vars reference",
+	provider.GHA + "/" + string(caps.JobEnvironmentApproval):     "approval rules live in repository settings and no parser sets Environment.Approval",
+	provider.Gitea + "/" + string(caps.JobEnvironmentApproval):   "approval rules live in repository settings and no parser sets Environment.Approval",
+	provider.Forgejo + "/" + string(caps.JobEnvironmentApproval): "approval rules live in repository settings and no parser sets Environment.Approval",
+	provider.GitLab + "/" + string(caps.JobEnvironmentApproval):  "approval rules live in project settings and no parser sets Environment.Approval",
+	provider.GitLab + "/" + string(caps.ConfigName):              "GitLab variables parse as plain script text, so no gitlab source yields a secrets or vars reference",
 }
 
 // fixtureComplete reports whether a fixture directory holds a source file for the provider and its IR golden, so
@@ -27,8 +29,12 @@ func fixtureComplete(id, dir string) bool {
 		_, err := os.Stat(filepath.Join(dir, ".gitlab-ci.yml"))
 		return err == nil
 	}
-	files, _ := filepath.Glob(filepath.Join(dir, ".github", "workflows", "*.y*ml"))
-	return len(files) > 0
+	for _, wd := range []string{".github/workflows", ".gitea/workflows", ".forgejo/workflows"} {
+		if files, _ := filepath.Glob(filepath.Join(dir, filepath.FromSlash(wd), "*.y*ml")); len(files) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // hasFixtureDir reports whether dir holds a complete fixture named after the feature, optionally followed by "--<variant>".
@@ -77,16 +83,25 @@ func TestCoverageRejectsEmptyFixtureDir(t *testing.T) {
 // TestFeatureFixtureCoverage requires a fixture directory for every feature a provider can write.
 // A lost feature has no syntax in the provider, so it has no fixture.
 func TestFeatureFixtureCoverage(t *testing.T) {
-	for _, id := range []string{provider.GHA, provider.GitLab} {
+	for _, id := range provider.IDs() {
 		m := prov(t, id).Caps()
-		dir := filepath.Join(featuresRoot, id, "features")
+		dirs := []string{filepath.Join(featuresRoot, id, "features")}
+		if provider.Family(id) == provider.GHA && id != provider.GHA {
+			// A dialect runs every GHA fixture remapped to its own directory, so those count as coverage.
+			dirs = append(dirs, filepath.Join(featuresRoot, provider.GHA, "features"))
+		}
 		for _, f := range caps.AllFeatures() {
 			if m.Lookup(f).Level == caps.Lost {
 				continue
 			}
 			key := id + "/" + string(f)
 			t.Run(key, func(t *testing.T) {
-				has := hasFixtureDir(t, id, dir, f)
+				has := false
+				for _, dir := range dirs {
+					if _, err := os.Stat(dir); err == nil {
+						has = has || hasFixtureDir(t, id, dir, f)
+					}
+				}
 				if reason, exempt := noSourceForm[key]; exempt {
 					if has {
 						t.Errorf("%s has a fixture; drop its noSourceForm entry (%s)", key, reason)
@@ -94,7 +109,7 @@ func TestFeatureFixtureCoverage(t *testing.T) {
 					return
 				}
 				if !has {
-					t.Errorf("no fixture directory %s/%s", dir, f)
+					t.Errorf("no fixture directory %s/%s", dirs[0], f)
 				}
 			})
 		}

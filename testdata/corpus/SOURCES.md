@@ -1,11 +1,12 @@
 # Corpus sources
 
 Real-world CI pipelines stored verbatim for `TestCorpus` (`internal/roundtrip/corpus_test.go`).
-The directory of an entry is `testdata/corpus/<#>-<gha or gitlab>-<slug>`.
+The directory of an entry is `testdata/corpus/<#>-<gha, gitea, forgejo or gitlab>-<slug>`.
 Every file is byte-identical to the file at the pinned commit; the test run does not edit them.
 
-- Fetch date: 2026-11-18 for every entry.
-- Each repository is public, and its licence was read from the host API (GitHub `license.spdx_id`, GitLab `license.key`) before use.
+- Fetch date: 2026-11-18 for entries 01 to 27 and 2026-11-19 for entries 28 to 40.
+- Each repository is public, and its licence was read before use: from the host API (GitHub `license.spdx_id`, GitLab `license.key`), or, for entries 28 to 40,
+  from the `LICENSE` file of the repository at the pinned commit.
   Every licence is MIT, Apache-2.0 or BSD-3-Clause.
 - No private repository and no repository of the operator is used. No file holds a secret.
 - Attribution: this file names the source repository, the commit, each path and the SPDX licence of every
@@ -16,6 +17,8 @@ Every file is byte-identical to the file at the pinned commit; the test run does
 - Entry 22 pins the last commit that changed `.gitlab-ci.yml`: the file at that commit is byte-identical
   to the file fetched on the fetch date.
 - Entry 23 (gitlab-org/labkit) is not in the corpus: its CI file holds a database URL with a user name and password, which the secret scanner of the commit hook flags, so the corpus does not copy it. The entry numbers do not shift.
+- Entries 28 to 35 are `.gitea/workflows` files from gitea.com. Entries 36 to 40 are `.forgejo/workflows` files from codeberg.org.
+  Every file comes from `<repository>/raw/commit/<commit>/<path>`, and holds only secret references.
 - Entries 15 to 27 include the local files the root `.gitlab-ci.yml` references (`include: local:`), at the same commit.
 
 | # | Slug | Provider | Repository | Commit | SPDX licence | Paths |
@@ -46,3 +49,16 @@ Every file is byte-identical to the file at the pinned commit; the test run does
 | 25 | semgrep | GitLab | <https://gitlab.com/gitlab-org/security-products/analyzers/semgrep> | `21b369a221298beab14a483fccbb700f545ab37e` | MIT | `.gitlab-ci.yml` |
 | 26 | terraform-images | GitLab | <https://gitlab.com/gitlab-org/terraform-images> | `88f4ad0c22470d65bf56aadb10fce1ec7e383d33` | MIT | `.gitlab-ci.yml` |
 | 27 | pipewire | GitLab | <https://gitlab.com/pipewire/pipewire> | `d329dac6ba7d32dacb13fd358b5360a59f7aac27` | MIT | `.gitlab-ci.yml` |
+| 28 | docs | Gitea | <https://gitea.com/gitea/docs> | `5df4373bfe3d38e368d4475af8aaf2de22c8eccd` | Apache-2.0 | `.gitea/workflows/build-and-publish.yaml`<br>`.gitea/workflows/cleanup-preview.yaml`<br>`.gitea/workflows/test.yaml`<br>`.gitea/workflows/update_runner_reference.yaml`<br>`.gitea/workflows/update_swagger.yaml` |
+| 29 | helm-actions | Gitea | <https://gitea.com/gitea/helm-actions> | `d0cf871b74ebad2ba42ba8849cea3a321375a4bb` | MIT | `.gitea/workflows/changelog.yml`<br>`.gitea/workflows/commitlint.yml`<br>`.gitea/workflows/release-version.yml`<br>`.gitea/workflows/shellcheck.yml`<br>`.gitea/workflows/test-pr.yml` |
+| 30 | runner-images | Gitea | <https://gitea.com/gitea/runner-images> | `e5e94cda9983fdef6ce541b216d36be73240d8ab` | MIT | `.gitea/workflows/build.yaml`<br>`.gitea/workflows/release.yaml` |
+| 31 | builder | Gitea | <https://gitea.com/xorm/builder> | `88db4b7a290e042ae5b3c08c9d094eca0b07584c` | BSD-3-Clause | `.gitea/workflows/test.yml` |
+| 32 | terraform-provider-gitea | Gitea | <https://gitea.com/gitea/terraform-provider-gitea> | `760cbc8342fa5fa45202140b7d5f5f8dd33b4e0f` | MIT | `.gitea/workflows/sync-to-github.yml`<br>`.gitea/workflows/test.yml` |
+| 33 | reverse | Gitea | <https://gitea.com/xorm/reverse> | `99cd7887d56885e298903983c5f666fb76c69ae1` | BSD-3-Clause | `.gitea/workflows/release-tag.yml`<br>`.gitea/workflows/test.yml` |
+| 34 | gitea-vscode | Gitea | <https://gitea.com/gitea/gitea-vscode> | `aa9504ece2e1df93bb053619d89139578a8ca654` | MIT | `.gitea/workflows/ci.yml`<br>`.gitea/workflows/release.yml`<br>`.gitea/workflows/tag-release.yml` |
+| 35 | actionslib | Gitea | <https://gitea.com/gitea/actionslib> | `a95558b443576745b1a22d2326722fef3534df9f` | MIT | `.gitea/workflows/pull-request.yml`<br>`.gitea/workflows/push.yml`<br>`.gitea/workflows/tag.yml` |
+| 36 | renovate-config | Forgejo | <https://codeberg.org/forgejo/renovate-config> | `4c322366ea37510f4f1012323cfec0cfec247ce1` | MIT | `.forgejo/workflows/build.yml` |
+| 37 | helm | Forgejo | <https://codeberg.org/forgejo-contrib/forgejo-helm> | `91fcfc2735b2919506179e4b1aff90bb00768251` | MIT | `.forgejo/workflows/build.yml`<br>`.forgejo/workflows/mirror.yml` |
+| 38 | deb | Forgejo | <https://codeberg.org/forgejo-contrib/forgejo-deb> | `0151f06943eaaec1909d637b2b237df1c95d95d5` | MIT | `.forgejo/workflows/forgejo-deb.yml`<br>`.forgejo/workflows/mirror.yml` |
+| 39 | renovate | Forgejo | <https://codeberg.org/forgejo-contrib/forgejo-renovate> | `0ef5e88be10c29a764c5203f5c2593f6cd5c2998` | MIT | `.forgejo/workflows/build.yml`<br>`.forgejo/workflows/mirror.yml`<br>`.forgejo/workflows/renovate-cb.yml`<br>`.forgejo/workflows/renovate.yml` |
+| 40 | contrib-renovate-config | Forgejo | <https://codeberg.org/forgejo-contrib/renovate-config> | `79cee37e7360ec5cbadb65afc5d83605dc9708e4` | MIT | `.forgejo/workflows/build.yml` |

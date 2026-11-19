@@ -1,0 +1,2 @@
+Loss report: forgejo -> gitlab
+[emulated] pipeline/ci pipeline.inputs: variables with description (input types and required flags are not enforced)

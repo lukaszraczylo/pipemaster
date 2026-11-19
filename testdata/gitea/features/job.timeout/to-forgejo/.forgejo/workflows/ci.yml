@@ -1,0 +1,13 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: timeout
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - run: echo ok

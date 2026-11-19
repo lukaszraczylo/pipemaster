@@ -1,0 +1,15 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: pr
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok

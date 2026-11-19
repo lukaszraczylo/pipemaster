@@ -1,0 +1,4 @@
+Loss report: forgejo -> gitlab
+[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
+[lost] pipeline/ci/job/use/step/use-step-1 script.interpolation (no GitLab variable for expression needs.version.outputs.tag; the line is commented out)
+[lost] pipeline/ci/job/version job.outputs (no GitLab variable for expression steps.tag.outputs.value)

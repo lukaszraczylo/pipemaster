@@ -1,0 +1,39 @@
+# pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/check
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/check
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/compile
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/package
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/package
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  check:
+    needs:
+      - compile
+      - package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: make check
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: make compile
+  package:
+    needs:
+      - compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: make package

@@ -1,0 +1,76 @@
+name: Tag Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  releases: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ gitea.ref_name }}
+          lfs: true
+
+      - name: Use Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ".node-version"
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build extension
+        run: pnpm run build
+
+      - name: Prepare release notes
+        id: prepare
+        env:
+          TAG_NAME: ${{ gitea.ref_name }}
+        run: |
+          version="${TAG_NAME#v}"
+          mkdir -p .tmp
+          awk -v version="$version" '
+            BEGIN { heading = "## [" version "]" }
+            index($0, heading) == 1 { found = 1; print; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > .tmp/release-body.md
+
+          if [ ! -s .tmp/release-body.md ]; then
+            echo "See CHANGELOG.md for release notes." > .tmp/release-body.md
+          fi
+
+          if [[ "$TAG_NAME" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Name VSIX asset
+        env:
+          TAG_NAME: ${{ gitea.ref_name }}
+        run: mv dist/extension.vsix "dist/gitea-for-vscode-${TAG_NAME#v}.vsix"
+
+      - name: Create Gitea release
+        uses: https://gitea.com/actions/gitea-release-action@v1
+        with:
+          token: ${{ secrets.GITEA_TOKEN }}
+          repository: ${{ gitea.repository }}
+          tag_name: ${{ gitea.ref_name }}
+          name: ${{ gitea.ref_name }}
+          body_path: .tmp/release-body.md
+          prerelease: ${{ steps.prepare.outputs.prerelease }}
+          files: dist/*.vsix
+          sha256sum: true

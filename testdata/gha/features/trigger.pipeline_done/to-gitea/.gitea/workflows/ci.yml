@@ -1,0 +1,14 @@
+name: after
+on:
+  workflow_run:
+    workflows:
+      - Build
+    branches:
+      - main
+    types:
+      - completed
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok

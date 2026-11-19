@@ -1,0 +1,5 @@
+Loss report: forgejo -> gha
+[emulated] pipeline/ci/job/build/step/build-step-1 step.action: bare ref (resolved against https://data.forgejo.org in the source; GitHub resolves it on github.com, where the action can differ)
+[emulated] pipeline/ci/job/build/step/build-step-2 step.action: bare ref (resolved against https://data.forgejo.org in the source; GitHub resolves it on github.com, where the action can differ)
+[emulated] pipeline/ci/job/build/step/build-step-4 step.action: bare ref (resolved against https://data.forgejo.org in the source; GitHub resolves it on github.com, where the action can differ)
+[emulated] pipeline/ci/job/test/step/test-step-1 step.action: bare ref (resolved against https://data.forgejo.org in the source; GitHub resolves it on github.com, where the action can differ)

@@ -1,0 +1,13 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: opaque
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    if: fromJSON('{"a":1}').a == 1
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ env[github.job] }}

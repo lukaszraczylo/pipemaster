@@ -1,0 +1,2 @@
+Loss report: gitea -> gha
+[lost] pipeline/ci/scope/code pipeline.permissions (scope code is not a GHA permission; dropped)

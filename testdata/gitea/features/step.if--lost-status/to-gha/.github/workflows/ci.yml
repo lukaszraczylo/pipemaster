@@ -1,0 +1,14 @@
+name: lost status
+on:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+      - if: failure()
+        run: echo cleanup
+      - id: config
+        run: echo "configured=true" >> "$GITHUB_OUTPUT"
+      - if: steps.config.outputs.configured == 'true'
+        run: echo configured

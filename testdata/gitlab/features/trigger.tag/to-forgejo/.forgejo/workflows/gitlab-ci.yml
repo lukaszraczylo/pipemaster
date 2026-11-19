@@ -1,0 +1,19 @@
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/release
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/release
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  push:
+    tags:
+      - '**'
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: make release

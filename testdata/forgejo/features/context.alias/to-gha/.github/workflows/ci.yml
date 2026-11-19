@@ -1,0 +1,11 @@
+name: alias
+on:
+  push:
+jobs:
+  build:
+    runs-on: docker
+    steps:
+      - if: github.ref_name == 'main'
+        run: echo ${{ github.ref_name }}
+      - if: github.sha != ''
+        run: echo ${{ github.sha }}

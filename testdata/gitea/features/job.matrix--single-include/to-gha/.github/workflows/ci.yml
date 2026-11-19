@@ -1,0 +1,12 @@
+name: ci
+on:
+  push:
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+    steps:
+      - run: make test

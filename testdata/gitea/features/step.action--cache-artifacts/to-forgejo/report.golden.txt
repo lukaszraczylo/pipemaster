@@ -1,0 +1,6 @@
+Loss report: gitea -> forgejo
+[emulated] pipeline/ci pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)
+[native] pipeline/ci/job/build/step/build-step-1 step.action (printed as an absolute URL; an instance that cannot reach https://github.com needs the URL edited)
+[native] pipeline/ci/job/build/step/build-step-2 step.action (printed as an absolute URL; an instance that cannot reach https://github.com needs the URL edited)
+[native] pipeline/ci/job/build/step/build-step-4 step.action (printed as an absolute URL; an instance that cannot reach https://github.com needs the URL edited)
+[native] pipeline/ci/job/test/step/test-step-1 step.action (printed as an absolute URL; an instance that cannot reach https://github.com needs the URL edited)

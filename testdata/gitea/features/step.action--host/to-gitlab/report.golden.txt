@@ -1,0 +1,5 @@
+Loss report: gitea -> gitlab
+[lost] pipeline/ci/job/build/step/build-step-1 ext.passthrough (the action reference actions/checkout@v4 is not in the GitLab file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/build/step/build-step-2 step.action (no GitLab mapping for action org/tool@v2)
+[lost] pipeline/ci/job/build/step/build-step-3 step.action (no GitLab mapping for action org/local-action@main)
+[lost] pipeline/ci/job/build/step/build-step-4 step.action (no GitLab mapping for action /checkout)

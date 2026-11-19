@@ -1,0 +1,16 @@
+on: [push]
+jobs:
+  mirror:
+    runs-on: trixie
+    if: forge.repository == 'forgejo-contrib/forgejo-deb'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: "mirror repo: code.forgejo.org"
+        env:
+          FORGEJO_DEST: code.forgejo.org
+          FORGEJO_DEST_REPO: ${{ forge.repository }}
+          FORGEJO_DEST_TOKEN: ${{ secrets.cfo_api_key }}
+        run: ./.scripted-action.sh mirror

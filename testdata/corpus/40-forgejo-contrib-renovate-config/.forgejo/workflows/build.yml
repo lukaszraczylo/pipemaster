@@ -1,0 +1,27 @@
+name: build
+
+on:
+  push:
+
+jobs:
+  lint:
+    runs-on: codeberg-tiny
+    container:
+      image: data.forgejo.org/renovate/renovate:44.239.1@sha256:0ce4e08df66821d1ad45de9019bf11241dd9bf2af52ec75a9345335b14c83814
+
+    strategy:
+      matrix:
+        file:
+          - default.json
+          - renovate.json
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          show-progress: false
+
+      - run: renovate-config-validator --no-global ${{ matrix.file }}
+        env:
+          LOG_LEVEL: debug
+          RENOVATE_PLATFORM: forgejo
+          RENOVATE_ENDPOINT: ${{ github.server_url }}

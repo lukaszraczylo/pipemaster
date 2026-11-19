@@ -1,0 +1,32 @@
+# pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/compile
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/cleanup
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/cleanup
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/cleanup
+# pipemaster:arg {"needs":[{"JobID":"compile","Artifacts":false,"Optional":false}]}
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: make build
+  # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+  cleanup:
+    needs:
+      - compile
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      # pipemaster:lost job.if pipeline/gitlab-ci/job/cleanup: opaque(gitlab): - if: $PIPELINE_TYPE =~ /_MR_PIPELINE$/\n
+      - id: script
+        run: make clean

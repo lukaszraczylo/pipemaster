@@ -25,33 +25,35 @@ const (
 
 func TestCrossGolden(t *testing.T) {
 	for _, f := range allFixtures(t) {
-		t.Run(f.provider+"/"+f.name, func(t *testing.T) {
-			a, b := prov(t, f.provider), prov(t, other(f.provider))
-			proj, _, err := a.Parse(os.DirFS(f.dir))
-			if err != nil {
-				t.Fatal(err)
-			}
-			files, rep, err := b.Emit(proj)
-			if err != nil {
-				t.Fatal(err)
-			}
-			out := filepath.Join(f.dir, "to-"+b.ID())
-			for _, name := range names(files) {
-				if err := validate.File(b.ID(), name, files[name]); err != nil && !errors.Is(err, validate.ErrNoSchema) {
-					t.Errorf("validate %s: %v", name, err)
+		for _, to := range targets(f.provider) {
+			t.Run(f.provider+"/"+f.name+"/to-"+to, func(t *testing.T) {
+				a, b := prov(t, f.provider), prov(t, to)
+				proj, _, err := a.Parse(os.DirFS(f.dir))
+				if err != nil {
+					t.Fatal(err)
 				}
-				if b.ID() == provider.GitLab && strings.Contains(string(files[name]), exprOpen) {
-					t.Errorf("%s holds a GHA expression", name)
+				files, rep, err := b.Emit(proj)
+				if err != nil {
+					t.Fatal(err)
 				}
-				golden.Assert(t, filepath.Join(out, name), files[name])
-			}
-			rep.Source, rep.Target = a.ID(), b.ID()
-			var buf bytes.Buffer
-			if err := rep.Render(&buf, "text"); err != nil {
-				t.Fatal(err)
-			}
-			golden.Assert(t, filepath.Join(out, reportGolden), buf.Bytes())
-		})
+				out := filepath.Join(f.golden, "to-"+b.ID())
+				for _, name := range names(files) {
+					if err := validate.File(b.ID(), name, files[name]); err != nil && !errors.Is(err, validate.ErrNoSchema) {
+						t.Errorf("validate %s: %v", name, err)
+					}
+					if b.ID() == provider.GitLab && strings.Contains(string(files[name]), exprOpen) {
+						t.Errorf("%s holds a GHA expression", name)
+					}
+					golden.Assert(t, filepath.Join(out, name), files[name])
+				}
+				rep.Source, rep.Target = a.ID(), b.ID()
+				var buf bytes.Buffer
+				if err := rep.Render(&buf, "text"); err != nil {
+					t.Fatal(err)
+				}
+				golden.Assert(t, filepath.Join(out, reportGolden), buf.Bytes())
+			})
+		}
 	}
 }
 

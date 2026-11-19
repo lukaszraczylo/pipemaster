@@ -1,0 +1,9 @@
+name: opaque
+on:
+  push:
+jobs:
+  build:
+    if: fromJSON('{"a":1}').a == 1
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ env[github.job] }}

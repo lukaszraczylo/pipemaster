@@ -1,0 +1,4 @@
+Loss report: gitea -> gha
+[lost] pipeline/ci/job/build/step/build-step-3 step.action (self: actions exist only in Gitea; the step is disabled)
+[lost] pipeline/ci/job/build/step/build-step-4 step.action (builtin: actions exist only in Gitea; the step is disabled)
+[emulated] pipeline/ci/job/build/step/build-step-2 step.action: bare ref (resolved against https://git.example.com in the source; GitHub resolves it on github.com, where the action can differ)

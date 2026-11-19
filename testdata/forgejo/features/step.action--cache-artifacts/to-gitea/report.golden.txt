@@ -1,0 +1,5 @@
+Loss report: forgejo -> gitea
+[native] pipeline/ci/job/build/step/build-step-1 step.action (printed as an absolute URL; an instance that cannot reach https://data.forgejo.org needs the URL edited)
+[native] pipeline/ci/job/build/step/build-step-2 step.action (printed as an absolute URL; an instance that cannot reach https://data.forgejo.org needs the URL edited)
+[native] pipeline/ci/job/build/step/build-step-4 step.action (printed as an absolute URL; an instance that cannot reach https://data.forgejo.org needs the URL edited)
+[native] pipeline/ci/job/test/step/test-step-1 step.action (printed as an absolute URL; an instance that cannot reach https://data.forgejo.org needs the URL edited)

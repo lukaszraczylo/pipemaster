@@ -1,0 +1,24 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  pull_request:
+    paths-ignore:
+      - '**.md'
+  push:
+    branches:
+      - '**'
+    paths:
+      - src/**
+      - '!src/docs/**'
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: build-step-1
+        run: echo ok

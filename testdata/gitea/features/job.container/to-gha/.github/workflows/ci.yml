@@ -1,0 +1,13 @@
+name: container
+on:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: golang:1.24
+      env:
+        GOFLAGS: -mod=readonly
+      options: --cpus 2
+    steps:
+      - run: go version

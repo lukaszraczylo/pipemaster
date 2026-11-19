@@ -1,0 +1,4 @@
+Loss report: gitea -> gitlab
+[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
+[lost] pipeline/ci pipeline.inputs (input dry-run is not a unique variable name)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider gha (inputs) is not written to the GitLab file; it is kept in round-trip metadata)

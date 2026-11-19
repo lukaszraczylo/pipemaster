@@ -1,0 +1,148 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish, for example v1.0.1"
+        required: true
+        type: string
+      target:
+        description: "Marketplace to publish to"
+        required: false
+        default: both
+        type: choice
+        options:
+          - both
+          - vs-marketplace
+          - open-vsx
+      dry_run:
+        description: "Build the VSIX without publishing it to the marketplaces"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+
+    outputs:
+      tag: ${{ steps.target.outputs.tag }}
+      version: ${{ steps.target.outputs.version }}
+      dry_run: ${{ steps.target.outputs.dry_run }}
+      vsmarketplace: ${{ steps.target.outputs.vsmarketplace }}
+      open_vsx: ${{ steps.target.outputs.open_vsx }}
+
+    steps:
+      - name: Checkout workflow source
+        uses: actions/checkout@v7
+
+      - name: Resolve release target
+        id: target
+        env:
+          REQUESTED_TAG: ${{ gitea.event.inputs.tag }}
+          REQUESTED_TARGET: ${{ gitea.event.inputs.target }}
+          REQUESTED_DRY_RUN: ${{ gitea.event.inputs.dry_run }}
+          REF_NAME: ${{ gitea.ref_name }}
+        run: node scripts/release-target.cjs
+
+  publish:
+    needs: prepare
+    if: needs.prepare.outputs.vsmarketplace == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+          lfs: true
+
+      - name: Use Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ".node-version"
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release tag matches package.json
+        env:
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [[ "$version" != "$RELEASE_VERSION" ]]; then
+            echo "::error::package.json version $version does not match release tag $RELEASE_TAG"
+            exit 1
+          fi
+
+      - name: Build extension
+        run: pnpm run build
+
+      - name: Publish to Visual Studio Marketplace
+        if: needs.prepare.outputs.dry_run != 'true'
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        run: |
+          publish_args=(--packagePath dist/extension.vsix --azure-credential --skip-duplicate)
+          if [[ "$(node -p "require('./package.json').version")" == *-* ]]; then
+            publish_args+=(--pre-release)
+          fi
+          pnpm exec vsce publish "${publish_args[@]}"
+
+  publish-open-vsx:
+    needs: prepare
+    if: needs.prepare.outputs.open_vsx == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+          lfs: true
+
+      - name: Use Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ".node-version"
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release tag matches package.json
+        env:
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [[ "$version" != "$RELEASE_VERSION" ]]; then
+            echo "::error::package.json version $version does not match release tag $RELEASE_TAG"
+            exit 1
+          fi
+
+      - name: Build extension
+        run: pnpm run build
+
+      - name: Publish to Open VSX Registry
+        if: needs.prepare.outputs.dry_run != 'true'
+        env:
+          OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}
+        run: |
+          publish_args=(--packagePath dist/extension.vsix --pat "$OPEN_VSX_TOKEN" --skip-duplicate)
+          if [[ "$(node -p "require('./package.json').version")" == *-* ]]; then
+            publish_args+=(--pre-release)
+          fi
+          pnpm exec ovsx publish "${publish_args[@]}"

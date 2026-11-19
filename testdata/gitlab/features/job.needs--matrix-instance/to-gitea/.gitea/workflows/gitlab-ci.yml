@@ -1,0 +1,39 @@
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/images
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/images
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/package
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/package
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/package-all
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/package-all
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  push:
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        TARGET:
+          - alpine
+          - ubuntu
+    steps:
+      - uses: actions/checkout@v7
+      - id: script
+        run: make images
+  package:
+    needs:
+      - images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: script
+        run: make package
+  package-all:
+    needs:
+      - images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: script
+        run: make package-all

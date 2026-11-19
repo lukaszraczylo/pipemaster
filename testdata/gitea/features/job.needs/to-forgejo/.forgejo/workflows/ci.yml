@@ -1,0 +1,23 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: needs
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo lint
+  ship:
+    needs:
+      - lint
+      - test
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ship
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo test

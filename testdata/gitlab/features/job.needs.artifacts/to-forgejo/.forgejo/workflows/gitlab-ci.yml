@@ -1,0 +1,47 @@
+# pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/compile
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
+# pipemaster:arg {"artifacts":[{"Name":"","Expire":"","Paths":["bin/"]}],"pre":1,"post":1}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/docs
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/docs
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/unit
+# pipemaster:emulated job.needs.artifacts pipeline/gitlab-ci/job/unit
+# pipemaster:arg {"needs":["compile"],"pre":2,"post":0}
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: make
+      # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
+      - uses: https://github.com/actions/upload-artifact@v7
+        with:
+          name: compile
+          path: bin/
+  docs:
+    needs:
+      - compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: make docs
+  unit:
+    needs:
+      - compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      # pipemaster:emulated job.needs.artifacts pipeline/gitlab-ci/job/unit
+      - uses: https://github.com/actions/download-artifact@v8
+        with:
+          name: compile
+      - id: script
+        run: make test

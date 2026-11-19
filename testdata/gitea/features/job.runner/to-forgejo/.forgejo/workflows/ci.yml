@@ -1,0 +1,22 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: runner
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on:
+      - linux
+      - self-hosted
+      - x64
+    steps:
+      - run: echo ok
+  grouped:
+    runs-on:
+      group: big-runners
+      labels:
+        - linux
+    steps:
+      - run: echo ok

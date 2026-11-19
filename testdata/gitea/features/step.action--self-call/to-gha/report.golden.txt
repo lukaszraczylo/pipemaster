@@ -1,0 +1,2 @@
+Loss report: gitea -> gha
+[lost] pipeline/ci/job/call/step/call-step-1 step.action (self: actions exist only in Gitea; the step is disabled)

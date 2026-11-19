@@ -1,0 +1,22 @@
+# pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/test
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/test
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container: golang:1.22
+    services:
+      postgres:
+        image: postgres:15
+      cache:
+        image: redis:7
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: make test

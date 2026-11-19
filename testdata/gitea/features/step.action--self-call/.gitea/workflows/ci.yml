@@ -1,0 +1,8 @@
+on: push
+jobs:
+  call:
+    uses: self:org/shared/.gitea/workflows/build.yml@main
+  plain:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok

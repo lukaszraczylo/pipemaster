@@ -1,0 +1,12 @@
+name: config
+on:
+  push:
+env:
+  API_TOKEN: ${{ secrets.API_TOKEN }}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "${{ vars.REGION }}"
+        env:
+          KEY: ${{ secrets.DEPLOY_KEY }}

@@ -1,0 +1,12 @@
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/adhoc
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/adhoc
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  workflow_dispatch:
+jobs:
+  adhoc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: make adhoc

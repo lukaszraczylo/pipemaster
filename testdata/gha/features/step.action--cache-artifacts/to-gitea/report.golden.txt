@@ -1,0 +1,5 @@
+Loss report: gha -> gitea
+[native] pipeline/ci/job/build/step/build-step-1 step.action (resolves against DEFAULT_ACTIONS_URL; default github)
+[native] pipeline/ci/job/build/step/build-step-2 step.action (resolves against DEFAULT_ACTIONS_URL; default github)
+[native] pipeline/ci/job/build/step/build-step-4 step.action (resolves against DEFAULT_ACTIONS_URL; default github)
+[native] pipeline/ci/job/test/step/test-step-1 step.action (resolves against DEFAULT_ACTIONS_URL; default github)

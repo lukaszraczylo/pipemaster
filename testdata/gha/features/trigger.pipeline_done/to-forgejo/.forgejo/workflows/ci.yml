@@ -1,0 +1,9 @@
+name: after
+on:
+  # pipemaster:emulated trigger.manual pipeline/ci
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok

@@ -1,0 +1,24 @@
+stages:
+  - stage-0
+  - stage-1
+compile:
+  stage: stage-0
+  needs: []
+  script:
+    - make
+  artifacts:
+    paths:
+      - bin/
+docs:
+  stage: stage-1
+  needs:
+    - job: compile
+      artifacts: false
+  script:
+    - make docs
+unit:
+  stage: stage-1
+  needs:
+    - compile
+  script:
+    - make test

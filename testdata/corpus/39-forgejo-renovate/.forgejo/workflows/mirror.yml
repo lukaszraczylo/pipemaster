@@ -1,0 +1,45 @@
+name: mirror
+
+on:
+  schedule:
+    - cron: '13 */6 * * *' # https://crontab.guru/#13_*/6_*_*_*
+
+  workflow_dispatch:
+
+
+jobs:
+  sync-renovate:
+    if: secrets.MIRROR_TOKEN != ''
+    runs-on: docker
+    container:
+      image: data.forgejo.org/oci/alpine:3.23@sha256:865b95f46d98cf867a156fe4a135ad3fe50d2056aa3f25ed31662dff6da4eb62
+
+    steps:
+      - name: Install packages
+        run: |
+          apk add --no-cache \
+            jq \
+            git \
+            nodejs \
+            skopeo \
+            ;
+
+      - uses: https://data.forgejo.org/actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          show-progress: false
+
+      - name: Docker login
+        run: |
+          skopeo login --username viceice --password '${{ secrets.MIRROR_TOKEN }}' code.forgejo.org
+
+      - name: Copy renovate images
+        run: |
+          skopeo sync --preserve-digests --keep-going --src yaml --dest docker skopeo.yml code.forgejo.org/renovate
+
+      # now done via package rule https://code.forgejo.org/org/renovate/settings/packages/rules/5
+      # - name: Cleanup renovate images
+      #   run: |
+      #     skopeo list-tags docker://code.forgejo.org/renovate/renovate | jq -r '.Tags[]' | sed -n -Ee '/^[0-9]+\.[0-9]+\.[0-9]+/p' | sort -r -V | sed -n '50,$p' | while read version ; \
+      #         do echo "deleting $version" ; \
+      #         skopeo delete docker://code.forgejo.org/renovate/renovate:$version ; \
+      #       done

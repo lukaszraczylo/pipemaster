@@ -1,0 +1,31 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: matrix multi axis
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  prod:
+    runs-on: ubuntu-latest
+    steps:
+      - run: make
+    outputs:
+      ver: v1
+  test:
+    needs:
+      - prod
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os:
+          - linux
+          - mac
+        go:
+          - "1.24"
+          - "1.25"
+        exclude:
+          - go: "1.24"
+            os: mac
+    steps:
+      - run: echo ${{ matrix.os }} ${{ matrix.go }} ${{ needs.prod.outputs.ver }}

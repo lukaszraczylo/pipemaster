@@ -1,0 +1,81 @@
+name: generate-chart
+
+on:
+  push:
+    tags:
+      - "*"
+
+env:
+  # renovate: datasource=docker depName=alpine/helm
+  HELM_VERSION: "4.3.1"
+
+jobs:
+  generate-chart-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: install Docker CLI
+        uses: https://github.com/docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4 # Gitea
+        #uses: docker/setup-buildx-action@v4 # Github / Act
+
+      - name: install Helm
+        uses: https://github.com/Azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5 # Gitea
+        #uses: Azure/setup-helm@v5 # Github / Act
+        with:
+          version: "${{ env.HELM_VERSION }}"
+
+      - name: install tools
+        run: |
+          apt update
+          apt install -y curl ca-certificates curl gnupg python3 python3-pip apt-transport-https
+          pip install awscli --break-system-packages
+
+      - name: import GPG key
+        id: import_gpg
+        uses: https://github.com/crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7 # Gitea
+        #uses: crazy-max/ghaction-import-gpg@v7 # Github / Act
+        with:
+          gpg_private_key: ${{ secrets.GPGSIGN_KEY }}
+          passphrase: ${{ secrets.GPGSIGN_PASSPHRASE }}
+          fingerprint: CC64B1DB67ABBEECAB24B6455FC346329753F4B0
+
+      - name: log into Docker Hub
+        uses: https://github.com/docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4 # Gitea
+        #uses: docker/login-action@v4 # Github / Act
+        with:
+          username: ${{ secrets.DOCKER_CHARTS_USERNAME }}
+          password: ${{ secrets.DOCKER_CHARTS_PASSWORD }}
+
+      - name: Add Artifacthub.io annotations
+        uses: volker-raschek/ah-annotations@00c8d25331570bd8f3408419e286916d8dcfb6c6 # v0.2.5
+
+      # Using helm gpg plugin as 'helm package --sign' has issues with gpg2: https://github.com/helm/helm/issues/2843
+      - name: package chart
+        run: |
+          # Install Helm GPG plugin
+          helm plugin install https://github.com/technosophos/helm-gpg.git --verify=false
+
+          # Package the chart
+          mkdir ./actions
+          helm dependency build
+          helm package --version "${GITHUB_REF#refs/tags/v}" --destination ./actions ./
+          curl -s -L -o actions/index.yaml https://dl.gitea.com/charts/index.yaml
+          helm repo index actions/ --url https://dl.gitea.com/charts --merge actions/index.yaml
+
+          # Push to Docker Hub
+          echo ${{ secrets.DOCKER_CHARTS_PASSWORD }} | helm registry login -u ${{ secrets.DOCKER_CHARTS_USERNAME }} registry-1.docker.io --password-stdin
+          helm push actions/actions-${GITHUB_REF#refs/tags/v}.tgz oci://registry-1.docker.io/giteacharts
+          helm registry logout registry-1.docker.io
+        env:
+          TAR_OPTIONS: "--wildcards"
+
+      - name: Copy files to Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          CLOUDFLARE_R2_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_R2_ACCOUNT_ID }}
+          CLOUDFLARE_R2_BUCKET: ${{ secrets.CLOUDFLARE_R2_BUCKET }}
+        run: |
+          aws s3 sync actions/ s3://${CLOUDFLARE_R2_BUCKET}/charts/ --endpoint-url https://${CLOUDFLARE_R2_ACCOUNT_ID}.r2.cloudflarestorage.com

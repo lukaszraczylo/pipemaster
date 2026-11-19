@@ -30,26 +30,27 @@ var fieldFeatures = map[string][]caps.Feature{
 	"Triggers": {caps.TriggerPush, caps.TriggerPullRequest, caps.TriggerTag, caps.TriggerSchedule, caps.TriggerManual,
 		caps.TriggerAPI, caps.TriggerPipelineDone, caps.TriggerResource, caps.TriggerFilterBranch,
 		caps.TriggerFilterTags, caps.TriggerFilterPaths, caps.PipelineInputs, caps.ExtPassthrough},
-	"Env":             {caps.PipelineEnv, caps.JobEnv, caps.StepEnv, caps.ExprOpaque, caps.ScriptInterpolation},
-	"Concurrency":     {caps.PipelineConcurrency, caps.ScriptInterpolation},
-	"Inputs":          {caps.PipelineInputs},
-	"Permissions":     {caps.PipelinePermissions},
-	"Name":            {caps.DisplayName},
-	"Ext":             {caps.ExtPassthrough},
-	"Runner":          {caps.JobRunner},
-	"Container":       {caps.JobContainer},
-	"Services":        {caps.JobServices},
-	"Matrix":          {caps.JobMatrix},
-	"Timeout":         {caps.JobTimeout, caps.StepTimeout},
-	"Retry":           {caps.JobRetry},
-	"AllowFailure":    {caps.JobAllowFailure},
-	"Environment":     {caps.JobEnvironment, caps.JobEnvironmentApproval},
-	"Manual":          {caps.JobManual},
-	"Cache":           {caps.JobCache},
-	"Artifacts":       {caps.JobArtifacts},
-	"Outputs":         {caps.JobOutputs},
-	"Needs":           {caps.JobNeeds, caps.JobNeedsArtifacts},
-	"If":              {caps.JobIf, caps.StepIf, caps.ExprOpaque},
+	"Env":          {caps.PipelineEnv, caps.JobEnv, caps.StepEnv, caps.ExprOpaque, caps.ScriptInterpolation},
+	"Concurrency":  {caps.PipelineConcurrency, caps.ScriptInterpolation},
+	"Inputs":       {caps.PipelineInputs},
+	"Permissions":  {caps.PipelinePermissions},
+	"Name":         {caps.DisplayName},
+	"Ext":          {caps.ExtPassthrough},
+	"Runner":       {caps.JobRunner},
+	"Container":    {caps.JobContainer},
+	"Services":     {caps.JobServices},
+	"Matrix":       {caps.JobMatrix},
+	"Timeout":      {caps.JobTimeout, caps.StepTimeout},
+	"Retry":        {caps.JobRetry},
+	"AllowFailure": {caps.JobAllowFailure},
+	"Environment":  {caps.JobEnvironment, caps.JobEnvironmentApproval},
+	"Manual":       {caps.JobManual},
+	"Cache":        {caps.JobCache},
+	"Artifacts":    {caps.JobArtifacts},
+	"Outputs":      {caps.JobOutputs},
+	"Needs":        {caps.JobNeeds, caps.JobNeedsArtifacts},
+	// A lost step.action disables the step with if: false, so the condition changes with it.
+	"If":              {caps.JobIf, caps.StepIf, caps.ExprOpaque, caps.StepAction},
 	"Script":          {caps.StepScript, caps.ScriptInterpolation, caps.StepAction, caps.ExtPassthrough},
 	"Action":          {caps.StepAction, caps.ExtPassthrough},
 	"With":            {caps.StepAction, caps.ExtPassthrough},
@@ -146,10 +147,15 @@ func structDiff(a, b any) []string {
 	return out
 }
 
-// atOrBelow is true when entry is the node at path. Only a trigger entry under the node counts too, because
-// triggers are not nodes of their own; any other descendant entry names a different node's field.
+// atOrBelow is true when entry is the node at path. Only a trigger or permission-scope entry under the node
+// counts too, because they are not nodes of their own; any other descendant entry names a different node's field.
 func atOrBelow(entry, path string) bool {
-	return entry == path || strings.HasPrefix(entry, path+"/trigger/")
+	return entry == path || strings.HasPrefix(entry, path+"/trigger/") || strings.HasPrefix(entry, path+"/scope/")
+}
+
+// isDisabledCall is a lost step.action on a step of the job: a disabled call job gets if: false on the job.
+func isDisabledCall(e report.Entry, d irDiff) bool {
+	return d.Field == "If" && e.Feature == caps.StepAction && strings.HasPrefix(e.IRPath, d.Path+"/step/")
 }
 
 // covered reports whether a lost or external entry at the node, or below it, names a feature that
@@ -161,6 +167,9 @@ func covered(d irDiff, reps ...*report.Report) bool {
 			if e.Level >= caps.External && atOrBelow(e.IRPath, d.Path) && slices.Contains(accepted, e.Feature) {
 				return true
 			}
+			if e.Level >= caps.External && isDisabledCall(e, d) {
+				return true
+			}
 		}
 	}
 	return false
@@ -168,22 +177,23 @@ func covered(d irDiff, reps ...*report.Report) bool {
 
 func TestRoundTripWithoutMetaBestEffort(t *testing.T) {
 	for _, f := range allFixtures(t) {
-		t.Run(f.provider+"/"+f.name, func(t *testing.T) {
-			a, b := prov(t, f.provider), prov(t, other(f.provider))
-			r := hops(t, os.DirFS(f.dir), a, b, false, false)
-			if same, _ := ir.Equal(r.src, r.back); same {
-				return
-			}
-			if len(r.src.Pipelines) == 1 && len(r.back.Pipelines) == 1 {
-				// The pipeline id is the file stem on GHA and a fixed name on GitLab, so it is no loss.
-				r.back.Pipelines[0].ID = r.src.Pipelines[0].ID
-			}
-			for _, d := range diffNodes(r.src, r.back) {
-				if !covered(d, r.srcRep, r.toRep, r.backRep) {
-					t.Errorf("%s: %s differs after A->B->A with no metadata and no lost or external report entry covers it", d.Path, d.Field)
+		for _, to := range targets(f.provider) {
+			t.Run(f.provider+"/"+f.name+"/to-"+to, func(t *testing.T) {
+				r := hops(t, os.DirFS(f.dir), prov(t, f.provider), prov(t, to), false, false)
+				if same, _ := ir.Equal(r.src, r.back); same {
+					return
 				}
-			}
-		})
+				if len(r.src.Pipelines) == 1 && len(r.back.Pipelines) == 1 {
+					// The pipeline id is the file stem on GHA and a fixed name on GitLab, so it is no loss.
+					r.back.Pipelines[0].ID = r.src.Pipelines[0].ID
+				}
+				for _, d := range diffNodes(r.src, r.back) {
+					if !covered(d, r.srcRep, r.toRep, r.backRep) {
+						t.Errorf("%s: %s differs after A->B->A with no metadata and no lost or external report entry covers it", d.Path, d.Field)
+					}
+				}
+			})
+		}
 	}
 }
 
@@ -223,5 +233,30 @@ func TestCoverageRejectsUnreportedDifference(t *testing.T) {
 	}
 	if !covered(diffs[0], entry(job, caps.JobTimeout, caps.Lost)) {
 		t.Error("an exact lost entry must cover the difference")
+	}
+}
+
+func TestScopeEntryCoversPermissionsOnly(t *testing.T) {
+	rep := &report.Report{Entries: []report.Entry{{IRPath: "pipeline/ci/scope/id-token", Feature: caps.PipelinePermissions, Level: caps.Lost}}}
+	if !covered(irDiff{"pipeline/ci", "Permissions"}, rep) {
+		t.Error("a lost scope entry under the pipeline must cover a Permissions difference")
+	}
+	if covered(irDiff{"pipeline/ci", "Env"}, rep) {
+		t.Error("a lost scope entry must not cover another field")
+	}
+	if covered(irDiff{"pipeline/ci/job/b", "Permissions"}, rep) {
+		t.Error("a scope entry of the pipeline must not cover a job")
+	}
+}
+
+func TestCallStepEntryCoversJobConditionOnly(t *testing.T) {
+	rep := &report.Report{Entries: []report.Entry{{IRPath: "pipeline/ci/job/b/step/c", Feature: caps.StepAction, Level: caps.Lost}}}
+	if !covered(irDiff{"pipeline/ci/job/b", "If"}, rep) {
+		t.Error("a lost step.action on the job's step must cover the job condition")
+	}
+	for _, d := range []irDiff{{"pipeline/ci/job/b", "Timeout"}, {"pipeline/ci/job/other", "If"}} {
+		if covered(d, rep) {
+			t.Errorf("%+v must not be covered", d)
+		}
 	}
 }

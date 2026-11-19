@@ -4,10 +4,13 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
+	"strings"
 	"testing"
 	"testing/fstest"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/meta"
@@ -17,12 +20,18 @@ import (
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
-const featuresRoot = "../../testdata"
+const (
+	featuresRoot = "../../testdata"
+	// fromGHA holds the goldens of a remapped GHA fixture whose name a dialect-only fixture also uses.
+	fromGHA = "from-gha"
+)
 
 type fixture struct {
 	provider string
 	name     string
 	dir      string
+	// golden is where cross goldens live; a remapped fixture runs from a temp dir, so it differs from dir.
+	golden string
 }
 
 func fixtures(t *testing.T, id string) []fixture {
@@ -42,11 +51,27 @@ func readFixtures(t *testing.T, id, dir string) []fixture {
 	}
 	var out []fixture
 	for _, e := range ents {
-		if e.IsDir() {
-			out = append(out, fixture{id, e.Name(), filepath.Join(root, e.Name())})
+		dir := filepath.Join(root, e.Name())
+		if e.IsDir() && hasSource(t, dir) {
+			out = append(out, fixture{id, e.Name(), dir, dir})
 		}
 	}
 	return out
+}
+
+// hasSource is false for a directory that only holds cross goldens (to-*) of a remapped fixture.
+func hasSource(t *testing.T, dir string) bool {
+	t.Helper()
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range ents {
+		if !strings.HasPrefix(e.Name(), "to-") && e.Name() != fromGHA {
+			return true
+		}
+	}
+	return false
 }
 
 // dialectFixtures returns the GHA fixtures remapped to the dialect's emit directory, then the
@@ -57,15 +82,20 @@ func dialectFixtures(t *testing.T, id string) []fixture {
 	if !ok {
 		t.Fatalf("no dialect %s", id)
 	}
-	base := readFixtures(t, id, provider.GHA)
-	out := make([]fixture, 0, len(base))
-	for _, f := range base {
-		out = append(out, fixture{id, f.name, remapDir(t, f.dir, d.Dirs[0])})
-	}
+	var own []fixture
 	if _, err := os.Stat(filepath.Join(featuresRoot, id, "features")); err == nil {
-		out = append(out, readFixtures(t, id, id)...)
+		own = readFixtures(t, id, id)
 	}
-	return out
+	base := readFixtures(t, id, provider.GHA)
+	out := make([]fixture, 0, len(base)+len(own))
+	for _, f := range base {
+		golden := filepath.Join(featuresRoot, id, "features", f.name)
+		if slices.ContainsFunc(own, func(o fixture) bool { return o.name == f.name }) {
+			golden = filepath.Join(golden, fromGHA)
+		}
+		out = append(out, fixture{id, f.name, remapDir(t, f.dir, d.Dirs[0]), golden})
+	}
+	return append(out, own...)
 }
 
 // remapDir copies a GHA fixture into a temp dir with .github/workflows moved to dir.
@@ -90,7 +120,11 @@ func remapDir(t *testing.T, src, dir string) string {
 }
 
 func allFixtures(t *testing.T) []fixture {
-	return append(fixtures(t, provider.GHA), fixtures(t, provider.GitLab)...)
+	var out []fixture
+	for _, id := range provider.IDs() {
+		out = append(out, fixtures(t, id)...)
+	}
+	return out
 }
 
 // targets returns every registered provider except id.
@@ -104,15 +138,7 @@ func targets(id string) []string {
 	return out
 }
 
-// other picks a base-adapter target so the pair keeps the golden directory names of the two-provider days.
-func other(id string) string {
-	for _, p := range targets(id) {
-		if !provider.SameFamily(p, id) && provider.Family(p) == p {
-			return p
-		}
-	}
-	return targets(id)[0]
-}
+func isDialect(id string) bool { return provider.Family(id) != id }
 
 func prov(t *testing.T, id string) provider.Provider {
 	t.Helper()
@@ -196,6 +222,10 @@ func hops(t *testing.T, fsA fs.FS, a, b provider.Provider, embed bool, withMeta 
 	r.back, _, err = a.Parse(toFS(files))
 	if err != nil {
 		t.Fatalf("parse %s back: %v", a.ID(), err)
+	}
+	// A dialect drops a key it cannot hold from the file and keeps it in the metadata of that emit.
+	if withMeta && isDialect(a.ID()) && rep2.Worst() >= caps.External {
+		roundtrip.Restore(r.back, roundtrip.NewMeta(a.ID(), r.src, a, rep2))
 	}
 	return r
 }

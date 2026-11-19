@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -38,21 +39,27 @@ func corpusEntries(t *testing.T) []fixture {
 			continue
 		}
 		dir := filepath.Join(corpusRoot, e.Name())
-		var found []string
-		for _, id := range []string{provider.GHA, provider.GitLab} {
-			if prov(t, id).Detect(os.DirFS(dir)) {
-				found = append(found, id)
-			}
+		id := corpusProvider(t, e.Name())
+		if !prov(t, id).Detect(os.DirFS(dir)) {
+			t.Fatalf("%s: provider %s does not detect the entry", e.Name(), id)
 		}
-		if len(found) != 1 {
-			t.Fatalf("%s: detected providers %v, want exactly one", e.Name(), found)
-		}
-		out = append(out, fixture{found[0], e.Name(), dir})
+		out = append(out, fixture{id, e.Name(), dir, dir})
 	}
 	if len(out) == 0 {
 		t.Fatal("no corpus entries")
 	}
 	return out
+}
+
+// corpusProvider reads the provider from the NN-<provider>-<slug> directory name; the dialect
+// directories overlap, so detection cannot tell them apart.
+func corpusProvider(t *testing.T, name string) string {
+	t.Helper()
+	parts := strings.SplitN(name, "-", 3)
+	if len(parts) != 3 || !slices.Contains(provider.IDs(), parts[1]) {
+		t.Fatalf("%s: want NN-<provider>-<slug> with provider in %v", name, provider.IDs())
+	}
+	return parts[1]
 }
 
 // verdictCounts counts the feature uses of src per verdict; native is every use the report does not list.
@@ -87,8 +94,36 @@ func (f findings) add(lines string) {
 	}
 }
 
+// dialectCtxRE matches the context aliases of Gitea and Forgejo.
+var dialectCtxRE = regexp.MustCompile(`\b(?:gitea|forgejo|forge)\.`)
+
 // braceVarRE matches ${NAME}, which the emitter prints as $NAME; both spell the same variable.
 var braceVarRE = regexp.MustCompile(`\$\{(\w+)\}`)
+
+// actionlint reports what the linter finds in one GHA-family file.
+func actionlint(t *testing.T, name string, data []byte) findings {
+	t.Helper()
+	out := findings{}
+	dir := t.TempDir()
+	p := filepath.Join(dir, name)
+	if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("actionlint", "-no-color", "-shellcheck=", "-pyflakes=", "-ignore", lintIgnore, p) // #nosec G204 -- fixed binary, temp path
+	if b, err := cmd.CombinedOutput(); err != nil {
+		out.add(string(b))
+	}
+	return out
+}
+
+func (f findings) merge(o findings) {
+	for l := range o {
+		f[l] = true
+	}
+}
 
 // problems lists what validate.File and, for GHA, actionlint find in one file. Shell and Python checks
 // are off: they judge the scripts of the source repository, not the conversion.
@@ -100,18 +135,7 @@ func problems(t *testing.T, id, name string, data []byte) findings {
 		out.add(braceVarRE.ReplaceAllString(strings.NewReplacer(name, "", "gitlab.com/.gitlab-ci.yml#", "gitlab.com/#").Replace(err.Error()), "$$$1"))
 	}
 	if id == provider.GHA {
-		dir := t.TempDir()
-		p := filepath.Join(dir, name)
-		if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(p, data, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		cmd := exec.Command("actionlint", "-no-color", "-shellcheck=", "-pyflakes=", "-ignore", lintIgnore, p) // #nosec G204 -- fixed binary, temp path
-		if b, err := cmd.CombinedOutput(); err != nil {
-			out.add(string(b))
-		}
+		out.merge(actionlint(t, name, data))
 	}
 	return out
 }
@@ -123,12 +147,14 @@ func sourceProblems(t *testing.T, f fixture) findings {
 	out := findings{}
 	root := os.DirFS(f.dir)
 	var rels []string
-	if f.provider == provider.GHA {
-		ents, err := fs.Glob(root, ".github/workflows/*.y*ml")
-		if err != nil {
-			t.Fatal(err)
+	if provider.Family(f.provider) == provider.GHA {
+		for _, wd := range []string{".github", ".gitea", ".forgejo"} {
+			ents, err := fs.Glob(root, wd+"/workflows/*.y*ml")
+			if err != nil {
+				t.Fatal(err)
+			}
+			rels = append(rels, ents...)
 		}
-		rels = ents
 	} else {
 		err := fs.WalkDir(root, ".", func(p string, d fs.DirEntry, werr error) error {
 			if werr == nil && !d.IsDir() && (strings.HasSuffix(p, ".yml") || strings.HasSuffix(p, ".yaml")) {
@@ -145,8 +171,10 @@ func sourceProblems(t *testing.T, f fixture) findings {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for l := range problems(t, f.provider, rel, data) {
-			out[l] = true
+		out.merge(problems(t, f.provider, rel, data))
+		if f.provider != provider.GHA && provider.Family(f.provider) == provider.GHA {
+			// actionlint rejects the dialect context aliases and so hides findings that the converted github.* form draws.
+			out.merge(actionlint(t, rel, dialectCtxRE.ReplaceAll(data, []byte("github."))))
 		}
 	}
 	return out
@@ -172,14 +200,13 @@ func TestCorpus(t *testing.T) {
 	var summary bytes.Buffer
 	healthy := true
 	for _, f := range corpusEntries(t) {
-		ok := t.Run(f.name, func(t *testing.T) {
-			a, b := prov(t, f.provider), prov(t, other(f.provider))
-			fsA := os.DirFS(f.dir)
+		a := prov(t, f.provider)
+		fsA := os.DirFS(f.dir)
+		ok := t.Run(f.name+"/identity", func(t *testing.T) {
 			src, _, err := a.Parse(fsA)
 			if err != nil {
 				t.Fatalf("parse: %v", err)
 			}
-
 			self, _, err := a.Emit(src)
 			if err != nil {
 				t.Fatalf("identity emit: %v", err)
@@ -191,26 +218,35 @@ func TestCorpus(t *testing.T) {
 			if same, diff := ir.Equal(src, again); !same {
 				t.Errorf("A->A differs:\n%s", diff)
 			}
-			known := sourceProblems(t, f)
-			checkEmitted(t, a.ID(), self, known)
-
-			r := hops(t, fsA, a, b, false, true)
-			if same, diff := ir.Equal(r.src, r.back); !same {
-				t.Errorf("A->B->A differs:\n%s", diff)
-			}
-			cross := map[string][]byte{}
-			for n, data := range r.toFiles {
-				if !strings.HasPrefix(n, ".pipemaster/") {
-					cross[n] = data
-				}
-			}
-			checkEmitted(t, b.ID(), cross, findings{})
-
-			c := verdictCounts(r.src, r.toRep)
-			fmt.Fprintf(&summary, "%s %s->%s native=%d emulated=%d external=%d lost=%d\n", f.name, a.ID(), b.ID(),
-				c[caps.Native], c[caps.Emulated], c[caps.External], c[caps.Lost])
+			checkEmitted(t, a.ID(), self, sourceProblems(t, f))
 		})
 		healthy = healthy && ok
+		// A GHA-family target keeps the source's own linter findings, so only new ones fail.
+		crossKnown := findings{}
+		if provider.Family(f.provider) == provider.GHA {
+			crossKnown = sourceProblems(t, f)
+		}
+		for _, to := range targets(f.provider) {
+			ok := t.Run(f.name+"/to-"+to, func(t *testing.T) {
+				b := prov(t, to)
+				r := hops(t, fsA, a, b, false, true)
+				if same, diff := ir.Equal(r.src, r.back); !same {
+					t.Errorf("A->B->A differs:\n%s", diff)
+				}
+				cross := map[string][]byte{}
+				for n, data := range r.toFiles {
+					if !strings.HasPrefix(n, ".pipemaster/") {
+						cross[n] = data
+					}
+				}
+				checkEmitted(t, b.ID(), cross, crossKnown)
+
+				c := verdictCounts(r.src, r.toRep)
+				fmt.Fprintf(&summary, "%s %s->%s native=%d emulated=%d external=%d lost=%d\n", f.name, a.ID(), b.ID(),
+					c[caps.Native], c[caps.Emulated], c[caps.External], c[caps.Lost])
+			})
+			healthy = healthy && ok
+		}
 	}
 	if !healthy {
 		return

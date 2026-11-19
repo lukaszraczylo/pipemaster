@@ -1,0 +1,2 @@
+Loss report: gitea -> forgejo
+[emulated] pipeline/ci pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)

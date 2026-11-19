@@ -1,0 +1,4 @@
+Loss report: gitea -> forgejo
+[lost] pipeline/ci pipeline.permissions (Forgejo does not document permissions; the token has write access except on fork pull requests)
+[lost] pipeline/ci/scope/code pipeline.permissions (scope code is not a Forgejo permission; dropped)
+[emulated] pipeline/ci pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)

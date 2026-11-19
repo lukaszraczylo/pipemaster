@@ -1,0 +1,10 @@
+name: config
+on:
+  push:
+jobs:
+  build:
+    runs-on: docker
+    steps:
+      - run: echo "${{ vars.FORGEJO_REGION }} ${{ vars.CI }}"
+        env:
+          KEY: ${{ secrets.DEPLOY_KEY }}

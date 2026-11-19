@@ -1,0 +1,13 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: stepto
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sleep 1
+        timeout-minutes: 2

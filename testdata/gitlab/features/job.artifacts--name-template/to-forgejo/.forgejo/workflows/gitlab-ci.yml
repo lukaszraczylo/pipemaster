@@ -1,0 +1,21 @@
+# pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg {"artifacts":[{"Name":"pkg-$\u007b{ sha }}","Expire":"","Paths":["out/"]}],"pre":1,"post":1}
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: make
+      # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+      - uses: https://github.com/actions/upload-artifact@v7
+        with:
+          name: pkg-${{ github.sha }}
+          path: out/

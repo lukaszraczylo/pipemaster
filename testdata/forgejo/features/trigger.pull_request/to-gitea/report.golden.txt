@@ -1,0 +1,2 @@
+Loss report: forgejo -> gitea
+[native] pipeline/ci/trigger/0 trigger.pull_request (the ref is refs/pull/N/head, not the merge ref)

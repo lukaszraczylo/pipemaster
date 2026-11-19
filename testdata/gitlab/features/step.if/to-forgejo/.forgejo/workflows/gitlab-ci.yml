@@ -1,0 +1,24 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated step.if pipeline/gitlab-ci/job/build/step/build-step-2
+# pipemaster:arg {"src":"event == 'push'"}
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  push:
+    branches:
+      - '**'
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: build-step-1
+        if: always()
+        run: echo cleanup
+      - id: build-step-2
+        if: github.event_name == 'push'
+        run: echo push

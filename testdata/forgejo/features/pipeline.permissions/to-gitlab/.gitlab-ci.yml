@@ -1,0 +1,7 @@
+build:
+  tags:
+    - docker
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - echo ok

@@ -1,0 +1,9 @@
+name: workdir
+on:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ls
+        working-directory: ./cmd/app

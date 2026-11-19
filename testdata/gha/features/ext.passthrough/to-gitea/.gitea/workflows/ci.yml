@@ -1,0 +1,14 @@
+name: ext
+on:
+  push:
+  issues:
+    types:
+      - opened
+run-name: Deploy by ${{ github.actor }}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok
+        shell: bash
+        working-directory: app

@@ -1,0 +1,13 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: cond
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo deploy

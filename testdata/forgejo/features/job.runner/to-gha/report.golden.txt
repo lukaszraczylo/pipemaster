@@ -1,0 +1,2 @@
+Loss report: forgejo -> gha
+No losses: every feature converted natively.

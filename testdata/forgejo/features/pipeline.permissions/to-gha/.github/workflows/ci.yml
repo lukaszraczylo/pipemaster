@@ -1,0 +1,11 @@
+name: perms
+on:
+  push:
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  build:
+    runs-on: docker
+    steps:
+      - run: echo ok

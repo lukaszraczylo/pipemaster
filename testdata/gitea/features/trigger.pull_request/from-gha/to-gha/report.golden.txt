@@ -1,0 +1,2 @@
+Loss report: gitea -> gha
+No losses: every feature converted natively.

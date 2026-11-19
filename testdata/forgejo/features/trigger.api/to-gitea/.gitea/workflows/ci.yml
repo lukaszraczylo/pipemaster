@@ -1,0 +1,15 @@
+name: api
+on:
+  workflow_call:
+    inputs:
+      target:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok

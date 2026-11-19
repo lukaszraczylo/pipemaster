@@ -1,0 +1,2 @@
+Loss report: gha -> forgejo
+[lost] pipeline/ci/trigger/0 trigger.api (event repository_dispatch is not supported by Forgejo; the trigger is dropped)

@@ -1,0 +1,52 @@
+name: check-and-test
+
+"on":
+  "workflow_dispatch":
+  pull_request:
+    branches:
+      - "*"
+  push:
+    branches:
+      - main
+
+env:
+  # renovate: datasource=github-releases depName=helm-unittest/helm-unittest
+  HELM_UNITTEST_VERSION: "v1.2.1"
+
+jobs:
+  check-and-test:
+    runs-on: ubuntu-latest
+    container: alpine/helm:4.3.1
+    steps:
+      - name: install tools
+        run: |
+          apk update
+          apk add --update bash make nodejs npm yamllint ncurses
+      - name: Install pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+        with:
+          version: 12
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: install chart dependencies
+        run: helm dependency build
+      - name: lint
+        run: helm lint .
+      - name: template
+        run: helm template --debug gitea-actions .
+      - name: prepare unit test environment
+        run: |
+          helm plugin install --version ${{ env.HELM_UNITTEST_VERSION }} --verify=false \
+            https://github.com/helm-unittest/helm-unittest.git # https://github.com/helm-unittest/helm-unittest?tab=readme-ov-file#install
+          git submodule update --init --recursive
+      - name: unit tests
+        env:
+          TERM: xterm
+        run: |
+          make unittests-helm
+      - name: verify readme
+        run: |
+          make readme
+          git diff --exit-code --name-only README.md
+      - name: yaml lint
+        # uses: ibiqlik/action-yamllint@v3 # Github / Act
+        uses: https://github.com/ibiqlik/action-yamllint@2576378a8e339169678f9939646ee3ee325e845c # v3 # Gitea

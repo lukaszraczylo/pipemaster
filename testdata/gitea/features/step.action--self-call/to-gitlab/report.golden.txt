@@ -1,0 +1,2 @@
+Loss report: gitea -> gitlab
+[lost] pipeline/ci/job/call/step/call-step-1 step.action (step kind pipeline_call has no GitLab form)

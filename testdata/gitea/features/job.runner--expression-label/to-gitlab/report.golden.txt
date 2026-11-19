@@ -1,0 +1,4 @@
+Loss report: gitea -> gitlab
+[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
+[lost] pipeline/ci/job/test job.runner (label ${{ matrix.os || 'ubuntu-latest' }} has no GitLab text and becomes no tag)
+[lost] pipeline/ci/job/test script.interpolation (no GitLab variable for expression matrix.os || 'ubuntu-latest')
