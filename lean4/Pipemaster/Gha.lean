@@ -280,7 +280,8 @@ def rawGha (g : Workflow) : Pipe :=
     fin := g.jobs.filterMap (finPick g) }
 
 /-- Mirrors gha.Parse (provider/gha/parse.go) with collapseMarkers, on the core subset; the
-round-trip metadata `m` is applied last (roundtrip.Restore). -/
+round-trip metadata `m` is applied last (roundtrip.Restore). The core subset has no conditions, so the per-directory
+rule for restored source conditions does not apply. -/
 def fromGha (g : Workflow) (m : Meta := Meta.empty) : Pipe := restore (rawGha g) m
 
 /-! ## Theorem 1: parse inverts emit on the GHA fragment -/

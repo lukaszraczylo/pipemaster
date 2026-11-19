@@ -54,14 +54,18 @@ def gitlab : Adapter where
   exact q h := Gitlab.gitlab_from_to q h
 
 /-- Mirrors roundtrip.Hop (internal/roundtrip/chain.go), rule 4: each hop emits, parses and pushes a layer.
-The layers are oldest first, as in `meta.Stack`. -/
+The layers are oldest first, as in `meta.Stack`. `Hop` applies a stack only if its top layer targets the source
+provider and lists every file read. A stack built by `hops` meets that precondition: each layer is pushed for the
+files its own hop emitted, and the next hop reads exactly those files. The model has no `Target` field because
+the precondition always holds here. -/
 def hops : Pipe → List Adapter → Pipe × List Meta
   | p, [] => (p, [])
   | p, a :: as =>
     let r := hops (a.parse (a.emit p)) as
     (r.1, a.metaOf p :: r.2)
 
-/-- Mirrors roundtrip.Hop (internal/roundtrip/chain.go), rule 3: restore the top layer first, then the older ones. -/
+/-- Mirrors roundtrip.Hop (internal/roundtrip/chain.go), rule 3: restore the top layer first, then the older ones.
+The layers come from `hops`, so they satisfy the accepted-stack precondition of `Hop` (see `hops`). -/
 def unwind : Pipe → List Meta → Pipe
   | q, [] => q
   | q, m :: ms => restore (unwind q ms) m

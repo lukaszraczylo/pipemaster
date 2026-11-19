@@ -74,7 +74,8 @@ def gitlabPipelineId : String := "gitlab-ci"
 
 /-- Mirrors meta.Meta (meta/meta.go) for the core subset. Each field is a Go map, read as a partial function:
 emitted pipeline ID to source ID (`IDs`), source IR path to display name (`Residual`), and source job path to
-the whole needs list of a job whose emit report holds a lost `job.needs.artifacts` entry (`Lost`, field Needs). -/
+the whole needs list of a job whose emit report holds a lost `job.needs.artifacts` entry (`Lost`, field Needs).
+The Go `Target` field is not modelled: it only decides whether `roundtrip.Hop` accepts a stack. -/
 structure Meta where
   ids : String → Option String
   names : Path → Option String
