@@ -45,7 +45,12 @@ func inputFromSpec(name string, v any) ir.Input {
 		in.Type = t
 	}
 	if d, ok := m[inputDef]; ok {
-		in.Default = fmt.Sprint(d)
+		switch d.(type) {
+		case map[string]any, []any:
+			// The structure stays in the kept header; flattened text would reach other providers as a value.
+		default:
+			in.Default = fmt.Sprint(d)
+		}
 	} else {
 		in.Required = true
 	}

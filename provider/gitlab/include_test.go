@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/lukaszraczylo/pipemaster/provider/gha"
 )
 
 func TestLocalInclude(t *testing.T) {
@@ -208,5 +210,25 @@ func TestSpecStructuredDefaultIsReportedLost(t *testing.T) {
 	}
 	if len(got) != 1 || !strings.Contains(got[0], "envs") {
 		t.Errorf("entries = %q", got)
+	}
+}
+
+// The flattened text of a list default must not reach another provider.
+func TestSpecStructuredDefaultLeavesIRDefaultEmpty(t *testing.T) {
+	src := "spec:\n  inputs:\n    envs:\n      default: [a, b]\n---\nbuild:\n  script: [make]\n"
+	proj, _ := parseFiles(t, map[string]string{".gitlab-ci.yml": src})
+	for _, in := range proj.Pipelines[0].Inputs {
+		if in.Name == "envs" && (in.Default != "" || in.Required) {
+			t.Errorf("input = %+v", in)
+		}
+	}
+	files, _, err := gha.New(gha.GHA).Emit(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for n, b := range files {
+		if strings.Contains(string(b), "[a b]") {
+			t.Errorf("%s holds the flattened default:\n%s", n, b)
+		}
 	}
 }
