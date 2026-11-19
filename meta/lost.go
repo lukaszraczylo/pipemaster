@@ -192,24 +192,27 @@ func copyFields[T any](dst, src *T, fields []string, f caps.Feature) *T {
 	return dst
 }
 
-// applyLost writes each stored field group over the parsed node. With keepEdits a field the node already holds
-// stays, and a path whose stored field differs from it is returned in kept. It returns the paths that match a node.
-func applyLost(p *ir.Project, m map[string]Lost, keepEdits bool) (found, kept map[string]bool) {
+// applyLost writes each stored field group over the parsed node. With keepEdits a stored field replaces the
+// parsed one only when the parsed one still equals what the emitter produced (m.Emitted); without that record it
+// replaces only an empty field. A path whose stored field was not applied is returned in kept. It returns the
+// paths that match a node.
+func applyLost(p *ir.Project, m *Meta, keepEdits bool) (found, kept map[string]bool) {
 	found, kept = map[string]bool{}, map[string]bool{}
 	for _, n := range ir.Nodes(p) {
-		l, ok := m[n.Path]
+		l, ok := m.Lost[n.Path]
 		if !ok {
 			continue
 		}
 		found[n.Path] = true
+		em := m.Emitted[n.Path]
 		var differs bool
 		switch {
 		case n.Pipeline != nil && l.Pipeline != nil:
-			differs = restorePipeline(n.Pipeline, l.Pipeline, keepEdits)
+			differs = restorePipeline(n.Pipeline, l.Pipeline, em.Pipeline, keepEdits)
 		case n.Job != nil && l.Job != nil:
-			differs = restoreJob(n.Job, l.Job, keepEdits)
+			differs = restoreJob(n.Job, l.Job, em.Job, keepEdits)
 		case n.Step != nil && l.Step != nil:
-			differs = restoreStep(n.Step, l.Step, keepEdits)
+			differs = restoreStep(n.Step, l.Step, em.Step, keepEdits)
 		}
 		if differs {
 			kept[n.Path] = true
@@ -218,26 +221,42 @@ func applyLost(p *ir.Project, m map[string]Lost, keepEdits bool) (found, kept ma
 	return found, kept
 }
 
-func restorePipeline(dst, src *ir.Pipeline, keepEdits bool) bool {
-	differs := copyNonZero(dst, src, keepEdits)
+// skipLost matches the nodes that have a stored lost group without applying it; every such node is reported as kept.
+func skipLost(p *ir.Project, m *Meta) (found, kept map[string]bool) {
+	found, kept = map[string]bool{}, map[string]bool{}
+	for _, n := range ir.Nodes(p) {
+		if _, ok := m.Lost[n.Path]; ok {
+			found[n.Path], kept[n.Path] = true, true
+		}
+	}
+	return found, kept
+}
+
+func restorePipeline(dst, src, em *ir.Pipeline, keepEdits bool) bool {
+	differs := copyNonZero(dst, src, em, keepEdits)
 	// Triggers decoded from metadata hold their Ext as named maps; providers read plain ones.
 	for i := range dst.Triggers {
 		dst.Triggers[i].Ext = copyExt(dst.Triggers[i].Ext)
 	}
 	return differs
 }
-func restoreJob(dst, src *ir.Job, keepEdits bool) bool { return copyNonZero(dst, src, keepEdits) }
-func restoreStep(dst, src *ir.Step, keepEdits bool) bool {
-	if src.Action != nil && !keepEdits {
+func restoreJob(dst, src, em *ir.Job, keepEdits bool) bool {
+	return copyNonZero(dst, src, em, keepEdits)
+}
+
+// restoreStep also drops the placeholder script of an action step the emitter wrote as a script; an edited
+// file keeps its script unless it still reads as emitted.
+func restoreStep(dst, src, em *ir.Step, keepEdits bool) bool {
+	if src.Action != nil && (!keepEdits || (em != nil && reflect.DeepEqual(dst.Script, em.Script))) {
 		dst.Script = nil
 	}
-	return copyNonZero(dst, src, keepEdits)
+	return copyNonZero(dst, src, em, keepEdits)
 }
 
 // copyNonZero copies every set field of a sparse src over dst. The ID and Ext fields are identity and
-// stay with dst; Ext has its own record. With keepEdits a field dst already holds stays, and the result says
-// whether any such field differed from src.
-func copyNonZero[T any](dst, src *T, keepEdits bool) (differs bool) {
+// stay with dst; Ext has its own record. With keepEdits a field dst holds stays unless it equals the emitted
+// form em, and the result says whether any field stayed that differs from src.
+func copyNonZero[T any](dst, src, em *T, keepEdits bool) (differs bool) {
 	d, s := reflect.ValueOf(dst).Elem(), reflect.ValueOf(src).Elem()
 	for i := 0; i < s.NumField(); i++ {
 		switch s.Type().Field(i).Name {
@@ -247,11 +266,66 @@ func copyNonZero[T any](dst, src *T, keepEdits bool) (differs bool) {
 		if s.Field(i).IsZero() {
 			continue
 		}
-		if keepEdits && !d.Field(i).IsZero() {
-			differs = differs || !reflect.DeepEqual(d.Field(i).Interface(), s.Field(i).Interface())
-			continue
+		if keepEdits {
+			unedited := d.Field(i).IsZero()
+			if em != nil {
+				unedited = reflect.DeepEqual(d.Field(i).Interface(), reflect.ValueOf(em).Elem().Field(i).Interface())
+			}
+			if !unedited {
+				differs = differs || !reflect.DeepEqual(d.Field(i).Interface(), s.Field(i).Interface())
+				continue
+			}
 		}
 		d.Field(i).Set(s.Field(i))
 	}
 	return differs
+}
+
+// CollectEmitted records, for every node in lost, what the same fields hold in parsed, the project read back
+// from the emitted file with its IDs already restored. An action step also records its script, which the
+// emitter fills with a placeholder.
+func CollectEmitted(parsed *ir.Project, lost map[string]Lost) map[string]Lost {
+	out := map[string]Lost{}
+	for _, n := range ir.Nodes(parsed) {
+		l, ok := lost[n.Path]
+		if !ok {
+			continue
+		}
+		var e Lost
+		switch {
+		case n.Pipeline != nil && l.Pipeline != nil:
+			e.Pipeline = sparseLike(n.Pipeline, l.Pipeline)
+		case n.Job != nil && l.Job != nil:
+			e.Job = sparseLike(n.Job, l.Job)
+		case n.Step != nil && l.Step != nil:
+			e.Step = sparseLike(n.Step, l.Step)
+			if l.Step.Action != nil {
+				e.Step.Script = n.Step.Script
+			}
+		}
+		out[n.Path] = e
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// sparseLike copies from node the fields that the sparse record names.
+func sparseLike[T any](node, record *T) *T {
+	out := new(T)
+	o, n, r := reflect.ValueOf(out).Elem(), reflect.ValueOf(node).Elem(), reflect.ValueOf(record).Elem()
+	for i := 0; i < r.NumField(); i++ {
+		switch r.Type().Field(i).Name {
+		case "ID":
+			o.Field(i).Set(n.Field(i))
+			continue
+		case "Ext":
+			continue
+		}
+		if !r.Field(i).IsZero() {
+			o.Field(i).Set(n.Field(i))
+		}
+	}
+	return out
 }

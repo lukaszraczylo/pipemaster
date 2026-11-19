@@ -72,6 +72,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: ./release.sh
+  notify:
+    needs: build
+    if: ${{ always() && github.ref == 'refs/heads/dev' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./notify.sh
+  call:
+    needs: build
+    uses: org/repo/.github/workflows/r.yml@v1
+    secrets: inherit
 `
 	if err := os.MkdirAll(filepath.Join(src, ".github", "workflows"), 0o750); err != nil { // #nosec G301 -- temp dir
 		t.Fatal(err)
@@ -91,7 +101,11 @@ jobs:
 	if !strings.Contains(string(data), releaseNever) {
 		t.Fatalf("expected a never rule on release:\n%s", data)
 	}
-	edited := strings.Replace(string(data), releaseNever, "  rules:\n    - if: $CI_COMMIT_TAG\n", 1)
+	head, tail, found := strings.Cut(string(data), "\nrelease:\n")
+	if !found {
+		t.Fatalf("no release job:\n%s", data)
+	}
+	edited := head + "\nrelease:\n" + strings.Replace(tail, releaseNever, "  rules:\n    - if: $CI_COMMIT_TAG\n", 1)
 	if err := os.WriteFile(file, []byte(edited), 0o600); err != nil { // #nosec G703 -- temp dir
 		t.Fatal(err)
 	}
@@ -109,6 +123,11 @@ jobs:
 	}
 	if !strings.Contains(string(out), "tag") {
 		t.Errorf("the edited condition is missing:\n%s", out)
+	}
+	for _, want := range []string{"refs/heads/dev", "uses: org/repo/.github/workflows/r.yml@v1", "secrets: inherit"} {
+		if !strings.Contains(string(out), want) {
+			t.Errorf("an unedited job lost %q although it still reads as emitted:\n%s", want, out)
+		}
 	}
 	if !strings.Contains(msg, "edited after conversion") || !strings.Contains(msg, "job/release") {
 		t.Errorf("report does not name the overridden entry:\n%s", msg)

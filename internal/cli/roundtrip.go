@@ -97,7 +97,11 @@ func hop(proj *ir.Project, m *meta.Meta, sourceID string, p provider.Provider, r
 	}
 	rep.Merge(r)
 	if attach {
-		files = meta.Attach(files, roundtrip.NewMeta(sourceID, proj, p, r))
+		m := roundtrip.NewMeta(sourceID, proj, p, r)
+		if err := roundtrip.RecordEmitted(m, p, files); err != nil {
+			addMetaGap(rep, err)
+		}
+		files = meta.Attach(files, m)
 	}
 	out := fstest.MapFS{}
 	for name, b := range files {

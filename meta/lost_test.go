@@ -68,3 +68,26 @@ func TestReattachReportsOrphanedLostPaths(t *testing.T) {
 		t.Errorf("orphans = %v", orphans)
 	}
 }
+
+func TestKeepingEditsRestoresOnlyFieldsThatStillReadAsEmitted(t *testing.T) {
+	src := lostProject()
+	src.Pipelines[0].Jobs[0].Timeout = nil
+	lost, _ := meta.CollectLost(src, []report.Entry{{IRPath: "pipeline/ci/job/build", Feature: caps.JobAllowFailure, Level: caps.Lost}})
+	// The target file dropped allow_failure, so the parsed job reads false.
+	parsed := emptied()
+	m := &meta.Meta{Lost: lost, Emitted: meta.CollectEmitted(parsed, lost)}
+
+	unedited := emptied()
+	if _, kept := meta.ReattachKeepingEdits(unedited, m); len(kept) != 0 || !unedited.Pipelines[0].Jobs[0].AllowFailure {
+		t.Errorf("an unedited field must be restored: kept=%v job=%+v", kept, unedited.Pipelines[0].Jobs[0])
+	}
+
+	// The user set a value the emitter never wrote: stored metadata must not replace it.
+	m.Lost["pipeline/ci/job/build"].Job.Timeout = nil
+	edited := emptied()
+	edited.Pipelines[0].Jobs[0].AllowFailure = false
+	m.Emitted["pipeline/ci/job/build"].Job.AllowFailure = true
+	if _, kept := meta.ReattachKeepingEdits(edited, m); len(kept) != 1 || edited.Pipelines[0].Jobs[0].AllowFailure {
+		t.Errorf("an edited field must be kept: kept=%v job=%+v", kept, edited.Pipelines[0].Jobs[0])
+	}
+}

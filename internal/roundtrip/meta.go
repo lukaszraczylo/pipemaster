@@ -1,7 +1,9 @@
 package roundtrip
 
 import (
+	"fmt"
 	"strings"
+	"testing/fstest"
 
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/meta"
@@ -84,4 +86,24 @@ func noteUnrecorded(rep *report.Report, ids map[string]string, skipped []meta.Un
 			}
 		}
 	}
+}
+
+// RecordEmitted stores in m what the emitted files read back as for every lost field, so a later restore of an
+// edited file can tell a field the user changed from one that still reads as emitted. It reads files with
+// target's parser before any metadata is attached.
+func RecordEmitted(m *meta.Meta, target provider.Provider, files map[string][]byte) error {
+	if len(m.Lost) == 0 {
+		return nil
+	}
+	fsys := fstest.MapFS{}
+	for name, b := range files {
+		fsys[name] = &fstest.MapFile{Data: b}
+	}
+	parsed, _, err := target.Parse(fsys)
+	if err != nil {
+		return fmt.Errorf("read back %s output: %w", target.ID(), err)
+	}
+	RestoreIDs(parsed, m.IDs)
+	m.Emitted = meta.CollectEmitted(parsed, m.Lost)
+	return nil
 }

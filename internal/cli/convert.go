@@ -75,6 +75,9 @@ func runConvert(args []string, _, stderr io.Writer) int {
 		return exitError
 	}
 	m := roundtrip.NewMeta(src.ID(), proj, tgt, emitRep)
+	if err := roundtrip.RecordEmitted(m, tgt, files); err != nil {
+		addMetaGap(emitRep, err)
+	}
 	rep.Merge(emitRep)
 	rep.Source, rep.Target = src.ID(), tgt.ID()
 
@@ -139,6 +142,17 @@ func addOrphans(rep *report.Report, orphans []string) {
 			Detail:  fmt.Sprintf("stored metadata for %s matches no node in the converted pipeline", path),
 		})
 	}
+}
+
+// addMetaGap reports that the metadata lacks its emitted-form record, so --force cannot restore lost fields
+// over an edited file.
+func addMetaGap(rep *report.Report, err error) {
+	rep.Add(report.Entry{
+		IRPath:  "",
+		Feature: caps.ExtPassthrough,
+		Level:   caps.Lost,
+		Detail:  fmt.Sprintf("round-trip metadata has no record of the emitted form (%v); a later --force run keeps the edited file and restores no lost fields", err),
+	})
 }
 
 // addEdited reports each node where stored metadata differed from the edited file and the file won.

@@ -33,7 +33,10 @@ type Meta struct {
 	// Residual holds display names and step content the target cannot hold, by source IR path.
 	Residual map[string]Residual `yaml:"residual,omitempty"`
 	// Lost holds the source fields of features the emit report called lost or external, by source IR path.
-	Lost    map[string]Lost `yaml:"lost,omitempty"`
+	Lost map[string]Lost `yaml:"lost,omitempty"`
+	// Emitted holds what the target file parsed to for the fields in Lost. A restore of an edited file applies a
+	// stored field only where the file still reads as emitted.
+	Emitted map[string]Lost `yaml:"emitted,omitempty"`
 	Source  string          `yaml:"source,omitempty"`
 	Dialect string          `yaml:"dialect,omitempty"`
 	Version int             `yaml:"version"`
@@ -68,12 +71,31 @@ func ReattachKeepingEdits(p *ir.Project, m *Meta) (orphans, kept []string) {
 func reattach(p *ir.Project, m *Meta, keepEdits bool) (orphans, kept []string) {
 	found := map[string]bool{}
 	keptSet := map[string]bool{}
+	var lostApplied map[string]bool
+	// Metadata with no emitted-form record cannot tell an edit from the emitter's own output, so an edited
+	// file keeps every node that has lost fields as parsed.
+	legacy := keepEdits && len(m.Lost) > 0 && len(m.Emitted) == 0
+	if keepEdits {
+		// The comparison with the emitted form must see the nodes before Ext changes their triggers.
+		var lostKept map[string]bool
+		if legacy {
+			lostApplied, lostKept = skipLost(p, m)
+		} else {
+			lostApplied, lostKept = applyLost(p, m, true)
+		}
+		for path := range lostKept {
+			keptSet[path] = true
+		}
+	}
 	for _, n := range ir.ExtNodes(p) {
 		stored, ok := m.Ext[n.Path]
 		if !ok {
 			continue
 		}
 		found[n.Path] = true
+		if _, hasLost := m.Lost[n.Path]; legacy && hasLost {
+			continue
+		}
 		if *n.Ext == nil {
 			*n.Ext = ir.Ext{}
 		}
@@ -87,9 +109,8 @@ func reattach(p *ir.Project, m *Meta, keepEdits bool) (orphans, kept []string) {
 			(*n.Ext)[k] = copyValue(v)
 		}
 	}
-	lostApplied, lostKept := applyLost(p, m.Lost, keepEdits)
-	for path := range lostKept {
-		keptSet[path] = true
+	if !keepEdits {
+		lostApplied, _ = applyLost(p, m, false)
 	}
 	for _, applied := range []map[string]bool{applyResidual(p, m.Residual), lostApplied} {
 		for path := range applied {
