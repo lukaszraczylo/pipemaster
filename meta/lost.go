@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -225,7 +226,30 @@ func applyLost(p *ir.Project, m *Meta, keepEdits bool) (found, kept map[string]b
 			kept[n.Path] = true
 		}
 	}
+	clearDisabledJobConditions(p, m)
 	return found, kept
+}
+
+// isDisabledCond is the condition the emitter writes for a step or call job whose action host the target cannot express.
+func isDisabledCond(e expr.Expr) bool { return e == expr.Expr(expr.Lit{Kind: expr.LitBool}) }
+
+// clearDisabledJobConditions drops if: false from a job whose call step has a stored action and whose own condition
+// is not stored: the source had no job condition, so none is left to put back.
+func clearDisabledJobConditions(p *ir.Project, m *Meta) {
+	for _, n := range ir.Nodes(p) {
+		if n.Job == nil || !isDisabledCond(n.Job.If) {
+			continue
+		}
+		if l, ok := m.Lost[n.Path]; ok && l.Job != nil && l.Job.If != nil {
+			continue
+		}
+		for _, s := range n.Job.Steps {
+			if l, ok := m.Lost[n.Path+"/step/"+s.ID]; ok && l.Step != nil && l.Step.Action != nil {
+				n.Job.If = nil
+				break
+			}
+		}
+	}
 }
 
 // skipLost matches the nodes that have a stored lost group without applying it; every such node is reported as kept.
@@ -256,6 +280,10 @@ func restoreJob(dst, src, em *ir.Job, keepEdits bool) bool {
 func restoreStep(dst, src, em *ir.Step, keepEdits bool) bool {
 	if src.Action != nil && (!keepEdits || (em != nil && reflect.DeepEqual(dst.Script, em.Script))) {
 		dst.Script = nil
+	}
+	// A disabled step is written with if: false, and a source without a condition has none to store back.
+	if src.Action != nil && src.If == nil && isDisabledCond(dst.If) {
+		dst.If = nil
 	}
 	return copyNonZero(dst, src, em, keepEdits)
 }
