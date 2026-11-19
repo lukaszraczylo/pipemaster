@@ -521,3 +521,21 @@ func TestScriptlessJobStaysScriptless(t *testing.T) {
 		t.Errorf("second parse differs: %s", diff)
 	}
 }
+
+// An empty before_script overrides a template's; it is no script, and Emit keeps it and invents none.
+func TestEmptyScriptSectionOverrideRoundTrips(t *testing.T) {
+	src := "include:\n  - template: Security/SAST.gitlab-ci.yml\nsast:\n  needs: []\n  before_script: []\n"
+	proj, _ := parseFiles(t, map[string]string{".gitlab-ci.yml": src})
+	files, _, err := gitlab.New().Emit(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(files[".gitlab-ci.yml"])
+	if !strings.Contains(out, "before_script: []") || strings.Contains(out, "script:\n") && strings.Contains(out, "true") {
+		t.Errorf("before_script override not kept as is:\n%s", out)
+	}
+	again, _ := parseFiles(t, map[string]string{".gitlab-ci.yml": out})
+	if eq, diff := ir.Equal(proj, again); !eq {
+		t.Errorf("second parse differs: %s", diff)
+	}
+}

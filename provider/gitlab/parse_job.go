@@ -152,6 +152,11 @@ func (s *state) jobScripts(j *ir.Job, r *reader) error {
 	var secs [3]*yaml.Node
 	for i, name := range []string{"before_script", "script", "after_script"} {
 		secs[i] = r.take(name)
+		if secs[i] != nil && secs[i].Kind == yaml.SequenceNode && len(secs[i].Content) == 0 {
+			// An empty list overrides what a template set; it stays in Ext, and the job has no script of its own.
+			r.release(name)
+			secs[i] = nil
+		}
 	}
 	if secs[0] == nil && secs[1] == nil && secs[2] == nil {
 		r.keep(ExtNoScript, true)
