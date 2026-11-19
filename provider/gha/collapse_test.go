@@ -267,14 +267,11 @@ func emitFinally(t *testing.T, edit func(string) string) (*ir.Project, *report.R
 }
 
 func finallyNeeds(p *ir.Project) []string {
-	for _, j := range p.Pipelines[0].Finally {
-		var ids []string
-		for _, n := range j.Needs {
-			ids = append(ids, n.JobID)
-		}
-		return ids
+	var ids []string
+	for _, n := range p.Pipelines[0].Finally[0].Needs {
+		ids = append(ids, n.JobID)
 	}
-	return nil
+	return ids
 }
 
 func TestFinallyNeedsRestoreWhenUnedited(t *testing.T) {
