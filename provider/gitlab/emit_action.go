@@ -316,6 +316,9 @@ func (e *emitter) uploadAction(p *jobPrep, sp string, st *ir.Step, t actions.Tar
 	if p.art.seen && when != p.art.when {
 		e.lose(sp, caps.StepIf, "a GitLab job has one artifacts:when; the first upload's value applies")
 	}
+	if p.art.seen && expire != p.art.expire {
+		e.lose(sp, caps.StepAction, "a GitLab job has one artifacts:expire_in; the first upload's value applies")
+	}
 	first := !p.art.seen
 	if first {
 		p.art.name, p.art.expire, p.art.when = name, expire, when

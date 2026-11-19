@@ -444,3 +444,13 @@ func TestMarkerHelperRoundTrip(t *testing.T) {
 		t.Errorf("marker %q not recognised", m)
 	}
 }
+
+func TestSecondUploadWithOtherExpiryIsReported(t *testing.T) {
+	p := glProject("gha", glJob("build", glStep("make"),
+		ghaUses("up1", "upload-artifact", map[string]string{"name": "bin", "path": "out", "retention-days": "3"}),
+		ghaUses("up2", "upload-artifact", map[string]string{"name": "bin", "path": "docs", "retention-days": "9"})))
+	_, rep := emitFiles(t, p)
+	if !hasEntry(rep, "expire_in") {
+		t.Errorf("the dropped second expiry is not reported: %+v", rep.Entries)
+	}
+}
