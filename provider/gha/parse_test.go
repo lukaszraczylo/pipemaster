@@ -537,3 +537,43 @@ func TestNullOn(t *testing.T) {
 		t.Fatalf("pipeline = %+v", pl)
 	}
 }
+
+func TestDefaultsRunApplyToRunSteps(t *testing.T) {
+	pl := one(t, `on: push
+defaults:
+  run:
+    shell: bash
+    working-directory: app
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: make
+      - run: make test
+        working-directory: other
+      - uses: actions/checkout@v4
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: sh
+    steps:
+      - run: lint
+`)
+	build, lint := pl.Jobs[0].Steps, pl.Jobs[1].Steps
+	if build[0].WorkDir != "app" || build[0].Shell != "bash" {
+		t.Errorf("pipeline defaults not applied: %+v", build[0])
+	}
+	if build[1].WorkDir != "other" || build[1].Shell != "bash" {
+		t.Errorf("a step's own working-directory must win: %+v", build[1])
+	}
+	if build[2].WorkDir != "" || build[2].Shell != "" {
+		t.Errorf("defaults.run must not reach a uses step: %+v", build[2])
+	}
+	if lint[0].Shell != "sh" || lint[0].WorkDir != "app" {
+		t.Errorf("job defaults must override per key: %+v", lint[0])
+	}
+	if gh, _ := pl.Ext["gha"].(map[string]any); gh["defaults"] != nil {
+		t.Errorf("defaults is consumed and must not also sit in Ext: %v", pl.Ext)
+	}
+}

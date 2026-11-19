@@ -1,4 +1,4 @@
 Loss report: gha -> gitlab
 [lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
-[lost] pipeline/ci/job/test ext.passthrough (Ext of provider gha is not written to the GitLab file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/test ext.passthrough (Ext of provider gha (services) is not written to the GitLab file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/test job.services (secret DB_PASSWORD is written as the variable $DB_PASSWORD; a GitLab file cannot mark it as a secret)

@@ -17,7 +17,7 @@ const (
 	extRunsOn      = "runs-on"
 )
 
-func (fp *fileParser) parseJob(id string, n *yaml.Node) (*ir.Job, error) {
+func (fp *fileParser) parseJob(id string, n *yaml.Node, defaults runDefaults) (*ir.Job, error) {
 	m, err := fp.mapping(n, "job "+id)
 	if err != nil {
 		return nil, err
@@ -31,6 +31,11 @@ func (fp *fileParser) parseJob(id string, n *yaml.Node) (*ir.Job, error) {
 			return nil, err
 		}
 	}
+	jobDefaults, err := fp.takeRunDefaults(m)
+	if err != nil {
+		return nil, err
+	}
+	defaults.over(jobDefaults).apply(j.Steps)
 	j.Ext, err = m.ext()
 	return j, err
 }

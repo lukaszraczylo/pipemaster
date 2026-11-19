@@ -130,8 +130,12 @@ func (fp *fileParser) parseWorkflow(src []byte) (*ir.Pipeline, error) {
 	if err := fp.pipelineFields(pl, m); err != nil {
 		return nil, err
 	}
+	defaults, err := fp.takeRunDefaults(m)
+	if err != nil {
+		return nil, err
+	}
 	if jn := m.take("jobs"); jn != nil {
-		if err := fp.parseJobs(pl, jn); err != nil {
+		if err := fp.parseJobs(pl, jn, defaults); err != nil {
 			return nil, err
 		}
 	}
@@ -150,7 +154,7 @@ func (fp *fileParser) yamlErr(err error) error {
 	return fmt.Errorf("%s: %s", fp.file, msg)
 }
 
-func (fp *fileParser) parseJobs(pl *ir.Pipeline, n *yaml.Node) error {
+func (fp *fileParser) parseJobs(pl *ir.Pipeline, n *yaml.Node, defaults runDefaults) error {
 	jm, err := fp.mapping(n, "jobs")
 	if err != nil {
 		return err
@@ -162,7 +166,7 @@ func (fp *fileParser) parseJobs(pl *ir.Pipeline, n *yaml.Node) error {
 		}
 		seen[e.key] = true
 		fp.lines[fp.stem+"/"+e.key] = e.line
-		j, err := fp.parseJob(e.key, e.val)
+		j, err := fp.parseJob(e.key, e.val, defaults)
 		if err != nil {
 			return err
 		}

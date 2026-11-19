@@ -6,6 +6,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
@@ -190,6 +191,7 @@ func (s *state) jobEnvironment(j *ir.Job, r *reader) error {
 		}
 	}
 	j.Environment = env
+	s.noteUnread(s.jobPath(j.ID), caps.JobEnvironment, "environment", er)
 	x, err := er.ext()
 	if x != nil {
 		r.keep(extEnvironment, x[dialect])
@@ -346,6 +348,7 @@ func (s *state) jobArtifacts(j *ir.Job, r *reader) error {
 	if len(a.Paths) > 0 || a.Name != "" || a.Expire != "" {
 		j.Artifacts = []ir.Artifact{a}
 	}
+	s.noteUnread(s.jobPath(j.ID), caps.JobArtifacts, "artifacts", ar)
 	x, err := ar.ext()
 	if x != nil {
 		r.keep(extArtifacts, x[dialect])

@@ -6,9 +6,6 @@ origin:
 pipelines:
     - ext:
         gha:
-            defaults:
-                run:
-                    shell: bash
             events:
                 issues:
                     types:
@@ -20,12 +17,7 @@ pipelines:
         - kind: push
         - kind: tag
       jobs:
-        - ext:
-            gha:
-                defaults:
-                    run:
-                        working-directory: app
-          id: build
+        - id: build
           runner:
             labels:
                 - ubuntu-latest
@@ -36,5 +28,6 @@ pipelines:
               id: build-step-1
               kind: script
               shell: bash
+              workdir: app
               script:
                 - echo ok

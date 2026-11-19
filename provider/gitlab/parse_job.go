@@ -84,7 +84,7 @@ func (s *state) parseJob(name string, merged, raw *yaml.Node, def []entry) (*job
 		}
 		r.keep(extExtends, list)
 	}
-	if err := s.jobInherit(r); err != nil {
+	if err := s.jobInherit(s.jobPath(j.ID), r); err != nil {
 		return nil, err
 	}
 	s.noteExtKeys(j, r)
@@ -94,7 +94,7 @@ func (s *state) parseJob(name string, merged, raw *yaml.Node, def []entry) (*job
 
 // structuralKeys stay in Ext because the emitter restores them, not because the IR lost them.
 // jobInherit keeps the parts of inherit that applyDefaults did not act on; inherit:default is already applied.
-func (s *state) jobInherit(r *reader) error {
+func (s *state) jobInherit(path string, r *reader) error {
 	n := r.take("inherit")
 	if n == nil {
 		return nil
@@ -107,6 +107,9 @@ func (s *state) jobInherit(r *reader) error {
 		delete(m, "default")
 		if len(m) > 0 {
 			r.keep("inherit", m)
+			for _, k := range sortedKeys(m) {
+				s.note(path, caps.ExtPassthrough, "kept in Ext[gitlab]", "inherit:"+k+" has no IR form; the job inherits "+k+" as other targets define it", n)
+			}
 		}
 	}
 	return nil
@@ -355,4 +358,13 @@ func (s *state) jobRetry(j *ir.Job, r *reader) error {
 		r.keep("retry", x[dialect])
 	}
 	return err
+}
+
+// noteUnread reports each key of a nested block that its parser left in Ext, by its block:key name.
+func (s *state) noteUnread(path string, f caps.Feature, block string, r *reader) {
+	for _, e := range r.ents {
+		if !r.used[e.name] {
+			s.note(path, f, "kept in Ext[gitlab]", block+":"+e.name+" has no IR field; kept in Ext and not written to other targets", e.key)
+		}
+	}
 }

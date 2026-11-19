@@ -1,7 +1,7 @@
 Loss report: gitlab -> gha
-[lost] pipeline/gitlab-ci ext.passthrough (Ext of provider gitlab is not written to the GHA file; it is kept in round-trip metadata)
-[lost] pipeline/gitlab-ci/job/build ext.passthrough (Ext of provider gitlab is not written to the GHA file; it is kept in round-trip metadata)
-[lost] pipeline/gitlab-ci/job/prod ext.passthrough (Ext of provider gitlab is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci ext.passthrough (Ext of provider gitlab (hidden, include) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/job/build ext.passthrough (Ext of provider gitlab (coverage) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/job/prod ext.passthrough (Ext of provider gitlab (extends, interruptible, resource_group) is not written to the GHA file; it is kept in round-trip metadata)
 [emulated] pipeline/gitlab-ci/job/build job.retry: step-level retry loop via shell (Retry.Attempts is the total number of runs, so GitLab retry: N is Attempts N+1)
 [emulated] pipeline/gitlab-ci/job/build job.runner: default runner label ubuntu-latest (the pipeline named no runner)
 [emulated] pipeline/gitlab-ci/job/build step.action: actions/checkout step (GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs)

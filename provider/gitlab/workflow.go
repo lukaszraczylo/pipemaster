@@ -61,6 +61,7 @@ func (s *state) workflow(pl *ir.Pipeline, r *reader) (guard expr.Expr, err error
 			})
 		}
 	}
+	s.noteWorkflowKeys(w)
 	pl.Triggers = trigs
 	return guard, nil
 }
@@ -240,5 +241,25 @@ func (s *state) guardJobs(pl *ir.Pipeline) {
 	}
 	for _, j := range append(append([]*ir.Job{}, pl.Jobs...), pl.Finally...) {
 		j.If = and(j.If, s.guard)
+	}
+}
+
+// noteWorkflowKeys reports the workflow settings that change a pipeline once it starts: its name, auto-cancel
+// policy and the variables a rule sets. The IR has no field for them, so they stay in Ext.
+func (s *state) noteWorkflowKeys(w *yaml.Node) {
+	path := "pipeline/" + pipelineID
+	for _, e := range entries(w) {
+		switch e.name {
+		case "name", "auto_cancel":
+			s.note(path, caps.ExtPassthrough, "kept in Ext[gitlab]", "workflow:"+e.name+" has no IR field; kept in Ext and not written to other targets", e.key)
+		case "rules":
+			for _, r := range e.val.Content {
+				for _, k := range entries(r) {
+					if k.name == "variables" || k.name == "auto_cancel" {
+						s.note(path, caps.ExtPassthrough, "kept in Ext[gitlab]", "workflow:rules "+k.name+" has no IR field; kept in Ext and not written to other targets", k.key)
+					}
+				}
+			}
+		}
 	}
 }

@@ -219,3 +219,24 @@ func TestCheckoutStepDoesNotSurviveReturnToGitlab(t *testing.T) {
 		t.Errorf("the return trip kept the clone step: %+v", steps)
 	}
 }
+
+func TestForeignExtEntryNamesTheKeys(t *testing.T) {
+	const src = `on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    concurrency: build-lock
+    steps:
+      - run: make
+`
+	_, rep := convert(t, provider.GHA, provider.GitLab, ghaWorkflow, src)
+	for _, e := range rep.Entries {
+		if strings.Contains(e.Detail, "Ext of provider gha") && strings.Contains(e.IRPath, "job/build") &&
+			strings.Contains(e.Detail, "permissions") && strings.Contains(e.Detail, "concurrency") {
+			return
+		}
+	}
+	t.Errorf("no entry names the dropped job keys: %+v", rep.Entries)
+}
