@@ -557,3 +557,18 @@ func TestBeforeScriptWithoutScriptRoundTrips(t *testing.T) {
 		t.Errorf("second parse differs: %s", diff)
 	}
 }
+
+// cache: [] removes the cache an extended job sets.
+func TestEmptyCacheListOverrideRoundTrips(t *testing.T) {
+	src := ".base:\n  cache:\n    paths: [.mod/]\nbuild:\n  extends: .base\n  cache: []\n  script: [make]\n"
+	proj, _ := parseFiles(t, map[string]string{".gitlab-ci.yml": src})
+	files, _, err := gitlab.New().Emit(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(files[".gitlab-ci.yml"])
+	again, _ := parseFiles(t, map[string]string{".gitlab-ci.yml": out})
+	if eq, diff := ir.Equal(proj, again); !eq {
+		t.Errorf("second parse differs: %s\n%s", diff, out)
+	}
+}

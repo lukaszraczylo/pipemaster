@@ -207,7 +207,11 @@ func (s *state) jobCache(j *ir.Job, r *reader) error {
 	case yaml.MappingNode:
 		items = []*yaml.Node{n}
 	case yaml.SequenceNode:
-		items = flattenSeq(n)
+		if items = flattenSeq(n); len(items) == 0 {
+			// An empty list removes the cache a parent job sets, so it must stay in the file.
+			r.release("cache")
+			return nil
+		}
 	default:
 		r.release("cache")
 		return nil
