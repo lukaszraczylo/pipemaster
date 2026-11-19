@@ -19,6 +19,7 @@ const (
 
 // EmbedStack appends the stack block to the lexically first file and returns a new map. It writes no block
 // for an empty stack. A first file without a trailing newline gains one, and the top layer's hash covers that form.
+// It sets Files on the top layer in place, so every stack that holds that layer sees the new hashes.
 func EmbedStack(files map[string][]byte, s *Stack) map[string][]byte {
 	out := make(map[string][]byte, len(files))
 	for k, v := range files {

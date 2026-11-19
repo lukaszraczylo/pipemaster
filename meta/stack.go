@@ -52,7 +52,8 @@ func LoadStack(fsys fs.FS, parsed []string) (*Stack, error) {
 }
 
 // AttachStack records the top layer's file hashes and returns a copy of files plus the sidecar.
-// It writes nothing for an empty stack.
+// It writes nothing for an empty stack. It sets Files on the top layer in place, so every stack that holds
+// that layer sees the new hashes.
 func AttachStack(files map[string][]byte, s *Stack) map[string][]byte {
 	out := make(map[string][]byte, len(files)+1)
 	for k, v := range files {
