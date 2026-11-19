@@ -1,0 +1,9 @@
+.go-cache:
+  variables:
+    GOMODCACHE: $CI_PROJECT_DIR/.cache/go-mod
+    GOCACHE: $CI_PROJECT_DIR/.cache/go-build
+
+lint:
+  extends: .go-cache
+  script:
+    - make lint

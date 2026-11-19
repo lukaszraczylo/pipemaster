@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
@@ -118,7 +119,26 @@ func (s *state) extend(name string, jobs jobSet, stack []string) (*yaml.Node, er
 	if acc == nil {
 		return own, nil
 	}
-	return s.deepMerge(acc, own), nil
+	merged := s.deepMerge(acc, own)
+	// Hidden jobs reach Emit as plain maps, which lose their key order, so an inherited block has no stable order.
+	sortMapping(get(merged, "variables"))
+	return merged, nil
+}
+
+// sortMapping orders the entries of a mapping node by key.
+func sortMapping(n *yaml.Node) {
+	if n == nil || n.Kind != yaml.MappingNode {
+		return
+	}
+	pairs := make([][2]*yaml.Node, 0, len(n.Content)/2)
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		pairs = append(pairs, [2]*yaml.Node{n.Content[i], n.Content[i+1]})
+	}
+	sort.SliceStable(pairs, func(a, b int) bool { return pairs[a][0].Value < pairs[b][0].Value })
+	n.Content = n.Content[:0]
+	for _, p := range pairs {
+		n.Content = append(n.Content, p[0], p[1])
+	}
 }
 
 func (s *state) extendsNames(n *yaml.Node) ([]string, error) {
