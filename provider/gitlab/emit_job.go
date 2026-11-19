@@ -3,6 +3,7 @@ package gitlab
 import (
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -97,9 +98,12 @@ func (e *emitter) needsNode(c *pipeCtx, p *jobPrep) (*yaml.Node, error) {
 		}
 		shown := n
 		shown.JobID = c.key(n.JobID)
-		entry, err := needEntry(shown, c.declares(n.JobID), downloaded[n.JobID], hasDeps, deps, extras[n.JobID])
+		entry, bad, err := needEntry(shown, c.declares(n.JobID), downloaded[n.JobID], hasDeps, deps, extras[n.JobID])
 		if err != nil {
 			return nil, err
+		}
+		if bad != "" {
+			e.lose(p.path, caps.JobNeeds, "matrix instance "+strconv.Quote(bad)+" of need "+n.JobID+" is not a valid GitLab need name; the need selects the whole job")
 		}
 		out.Content = append(out.Content, entry)
 	}
@@ -118,15 +122,20 @@ func (e *emitter) needsNode(c *pipeCtx, p *jobPrep) (*yaml.Node, error) {
 
 // needEntry writes one needs entry. GitLab downloads the producer's artifacts by default when it has any
 // (and dependencies lists it), so the map form appears only when the IR says otherwise or an action asked for them.
-func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps []string, extra any) (*yaml.Node, error) {
+func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps []string, extra any) (node *yaml.Node, badInstance string, err error) {
 	x, _ := extra.(map[string]any)
 	job := n.JobID
 	if inst, _ := x[ExtNeedsInstance].(string); inst != "" {
 		x = maps.Clone(x)
 		delete(x, ExtNeedsInstance)
 		// The instance name starts with the job name, which a fold prefix may have changed.
-		if at := strings.Index(inst, ": ["); at > 0 {
+		switch at := strings.Index(inst, ": ["); {
+		case at > 0:
 			job = n.JobID + inst[at:]
+		case validNeedName(inst):
+			job = inst
+		default:
+			badInstance = inst
 		}
 	}
 	m := newMap()
@@ -146,14 +155,19 @@ func needEntry(n ir.Need, producerHasArtifacts, downloaded, hasDeps bool, deps [
 	}
 	if len(x) > 0 {
 		if err := m.addExtra(x, nil); err != nil {
-			return nil, err
+			return nil, badInstance, err
 		}
 		explicit = true
 	}
 	if !explicit {
-		return str(job), nil
+		return str(job), badInstance, nil
 	}
-	return m.n, nil
+	return m.n, badInstance, nil
+}
+
+// validNeedName accepts a non-empty single-line name; GitLab matches it against job names.
+func validNeedName(s string) bool {
+	return strings.TrimSpace(s) != "" && !strings.ContainsAny(s, "\n\r")
 }
 
 // downloadedFrom maps each needed job whose artifacts an action downloads, and reports downloads that match no needed job.

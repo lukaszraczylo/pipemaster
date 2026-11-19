@@ -6,10 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/gitlab"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 func TestScriptsAreCanonicalTemplates(t *testing.T) {
@@ -629,4 +631,39 @@ func TestMatrixInstanceNeedFollowsRename(t *testing.T) {
 	if strings.Contains(out, "- on\n") || !strings.Contains(out, ": [x]") || strings.Contains(out, "- 'on: [x]'") {
 		t.Errorf("selector wrong after rename:\n%s", out)
 	}
+}
+
+func instanceNeedEmit(t *testing.T, inst string) (string, *report.Report) {
+	t.Helper()
+	prod := glJob("on", glStep("x"))
+	cons := glJob("pkg", glStep("y"))
+	cons.Needs = []ir.Need{{JobID: "on"}}
+	cons.Ext = ir.Ext{"gitlab": map[string]any{"needs_extra": map[string]any{"on": map[string]any{"_instance": inst}}}}
+	files, rep, err := gitlab.New().Emit(glProject("gitlab", prod, cons))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(files[".gitlab-ci.yml"]), rep
+}
+
+// An instance value without a bracket selector is written as the need name when GitLab can take it.
+func TestInstanceNeedWithoutSelectorIsEmittedVerbatim(t *testing.T) {
+	out, _ := instanceNeedEmit(t, "on-custom")
+	if !strings.Contains(out, "- on-custom") {
+		t.Errorf("instance dropped:\n%s", out)
+	}
+}
+
+// A value GitLab cannot take as a need name is reported with its text.
+func TestInstanceNeedInvalidIsReportedLost(t *testing.T) {
+	out, rep := instanceNeedEmit(t, "bad\nname")
+	if strings.Contains(out, "bad") {
+		t.Errorf("invalid instance written:\n%s", out)
+	}
+	for _, e := range rep.Entries {
+		if e.Level == caps.Lost && strings.Contains(e.Detail, "bad") {
+			return
+		}
+	}
+	t.Error("no lost entry naming the instance")
 }
