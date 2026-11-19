@@ -2,11 +2,14 @@ package roundtrip_test
 
 import (
 	"os"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 func TestRoundTripMatrix(t *testing.T) {
@@ -42,6 +45,11 @@ func TestRoundTripIdentity(t *testing.T) {
 			}
 			// A dialect drops a key it cannot hold from the file and keeps it in the metadata.
 			if isDialect(a.ID()) && rep.Worst() >= caps.External {
+				for _, d := range diffNodes(src, back) {
+					if !reportedLost(rep, d.Path) {
+						t.Errorf("%s: %s differs and no lost or external entry names it", d.Path, d.Field)
+					}
+				}
 				roundtrip.Restore(back, roundtrip.NewMeta(a.ID(), src, a, rep))
 			}
 			if same, diff := ir.Equal(src, back); !same {
@@ -49,4 +57,11 @@ func TestRoundTripIdentity(t *testing.T) {
 			}
 		})
 	}
+}
+
+// reportedLost is true when a lost or external entry sits at the node or at one of its trigger, scope or event parts.
+func reportedLost(rep *report.Report, path string) bool {
+	return slices.ContainsFunc(rep.Entries, func(e report.Entry) bool {
+		return e.Level >= caps.External && (atOrBelow(e.IRPath, path) || strings.HasPrefix(e.IRPath, path+"/event/"))
+	})
 }

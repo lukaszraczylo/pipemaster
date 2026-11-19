@@ -222,11 +222,15 @@ func TestCorpus(t *testing.T) {
 		})
 		healthy = healthy && ok
 		// A GHA-family target keeps the source's own linter findings, so only new ones fail.
-		crossKnown := findings{}
-		if provider.Family(f.provider) == provider.GHA {
-			crossKnown = sourceProblems(t, f)
-		}
+		var srcKnown findings
 		for _, to := range targets(f.provider) {
+			crossKnown := findings{}
+			if provider.Family(f.provider) == provider.GHA && provider.Family(to) == provider.GHA {
+				if srcKnown == nil {
+					srcKnown = sourceProblems(t, f)
+				}
+				crossKnown = srcKnown
+			}
 			ok := t.Run(f.name+"/to-"+to, func(t *testing.T) {
 				b := prov(t, to)
 				r := hops(t, fsA, a, b, false, true)
