@@ -339,7 +339,7 @@ func TestParseRestoredConditionReadsInSourceDialect(t *testing.T) {
 	if got := expr.String(back.Pipelines[0].Jobs[0].If); got != expr.String(cond) {
 		t.Fatalf("condition = %s, want %s\n%s", got, expr.String(cond), text)
 	}
-	if back.Origin.Provider != provider.GitLab {
-		t.Errorf("origin = %q, want %q: the restored condition reads in GitLab's dialect", back.Origin.Provider, provider.GitLab)
+	if back.Origin.Provider != provider.GitLab || back.Origin.Dialect != provider.GitLab {
+		t.Errorf("origin = %+v, want provider and dialect %q: the restored condition reads in GitLab's dialect", back.Origin, provider.GitLab)
 	}
 }
