@@ -17,6 +17,7 @@ pipelines:
           steps:
             - action:
                 kind: repo
+                host: https://github.com
                 owner: actions
                 repo: checkout
                 ref: v4
@@ -32,6 +33,7 @@ pipelines:
               kind: action
             - action:
                 kind: repo
+                host: https://github.com
                 owner: actions
                 repo: setup-go
                 ref: v5

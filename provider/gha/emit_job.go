@@ -227,7 +227,14 @@ func (e *emitter) callKeys(m *omap, jp string, call *ir.Step) error {
 			e.lose(sp, l.f, why)
 		}
 	}
-	m.set("uses", str(actionString(call.Action)))
+	text, ok, err := e.uses(sp, call.Action)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		text = actionString(call.Action)
+	}
+	m.set("uses", str(text))
 	if len(call.With) > 0 {
 		w, err := e.withNode(jp, call.With)
 		if err != nil {
@@ -469,6 +476,10 @@ func actionString(a *ir.ActionRef) string {
 	case ir.ActionLocal:
 		return a.Path
 	}
+	return repoString(a)
+}
+
+func repoString(a *ir.ActionRef) string {
 	s := a.Owner + "/" + a.Repo
 	if a.Path != "" {
 		s += "/" + a.Path

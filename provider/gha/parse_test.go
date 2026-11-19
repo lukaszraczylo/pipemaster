@@ -286,8 +286,8 @@ jobs:
       - uses: ./local/act
 `)
 	want := []ir.ActionRef{
-		{Kind: ir.ActionRepo, Owner: "actions", Repo: "checkout", Ref: "v4"},
-		{Kind: ir.ActionRepo, Owner: "owner", Repo: "repo", Path: "sub/dir", Ref: "main"},
+		{Kind: ir.ActionRepo, Host: "https://github.com", Owner: "actions", Repo: "checkout", Ref: "v4"},
+		{Kind: ir.ActionRepo, Host: "https://github.com", Owner: "owner", Repo: "repo", Path: "sub/dir", Ref: "main"},
 		{Kind: ir.ActionDocker, Image: "alpine:3.20"},
 		{Kind: ir.ActionLocal, Path: "./local/act"},
 	}

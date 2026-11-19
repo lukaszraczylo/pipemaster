@@ -263,9 +263,16 @@ const (
 	ActionLocal  ActionKind = "local"
 )
 
-// ActionRef identifies a reusable action.
+// Gitea host prefix forms; any other Host is a base URL without a trailing slash.
+const (
+	HostSelf    = "self:"
+	HostBuiltin = "builtin:"
+)
+
+// ActionRef identifies a reusable action; Host says where a repo action resolves and is empty when unknown.
 type ActionRef struct {
 	Kind  ActionKind `yaml:"kind,omitempty"`
+	Host  string     `yaml:"host,omitempty"`
 	Owner string     `yaml:"owner,omitempty"`
 	Repo  string     `yaml:"repo,omitempty"`
 	Path  string     `yaml:"path,omitempty"`

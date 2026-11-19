@@ -8,6 +8,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 )
 
 // ExtDerivedID marks a step whose ID the parser synthesised, so an emitter does not write it back.
@@ -199,29 +200,64 @@ func (fp *fileParser) stepFields(s *ir.Step, m *mapping) (err error) {
 	return err
 }
 
-// action parses a uses: reference: owner/repo[/path]@ref, docker://image or ./local/path.
+// action parses a uses: reference: owner/repo[/path]@ref, docker://image, ./local/path, and for Gitea and
+// Forgejo an absolute URL; Gitea adds self:owner/repo@ref and builtin:name.
 func (fp *fileParser) action(n *yaml.Node) (ir.ActionRef, error) {
 	s, err := fp.scalar(n, "uses")
 	if err != nil {
 		return ir.ActionRef{}, err
 	}
-	ref, ok := parseAction(s)
+	ref, ok := parseAction(fp.d, s)
 	if !ok {
 		return ir.ActionRef{}, fp.errf(n, "unsupported uses %q: want owner/repo@ref, docker://image or ./path", s)
 	}
 	return ref, nil
 }
 
-func parseAction(s string) (ir.ActionRef, bool) {
+func parseAction(d Dialect, s string) (ir.ActionRef, bool) {
 	switch {
 	case strings.HasPrefix(s, dockerPrefix):
 		img := strings.TrimPrefix(s, dockerPrefix)
 		return ir.ActionRef{Kind: ir.ActionDocker, Image: img}, img != "" && !strings.ContainsAny(img, " \t\n")
 	case strings.HasPrefix(s, "./"):
 		return ir.ActionRef{Kind: ir.ActionLocal, Path: s}, !strings.ContainsAny(s, " \t\n")
+	case strings.ContainsAny(s, " \t\n"):
+		return ir.ActionRef{}, false
 	}
+	host := d.DefaultHost
+	switch {
+	case d.ID == provider.Gitea && strings.HasPrefix(s, ir.HostBuiltin):
+		name := strings.TrimPrefix(s, ir.HostBuiltin)
+		return ir.ActionRef{Kind: ir.ActionRepo, Host: ir.HostBuiltin, Repo: name}, name != "" && !strings.ContainsAny(name, "/@")
+	case d.ID == provider.Gitea && strings.HasPrefix(s, ir.HostSelf):
+		host, s = ir.HostSelf, strings.TrimPrefix(s, ir.HostSelf)
+	case strings.Contains(s, "://"):
+		if d.ID == provider.GHA {
+			return ir.ActionRef{}, false
+		}
+		var ok bool
+		if host, s, ok = splitURLHost(s); !ok {
+			return ir.ActionRef{}, false
+		}
+	}
+	ref, ok := parseRepoRef(s)
+	ref.Host = host
+	return ref, ok
+}
+
+// splitURLHost splits https://h/owner/repo@ref into the base URL and owner/repo@ref.
+func splitURLHost(s string) (host, rest string, ok bool) {
+	scheme, after, _ := strings.Cut(s, "://")
+	if scheme != "https" && scheme != "http" {
+		return "", "", false
+	}
+	h, rest, found := strings.Cut(after, "/")
+	return scheme + "://" + h, rest, found && h != ""
+}
+
+func parseRepoRef(s string) (ir.ActionRef, bool) {
 	at := strings.Index(s, "@")
-	if at < 0 || strings.ContainsAny(s, " \t\n") {
+	if at < 0 {
 		return ir.ActionRef{}, false
 	}
 	segs := strings.Split(s[:at], "/")
@@ -230,7 +266,7 @@ func parseAction(s string) (ir.ActionRef, bool) {
 		return ir.ActionRef{}, false
 	}
 	for _, seg := range segs {
-		if seg == "" {
+		if seg == "" || strings.Contains(seg, ":") {
 			return ir.ActionRef{}, false
 		}
 	}

@@ -95,3 +95,33 @@ func TestValidateNilSafe(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestIRValidateHost(t *testing.T) {
+	for _, c := range []struct {
+		host string
+		ok   bool
+	}{
+		{"", true},
+		{"https://github.com", true},
+		{"http://gitea.local:3000", true},
+		{ir.HostSelf, true},
+		{ir.HostBuiltin, true},
+		{"github.com", false},
+		{"https://github.com/", false},
+		{"https://github.com/owner", false},
+		{"ftp://example.com", false},
+		{"self", false},
+		{"https://u:p@example.com", false},
+	} {
+		t.Run(c.host, func(t *testing.T) {
+			p := one(&ir.Job{ID: "a", Steps: []*ir.Step{{ID: "s", Action: &ir.ActionRef{Kind: ir.ActionRepo, Host: c.host, Owner: "o", Repo: "r", Ref: "v1"}}}})
+			err := ir.Validate(p)
+			if c.ok && err != nil {
+				t.Fatalf("want ok, got %v", err)
+			}
+			if !c.ok && (err == nil || !strings.Contains(err.Error(), "pipeline/ci/job/a/step/s")) {
+				t.Fatalf("want host error naming the step, got %v", err)
+			}
+		})
+	}
+}

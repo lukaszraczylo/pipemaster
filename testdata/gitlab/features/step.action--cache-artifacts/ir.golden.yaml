@@ -26,6 +26,7 @@ pipelines:
           steps:
             - action:
                 kind: repo
+                host: https://github.com
                 owner: actions
                 repo: cache
                 ref: v4
@@ -45,6 +46,7 @@ pipelines:
                 - make build
             - action:
                 kind: repo
+                host: https://github.com
                 owner: actions
                 repo: upload-artifact
                 ref: v4
@@ -67,6 +69,7 @@ pipelines:
           steps:
             - action:
                 kind: repo
+                host: https://github.com
                 owner: actions
                 repo: download-artifact
                 ref: v4

@@ -72,7 +72,18 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 		}
 		m.set("name", str(t))
 	}
-	if st.If != nil {
+	var usesText string
+	usesOK := true
+	if (st.Kind == ir.StepAction || st.Kind == ir.StepPipelineCall) && st.Action != nil && st.Image == nil {
+		var uerr error
+		if usesText, usesOK, uerr = e.uses(sp, st.Action); uerr != nil {
+			return nil, false, uerr
+		}
+	}
+	switch {
+	case !usesOK:
+		m.set("if", boolNodeOf(false))
+	case st.If != nil:
 		m.set("if", e.condition(sp, caps.StepIf, st.If, "step"))
 	}
 	var markers []string
@@ -96,7 +107,11 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 			m.set("run", block(ts))
 		}
 	case (st.Kind == ir.StepAction || st.Kind == ir.StepPipelineCall) && st.Action != nil:
-		m.set("uses", str(actionString(st.Action)))
+		if !usesOK {
+			m.set("run", str(noopScript))
+			break
+		}
+		m.set("uses", str(usesText))
 		err = e.withKey(m, sp, st.With, nil)
 	case st.Kind == ir.StepScript && st.Image == nil:
 		m.set("run", str(noopScript))

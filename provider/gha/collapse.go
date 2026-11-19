@@ -68,6 +68,8 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			}
 		case caps.StepImage:
 			collapseImage(e, pl, rep, u, args[u])
+		case caps.StepAction:
+			collapseHost(e, markedStep(pl, u.IRPath), args[u])
 		case caps.JobRetry:
 			collapseRetry(markedJob(pl, u.IRPath), args[u])
 		case caps.TriggerPush:
@@ -336,4 +338,15 @@ func collapseImage(e *emitter, pl *ir.Pipeline, rep *report.Report, u ir.Feature
 		with = nil
 	}
 	st.Kind, st.Action, st.With, st.Image, st.Script = ir.StepScript, nil, with, &a.Image, a.Script
+}
+
+// collapseHost restores the host a bare ref had in its source when the parsed step still holds the dialect default.
+func collapseHost(e *emitter, st *ir.Step, args []string) {
+	var a hostArg
+	if st == nil || len(args) != 1 || json.Unmarshal([]byte(args[0]), &a) != nil || !ir.ValidHost(a.Host) || a.Host == "" {
+		return
+	}
+	if st.Action != nil && st.Action.Kind == ir.ActionRepo && st.Action.Host == e.d.DefaultHost {
+		st.Action.Host = a.Host
+	}
 }

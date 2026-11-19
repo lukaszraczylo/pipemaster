@@ -3,6 +3,7 @@ package ir
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -64,6 +65,9 @@ func validatePipeline(pl *Pipeline, add func(path, format string, a ...any)) {
 		byID[j.ID] = j
 		seenS := map[string]bool{}
 		for _, s := range j.Steps {
+			if s != nil && s.Action != nil && !ValidHost(s.Action.Host) {
+				add(stepPath(pl.ID, j.ID, s.ID), "action host %q must be a http(s) base URL, %q or %q", s.Action.Host, HostSelf, HostBuiltin)
+			}
 			if s == nil || s.ID == "" {
 				continue
 			}
@@ -204,4 +208,14 @@ func findCycles(byID map[string]*Job) [][]string {
 		}
 	}
 	return out
+}
+
+// ValidHost reports whether h is empty, a Gitea prefix form or an http(s) base URL with no path.
+func ValidHost(h string) bool {
+	if h == "" || h == HostSelf || h == HostBuiltin {
+		return true
+	}
+	u, err := url.Parse(h)
+	return err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" && u.Path == "" &&
+		u.RawQuery == "" && u.Fragment == "" && u.User == nil && !strings.HasSuffix(h, "/")
 }

@@ -191,6 +191,9 @@ func parse(src []byte) (*registry, error) {
 	return r, nil
 }
 
+// githubHost is where the pinned actions live; Lookup ignores it.
+const githubHost = "https://github.com"
+
 func parsePinned(s string) (ir.ActionRef, error) {
 	nameRef, ref, ok := strings.Cut(s, "@")
 	if !ok || ref == "" {
@@ -200,7 +203,7 @@ func parsePinned(s string) (ir.ActionRef, error) {
 	if !ok || owner == "" || name == "" {
 		return ir.ActionRef{}, fmt.Errorf("%q must be owner/repo@ref", s)
 	}
-	return ir.ActionRef{Kind: ir.ActionRepo, Owner: owner, Repo: name, Ref: ref}, nil
+	return ir.ActionRef{Kind: ir.ActionRepo, Host: githubHost, Owner: owner, Repo: name, Ref: ref}, nil
 }
 
 // Reverse returns the pinned GitHub action for a GitLab-side construct:

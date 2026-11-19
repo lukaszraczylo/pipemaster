@@ -64,3 +64,21 @@ func TestDialectAliasRoundTrip(t *testing.T) {
 		t.Errorf("Parse->Emit->Parse differs:\n%s", diff)
 	}
 }
+
+func TestDialectHostFixtures(t *testing.T) {
+	for _, id := range []string{provider.Gitea, provider.Forgejo} {
+		t.Run(id, func(t *testing.T) {
+			dir := filepath.Join(featuresRoot, id, "features", "step.action--host")
+			p := prov(t, id)
+			src, _, err := p.Parse(os.DirFS(dir))
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := ir.Marshal(src)
+			if err != nil {
+				t.Fatal(err)
+			}
+			golden.Assert(t, filepath.Join(dir, "ir.golden.yaml"), got)
+		})
+	}
+}

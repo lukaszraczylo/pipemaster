@@ -297,8 +297,8 @@ func nativizeJob(t *rapid.T, j *ir.Job) {
 }
 
 var actionRefs = []*ir.ActionRef{
-	{Kind: ir.ActionRepo, Owner: "o", Repo: "r", Ref: "v1"},
-	{Kind: ir.ActionRepo, Owner: "o", Repo: "r", Path: "sub/dir", Ref: "v2"},
+	{Kind: ir.ActionRepo, Host: "https://github.com", Owner: "o", Repo: "r", Ref: "v1"},
+	{Kind: ir.ActionRepo, Host: "https://github.com", Owner: "o", Repo: "r", Path: "sub/dir", Ref: "v2"},
 	{Kind: ir.ActionDocker, Image: "alpine:3"},
 	{Kind: ir.ActionLocal, Path: "./local/action"},
 }

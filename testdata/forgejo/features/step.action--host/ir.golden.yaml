@@ -1,0 +1,50 @@
+origin:
+    provider: forgejo
+    dialect: forgejo
+    files:
+        - .forgejo/workflows/ci.yml
+pipelines:
+    - id: ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - docker
+          steps:
+            - action:
+                kind: repo
+                host: https://data.forgejo.org
+                owner: actions
+                repo: checkout
+                ref: v4
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: action
+            - action:
+                kind: repo
+                host: https://github.com
+                owner: actions
+                repo: setup-go
+                ref: v5
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-2
+              kind: action
+            - action:
+                kind: repo
+                host: https://codeberg.org
+                owner: org
+                repo: tool
+                path: sub
+                ref: v2
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-3
+              kind: action

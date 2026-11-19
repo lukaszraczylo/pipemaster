@@ -1,0 +1,58 @@
+origin:
+    provider: gitea
+    dialect: gitea
+    files:
+        - .gitea/workflows/ci.yml
+pipelines:
+    - id: ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - action:
+                kind: repo
+                host: https://github.com
+                owner: actions
+                repo: checkout
+                ref: v4
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: action
+            - action:
+                kind: repo
+                host: https://git.example.com
+                owner: org
+                repo: tool
+                ref: v2
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-2
+              kind: action
+            - action:
+                kind: repo
+                host: 'self:'
+                owner: org
+                repo: local-action
+                ref: main
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-3
+              kind: action
+            - action:
+                kind: repo
+                host: 'builtin:'
+                repo: checkout
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-4
+              kind: action

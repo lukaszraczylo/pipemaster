@@ -13,11 +13,11 @@ build:
     # pipemaster:step build-step-1
     # pipemaster:step build-step-2
     # pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/build-step-1
-    # pipemaster:arg {"cache":{"Key":"go-mod","Policy":"","Paths":["~/go/pkg/mod"]},"step":{"action":{"Kind":"repo","Owner":"actions","Repo":"cache","Path":"","Ref":"v4","Image":""},"with":{"key":{"l":"go-mod"},"path":{"l":"~/go/pkg/mod"}},"id":"build-step-1"},"kind":"cache","pos":0}
+    # pipemaster:arg {"cache":{"Key":"go-mod","Policy":"","Paths":["~/go/pkg/mod"]},"step":{"action":{"Kind":"repo","Host":"https://github.com","Owner":"actions","Repo":"cache","Path":"","Ref":"v4","Image":""},"with":{"key":{"l":"go-mod"},"path":{"l":"~/go/pkg/mod"}},"id":"build-step-1"},"kind":"cache","pos":0}
     - make build
     # pipemaster:step build-step-3
     # pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/build-step-3
-    # pipemaster:arg {"art":{"name":"dist","paths":["dist/"],"first":true},"step":{"action":{"Kind":"repo","Owner":"actions","Repo":"upload-artifact","Path":"","Ref":"v4","Image":""},"with":{"name":{"l":"dist"},"path":{"l":"dist/"}},"id":"build-step-3"},"kind":"upload","pos":2}
+    # pipemaster:arg {"art":{"name":"dist","paths":["dist/"],"first":true},"step":{"action":{"Kind":"repo","Host":"https://github.com","Owner":"actions","Repo":"upload-artifact","Path":"","Ref":"v4","Image":""},"with":{"name":{"l":"dist"},"path":{"l":"dist/"}},"id":"build-step-3"},"kind":"upload","pos":2}
   cache:
     - key: go-mod
       paths:
@@ -27,7 +27,7 @@ build:
     paths:
       - dist/
 # pipemaster:emulated step.action pipeline/gitlab-ci/job/test/step/test-step-1
-# pipemaster:arg {"step":{"action":{"Kind":"repo","Owner":"actions","Repo":"download-artifact","Path":"","Ref":"v4","Image":""},"with":{"name":{"l":"dist"}},"id":"test-step-1"},"kind":"download","jobs":[{"id":"build"}],"pos":0}
+# pipemaster:arg {"step":{"action":{"Kind":"repo","Host":"https://github.com","Owner":"actions","Repo":"download-artifact","Path":"","Ref":"v4","Image":""},"with":{"name":{"l":"dist"}},"id":"test-step-1"},"kind":"download","jobs":[{"id":"build"}],"pos":0}
 test:
   stage: stage-1
   tags:

@@ -1,0 +1,9 @@
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: https://git.example.com/org/tool@v2
+      - uses: self:org/local-action@main
+      - uses: builtin:checkout
