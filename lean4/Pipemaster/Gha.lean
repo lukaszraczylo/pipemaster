@@ -84,7 +84,7 @@ def retryTail : List String :=
 def wrapRetry (n : Nat) (l : List String) : List String :=
   if n = 0 then l else retryHead n ++ l ++ retryTail
 
-/-- Mirrors gha.New (provider/gha/collapse.go), function unwrapRetry; the model compares the loop lines for equality
+/-- Mirrors gha.unwrapRetry (provider/gha/collapse.go); the model compares the loop lines for equality
 where Go checks the prefix of the first line and the trimmed text of the others. -/
 def unwrapRetry (n : Nat) (l : List String) : Option (List String) :=
   if 11 ≤ l.length ∧ l.take 5 = retryHead n ∧ l.drop (l.length - 6) = retryTail then
@@ -152,7 +152,7 @@ def marksOf (p : Pipe) : List Mark :=
   p.fin.map (fun j => Mark.finally j.id j.needs) ++
   (if p.fin.isEmpty then [] else [Mark.finallyRoot])
 
-/-- Mirrors gha.New (provider/gha/emit.go), method Emit, on the core subset. -/
+/-- Mirrors gha.Emit (provider/gha/emit.go) on the core subset. -/
 def toGha (p : Pipe) : Workflow where
   id := p.id
   name := p.name
@@ -279,7 +279,7 @@ def rawGha (g : Workflow) : Pipe :=
     jobs := g.jobs.filterMap (mainPick g)
     fin := g.jobs.filterMap (finPick g) }
 
-/-- Mirrors gha.New (provider/gha/parse.go), method Parse with collapseMarkers, on the core subset; the
+/-- Mirrors gha.Parse (provider/gha/parse.go) with collapseMarkers, on the core subset; the
 round-trip metadata `m` is applied last (roundtrip.Restore). -/
 def fromGha (g : Workflow) (m : Meta := Meta.empty) : Pipe := restore m (rawGha g)
 

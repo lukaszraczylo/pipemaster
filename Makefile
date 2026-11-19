@@ -17,3 +17,4 @@ check: export PIPEMASTER_REQUIRE_LINTERS = 1
 check: test lint
 	scripts/check-vectors.sh
 	scripts/lean-axioms.sh
+	scripts/lean-currency.sh

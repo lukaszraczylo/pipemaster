@@ -33,7 +33,7 @@ capability matrices (provider/gha/caps.go, provider/gitlab/caps.go): GitLab caps
 needs a runner label and a script per job.
 
 A manual finally job is outside the fragment because it is a reported loss, not a silent one. The GitLab
-emitter (Mirrors gitlab.New (provider/gitlab/emit_rules.go), method timing) lets `when: manual` win over the
+emitter (Mirrors gitlab.timing (provider/gitlab/emit_rules.go)) lets `when: manual` win over the
 finally branch and records a `lost` entry for `pipeline.finally` at the job path; the parser then returns a main
 job. The GHA emitter keeps both guards (`always() && github.event_name == 'workflow_dispatch'`) and the parser
 restores the job, but the model `Gha.finJob` does not state that, so `Wf` excludes the case for both providers. -/

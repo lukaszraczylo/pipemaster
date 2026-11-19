@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Checks that every `Mirrors <pkg>.<Name> (<file>)` citation in lean4/ still names an
-# existing Go file and symbol, then lists Lean files whose cited Go file changed since
+# existing Go file that declares the symbol, then lists Lean files whose cited Go file changed since
 # the commit in lean4/reviewed-commit (informational, never fails).
 set -euo pipefail
 
@@ -12,6 +12,11 @@ if [ -z "$cites" ]; then
   echo "FAIL: no Mirrors citations found in lean4/" >&2
   exit 1
 fi
+
+# has_symbol is true when the Go file declares NAME as a function, method, type, var or const.
+has_symbol() {
+  grep -qE "^func (\([^)]*\) )?$2[(\[]|^(type|var|const) $2([[:space:]]|\$)|^[[:space:]]+$2[[:space:]]+(=|[A-Za-z*\[])" "$1"
+}
 
 fail=0
 count=0
@@ -33,8 +38,8 @@ while IFS= read -r line; do
     fail=1
     continue
   fi
-  if ! go doc "./$(dirname "$gofile")" "$name" >/dev/null 2>&1; then
-    echo "FAIL: $lean_file cites $sym but go doc finds no $name in ./$(dirname "$gofile")" >&2
+  if ! has_symbol "$gofile" "$name"; then
+    echo "FAIL: $lean_file cites $sym but $gofile declares no $name" >&2
     fail=1
     continue
   fi

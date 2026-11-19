@@ -285,10 +285,10 @@ def GitlabOk (p : Pipe) : Prop :=
 
 instance (p : Pipe) : Decidable (GitlabOk p) := by unfold GitlabOk; exact inferInstance
 
-/-- The GHA fragment (Mirrors gha.New (provider/gha/caps.go)): GHA's own needs, plus GitLab's because `cross_roundtrip` runs through GitLab. -/
+/-- The GHA fragment (Mirrors gha.Caps (provider/gha/caps.go)): GHA's own needs, plus GitLab's because `cross_roundtrip` runs through GitLab. -/
 def InGha (p : Pipe) : Prop := Wf p ∧ GhaOk p ∧ GitlabOk p
 
-/-- The GitLab fragment (Mirrors gitlab.New (provider/gitlab/caps.go)): GitLab's own needs, plus GHA's because `cross_roundtrip_rev` runs through GHA. -/
+/-- The GitLab fragment (Mirrors gitlab.Caps (provider/gitlab/caps.go)): GitLab's own needs, plus GHA's because `cross_roundtrip_rev` runs through GHA. -/
 def InGitlab (p : Pipe) : Prop := Wf p ∧ GitlabOk p ∧ GhaOk p
 
 instance (p : Pipe) : Decidable (InGha p) := by unfold InGha; exact inferInstance

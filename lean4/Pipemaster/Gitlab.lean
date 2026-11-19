@@ -70,7 +70,7 @@ def stageName (k : Nat) : String := stagePrefix ++ toString k
 (gitlab restoreStages succeeds, since no finally job needs a main job). -/
 def allFree (p : Pipe) : Bool := p.all.all (·.needs.isEmpty)
 
-/-- Mirrors gitlab.New (provider/gitlab/emit_stages.go), function layerStages: the main jobs go to `stage-<layer>` when there is more than one layer. -/
+/-- Mirrors gitlab.layerStages (provider/gitlab/emit_stages.go): the main jobs go to `stage-<layer>` when there is more than one layer. -/
 def layerList (p : Pipe) : List (List String) :=
   (Dag.layers (dagJobs p.jobs)).getD []
 
@@ -125,7 +125,7 @@ def needsMarks (p : Pipe) : Bool := match p.pr with
   | some (_ :: _) => true
   | _ => false
 
-/-- Mirrors gitlab.New (provider/gitlab/emit.go), method Emit, on the core subset. -/
+/-- Mirrors gitlab.Emit (provider/gitlab/emit.go) on the core subset. -/
 def toGitlab (p : Pipe) : Pipeline where
   stages := stagesOf p
   rules := if isDefaultTriggers p ∨ trigMarks p = [] then none else some (trigMarks p)
@@ -179,7 +179,7 @@ def rawGitlab (g : Pipeline) : Pipe :=
     jobs := (g.jobs.filter fun j => !isFin j).map (parseJob g)
     fin := (g.jobs.filter isFin).map (parseJob g) }
 
-/-- Mirrors gitlab.New (provider/gitlab/parse.go), method Parse, on the core subset; the round-trip metadata `m`
+/-- Mirrors gitlab.Parse (provider/gitlab/parse.go) on the core subset; the round-trip metadata `m`
 is applied last (roundtrip.Restore). -/
 def fromGitlab (g : Pipeline) (m : Meta) : Pipe := restore m (rawGitlab g)
 
