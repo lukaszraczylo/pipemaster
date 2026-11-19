@@ -3,6 +3,7 @@ package gitlab
 import (
 	"encoding/json"
 	"slices"
+	"strconv"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
@@ -16,92 +17,129 @@ const (
 	pairExpr = "x"
 )
 
-// refPair records that the emitter wrote GitLab text G for the source S. Parse restores S only where a
-// value or line equals G exactly, so edited text stays as the file holds it.
+// refPair records that the emitter wrote GitLab text G at position P for the source S. Parse restores S only
+// at P and only while the text there still equals G, so edited text stays as the file holds it.
 type refPair struct {
 	Kind string `json:"k"`
+	P    string `json:"p"`
 	G    string `json:"g"`
 	S    string `json:"s"`
 }
 
+// refSite is one place in the pipeline that holds converted text: a string or a whole value.
+type refSite struct {
+	text  *string
+	val   *ir.Value
+	after func()
+	pos   string
+}
+
+// refSites lists every field the GitLab emitter writes through the text conversion, in a fixed order with a
+// stable position each. Emit and Parse both walk it, so a position names the same field on both sides.
+func refSites(pl *ir.Pipeline) []refSite {
+	var out []refSite
+	str := func(pos string, s *string) { out = append(out, refSite{pos: pos, text: s}) }
+	strs := func(pos string, l []string) {
+		for i := range l {
+			str(pos+"/"+strconv.Itoa(i), &l[i])
+		}
+	}
+	vars := func(pos string, vs []ir.Var) {
+		for i := range vs {
+			out = append(out, refSite{pos: pos + "/" + strconv.Itoa(i), val: &vs[i].Value})
+		}
+	}
+	if pl.Concurrency != nil {
+		str("concurrency", &pl.Concurrency.Group)
+	}
+	vars("env", pl.Env)
+	for _, j := range allJobs(pl) {
+		jp := "job/" + j.ID
+		vars(jp+"/env", j.Env)
+		strs(jp+"/runner", j.Runner.Labels)
+		if j.Container != nil {
+			str(jp+"/image", &j.Container.Ref)
+		}
+		for i := range j.Services {
+			sp := jp + "/service/" + strconv.Itoa(i)
+			str(sp+"/image", &j.Services[i].Image.Ref)
+			str(sp+"/name", &j.Services[i].Name)
+		}
+		for i := range j.Cache {
+			cp := jp + "/cache/" + strconv.Itoa(i)
+			str(cp+"/key", &j.Cache[i].Key)
+			strs(cp+"/paths", j.Cache[i].Paths)
+		}
+		for i := range j.Artifacts {
+			ap := jp + "/artifact/" + strconv.Itoa(i)
+			str(ap+"/name", &j.Artifacts[i].Name)
+			strs(ap+"/paths", j.Artifacts[i].Paths)
+		}
+		if j.Environment != nil {
+			str(jp+"/environment/name", &j.Environment.Name)
+			str(jp+"/environment/url", &j.Environment.URL)
+		}
+		if j.Matrix != nil {
+			for i := range j.Matrix.Axes {
+				strs(jp+"/matrix/"+strconv.Itoa(i), j.Matrix.Axes[i].Values)
+			}
+			for i := range j.Matrix.Include {
+				for k := range j.Matrix.Include[i] {
+					str(jp+"/include/"+strconv.Itoa(i)+"/"+strconv.Itoa(k), &j.Matrix.Include[i][k].Value)
+				}
+			}
+		}
+		for _, st := range j.Steps {
+			sp := jp + "/step/" + st.ID
+			vars(sp+"/env", st.Env)
+			strs(sp+"/script", st.Script)
+			str(sp+"/workdir", &st.WorkDir)
+			if st.Image != nil {
+				str(sp+"/image", &st.Image.Ref)
+			}
+			keys := make([]string, 0, len(st.With))
+			for k := range st.With {
+				keys = append(keys, k)
+			}
+			slices.Sort(keys)
+			for _, k := range keys {
+				v := st.With[k]
+				out = append(out, refSite{pos: sp + "/with/" + k, val: &v, after: func() { st.With[k] = v }})
+			}
+		}
+	}
+	return out
+}
+
 // refPairs lists every flattening conversion in the pipeline: references such as matrix.x, inputs.x or
 // env.x all print as $x, so the namespace cannot be read back from the text alone.
-// A text that two different sources convert to is dropped, because no restore would be sound.
 func refPairs(pl *ir.Pipeline) []refPair {
-	byG := map[string]refPair{}
-	clash := map[string]bool{}
-	add := func(p refPair) {
-		if p.G == p.S && p.Kind == pairText {
-			return
-		}
-		if old, ok := byG[p.G]; ok && old != p {
-			clash[p.G] = true
-		}
-		byG[p.G] = p
-	}
-	text := func(s string) {
+	var out []refPair
+	text := func(pos, s string) {
 		if parts, err := expr.ParseScriptTemplate(s); err != nil || !flattens(parts) {
 			return
 		}
 		if t, lost, err := convert(s); err == nil && len(lost) == 0 && t != s {
-			if c, err := canonText(t); err == nil {
-				add(refPair{pairText, c, s})
+			out = append(out, refPair{pairText, pos, t, s})
+		}
+	}
+	for _, st := range refSites(pl) {
+		switch {
+		case st.text != nil:
+			text(st.pos, *st.text)
+		case st.val.Kind == ir.ValueLit:
+			text(st.pos, st.val.Lit)
+		case st.val.Kind == ir.ValueExpr:
+			x := st.val.Expr
+			if !flattens([]expr.Part{{Expr: x}}) && !flattensFormat(x) {
+				continue
+			}
+			if t, lost, err := exprText(x); err == nil && len(lost) == 0 {
+				out = append(out, refPair{pairExpr, st.pos, t, expr.String(x)})
 			}
 		}
 	}
-	vars := func(vs []ir.Var) {
-		for _, v := range vs {
-			switch v.Value.Kind {
-			case ir.ValueLit:
-				text(v.Value.Lit)
-			case ir.ValueExpr:
-				if !flattens([]expr.Part{{Expr: v.Value.Expr}}) && !flattensFormat(v.Value.Expr) {
-					continue
-				}
-				if t, lost, err := exprText(v.Value.Expr); err == nil && len(lost) == 0 {
-					if c, err := canonText(t); err == nil {
-						add(refPair{pairExpr, c, expr.String(v.Value.Expr)})
-					}
-				}
-			}
-		}
-	}
-	vars(pl.Env)
-	for _, j := range allJobs(pl) {
-		vars(j.Env)
-		for _, l := range j.Runner.Labels {
-			text(l)
-		}
-		for _, st := range j.Steps {
-			vars(st.Env)
-			for _, l := range st.Script {
-				text(l)
-			}
-		}
-	}
-	var out []refPair
-	for g, p := range byG {
-		if !clash[g] {
-			out = append(out, p)
-		}
-	}
-	slices.SortFunc(out, func(a, b refPair) int {
-		if a.G != b.G {
-			return compareStr(a.G, b.G)
-		}
-		return compareStr(a.S, b.S)
-	})
 	return out
-}
-
-func compareStr(a, b string) int {
-	switch {
-	case a < b:
-		return -1
-	case a > b:
-		return 1
-	}
-	return 0
 }
 
 // flattensRoots are the namespaces whose references all print as one bare variable name.
@@ -150,7 +188,8 @@ func refMarks(pp string, pl *ir.Pipeline) ([]string, error) {
 	return []string{emitkit.Marker(caps.ScriptInterpolation, pp), arg}, nil
 }
 
-// collapseRefs puts the source text back in every line and value that equals a converted text.
+// collapseRefs puts the source text back at each recorded position whose text still equals what the emitter
+// wrote; a position whose text changed keeps the file's text and is reported.
 func collapseRefs(c *collapseCtx) bool {
 	if len(c.args) != 1 {
 		return false
@@ -159,44 +198,40 @@ func collapseRefs(c *collapseCtx) bool {
 	if json.Unmarshal([]byte(c.args[0]), &pairs) != nil {
 		return false
 	}
-	byG := map[string]refPair{}
+	at := map[string]refSite{}
+	for _, st := range refSites(c.pl) {
+		at[st.pos] = st
+	}
 	for _, p := range pairs {
-		byG[p.G] = p
-	}
-	line := func(s *string) {
-		if p, ok := byG[*s]; ok && p.Kind == pairText {
-			*s = p.S
+		st, ok := at[p.P]
+		if !ok {
+			continue
 		}
-	}
-	vars := func(vs []ir.Var) {
-		for i := range vs {
-			v := &vs[i].Value
-			if v.Kind != ir.ValueLit {
+		cur := ""
+		switch {
+		case st.text != nil:
+			cur = *st.text
+		case st.val.Kind == ir.ValueLit:
+			cur = st.val.Lit
+		}
+		if cur != p.G {
+			if canon, err := canonText(p.G); err != nil || cur != canon {
+				c.ignore("marker ignored: the text at " + p.P + " was edited after conversion, so the file's text stands")
 				continue
 			}
-			p, ok := byG[v.Lit]
-			switch {
-			case !ok:
-			case p.Kind == pairText:
-				v.Lit = p.S
-			case p.Kind == pairExpr:
-				if x, err := expr.ParseCanonical(p.S); err == nil {
-					*v = ir.Value{Kind: ir.ValueExpr, Expr: x}
-				}
+		}
+		switch {
+		case st.text != nil:
+			*st.text = p.S
+		case p.Kind == pairText:
+			st.val.Lit = p.S
+		default:
+			if x, err := expr.ParseCanonical(p.S); err == nil {
+				*st.val = ir.Value{Kind: ir.ValueExpr, Expr: x}
 			}
 		}
-	}
-	vars(c.pl.Env)
-	for _, j := range allJobs(c.pl) {
-		vars(j.Env)
-		for i := range j.Runner.Labels {
-			line(&j.Runner.Labels[i])
-		}
-		for _, st := range j.Steps {
-			vars(st.Env)
-			for i := range st.Script {
-				line(&st.Script[i])
-			}
+		if st.after != nil {
+			st.after()
 		}
 	}
 	return true

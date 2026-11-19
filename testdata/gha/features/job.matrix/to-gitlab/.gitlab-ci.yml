@@ -1,5 +1,5 @@
 # pipemaster:emulated script.interpolation pipeline/ci
-# pipemaster:arg [{"k":"t","g":"$os","s":"$\u007b{ matrix.os }}"},{"k":"t","g":"echo $go","s":"echo $\u007b{ matrix.go }}"}]
+# pipemaster:arg [{"k":"t","p":"job/test/runner/0","g":"$os","s":"$\u007b{ matrix.os }}"},{"k":"t","p":"job/test/step/test-step-1/script/0","g":"echo $go","s":"echo $\u007b{ matrix.go }}"}]
 workflow:
   rules:
     - if: $CI_COMMIT_BRANCH

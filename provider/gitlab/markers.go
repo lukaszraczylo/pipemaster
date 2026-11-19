@@ -18,9 +18,11 @@ const (
 
 // collapseCtx is what a collapser works on: the pipeline, the marked IR path and the argument lines after the marker.
 type collapseCtx struct {
-	pl   *ir.Pipeline
-	path string
-	args []string
+	pl *ir.Pipeline
+	// ignore reports that the marker did not apply because the file was edited.
+	ignore func(detail string)
+	path   string
+	args   []string
 }
 
 // collapser undoes one emulation: it edits the pipeline and reports whether the marker's construct was found.
@@ -63,7 +65,7 @@ func (s *state) collapseMarkers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[
 			}
 		} else if _, last := lastCollapsers[u.Feature]; last {
 			continue
-		} else if c, ok := collapsers[u.Feature]; ok && c(&collapseCtx{pl: pl, path: u.IRPath, args: args[u]}) {
+		} else if c, ok := collapsers[u.Feature]; ok && c(s.ctx(pl, u, args)) {
 			continue
 		}
 		s.rep.Add(report.Entry{
@@ -72,7 +74,7 @@ func (s *state) collapseMarkers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[
 		})
 	}
 	for _, u := range uses {
-		if c, ok := lastCollapsers[u.Feature]; ok && !c(&collapseCtx{pl: pl, path: u.IRPath, args: args[u]}) {
+		if c, ok := lastCollapsers[u.Feature]; ok && !c(s.ctx(pl, u, args)) {
 			s.rep.Add(report.Entry{
 				IRPath: u.IRPath, Feature: u.Feature, Level: caps.Emulated, Strategy: "kept as shell text",
 				Detail: "marker not collapsed: its argument is not a list of converted texts",
@@ -171,4 +173,10 @@ func findJobAt(pl *ir.Pipeline, path string) *ir.Job {
 		return nil
 	}
 	return findJob(pl, id)
+}
+
+func (s *state) ctx(pl *ir.Pipeline, u ir.FeatureUse, args map[ir.FeatureUse][]string) *collapseCtx {
+	return &collapseCtx{pl: pl, path: u.IRPath, args: args[u], ignore: func(detail string) {
+		s.rep.Add(report.Entry{IRPath: u.IRPath, Feature: u.Feature, Level: caps.Lost, Strategy: "marker ignored", Detail: detail})
+	}}
 }
