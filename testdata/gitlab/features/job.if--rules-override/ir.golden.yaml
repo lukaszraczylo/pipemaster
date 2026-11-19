@@ -1,0 +1,31 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - ext:
+        gitlab:
+            hidden:
+                .tests:
+                    rules:
+                        - if: $CI_COMMIT_BRANCH == "main"
+      id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - ext:
+            gitlab:
+                _rules_always: true
+                extends:
+                    - .tests
+          id: unit
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make test

@@ -172,7 +172,7 @@ func (e *emitter) jobNode(c *pipeCtx, p *jobPrep) (*yaml.Node, []string, error) 
 	ext := extOf(j.Ext)
 	finally := c.isFinally(j.ID)
 	m := newMap()
-	skip := map[string]bool{"stage": true, ExtDerivedNeeds: true, ExtNoScript: true, extNeedsKey: true, ExtNeedsExtra: true, "rules": true}
+	skip := map[string]bool{"stage": true, ExtDerivedNeeds: true, ExtNoScript: true, ExtRulesAlways: true, extNeedsKey: true, ExtNeedsExtra: true, "rules": true}
 	if s := c.plan.stage[j.ID]; s != "" {
 		m.set("stage", str(s))
 	}

@@ -1,0 +1,10 @@
+.tests:
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+unit:
+  extends: .tests
+  script:
+    - make test
+  rules:
+    - when: on_success

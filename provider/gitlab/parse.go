@@ -19,6 +19,7 @@ const (
 	ExtDerivedNeeds = "_derived_needs"
 	ExtSection      = "section"
 	ExtNoScript     = "_no_script"
+	ExtRulesAlways  = "_rules_always"
 
 	extHidden    = "hidden"
 	extInclude   = "include"

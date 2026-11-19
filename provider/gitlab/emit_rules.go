@@ -78,6 +78,12 @@ func (e *emitter) timing(jp string, j *ir.Job, finally bool) (jobTiming, error) 
 		}
 		t.rules = rules
 	case cond == nil:
+		if always, _ := extOf(j.Ext)[ExtRulesAlways].(bool); always && base == "" {
+			r := newMap()
+			r.set(whenRuleKey, str(whenOnSuccess))
+			t.rules = seqOf(r.n)
+			break
+		}
 		t.when = base
 	default:
 		if o, ok := cond.(expr.Opaque); ok {
