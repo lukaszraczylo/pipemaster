@@ -15,7 +15,7 @@ import (
 
 func TestYAMLRoundTrip(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		p := irtest.GenProject(t, func(caps.Feature) bool { return true })
+		p := irtest.GenProject(t, "gha", func(caps.Feature) bool { return true })
 		b, err := ir.Marshal(p)
 		if err != nil {
 			t.Fatal(err)
@@ -158,7 +158,7 @@ func hostile(t *rapid.T, label string) expr.Expr {
 // The rejected side is pinned deterministically by TestMarshalRejectsUnprintableExpressions and TestValidateReportsUnmarshalableValues.
 func TestValidatedProjectsMarshalAndRoundTrip(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		p := irtest.GenProject(t, func(caps.Feature) bool { return true })
+		p := irtest.GenProject(t, "gha", func(caps.Feature) bool { return true })
 		j := p.Pipelines[0].Jobs[0]
 		switch rapid.IntRange(0, 3).Draw(t, "slot") {
 		case 0:

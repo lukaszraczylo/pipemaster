@@ -3,7 +3,7 @@ package validate
 
 import (
 	"bytes"
-	"embed"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,12 +14,7 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"go.yaml.in/yaml/v3"
-
-	"github.com/lukaszraczylo/pipemaster/provider"
 )
-
-//go:embed schemas/*.json
-var schemaFS embed.FS
 
 // ErrNoSchema means no schema is pinned for the provider.
 var ErrNoSchema = errors.New("no schema for provider")
@@ -27,19 +22,40 @@ var ErrNoSchema = errors.New("no schema for provider")
 type entry struct {
 	err    error
 	schema *jsonschema.Schema
-	file   string
 	id     string
+	raw    []byte
 	once   sync.Once
 }
 
-var ghaEntry = &entry{file: "schemas/github-workflow.json", id: "https://json.schemastore.org/github-workflow.json"}
+var (
+	regMu      sync.RWMutex
+	pinned     = map[string]*entry{}
+	patterns   = map[string][]string{}
+	sharedByID = map[[sha256.Size]byte]*entry{}
+)
 
-// Gitea and Forgejo share the GHA schema entry: neither project publishes a workflow schema.
-var schemas = map[string]*entry{
-	provider.GHA:     ghaEntry,
-	provider.Gitea:   ghaEntry,
-	provider.Forgejo: ghaEntry,
-	provider.GitLab:  {file: "schemas/gitlab-ci.json", id: "https://gitlab.com/.gitlab-ci.yml"},
+// Register pins schema (JSON) for provider id and the fs.Glob patterns of its files. Providers with
+// identical schema bytes share one compiled schema. It panics on a duplicate id or an unparsable schema.
+func Register(id string, schema []byte, patternList []string) {
+	var head struct {
+		ID string `json:"$id"`
+	}
+	if err := json.Unmarshal(schema, &head); err != nil || head.ID == "" {
+		panic(fmt.Sprintf("validate: schema for %q has no readable $id: %v", id, err))
+	}
+	regMu.Lock()
+	defer regMu.Unlock()
+	if _, dup := pinned[id]; dup {
+		panic("validate: duplicate schema registration for " + id)
+	}
+	sum := sha256.Sum256(schema)
+	e, ok := sharedByID[sum]
+	if !ok {
+		e = &entry{id: head.ID, raw: schema}
+		sharedByID[sum] = e
+	}
+	pinned[id] = e
+	patterns[id] = append([]string(nil), patternList...)
 }
 
 // offlineLoader makes any reference outside the embedded schema an error.
@@ -63,17 +79,14 @@ func compileDoc(id string, raw []byte) (*jsonschema.Schema, error) {
 }
 
 func schemaFor(providerID string) (*jsonschema.Schema, error) {
-	e, ok := schemas[providerID]
+	regMu.RLock()
+	e, ok := pinned[providerID]
+	regMu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("%w %q", ErrNoSchema, providerID)
 	}
 	e.once.Do(func() {
-		raw, err := schemaFS.ReadFile(e.file)
-		if err != nil {
-			e.err = err
-			return
-		}
-		e.schema, e.err = compileDoc(e.id, raw)
+		e.schema, e.err = compileDoc(e.id, e.raw)
 	})
 	return e.schema, e.err
 }
@@ -210,22 +223,19 @@ func keyString(k any) (string, error) {
 	return "", fmt.Errorf("unsupported yaml map key type %T", k)
 }
 
-var patterns = map[string][]string{
-	provider.GHA:     {".github/workflows/*.yml", ".github/workflows/*.yaml"},
-	provider.Gitea:   {".gitea/workflows/*.yml", ".gitea/workflows/*.yaml"},
-	provider.Forgejo: {".forgejo/workflows/*.yml", ".forgejo/workflows/*.yaml"},
-	provider.GitLab:  {".gitlab-ci.yml"},
-}
-
 // Patterns returns the fs.Glob patterns of the files validated as providerID, or nil when none are pinned.
 func Patterns(providerID string) []string {
+	regMu.RLock()
+	defer regMu.RUnlock()
 	return append([]string(nil), patterns[providerID]...)
 }
 
 // Providers lists the provider IDs that have a pinned schema, sorted.
 func Providers() []string {
-	ids := make([]string, 0, len(schemas))
-	for id := range schemas {
+	regMu.RLock()
+	defer regMu.RUnlock()
+	ids := make([]string, 0, len(pinned))
+	for id := range pinned {
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)

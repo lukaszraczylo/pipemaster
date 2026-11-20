@@ -6,6 +6,8 @@ import (
 	"slices"
 	"sort"
 	"sync"
+
+	"github.com/lukaszraczylo/pipemaster/validate/schemas"
 )
 
 // DialectRules are the keys and permission scopes a GHA-family dialect adds to the GHA schema.
@@ -44,10 +46,7 @@ func RegisterDialect(id string, r DialectRules) {
 func PermissionScopes() []string { return slices.Clone(ghaScopes()) }
 
 var ghaScopes = sync.OnceValue(func() []string {
-	raw, err := schemaFS.ReadFile(ghaEntry.file)
-	if err != nil {
-		panic("validate: embedded GHA schema missing: " + err.Error())
-	}
+	raw := schemas.GitHubWorkflow
 	var doc struct {
 		Definitions map[string]struct {
 			Properties map[string]json.RawMessage `json:"properties"`

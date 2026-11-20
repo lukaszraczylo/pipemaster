@@ -2,6 +2,7 @@
 package gha
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"path"
@@ -12,6 +13,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/validate"
+	"github.com/lukaszraczylo/pipemaster/validate/schemas"
 )
 
 // NodeLevel names the workflow node that a dialect-only key sits on.
@@ -130,6 +132,7 @@ func New(d Dialect) provider.Provider { return &adapter{d: d} }
 func init() {
 	for _, d := range []Dialect{GHA, Gitea, Forgejo} {
 		provider.Register(New(d))
+		validate.Register(d.ID, schemas.GitHubWorkflow, []string{d.Dirs[0] + "/*.yml", d.Dirs[0] + "/*.yaml"})
 		if d.ID != provider.GHA {
 			validate.RegisterDialect(d.ID, validate.DialectRules{
 				Workflow: d.Extra[NodeWorkflow], Job: d.Extra[NodeJob], Step: d.Extra[NodeStep], Scopes: d.Scopes, Bools: d.BoolKeys,
@@ -183,6 +186,20 @@ func (a *adapter) ID() string { return a.d.ID }
 func (a *adapter) Detect(fsys fs.FS) bool {
 	files, err := workflowFiles(fsys, a.d.Dirs[0])
 	return err == nil && len(files) > 0
+}
+
+// SourceFiles lists the workflow files of the first directory in Dirs that holds any, or none.
+func (a *adapter) SourceFiles(fsys fs.FS) ([]string, error) {
+	for _, d := range a.d.Dirs {
+		files, err := workflowFiles(fsys, d)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil || len(files) > 0 {
+			return files, err
+		}
+	}
+	return nil, nil
 }
 
 // readDir lists the workflow files of the first directory in Dirs that exists, with no merge.

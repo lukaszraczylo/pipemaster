@@ -1,30 +1,11 @@
 package validate
 
 import (
-	"errors"
 	"strings"
 	"testing"
 
-	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/validate/schemas"
 )
-
-func TestValidGHA(t *testing.T) {
-	y := "name: ci\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n"
-	if err := File(provider.GHA, "ci.yml", []byte(y)); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestInvalidGHA(t *testing.T) {
-	y := "on: push\njobs:\n  build:\n    steps:\n      - run: echo hi\n"
-	err := File(provider.GHA, "ci.yml", []byte(y))
-	if err == nil {
-		t.Fatal("want error")
-	}
-	if !strings.Contains(err.Error(), "runs-on") || !strings.Contains(err.Error(), "ci.yml") {
-		t.Fatalf("error lacks runs-on or file name: %v", err)
-	}
-}
 
 func TestOnKeyStaysString(t *testing.T) {
 	v, err := toJSONValue([]byte("on: push\n"))
@@ -56,33 +37,6 @@ func TestIntKeyConverted(t *testing.T) {
 	}
 }
 
-func TestValidGitLab(t *testing.T) {
-	y := "build:\n  script:\n    - echo hi\n"
-	if err := File(provider.GitLab, ".gitlab-ci.yml", []byte(y)); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestInvalidGitLab(t *testing.T) {
-	err := File(provider.GitLab, ".gitlab-ci.yml", []byte("build:\n  script: 5\n"))
-	if err == nil || !strings.Contains(err.Error(), ".gitlab-ci.yml") || !strings.Contains(err.Error(), "script") {
-		t.Fatalf("got %v", err)
-	}
-}
-
-func TestNoSchema(t *testing.T) {
-	err := File("drone", "x.yml", []byte("a: 1\n"))
-	if !errors.Is(err, ErrNoSchema) || !strings.Contains(err.Error(), "drone") {
-		t.Fatalf("got %v", err)
-	}
-}
-
-func TestBadYAML(t *testing.T) {
-	if err := File(provider.GHA, "x.yml", []byte("a: [\n")); err == nil {
-		t.Fatal("want error")
-	}
-}
-
 func TestOfflineLoaderRefusesExternalRef(t *testing.T) {
 	_, err := compileDoc("https://example.test/s.json", []byte(`{"$ref":"https://example.com/x.json"}`))
 	if err == nil || !strings.Contains(err.Error(), "network access refused") {
@@ -91,11 +45,12 @@ func TestOfflineLoaderRefusesExternalRef(t *testing.T) {
 }
 
 func TestSchemaCompiledOnce(t *testing.T) {
-	a, err := schemaFor(provider.GHA)
+	Register("compile-once", schemas.GitHubWorkflow, nil)
+	a, err := schemaFor("compile-once")
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := schemaFor(provider.GHA)
+	b, err := schemaFor("compile-once")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,25 +59,42 @@ func TestSchemaCompiledOnce(t *testing.T) {
 	}
 }
 
-func TestPatterns(t *testing.T) {
-	if got := Patterns(provider.GitLab); len(got) != 1 || got[0] != ".gitlab-ci.yml" {
-		t.Fatalf("gitlab = %v", got)
+func TestRegister(t *testing.T) {
+	const doc = `{"$id":"https://example.test/s.json","type":"object"}`
+	panics := func(f func()) (p bool) {
+		defer func() { p = recover() != nil }()
+		f()
+		return false
 	}
-	if got := Patterns(provider.GHA); len(got) != 2 {
-		t.Fatalf("gha = %v", got)
+	cases := []struct {
+		run  func()
+		name string
+		want bool
+	}{
+		{func() { Register("reg-ok", []byte(doc), []string{"x/*.yml"}) }, "valid schema", false},
+		{func() { Register("reg-ok", []byte(doc), nil) }, "duplicate id", true},
+		{func() { Register("reg-bad", []byte("{"), nil) }, "not JSON", true},
+		{func() { Register("reg-noid", []byte(`{}`), nil) }, "no $id", true},
 	}
-	if got := Patterns(provider.Drone); got != nil {
-		t.Fatalf("drone = %v", got)
+	for _, c := range cases {
+		if got := panics(c.run); got != c.want {
+			t.Errorf("%s: panic = %v, want %v", c.name, got, c.want)
+		}
+	}
+	if err := File("reg-ok", "a.yml", []byte("a: 1\n")); err != nil {
+		t.Errorf("registered schema rejects a valid file: %v", err)
+	}
+	if got := Patterns("reg-ok"); len(got) != 1 || got[0] != "x/*.yml" {
+		t.Errorf("patterns = %v", got)
 	}
 }
 
-func TestEveryYAMLDocumentIsValidated(t *testing.T) {
-	header := "spec:\n  inputs:\n    t:\n      default: x\n---\n"
-	if err := File(provider.GitLab, ".gitlab-ci.yml", []byte(header+"build:\n  script:\n    - echo hi\n")); err != nil {
-		t.Fatalf("valid header and body: %v", err)
-	}
-	err := File(provider.GitLab, ".gitlab-ci.yml", []byte(header+"build:\n  script: 5\n"))
-	if err == nil || !strings.Contains(err.Error(), "script") {
-		t.Fatalf("an invalid body after a spec header must be rejected, got %v", err)
+func TestRegisterSharesIdenticalSchemas(t *testing.T) {
+	Register("share-a", schemas.GitLabCI, nil)
+	Register("share-b", schemas.GitLabCI, nil)
+	a, errA := schemaFor("share-a")
+	b, errB := schemaFor("share-b")
+	if errA != nil || errB != nil || a != b {
+		t.Fatalf("identical schema bytes compiled twice: %v %v", errA, errB)
 	}
 }

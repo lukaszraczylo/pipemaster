@@ -139,7 +139,7 @@ func needsArtifacts(all []*ir.Job, id string) bool {
 
 func TestIdentityProperty(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		p := irtest.GenProject(t, nativeFragment)
+		p := irtest.GenProject(t, "gha", nativeFragment)
 		nativize(p)
 		back, files := roundTrip(t, p)
 		if ok, diff := ir.Equal(p, back); !ok {

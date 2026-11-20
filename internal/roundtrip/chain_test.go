@@ -490,10 +490,6 @@ func checkValid(t *testing.T, id string, files map[string][]byte) {
 	}
 }
 
-// schemaLagEntries are the corpus entries whose own file fails the pinned GitLab schema, so their full return may
-// only warn.
-var schemaLagEntries = []string{"15-gitlab-charts-gitlab", "16-gitlab-cli", "20-gitlab-gitlab-runner", "24-gitlab-release-cli"}
-
 const schemaWarning = "warning: restored origin does not validate against the pinned schema"
 
 // checkFinalSchema asserts that the final output fails the pinned schema, and warns, only for a known entry.
@@ -505,10 +501,11 @@ func checkFinalSchema(t *testing.T, a, name, dir, stderr string) {
 			invalid = true
 		}
 	}
-	known := a == provider.GitLab && slices.Contains(schemaLagEntries, name)
+	lag := providerChecks[a].schemaLag
+	known := slices.Contains(lag, name)
 	switch warned := strings.Contains(stderr, schemaWarning); {
 	case invalid && !known:
-		t.Fatalf("final output of %s fails the schema, and only %v may", name, schemaLagEntries)
+		t.Fatalf("final output of %s fails the schema, and only %v may", name, lag)
 	case invalid && !warned:
 		t.Fatalf("final output fails the schema without a warning\n%s", stderr)
 	case !invalid && warned:

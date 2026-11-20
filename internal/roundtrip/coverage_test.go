@@ -1,6 +1,7 @@
 package roundtrip_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,16 +26,21 @@ func fixtureComplete(id, dir string) bool {
 	if _, err := os.Stat(filepath.Join(dir, "ir.golden.yaml")); err != nil {
 		return false
 	}
-	if provider.Family(id) != provider.GHA {
-		_, err := os.Stat(filepath.Join(dir, ".gitlab-ci.yml"))
-		return err == nil
+	files, err := fixtureSources(id, dir)
+	return err == nil && len(files) > 0
+}
+
+// fixtureSources lists the source files of provider id in a fixture directory.
+func fixtureSources(id, dir string) ([]string, error) {
+	p, err := provider.Get(id)
+	if err != nil {
+		return nil, err
 	}
-	for _, wd := range []string{".github/workflows", ".gitea/workflows", ".forgejo/workflows"} {
-		if files, _ := filepath.Glob(filepath.Join(dir, filepath.FromSlash(wd), "*.y*ml")); len(files) > 0 {
-			return true
-		}
+	l, ok := p.(provider.Layout)
+	if !ok {
+		return nil, fmt.Errorf("provider %s does not implement provider.Layout", id)
 	}
-	return false
+	return l.SourceFiles(os.DirFS(dir))
 }
 
 // hasFixtureDir reports whether dir holds a complete fixture named after the feature, optionally followed by "--<variant>".
@@ -112,6 +118,45 @@ func TestFeatureFixtureCoverage(t *testing.T) {
 					t.Errorf("no fixture directory %s/%s", dirs[0], f)
 				}
 			})
+		}
+	}
+}
+
+func TestFixtureSourcesPerProvider(t *testing.T) {
+	cases := []struct {
+		files map[string]string
+		id    string
+		want  int
+	}{
+		{map[string]string{".github/workflows/ci.yml": "x"}, provider.GHA, 1},
+		{map[string]string{".gitea/workflows/a.yaml": "x", ".gitea/workflows/b.yml": "x"}, provider.Gitea, 2},
+		{map[string]string{".gitlab-ci.yml": "x"}, provider.GitLab, 1},
+		{map[string]string{"ci/other.yml": "x"}, provider.GitLab, 0},
+		{map[string]string{".gitlab-ci.yml": "x"}, provider.GHA, 0},
+		{nil, provider.GHA, 0},
+	}
+	for _, c := range cases {
+		dir := t.TempDir()
+		for n, body := range c.files {
+			p := filepath.Join(dir, filepath.FromSlash(n))
+			if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil { // #nosec G301 -- temp dir
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(p, []byte(body), 0o600); err != nil { // #nosec G306 G703 -- temp dir
+				t.Fatal(err)
+			}
+		}
+		got, err := fixtureSources(c.id, dir)
+		if err != nil || len(got) != c.want {
+			t.Errorf("%s %v: got %v, %v; want %d files", c.id, c.files, got, err, c.want)
+		}
+	}
+}
+
+func TestEveryProviderHasLayout(t *testing.T) {
+	for _, id := range provider.IDs() {
+		if _, ok := prov(t, id).(provider.Layout); !ok {
+			t.Errorf("%s does not implement provider.Layout", id)
 		}
 	}
 }

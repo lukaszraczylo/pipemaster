@@ -23,6 +23,7 @@ func TestChainVectors(t *testing.T) {
 		t.Fatalf("%d cases, want at least %d", len(cases), vectors.MinAdapterCases)
 	}
 	seen := map[string]bool{}
+	providers := map[string]bool{}
 	for i, c := range cases {
 		var in struct {
 			Core  json.RawMessage `json:"core"`
@@ -42,15 +43,30 @@ func TestChainVectors(t *testing.T) {
 			t.Fatalf("case %d: chain %v with %d stages", i, in.Chain, len(out.Stages))
 		}
 		seen[fmt.Sprint(in.Chain)] = true
+		for _, id := range in.Chain {
+			providers[id] = true
+		}
 		label := fmt.Sprintf("case %d %v", i, in.Chain)
 		runChain(t, label, in.Chain, in.Core, out.Stages, out.Final)
 		if t.Failed() {
 			return
 		}
 	}
-	if len(seen) != 24 {
-		t.Errorf("vectors cover %d chains, want 24", len(seen))
+	if want := distinctChains(len(providers)); len(seen) != want {
+		t.Errorf("vectors cover %d chains over %d providers, want %d", len(seen), len(providers), want)
 	}
+}
+
+// distinctChains counts the chains A to B to C to A over n providers: A, B and C pairwise differ.
+func distinctChains(n int) int {
+	if n < chainHops+1 {
+		return 0
+	}
+	count := 1
+	for k := 0; k <= chainHops; k++ {
+		count *= n - k
+	}
+	return count
 }
 
 func runChain(t *testing.T, label string, chain []string, core json.RawMessage, stages []json.RawMessage, final json.RawMessage) {
@@ -102,4 +118,12 @@ func runChain(t *testing.T, label string, chain []string, core json.RawMessage, 
 	}
 	vectors.DiffCore(t, label+" final", final, back)
 	vectors.DiffCore(t, label+" final equals the origin", core, back)
+}
+
+func TestDistinctChains(t *testing.T) {
+	for n, want := range map[int]int{0: 0, 2: 0, 3: 6, 4: 24, 9: 504} {
+		if got := distinctChains(n); got != want {
+			t.Errorf("distinctChains(%d) = %d, want %d", n, got, want)
+		}
+	}
 }

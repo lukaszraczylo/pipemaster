@@ -132,12 +132,22 @@ func problems(t *testing.T, id, name string, data []byte) findings {
 	out := findings{}
 	if err := validate.File(id, name, data); err != nil && !errors.Is(err, validate.ErrNoSchema) {
 		// The schema id carries a fixed file name that must not tell an included file from the merged one.
-		out.add(braceVarRE.ReplaceAllString(strings.NewReplacer(name, "", "gitlab.com/.gitlab-ci.yml#", "gitlab.com/#").Replace(err.Error()), "$$$1"))
+		out.add(braceVarRE.ReplaceAllString(strings.NewReplacer(append([]string{name, ""}, providerChecks[id].errReplace...)...).Replace(err.Error()), "$$$1"))
 	}
-	if id == provider.GHA {
-		out.merge(actionlint(t, name, data))
+	if lint := providerChecks[id].lintFindings; lint != nil {
+		out.merge(lint(t, name, data))
 	}
 	return out
+}
+
+// sourceFiles lists the files of fsys that provider id reads.
+func sourceFiles(t *testing.T, id string, fsys fs.FS) ([]string, error) {
+	t.Helper()
+	l, ok := prov(t, id).(provider.Layout)
+	if !ok {
+		t.Fatalf("provider %s does not implement provider.Layout", id)
+	}
+	return l.SourceFiles(fsys)
 }
 
 // sourceProblems are the complaints the unconverted files already draw; the schema and actionlint lag
@@ -146,25 +156,9 @@ func sourceProblems(t *testing.T, f fixture) findings {
 	t.Helper()
 	out := findings{}
 	root := os.DirFS(f.dir)
-	var rels []string
-	if provider.Family(f.provider) == provider.GHA {
-		for _, wd := range []string{".github", ".gitea", ".forgejo"} {
-			ents, err := fs.Glob(root, wd+"/workflows/*.y*ml")
-			if err != nil {
-				t.Fatal(err)
-			}
-			rels = append(rels, ents...)
-		}
-	} else {
-		err := fs.WalkDir(root, ".", func(p string, d fs.DirEntry, werr error) error {
-			if werr == nil && !d.IsDir() && (strings.HasSuffix(p, ".yml") || strings.HasSuffix(p, ".yaml")) {
-				rels = append(rels, p)
-			}
-			return werr
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
+	rels, err := sourceFiles(t, f.provider, root)
+	if err != nil {
+		t.Fatal(err)
 	}
 	for _, rel := range rels {
 		data, err := fs.ReadFile(root, rel)
@@ -189,14 +183,16 @@ func checkEmitted(t *testing.T, id string, files map[string][]byte, known findin
 				t.Errorf("%s: %s", name, l)
 			}
 		}
-		if id == provider.GitLab && strings.Contains(string(files[name]), exprOpen) {
+		if providerChecks[id].noGHAExpr && strings.Contains(string(files[name]), exprOpen) {
 			t.Errorf("%s holds a GHA expression", name)
 		}
 	}
 }
 
 func TestCorpus(t *testing.T) {
-	requireActionlint(t)
+	for _, id := range lintedProviders() {
+		providerChecks[id].requireLinter(t)
+	}
 	var summary bytes.Buffer
 	healthy := true
 	for _, f := range corpusEntries(t) {

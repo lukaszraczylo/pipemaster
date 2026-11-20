@@ -7,6 +7,27 @@ import (
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
+// SanitizeID makes id match the GHA job id pattern ^[A-Za-z_][A-Za-z0-9_-]*$; Gitea and Forgejo share it.
+func (*adapter) SanitizeID(id string) string {
+	out := make([]byte, 0, len(id)+1)
+	for i := 0; i < len(id); i++ {
+		c := id[i]
+		if !validIDByte(c, false) {
+			c = '-'
+		}
+		out = append(out, c)
+	}
+	if len(out) == 0 || !validIDByte(out[0], true) {
+		out = append([]byte{'_'}, out...)
+	}
+	return string(out)
+}
+
+func validIDByte(c byte, first bool) bool {
+	letter := c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_'
+	return letter || !first && (c >= '0' && c <= '9' || c == '-')
+}
+
 // jobIDMap maps each job id of pl to the valid id it is emitted under.
 func jobIDMap(pl *ir.Pipeline) map[string]string {
 	var ids []string

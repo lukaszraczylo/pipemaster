@@ -263,3 +263,20 @@ func TestSanitizeIDFamily(t *testing.T) {
 		t.Errorf("gitlab: got %q", got)
 	}
 }
+
+func TestSanitizeIDWithoutRulesKeepsID(t *testing.T) {
+	for _, target := range []string{provider.GitLab, "unregistered"} {
+		if got := roundtrip.SanitizeID(target, "1 a.b"); got != "1 a.b" {
+			t.Errorf("%s: got %q", target, got)
+		}
+	}
+}
+
+func TestIDRulesProviders(t *testing.T) {
+	for id, want := range map[string]bool{provider.GHA: true, provider.Gitea: true, provider.Forgejo: true, provider.GitLab: false} {
+		_, ok := prov(t, id).(provider.IDRules)
+		if ok != want {
+			t.Errorf("%s implements IDRules = %v, want %v", id, ok, want)
+		}
+	}
+}

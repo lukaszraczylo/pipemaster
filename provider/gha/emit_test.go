@@ -201,7 +201,7 @@ func TestIdentityProperty(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			rapid.Check(t, func(t *rapid.T) {
-				p := irtest.GenProject(t, nativeFragment(action))
+				p := irtest.GenProject(t, "gha", nativeFragment(action))
 				nativize(t, p)
 				files, rep, err := gha.New(gha.GHA).Emit(p)
 				if err != nil {

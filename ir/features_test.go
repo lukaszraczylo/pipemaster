@@ -35,7 +35,7 @@ func TestFeaturesCoversEveryField(t *testing.T) {
 				want[parent] = true
 			}
 		}
-		p := irtest.GenProject(t, func(f caps.Feature) bool { return want[f] })
+		p := irtest.GenProject(t, "gha", func(f caps.Feature) bool { return want[f] })
 		got := map[caps.Feature]bool{}
 		for _, u := range ir.Features(p) {
 			got[u.Feature] = true
@@ -237,7 +237,7 @@ func TestFeaturesOneEntryPerPathFeaturePair(t *testing.T) {
 func TestGeneratorMixesOpaqueAndStructured(t *testing.T) {
 	var structJobIf, opaqueJobIf, structStepIf, opaqueStepIf int
 	rapid.Check(t, func(t *rapid.T) {
-		p := irtest.GenProject(t, func(f caps.Feature) bool { return f == caps.JobIf || f == caps.StepIf || f == caps.ExprOpaque })
+		p := irtest.GenProject(t, "gha", func(f caps.Feature) bool { return f == caps.JobIf || f == caps.StepIf || f == caps.ExprOpaque })
 		for _, pl := range p.Pipelines {
 			for _, j := range pl.Jobs {
 				if _, ok := j.If.(expr.Opaque); ok {

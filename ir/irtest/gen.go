@@ -21,20 +21,21 @@ const (
 )
 
 type gen struct {
-	t    *rapid.T
-	frag Fragment
-	n    int
+	t      *rapid.T
+	frag   Fragment
+	origin string
+	n      int
 }
 
-// GenProject draws a valid project that uses only features frag allows, each at least once where an IR field can carry it.
+// GenProject draws a valid project, written by the origin provider, that uses only features frag allows, each at least once where an IR field can carry it.
 // It draws two pipelines when frag allows project.multi_pipeline and one otherwise.
 // Dependencies: job.needs.artifacts implies job.needs; job.environment.approval implies job.environment.
 // Each expression slot (job.if, step.if, expression values) is a random structured AST of depth at most 3;
 // when frag allows expr.opaque a slot is instead an Opaque by a random choice, so Opaque is never guaranteed to appear.
 // script.interpolation is derived from script text, so it is never generated.
-func GenProject(t *rapid.T, frag Fragment) *ir.Project {
-	g := &gen{t: t, frag: frag}
-	p := &ir.Project{Origin: ir.Origin{Provider: "gha", Dialect: "gha", Files: []string{"a.yml"}}}
+func GenProject(t *rapid.T, origin string, frag Fragment) *ir.Project {
+	g := &gen{t: t, frag: frag, origin: origin}
+	p := &ir.Project{Origin: ir.Origin{Provider: origin, Dialect: origin, Files: []string{"a.yml"}}}
 	n := 1
 	if frag(caps.ProjectMultiPipeline) {
 		n = 2
@@ -61,8 +62,16 @@ var scopeNames = []string{"actions", "contents", "issues", "packages", "pull-req
 
 func (g *gen) scope() string { return rapid.SampledFrom(scopeNames).Draw(g.t, g.label("sc")) }
 
+// opaqueDialects are the expression dialects an Opaque draws from: GHA and GitLab, plus the origin's own.
+func (g *gen) opaqueDialects() []string {
+	if g.origin == "gha" || g.origin == "gitlab" {
+		return []string{"gha", "gitlab"}
+	}
+	return []string{"gha", "gitlab", g.origin}
+}
+
 func (g *gen) opaque() expr.Expr {
-	return expr.Opaque{Dialect: rapid.SampledFrom([]string{"gha", "gitlab"}).Draw(g.t, g.label("d")), Text: g.str()}
+	return expr.Opaque{Dialect: rapid.SampledFrom(g.opaqueDialects()).Draw(g.t, g.label("d")), Text: g.str()}
 }
 
 // ast draws a structured expression that never contains an Opaque.
@@ -77,7 +86,7 @@ func (g *gen) slot() expr.Expr {
 }
 
 func (g *gen) ext() ir.Ext {
-	return ir.Ext{"gha": map[string]any{g.str(): g.str(), "n": rapid.IntRange(0, 99).Draw(g.t, g.label("n")), "l": []any{g.str()}}}
+	return ir.Ext{g.origin: map[string]any{g.str(): g.str(), "n": rapid.IntRange(0, 99).Draw(g.t, g.label("n")), "l": []any{g.str()}}}
 }
 
 func (g *gen) value() ir.Value {

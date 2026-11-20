@@ -18,3 +18,13 @@ type Provider interface {
 	Emit(p *ir.Project) (map[string][]byte, *report.Report, error)
 	Caps() caps.Matrix
 }
+
+// Layout is implemented by providers whose source files tests and tools must find.
+type Layout interface {
+	SourceFiles(fsys fs.FS) ([]string, error)
+}
+
+// IDRules is implemented by providers that restrict job and pipeline IDs.
+type IDRules interface {
+	SanitizeID(id string) string
+}
