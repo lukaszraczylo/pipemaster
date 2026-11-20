@@ -25,7 +25,9 @@ type emitter struct {
 	from     *expr.Dialect
 	comments []string
 	marks    []string
-	d        Dialect
+	// stepIDs maps the step IDs of the job being written to the IDs written.
+	stepIDs map[string]string
+	d       Dialect
 }
 
 // sourceDialect is the expression dialect of a project's origin; nil means GHA semantics already hold.
@@ -260,8 +262,19 @@ func (e *emitter) value(path string, v ir.Value) (*yaml.Node, error) {
 	return str(s), nil
 }
 
+// refValue translates a value made of references from a foreign origin; ok is false when it is not one.
+func (e *emitter) refValue(x expr.Expr) (expr.Expr, bool) {
+	if e.from == nil {
+		return nil, false
+	}
+	return expr.TranslateRefs(x, *e.from, exprgha.Lang)
+}
+
 func (e *emitter) exprValue(path string, x expr.Expr) *yaml.Node {
-	t, ok := e.source(path, caps.ExprOpaque, x)
+	t, ok := e.refValue(x)
+	if !ok {
+		t, ok = e.source(path, caps.ExprOpaque, x)
+	}
 	if !ok {
 		e.lose(path, caps.ExprOpaque, "expression has no translation from "+e.from.ID)
 		e.comment("expr.opaque " + path + ": " + expr.String(x))
@@ -280,6 +293,25 @@ func (e *emitter) exprValue(path string, x expr.Expr) *yaml.Node {
 		return nil
 	}
 	return str("${{ " + text + " }}")
+}
+
+// valueText is the text of a with or env value as a workflow file writes it.
+func valueText(v ir.Value) string {
+	if v.Kind != ir.ValueExpr {
+		return v.Lit
+	}
+	if c, ok := v.Expr.(expr.Call); ok {
+		if parts, ok := emitkit.UnmixFormat(c); ok {
+			if s, ok := joinParts(parts); ok {
+				return s
+			}
+		}
+	}
+	text, err := printExpr(v.Expr)
+	if err != nil {
+		return ""
+	}
+	return "${{ " + text + " }}"
 }
 
 func joinParts(parts []expr.Part) (string, bool) {

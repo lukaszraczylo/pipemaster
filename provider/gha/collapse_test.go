@@ -557,3 +557,108 @@ func TestSecondMarkerFromAnotherDialectCannotRestoreOverTheFirst(t *testing.T) {
 		t.Errorf("details = %q", got)
 	}
 }
+
+func TestImageStepWithExpressionInScriptCollapses(t *testing.T) {
+	p := imageProject(t)
+	job(p, "build").Steps[0].Script = []string{"echo ${{ secrets.TOKEN }}"}
+	back, text := viaGHA(t, p)
+	st := back.Pipelines[0].Jobs[0].Steps[0]
+	if st.Action != nil || st.Image == nil || !slices.Equal(st.Script, []string{"echo ${{ secrets.TOKEN }}"}) {
+		t.Errorf("image step with an expression not restored: %+v\n%s", st, text)
+	}
+}
+
+func TestPluginStepCollapses(t *testing.T) {
+	p := imageProject(t)
+	st := job(p, "build").Steps[0]
+	st.Kind, st.Script, st.Image = ir.StepPlugin, nil, &ir.Image{Ref: "alpine:3.20"}
+	st.With = map[string]ir.Value{"repo": {Lit: "example/app"}}
+	back, text := viaGHA(t, p)
+	got := back.Pipelines[0].Jobs[0].Steps[0]
+	if got.Kind != ir.StepPlugin || got.Image == nil || got.Image.Ref != "alpine:3.20" || got.With["repo"].Lit != "example/app" {
+		t.Errorf("plugin step not restored: %+v\n%s", got, text)
+	}
+}
+
+func TestImageStepWithVariableRefRunsOnTheRunner(t *testing.T) {
+	p := imageProject(t)
+	job(p, "build").Steps[0].Image.Ref = "registry/${CI_REPO}:1"
+	files, rep, err := gha.New(gha.GHA).Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(files[".github/workflows/ci.yml"]), "docker://") {
+		t.Errorf("a docker step cannot hold a variable:\n%s", files[".github/workflows/ci.yml"])
+	}
+	if !slices.ContainsFunc(rep.Entries, func(e report.Entry) bool { return e.Feature == caps.StepImage && e.Level == caps.Lost }) {
+		t.Errorf("the lost image must be reported: %+v", rep.Entries)
+	}
+}
+
+func TestStepIDInvalidForGHAIsSanitised(t *testing.T) {
+	p := baseProject(t)
+	st := job(p, "build").Steps[0]
+	st.ID, st.Ext = "test:tox", nil
+	files, _, err := gha.New(gha.GHA).Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(files[".github/workflows/ci.yml"]), "id: test-tox") {
+		t.Errorf("the step id must be a valid GHA id:\n%s", files[".github/workflows/ci.yml"])
+	}
+}
+
+func TestImageStepKeepsQuotesInsideAnExpression(t *testing.T) {
+	p := imageProject(t)
+	const line = "echo ${{ github.ref_type == 'branch' && github.ref_name || '' }} it's"
+	job(p, "build").Steps[0].Script = []string{line}
+	back, text := viaGHA(t, p)
+	if got := back.Pipelines[0].Jobs[0].Steps[0].Script; !slices.Equal(got, []string{line}) {
+		t.Errorf("script = %q, want %q\n%s", got, line, text)
+	}
+}
+
+func TestIncludeAndExcludeFilterCollapse(t *testing.T) {
+	p := baseProject(t)
+	want := ir.Filter{Include: []string{"main"}, Exclude: []string{"wip"}}
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush, Branches: want}}
+	back, text := viaGHA(t, p)
+	if got := back.Pipelines[0].Triggers; len(got) != 1 || !slices.Equal(got[0].Branches.Include, want.Include) || !slices.Equal(got[0].Branches.Exclude, want.Exclude) {
+		t.Errorf("filter not restored: %+v\n%s", got, text)
+	}
+}
+
+func TestImageStepKeepsItsWorkDir(t *testing.T) {
+	p := imageProject(t)
+	job(p, "build").Steps[0].WorkDir = "cmd/app"
+	back, text := viaGHA(t, p)
+	if strings.Contains(text, "working-directory") {
+		t.Errorf("a docker step cannot hold working-directory:\n%s", text)
+	}
+	if got := back.Pipelines[0].Jobs[0].Steps[0].WorkDir; got != "cmd/app" {
+		t.Errorf("workdir = %q, want cmd/app\n%s", got, text)
+	}
+}
+
+func TestPluginSettingNamedArgsSurvives(t *testing.T) {
+	p := imageProject(t)
+	st := job(p, "build").Steps[0]
+	st.Kind, st.Script, st.Image = ir.StepPlugin, nil, &ir.Image{Ref: "alpine:3.20"}
+	st.With = map[string]ir.Value{"args": {Lit: "--all-files"}}
+	back, text := viaGHA(t, p)
+	got := back.Pipelines[0].Jobs[0].Steps[0]
+	if got.Kind != ir.StepPlugin || got.With["args"].Lit != "--all-files" {
+		t.Errorf("plugin step not restored: %+v\n%s", got, text)
+	}
+}
+
+func TestImageStepWithSanitisedIDCollapses(t *testing.T) {
+	p := imageProject(t)
+	st := job(p, "build").Steps[0]
+	st.ID, st.Ext = "test:tox", nil
+	back, text := viaGHA(t, p)
+	got := back.Pipelines[0].Jobs[0].Steps[0]
+	if got.Image == nil || got.Action != nil {
+		t.Errorf("image step not restored: %+v\n%s", got, text)
+	}
+}

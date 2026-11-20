@@ -41,6 +41,17 @@ func jobIDMap(pl *ir.Pipeline) map[string]string {
 	return roundtrip.AssignIDs(provider.GHA, ids)
 }
 
+// stepIDMap maps each step id of j to the valid, unique id it is written under. Made-up ids are not written.
+func stepIDMap(j *ir.Job) map[string]string {
+	var ids []string
+	for _, st := range j.Steps {
+		if st != nil && st.ID != "" && !derivedStep(st, nil) {
+			ids = append(ids, st.ID)
+		}
+	}
+	return roundtrip.AssignIDs(provider.GHA, ids)
+}
+
 // idRename is one job id the emitter changed, as the path of the renamed job and the original id.
 type idRename struct{ path, from, to string }
 
@@ -112,9 +123,20 @@ func (a *adapter) EmittedIDs(p *ir.Project) map[string]string {
 		if pl == nil {
 			continue
 		}
-		for src, id := range jobIDMap(pl) {
+		jobs := jobIDMap(pl)
+		for src, id := range jobs {
 			if src != id {
 				out["pipeline/"+pl.ID+"/job/"+id] = src
+			}
+		}
+		for _, j := range append(append([]*ir.Job{}, pl.Jobs...), pl.Finally...) {
+			if j == nil {
+				continue
+			}
+			for src, id := range stepIDMap(j) {
+				if src != id {
+					out["pipeline/"+pl.ID+"/job/"+jobs[j.ID]+"/step/"+id] = src
+				}
 			}
 		}
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
+	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -73,6 +74,8 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			if st := markedStep(pl, u.IRPath); st != nil {
 				st.If = sourceCond(rep, u, args[u], st.If, &condsFrom)
 			}
+		case caps.TriggerFilterBranch, caps.TriggerFilterTags, caps.TriggerFilterPaths:
+			collapseFilter(pl, u.Feature, args[u])
 		case caps.StepImage:
 			collapseImage(e, pl, rep, u, args[u])
 		case caps.StepAction:
@@ -278,9 +281,10 @@ func markedStep(pl *ir.Pipeline, path string) *ir.Step {
 	// A step without an id gets a derived one that can equal an explicit id (a synthesised checkout and the
 	// step after it), and the marker names the explicit one.
 	var derived *ir.Step
+	written := roundtrip.AssignIDs(provider.GHA, []string{stepID})[stepID]
 	for _, st := range j.Steps {
 		switch {
-		case st.ID != stepID:
+		case st.ID != stepID && st.ID != written:
 		case !isDerivedID(st):
 			return st
 		case derived == nil:
@@ -378,22 +382,30 @@ func collapseImage(e *emitter, pl *ir.Pipeline, rep *report.Report, u ir.Feature
 		return
 	}
 	ref, entrypoint, argText, err := e.imageParts(u.IRPath, &ir.Step{Image: &a.Image, Script: a.Script})
-	lit := func(k string) string { return st.With[k].Lit }
-	if err != nil || st.Action.Image != ref || lit("entrypoint") != entrypoint || lit("args") != argText {
+	text := func(k string) string { return valueText(st.With[k]) }
+	// A key the emitter did not write is the step's own input, such as a plugin setting named args.
+	if err != nil || st.Action.Image != ref || entrypoint != "" && text("entrypoint") != entrypoint || argText != "" && text("args") != argText {
 		rep.Add(report.Entry{IRPath: u.IRPath, Feature: u.Feature, Level: caps.Lost, Strategy: "marker ignored",
 			Detail: "marker ignored: the docker step was edited after conversion, so the parsed step stands"})
 		return
 	}
 	with := map[string]ir.Value{}
 	for k, v := range st.With {
-		if k != "entrypoint" && k != "args" {
-			with[k] = v
+		if k == "entrypoint" && entrypoint != "" || k == "args" && argText != "" {
+			continue
 		}
+		with[k] = v
 	}
 	if len(with) == 0 {
 		with = nil
 	}
 	st.Kind, st.Action, st.With, st.Image, st.Script = ir.StepScript, nil, with, &a.Image, a.Script
+	if a.Kind == ir.StepPlugin {
+		st.Kind = ir.StepPlugin
+	}
+	if st.WorkDir == "" {
+		st.WorkDir = a.WorkDir
+	}
 }
 
 // collapseHost restores the host a bare ref had in its source when the parsed step still holds the dialect default.
@@ -404,5 +416,33 @@ func collapseHost(e *emitter, st *ir.Step, args []string) {
 	}
 	if st.Action != nil && st.Action.Kind == ir.ActionRepo && st.Action.Host == e.d.DefaultHost {
 		st.Action.Host = a.Host
+	}
+}
+
+// collapseFilter turns the "!" entries that stood for exclusions back into the include and exclude lists the
+// marker holds, in the trigger whose filter still reads as the emitted form.
+func collapseFilter(pl *ir.Pipeline, f caps.Feature, args []string) {
+	var want ir.Filter
+	if len(args) != 1 || json.Unmarshal([]byte(args[0]), &want) != nil {
+		return
+	}
+	written := ir.Filter{Include: slices.Clone(want.Include)}
+	for _, x := range want.Exclude {
+		written.Include = append(written.Include, negate+x)
+	}
+	for i := range pl.Triggers {
+		var got *ir.Filter
+		switch f {
+		case caps.TriggerFilterBranch:
+			got = &pl.Triggers[i].Branches
+		case caps.TriggerFilterTags:
+			got = &pl.Triggers[i].Tags
+		default:
+			got = &pl.Triggers[i].Paths
+		}
+		if sameFilter(*got, written) {
+			*got = want
+			return
+		}
 	}
 }

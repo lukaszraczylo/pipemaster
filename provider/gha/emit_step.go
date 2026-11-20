@@ -26,7 +26,26 @@ func shellQuote(s string) string {
 	if shellSafe.MatchString(s) {
 		return s
 	}
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+	var sb strings.Builder
+	sb.WriteByte('\'')
+	for rest := s; rest != ""; {
+		start := strings.Index(rest, "${{")
+		end := -1
+		if start >= 0 {
+			end = strings.Index(rest[start:], "}}")
+		}
+		if start < 0 || end < 0 {
+			sb.WriteString(strings.ReplaceAll(rest, "'", `'\''`))
+			break
+		}
+		end += start + 2
+		// GHA evaluates an expression before the shell runs, so its own quotes must stay as written.
+		sb.WriteString(strings.ReplaceAll(rest[:start], "'", `'\''`))
+		sb.WriteString(rest[start:end])
+		rest = rest[end:]
+	}
+	sb.WriteByte('\'')
+	return sb.String()
 }
 
 // retryScript wraps body (attempts is the total number of runs, not the number of retries) in a loop that runs it up to attempts times; set -e inside the subshell
@@ -50,6 +69,30 @@ func retryScript(body []string, attempts int) []string {
 	)
 }
 
+// derivedStep reports whether any provider made the step ID up from the step position; such an ID is never written back as a name.
+func derivedStep(st *ir.Step, own map[string]any) bool {
+	if d, _ := own[ExtDerivedID].(bool); d {
+		return true
+	}
+	for _, raw := range st.Ext {
+		if m, ok := raw.(map[string]any); ok && m[ExtDerivedID] == true {
+			return true
+		}
+	}
+	return false
+}
+
+// reidentify names a step that another provider gave a made-up ID by the ID a reader derives for its place in
+// this file, so its markers and report entries match the step after a return parse.
+func (e *emitter) reidentify(j *ir.Job, st *ir.Step, pos int) *ir.Step {
+	if own, _ := e.ext(st.Ext)[ExtDerivedID].(bool); own || !derivedStep(st, nil) {
+		return st
+	}
+	c := *st
+	c.ID = derivedID(j.ID, pos)
+	return &c
+}
+
 // noopScript runs for a script step whose lines an earlier conversion could not carry.
 const noopScript = "true"
 
@@ -60,10 +103,14 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 	sp := stepPath(jp, st.ID)
 	ext := e.ext(st.Ext)
 	e.foreignExt(sp, st.Ext)
-	derived, _ := ext[ExtDerivedID].(bool)
+	derived := derivedStep(st, ext)
 	m := newMap()
 	if !derived && st.ID != "" {
-		m.set("id", str(st.ID))
+		id := st.ID
+		if w, ok := e.stepIDs[id]; ok {
+			id = w
+		}
+		m.set("id", str(id))
 	}
 	if st.Name != "" {
 		t, err := e.template(sp, st.Name)
@@ -80,10 +127,12 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 			return nil, false, uerr
 		}
 	}
+	dockerOK := st.Image == nil || !strings.Contains(st.Image.Ref, "$")
 	switch {
 	case !usesOK:
 		e.lose(sp, caps.StepIf, whyDisabled)
 		m.set("if", boolNodeOf(false))
+
 	case st.If != nil:
 		m.set("if", e.condition(sp, caps.StepIf, st.If, "step"))
 	}
@@ -91,7 +140,17 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 	wrapped := false
 	var err error
 	switch {
-	case st.Kind == ir.StepScript && st.Image != nil:
+	case !dockerOK && len(st.Script) == 0:
+		e.lose(sp, caps.StepImage, "a docker step needs a literal image reference and the reference holds a variable; the step does not run")
+		m.set("run", str(noopScript))
+	case !dockerOK:
+		e.lose(sp, caps.StepImage, "a docker step needs a literal image reference and the reference holds a variable; the script runs on the runner")
+		lines := e.withoutRemoteRefs(sp, st.Script)
+		var ts []string
+		if ts, err = e.templates(sp, lines); err == nil {
+			m.set("run", block(ts))
+		}
+	case (st.Kind == ir.StepScript || st.Kind == ir.StepPlugin) && st.Image != nil:
 		markers = append(markers, emitkit.Marker(caps.StepImage, sp))
 		err = e.imageStep(m, sp, st)
 	case st.Kind == ir.StepScript && len(st.Script) > 0:
@@ -170,7 +229,10 @@ func (e *emitter) stepTail(m *omap, sp string, st *ir.Step, ext map[string]any) 
 	if st.Shell != "" && st.Image == nil {
 		m.set("shell", str(st.Shell))
 	}
-	if st.WorkDir != "" {
+	switch {
+	case st.WorkDir != "" && st.Image != nil && m.has("uses"):
+		e.emulate(sp, caps.StepWorkdir, "kept in the image step marker", "a docker step has no working-directory")
+	case st.WorkDir != "":
 		t, err := e.template(sp, st.WorkDir)
 		if err != nil {
 			return err
@@ -243,7 +305,7 @@ func (e *emitter) imageStep(m *omap, sp string, st *ir.Step) error {
 	if argText != "" {
 		args.set("args", str(argText))
 	}
-	if err := e.markArg(caps.StepImage, sp, imageArg{Image: *st.Image, Script: st.Script}); err != nil {
+	if err := e.markArg(caps.StepImage, sp, imageArg{Image: *st.Image, Script: st.Script, Kind: st.Kind, WorkDir: st.WorkDir}); err != nil {
 		return err
 	}
 	return e.withKey(m, sp, st.With, args)
@@ -251,8 +313,10 @@ func (e *emitter) imageStep(m *omap, sp string, st *ir.Step) error {
 
 // imageArg is the marker argument of an image step: what the step ran before it became a docker action.
 type imageArg struct {
-	Image  ir.Image `json:"image"`
-	Script []string `json:"script,omitempty"`
+	Kind    ir.StepKind `json:"kind,omitempty"`
+	WorkDir string      `json:"workdir,omitempty"`
+	Image   ir.Image    `json:"image"`
+	Script  []string    `json:"script,omitempty"`
 }
 
 // jobSteps lists a job's steps with the emulation steps around them: downloads and cache first, uploads last.
@@ -271,11 +335,12 @@ func (e *emitter) jobSteps(c jobCtx, j *ir.Job) (*yaml.Node, error) {
 			e.emulate(jp, caps.JobRetry, "step-level retry loop via shell", "retry conditions are ignored; every failure retries")
 		}
 	}
+	e.stepIDs = stepIDMap(j)
 	for _, st := range j.Steps {
 		if st == nil {
 			continue
 		}
-		n, w, err := e.stepNode(jp, st, attempts)
+		n, w, err := e.stepNode(jp, e.reidentify(j, st, len(seq.Content)+1), attempts)
 		if err != nil {
 			return nil, err
 		}

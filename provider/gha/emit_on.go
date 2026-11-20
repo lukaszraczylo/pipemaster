@@ -67,7 +67,7 @@ func sameFilter(a, b ir.Filter) bool {
 
 // filterKeys writes key and key-ignore; GHA forbids both on one event, so include and exclude together
 // become "!" entries and the ledger says so.
-func (e *emitter) filterKeys(m *omap, key string, f ir.Filter, path string, feature caps.Feature) {
+func (e *emitter) filterKeys(m *omap, key string, f ir.Filter, path string, feature caps.Feature) error {
 	switch {
 	case len(f.Include) > 0 && len(f.Exclude) > 0:
 		all := append([]string{}, f.Include...)
@@ -76,11 +76,13 @@ func (e *emitter) filterKeys(m *omap, key string, f ir.Filter, path string, feat
 		}
 		m.set(key, strSeq(all))
 		e.emulate(path, feature, "exclusions written as ! entries", "GHA cannot combine "+key+" and "+key+"-ignore on one event")
+		return e.markArg(feature, path, f)
 	case len(f.Include) > 0:
 		m.set(key, strSeq(f.Include))
 	case len(f.Exclude) > 0:
 		m.set(key+"-ignore", strSeq(f.Exclude))
 	}
+	return nil
 }
 
 // loseFilters reports every filter of t that its GHA event has no key for.
@@ -231,7 +233,9 @@ func (e *emitter) pushEvent(b *onBuilder, pl *ir.Pipeline, i int, used map[int]b
 			m.set("branches", strSeq([]string{matchAll}))
 			e.mark(caps.TriggerPush, pp)
 		}
-		e.filterKeys(m, "branches", push.Branches, pp, caps.TriggerFilterBranch)
+		if err := e.filterKeys(m, "branches", push.Branches, pp, caps.TriggerFilterBranch); err != nil {
+			return err
+		}
 		paths = push.Paths
 	}
 	if tag != nil {
@@ -246,12 +250,16 @@ func (e *emitter) pushEvent(b *onBuilder, pl *ir.Pipeline, i int, used map[int]b
 			m.set("tags", strSeq([]string{matchAll}))
 			e.mark(caps.TriggerTag, tp)
 		}
-		e.filterKeys(m, "tags", tag.Tags, tp, caps.TriggerFilterTags)
+		if err := e.filterKeys(m, "tags", tag.Tags, tp, caps.TriggerFilterTags); err != nil {
+			return err
+		}
 		if push == nil {
 			paths = tag.Paths
 		}
 	}
-	e.filterKeys(m, "paths", paths, firstNonEmpty(pp, tp), caps.TriggerFilterPaths)
+	if err := e.filterKeys(m, "paths", paths, firstNonEmpty(pp, tp), caps.TriggerFilterPaths); err != nil {
+		return err
+	}
 	for _, t := range []*ir.Trigger{push, tag} {
 		if t == nil {
 			continue
@@ -281,8 +289,12 @@ func (e *emitter) prEvent(b *onBuilder, path string, t *ir.Trigger) error {
 		name = evPRTarget
 	}
 	m := newMap()
-	e.filterKeys(m, "branches", t.Branches, path, caps.TriggerFilterBranch)
-	e.filterKeys(m, "paths", t.Paths, path, caps.TriggerFilterPaths)
+	if err := e.filterKeys(m, "branches", t.Branches, path, caps.TriggerFilterBranch); err != nil {
+		return err
+	}
+	if err := e.filterKeys(m, "paths", t.Paths, path, caps.TriggerFilterPaths); err != nil {
+		return err
+	}
 	if err := m.addExtra(ext, map[string]bool{extEvent: true}); err != nil {
 		return err
 	}
@@ -399,7 +411,9 @@ func (e *emitter) workflowRun(b *onBuilder, path string, t *ir.Trigger) error {
 	}
 	m := newMap()
 	m.set("workflows", n)
-	e.filterKeys(m, "branches", t.Branches, path, caps.TriggerFilterBranch)
+	if err := e.filterKeys(m, "branches", t.Branches, path, caps.TriggerFilterBranch); err != nil {
+		return err
+	}
 	if err := m.addExtra(ext, nil); err != nil {
 		return err
 	}
