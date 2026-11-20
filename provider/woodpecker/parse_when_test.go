@@ -73,24 +73,34 @@ func TestInexactGlobStaysAConditionNotATrigger(t *testing.T) {
 		if len(pl.Triggers) != 0 {
 			t.Errorf("%s: glob with no exact IR filter form became a trigger: %+v", pat, pl.Triggers)
 		}
-		if j.If == nil || !containsOpaque(text(j.If), pat) {
-			t.Errorf("%s: condition = %q", pat, text(j.If))
+		if got := text(j.If); !strings.Contains(got, "glob") || !strings.Contains(got, pat) {
+			t.Errorf("%s: condition = %q", pat, got)
 		}
-		_ = rep
+		if !hasEntry(rep, pat) {
+			t.Errorf("%s: no report entry for the opaque glob: %+v", pat, rep.Entries)
+		}
 	}
 }
 
-func containsOpaque(s, pat string) bool {
-	return len(s) > 0 && (indexOf(s, "glob") >= 0 && indexOf(s, pat) >= 0)
-}
-
-func indexOf(s, sub string) int {
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return i
+// IR consumers read a leading ! as negation and + as a quantifier; doublestar reads both as literal.
+// The value stays an exact equality in the condition and never reaches a trigger filter.
+func TestIRMetacharactersStayLiteralConditions(t *testing.T) {
+	for _, pat := range []string{"!main", "feat+", "a+b"} {
+		pl, j, rep := single(t, "when:\n  event: push\n  branch: '"+pat+"'\n"+body)
+		if len(pl.Triggers) != 0 {
+			t.Errorf("%s: became a trigger filter: %+v", pat, pl.Triggers)
+		}
+		if got := text(j.If); !strings.Contains(got, "branch == '"+pat+"'") || strings.Contains(got, "glob") {
+			t.Errorf("%s: condition = %q", pat, got)
+		}
+		if len(rep.Entries) != 0 {
+			t.Errorf("%s: an exact equality needs no entry: %+v", pat, rep.Entries)
 		}
 	}
-	return -1
+	pl, _, _ := single(t, "when:\n  event: push\n  path: ['!docs/*']\n"+body)
+	if len(pl.Triggers) != 0 {
+		t.Errorf("a path with a leading ! became a trigger filter: %+v", pl.Triggers)
+	}
 }
 
 func TestWhenWithOnlyUnmodelledKeysIsNotNoRestriction(t *testing.T) {

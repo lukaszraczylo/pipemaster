@@ -175,10 +175,15 @@ func (w *wf) when(r *reader) (*whenSpec, error) {
 	return spec, nil
 }
 
-// exactGlob reports whether a doublestar pattern means the same as the glob an IR filter holds: a literal, or
-// one with single stars only. A path pattern may also end in /**, which both read as "below this directory"
-// for a file path. Any other doublestar form differs (a/** also matches a, ? and {} have other meanings).
+// exactGlob reports whether a doublestar pattern means the same to the IR consumers as to Woodpecker: a literal
+// without a leading "!" or a "+", or one with single stars only. IR consumers read a leading "!" as negation and
+// "+" as a quantifier (GHA filter pattern cheat sheet); doublestar reads both as literal. A path pattern may also
+// end in /**, which both read as "below this directory" for a file path. Any other doublestar form differs
+// (a/** also matches a, and ? and {} have other meanings).
 func exactGlob(p string, isPath bool) bool {
+	if strings.HasPrefix(p, "!") || strings.Contains(p, "+") {
+		return false
+	}
 	if isPath {
 		if rest, ok := strings.CutSuffix(p, "/**"); ok && rest != "" {
 			p = rest
@@ -341,6 +346,7 @@ func (s *whenSpec) gate(sk *sink) (expr.Expr, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.noteGlobs(sk)
 	if lossy := s.lossyKeys(statusLossy); len(lossy) > 0 {
 		sk.vals[whenKey] = plain(s.raw)
 		for _, k := range lossy {
@@ -367,4 +373,22 @@ func (s *whenSpec) apply(rep *report.Report, j *ir.Job, file string, triggersUse
 	}
 	j.If, j.Ext = e, sk.ext()
 	return nil
+}
+
+// noteGlobs reports each filter value that is a glob: the condition holds it as an opaque node, not as a native test.
+func (s *whenSpec) noteGlobs(sk *sink) {
+	for _, it := range s.items {
+		for _, f := range []wpexpr.Filter{it.item.Event, it.item.Branch, it.item.Ref, it.item.Repo, it.item.Instance} {
+			for _, v := range append(slices.Clone(f.Include), f.Exclude...) {
+				if wpexpr.IsLiteral(v) {
+					continue
+				}
+				sk.rep.Add(report.Entry{
+					IRPath: sk.path, Feature: caps.ExprOpaque, Level: caps.Emulated, Strategy: "opaque glob condition",
+					Detail:    "the glob " + v + " has no exact IR form; the condition keeps it as an opaque node",
+					SourceLoc: fmt.Sprintf("%s:%d", sk.file, s.line),
+				})
+			}
+		}
+	}
 }
