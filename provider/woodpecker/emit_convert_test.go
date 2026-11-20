@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gha"
@@ -198,5 +199,73 @@ func TestStepVariableEqualToTheJobOneSurvives(t *testing.T) {
 	back := parseProject(t, "woodpecker", raw)
 	if got := back.Pipelines[0].Jobs[0].Steps[0].Env; !reflect.DeepEqual(got, p.Pipelines[0].Jobs[0].Steps[0].Env) {
 		t.Errorf("step env = %+v, want %+v", got, p.Pipelines[0].Jobs[0].Steps[0].Env)
+	}
+}
+
+func ghaTriggers(t *testing.T, on string) (map[string]string, *report.Report) {
+	t.Helper()
+	p := parseProject(t, "gha", map[string]string{".github/workflows/ci.yml": "on:\n" + on + "jobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make\n"})
+	return emitFiles(t, p)
+}
+
+func TestGHAQuantifierFilterBecomesEvaluate(t *testing.T) {
+	for name, c := range map[string]struct{ on, key, want string }{
+		"tag plus":        {"  push:\n    tags: ['v[0-9]+.[0-9]+']\n", "CI_COMMIT_TAG", `CI_COMMIT_TAG matches "^v[0-9]+\\.[0-9]+$$"`},
+		"branch plus":     {"  push:\n    branches: ['release-[0-9]+']\n", "CI_COMMIT_BRANCH", `CI_COMMIT_BRANCH matches "^release-[0-9]+$$"`},
+		"branch question": {"  push:\n    branches: ['colou?r']\n", "CI_COMMIT_BRANCH", `CI_COMMIT_BRANCH matches "^colou?r$$"`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			want, got, _ := roundTripTriggers(t, c.on)
+			if !reflect.DeepEqual(want, got) {
+				t.Errorf("triggers changed:\nwant %+v\ngot  %+v", want, got)
+			}
+			files, rep := ghaTriggers(t, c.on)
+			body := files[".woodpecker/b.yaml"]
+			if !strings.Contains(body, c.want) {
+				t.Errorf("missing %s in\n%s", c.want, body)
+			}
+			if strings.Contains(body, "refs/tags/v[0-9]+") || strings.Contains(body, "branch:\n") && strings.Contains(body, "[0-9]+") && !strings.Contains(body, "evaluate") {
+				t.Errorf("a pattern doublestar misreads was written as a glob:\n%s", body)
+			}
+			if !reportDetailHas(rep, "regular expression test on") {
+				t.Errorf("the report must say the filter became a regular expression: %+v", rep.Entries)
+			}
+		})
+	}
+}
+
+func TestGHAQuantifierFilterKeepsTheJobCondition(t *testing.T) {
+	p := parseProject(t, "gha", map[string]string{".github/workflows/ci.yml": "on:\n  push:\n    branches: ['r-[0-9]+']\n  pull_request:\n    branches: ['r-[0-9]+']\njobs:\n  b:\n    runs-on: ubuntu-latest\n    if: github.sha == 'abc'\n    steps:\n      - run: make\n"})
+	files, _ := emitFiles(t, p)
+	raw := map[string]string{}
+	for n, b := range files {
+		raw[n] = b
+	}
+	back := parseProject(t, "woodpecker", raw)
+	if !reflect.DeepEqual(back.Pipelines[0].Triggers, p.Pipelines[0].Triggers) {
+		t.Errorf("triggers changed: %+v", back.Pipelines[0].Triggers)
+	}
+	got := expr.String(back.Pipelines[0].Jobs[0].If)
+	if !strings.Contains(got, "sha") || strings.Contains(got, "branch") {
+		t.Errorf("job condition = %s, want only the sha test: the filter text must not leak into it", got)
+	}
+}
+
+func TestGHAQuantifierPathFilterDisablesTheWorkflow(t *testing.T) {
+	files, rep := ghaTriggers(t, "  push:\n    paths: ['docs/a+.md']\n")
+	if !reportHas(rep, caps.TriggerFilterPaths, caps.Lost) {
+		t.Errorf("a path filter that cannot be written must be lost: %+v", rep.Entries)
+	}
+	for n, b := range files {
+		if !strings.Contains(b, `evaluate: "false"`) {
+			t.Errorf("%s must never run, not silently never match the path:\n%s", n, b)
+		}
+	}
+}
+
+func TestInexactTagFilterReportKeepsEveryCaveat(t *testing.T) {
+	_, rep := ghaTriggers(t, "  push:\n    tags: ['v**']\n")
+	if !reportDetail(rep, caps.TriggerFilterTags, "different meaning in doublestar") || !reportDetail(rep, caps.TriggerFilterTags, "tag name filter") {
+		t.Errorf("both caveats must survive in the report: %+v", rep.Entries)
 	}
 }

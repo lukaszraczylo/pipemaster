@@ -2,6 +2,7 @@ package woodpecker
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -129,5 +130,43 @@ func TestRenameKeepsToItsOwnJobPaths(t *testing.T) {
 	want := []string{"pipeline/ci/job/a", "pipeline/ci/job/a/step/s", "pipeline/ci/job/ab", "pipeline/ci/job/ab/step/s"}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("paths = %v, want %v", got, want)
+	}
+}
+
+func TestGHARegexMatchesLikeAGHAPattern(t *testing.T) {
+	cases := []struct {
+		pattern string
+		match   []string
+		reject  []string
+	}{
+		{"v[0-9]+.[0-9]+", []string{"v1.2", "v10.20"}, []string{"v1", "v1x2", "xv1.2", "v1.2.3"}},
+		{"release-*", []string{"release-1", "release-"}, []string{"release-1/x"}},
+		{"release/**", []string{"release/a/b"}, []string{"releas"}},
+		{"colou?r", []string{"color", "colour"}, []string{"colouur"}},
+		{"a.b", []string{"a.b"}, []string{"axb"}},
+	}
+	for _, c := range cases {
+		t.Run(c.pattern, func(t *testing.T) {
+			rx, ok := ghaRegex(c.pattern)
+			if !ok {
+				t.Fatal("no regular expression")
+			}
+			re := regexp.MustCompile(rx)
+			for _, s := range c.match {
+				if !re.MatchString(s) {
+					t.Errorf("%s must match %q", rx, s)
+				}
+			}
+			for _, s := range c.reject {
+				if re.MatchString(s) {
+					t.Errorf("%s must not match %q", rx, s)
+				}
+			}
+		})
+	}
+	for _, bad := range []string{"+x", "a[b", `a\`, "a*+"} {
+		if rx, ok := ghaRegex(bad); ok {
+			t.Errorf("%q has no regular expression form, got %s", bad, rx)
+		}
 	}
 }

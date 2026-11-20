@@ -2,4 +2,4 @@ Loss report: forgejo -> woodpecker
 [lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
 [lost] pipeline/ci/job/build job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
-[emulated] pipeline/ci/trigger/0 trigger.filter.tags: ref filter refs/tags/<pattern> (the tag name filter is written as a ref filter on the tag event)
+[emulated] pipeline/ci/trigger/0 trigger.filter.tags: evaluate matches (pattern with + or ? has no doublestar form; it is written as a regular expression test on tag)

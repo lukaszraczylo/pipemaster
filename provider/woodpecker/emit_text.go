@@ -38,6 +38,8 @@ type emitter struct {
 	// inexact is the first trigger filter feature of the workflow being written whose globs changed meaning.
 	inexact caps.Feature
 	head    []string
+	// said holds the strategy and detail last noted per emulated use.
+	said map[ir.FeatureUse][2]string
 	// matrixRefs lists the matrix names the workflow being written reads.
 	matrixRefs []string
 	// cut is set when an image, workdir or service field lost an expression; the step or service being written owns it.
@@ -56,8 +58,28 @@ func (e *emitter) lose(path string, f caps.Feature, detail string) {
 	e.led.Note(use(path, f), caps.Support{Level: caps.Lost}, detail)
 }
 
+// emulate notes an emulation. A second note for the same path and feature adds its text to the first, so the
+// report keeps every caveat.
 func (e *emitter) emulate(path string, f caps.Feature, strategy, detail string) {
-	e.led.Note(use(path, f), caps.Support{Level: caps.Emulated, Strategy: strategy}, detail)
+	u := use(path, f)
+	if prev, ok := e.said[u]; ok {
+		strategy, detail = joinNew(prev[0], strategy), joinNew(prev[1], detail)
+	}
+	if e.said == nil {
+		e.said = map[ir.FeatureUse][2]string{}
+	}
+	e.said[u] = [2]string{strategy, detail}
+	e.led.Note(u, caps.Support{Level: caps.Emulated, Strategy: strategy}, detail)
+}
+
+func joinNew(prev, next string) string {
+	if next == "" || strings.Contains(prev, next) {
+		return prev
+	}
+	if prev == "" {
+		return next
+	}
+	return prev + "; " + next
 }
 
 func (e *emitter) external(path string, f caps.Feature, strategy, detail string) {

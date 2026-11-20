@@ -1,6 +1,7 @@
 package woodpecker
 
 import (
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -254,6 +255,141 @@ func irGlobs(f ir.Filter, isPath bool) (out wpexpr.Filter, inexact []string) {
 	return out, inexact
 }
 
+// regexQuantifiers are the GHA pattern characters that doublestar reads as plain text or as another operator.
+const regexQuantifiers = "+?"
+
+func needsRegex(f ir.Filter) bool {
+	return slices.ContainsFunc(append(slices.Clone(f.Include), f.Exclude...), func(p string) bool {
+		return strings.ContainsAny(strings.TrimPrefix(p, negation), regexQuantifiers)
+	})
+}
+
+// hasPlus is true when a pattern uses + as a quantifier, which doublestar reads as a plain character, so the
+// pattern would never match a real name. A ? still matches there, only with another meaning.
+func hasPlus(f ir.Filter) bool {
+	return slices.ContainsFunc(append(slices.Clone(f.Include), f.Exclude...), func(p string) bool { return strings.Contains(p, "+") })
+}
+
+// ghaRegex turns a GHA filter pattern into an anchored RE2 pattern: * stops at a slash, ** does not, ? and +
+// quantify the character before them, and a character class stays one.
+func ghaRegex(p string) (string, bool) {
+	var sb strings.Builder
+	sb.WriteString("^")
+	rs := []rune(p)
+	for i := 0; i < len(rs); i++ {
+		switch c := rs[i]; c {
+		case '*':
+			if i+1 < len(rs) && rs[i+1] == '*' {
+				sb.WriteString(".*")
+				i++
+			} else {
+				sb.WriteString("[^/]*")
+			}
+		case '?', '+':
+			if i == 0 {
+				return "", false
+			}
+			sb.WriteRune(c)
+		case '[':
+			end := slices.Index(rs[i:], ']')
+			if end < 0 {
+				return "", false
+			}
+			sb.WriteString(string(rs[i : i+end+1]))
+			i += end
+		case '\\':
+			if i+1 >= len(rs) {
+				return "", false
+			}
+			i++
+			sb.WriteString(regexp.QuoteMeta(string(rs[i])))
+		default:
+			sb.WriteString(regexp.QuoteMeta(string(c)))
+		}
+	}
+	sb.WriteString("$")
+	if _, err := regexp.Compile(sb.String()); err != nil {
+		return "", false
+	}
+	return sb.String(), true
+}
+
+// regexTest writes a filter as a matches test on ref: a run passes when it matches an include and no exclude.
+func regexTest(ref string, f ir.Filter) (string, bool) {
+	r := expr.Ref{Path: []string{ref}}
+	var inc, exc []expr.Expr
+	add := func(p string, negate bool) bool {
+		rx, ok := ghaRegex(p)
+		if !ok {
+			return false
+		}
+		if negate {
+			exc = append(exc, expr.Binary{Op: expr.OpNoMatch, L: r, R: expr.Lit{Kind: expr.LitStr, Str: rx}})
+		} else {
+			inc = append(inc, expr.Binary{Op: expr.OpMatch, L: r, R: expr.Lit{Kind: expr.LitStr, Str: rx}})
+		}
+		return true
+	}
+	for _, p := range f.Include {
+		rest, neg := strings.CutPrefix(p, negation)
+		if !add(rest, neg) {
+			return "", false
+		}
+	}
+	for _, p := range f.Exclude {
+		if !add(p, true) {
+			return "", false
+		}
+	}
+	var out expr.Expr
+	if len(inc) > 0 {
+		out = inc[0]
+		for _, x := range inc[1:] {
+			out = expr.Binary{Op: expr.OpOr, L: out, R: x}
+		}
+	}
+	for _, x := range exc {
+		out = and(out, x)
+	}
+	text, err := wpexpr.Print(out)
+	return text, err == nil
+}
+
+// evalArg carries the evaluate text an emitter wrote for a trigger filter, so the parser can tell it from a condition.
+type evalArg struct {
+	Evaluate string `json:"evaluate"`
+}
+
+// regexFilter writes the filter of one trigger as an evaluate test when doublestar cannot read its patterns. It
+// returns the evaluate text; "false" with a lost entry is the fail-safe when no test exists.
+func (e *emitter) regexFilter(tp string, feat caps.Feature, ref string, f ir.Filter) string {
+	if e.inexact == "" {
+		e.inexact = feat
+	}
+	text, ok := regexTest(ref, f)
+	if !ok {
+		e.lose(tp, feat, "a pattern has no regular expression form, so the workflow is disabled for this trigger")
+		return disabledText
+	}
+	e.emulate(tp, feat, "evaluate matches", "pattern with + or ? has no doublestar form; it is written as a regular expression test on "+ref)
+	if err := e.markArg(feat, tp, evalArg{Evaluate: text}); err != nil {
+		e.comment("trigger filter text not carried: " + err.Error())
+	}
+	return text
+}
+
+func andText(a, b string) string {
+	switch {
+	case a == disabledText || b == disabledText:
+		return disabledText
+	case a == "":
+		return b
+	case b == "":
+		return a
+	}
+	return a + " && (" + b + ")"
+}
+
 func (e *emitter) globFilter(tp string, f caps.Feature, in ir.Filter, isPath bool) wpexpr.Filter {
 	out, inexact := irGlobs(in, isPath)
 	if len(inexact) > 0 {
@@ -287,14 +423,23 @@ func (e *emitter) triggerEntry(tp string, t *ir.Trigger) (whenEntry, bool) {
 		if t.Kind == ir.TriggerPR {
 			w.Event.Include = []string{eventPR}
 		}
-		w.Branch = e.globFilter(tp, caps.TriggerFilterBranch, t.Branches, false)
-		w.path = e.globFilter(tp, caps.TriggerFilterPaths, t.Paths, true)
+		if needsRegex(t.Branches) {
+			w.Evaluate = e.regexFilter(tp, caps.TriggerFilterBranch, expr.CtxBranch, t.Branches)
+		} else {
+			w.Branch = e.globFilter(tp, caps.TriggerFilterBranch, t.Branches, false)
+		}
+		if hasPlus(t.Paths) {
+			e.lose(tp, caps.TriggerFilterPaths, "a path pattern with + has no Woodpecker form, so the workflow is disabled for this trigger")
+			w.Evaluate = disabledText
+		} else {
+			w.path = e.globFilter(tp, caps.TriggerFilterPaths, t.Paths, true)
+		}
 		if hasFilter(t.Tags) {
 			e.lose(tp, caps.TriggerFilterTags, "a "+string(t.Kind)+" trigger has no tag filter; tags belong to a tag trigger")
 		}
 	case ir.TriggerTag:
 		w.Event.Include = []string{eventTag}
-		w.Ref = e.tagRefs(tp, t.Tags)
+		w.Ref, w.Evaluate = e.tagRefs(tp, t.Tags)
 		e.dropFilters(tp, t, "a tag event")
 	case ir.TriggerSchedule:
 		w.Event.Include = []string{eventCron}
@@ -325,9 +470,12 @@ func (e *emitter) dropFilters(tp string, t *ir.Trigger, event string) {
 }
 
 // tagRefs maps tag globs to a ref filter on the full ref; the tag event itself has no tag name filter.
-func (e *emitter) tagRefs(tp string, in ir.Filter) wpexpr.Filter {
+func (e *emitter) tagRefs(tp string, in ir.Filter) (wpexpr.Filter, string) {
 	if !hasFilter(in) {
-		return wpexpr.Filter{}
+		return wpexpr.Filter{}, ""
+	}
+	if needsRegex(in) {
+		return wpexpr.Filter{}, e.regexFilter(tp, caps.TriggerFilterTags, expr.CtxTag, in)
 	}
 	f := e.globFilter(tp, caps.TriggerFilterTags, in, false)
 	for i, p := range f.Include {
@@ -338,7 +486,7 @@ func (e *emitter) tagRefs(tp string, in ir.Filter) wpexpr.Filter {
 	}
 	e.emulate(tp, caps.TriggerFilterTags, "ref filter refs/tags/<pattern>", "the tag name filter is written as a ref filter on the tag event")
 	e.mark(caps.TriggerFilterTags, tp)
-	return f
+	return f, ""
 }
 
 // jobWhen combines the trigger entries, the manual gate, the job condition and the status gate of one workflow.
@@ -407,7 +555,7 @@ func (e *emitter) mergeCond(jp string, orig expr.Expr, base []whenEntry, cond []
 	}
 	out := slices.Clone(base)
 	for i := range out {
-		out[i].Evaluate = text
+		out[i].Evaluate = andText(out[i].Evaluate, text)
 	}
 	return out
 }

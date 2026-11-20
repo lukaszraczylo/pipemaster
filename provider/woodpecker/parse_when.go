@@ -71,6 +71,7 @@ func (s *whenSpec) configure(m *marks) {
 	if s == nil {
 		return
 	}
+	s.dropGenerated(m)
 	s.disabled = len(s.items) > 0 && !slices.ContainsFunc(s.items, func(it itemInfo) bool { return it.item.Evaluate != disabledText })
 	s.shared = s.sharedEvaluate()
 	s.sharedStatus = s.sharedStatusList()
@@ -80,6 +81,28 @@ func (s *whenSpec) configure(m *marks) {
 			s.lenient = s.lenient || u.IRPath == pipelinePth
 		case caps.PipelineFinally:
 			s.ignoreStatus = true
+		}
+	}
+}
+
+// dropGenerated removes the evaluate text an emitter wrote for a trigger filter, which a marker names, so that the
+// job condition is what is left.
+func (s *whenSpec) dropGenerated(m *marks) {
+	var gens []string
+	for _, u := range m.uses {
+		var a evalArg
+		if strings.HasPrefix(u.IRPath, pipelinePth+"/trigger/") && decodeArg(m.args[u], &a) && a.Evaluate != "" {
+			gens = append(gens, a.Evaluate)
+		}
+	}
+	for i := range s.items {
+		ev := s.items[i].item.Evaluate
+		for _, g := range gens {
+			if ev == g {
+				s.items[i].item.Evaluate = ""
+			} else if rest, ok := strings.CutPrefix(ev, g+" && ("); ok && strings.HasSuffix(rest, ")") {
+				s.items[i].item.Evaluate = strings.TrimSuffix(rest, ")")
+			}
 		}
 	}
 }
