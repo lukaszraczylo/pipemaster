@@ -351,12 +351,12 @@ func (e *emitter) jobWhen(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) [
 	if finally && status == nil {
 		status = []string{statusOK, statusFail}
 	}
-	return withStatus(e.mergeCond(base, cond), status)
+	return withStatus(e.mergeCond(jp, j.If, base, cond), status)
 }
 
 // mergeCond ANDs the condition with every base entry. Two entries cannot be merged key by key, so the
 // whole condition goes into the evaluate text of each base entry.
-func (e *emitter) mergeCond(base []whenEntry, cond []wpexpr.Item) []whenEntry {
+func (e *emitter) mergeCond(jp string, orig expr.Expr, base []whenEntry, cond []wpexpr.Item) []whenEntry {
 	if len(cond) == 0 {
 		return base
 	}
@@ -368,11 +368,16 @@ func (e *emitter) mergeCond(base []whenEntry, cond []wpexpr.Item) []whenEntry {
 		return out
 	}
 	x, err := wpexpr.WhenExpr(cond)
-	if err != nil || x == nil {
+	if err != nil {
+		e.disable(jp, caps.JobIf, orig, "the workflow")
+		return neverEntries()
+	}
+	if x == nil {
 		return base
 	}
 	text, err := wpexpr.Print(x)
 	if err != nil {
+		e.disable(jp, caps.JobIf, orig, "the workflow")
 		return neverEntries()
 	}
 	out := slices.Clone(base)
