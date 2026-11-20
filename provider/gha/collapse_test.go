@@ -662,3 +662,18 @@ func TestImageStepWithSanitisedIDCollapses(t *testing.T) {
 		t.Errorf("image step not restored: %+v\n%s", got, text)
 	}
 }
+
+func TestImageStepsWithCollidingSanitisedIDsCollapse(t *testing.T) {
+	p := imageProject(t)
+	j := job(p, "build")
+	first := j.Steps[0]
+	first.ID, first.Ext = "test:tox", nil
+	second := *first
+	second.ID, second.Image = "test-tox", &ir.Image{Ref: "debian:12"}
+	j.Steps = append([]*ir.Step{first, &second}, j.Steps[1:]...)
+	back, text := viaGHA(t, p)
+	got := back.Pipelines[0].Jobs[0].Steps
+	if got[0].Image == nil || got[0].Image.Ref != "alpine:3.20" || got[1].Image == nil || got[1].Image.Ref != "debian:12" {
+		t.Errorf("each step must collapse to its own image: %+v %+v\n%s", got[0], got[1], text)
+	}
+}

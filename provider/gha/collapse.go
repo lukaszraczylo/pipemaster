@@ -10,7 +10,6 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
-	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -281,10 +280,9 @@ func markedStep(pl *ir.Pipeline, path string) *ir.Step {
 	// A step without an id gets a derived one that can equal an explicit id (a synthesised checkout and the
 	// step after it), and the marker names the explicit one.
 	var derived *ir.Step
-	written := roundtrip.AssignIDs(provider.GHA, []string{stepID})[stepID]
 	for _, st := range j.Steps {
 		switch {
-		case st.ID != stepID && st.ID != written:
+		case st.ID != stepID:
 		case !isDerivedID(st):
 			return st
 		case derived == nil:

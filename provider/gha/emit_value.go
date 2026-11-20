@@ -135,7 +135,19 @@ func (e *emitter) foreignExt(path string, x ir.Ext) {
 
 // mark queues a marker line for the file head, where the parser finds it whatever the construct's position.
 func (e *emitter) mark(f caps.Feature, path string) {
-	e.marks = append(e.marks, emitkit.Marker(f, path))
+	e.marks = append(e.marks, emitkit.Marker(f, e.writtenPath(path)))
+}
+
+// writtenPath names a step by the ID the file holds, which is where the parser looks for it.
+func (e *emitter) writtenPath(path string) string {
+	head, id, ok := strings.Cut(path, "/step/")
+	if !ok {
+		return path
+	}
+	if w, ok := e.stepIDs[id]; ok {
+		return head + "/step/" + w
+	}
+	return path
 }
 
 // markArg queues a marker and its JSON argument line.
@@ -144,7 +156,7 @@ func (e *emitter) markArg(f caps.Feature, path string, v any) error {
 	if err != nil {
 		return err
 	}
-	e.marks = append(e.marks, emitkit.Marker(f, path), line)
+	e.marks = append(e.marks, emitkit.Marker(f, e.writtenPath(path)), line)
 	return nil
 }
 
