@@ -1,8 +1,11 @@
 package expr
 
+import "strings"
+
 // TranslateRefs moves a value expression between dialects. It accepts only references, string literals and
 // format calls over them, because the canonical name of a reference stands for one value in every dialect that
 // names it. Both vocabularies must name every reference, and the event reference is refused: its values differ by dialect.
+// Literal text with a "$" is refused too: it holds a variable the source dialect expands and the target does not.
 func TranslateRefs(e Expr, from, to Dialect) (Expr, bool) {
 	if from.Class == 0 || to.Class == 0 || !refsOnly(e) || !from.names(e) || !to.names(e) {
 		return nil, false
@@ -16,7 +19,7 @@ func TranslateRefs(e Expr, from, to Dialect) (Expr, bool) {
 func refsOnly(e Expr) bool {
 	switch v := e.(type) {
 	case Lit:
-		return v.Kind == LitStr
+		return v.Kind == LitStr && !strings.Contains(v.Str, "$")
 	case Ref:
 		return len(v.Path) > 0 && (len(v.Path) > 1 || v.Path[0] != CtxEvent)
 	case Call:
