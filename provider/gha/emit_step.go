@@ -372,7 +372,7 @@ func (e *emitter) jobSteps(c jobCtx, j *ir.Job) (*yaml.Node, error) {
 		n := newMap()
 		n.set("run", str(noopScript))
 		seq.Content = append(seq.Content, n.n)
-		e.lose(stepPath(jp, "script"), caps.StepScript, "the job has no steps; a no-op step keeps the workflow valid")
+		e.lose(jp, caps.StepScript, "the job has no steps; a no-op step keeps the workflow valid")
 		e.mark(caps.StepScript, jp)
 	}
 	return seq, nil
