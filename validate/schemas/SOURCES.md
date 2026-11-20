@@ -10,3 +10,4 @@ Fetched 2026-11-18. Both are JSON Schema draft-07 and have no external `$ref`
 
 The gitlab-foss URL from the brief was not used; the gitlab-org/gitlab path
 above resolved first try.
+| woodpecker.json | https://raw.githubusercontent.com/woodpecker-ci/woodpecker/v3.20.1/pipeline/frontend/yaml/linter/schema/schema.json | 38991 | b448916fea06650f833a355496b33a5672213d6801ca9e3def60bf198c1a492e | Apache-2.0 (woodpecker-ci/woodpecker repo LICENSE), tag v3.20.1, fetched 2026-11-20, draft-07, no external `$ref` |

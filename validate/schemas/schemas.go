@@ -12,3 +12,8 @@ var GitHubWorkflow []byte
 //
 //go:embed gitlab-ci.json
 var GitLabCI []byte
+
+// Woodpecker is the Woodpecker CI workflow schema.
+//
+//go:embed woodpecker.json
+var Woodpecker []byte

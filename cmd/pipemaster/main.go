@@ -7,6 +7,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/internal/cli"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gha"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gitlab"
+	_ "github.com/lukaszraczylo/pipemaster/provider/woodpecker"
 )
 
 func main() {
