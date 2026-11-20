@@ -217,7 +217,7 @@ structure Trig where
 
 /-- A workflow file; `name` is the file stem. `jobEnv` is the `job.env` marker (empty when absent), `noop` the
 `step.script` marker of the job, `manual` the `job.manual` marker with its triggers, `fin` the `pipeline.finally`
-marker (needs and `noIf`), `tagIdx` the `trigger.filter.tags` marker. -/
+marker (needs and `noIf`), `tagIdx` the `trigger.filter.tags` marker, `platform` the `labels.platform` key. -/
 structure WFile where
   name : String
   whens : List Entry
@@ -229,6 +229,7 @@ structure WFile where
   manual : Option (List Trig)
   fin : Option (List Core.Need × Bool)
   tagIdx : Option Nat
+  platform : Option String
   deriving DecidableEq, Repr
 
 /-! ### Constants of the emitter and parser -/
@@ -261,6 +262,24 @@ def allEvents : List String :=
    "cron", "manual"]
 
 /-! ### Emission -/
+
+/-- A character of `platformRE`'s classes `[a-z0-9]` (provider/woodpecker/emit_job.go:35). -/
+def platChar (c : Char) : Bool := c.isLower || c.isDigit
+
+def platPart (s : String) : Bool := !s.isEmpty && s.toList.all platChar
+
+/-- Mirrors woodpecker.platformRE (provider/woodpecker/emit_job.go): `^[a-z0-9]+/[a-z0-9]+(/v[0-9]+)?$`. -/
+def platformLabel (l : String) : Bool :=
+  match l.splitOn "/" with
+  | [a, b] => platPart a && platPart b
+  | [a, b, v] =>
+    platPart a && platPart b &&
+      (match v.toList with | 'v' :: d :: ds => (d :: ds).all Char.isDigit | _ => false)
+  | _ => false
+
+/-- Mirrors woodpecker.emitter.labels (provider/woodpecker/emit_job.go): the first runner label of the
+`os/arch` form becomes `labels.platform`; every other label is lost. -/
+def platformOf (r : List String) : Option String := r.find? platformLabel
 
 /-- The pipeline triggers in IR order (`ir.CorePipeline.Project`): pr, push, tag. -/
 def trigsOf (p : Pipe) : List Trig :=
@@ -316,6 +335,7 @@ def mainFile (p : Pipe) (j : Core.Job) : WFile where
   manual := if j.manual then some (trigsOf p) else none
   fin := none
   tagIdx := tagIdxOf p
+  platform := platformOf j.runner
 
 /-- Mirrors woodpecker.emitter.dependsOn (provider/woodpecker/emit_job.go): a finally workflow waits for every
 main workflow as optional. Its needs are on main jobs, so they add nothing, and it keeps them in the marker. -/
@@ -330,6 +350,7 @@ def finFile (p : Pipe) (j : Core.Job) : WFile where
   manual := none
   fin := some (j.needs, !j.onFailure)
   tagIdx := tagIdxOf p
+  platform := platformOf j.runner
 
 /-- Mirrors woodpecker.Emit (provider/woodpecker/emit.go) on the core subset: one file per job, main jobs first. -/
 def toWp (p : Pipe) : List WFile := p.jobs.map (mainFile p) ++ p.fin.map (finFile p)
@@ -395,7 +416,7 @@ def parseFile (f : WFile) : Core.Job where
     | some (ns, _) => ns
     | none => f.deps.map fun d => ⟨d.name, false⟩
   env := f.jobEnv
-  runner := []
+  runner := f.platform.toList
   steps := parseSteps f
   retry := 0
   timeout := 0
@@ -444,7 +465,9 @@ def tplOpen : List Char → Bool
   | _ :: t => tplOpen t
   | [] => false
 
-/-- A script line the model keeps: the codec writes a newline as a second command, and `${{` is an expression. -/
+/-- A script line the model keeps. A newline joins into one multi-line command that the parser splits again
+(emit_step.go:362, parse_step.go:127). An unterminated `${{` is an emit error (expr/template.go:37), and a closed
+one moves the step into a `step.action` marker. -/
 def LineOk (l : String) : Prop := '\n' ∉ l.toList ∧ tplOpen l.toList = false
 
 /-- A variable value the codec keeps: a newline with a tab breaks the YAML scalar. -/
@@ -474,17 +497,17 @@ instance (p : Pipe) : Decidable (WpFrag p) := by unfold WpFrag; exact inferInsta
 
 /-! ### Theorem 2: parse inverts emit on the Woodpecker fragment -/
 
-/-- What Woodpecker keeps of a main job before the metadata: no names, no artifacts flag on needs, no runner,
-retry or timeout. -/
+/-- What Woodpecker keeps of a main job before the metadata: no names, no artifacts flag on needs, no retry or
+timeout, and no runner label but the platform label. -/
 def stripName (s : Core.Step) : Core.Step := { s with name := "" }
 
 def wpStripMain (j : Core.Job) : Core.Job :=
-  { j with name := "", needs := j.needs.map fun n => { n with artifacts := false }, runner := [],
+  { j with name := "", needs := j.needs.map fun n => { n with artifacts := false }, runner := (platformOf j.runner).toList,
            steps := j.steps.map stripName, retry := 0, timeout := 0 }
 
 /-- A finally job keeps its needs with the flags, because the `pipeline.finally` marker carries them. -/
 def wpStripFin (j : Core.Job) : Core.Job :=
-  { j with name := "", runner := [], steps := j.steps.map stripName, retry := 0, timeout := 0 }
+  { j with name := "", runner := (platformOf j.runner).toList, steps := j.steps.map stripName, retry := 0, timeout := 0 }
 
 theorem env_roundtrip (j : Core.Job) (s : Core.Step) :
     ((s.env ++ inherited j s).filter fun v => (shadowOf j s).contains v.name || !j.env.contains v) = s.env := by
@@ -566,7 +589,7 @@ theorem sharedTrigs_of (sel : List WFile) (W : Option (List Trig)) (x : WFile) (
     have := h y (by simp [hy])
     simp [this, hx]
   simp only [sharedTrigs, List.map_cons]
-  rw [if_pos (by rw [List.all_map]; simpa [Function.comp_def] using hr)]
+  rw [ite_eq_left (by rw [List.all_map]; simpa [Function.comp_def] using hr)]
   exact hx
 
 theorem readTriggers_of (fs : List WFile) (W : Option (List Trig)) (T : List Trig) (hne : fs ≠ [])
@@ -594,7 +617,7 @@ theorem readTriggers_of (fs : List WFile) (W : Option (List Trig)) (T : List Tri
       | some o => exact ⟨o, rfl⟩
     have hoT := hM f (by simp) o ho
     rw [hsel]
-    simp [List.findSome?_cons, ho, hoT]
+    simp [ho, hoT]
   · obtain ⟨x, r, hxr⟩ : ∃ x r, fs.filter (fun f => f.manual.isNone) = x :: r := by
       cases h : fs.filter (fun f => f.manual.isNone) with
       | nil => exact absurd h hsel
@@ -673,7 +696,7 @@ theorem baseEntries_mapM (p : Pipe) (hex : ∀ x ∈ trigPats p, ExactPat x) :
     refine ⟨?_, h⟩
     simp [h, entryTrig, allEvents, evPush, evPr, evTag]
   · left
-    rw [if_neg h]
+    rw [ite_eq_right h]
     exact mapM_trigEntry _ fun t ht => entryTrig_trigEntry t (trig_ok hex ht).1 (trig_ok hex ht).2
 
 theorem view_main (p : Pipe) (j : Core.Job) : (mainFile p j).view = (mainFile p j).whens := by
@@ -685,7 +708,7 @@ theorem view_fin (p : Pipe) (j : Core.Job) : (finFile p j).view = baseEntries p 
     have hs := baseEntries_status p e he
     cases e
     simp_all
-  simp only [WFile.view, finFile, Option.isSome_some, if_true]
+  simp only [WFile.view, finFile, Option.isSome_some, ite_true]
   rw [List.map_map]
   conv_rhs => rw [← List.map_id (baseEntries p)]
   exact List.map_congr_left hid
@@ -768,7 +791,7 @@ theorem restoreStep_wp (p : Pipe) (j : Core.Job) (hj : j ∈ p.all) (hn : (p.all
   have hf : findJob p j.id = some j := find_id Core.Job.id p.all j hj hn
   have hst : findStep j s.id = some s := find_id Core.Step.id j.steps s hsj hs
   unfold restoreStep stripName
-  simp only [metaOf, hf, hst, if_true, Option.bind_some]
+  simp only [metaOf, hf, hst, ite_true, Option.bind_some]
   rw [fill_nameOf]
 
 theorem restoreSteps_wp (p : Pipe) (j : Core.Job) (hj : j ∈ p.all) (hn : (p.all.map Core.Job.id).Nodup)
@@ -787,8 +810,9 @@ theorem wpMeta_fields (p : Pipe) (j : Core.Job) (hf : findJob p j.id = some j) :
     (wpMeta p).needs (.job p.id j.id) = (if j.needs.any (·.artifacts) = true then some j.needs else none) := by
   refine ⟨?_, ?_, ?_, ?_, ?_⟩ <;> simp [wpMeta, metaOf, hf]
 
-theorem runner_rt (r : List String) : ((if r = [] then (none : Option (List String)) else some r).getD []) = r := by
-  split <;> simp_all
+theorem runner_rt (r : List String) :
+    ((if r = [] then (none : Option (List String)) else some r).getD (platformOf r).toList) = r := by
+  split <;> simp_all [platformOf]
 
 theorem retry_rt (r : Nat) : ((if r = 0 then (none : Option Nat) else some r).getD 0) = r := by
   split <;> simp_all
@@ -806,7 +830,7 @@ theorem restoreJob_wpMain (p : Pipe) (hn : (p.all.map Core.Job.id).Nodup)
     · have hall : ∀ n ∈ j.needs, n.artifacts = false := by
         intro n hn'
         simpa using fun h => hany (List.any_eq_true.mpr ⟨n, hn', h⟩)
-      simp only [hany, if_false, Option.getD_none]
+      simp only [hany]
       exact map_self_mem _ j.needs (fun n hn' => by
         have := hall n hn'
         cases n; simp_all)
@@ -844,7 +868,7 @@ theorem woodpecker_from_to (p : Pipe) (h : WpFrag p) : fromWp (toWp p) (wpMeta p
   have hpid : ((wpMeta p).ids wpPipelineId).getD wpPipelineId = p.id := by
     rw [hid]; by_cases h : p.id = wpPipelineId <;> simp [h]
   have hnm : fill "" ((wpMeta p).names (.pipe p.id)) = p.name := by
-    simp only [wpMeta, metaOf, if_true]; exact fill_nameOf _
+    simp only [wpMeta, metaOf, ite_true]; exact fill_nameOf _
   unfold restore
   simp only [hpid, hnm, List.map_map]
   have e1 : List.map (restoreJob (wpMeta p) p.id ∘ wpStripMain) p.jobs = p.jobs :=
@@ -870,7 +894,7 @@ theorem validId_wpPipelineId : validId wpPipelineId := by
     intro c hc
     simp only [List.mem_cons, List.not_mem_nil, or_false] at hc
     rcases hc with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-    all_goals first | (left; decide +kernel) | (right; right; rfl)
+    all_goals (left; decide +kernel)
   · show wpPipelineId.toLower ∉ gitlabReserved
     rw [hl]; decide +kernel
 
@@ -900,7 +924,8 @@ theorem same_needs_mem {j x : Core.Job} (hs : Same j x) {n : Core.Need} (hn : n 
   exact ⟨n0, h0, e⟩
 
 theorem rawWp_frag (p : Pipe) (hw : Wf p) (ho : WpOk p) :
-    Wf (rawWp (toWp p)) ∧ WpOk (rawWp (toWp p)) ∧ (GitlabOk p → GitlabOk (rawWp (toWp p))) := by
+    Wf (rawWp (toWp p)) ∧ WpOk (rawWp (toWp p)) ∧ (GhaOk p → GhaOk (rawWp (toWp p))) ∧
+      (GitlabOk p → GitlabOk (rawWp (toWp p))) := by
   rw [rawWp_toWp p hw ho]
   obtain ⟨h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10⟩ := hw
   obtain ⟨hm, hx, hne, hjo⟩ := ho
@@ -971,7 +996,7 @@ theorem rawWp_frag (p : Pipe) (hw : Wf p) (ho : WpOk p) :
     · intro x hx
       obtain ⟨j, hj, hs⟩ := finm x hx
       rw [hs.2.2.2.2.1]; exact h10 j hj
-  refine ⟨hW, ⟨?_, hx, hall', ?_⟩, ?_⟩
+  refine ⟨hW, ⟨?_, hx, hall', ?_⟩, ?_, ?_⟩
   · intro x hx hman
     obtain ⟨j, hj, hs⟩ := allm x hx
     rw [hs.2.2.2.2.1] at hman
@@ -983,6 +1008,14 @@ theorem rawWp_frag (p : Pipe) (hw : Wf p) (ho : WpOk p) :
     rw [hs.2.2.2.1] at hs'
     obtain ⟨s0, hs0, _, e2, e3⟩ := mem_stripName hs'
     rw [e2, e3]; exact (hjo j hj).2 s0 hs0
+  · intro hg x hx
+    obtain ⟨j, hj, hs⟩ := allm x hx
+    obtain ⟨hst, hsc⟩ := hg j hj
+    refine ⟨by rw [hs.2.2.2.1]; simpa using hst, ?_⟩
+    intro s hs'
+    rw [hs.2.2.2.1] at hs'
+    obtain ⟨s0, hs0, _, e2, _⟩ := mem_stripName hs'
+    rw [e2]; exact hsc s0 hs0
   · intro hg
     obtain ⟨hany, hretry, hfree⟩ := hg
     refine ⟨hany, ?_, ?_⟩

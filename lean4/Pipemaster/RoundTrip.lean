@@ -30,7 +30,7 @@ Left out, each on purpose:
 and the needs list of a job whose artifacts flag GitLab cannot keep (`meta.Lost`, recorded by the GitLab emitter
 since Task 23). The pipeline ID that GitLab renames is added by `Gitlab.gitlabMeta`. The fragments `GhaFrag` and
 `GitlabFrag` come from the capability matrices (provider/gha/caps.go, provider/gitlab/caps.go): GitLab caps retry at three runs, and GHA
-needs a runner label and a script per job.
+needs a script per job. A job with no runner label passes GHA, because the emitter writes the default label and the parser removes it again (provider/gha/emit_job.go:320-322, collapse.go:48-50).
 
 A manual finally job is outside the fragment because it is a reported loss, not a silent one. The GitLab
 emitter (Mirrors gitlab.timing (provider/gitlab/emit_rules.go)) lets `when: manual` win over the

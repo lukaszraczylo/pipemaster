@@ -516,7 +516,7 @@ def wpFileJson (f : Woodpecker.WFile) : Json :=
     ("finally", match f.fin with
       | some (ns, noIf) => Json.mkObj [("needs", Json.arr (ns.map needJ).toArray), ("no_if", noIf)]
       | none => Json.null),
-    ("tag_idx", optNat f.tagIdx)]
+    ("tag_idx", optNat f.tagIdx), ("platform", match f.platform with | some x => Json.str x | none => Json.null)]
 
 section Adapters
 open Pipemaster.Core
@@ -616,7 +616,10 @@ def wpExtraPipes : List Core.Pipe :=
    pushAll [shadow] [], pushAll [dollar] [],
    pipeOf [cj "a", { cj "b" with manual := true }] [] (some ["main"]) (some ["v1", "v2"]) (some ["dev"]),
    pipeOf [cj "a"] [{ cj "f" with needs := needOn "a" true }] none (some ["v1"]) none,
-   pipeOf [{ cj "a" with manual := true }] [{ cj "f" with onFailure := true, steps := [] }] (some ["x"]) (some []) none]
+   pipeOf [{ cj "a" with manual := true }] [{ cj "f" with onFailure := true, steps := [] }] (some ["x"]) (some []) none] ++
+  [[], ["linux/amd64"], ["linux/amd64", "x"], ["linux/arm64/v8", "x"], ["darwin/arm64", "linux/amd64", "x"],
+   ["Linux/amd64"], ["linux/amd64/v"], ["a/b/c"], ["linux"]].flatMap fun r =>
+    [pushAll [{ cj "a" with runner := r }] [], pushAll [cj "a"] [{ cj "f" with runner := r }]]
 
 def wpPipes : List Core.Pipe :=
   (allPipes ++ wpExtraPipes).filter fun p => decide (Wf p ∧ Woodpecker.WpOk p)
@@ -624,6 +627,7 @@ def wpPipes : List Core.Pipe :=
 def woodpeckerAdapterCases : List (Json × Json) :=
   wpPipes.map fun p =>
     (coreJson p, Json.mkObj [("woodpecker", Json.arr ((Woodpecker.toWp p).map wpFileJson).toArray),
+      ("raw", coreJson (Woodpecker.rawWp (Woodpecker.toWp p))),
       ("core", coreJson (Woodpecker.fromWp (Woodpecker.toWp p) (Woodpecker.wpMeta p)))])
 
 def crossAdapterCases : List (Json × Json) :=
@@ -634,17 +638,18 @@ def crossAdapterCases : List (Json × Json) :=
 
 /-! ## Chain vectors (Task 9)
 
-Every ordered choice of three distinct providers over `chainAdapters` (51 of the 60 over five: `chainAdmissible`
-drops the 9 whose second hop is Woodpecker and third hop a GHA-family adapter): the first is the origin, the other
+Every ordered choice of three distinct providers over `chainAdapters` (60 over five): the first is the origin, the other
 two are the hops. Each case holds the IR as the origin parsed it, the IR after each hop's parse
 with no metadata applied, and the IR after unwinding the stack. The pipelines are a reduced subset of `allPipes`
-that lie in the fragment of every adapter (`Chain.chainFrag_adapters5_iff`; the hops keep it by
-`Chain.chain_roundtrip_keeps` for the admissible chains):
+that lie in the fragment of every adapter (`Chain.chainFrag_adapters_iff`, with `Chain.chainFrag_run` for the hops):
 - triggers: push and pr over {absent, no filter, [x, y]} and a lone tag trigger, with one plain job;
 - one job: the 17 variants of `jobVariants`;
 - two main jobs: 3 variants of the first and 2 of the second, with needs none, plain or artifacts;
 - finally: 2 main layouts (a; a and b needing a) times the 8 finally layouts;
-- pipeline name and ID: three cases.
+- pipeline name and ID: three cases;
+- the Woodpecker extras (`wpExtraPipes`): no-step jobs, shadowed variables, `$` text, tag filters and runner labels, with
+  and without an `os/arch` platform label. Runner lists are sorted, because `ir.Normalize` sorts the labels
+  (ir/normalize.go:56) and the model keeps list order.
 The full `allPipes` set gives a 10 MB file; this subset keeps the file near the size of the largest other one.
 
 Bound: the number of ordered triples grows as n(n-1)(n-2), so at nine adapters (504 triples) the full subset
@@ -662,7 +667,7 @@ def chainPipes : List Core.Pipe :=
   ((smallVariants "a").take 3).flatMap (fun a => ((smallVariants "b").take 2).flatMap fun b =>
     [[], needOn "a" false, needOn "a" true].map fun ns => pushAll [a, { b with needs := ns }] []) ++
   [[cj "a"], [cj "a", { cj "b" with needs := needOn "a" false }]].flatMap (fun ms => finLayouts.map fun fs => pushAll ms fs) ++
-  namePipes
+  namePipes ++ wpExtraPipes
 
 /-- The pipelines in the fragment of every adapter (decided once per pipeline). -/
 def chainFragPipes : List Core.Pipe :=
@@ -672,13 +677,9 @@ def chainAdapters : List (String × Chain.Adapter) :=
   [("gha", Chain.gha), ("gitea", Chain.gitea), ("forgejo", Chain.forgejo), ("gitlab", Chain.gitlab),
    ("woodpecker", Chain.woodpecker)]
 
-/-- A hop through Woodpecker leaves the GHA fragment (`Chain.woodpecker_not_keeps_gha`), so no admissible chain
-runs a GHA-family hop after a Woodpecker hop. -/
-def chainAdmissible (b c : String) : Bool := !(b == "woodpecker" && (c == "gha" || c == "gitea" || c == "forgejo"))
-
 def chainTriples : List ((String × Chain.Adapter) × (String × Chain.Adapter) × (String × Chain.Adapter)) :=
   chainAdapters.flatMap fun a => chainAdapters.flatMap fun b => chainAdapters.flatMap fun c =>
-    if a.1 ≠ b.1 ∧ a.1 ≠ c.1 ∧ b.1 ≠ c.1 ∧ chainAdmissible b.1 c.1 then [(a, b, c)] else []
+    if a.1 ≠ b.1 ∧ a.1 ≠ c.1 ∧ b.1 ≠ c.1 then [(a, b, c)] else []
 
 /-- The pipelines per triple under the bound. -/
 def chainPerTriple : Nat :=

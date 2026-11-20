@@ -208,8 +208,8 @@ theorem rawGitlab_frag (p : Pipe) (hw : Wf p) (hg : GitlabOk p) :
     exact h10 j hj
   · intro ha x hx
     obtain ⟨j, hj, rfl⟩ := allm x hx
-    obtain ⟨hr, hst, hsc⟩ := ha j hj
-    refine ⟨hr, ?_, ?_⟩
+    obtain ⟨hst, hsc⟩ := ha j hj
+    refine ⟨?_, ?_⟩
     · simpa [Gitlab.strip] using hst
     · intro s hs
       obtain ⟨s0, hs0, rfl⟩ := List.mem_map.1 (show s ∈ j.steps.map _ from hs)
@@ -224,9 +224,6 @@ theorem rawGitlab_frag (p : Pipe) (hw : Wf p) (hg : GitlabOk p) :
       obtain ⟨k, hk, rfl⟩ := allm y hy
       have := hfree j hj ((strip_needs_nil j).1 hnil) k hk
       exact (strip_needs_nil k).2 this
-
-/-- The four adapters. -/
-def adapters : List Adapter := [gha, gitea, forgejo, gitlab]
 
 /-- A list of adapters is closed when a hop through any member keeps a pipeline in the fragment of every member.
 Adding an adapter to a list means proving `Keeps` for the new pairs. -/
@@ -245,19 +242,14 @@ theorem gitlab_keeps_gitlab : gitlab.Keeps gitlab := by
   have h := rawGitlab_frag q hq.1 hq.2
   exact ⟨h.1, h.2.2⟩
 
-theorem adapters_closed : Closed adapters := by
-  intro a ha b hb
-  simp only [adapters, List.mem_cons, List.not_mem_nil, or_false] at ha hb
-  rcases ha with rfl | rfl | rfl | rfl <;> rcases hb with rfl | rfl | rfl | rfl <;>
-    first | exact gha_keeps _ | exact gitlab_keeps_gha | exact gitlab_keeps_gitlab
-
 /-! ## Woodpecker in a chain
 
-The Woodpecker parser returns every job without its runner labels: Woodpecker has no key for them, so the emitter
-reports them lost and only the round-trip metadata brings them back (`Woodpecker.wpMeta`). The GHA fragment needs a
-runner label on every job, so a hop through Woodpecker followed by a hop through GHA leaves the GHA fragment
-(`woodpecker_not_keeps_gha`). The five adapters are therefore not a closed list. `KeepsAll` states the chains
-that stay inside every fragment: each adapter keeps the fragment of every adapter that runs after it. -/
+The Woodpecker parser returns every job with no runner label, or with its `os/arch` platform label alone
+(`Woodpecker.platformOf`). Only the round-trip metadata brings the labels back (`Woodpecker.wpMeta`), and only at
+the layer's own target (internal/roundtrip/chain.go:45-62). A hop through GHA after a hop through Woodpecker
+therefore sees a job with no runner. The GHA emitter writes the default label `ubuntu-latest` with an emulated
+`job.runner` marker (provider/gha/emit_job.go:320-322) and its parser removes the default again
+(provider/gha/collapse.go:48-50), so `GhaOk` does not need a runner and the empty runner survives the hop. -/
 
 theorem gitlab_keeps_woodpecker : gitlab.Keeps woodpecker := by
   intro q hq hw
@@ -296,84 +288,23 @@ theorem woodpecker_keeps_woodpecker : woodpecker.Keeps woodpecker := by
 theorem woodpecker_keeps_gitlab : woodpecker.Keeps gitlab := by
   intro q hq hg
   have h := Woodpecker.rawWp_frag q hq.1 hq.2
-  exact ⟨h.1, h.2.2 hg.2⟩
+  exact ⟨h.1, h.2.2.2 hg.2⟩
 
-/-- A finally job with a runner label and a script. The IDs are strings with a proved `validId`. -/
-def cexJob : Core.Job :=
-  ⟨Gitlab.gitlabPipelineId, "", [], [], ["r1"], [⟨Woodpecker.wpPipelineId, "", ["echo 1"], []⟩], 0, 0, false, false,
-   false⟩
+theorem woodpecker_keeps_gha : woodpecker.Keeps gha := by
+  intro q hq hg
+  have h := Woodpecker.rawWp_frag q hq.1 hq.2
+  exact ⟨h.1, h.2.2.1 hg.2⟩
 
-/-- A pipeline that both Woodpecker and GHA accept. -/
-def cexPipe : Pipe := ⟨Woodpecker.wpPipelineId, "", some [], none, none, [], [cexJob]⟩
+/-- The five adapters. -/
+def adapters : List Adapter := [gha, gitea, forgejo, gitlab, woodpecker]
 
-theorem layers_nil_isSome : (Dag.layers ([] : List Pipemaster.Job)).isSome = true := by
-  cases h : Dag.layers ([] : List Pipemaster.Job) with
-  | some _ => rfl
-  | none =>
-    exfalso
-    rcases Dag.layers_none_iff.1 h with ⟨x, hx⟩ | ⟨j, hj, _⟩
-    · obtain ⟨hxs, _⟩ | ⟨c, ⟨hxs, _⟩, _⟩ := Dag.transGen_cases_head hx <;>
-        exact absurd (Dag.mem_ids.1 hxs) (by simp)
-    · exact absurd (Dag.mem_ids.1 hj.id_mem_ids) (by simp)
-
-theorem cexPipe_wf : Wf cexPipe := by
-  have h0 : dagJobs cexPipe.jobs = [] := rfl
-  refine ⟨Woodpecker.validId_wpPipelineId, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · simp [jobIds, Pipe.all, cexPipe]
-  · intro j hj; simp [Pipe.all, cexPipe] at hj; subst hj; exact validId_gitlabPipelineId
-  · rw [h0]; exact layers_nil_isSome
-  · simp [cexPipe]
-  · intro j hj n hn; simp [cexPipe] at hj; subst hj; simp [cexJob] at hn
-  · intro j hj; simp [Pipe.all, cexPipe] at hj; subst hj; simp [cexJob]
-  · intro j hj; simp [Pipe.all, cexPipe] at hj; subst hj; simp [cexJob, varNames]
-  · intro j hj s hs; simp [Pipe.all, cexPipe] at hj; subst hj; simp [cexJob] at hs; subst hs
-    exact ⟨Woodpecker.validId_wpPipelineId, by simp [varNames]⟩
-  · simp [cexPipe]
-  · intro j hj; simp [cexPipe] at hj; subst hj; rfl
-
-theorem cexPipe_wpOk : Woodpecker.WpOk cexPipe := by
-  have hl : Woodpecker.LineOk "echo 1" := by unfold Woodpecker.LineOk; decide +kernel
-  refine ⟨?_, ?_, ?_, ?_⟩
-  · intro j hj hm; simp [Pipe.all, cexPipe] at hj; subst hj; simp [cexJob] at hm
-  · intro x hx; simp [Woodpecker.trigPats, cexPipe] at hx
-  · simp [Pipe.all, cexPipe]
-  · intro j hj; simp [Pipe.all, cexPipe] at hj; subst hj
-    refine ⟨by simp [cexJob], ?_⟩
-    intro s hs; simp [cexJob] at hs; subst hs
-    exact ⟨by simp, by simpa using hl, by simp⟩
-
-theorem cexPipe_ghaOk : GhaOk cexPipe := by
-  intro j hj; simp [Pipe.all, cexPipe] at hj; subst hj
-  exact ⟨by simp [cexJob], by simp [cexJob], by intro s hs; simp [cexJob] at hs; subst hs; simp⟩
-
-/-- The finding: a hop through Woodpecker takes a pipeline out of the GHA fragment, because the parser returns
-the job with no runner label. The metadata restores the label only at the end of the chain. -/
-theorem woodpecker_not_keeps_gha : ¬ woodpecker.Keeps gha := by
-  intro h
-  have hraw := Woodpecker.rawWp_toWp cexPipe cexPipe_wf cexPipe_wpOk
-  have hg := (h cexPipe ⟨cexPipe_wf, cexPipe_wpOk⟩ ⟨cexPipe_wf, cexPipe_ghaOk⟩).2
-  have hmem : Woodpecker.wpStripFin cexJob ∈ (Woodpecker.rawWp (Woodpecker.toWp cexPipe)).all := by
-    rw [hraw]; simp [Pipe.all, cexPipe]
-  exact absurd (hg _ hmem).1 (by simp [Woodpecker.wpStripFin])
-
-/-- Each adapter keeps the fragment of every adapter that runs after it. -/
-def KeepsAll : List Adapter → Prop
-  | [] => True
-  | a :: as => (∀ b ∈ as, a.Keeps b) ∧ KeepsAll as
-
-/-- A chain whose adapters each keep the fragments of the later ones runs inside every fragment. -/
-theorem runFrag_of_keeps (as : List Adapter) (hk : KeepsAll as) (p : Pipe) (h : ∀ a ∈ as, a.Frag p) :
-    RunFrag p as := by
-  induction as generalizing p with
-  | nil => trivial
-  | cons a as ih =>
-    obtain ⟨hka, hks⟩ := hk
-    exact ⟨h a (by simp), ih hks _ fun b hb => hka b hb p (h a (by simp)) (h b (by simp [hb]))⟩
-
-/-- The round trip of a chain whose hops keep the fragments of the later hops. -/
-theorem chain_roundtrip_keeps (as : List Adapter) (hk : KeepsAll as) (p : Pipe) (h : ∀ a ∈ as, a.Frag p) :
-    unwind (hops p as).1 (hops p as).2 = p :=
-  chain_roundtrip p as (runFrag_of_keeps as hk p h)
+theorem adapters_closed : Closed adapters := by
+  intro a ha b hb
+  simp only [adapters, List.mem_cons, List.not_mem_nil, or_false] at ha hb
+  rcases ha with rfl | rfl | rfl | rfl | rfl <;> rcases hb with rfl | rfl | rfl | rfl | rfl <;>
+    first | exact gha_keeps _ | exact gitlab_keeps_gha | exact gitlab_keeps_gitlab |
+      exact gitlab_keeps_woodpecker | exact woodpecker_keeps_woodpecker | exact woodpecker_keeps_gitlab |
+      exact woodpecker_keeps_gha
 
 /-- One hop through a member of a closed list keeps a pipeline in the fragment of every member. -/
 theorem chainFrag_hop (L : List Adapter) (hL : Closed L) (p : Pipe) (h : ChainFrag p L) (a : Adapter)
@@ -394,20 +325,21 @@ theorem chainFrag_pair (L : List Adapter) (hL : Closed L) (p : Pipe) (h : ChainF
     (hb : b ∈ L) (hc : c ∈ L) : RunFrag p [b, c] :=
   chainFrag_run L hL [b, c] (by intro a ha; simp at ha; rcases ha with rfl | rfl <;> assumption) p h
 
-/-- The intersection over the four adapters is the pair of fragments the cross theorems use. -/
-theorem chainFrag_adapters_iff (p : Pipe) : ChainFrag p adapters ↔ RoundTrip.Both p := by
+/-- The intersection over the five adapters: both cross fragments and the Woodpecker fragment. -/
+theorem chainFrag_adapters_iff (p : Pipe) : ChainFrag p adapters ↔ RoundTrip.Both p ∧ woodpecker.Frag p := by
   constructor
   · intro h
-    exact ⟨h gha (by simp [adapters]), h gitlab (by simp [adapters])⟩
+    exact ⟨⟨h gha (by simp [adapters]), h gitlab (by simp [adapters])⟩, h woodpecker (by simp [adapters])⟩
   · intro h a ha
     simp only [adapters, List.mem_cons, List.not_mem_nil, or_false] at ha
-    rcases ha with rfl | rfl | rfl | rfl
-    · exact h.1
-    · exact h.1
-    · exact h.1
+    rcases ha with rfl | rfl | rfl | rfl | rfl
+    · exact h.1.1
+    · exact h.1.1
+    · exact h.1.1
+    · exact h.1.2
     · exact h.2
 
-theorem chain_gha_gitlab_gitea (p : Pipe) (h : RoundTrip.Both p) :
+theorem chain_gha_gitlab_gitea (p : Pipe) (h : RoundTrip.Both p ∧ woodpecker.Frag p) :
     unwind (hops p [gitlab, gitea]).1 (hops p [gitlab, gitea]).2 = p := by
   apply chain_roundtrip
   apply chainFrag_run adapters adapters_closed _ _ p ((chainFrag_adapters_iff p).2 h)
@@ -416,52 +348,25 @@ theorem chain_gha_gitlab_gitea (p : Pipe) (h : RoundTrip.Both p) :
   simp only [adapters, List.mem_cons, List.not_mem_nil, or_false]
   rcases ha with rfl | rfl <;> simp [gitea, gha, gitlab]
 
-/-- The five adapters. Not closed: `woodpecker_not_keeps_gha`. -/
-def adapters5 : List Adapter := adapters ++ [woodpecker]
+/-- Woodpecker as the first hop, then GHA: the chain the earlier model had to leave out. -/
+theorem chain_woodpecker_gha (p : Pipe) (h : RoundTrip.Both p ∧ woodpecker.Frag p) :
+    unwind (hops p [woodpecker, gha]).1 (hops p [woodpecker, gha]).2 = p := by
+  apply chain_roundtrip
+  apply chainFrag_run adapters adapters_closed _ _ p ((chainFrag_adapters_iff p).2 h)
+  intro a ha
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
+  simp only [adapters, List.mem_cons, List.not_mem_nil, or_false]
+  rcases ha with rfl | rfl <;> simp [gha, woodpecker]
 
-theorem keepsAll_of_pairwise (as : List Adapter) (h : as.Pairwise Adapter.Keeps) : KeepsAll as := by
-  induction as with
-  | nil => trivial
-  | cons a as ih =>
-    rw [List.pairwise_cons] at h
-    exact ⟨h.1, ih h.2⟩
-
-/-- The intersection over the five adapters: both cross fragments and the Woodpecker fragment. -/
-theorem chainFrag_adapters5_iff (p : Pipe) :
-    ChainFrag p adapters5 ↔ RoundTrip.Both p ∧ woodpecker.Frag p := by
-  constructor
-  · intro h
-    exact ⟨(chainFrag_adapters_iff p).1 fun a ha => h a (by simp [adapters5, ha]),
-      h woodpecker (by simp [adapters5])⟩
-  · intro h a ha
-    rcases List.mem_append.1 ha with ha | ha
-    · exact (chainFrag_adapters_iff p).2 h.1 a ha
-    · simp only [List.mem_singleton] at ha; subst ha; exact h.2
-
-/-- Chains with Woodpecker in the middle: every hop keeps the later fragments, so the round trip holds. -/
-theorem chain_gitlab_woodpecker_gitlab (p : Pipe) (h : RoundTrip.Both p ∧ woodpecker.Frag p) :
-    unwind (hops p [gitlab, woodpecker, gitlab]).1 (hops p [gitlab, woodpecker, gitlab]).2 = p := by
-  have hc := (chainFrag_adapters5_iff p).2 h
-  apply chain_roundtrip_keeps _ _ p
-  · intro a ha
-    exact hc a (by simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
-                   rcases ha with rfl | rfl | rfl <;> simp [adapters5, adapters])
-  · apply keepsAll_of_pairwise
-    simp only [List.pairwise_cons, List.mem_cons, List.not_mem_nil, or_false, forall_eq_or_imp, forall_eq,
-      List.Pairwise.nil, List.pairwise_singleton, and_true]
-    exact ⟨⟨gitlab_keeps_woodpecker, gitlab_keeps_gitlab⟩, woodpecker_keeps_gitlab, fun _ h => h.elim⟩
-
-theorem chain_woodpecker_gitlab_gha (p : Pipe) (h : RoundTrip.Both p ∧ woodpecker.Frag p) :
+/-- GHA, then Woodpecker, then GitLab. -/
+theorem chain_gha_woodpecker_gitlab (p : Pipe) (h : RoundTrip.Both p ∧ woodpecker.Frag p) :
     unwind (hops p [gha, woodpecker, gitlab]).1 (hops p [gha, woodpecker, gitlab]).2 = p := by
-  have hc := (chainFrag_adapters5_iff p).2 h
-  apply chain_roundtrip_keeps _ _ p
-  · intro a ha
-    exact hc a (by simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
-                   rcases ha with rfl | rfl | rfl <;> simp [adapters5, adapters])
-  · apply keepsAll_of_pairwise
-    simp only [List.pairwise_cons, List.mem_cons, List.not_mem_nil, or_false, forall_eq_or_imp, forall_eq,
-      List.Pairwise.nil, List.pairwise_singleton, and_true]
-    exact ⟨⟨gha_keeps _, gha_keeps _⟩, woodpecker_keeps_gitlab, fun _ h => h.elim⟩
+  apply chain_roundtrip
+  apply chainFrag_run adapters adapters_closed _ _ p ((chainFrag_adapters_iff p).2 h)
+  intro a ha
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
+  simp only [adapters, List.mem_cons, List.not_mem_nil, or_false]
+  rcases ha with rfl | rfl | rfl <;> simp [gha, woodpecker, gitlab]
 
 end Chain
 end Pipemaster

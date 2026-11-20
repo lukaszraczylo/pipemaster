@@ -277,10 +277,13 @@ def Wf (p : Pipe) : Prop :=
 
 instance (p : Pipe) : Decidable (Wf p) := by unfold Wf; exact inferInstance
 
-/-- What GHA needs beyond `Wf`: a job with no runner label or no script gets a placeholder from the
-emitter (gha defaultRunner and noopScript, which the parser collapses only after a marker). -/
+/-- What GHA needs beyond `Wf`: a job with no script gets a placeholder from the emitter (gha noopScript). A job
+with no runner label needs nothing: the emitter writes the default label `ubuntu-latest` with an emulated
+`job.runner` marker (provider/gha/emit_job.go:320-322), and the parser removes it again
+(provider/gha/collapse.go:48-50), so the pair keeps the empty runner. Both placeholders are collapsed only after a
+marker. -/
 def GhaOk (p : Pipe) : Prop :=
-  ∀ j ∈ p.all, j.runner ≠ [] ∧ j.steps ≠ [] ∧ ∀ s ∈ j.steps, s.script ≠ []
+  ∀ j ∈ p.all, j.steps ≠ [] ∧ ∀ s ∈ j.steps, s.script ≠ []
 
 instance (p : Pipe) : Decidable (GhaOk p) := by unfold GhaOk; exact inferInstance
 

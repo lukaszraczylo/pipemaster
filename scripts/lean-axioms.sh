@@ -54,10 +54,17 @@ required=(
   Pipemaster.Woodpecker.rawWp_toWp
   Pipemaster.Woodpecker.rawWp_frag
   Pipemaster.Woodpecker.woodpecker_from_to
+  Pipemaster.Woodpecker.restoreJob_wpMain
+  Pipemaster.Woodpecker.restoreJob_wpFin
+  Pipemaster.Woodpecker.wpMeta_fields
+  Pipemaster.Woodpecker.validId_wpPipelineId
   Pipemaster.RoundTrip.cross_roundtrip
   Pipemaster.RoundTrip.cross_roundtrip_rev
   Pipemaster.RoundTrip.both_iff
   Pipemaster.Core.fromGitlab_restore
+  Pipemaster.Core.metaOf_runner
+  Pipemaster.Core.metaOf_retry
+  Pipemaster.Core.metaOf_timeout
   Pipemaster.Chain.adapters_closed
   Pipemaster.Chain.chainFrag_run
   Pipemaster.Chain.chainFrag_adapters_iff
@@ -66,12 +73,9 @@ required=(
   Pipemaster.Chain.gitlab_keeps_woodpecker
   Pipemaster.Chain.woodpecker_keeps_woodpecker
   Pipemaster.Chain.woodpecker_keeps_gitlab
-  Pipemaster.Chain.woodpecker_not_keeps_gha
-  Pipemaster.Chain.runFrag_of_keeps
-  Pipemaster.Chain.chain_roundtrip_keeps
-  Pipemaster.Chain.chainFrag_adapters5_iff
-  Pipemaster.Chain.chain_gitlab_woodpecker_gitlab
-  Pipemaster.Chain.chain_woodpecker_gitlab_gha
+  Pipemaster.Chain.woodpecker_keeps_gha
+  Pipemaster.Chain.chain_woodpecker_gha
+  Pipemaster.Chain.chain_gha_woodpecker_gitlab
 )
 required_lean="$(printf '`%s, ' "${required[@]}")"
 required_lean="[${required_lean%, }]"

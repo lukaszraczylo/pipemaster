@@ -57,6 +57,7 @@ type (
 		Deps         []vDep        `json:"deps"`
 		Steps        []vStep       `json:"steps"`
 		JobEnv       []vectors.Var `json:"job_env"`
+		Platform     *string       `json:"platform"`
 		Noop         bool          `json:"noop"`
 		AllowFailure bool          `json:"allow_failure"`
 	}
@@ -68,6 +69,8 @@ const (
 	tagRefPrefix = "refs/tags/"
 	stepPathMid  = "/step/"
 	triggerPath  = "/trigger/"
+	// vectorOrigin is the provider the vector projects claim to come from; it only names the metadata layer.
+	vectorOrigin = "gha"
 )
 
 // unescape reverses the emitter's `$` to `$$` escape, which the model leaves out.
@@ -169,6 +172,23 @@ func decodeStep(n *yaml.Node) (vStep, error) {
 		}
 	}
 	return s, nil
+}
+
+// decodeLabels reads the labels.platform key; any other label key is not modelled.
+func decodeLabels(n *yaml.Node) (*string, error) {
+	es, err := vectors.Entries(n)
+	if err != nil {
+		return nil, err
+	}
+	var platform *string
+	for _, kv := range es {
+		if kv.Key != "platform" {
+			return nil, fmt.Errorf("label key %q is not modelled", kv.Key)
+		}
+		v := kv.Val.Value
+		platform = &v
+	}
+	return platform, nil
 }
 
 func decodeSeq[T any](n *yaml.Node, one func(*yaml.Node) (T, error)) ([]T, error) {
@@ -306,6 +326,8 @@ func decodeFile(name string, src []byte) (vFile, error) {
 			f.Deps, err = decodeSeq(e.Val, decodeDep)
 		case "steps":
 			f.Steps, err = decodeSeq(e.Val, decodeStep)
+		case "labels":
+			f.Platform, err = decodeLabels(e.Val)
 		default:
 			err = fmt.Errorf("key %q is not modelled", e.Key)
 		}
@@ -335,12 +357,14 @@ func TestWoodpeckerVectors(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", label, err)
 		}
+		proj.Origin.Provider, proj.Origin.Dialect = vectorOrigin, vectorOrigin
 		files, rep, err := p.Emit(proj)
 		if err != nil {
 			t.Fatalf("%s: emit: %v", label, err)
 		}
 		var out struct {
 			Woodpecker []vFile         `json:"woodpecker"`
+			Raw        json.RawMessage `json:"raw"`
 			Core       json.RawMessage `json:"core"`
 		}
 		if err := json.Unmarshal(c.Out, &out); err != nil {
@@ -379,7 +403,12 @@ func TestWoodpeckerVectors(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: parse: %v", label, err)
 		}
-		roundtrip.Restore(back, roundtrip.NewMeta("gha", proj, p, rep))
+		rawCore, err := ir.CoreOf(back)
+		if err != nil {
+			t.Fatalf("%s: raw parse: %v", label, err)
+		}
+		vectors.DiffCore(t, label+" raw parse", out.Raw, rawCore)
+		roundtrip.Restore(back, roundtrip.NewMeta(vectorOrigin, proj, p, rep))
 		core, err := ir.CoreOf(back)
 		if err != nil {
 			t.Fatalf("%s: parsed project: %v", label, err)
