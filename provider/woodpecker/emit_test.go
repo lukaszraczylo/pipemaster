@@ -615,3 +615,19 @@ func TestDollarIsEscapedInEveryStringField(t *testing.T) {
 		t.Errorf("filters changed: %+v", tr)
 	}
 }
+
+func TestDollarIsEscapedInEvaluate(t *testing.T) {
+	j := wpJob("ci", wpStep("s", "x"))
+	j.If = ghaCond(t, "startsWith(github.sha, 'a$b')")
+	p := wpProject(ghaOrigin, j)
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush}, {Kind: ir.TriggerTag}}
+	body, _ := one(t, p)
+	if !strings.Contains(body, `matches "(?i)^a\\$$b"`) {
+		t.Fatalf("want a condition:\n%s", body)
+	}
+	for _, line := range strings.Split(body, "\n") {
+		if strings.Contains(strings.ReplaceAll(line, "$$", ""), "$") {
+			t.Errorf("unescaped $ in %q", line)
+		}
+	}
+}
