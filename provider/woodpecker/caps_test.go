@@ -19,7 +19,8 @@ func TestCapsLedger(t *testing.T) {
 			caps.TriggerPush, caps.TriggerPullRequest, caps.TriggerTag, caps.TriggerManual, caps.TriggerFilterBranch,
 			caps.TriggerFilterPaths, caps.JobNeeds, caps.JobIf, caps.JobContainer, caps.JobServices, caps.JobMatrix,
 			caps.StepScript, caps.StepAction, caps.StepImage, caps.StepIf, caps.StepEnv, caps.StepContinueOnError,
-			caps.StepWorkdir, caps.PipelineConcurrency, caps.DisplayName,
+			caps.StepWorkdir, caps.PipelineConcurrency, caps.DisplayName, caps.ConfigName, caps.ExprOpaque,
+			caps.ExtPassthrough, caps.ScriptInterpolation,
 		},
 		caps.Emulated: {
 			caps.JobEnv, caps.PipelineEnv, caps.ProjectMultiPipeline, caps.JobCache, caps.JobArtifacts,
@@ -43,6 +44,15 @@ func TestCapsLedger(t *testing.T) {
 				t.Errorf("%s = %v, want %v", f, got, lvl)
 			}
 		}
+	}
+	all := caps.AllFeatures()
+	for _, f := range all {
+		if !seen[f] {
+			t.Errorf("feature %s is declared but not listed in the test table", f)
+		}
+	}
+	if len(seen) != len(all) {
+		t.Errorf("the table lists %d features, caps.AllFeatures has %d", len(seen), len(all))
 	}
 }
 

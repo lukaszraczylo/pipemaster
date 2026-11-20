@@ -3,6 +3,7 @@ package woodpecker_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
@@ -406,8 +407,11 @@ func TestEmitConditions(t *testing.T) {
 		j.Steps[0].If = expr.Call{Name: "failure"}
 		j.If = expr.Call{Name: "always"}
 		body, _ := one(t, wpProject(ghaOrigin, j))
-		if !strings.Contains(body, "status:\n      - failure") && !strings.Contains(body, "- failure") {
-			t.Errorf("status lost:\n%s", body)
+		if !strings.Contains(body, "    status:\n      - success\n      - failure\n") {
+			t.Errorf("always() must run on success and failure at the workflow:\n%s", body)
+		}
+		if !strings.Contains(body, "    when:\n      - status:\n          - failure\n") {
+			t.Errorf("failure() must gate the step on failure:\n%s", body)
 		}
 	})
 	t.Run("job condition ANDs with triggers", func(t *testing.T) {
@@ -557,16 +561,78 @@ func TestEmittedIDs(t *testing.T) {
 	}
 }
 
+// capCases builds, for each feature that Woodpecker does not state natively, a project that uses it.
+var capCases = map[caps.Feature]func(*ir.Project){
+	caps.JobEnv:      func(p *ir.Project) { p.Pipelines[0].Jobs[0].Env = []ir.Var{{Name: "A", Value: ir.Value{Lit: "b"}}} },
+	caps.PipelineEnv: func(p *ir.Project) { p.Pipelines[0].Env = []ir.Var{{Name: "A", Value: ir.Value{Lit: "b"}}} },
+	caps.ProjectMultiPipeline: func(p *ir.Project) {
+		p.Pipelines = append(p.Pipelines, &ir.Pipeline{ID: "second", Jobs: []*ir.Job{wpJob("x", wpStep("s", "y"))}})
+	},
+	caps.JobCache: func(p *ir.Project) { p.Pipelines[0].Jobs[0].Cache = []ir.Cache{{Key: "k", Paths: []string{"p"}}} },
+	caps.JobArtifacts: func(p *ir.Project) {
+		p.Pipelines[0].Jobs[0].Artifacts = []ir.Artifact{{Name: "n", Paths: []string{"p"}}}
+	},
+	caps.JobAllowFailure: func(p *ir.Project) { p.Pipelines[0].Jobs[0].AllowFailure = true },
+	caps.PipelineFinally: func(p *ir.Project) { p.Pipelines[0].Finally = []*ir.Job{wpJob("fin", wpStep("s", "z"))} },
+	caps.JobManual:       func(p *ir.Project) { p.Pipelines[0].Jobs[0].Manual = true },
+	caps.TriggerFilterTags: func(p *ir.Project) {
+		p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{"v*"}}}}
+	},
+	caps.TriggerSchedule: func(p *ir.Project) {
+		p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerSchedule, Cron: "0 1 * * *"}}
+	},
+	caps.JobTimeout: func(p *ir.Project) {
+		d := ir.Duration(time.Minute)
+		p.Pipelines[0].Jobs[0].Timeout = &d
+	},
+	caps.JobEnvironmentApproval: func(p *ir.Project) {
+		p.Pipelines[0].Jobs[0].Environment = &ir.Environment{Name: "prod", Approval: true}
+	},
+	caps.JobRetry:   func(p *ir.Project) { p.Pipelines[0].Jobs[0].Retry = &ir.Retry{Attempts: 2} },
+	caps.JobOutputs: func(p *ir.Project) { p.Pipelines[0].Jobs[0].Outputs = []ir.Output{{Name: "o", Value: "v"}} },
+	caps.JobRunner:  func(p *ir.Project) { p.Pipelines[0].Jobs[0].Runner = ir.Runner{Labels: []string{"self-hosted"}} },
+	caps.PipelinePermissions: func(p *ir.Project) {
+		p.Pipelines[0].Permissions = &ir.Permissions{Scopes: map[string]string{"contents": "read"}}
+	},
+	caps.PipelineInputs: func(p *ir.Project) { p.Pipelines[0].Inputs = []ir.Input{{Name: "i"}} },
+	caps.StepTimeout: func(p *ir.Project) {
+		d := ir.Duration(time.Minute)
+		p.Pipelines[0].Jobs[0].Steps[0].Timeout = &d
+	},
+	caps.StepShell:      func(p *ir.Project) { p.Pipelines[0].Jobs[0].Steps[0].Shell = "bash" },
+	caps.JobEnvironment: func(p *ir.Project) { p.Pipelines[0].Jobs[0].Environment = &ir.Environment{Name: "prod"} },
+	caps.JobNeedsArtifacts: func(p *ir.Project) {
+		p.Pipelines[0].Jobs = append(p.Pipelines[0].Jobs, wpJob("b", wpStep("s", "y")))
+		p.Pipelines[0].Jobs[1].Needs = []ir.Need{{JobID: p.Pipelines[0].Jobs[0].ID, Artifacts: true}}
+		p.Pipelines[0].Jobs[0].Artifacts = []ir.Artifact{{Name: "n", Paths: []string{"p"}}}
+	},
+	caps.TriggerAPI:          func(p *ir.Project) { p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerAPI}} },
+	caps.TriggerPipelineDone: func(p *ir.Project) { p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPipelineDone}} },
+	caps.TriggerResource: func(p *ir.Project) {
+		p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerResource, Resource: &ir.ResourceRef{Name: "r", Type: "git"}}}
+	},
+}
+
+// TestEveryNonNativeCapIsExercised emits a project for each non-native feature and requires a report entry at
+// the level the table declares.
 func TestEveryNonNativeCapIsExercised(t *testing.T) {
-	tested := map[caps.Feature]bool{
-		caps.JobEnv: true, caps.PipelineEnv: true, caps.ProjectMultiPipeline: true, caps.JobCache: true, caps.JobArtifacts: true,
-		caps.JobAllowFailure: true, caps.PipelineFinally: true, caps.JobManual: true, caps.TriggerFilterTags: true,
-		caps.TriggerSchedule: true, caps.JobTimeout: true, caps.JobEnvironmentApproval: true,
-	}
 	for f, s := range woodpecker.New().Caps() {
-		if (s.Level == caps.Emulated || s.Level == caps.External) && !tested[f] {
-			t.Errorf("%s is %v but has no emulation or external test", f, s.Level)
+		if s.Level == caps.Native {
+			continue
 		}
+		build, ok := capCases[f]
+		if !ok {
+			t.Errorf("%s is %v but no case exercises it", f, s.Level)
+			continue
+		}
+		t.Run(string(f), func(t *testing.T) {
+			p := wpProject(ghaOrigin, wpJob("ci", wpStep("s", "x")))
+			build(p)
+			_, rep := emitFiles(t, p)
+			if !reportHas(rep, f, s.Level) {
+				t.Errorf("no %v entry for %s: %+v", s.Level, f, rep.Entries)
+			}
+		})
 	}
 }
 
