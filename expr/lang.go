@@ -12,10 +12,13 @@ import (
 type Class uint8
 
 // Dialect classes. ClassGHA compares strings case-insensitively and coerces as GHA does. ClassGitLab
-// compares case-sensitively and matches with =~ /re/i.
+// compares case-sensitively and matches with =~ /re/i. ClassWoodpecker is expr-lang over string environments,
+// where an unset name reads "" and not null (lean4/Pipemaster/Woodpecker.lean: not_gitlab_class); it matches
+// neither class, so Translate refuses every translation to or from it.
 const (
 	ClassGHA Class = iota + 1
 	ClassGitLab
+	ClassWoodpecker
 )
 
 var (

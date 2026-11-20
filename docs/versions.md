@@ -9,6 +9,7 @@ These versions were verified on 2026-11-19. The Gitea and Forgejo dialects follo
 | Forgejo | v17.0.2 | 2026-11-18 |
 | Forgejo LTS | v15.0.12 | |
 | forgejo-runner | v13.2.1 | 2026-10-29 |
+| Woodpecker CI | v3.20.1 | 2026-10-29 |
 
 ## Sources
 
@@ -17,6 +18,8 @@ These versions were verified on 2026-11-19. The Gitea and Forgejo dialects follo
 - <https://docs.gitea.com/usage/actions/secrets>
 - <https://forgejo.org/docs/latest/user/actions/reference/>
 - <https://forgejo.org/docs/latest/user/actions/basic-concepts/>
+- <https://github.com/woodpecker-ci/woodpecker/releases/tag/v3.20.1>
+- <https://woodpecker-ci.org/docs/usage/workflow-syntax>
 
 ## Workflow directories
 

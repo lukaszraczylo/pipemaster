@@ -8,5 +8,6 @@ import Pipemaster.TranslateClass
 import Pipemaster.Core
 import Pipemaster.Gha
 import Pipemaster.Gitlab
+import Pipemaster.Woodpecker
 import Pipemaster.RoundTrip
 import Pipemaster.Chain

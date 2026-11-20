@@ -206,6 +206,11 @@ func rx(neg bool, x Expr, m Mode, s string) Expr {
 	return Binary{Op: op, L: x, R: Lit{Kind: LitStr, Str: Pattern(m, s)}}
 }
 
+// foreignClass is true for a pair across classes where one side has no translation rules (ClassWoodpecker).
+func foreignClass(from, to Dialect) bool {
+	return from.Class != to.Class && (from.Class == ClassWoodpecker || to.Class == ClassWoodpecker)
+}
+
 // Translate converts e between two dialects, exactly. Dialects of one class (ClassGHA or ClassGitLab) differ
 // only in the names their vocabularies give the canonical refs, so e is returned as it is, provided both
 // vocabularies name every ref in it (lean4/Pipemaster/TranslateClass.lean: rename_sound). Across classes the
@@ -239,7 +244,7 @@ func Translate(e Expr, from, to Dialect) (Expr, bool) {
 	var t Expr
 	var ok bool
 	switch {
-	case from.Class == 0 || to.Class == 0:
+	case from.Class == 0 || to.Class == 0 || foreignClass(from, to):
 		return nil, false
 	case from.Class == to.Class:
 		t, ok = renameClass(e, from, to)
@@ -260,7 +265,7 @@ func Translate(e Expr, from, to Dialect) (Expr, bool) {
 // rules are stated separately from Translate, as in the Lean model, so tests can hold the two together.
 func Translatable(e Expr, from, to Dialect) bool {
 	switch {
-	case from.Class == 0 || to.Class == 0:
+	case from.Class == 0 || to.Class == 0 || foreignClass(from, to):
 		return false
 	case from.Class == to.Class:
 		_, ok := renameClass(e, from, to)

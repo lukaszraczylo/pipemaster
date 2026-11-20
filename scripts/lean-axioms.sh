@@ -41,6 +41,9 @@ required=(
   Pipemaster.TranslateClass.event_rx_rename
   Pipemaster.Gha.gha_from_to
   Pipemaster.Gitlab.gitlab_from_to
+  Pipemaster.Woodpecker.eq_empty_differs
+  Pipemaster.Woodpecker.eq_null_differs
+  Pipemaster.Woodpecker.not_gitlab_class
   Pipemaster.RoundTrip.cross_roundtrip
   Pipemaster.RoundTrip.cross_roundtrip_rev
   Pipemaster.RoundTrip.both_iff
