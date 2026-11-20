@@ -1,0 +1,13 @@
+# pipemaster:emulated trigger.push pipeline/woodpecker/trigger/0
+# pipemaster:arg {"kind":"push","paths":{"Include":["src/main.go","go.mod"],"Exclude":null}}
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        - src/main.go
+        - go.mod
+ci:
+  needs: []
+  script:
+    # pipemaster:step build
+    - go build ./...

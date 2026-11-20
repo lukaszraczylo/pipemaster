@@ -1,0 +1,9 @@
+# pipemaster:emulated display.name pipeline/woodpecker/job/ci/step/ci-step-1
+# pipemaster:arg {"pos":0,"name":"Compile"}
+when:
+  - event: push
+steps:
+  - name: Compile
+    image: golang:1.25
+    commands:
+      - go build ./...

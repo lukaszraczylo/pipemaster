@@ -1,0 +1,11 @@
+# pipemaster:emulated job.env pipeline/woodpecker/job/ci
+# pipemaster:arg "- name: GOFLAGS\n  value:\n    lit: -trimpath\n"
+when:
+  - event: push
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...
+    environment:
+      GOFLAGS: -trimpath

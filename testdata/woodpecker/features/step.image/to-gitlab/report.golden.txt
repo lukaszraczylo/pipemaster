@@ -1,0 +1,4 @@
+Loss report: woodpecker -> gitlab
+[lost] pipeline/woodpecker/job/ci/step/build step.image (GitLab sets the image per job, not per step)
+[lost] pipeline/woodpecker/job/ci/step/publish step.action (step kind plugin has no GitLab form)
+[lost] pipeline/woodpecker/job/ci/step/publish step.image (GitLab sets the image per job, not per step)

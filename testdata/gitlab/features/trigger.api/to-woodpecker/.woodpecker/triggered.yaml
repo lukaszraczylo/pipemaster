@@ -1,0 +1,19 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/triggered
+# pipemaster:lost trigger.* pipeline/gitlab-ci/job/triggered: no trigger of the pipeline has a Woodpecker event
+when:
+  - event:
+      - push
+      - pull_request
+      - pull_request_closed
+      - pull_request_metadata
+      - tag
+      - release
+      - deployment
+      - cron
+      - manual
+    evaluate: "false"
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make triggered

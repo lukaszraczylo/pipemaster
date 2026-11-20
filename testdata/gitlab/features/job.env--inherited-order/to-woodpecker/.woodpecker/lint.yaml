@@ -1,0 +1,14 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/lint
+# pipemaster:emulated job.env pipeline/gitlab-ci/job/lint
+# pipemaster:arg "- name: GOCACHE\n  value:\n    lit: $$CI_PROJECT_DIR/.cache/go-build\n- name: GOMODCACHE\n  value:\n    lit: $$CI_PROJECT_DIR/.cache/go-mod\n"
+when:
+  - event: push
+  - event: tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make lint
+    environment:
+      GOCACHE: $$CI_PROJECT_DIR/.cache/go-build
+      GOMODCACHE: $$CI_PROJECT_DIR/.cache/go-mod

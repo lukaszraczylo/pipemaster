@@ -1,0 +1,12 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/release
+# pipemaster:emulated trigger.filter.tags pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.filter.tags pipeline/gitlab-ci
+# pipemaster:arg "- kind: tag\n  tags:\n    include:\n        - v**\n"
+when:
+  - event: tag
+    ref: refs/tags/v**
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make release

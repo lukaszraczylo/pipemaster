@@ -1,0 +1,2 @@
+Loss report: gitlab -> woodpecker
+No losses: every feature converted natively.

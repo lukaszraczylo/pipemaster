@@ -1,0 +1,8 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/release
+when:
+  - event: tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make release

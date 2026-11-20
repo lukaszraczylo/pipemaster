@@ -1,0 +1,13 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/test
+# pipemaster:emulated job.env pipeline/gitlab-ci/job/test
+# pipemaster:arg "- name: IMAGE\n  value:\n    expr: format('$$CI_REGISTRY_IMAGE/tmp:{0}', sha)\n"
+when:
+  - event: push
+  - event: tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make test
+    environment:
+      IMAGE: $$CI_REGISTRY_IMAGE/tmp:${CI_COMMIT_SHA}

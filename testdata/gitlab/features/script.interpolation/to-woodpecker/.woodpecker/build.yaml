@@ -1,0 +1,10 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+when:
+  - event: push
+  - event: tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - echo "building ${CI_COMMIT_SHA} on ${CI_COMMIT_BRANCH} for ${CI_COMMIT_AUTHOR}"
+      - echo "keeps $$HOME and $${UNMAPPED}"

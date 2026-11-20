@@ -1,0 +1,12 @@
+# pipemaster:emulated script.interpolation pipeline/woodpecker/job/ci/step/build
+# pipemaster:arg {"pos":0,"refs":["secrets.TOKEN","vars.REGION"]}
+when:
+  - event: push
+steps:
+  - name: build
+    image: alpine:3.20
+    commands:
+      - 'curl -H "Authorization: Bearer $${TOKEN}" "https://$${REGION}.example.org"'
+    environment:
+      TOKEN:
+        from_secret: TOKEN

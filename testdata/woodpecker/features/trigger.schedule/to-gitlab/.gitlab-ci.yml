@@ -1,0 +1,8 @@
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+ci:
+  needs: []
+  script:
+    # pipemaster:step build
+    - go build ./...

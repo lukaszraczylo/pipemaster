@@ -1,0 +1,7 @@
+when:
+  - event: cron
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

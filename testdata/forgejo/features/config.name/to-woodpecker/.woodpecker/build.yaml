@@ -1,0 +1,13 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+# pipemaster:emulated script.interpolation pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"refs":["vars.FORGEJO_REGION","vars.CI"],"pos":0}
+when:
+  - event: push
+  - event: tag
+steps:
+  - image: ubuntu:latest
+    commands:
+      - echo "$${FORGEJO_REGION} $${CI}"
+    environment:
+      KEY:
+        from_secret: DEPLOY_KEY

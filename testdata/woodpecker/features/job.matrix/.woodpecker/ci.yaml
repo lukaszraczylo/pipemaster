@@ -1,0 +1,15 @@
+matrix:
+  GO_VERSION:
+    - "1.24"
+    - "1.25"
+  OS:
+    - linux
+    - darwin
+when:
+  - event: push
+steps:
+  - name: test
+    image: golang:${GO_VERSION}
+    commands:
+      - go test ./...
+      - echo ${OS}

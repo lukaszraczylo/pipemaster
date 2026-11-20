@@ -1,0 +1,9 @@
+# pipemaster:emulated job.container pipeline/ci/job/version
+when:
+  - event: push
+  - event: tag
+steps:
+  - name: tag
+    image: ubuntu:latest
+    commands:
+      - echo "value=v1" >> "$$GITHUB_OUTPUT"

@@ -1,0 +1,8 @@
+when:
+  - event: push
+    evaluate: CI_COMMIT_AUTHOR == "release-bot"
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

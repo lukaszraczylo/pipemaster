@@ -1,0 +1,18 @@
+origin:
+    provider: woodpecker
+    dialect: woodpecker
+    files:
+        - .woodpecker/ci.yaml
+pipelines:
+    - id: woodpecker
+      triggers:
+        - kind: push
+      jobs:
+        - container:
+            ref: node:22
+          id: ci
+          steps:
+            - id: test
+              kind: script
+              script:
+                - npm test

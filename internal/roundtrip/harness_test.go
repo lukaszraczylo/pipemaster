@@ -16,6 +16,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/gha"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gitlab"
+	_ "github.com/lukaszraczylo/pipemaster/provider/woodpecker"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 

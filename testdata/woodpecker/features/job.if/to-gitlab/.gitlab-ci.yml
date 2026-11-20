@@ -1,0 +1,11 @@
+workflow:
+  rules:
+    - when: never
+# pipemaster:lost job.if pipeline/woodpecker/job/ci: (event == 'push') && (actor == 'release-bot')
+ci:
+  needs: []
+  rules:
+    - when: never
+  script:
+    # pipemaster:step build
+    - go build ./...

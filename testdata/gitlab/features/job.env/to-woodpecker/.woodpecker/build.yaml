@@ -1,0 +1,14 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+# pipemaster:emulated job.env pipeline/gitlab-ci/job/build
+# pipemaster:arg "- name: CGO_ENABLED\n  value:\n    lit: \"0\"\n- name: TAG\n  value:\n    expr: tag\n"
+when:
+  - event: push
+  - event: tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make
+    environment:
+      CGO_ENABLED: "0"
+      TAG: ${CI_COMMIT_TAG}

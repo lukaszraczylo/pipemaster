@@ -1,0 +1,12 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+# pipemaster:emulated display.name pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"name":"Build","pos":0}
+when:
+  - event: push
+  - event: tag
+steps:
+  - name: Build
+    image: ubuntu:latest
+    commands:
+      - go build ./...
+      - go test ./...

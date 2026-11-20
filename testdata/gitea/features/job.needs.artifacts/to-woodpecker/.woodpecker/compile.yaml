@@ -1,0 +1,11 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/compile
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
+# pipemaster:arg [{"Name":"","Expire":"","Paths":["bin/"]}]
+when:
+  - event: push
+  - event: tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make

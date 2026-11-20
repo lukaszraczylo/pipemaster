@@ -1,0 +1,4 @@
+Loss report: gitlab -> woodpecker
+[lost] pipeline/gitlab-ci/job/version job.outputs (Woodpecker steps cannot pass values to other workflows)
+[lost] pipeline/gitlab-ci/job/version job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
+[emulated] pipeline/gitlab-ci/job/version job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

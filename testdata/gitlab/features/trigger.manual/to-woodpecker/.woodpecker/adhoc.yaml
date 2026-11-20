@@ -1,0 +1,8 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/adhoc
+when:
+  - event: manual
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make adhoc

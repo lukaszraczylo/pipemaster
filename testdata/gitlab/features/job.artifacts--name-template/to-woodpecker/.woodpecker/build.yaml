@@ -1,0 +1,11 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg [{"Name":"pkg-$$\u007b{ sha }}","Expire":"","Paths":["out/"]}]
+when:
+  - event: push
+  - event: tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make

@@ -1,0 +1,13 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+ci:
+  services:
+    - name: postgres:17
+      alias: db
+      variables:
+        POSTGRES_PASSWORD: example
+  needs: []
+  script:
+    # pipemaster:step test
+    - go test ./...

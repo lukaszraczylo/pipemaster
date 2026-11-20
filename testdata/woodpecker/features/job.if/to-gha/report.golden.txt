@@ -1,0 +1,4 @@
+Loss report: woodpecker -> gha
+[lost] pipeline/woodpecker/job/ci job.if (condition not expressible in GitHub Actions; job disabled)
+[emulated] pipeline/woodpecker/job/ci job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/woodpecker/job/ci/step/build step.image: uses: docker://<image> with entrypoint and args

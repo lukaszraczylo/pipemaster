@@ -1,0 +1,27 @@
+# pipemaster:emulated trigger.push pipeline/woodpecker/trigger/0
+# pipemaster:emulated pipeline.concurrency pipeline/woodpecker
+# pipemaster:emulated job.runner pipeline/woodpecker/job/ci
+# pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/test
+# pipemaster:arg {"kind":"script","image":{"Ref":"golang:1.25","Entrypoint":null},"script":["go test ./..."]}
+on:
+  push:
+    branches:
+      - '**'
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: example
+    steps:
+      # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/test
+      - id: test
+        uses: docker://golang:1.25
+        with:
+          entrypoint: /bin/sh
+          args: -ec 'go test ./...'

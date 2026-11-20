@@ -1,0 +1,2 @@
+Loss report: woodpecker -> gitlab
+[lost] pipeline/woodpecker/job/ci/step/flaky step.image (GitLab sets the image per job, not per step)

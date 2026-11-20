@@ -1,0 +1,21 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/test
+when:
+  - event: push
+  - event: tag
+matrix:
+  include:
+    - GO: "1.21"
+      OS: linux
+    - GO: "1.21"
+      OS: mac
+    - GO: "1.22"
+      OS: linux
+    - GO: "1.22"
+      OS: mac
+    - GO: "1.20"
+      OS: linux
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make test

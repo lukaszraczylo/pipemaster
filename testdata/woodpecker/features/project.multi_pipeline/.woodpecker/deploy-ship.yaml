@@ -1,0 +1,9 @@
+# pipemaster:emulated project.multi_pipeline pipeline/deploy
+# pipemaster:arg {"pipeline":"deploy","job":"ship","p":1,"j":0}
+when:
+  - event: manual
+steps:
+  - name: ship
+    image: alpine:3.20
+    commands:
+      - ./ship.sh

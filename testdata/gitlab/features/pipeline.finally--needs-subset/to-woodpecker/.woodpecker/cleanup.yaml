@@ -1,0 +1,26 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/cleanup
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:arg {"needs":[{"JobID":"compile","Artifacts":false,"Optional":false}],"noIf":true}
+when:
+  - event: push
+    status:
+      - success
+      - failure
+  - event: tag
+    status:
+      - success
+      - failure
+depends_on:
+  - name: compile
+    optional: true
+  - name: lint
+    optional: true
+  - name: summary
+    optional: true
+  - name: unit
+    optional: true
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make clean

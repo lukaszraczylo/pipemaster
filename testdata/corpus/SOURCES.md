@@ -1,10 +1,10 @@
 # Corpus sources
 
 Real-world CI pipelines stored verbatim for `TestCorpus` (`internal/roundtrip/corpus_test.go`).
-The directory of an entry is `testdata/corpus/<#>-<gha, gitea, forgejo or gitlab>-<slug>`.
+The directory of an entry is `testdata/corpus/<#>-<gha, gitea, forgejo, gitlab or woodpecker>-<slug>`.
 Every file is byte-identical to the file at the pinned commit; the test run does not edit them.
 
-- Fetch date: 2026-11-18 for entries 01 to 27 and 2026-11-19 for entries 28 to 40.
+- Fetch date: 2026-11-18 for entries 01 to 27, 2026-11-19 for entries 28 to 40 and 2026-11-20 for entries 41 to 50.
 - Each repository is public, and its licence was read before use: from the host API (GitHub `license.spdx_id`, GitLab `license.key`), or, for entries 28 to 40,
   from the `LICENSE` file of the repository at the pinned commit.
   Every licence is MIT, Apache-2.0 or BSD-3-Clause.
@@ -62,3 +62,21 @@ Every file is byte-identical to the file at the pinned commit; the test run does
 | 38 | deb | Forgejo | <https://codeberg.org/forgejo-contrib/forgejo-deb> | `0151f06943eaaec1909d637b2b237df1c95d95d5` | MIT | `.forgejo/workflows/forgejo-deb.yml`<br>`.forgejo/workflows/mirror.yml` |
 | 39 | renovate | Forgejo | <https://codeberg.org/forgejo-contrib/forgejo-renovate> | `0ef5e88be10c29a764c5203f5c2593f6cd5c2998` | MIT | `.forgejo/workflows/build.yml`<br>`.forgejo/workflows/mirror.yml`<br>`.forgejo/workflows/renovate-cb.yml`<br>`.forgejo/workflows/renovate.yml` |
 | 40 | contrib-renovate-config | Forgejo | <https://codeberg.org/forgejo-contrib/renovate-config> | `79cee37e7360ec5cbadb65afc5d83605dc9708e4` | MIT | `.forgejo/workflows/build.yml` |
+| 41 | woodpecker | Woodpecker | <https://github.com/woodpecker-ci/woodpecker> | `f1f38e319804d5b96369e7c772a45d7d70dc5c55` | Apache-2.0 | `.woodpecker/test.yaml`<br>`.woodpecker/docker.yaml`<br>`.woodpecker/securityscan.yaml` |
+| 42 | plugin-git | Woodpecker | <https://github.com/woodpecker-ci/plugin-git> | `1097dc26ddd07ad42f3b345596da693ef44bfa4f` | Apache-2.0 | `.woodpecker/test-release.yml` |
+| 43 | catala | Woodpecker | <https://github.com/CatalaLang/catala> | `7a0c93beda25b903ebcdfe64d672caf53dd41370` | Apache-2.0 | `.woodpecker/main.yaml` |
+| 44 | monitor | Woodpecker | <https://github.com/ntppool/monitor> | `e01e6f0461f818b66e376790bd8c2882e1c78668` | MIT | `.woodpecker/publish-production.yaml` |
+| 46 | go-starter | Woodpecker | <https://github.com/allaboutapps/go-starter> | `39baa1b429b67096847200324fce542243e1a6e9` | MIT | `.woodpecker/ci.yaml` |
+| 47 | core | Woodpecker | <https://github.com/azugo/core> | `46034f8b4bbe51512a3fb27abf3939974c1a868c` | MIT | `.woodpecker/test.yaml`<br>`.woodpecker/integration.yaml` |
+| 48 | aiocoap | Woodpecker | <https://github.com/chrysn/aiocoap> | `f867dc482ec4bfd7246924a7f4babf30b0193e79` | MIT | `.woodpecker/all.yaml` |
+| 49 | contributions-web | Woodpecker | <https://github.com/jordanopensource/contributions-web> | `5c4d44955d335d309777234d10097f31db583f5c` | Apache-2.0 | `.woodpecker/build-latest-image.yaml` |
+| 50 | rust-confirm-email | Woodpecker | <https://github.com/FrostWalk/rust-confirm-email> | `8dccde4410b4339c47ca92c590f5a2019d2fce96` | MIT | `.woodpecker/pr.yaml` |
+
+Woodpecker entries (41 to 50):
+
+- The `.woodpecker/` files of the research list (section 10.1) are copied byte for byte. The linter runs with
+  `--plugins-privileged woodpeckerci/plugin-docker-buildx`, which entries 41, 42 and 49 need.
+- Gap: `.woodpecker/default.yaml` of ntppool/monitor (entry 44) is not stored. It holds a database connection string
+  that trufflehog reports as a Postgres credential at line 43.
+- Gap: entry 45 (abh/ntppool, `.woodpecker/e2e.yaml`) is not stored for the same reason, at line 67.
+- Entry 48 is MIT per its `SPDX-License-Identifier` header and `LICENSES/MIT.txt`.

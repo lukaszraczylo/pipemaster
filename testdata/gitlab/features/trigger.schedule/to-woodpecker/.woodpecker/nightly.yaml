@@ -1,0 +1,8 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/nightly
+when:
+  - event: cron
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make nightly

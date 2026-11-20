@@ -1,0 +1,11 @@
+when:
+  - event: push
+    path:
+      include:
+        - src/main.go
+        - go.mod
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

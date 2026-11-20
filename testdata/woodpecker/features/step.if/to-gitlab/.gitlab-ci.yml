@@ -1,0 +1,14 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+ci:
+  needs: []
+  script:
+    # pipemaster:step deploy
+    # pipemaster:emulated step.if pipeline/woodpecker/job/ci/step/deploy
+    # pipemaster:arg "false"
+    # pipemaster:lost step.if pipeline/woodpecker/job/ci/step/deploy: ((event == 'tag') || (branch == 'main')) && (actor == 'release-bot')
+    - |
+      if false; then
+      ./deploy.sh
+      fi

@@ -1,0 +1,19 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+# pipemaster:lost step.if pipeline/gitlab-ci/job/build/step/build-step-2: event == 'push'
+when:
+  - event: push
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo cleanup
+    when:
+      - status:
+          - success
+          - failure
+  - name: build-step-2
+    image: ubuntu:latest
+    commands:
+      - echo push
+    when:
+      - evaluate: "false"

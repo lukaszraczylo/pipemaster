@@ -1,0 +1,14 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+# pipemaster:arg {"Ref":"alpine:3","Entrypoint":null}
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci
+# pipemaster:arg "- name: SHARED\n  value:\n    lit: \"1\"\n"
+when:
+  - event: push
+  - event: tag
+steps:
+  - name: script
+    image: alpine:3
+    commands:
+      - make
+    environment:
+      SHARED: "1"

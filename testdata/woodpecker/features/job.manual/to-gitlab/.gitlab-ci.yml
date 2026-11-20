@@ -1,0 +1,10 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+deploy:
+  needs: []
+  script:
+    # pipemaster:step deploy
+    - ./deploy.sh
+  allow_failure: false
+  when: manual

@@ -1,0 +1,17 @@
+origin:
+    provider: woodpecker
+    dialect: woodpecker
+    files:
+        - .woodpecker/ci.yaml
+pipelines:
+    - id: woodpecker
+      jobs:
+        - if: (event == 'push') && (actor == 'release-bot')
+          id: ci
+          steps:
+            - image:
+                ref: golang:1.25
+              id: build
+              kind: script
+              script:
+                - go build ./...

@@ -13,11 +13,13 @@ import (
 
 // noSourceForm lists supported features that a fixture cannot exercise, with the reason.
 var noSourceForm = map[string]string{
-	provider.GHA + "/" + string(caps.JobEnvironmentApproval):     "approval rules live in repository settings and no parser sets Environment.Approval",
-	provider.Gitea + "/" + string(caps.JobEnvironmentApproval):   "approval rules live in repository settings and no parser sets Environment.Approval",
-	provider.Forgejo + "/" + string(caps.JobEnvironmentApproval): "approval rules live in repository settings and no parser sets Environment.Approval",
-	provider.GitLab + "/" + string(caps.JobEnvironmentApproval):  "approval rules live in project settings and no parser sets Environment.Approval",
-	provider.GitLab + "/" + string(caps.ConfigName):              "GitLab variables parse as plain script text, so no gitlab source yields a secrets or vars reference",
+	provider.GHA + "/" + string(caps.JobEnvironmentApproval):        "approval rules live in repository settings and no parser sets Environment.Approval",
+	provider.Gitea + "/" + string(caps.JobEnvironmentApproval):      "approval rules live in repository settings and no parser sets Environment.Approval",
+	provider.Forgejo + "/" + string(caps.JobEnvironmentApproval):    "approval rules live in repository settings and no parser sets Environment.Approval",
+	provider.GitLab + "/" + string(caps.JobEnvironmentApproval):     "approval rules live in project settings and no parser sets Environment.Approval",
+	provider.GitLab + "/" + string(caps.ConfigName):                 "GitLab variables parse as plain script text, so no gitlab source yields a secrets or vars reference",
+	provider.Woodpecker + "/" + string(caps.JobEnvironmentApproval): "approval rules live in repo settings and no parser sets Environment.Approval",
+	provider.Woodpecker + "/" + string(caps.JobTimeout):             "Woodpecker limits the whole pipeline with a repo setting, which no workflow file holds",
 }
 
 // fixtureComplete reports whether a fixture directory holds a source file for the provider and its IR golden, so

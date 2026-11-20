@@ -1,0 +1,13 @@
+# pipemaster:emulated step.script pipeline/gitlab-ci
+# pipemaster:emulated step.script pipeline/gitlab-ci/job/empty
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/empty
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci
+# pipemaster:arg "- name: REGION\n  value:\n    lit: eu\n"
+when:
+  - event: push
+  - event: tag
+steps:
+  - name: noop
+    image: ubuntu:latest
+    commands:
+      - "true"

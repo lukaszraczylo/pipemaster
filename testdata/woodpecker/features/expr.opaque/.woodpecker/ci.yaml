@@ -1,0 +1,9 @@
+when:
+  - event: push
+steps:
+  - name: release
+    image: alpine:3.20
+    commands:
+      - ./release.sh
+    when:
+      - branch: release/*

@@ -1,0 +1,20 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+when:
+  - event: push
+  - event: tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - echo prepare
+      - make build
+      - make test
+  - name: after_script
+    image: ubuntu:latest
+    commands:
+      - echo cleanup
+    failure: ignore
+    when:
+      - status:
+          - success
+          - failure

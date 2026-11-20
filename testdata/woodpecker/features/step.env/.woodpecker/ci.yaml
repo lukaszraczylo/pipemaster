@@ -1,0 +1,11 @@
+when:
+  - event: push
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...
+    environment:
+      GOFLAGS: -trimpath
+      TOKEN:
+        from_secret: deploy_token

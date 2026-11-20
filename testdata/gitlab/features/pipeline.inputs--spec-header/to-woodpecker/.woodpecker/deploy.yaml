@@ -1,0 +1,13 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/deploy
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci
+# pipemaster:arg "- name: TAG\n  value:\n    lit: $$[[ inputs.image_tag ]]\n"
+when:
+  - event: push
+  - event: tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - echo deploy
+    environment:
+      TAG: $$[[ inputs.image_tag ]]

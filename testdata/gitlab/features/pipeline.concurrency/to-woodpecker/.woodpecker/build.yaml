@@ -1,0 +1,11 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+when:
+  - event: push
+concurrency:
+  limit: 1
+  group: ci-
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok

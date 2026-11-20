@@ -1,0 +1,9 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+# pipemaster:arg {"Ref":"golang:1.24","Entrypoint":null}
+when:
+  - event: push
+  - event: tag
+steps:
+  - image: golang:1.24
+    commands:
+      - go version

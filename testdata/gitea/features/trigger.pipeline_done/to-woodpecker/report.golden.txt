@@ -1,0 +1,7 @@
+Loss report: gitea -> woodpecker
+[lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
+[lost] pipeline/ci/job/build job.if (no trigger of the pipeline has a Woodpecker event; the workflow never runs)
+[lost] pipeline/ci/job/build job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider gha (types, workflows) is not written to the Woodpecker file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/0 trigger.pipeline_done (Woodpecker has no pipeline-completion trigger)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

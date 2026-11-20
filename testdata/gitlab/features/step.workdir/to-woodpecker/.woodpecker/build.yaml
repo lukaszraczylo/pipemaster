@@ -1,0 +1,9 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+when:
+  - event: push
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - ls
+    directory: ./cmd/app

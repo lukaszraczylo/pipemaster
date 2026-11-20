@@ -1,0 +1,9 @@
+when:
+  - event: push
+depends_on:
+  - lint
+steps:
+  - name: ship
+    image: alpine:3.20
+    commands:
+      - ./ship.sh

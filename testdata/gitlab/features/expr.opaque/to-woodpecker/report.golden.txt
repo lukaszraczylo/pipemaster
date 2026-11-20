@@ -1,0 +1,5 @@
+Loss report: gitlab -> woodpecker
+[lost] pipeline/gitlab-ci/job/build expr.opaque (an opaque expression of another dialect has no Woodpecker form)
+[lost] pipeline/gitlab-ci/job/build ext.passthrough (Ext of provider gitlab (rules) is not written to the Woodpecker file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/job/build job.if (condition not expressible in Woodpecker CI; the workflow disabled)
+[emulated] pipeline/gitlab-ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

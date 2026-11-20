@@ -1,0 +1,11 @@
+# pipemaster:emulated job.container pipeline/ci/job/deploy
+# pipemaster:lost job.if pipeline/ci/job/deploy: (ref == 'refs/heads/main') && (event == 'push')
+when:
+  - event: push
+    evaluate: "false"
+  - event: tag
+    evaluate: "false"
+steps:
+  - image: ubuntu:latest
+    commands:
+      - echo deploy

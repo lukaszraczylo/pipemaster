@@ -1,0 +1,12 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/publish
+# pipemaster:lost job.if pipeline/gitlab-ci/job/publish: branch == gitlab.CI_DEFAULT_BRANCH
+when:
+  - event: push
+    evaluate: "false"
+  - event: tag
+    evaluate: "false"
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make publish

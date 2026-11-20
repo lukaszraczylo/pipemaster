@@ -1,0 +1,3 @@
+Loss report: woodpecker -> gitlab
+[lost] pipeline/woodpecker/job/ci/step/release step.if (condition not expressible in GitLab CI; step disabled)
+[lost] pipeline/woodpecker/job/ci/step/release step.image (GitLab sets the image per job, not per step)

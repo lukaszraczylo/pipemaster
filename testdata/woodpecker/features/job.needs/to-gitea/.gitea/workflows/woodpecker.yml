@@ -1,0 +1,32 @@
+# pipemaster:emulated trigger.push pipeline/woodpecker/trigger/0
+# pipemaster:emulated job.runner pipeline/woodpecker/job/lint
+# pipemaster:emulated step.image pipeline/woodpecker/job/lint/step/lint
+# pipemaster:arg {"kind":"script","image":{"Ref":"golangci/golangci-lint:v2","Entrypoint":null},"script":["golangci-lint run"]}
+# pipemaster:emulated job.runner pipeline/woodpecker/job/ship
+# pipemaster:emulated step.image pipeline/woodpecker/job/ship/step/ship
+# pipemaster:arg {"kind":"script","image":{"Ref":"alpine:3.20","Entrypoint":null},"script":["./ship.sh"]}
+on:
+  push:
+    branches:
+      - '**'
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      # pipemaster:emulated step.image pipeline/woodpecker/job/lint/step/lint
+      - id: lint
+        uses: docker://golangci/golangci-lint:v2
+        with:
+          entrypoint: /bin/sh
+          args: -ec 'golangci-lint run'
+  ship:
+    needs:
+      - lint
+    runs-on: ubuntu-latest
+    steps:
+      # pipemaster:emulated step.image pipeline/woodpecker/job/ship/step/ship
+      - id: ship
+        uses: docker://alpine:3.20
+        with:
+          entrypoint: /bin/sh
+          args: -ec ./ship.sh

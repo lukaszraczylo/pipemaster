@@ -1,0 +1,20 @@
+# pipemaster:emulated project.multi_pipeline pipeline/.shared
+# pipemaster:arg {"pipeline":".shared","job":"run","p":0,"j":0}
+# pipemaster:emulated job.container pipeline/.shared/job/run
+# pipemaster:lost trigger.* pipeline/.shared/job/run: no trigger of the pipeline has a Woodpecker event
+when:
+  - event:
+      - push
+      - pull_request
+      - pull_request_closed
+      - pull_request_metadata
+      - tag
+      - release
+      - deployment
+      - cron
+      - manual
+    evaluate: "false"
+steps:
+  - image: ubuntu:latest
+    commands:
+      - echo run

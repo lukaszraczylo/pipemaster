@@ -1,0 +1,6 @@
+Loss report: gha -> woodpecker
+[lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
+[lost] pipeline/ci/job/build job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
+[external] pipeline/ci/trigger/0 trigger.schedule: when event cron (Woodpecker keeps the schedule in the repo settings: add a cron job with the schedule "0 0 * * 0" under Settings > Cron)
+[external] pipeline/ci/trigger/1 trigger.schedule: when event cron (Woodpecker keeps the schedule in the repo settings: add a cron job with the schedule "30 5 * * 1-5" under Settings > Cron)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

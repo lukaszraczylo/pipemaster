@@ -1,0 +1,9 @@
+when:
+  - event: push
+  - event: tag
+steps:
+  - image: alpine:3.20
+    entrypoint:
+      - ""
+    commands:
+      - make build

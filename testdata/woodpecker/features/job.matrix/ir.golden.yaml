@@ -1,0 +1,29 @@
+origin:
+    provider: woodpecker
+    dialect: woodpecker
+    files:
+        - .woodpecker/ci.yaml
+pipelines:
+    - id: woodpecker
+      triggers:
+        - kind: push
+      jobs:
+        - matrix:
+            axes:
+                - name: GO_VERSION
+                  values:
+                    - "1.24"
+                    - "1.25"
+                - name: OS
+                  values:
+                    - linux
+                    - darwin
+          id: ci
+          steps:
+            - image:
+                ref: golang:${{ matrix.GO_VERSION }}
+              id: test
+              kind: script
+              script:
+                - go test ./...
+                - echo ${{ matrix.OS }}

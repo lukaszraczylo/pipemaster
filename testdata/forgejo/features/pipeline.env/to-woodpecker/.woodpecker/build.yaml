@@ -1,0 +1,16 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+# pipemaster:lost expr.opaque pipeline/ci: gha.github.run_number
+# pipemaster:emulated pipeline.env pipeline/ci
+# pipemaster:arg "- name: CGO_ENABLED\n  value:\n    lit: \"0\"\n- name: VERSION\n  value:\n    lit: \"3.1\"\n- name: TOKEN\n  value:\n    secret: DEPLOY_TOKEN\n- name: LABEL\n  value:\n    expr: format('build-{0}', gha.github.run_number)\n"
+when:
+  - event: push
+  - event: tag
+steps:
+  - image: ubuntu:latest
+    commands:
+      - echo ok
+    environment:
+      CGO_ENABLED: "0"
+      VERSION: "3.1"
+      TOKEN:
+        from_secret: DEPLOY_TOKEN

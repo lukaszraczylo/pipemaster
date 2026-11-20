@@ -6,6 +6,7 @@ import (
 
 	_ "github.com/lukaszraczylo/pipemaster/provider/gha"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gitlab"
+	_ "github.com/lukaszraczylo/pipemaster/provider/woodpecker"
 )
 
 const ciWorkflow = "on: push\njobs:\n  %s:\n    runs-on: x\n    steps:\n      - run: echo hi\n"

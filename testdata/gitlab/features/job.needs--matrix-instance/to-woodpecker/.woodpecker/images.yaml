@@ -1,0 +1,13 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/images
+when:
+  - event: push
+  - event: tag
+matrix:
+  TARGET:
+    - alpine
+    - ubuntu
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make images

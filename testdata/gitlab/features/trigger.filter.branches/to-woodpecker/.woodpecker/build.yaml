@@ -1,0 +1,13 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n  branches:\n    include:\n        - main\n        - release-**\n"
+when:
+  - event: push
+    branch:
+      - main
+      - release-**
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make build

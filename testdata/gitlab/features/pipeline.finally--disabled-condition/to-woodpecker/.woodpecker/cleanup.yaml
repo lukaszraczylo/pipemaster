@@ -1,0 +1,17 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/cleanup
+# pipemaster:lost job.if pipeline/gitlab-ci/job/cleanup: opaque(gitlab): - if: $$PIPELINE_TYPE =~ /_MR_PIPELINE$$/\n
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:arg {"needs":[{"JobID":"compile","Artifacts":false,"Optional":false}]}
+when:
+  - event: push
+    evaluate: "false"
+  - event: tag
+    evaluate: "false"
+depends_on:
+  - name: compile
+    optional: true
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make clean

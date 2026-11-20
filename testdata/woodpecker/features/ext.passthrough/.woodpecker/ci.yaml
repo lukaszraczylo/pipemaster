@@ -1,0 +1,8 @@
+when:
+  - event: push
+skip_clone: true
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

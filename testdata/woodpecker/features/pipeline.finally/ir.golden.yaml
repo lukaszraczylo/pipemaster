@@ -1,0 +1,30 @@
+origin:
+    provider: woodpecker
+    dialect: woodpecker
+    files:
+        - .woodpecker/build.yaml
+        - .woodpecker/notify.yaml
+pipelines:
+    - id: woodpecker
+      triggers:
+        - kind: push
+      jobs:
+        - id: build
+          steps:
+            - image:
+                ref: golang:1.25
+              id: build
+              kind: script
+              script:
+                - go build ./...
+      finally:
+        - id: notify
+          needs:
+            - job: build
+          steps:
+            - image:
+                ref: alpine:3.20
+              id: notify
+              kind: script
+              script:
+                - ./notify.sh

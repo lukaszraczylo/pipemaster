@@ -1,0 +1,4 @@
+Loss report: gitlab -> woodpecker
+[lost] pipeline/gitlab-ci/job/triggered job.if (no trigger of the pipeline has a Woodpecker event; the workflow never runs)
+[lost] pipeline/gitlab-ci/trigger/0 trigger.api (Woodpecker starts API pipelines as manual events)
+[emulated] pipeline/gitlab-ci/job/triggered job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

@@ -1,0 +1,13 @@
+matrix:
+  include:
+    - GO_VERSION: "1.24"
+      TAGS: nethttp
+    - GO_VERSION: "1.25"
+      TAGS: netgo
+when:
+  - event: push
+steps:
+  - name: test
+    image: golang:${GO_VERSION}
+    commands:
+      - go test -tags ${TAGS} ./...

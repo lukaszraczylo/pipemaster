@@ -1,0 +1,19 @@
+origin:
+    provider: woodpecker
+    dialect: woodpecker
+    files:
+        - .woodpecker/ci.yaml
+pipelines:
+    - id: woodpecker
+      triggers:
+        - kind: push
+      jobs:
+        - id: ci
+          steps:
+            - image:
+                ref: golangci/golangci-lint:v2
+              id: lint
+              kind: script
+              script:
+                - golangci-lint run
+              continue_on_error: true

@@ -1,0 +1,19 @@
+origin:
+    provider: woodpecker
+    dialect: woodpecker
+    files:
+        - .woodpecker/ci.yaml
+pipelines:
+    - id: woodpecker
+      triggers:
+        - kind: push
+      jobs:
+        - id: ci
+          steps:
+            - image:
+                ref: alpine:3.20
+              id: build
+              kind: script
+              script:
+                - echo ${{ sha }} on ${{ branch }}
+                - 'echo "cost: $5"'

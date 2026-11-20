@@ -1,6 +1,6 @@
 # pipemaster:emulated pipeline.concurrency pipeline/ci
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
-# pipemaster:arg {"image":{"Ref":"alpine:3.20","Entrypoint":[""]},"script":["make build"]}
+# pipemaster:arg {"kind":"script","image":{"Ref":"alpine:3.20","Entrypoint":[""]},"script":["make build"]}
 name: base
 on:
   push:

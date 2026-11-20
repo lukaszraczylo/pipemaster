@@ -1,0 +1,12 @@
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/build-step-1
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: cache\n    ref: v4\nwith:\n    key:\n        lit: go-mod\n    path:\n        lit: ~/go/pkg/mod\nid: build-step-1\nkind: action\n","at":0}
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/build-step-3
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\nid: build-step-3\nkind: action\n","at":2}
+when:
+  - event: push
+steps:
+  - name: build-step-2
+    image: ubuntu:latest
+    commands:
+      - make build

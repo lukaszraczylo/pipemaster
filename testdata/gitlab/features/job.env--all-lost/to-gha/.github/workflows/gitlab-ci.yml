@@ -6,8 +6,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      IMAGE: $CI_REGISTRY_IMAGE/tmp:${{ github.sha }}
     steps:
       - uses: actions/checkout@v7
-      # pipemaster:lost expr.opaque pipeline/gitlab-ci/job/test: format('$CI_REGISTRY_IMAGE/tmp:{0}', sha)
       - id: script
         run: make test

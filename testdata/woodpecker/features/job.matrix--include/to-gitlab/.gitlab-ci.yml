@@ -1,0 +1,20 @@
+# pipemaster:emulated script.interpolation pipeline/woodpecker
+# pipemaster:arg [{"k":"t","p":"job/ci/step/test/script/0","g":"go test -tags $TAGS ./...","s":"go test -tags $\u007b{ matrix.TAGS }} ./..."},{"k":"t","p":"job/ci/step/test/image","g":"golang:$GO_VERSION","s":"golang:$\u007b{ matrix.GO_VERSION }}"}]
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+ci:
+  needs: []
+  script:
+    # pipemaster:step test
+    - go test -tags $TAGS ./...
+  parallel:
+    matrix:
+      - GO_VERSION:
+          - "1.24"
+        TAGS:
+          - nethttp
+      - GO_VERSION:
+          - "1.25"
+        TAGS:
+          - netgo

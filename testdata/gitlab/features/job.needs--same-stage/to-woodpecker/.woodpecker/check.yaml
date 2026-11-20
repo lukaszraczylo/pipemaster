@@ -1,0 +1,12 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/check
+when:
+  - event: push
+  - event: tag
+depends_on:
+  - compile
+  - package
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make check

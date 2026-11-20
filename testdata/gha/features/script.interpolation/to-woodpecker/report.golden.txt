@@ -1,0 +1,8 @@
+Loss report: gha -> woodpecker
+[lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
+[lost] pipeline/ci/job/build job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
+[lost] pipeline/ci/job/build/step/build-step-1 script.interpolation (no Woodpecker spelling for expression gha.github.workspace; the line is commented out)
+[lost] pipeline/ci/job/build/step/build-step-1 step.script (no command of the step has a Woodpecker spelling; the step is not written)
+[lost] pipeline/ci/job/build/step/script step.script (the job has no steps; a no-op step keeps the workflow valid)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/ci/job/build step.script: no-op step (Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in)

@@ -1,0 +1,17 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+# pipemaster:emulated script.interpolation pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"refs":["vars.REGION"],"pos":0}
+# pipemaster:emulated pipeline.env pipeline/ci
+# pipemaster:arg "- name: API_TOKEN\n  value:\n    secret: API_TOKEN\n"
+when:
+  - event: push
+  - event: tag
+steps:
+  - image: ubuntu:latest
+    commands:
+      - echo "$${REGION}"
+    environment:
+      KEY:
+        from_secret: DEPLOY_KEY
+      API_TOKEN:
+        from_secret: API_TOKEN

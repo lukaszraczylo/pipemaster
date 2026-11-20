@@ -1,0 +1,15 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+# pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/0
+# pipemaster:emulated trigger.filter.tags pipeline/ci
+# pipemaster:arg "- kind: tag\n  tags:\n    include:\n        - v[0-9]+.[0-9]+.[0-9]+\n        - '!v*-rc*'\n"
+when:
+  - event: tag
+    ref:
+      include:
+        - refs/tags/v[0-9]+.[0-9]+.[0-9]+
+      exclude:
+        - refs/tags/v*-rc*
+steps:
+  - image: ubuntu:latest
+    commands:
+      - echo ok

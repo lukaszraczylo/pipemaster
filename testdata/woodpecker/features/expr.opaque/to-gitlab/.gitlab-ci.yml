@@ -1,0 +1,14 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+ci:
+  needs: []
+  script:
+    # pipemaster:step release
+    # pipemaster:emulated step.if pipeline/woodpecker/job/ci/step/release
+    # pipemaster:arg "false"
+    # pipemaster:lost step.if pipeline/woodpecker/job/ci/step/release: (event == 'tag') || @opaque('woodpecker', 'when.branch glob "release/*"')
+    - |
+      if false; then
+      ./release.sh
+      fi

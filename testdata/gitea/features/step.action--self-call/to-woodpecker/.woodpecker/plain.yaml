@@ -1,0 +1,8 @@
+# pipemaster:emulated job.container pipeline/ci/job/plain
+when:
+  - event: push
+  - event: tag
+steps:
+  - image: ubuntu:latest
+    commands:
+      - echo ok

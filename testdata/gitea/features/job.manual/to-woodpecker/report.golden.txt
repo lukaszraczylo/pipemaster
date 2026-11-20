@@ -1,0 +1,4 @@
+Loss report: gitea -> woodpecker
+[emulated] pipeline/gitlab-ci/job/deploy job.allow_failure: failure ignore on every step (later steps still run after a failed step)
+[emulated] pipeline/gitlab-ci/job/deploy job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/deploy job.manual: when event manual (the workflow runs only when a person starts it from the UI or API)

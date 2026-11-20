@@ -1,0 +1,8 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/test
+when:
+  - event: pull_request
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make test

@@ -1,0 +1,7 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+when:
+  - event: pull_request
+steps:
+  - image: ubuntu:latest
+    commands:
+      - echo ok

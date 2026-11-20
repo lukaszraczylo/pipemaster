@@ -1,0 +1,3 @@
+Loss report: woodpecker -> gitlab
+[lost] pipeline/woodpecker/job/ci/step/build step.image (GitLab sets the image per job, not per step)
+[emulated] pipeline/woodpecker/job/ci/step/build step.workdir: cd in a subshell around the step

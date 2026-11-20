@@ -1,0 +1,16 @@
+# pipemaster:lost script.interpolation pipeline/ci/job/use/step/use-step-1: echo {{ needs.version.outputs.tag }}
+# pipemaster:lost step.script pipeline/ci/job/use/step/use-step-1: the step has no command left
+# pipemaster:emulated step.action pipeline/ci/job/use/step/use-step-1
+# pipemaster:arg {"step":"ext:\n    gha:\n        _derived_id: true\nid: use-step-1\nkind: script\nscript:\n    - echo $$\u007b{ needs.version.outputs.tag }}\n","at":0}
+# pipemaster:emulated step.script pipeline/ci/job/use
+# pipemaster:emulated job.container pipeline/ci/job/use
+when:
+  - event: push
+  - event: tag
+depends_on:
+  - version
+steps:
+  - name: noop
+    image: ubuntu:latest
+    commands:
+      - "true"

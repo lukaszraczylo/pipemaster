@@ -1,0 +1,4 @@
+Loss report: woodpecker -> forgejo
+[lost] pipeline/woodpecker/trigger/0 trigger.schedule (the schedule names no cron expression; GHA needs one)
+[emulated] pipeline/woodpecker/job/ci job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/woodpecker/job/ci/step/build step.image: uses: docker://<image> with entrypoint and args

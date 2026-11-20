@@ -1,0 +1,5 @@
+Loss report: gitea -> woodpecker
+[emulated] pipeline/gitlab-ci pipeline.finally: a workflow that depends on every other workflow and runs on status success or failure (a skipped dependency is optional, so the workflow still runs)
+[emulated] pipeline/gitlab-ci/job/alert job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/report job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

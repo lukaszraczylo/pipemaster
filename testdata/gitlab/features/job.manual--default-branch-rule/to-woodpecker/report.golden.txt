@@ -1,0 +1,4 @@
+Loss report: gitlab -> woodpecker
+[lost] pipeline/gitlab-ci/job/publish job.if (condition not expressible in Woodpecker CI; the workflow disabled)
+[lost] pipeline/gitlab-ci/job/publish job.manual (a workflow that never runs has no manual start)
+[emulated] pipeline/gitlab-ci/job/publish job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

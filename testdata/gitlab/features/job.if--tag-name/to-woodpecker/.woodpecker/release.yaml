@@ -1,0 +1,12 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/release
+# pipemaster:lost job.if pipeline/gitlab-ci/job/release: tag
+when:
+  - event: push
+    evaluate: "false"
+  - event: tag
+    evaluate: "false"
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make release

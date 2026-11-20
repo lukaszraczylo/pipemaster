@@ -1,0 +1,10 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+ci:
+  needs: []
+  variables:
+    GOFLAGS: -trimpath
+  script:
+    # pipemaster:step build
+    - go build ./...

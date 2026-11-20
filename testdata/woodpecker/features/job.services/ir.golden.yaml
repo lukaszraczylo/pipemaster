@@ -1,0 +1,26 @@
+origin:
+    provider: woodpecker
+    dialect: woodpecker
+    files:
+        - .woodpecker/ci.yaml
+pipelines:
+    - id: woodpecker
+      triggers:
+        - kind: push
+      jobs:
+        - id: ci
+          services:
+            - name: db
+              image:
+                ref: postgres:17
+              env:
+                - name: POSTGRES_PASSWORD
+                  value:
+                    lit: example
+          steps:
+            - image:
+                ref: golang:1.25
+              id: test
+              kind: script
+              script:
+                - go test ./...

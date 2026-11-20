@@ -1,0 +1,12 @@
+# pipemaster:emulated step.script pipeline/gitlab-ci/job/downstream
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/downstream
+when:
+  - event: push
+  - event: tag
+depends_on:
+  - build
+steps:
+  - name: noop
+    image: ubuntu:latest
+    commands:
+      - "true"

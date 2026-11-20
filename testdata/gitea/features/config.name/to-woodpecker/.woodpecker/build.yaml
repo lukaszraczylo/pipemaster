@@ -1,0 +1,15 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+# pipemaster:emulated script.interpolation pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"refs":["vars.CI_MODE"],"pos":0}
+when:
+  - event: push
+  - event: tag
+steps:
+  - image: ubuntu:latest
+    commands:
+      - echo "$${CI_MODE}"
+    environment:
+      KEY:
+        from_secret: GITEA_DEPLOY
+      TOKEN:
+        from_secret: GITHUB_TOKEN

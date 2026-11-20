@@ -1,0 +1,10 @@
+when:
+  - event: push
+concurrency:
+  limit: 1
+  group: deploy
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

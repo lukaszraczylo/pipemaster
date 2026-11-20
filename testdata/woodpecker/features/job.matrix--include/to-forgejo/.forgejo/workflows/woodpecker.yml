@@ -1,0 +1,23 @@
+# pipemaster:emulated trigger.push pipeline/woodpecker/trigger/0
+# pipemaster:emulated pipeline.concurrency pipeline/woodpecker
+# pipemaster:emulated job.runner pipeline/woodpecker/job/ci
+on:
+  push:
+    branches:
+      - '**'
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - GO_VERSION: "1.24"
+            TAGS: nethttp
+          - GO_VERSION: "1.25"
+            TAGS: netgo
+    steps:
+      - id: test
+        run: go test -tags ${{ matrix.TAGS }} ./...

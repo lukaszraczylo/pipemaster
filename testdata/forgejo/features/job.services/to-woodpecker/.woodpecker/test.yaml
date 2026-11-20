@@ -1,0 +1,18 @@
+# pipemaster:emulated job.container pipeline/ci/job/test
+when:
+  - event: push
+  - event: tag
+steps:
+  - image: ubuntu:latest
+    commands:
+      - echo ok
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD:
+        from_secret: DB_PASSWORD
+    ports:
+      - 5432:5432
+  cache:
+    image: redis:7

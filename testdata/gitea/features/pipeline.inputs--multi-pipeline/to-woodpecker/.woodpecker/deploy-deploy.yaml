@@ -1,0 +1,9 @@
+# pipemaster:emulated project.multi_pipeline pipeline/deploy
+# pipemaster:arg {"pipeline":"deploy","job":"deploy","p":1,"j":0}
+# pipemaster:emulated job.container pipeline/deploy/job/deploy
+when:
+  - event: manual
+steps:
+  - image: ubuntu:latest
+    commands:
+      - echo deploy

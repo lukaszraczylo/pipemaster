@@ -1,0 +1,21 @@
+origin:
+    provider: woodpecker
+    dialect: woodpecker
+    files:
+        - .woodpecker/ci.yaml
+pipelines:
+    - id: woodpecker
+      triggers:
+        - kind: tag
+          tags:
+            include:
+                - v*
+      jobs:
+        - id: ci
+          steps:
+            - image:
+                ref: golang:1.25
+              id: build
+              kind: script
+              script:
+                - go build ./...

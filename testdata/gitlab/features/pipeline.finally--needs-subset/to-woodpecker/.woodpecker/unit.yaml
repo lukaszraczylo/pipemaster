@@ -1,0 +1,12 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/unit
+when:
+  - event: push
+  - event: tag
+depends_on:
+  - compile
+  - lint
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make test

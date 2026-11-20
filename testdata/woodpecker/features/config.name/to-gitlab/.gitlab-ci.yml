@@ -1,0 +1,10 @@
+# pipemaster:emulated script.interpolation pipeline/woodpecker
+# pipemaster:arg [{"k":"t","p":"job/ci/step/build/script/0","g":"curl -H \"Authorization: Bearer $TOKEN\" \"https://$REGION.example.org\"","s":"curl -H \"Authorization: Bearer $\u007b{ secrets.TOKEN }}\" \"https://$\u007b{ vars.REGION }}.example.org\""}]
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+ci:
+  needs: []
+  script:
+    # pipemaster:step build
+    - 'curl -H "Authorization: Bearer $TOKEN" "https://$REGION.example.org"'

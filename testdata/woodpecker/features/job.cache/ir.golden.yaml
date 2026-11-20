@@ -1,0 +1,23 @@
+origin:
+    provider: woodpecker
+    dialect: woodpecker
+    files:
+        - .woodpecker/ci.yaml
+pipelines:
+    - id: woodpecker
+      triggers:
+        - kind: push
+      jobs:
+        - id: ci
+          steps:
+            - image:
+                ref: golang:1.25
+              id: build
+              kind: script
+              script:
+                - go build ./...
+          cache:
+            - key: go-mod
+              policy: pull-push
+              paths:
+                - ~/go/pkg/mod

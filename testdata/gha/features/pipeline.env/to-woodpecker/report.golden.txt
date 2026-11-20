@@ -1,0 +1,6 @@
+Loss report: gha -> woodpecker
+[lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
+[lost] pipeline/ci expr.opaque (no Woodpecker spelling for expression gha.github.run_number)
+[lost] pipeline/ci/job/build job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
+[emulated] pipeline/ci pipeline.env: copied into the environment of every step (a step variable of the same name wins)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

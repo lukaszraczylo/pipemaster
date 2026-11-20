@@ -1,0 +1,7 @@
+Loss report: gitea -> woodpecker
+[lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
+[lost] pipeline/ci/job/build job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
+[lost] pipeline/ci/trigger/2 trigger.filter.paths (Woodpecker does not apply a path filter to a tag event)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/ci/trigger/0 trigger.filter.paths: doublestar glob (pattern **.md has a different meaning in doublestar than in the source; it is written as is)
+[emulated] pipeline/ci/trigger/1 trigger.filter.paths: doublestar glob (pattern !src/docs/** has a different meaning in doublestar than in the source; it is written as is)
