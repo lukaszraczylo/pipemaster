@@ -10,6 +10,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/provider"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gha"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gitlab"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 const gitlabEntrypoint = `build:
@@ -20,16 +21,57 @@ const gitlabEntrypoint = `build:
     - make
 `
 
-func TestGitLabImageEntrypointIsReportedLost(t *testing.T) {
-	p := parseProject(t, "gitlab", map[string]string{".gitlab-ci.yml": gitlabEntrypoint})
-	_, rep := emitFiles(t, p)
-	found := false
+const reasonScriptRunner = "a step entrypoint replaces Woodpecker's script runner"
+
+func lostWithReason(rep *report.Report, reason string) bool {
 	for _, e := range rep.Entries {
-		found = found || (e.Feature == caps.StepImage && e.Level == caps.Lost && strings.Contains(e.Detail, "entrypoint"))
+		if e.Level == caps.Lost && strings.Contains(e.Detail, reason) {
+			return true
+		}
 	}
-	if !found {
-		t.Errorf("a job entrypoint that Woodpecker overrides must be reported: %+v", rep.Entries)
+	return false
+}
+
+func TestGitLabImageEntrypointIsLostWithReason(t *testing.T) {
+	p := parseProject(t, "gitlab", map[string]string{".gitlab-ci.yml": gitlabEntrypoint})
+	if len(p.Pipelines[0].Jobs[0].Container.Entrypoint) == 0 {
+		t.Fatal("precondition: the GitLab parser must keep the entrypoint")
 	}
+	files, rep := emitFiles(t, p)
+	if !lostWithReason(rep, reasonScriptRunner) {
+		t.Errorf("a non-empty job entrypoint must be reported lost: %+v", rep.Entries)
+	}
+	for n, body := range files {
+		if strings.Contains(body, "entrypoint") {
+			t.Errorf("%s: the entrypoint must not reach a command step:\n%s", n, body)
+		}
+	}
+}
+
+func TestGitLabEmptyEntrypointIsNotLost(t *testing.T) {
+	src := "build:\n  image:\n    name: x\n    entrypoint: [\"\"]\n  script:\n    - make\n"
+	p := parseProject(t, "gitlab", map[string]string{".gitlab-ci.yml": src})
+	if c := p.Pipelines[0].Jobs[0].Container; c == nil || len(c.Entrypoint) == 0 {
+		t.Fatalf("precondition: the entrypoint [\"\"] must reach the IR: %+v", c)
+	}
+	files, rep := emitFiles(t, p)
+	if lostWithReason(rep, reasonScriptRunner) || reportDetailHas(rep, "entrypoint") {
+		t.Errorf("an empty entrypoint is already ignored by Woodpecker: %+v", rep.Entries)
+	}
+	for n, body := range files {
+		if strings.Contains(body, "entrypoint") {
+			t.Errorf("%s: no entrypoint expected:\n%s", n, body)
+		}
+	}
+}
+
+func reportDetailHas(rep *report.Report, s string) bool {
+	for _, e := range rep.Entries {
+		if strings.Contains(e.Detail, s) {
+			return true
+		}
+	}
+	return false
 }
 
 // parseProject reads files with the source provider.

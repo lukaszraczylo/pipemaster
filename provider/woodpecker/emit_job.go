@@ -45,9 +45,7 @@ type wfCtx struct {
 	// image is what a step without its own image runs in; a setup action replaces it for the steps after it.
 	image string
 	// depth is the clone depth that an actions/checkout step asked for; empty means the default clone.
-	depth string
-	// entry is the job container entrypoint, which a step without its own image inherits.
-	entry   []string
+	depth   string
 	finally bool
 	defImg  bool
 	// mapForm is true when the steps are written as a map keyed by name.
@@ -68,7 +66,7 @@ func (e *emitter) workflow(c *wfCtx) (*yaml.Node, error) {
 	ext := extOf(j.Ext)
 	if j.Container != nil {
 		c.image = j.Container.Ref
-		c.entry = j.Container.Entrypoint
+		e.jobEntrypoint(c)
 	}
 	steps, err := e.steps(c)
 	if err != nil {
@@ -447,4 +445,17 @@ func (e *emitter) entrypoint(jp string, ep []string) (*yaml.Node, error) {
 
 func longAxis(mx *ir.Matrix) bool {
 	return slices.ContainsFunc(mx.Axes, func(a ir.Axis) bool { return len(a.Values) > maxAxisValues })
+}
+
+// jobEntrypoint reports a job container entrypoint that Woodpecker cannot apply. A step entrypoint replaces
+// Woodpecker's script runner, so a command step cannot take one. An empty entrypoint only clears the one of the
+// image, which Woodpecker already ignores for command steps. The IR keeps the value for the return trip.
+func (e *emitter) jobEntrypoint(c *wfCtx) {
+	if !slices.ContainsFunc(c.j.Container.Entrypoint, func(s string) bool { return s != "" }) {
+		return
+	}
+	inherits := slices.ContainsFunc(c.j.Steps, func(st *ir.Step) bool { return st.Image == nil || st.Image.Ref == "" })
+	if inherits {
+		e.lose(c.jp, caps.JobContainer, "a step entrypoint replaces Woodpecker's script runner, so the job container entrypoint is not written")
+	}
 }
