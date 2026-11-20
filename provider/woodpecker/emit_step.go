@@ -149,7 +149,11 @@ func (e *emitter) finishStep(c *wfCtx, sp string, st *ir.Step, idx int, body *wm
 	if c.j.AllowFailure || st.ContinueOnError {
 		m.set(failKey, str("ignore"))
 	}
-	if raw, ok := ext[keyWhen]; ok {
+	if e.cut {
+		e.cut = false
+		e.comment("step " + sp + ": an image or workdir lost an expression, so the step is disabled")
+		m.set(keyWhen, whenNode(neverEntries()))
+	} else if raw, ok := ext[keyWhen]; ok {
 		n, err := plainNode(raw)
 		if err != nil {
 			return stepDone{}, err

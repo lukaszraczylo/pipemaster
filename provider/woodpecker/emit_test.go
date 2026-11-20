@@ -646,3 +646,29 @@ func TestFinallyDependsOnEachWorkflowOnce(t *testing.T) {
 		t.Errorf("the finally workflow must keep a optional:\n%s", files[dirPrefix+"done.yaml"])
 	}
 }
+
+func TestLostExpressionInImageDisablesTheStep(t *testing.T) {
+	st := wpStep("s", "x")
+	st.Image = &ir.Image{Ref: "ubuntu:${{ needs.a.outputs.v }}"}
+	st2 := wpStep("t", "y")
+	body, rep := one(t, wpProject(ghaOrigin, wpJob("ci", st, st2)))
+	if !reportHas(rep, caps.StepImage, caps.Lost) {
+		t.Errorf("the lost expression must be reported: %+v", rep.Entries)
+	}
+	first, second, _ := strings.Cut(body[strings.Index(body, "- name: s"):], "- name: t")
+	if !strings.Contains(first, `evaluate: "false"`) {
+		t.Errorf("the step with a truncated image must be disabled:\n%s", body)
+	}
+	if strings.Contains(second, `evaluate: "false"`) {
+		t.Errorf("the next step must not inherit the guard:\n%s", body)
+	}
+}
+
+func TestLostExpressionInWorkdirDisablesTheStep(t *testing.T) {
+	st := wpStep("s", "x")
+	st.WorkDir = "${{ needs.a.outputs.dir }}/src"
+	body, rep := one(t, wpProject(ghaOrigin, wpJob("ci", st)))
+	if !reportHas(rep, caps.StepWorkdir, caps.Lost) || !strings.Contains(body, `evaluate: "false"`) {
+		t.Errorf("a truncated workdir must disable the step:\n%s\n%+v", body, rep.Entries)
+	}
+}
