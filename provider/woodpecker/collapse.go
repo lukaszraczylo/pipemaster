@@ -130,7 +130,7 @@ func collapseRefs(c *collapseCtx) bool {
 		return true
 	}
 	var a posArg
-	if !decodeArg(c.args, &a) || a.Pos >= len(c.j.Steps) {
+	if !decodeArg(c.args, &a) || !validPos(c.j, a.Pos) {
 		return false
 	}
 	st := c.j.Steps[a.Pos]
@@ -155,7 +155,7 @@ func collapseRefs(c *collapseCtx) bool {
 func collapseStepName(c *collapseCtx) bool {
 	var a posArg
 	_, id, ok := strings.Cut(c.use.IRPath, stepSep)
-	if !ok || !decodeArg(c.args, &a) || a.Pos >= len(c.j.Steps) {
+	if !ok || !decodeArg(c.args, &a) || !validPos(c.j, a.Pos) {
 		return false
 	}
 	wrote := a.Name
@@ -175,8 +175,8 @@ func collapseStepName(c *collapseCtx) bool {
 func collapseLostEnv(c *collapseCtx) bool {
 	var a lostEnvArg
 	var vars []ir.Var
-	if !decodeArg(c.args, &a) || a.Pos >= len(c.j.Steps) ||
-		yaml.Unmarshal([]byte(a.Vars), &vars) != nil || len(vars) != len(a.At) {
+	if !decodeArg(c.args, &a) || !validPos(c.j, a.Pos) ||
+		yaml.Unmarshal([]byte(a.Vars), &vars) != nil || len(vars) != len(a.At) || slices.ContainsFunc(a.At, func(n int) bool { return n < 0 }) {
 		return false
 	}
 	st := c.j.Steps[a.Pos]
@@ -185,6 +185,9 @@ func collapseLostEnv(c *collapseCtx) bool {
 	}
 	return true
 }
+
+// validPos is true when pos names a step of j; a marker edited by hand can hold any number.
+func validPos(j *ir.Job, pos int) bool { return pos >= 0 && pos < len(j.Steps) }
 
 func markDerived(x ir.Ext) ir.Ext {
 	if x == nil {
@@ -300,7 +303,7 @@ func collapseActions(rep *report.Report, j *ir.Job, m *marks) {
 			continue
 		}
 		am := actionMark{use: u}
-		if !decodeArg(m.args[u], &am.arg) || yaml.Unmarshal([]byte(am.arg.Step), &am.st) != nil {
+		if !decodeArg(m.args[u], &am.arg) || am.arg.At < 0 || yaml.Unmarshal([]byte(am.arg.Step), &am.st) != nil {
 			reportUncollapsed(rep, u, "its argument is not an action step")
 			continue
 		}
@@ -343,7 +346,7 @@ func shadowed(j *ir.Job, m *marks) map[*ir.Step][]string {
 	out := map[*ir.Step][]string{}
 	for _, u := range m.uses {
 		var a shadowArg
-		if u.Feature == caps.StepEnv && decodeArg(m.args[u], &a) && a.Pos < len(j.Steps) {
+		if u.Feature == caps.StepEnv && decodeArg(m.args[u], &a) && validPos(j, a.Pos) {
 			out[j.Steps[a.Pos]] = append(out[j.Steps[a.Pos]], a.Names...)
 		}
 	}
