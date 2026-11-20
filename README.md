@@ -326,6 +326,7 @@ The following table comes from `pipemaster caps --from gha --to woodpecker --for
 ### Woodpecker notes
 
 - The emitter writes one workflow file for each job in `.woodpecker/`. The parser reads the first form that exists and does not merge forms.
+- Woodpecker keeps only an `os/arch` runner label (`labels.platform`). The round-trip metadata restores the other labels when the chain returns to the origin. If a later hop emits GHA, Gitea or Forgejo, the emitter writes the default label `ubuntu-latest` and reports an emulated `job.runner` entry.
 - Woodpecker substitutes `${NAME}` in the raw YAML and turns `$$` into a literal `$`. Thus the emitter writes `$` in script and environment text as `$$`. The parser reverses this.
 - Woodpecker filters use doublestar globs. If a GHA filter uses `+` or `?`, doublestar cannot express it. The emitter then writes an anchored regular expression in `evaluate`.
 - A cron schedule is external. Woodpecker keeps the cron string in the repository settings, not in the workflow file.
