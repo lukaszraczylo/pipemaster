@@ -2,6 +2,7 @@ package gha
 
 import (
 	"encoding/json"
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -183,7 +184,15 @@ func sourceCond(rep *report.Report, u ir.FeatureUse, args []string, parsed expr.
 			continue
 		}
 		src, ok := foreignLang(s.From)
-		if ok && parsed != nil && (*from == "" || *from == src.ID) {
+		switch {
+		case !ok:
+			rep.Add(ignoredMarker(u, fmt.Sprintf("the source dialect %q is not a registered GitLab-class dialect", markName(s.From))))
+			continue
+		case *from != "" && *from != src.ID:
+			rep.Add(ignoredMarker(u, fmt.Sprintf("the file already restores conditions from %q, not %q", *from, src.ID)))
+			continue
+		}
+		if parsed != nil {
 			if r, ok := restoreCond(x, parsed, *src); ok {
 				if expr.String(r) != expr.String(parsed) {
 					*from = src.ID
@@ -192,10 +201,21 @@ func sourceCond(rep *report.Report, u ir.FeatureUse, args []string, parsed expr.
 				continue
 			}
 		}
-		rep.Add(report.Entry{IRPath: u.IRPath, Feature: u.Feature, Level: caps.Lost, Strategy: "marker ignored",
-			Detail: "marker ignored: the condition was edited after conversion, so the parsed condition stands"})
+		rep.Add(ignoredMarker(u, "the condition was edited after conversion, so the parsed condition stands"))
 	}
 	return parsed
+}
+
+func ignoredMarker(u ir.FeatureUse, why string) report.Entry {
+	return report.Entry{IRPath: u.IRPath, Feature: u.Feature, Level: caps.Lost, Strategy: "marker ignored", Detail: "marker ignored: " + why}
+}
+
+// markName is the dialect a marker names; an empty name means GitLab.
+func markName(id string) string {
+	if id == "" {
+		return provider.GitLab
+	}
+	return id
 }
 
 // foreignLang resolves the dialect a marker names; an empty name is GitLab, the only source before the

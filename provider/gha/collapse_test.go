@@ -458,3 +458,102 @@ func TestParseRefusesMarkerNamingAGHAClassDialect(t *testing.T) {
 		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
 	}
 }
+
+func markerIgnoredDetails(rep *report.Report) []string {
+	var out []string
+	for _, e := range rep.Entries {
+		if e.Strategy == "marker ignored" {
+			out = append(out, e.Detail)
+		}
+	}
+	return out
+}
+
+func TestMarkerNamingAnUnusableDialectGetsAnAccurateReport(t *testing.T) {
+	fakeGitLabOrigin()
+	for name, c := range map[string]struct{ from, want string }{
+		"unregistered": {"nosuchdialect", `"nosuchdialect" is not a registered GitLab-class dialect`},
+		"gha class":    {"gitea", `"gitea" is not a registered GitLab-class dialect`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			files, _, err := gha.New(gha.GHA).Emit(gitlabCondProject(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for n, b := range files {
+				files[n] = []byte(strings.ReplaceAll(string(b), `{"src"`, `{"from":"`+c.from+`","src"`))
+			}
+			_, rep := parseGHAText(t, files)
+			got := markerIgnoredDetails(rep)
+			if len(got) != 1 || !strings.Contains(got[0], c.want) || strings.Contains(got[0], "edited") {
+				t.Errorf("details = %q, want one mentioning %q and not an edit", got, c.want)
+			}
+		})
+	}
+}
+
+func TestParseDirWithTwoSourceDialectsRestoresNone(t *testing.T) {
+	id := fakeGitLabOrigin()
+	emit := func(origin, pipeline string) map[string][]byte {
+		p := baseProject(t)
+		p.Pipelines[0].ID = pipeline
+		p.Origin = ir.Origin{Provider: origin, Dialect: origin}
+		cond, err := expr.ParseCanonical("branch == 'main'")
+		if err != nil {
+			t.Fatal(err)
+		}
+		job(p, "build").If = cond
+		files, _, err := gha.New(gha.GHA).Emit(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return files
+	}
+	fsys := fstest.MapFS{}
+	for _, c := range []struct{ origin, pipeline string }{{provider.GitLab, "one"}, {id, "two"}} {
+		for n, b := range emit(c.origin, c.pipeline) {
+			fsys[n] = &fstest.MapFile{Data: b}
+		}
+	}
+	back, rep, err := gha.New(gha.GHA).Parse(fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back.Origin.Provider != provider.GHA {
+		t.Errorf("origin = %+v, want %q: no restored condition may flip the project", back.Origin, provider.GHA)
+	}
+	for _, pl := range back.Pipelines {
+		if got := expr.String(pl.Jobs[0].If); got == "branch == 'main'" {
+			t.Errorf("%s: condition %s was restored", pl.ID, got)
+		}
+	}
+	lost := 0
+	for _, e := range rep.Entries {
+		if e.Level == caps.Lost && strings.Contains(e.Detail, "more than one source dialect") {
+			lost++
+		}
+	}
+	if lost != 2 {
+		t.Errorf("%d entries name the mixed dialects, want 2: %+v", lost, rep.Entries)
+	}
+}
+
+func TestSecondMarkerFromAnotherDialectCannotRestoreOverTheFirst(t *testing.T) {
+	id := fakeGitLabOrigin()
+	files, _, err := gha.New(gha.GHA).Emit(gitlabCondProject(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const first = "# pipemaster:arg {\"src\":\"branch == 'main'\"}\n"
+	for n, b := range files {
+		files[n] = []byte(strings.Replace(string(b), first, first+"# pipemaster:arg {\"from\":\""+id+"\",\"src\":\"branch == 'main'\"}\n", 1))
+	}
+	back, rep := parseGHAText(t, files)
+	if got := expr.String(back.Pipelines[0].Jobs[0].If); got != "branch == 'main'" {
+		t.Errorf("the first marker did not restore: %s", got)
+	}
+	got := markerIgnoredDetails(rep)
+	if len(got) != 1 || !strings.Contains(got[0], `already restores conditions from "gitlab", not "`+id+`"`) {
+		t.Errorf("details = %q", got)
+	}
+}
