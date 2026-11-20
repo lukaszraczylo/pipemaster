@@ -227,7 +227,9 @@ func (s *whenSpec) triggers() ([]ir.Trigger, bool) {
 	}
 	var out []ir.Trigger
 	for _, it := range s.items {
-		if it.item.Evaluate != "" || !it.item.Ref.Empty() || !it.item.Repo.Empty() || !it.item.Instance.Empty() ||
+		tagRef, tagOK := tagGlobs(it.item.Ref)
+		refBlocks := !it.item.Ref.Empty() && (!tagOK || !slices.Equal(it.item.Event.Include, []string{eventTag}))
+		if it.item.Evaluate != "" || refBlocks || !it.item.Repo.Empty() || !it.item.Instance.Empty() ||
 			it.hasStatus || len(it.extras) > 0 || len(it.item.Event.Exclude) > 0 || len(it.item.Event.Include) == 0 {
 			return nil, false
 		}
@@ -251,6 +253,10 @@ func (s *whenSpec) triggers() ([]ir.Trigger, bool) {
 				if !it.path.Empty() {
 					return nil, false
 				}
+				var okT bool
+				if t.Tags, okT = irFilter(tagRef, false); !okT {
+					return nil, false
+				}
 			default:
 				if !it.item.Branch.Empty() || !it.path.Empty() {
 					return nil, false
@@ -264,8 +270,29 @@ func (s *whenSpec) triggers() ([]ir.Trigger, bool) {
 	return out, true
 }
 
+// tagGlobs reads a ref filter whose every value is a tag ref as the tag name globs, the inverse of the emitter's
+// tagRefs. An empty filter is a valid empty result.
+func tagGlobs(f wpexpr.Filter) (wpexpr.Filter, bool) {
+	var out wpexpr.Filter
+	for _, p := range f.Include {
+		rest, ok := strings.CutPrefix(p, refTagPrefix)
+		if !ok || rest == "" {
+			return wpexpr.Filter{}, false
+		}
+		out.Include = append(out.Include, rest)
+	}
+	for _, p := range f.Exclude {
+		rest, ok := strings.CutPrefix(p, refTagPrefix)
+		if !ok || rest == "" {
+			return wpexpr.Filter{}, false
+		}
+		out.Exclude = append(out.Exclude, rest)
+	}
+	return out, true
+}
+
 func triggerEqual(a, b ir.Trigger) bool {
-	return a.Kind == b.Kind && slices.Equal(a.Branches.Include, b.Branches.Include) && slices.Equal(a.Branches.Exclude, b.Branches.Exclude) &&
+	return a.Kind == b.Kind && slices.Equal(a.Tags.Include, b.Tags.Include) && slices.Equal(a.Tags.Exclude, b.Tags.Exclude) && slices.Equal(a.Branches.Include, b.Branches.Include) && slices.Equal(a.Branches.Exclude, b.Branches.Exclude) &&
 		slices.Equal(a.Paths.Include, b.Paths.Include) && slices.Equal(a.Paths.Exclude, b.Paths.Exclude)
 }
 

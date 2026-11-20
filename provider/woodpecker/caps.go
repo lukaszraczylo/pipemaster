@@ -14,7 +14,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.TriggerAPI:             {Level: caps.Lost, Caveat: "Woodpecker starts API pipelines as manual events"},
 		caps.TriggerPipelineDone:    {Level: caps.Lost, Caveat: "Woodpecker has no pipeline-completion trigger"},
 		caps.TriggerResource:        {Level: caps.Lost, Caveat: "Woodpecker CI has no resource triggers"},
-		caps.TriggerFilterTags:      {Level: caps.Emulated, Strategy: "ref filter refs/tags/<pattern> on the tag event", Caveat: "the glob dialect is doublestar; the parser reads the filter back as a condition, not a trigger"},
+		caps.TriggerFilterTags:      {Level: caps.Emulated, Strategy: "ref filter refs/tags/<pattern> on the tag event", Caveat: "the glob dialect is doublestar; the parser reads it back as the tag trigger filter"},
 		caps.TriggerFilterBranch:    {Level: caps.Native, Strategy: "branch filter", Caveat: "only exact globs are native; other patterns keep doublestar meaning"},
 		caps.PipelineEnv:            {Level: caps.Emulated, Strategy: "copied into the environment of every step", Caveat: "a step variable of the same name wins"},
 		caps.JobEnv:                 {Level: caps.Emulated, Strategy: "copied into the environment of every step", Caveat: "a step variable of the same name wins"},

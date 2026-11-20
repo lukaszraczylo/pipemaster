@@ -44,10 +44,10 @@ type wfCtx struct {
 	name    string
 	// image is what a step without its own image runs in; a setup action replaces it for the steps after it.
 	image string
-	// entry is the job container entrypoint, which a step without its own image inherits.
-	entry []string
 	// depth is the clone depth that an actions/checkout step asked for; empty means the default clone.
-	depth   string
+	depth string
+	// entry is the job container entrypoint, which a step without its own image inherits.
+	entry   []string
 	finally bool
 	defImg  bool
 	// mapForm is true when the steps are written as a map keyed by name.
