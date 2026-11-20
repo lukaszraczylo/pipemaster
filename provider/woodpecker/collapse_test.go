@@ -76,27 +76,40 @@ func TestCollapseJobRestoresEachMarkerKind(t *testing.T) {
 	env := `"- name: X\n  value:\n    lit: \"1\"\n"`
 	cases := []struct {
 		check   func(*ir.Job) bool
+		prep    func(*ir.Job)
 		name    string
 		feature caps.Feature
 		path    string
 		arg     string
 	}{
-		{func(j *ir.Job) bool { return j.Steps[0].Script[0] == "echo ${{ secrets.TOKEN }}" },
+		{func(j *ir.Job) bool { return j.Steps[0].Script[0] == "echo ${{ secrets.TOKEN }}" }, nil,
 			"refs", caps.ScriptInterpolation, jp, `{"refs":["secrets.TOKEN"],"pos":0}`},
-		{func(j *ir.Job) bool { return j.Steps[1].Name == "b" && j.Steps[1].ID == "orig" },
+		{func(j *ir.Job) bool { return j.Steps[1].Name == "b" && j.Steps[1].ID == "orig" }, nil,
 			"display name", caps.DisplayName, jp + "/step/orig", `{"name":"b","pos":1}`},
-		{func(j *ir.Job) bool { return j.Container != nil && j.Container.Ref == "alpine" }, "container", caps.JobContainer, jp, `{"Ref":"alpine"}`},
-		{func(j *ir.Job) bool { return j.Matrix != nil && len(j.Matrix.Axes) == 1 }, "matrix", caps.JobMatrix, jp, `{"Axes":[{"Name":"go","Values":["1"]}]}`},
-		{func(j *ir.Job) bool { return j.AllowFailure }, "allow failure", caps.JobAllowFailure, jp, ``},
-		{func(j *ir.Job) bool { return len(j.Steps[1].Env) == 1 && j.Steps[1].Env[0].Name == "X" },
+		{func(j *ir.Job) bool { return j.Container != nil && j.Container.Ref == "alpine" }, nil, "container", caps.JobContainer, jp, `{"Ref":"alpine"}`},
+		{func(j *ir.Job) bool { return j.Matrix != nil && len(j.Matrix.Axes) == 1 },
+			func(j *ir.Job) { j.Matrix = &ir.Matrix{Include: []ir.Combo{{{Key: "go", Value: "1"}}}} }, "matrix", caps.JobMatrix, jp, `{"Axes":[{"Name":"go","Values":["1"]}]}`},
+		{func(j *ir.Job) bool { return j.AllowFailure }, func(j *ir.Job) {
+			for _, st := range j.Steps {
+				st.ContinueOnError = true
+			}
+		}, "allow failure", caps.JobAllowFailure, jp, ``},
+		{func(j *ir.Job) bool { return len(j.Steps[1].Env) == 1 && j.Steps[1].Env[0].Name == "X" }, nil,
 			"lost env", caps.ExprOpaque, jp, `{"vars":` + env + `,"at":[0],"pos":1}`},
-		{func(j *ir.Job) bool { return len(j.Steps) == 3 && j.Steps[1].ID == "c" },
+		{func(j *ir.Job) bool { return len(j.Steps) == 3 && j.Steps[1].ID == "c" }, nil,
 			"action", caps.StepAction, jp + "/step/c", `{"step":"id: c\nkind: action\n","at":1}`},
-		{func(j *ir.Job) bool { return len(j.Env) == 1 && j.Env[0].Name == "X" }, "job env", caps.JobEnv, jp, env},
+		{func(j *ir.Job) bool { return len(j.Env) == 1 && j.Env[0].Name == "X" }, func(j *ir.Job) {
+			for _, st := range j.Steps {
+				st.Env = []ir.Var{{Name: "X", Value: ir.Value{Lit: "1"}}}
+			}
+		}, "job env", caps.JobEnv, jp, env},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			j := twoSteps()
+			if c.prep != nil {
+				c.prep(j)
+			}
 			rep := &report.Report{}
 			collapseJob(rep, j, readMarks(markerText(c.feature, c.path, c.arg)))
 			if !c.check(j) {

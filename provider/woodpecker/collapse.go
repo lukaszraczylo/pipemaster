@@ -49,6 +49,7 @@ func readMarks(src []byte) *marks {
 
 // collapseCtx is what a collapser works on: the job of the file and the marker with its argument.
 type collapseCtx struct {
+	rep  *report.Report
 	j    *ir.Job
 	use  ir.FeatureUse
 	args []string
@@ -81,25 +82,32 @@ func collapseJob(rep *report.Report, j *ir.Job, m *marks) (pipeEnv []ir.Var) {
 			if u.Feature != cl.feature {
 				continue
 			}
-			if !cl.run(&collapseCtx{j: j, use: u, args: m.args[u]}) {
+			if !cl.run(&collapseCtx{rep: rep, j: j, use: u, args: m.args[u]}) {
 				reportUncollapsed(rep, u, "no parser rule restores "+string(u.Feature)+" at this path")
 			}
 		}
 	}
 	keep := shadowed(j, m)
+	edited := map[ir.FeatureUse]bool{}
+	for _, u := range m.uses {
+		var vars []ir.Var
+		edited[u] = (u.Feature == caps.JobEnv || u.Feature == caps.PipelineEnv) && decodeYAMLArg(m.args[u], &vars) && !envAsEmitted(j, vars)
+	}
 	collapseActions(rep, j, m)
 	for _, u := range m.uses {
 		if u.Feature != caps.JobEnv && u.Feature != caps.PipelineEnv {
 			continue
 		}
-		vars, ok := collapseEnv(j, m.args[u], keep)
+		var vars []ir.Var
 		switch {
-		case !ok:
+		case !decodeYAMLArg(m.args[u], &vars):
 			reportUncollapsed(rep, u, "its argument is not a list of variables")
+		case edited[u]:
+			reportIgnored(rep, u, "the variable copy")
 		case u.Feature == caps.JobEnv:
-			j.Env = vars
+			j.Env = dropCopies(j, vars, keep)
 		default:
-			pipeEnv = vars
+			pipeEnv = dropCopies(j, vars, keep)
 		}
 	}
 	return pipeEnv
@@ -226,22 +234,64 @@ func collapseMatrix(c *collapseCtx) bool {
 	if !decodeArg(c.args, &mx) {
 		return false
 	}
+	if !matrixAsEmitted(c.j.Matrix, &mx) {
+		reportIgnored(c.rep, c.use, "the matrix")
+		return true
+	}
 	c.j.Matrix = &mx
 	return true
+}
+
+// matrixAsEmitted is true when the parsed matrix lists exactly the combinations the emitter wrote for mx.
+func matrixAsEmitted(parsed, mx *ir.Matrix) bool {
+	if parsed == nil || len(parsed.Axes) > 0 || len(parsed.Exclude) > 0 {
+		return false
+	}
+	want := ir.Expand(mx)
+	if len(want) != len(parsed.Include) {
+		return false
+	}
+	for i := range want {
+		if !sameCombo(want[i], parsed.Include[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func sameCombo(a, b ir.Combo) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for _, kv := range a {
+		if !slices.Contains(b, kv) {
+			return false
+		}
+	}
+	return true
+}
+
+// reportIgnored records a marker that the file no longer matches, so the parsed value stands.
+func reportIgnored(rep *report.Report, u ir.FeatureUse, what string) {
+	rep.Add(report.Entry{
+		IRPath: u.IRPath, Feature: u.Feature, Level: caps.Lost, Strategy: "marker ignored",
+		Detail: "marker ignored: " + what + " was edited after conversion, so the parsed value stands",
+	})
 }
 
 func collapseCache(c *collapseCtx) bool { return decodeArg(c.args, &c.j.Cache) }
 
 func collapseArtifacts(c *collapseCtx) bool { return decodeArg(c.args, &c.j.Artifacts) }
 
-// collapseAllowFailure moves failure: ignore from every step to the job. A step that ignores failure on its
-// own while a sibling does not keeps the flag.
+// collapseAllowFailure moves failure: ignore from every step to the job; a step without it, bar the placeholder, means the file was edited.
 func collapseAllowFailure(c *collapseCtx) bool {
+	if slices.ContainsFunc(c.j.Steps, func(s *ir.Step) bool { return !s.ContinueOnError && s.ID != placeholderStep }) {
+		reportIgnored(c.rep, c.use, "failure: ignore")
+		return true
+	}
 	c.j.AllowFailure = true
-	if !slices.ContainsFunc(c.j.Steps, func(s *ir.Step) bool { return !s.ContinueOnError }) {
-		for _, st := range c.j.Steps {
-			st.ContinueOnError = false
-		}
+	for _, st := range c.j.Steps {
+		st.ContinueOnError = false
 	}
 	return true
 }
@@ -325,20 +375,33 @@ func collapseActions(rep *report.Report, j *ir.Job, m *marks) {
 	}
 }
 
-// collapseEnv undoes the copy of job and pipeline variables into every step. The marker holds the variables, so
+// dropCopies undoes the copy of job and pipeline variables into every step. The marker holds the variables, so
 // each is restored exactly and removed from the steps that carry the same value.
-func collapseEnv(j *ir.Job, args []string, keep map[*ir.Step][]string) ([]ir.Var, bool) {
-	var vars []ir.Var
-	if !decodeYAMLArg(args, &vars) {
-		return nil, false
-	}
+func dropCopies(j *ir.Job, vars []ir.Var, keep map[*ir.Step][]string) []ir.Var {
 	for _, st := range j.Steps {
 		st.Env = slices.DeleteFunc(st.Env, func(v ir.Var) bool {
 			return !slices.Contains(keep[st], v.Name) &&
 				slices.ContainsFunc(vars, func(w ir.Var) bool { return w.Name == v.Name && reflect.DeepEqual(w.Value, v.Value) })
 		})
 	}
-	return vars, true
+	return vars
+}
+
+// envAsEmitted is true when every command step still carries every variable of the marker; a step value that
+// differs is the step's own override. An expression value can have no spelling, so the emitter may not have
+// copied it.
+func envAsEmitted(j *ir.Job, vars []ir.Var) bool {
+	for _, st := range j.Steps {
+		if len(st.Script) == 0 || st.ID == placeholderStep {
+			continue
+		}
+		for _, v := range vars {
+			if v.Value.Kind != ir.ValueExpr && !slices.ContainsFunc(st.Env, func(w ir.Var) bool { return w.Name == v.Name }) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // shadowed reads the markers of the variables that a step sets to the value it would inherit, by step place.
