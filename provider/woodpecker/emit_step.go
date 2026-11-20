@@ -100,6 +100,7 @@ func (e *emitter) stepName(sp string, st *ir.Step) string {
 func (e *emitter) step(c *wfCtx, st *ir.Step, idx int) (stepDone, error) {
 	sp := c.jp + "/step/" + st.ID
 	e.foreignExt(sp, st.Ext)
+	e.cut = false
 	var m *wmap
 	var err error
 	switch {

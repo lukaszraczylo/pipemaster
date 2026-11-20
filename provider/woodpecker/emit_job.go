@@ -383,11 +383,23 @@ func (e *emitter) services(c *wfCtx, ext map[string]any) (*yaml.Node, error) {
 	rest, _ := ext["services"].(map[string]any)
 	m := newMap()
 	for _, sv := range c.j.Services {
+		e.cut = false
 		n, err := e.service(c.jp, sv, rest[sv.Name])
 		if err != nil {
 			return nil, fmt.Errorf("service %s: %w", sv.Name, err)
 		}
+		if e.cut {
+			// A service cannot be guarded by a condition, and a truncated one would start with the wrong image or
+			// entrypoint, so it is not written; the steps that use it fail where they connect.
+			e.cut = false
+			e.lose(c.jp, caps.JobServices, "service "+sv.Name+" lost an expression in its image or entrypoint and is not written")
+			e.comment("job.services " + c.jp + ": service " + sv.Name + " is not written")
+			continue
+		}
 		m.set(sv.Name, n)
+	}
+	if m.empty() {
+		return nil, nil
 	}
 	return m.n, nil
 }

@@ -770,3 +770,25 @@ func hasExtEntry(rep *report.Report) bool {
 	}
 	return false
 }
+
+func TestLostExpressionInServiceDropsOnlyTheService(t *testing.T) {
+	a := wpJob("a", wpStep("s", "x"))
+	a.Services = []ir.Service{
+		{Name: "bad", Image: ir.Image{Ref: "pg", Entrypoint: []string{"${{ needs.a.outputs.v }}"}}},
+		{Name: "good", Image: ir.Image{Ref: "redis"}},
+	}
+	b := wpJob("b", wpStep("first", "y"), wpStep("second", "z"))
+	files, rep := emitFiles(t, wpProject(ghaOrigin, a, b))
+	if got := files[dirPrefix+"a.yaml"]; strings.Contains(got, "  bad:") || !strings.Contains(got, "  good:") {
+		t.Errorf("only the service with a lost expression is dropped:\n%s", got)
+	}
+	if strings.Contains(files[dirPrefix+"a.yaml"], `evaluate: "false"`) {
+		t.Errorf("a service must not disable a step:\n%s", files[dirPrefix+"a.yaml"])
+	}
+	if strings.Contains(files[dirPrefix+"b.yaml"], `evaluate: "false"`) {
+		t.Errorf("the flag leaked into another workflow:\n%s", files[dirPrefix+"b.yaml"])
+	}
+	if !reportHas(rep, caps.JobServices, caps.Lost) {
+		t.Errorf("the dropped service must be reported: %+v", rep.Entries)
+	}
+}

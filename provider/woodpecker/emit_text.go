@@ -34,7 +34,7 @@ type emitter struct {
 	led  *emitkit.Ledger
 	from *expr.Dialect
 	head []string
-	// cut is set when an image or workdir lost an expression, so the step in progress must not run.
+	// cut is set when an image, workdir or service field lost an expression; the step or service being written owns it.
 	cut bool
 	// own is true when the project came from Woodpecker, where a name that is not a built-in is a
 	// substitution of the global environment.
@@ -151,7 +151,7 @@ func (e *emitter) text(b *bindings, path string, f caps.Feature, mode textMode, 
 		e.lose(path, f, "no Woodpecker spelling for expression "+l)
 		e.comment(string(f) + " " + path + ": {{ " + l + " }}")
 	}
-	if len(lost) > 0 && (f == caps.StepImage || f == caps.StepWorkdir) {
+	if len(lost) > 0 && (f == caps.StepImage || f == caps.StepWorkdir || f == caps.JobServices) {
 		e.cut = true
 	}
 	return out, nil
