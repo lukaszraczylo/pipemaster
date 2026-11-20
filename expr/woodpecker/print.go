@@ -46,6 +46,8 @@ func prec(e expr.Expr) int {
 			return precOr
 		case expr.OpAnd:
 			return precAnd
+		case expr.OpNoMatch:
+			return precNot // printed as !(...)
 		}
 		return precCmp
 	case expr.Call:

@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/lukaszraczylo/pipemaster/expr"
-	"github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/expr/woodpecker"
 	"pgregory.net/rapid"
 )
@@ -225,27 +224,40 @@ func TestAndBindsTighterThanOr(t *testing.T) {
 }
 
 func TestEventMap(t *testing.T) {
-	want := map[string]string{"push": "push", "pull_request": "pull_request", "schedule": "cron", "workflow_dispatch": "manual"}
+	want := map[string]string{"pull_request": "pull_request", "schedule": "cron", "workflow_dispatch": "manual"}
 	if !reflect.DeepEqual(woodpecker.Events, want) {
 		t.Errorf("Events = %v", woodpecker.Events)
 	}
 }
 
-// The class claim is refused (lean4/Pipemaster/Woodpecker.lean: not_gitlab_class), so nothing translates.
-func TestClassTranslatesNothing(t *testing.T) {
-	e := bin(expr.OpEq, branch, str("main"))
-	if woodpecker.Lang.Class != expr.ClassWoodpecker {
+// The whole-class claim is refused (lean4/Pipemaster/Woodpecker.lean: not_gitlab_class); only the proved subset
+// shares the GitLab class (eval_woodpecker), so Reads and Supports must reject what lies outside it.
+func TestLangConfinesTranslationToTheSubset(t *testing.T) {
+	if woodpecker.Lang.Class != expr.ClassGitLab {
 		t.Fatalf("class = %d", woodpecker.Lang.Class)
 	}
-	for _, p := range [][2]expr.Dialect{{woodpecker.Lang, gitlab.Lang}, {gitlab.Lang, woodpecker.Lang}} {
-		if _, ok := expr.Translate(e, p[0], p[1]); ok {
-			t.Errorf("Translate %s -> %s succeeded", p[0].ID, p[1].ID)
+	in := bin(expr.OpMatch, branch, str("(?i)^main$"))
+	for name, e := range map[string]expr.Expr{
+		"eq string":    bin(expr.OpEq, branch, str("main")),
+		"eq empty":     bin(expr.OpEq, r("tag"), str("")),
+		"ne nil":       bin(expr.OpNe, r("tag"), null),
+		"bare ref":     branch,
+		"not ref":      not(branch),
+		"call":         call("contains", branch, str("a")),
+		"raw pattern":  bin(expr.OpMatch, branch, str(`^v\d+`)),
+		"and bare ref": bin(expr.OpAnd, in, branch),
+		"or eq":        bin(expr.OpOr, in, bin(expr.OpEq, branch, str("x"))),
+	} {
+		if woodpecker.Lang.Reads(e) || woodpecker.Lang.Supports(e) {
+			t.Errorf("%s: outside the subset but accepted", name)
 		}
-		if expr.Translatable(e, p[0], p[1]) {
-			t.Errorf("Translatable %s -> %s", p[0].ID, p[1].ID)
-		}
-		if _, _, ok := expr.TranslateApprox(e, p[0], p[1]); ok {
-			t.Errorf("TranslateApprox %s -> %s succeeded", p[0].ID, p[1].ID)
+	}
+	for name, e := range map[string]expr.Expr{
+		"match": in, "no match": bin(expr.OpNoMatch, branch, str("(?i)abc")),
+		"not": not(in), "and or": bin(expr.OpOr, bin(expr.OpAnd, in, not(in)), in),
+	} {
+		if !woodpecker.Lang.Reads(e) || !woodpecker.Lang.Supports(e) {
+			t.Errorf("%s: inside the subset but refused", name)
 		}
 	}
 	if got, ok := expr.LangOf("woodpecker"); !ok || got.ID != "woodpecker" {

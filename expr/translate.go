@@ -8,6 +8,11 @@ import (
 
 // Dialect describes one expression language for translation.
 type Dialect struct {
+	// Reads, when set, restricts the expressions Translate takes from this dialect to the subset that shares
+	// the class semantics; the rest of the dialect's language evaluates differently (Woodpecker, where an
+	// unset name reads "" and not null: lean4/Pipemaster/Woodpecker.lean).
+	Reads func(Expr) bool
+	// Supports, when set, accepts the expressions the dialect can print and that stay inside its subset.
 	Supports func(Expr) bool
 	// Events maps canonical event values to this dialect's values.
 	Events map[string]string
@@ -206,10 +211,11 @@ func rx(neg bool, x Expr, m Mode, s string) Expr {
 	return Binary{Op: op, L: x, R: Lit{Kind: LitStr, Str: Pattern(m, s)}}
 }
 
-// foreignClass is true for a pair across classes where one side has no translation rules (ClassWoodpecker).
-func foreignClass(from, to Dialect) bool {
-	return from.Class != to.Class && (from.Class == ClassWoodpecker || to.Class == ClassWoodpecker)
-}
+// supported reports whether the target dialect accepts t.
+func supported(t Expr, to Dialect) bool { return to.Supports == nil || to.Supports(t) }
+
+// reads reports whether e lies in the subset of from that shares its class semantics.
+func reads(e Expr, from Dialect) bool { return from.Reads == nil || from.Reads(e) }
 
 // Translate converts e between two dialects, exactly. Dialects of one class (ClassGHA or ClassGitLab) differ
 // only in the names their vocabularies give the canonical refs, so e is returned as it is, provided both
@@ -244,16 +250,16 @@ func Translate(e Expr, from, to Dialect) (Expr, bool) {
 	var t Expr
 	var ok bool
 	switch {
-	case from.Class == 0 || to.Class == 0 || foreignClass(from, to):
+	case from.Class == 0 || to.Class == 0 || !reads(e, from):
 		return nil, false
 	case from.Class == to.Class:
 		t, ok = renameClass(e, from, to)
 	case from.Class == ClassGHA:
 		t, ok = toGitLab(e, from, to)
-		ok = ok && from.names(e) && to.names(t)
+		ok = ok && from.names(e) && to.names(t) && supported(t, to)
 	default:
 		t, ok = toGHA(e, from, to)
-		ok = ok && from.names(e) && to.names(t)
+		ok = ok && from.names(e) && to.names(t) && supported(t, to)
 	}
 	if !ok {
 		return nil, false
@@ -265,7 +271,7 @@ func Translate(e Expr, from, to Dialect) (Expr, bool) {
 // rules are stated separately from Translate, as in the Lean model, so tests can hold the two together.
 func Translatable(e Expr, from, to Dialect) bool {
 	switch {
-	case from.Class == 0 || to.Class == 0 || foreignClass(from, to):
+	case from.Class == 0 || to.Class == 0 || !reads(e, from):
 		return false
 	case from.Class == to.Class:
 		_, ok := renameClass(e, from, to)
@@ -275,13 +281,13 @@ func Translatable(e Expr, from, to Dialect) bool {
 			return false
 		}
 		t, _ := toGitLab(e, from, to)
-		return to.names(t)
+		return to.names(t) && supported(t, to)
 	}
 	if !okRev(e, from) || !from.names(e) {
 		return false
 	}
 	t, _ := toGHA(e, from, to)
-	return to.names(t)
+	return to.names(t) && supported(t, to)
 }
 
 func copyRef(r Ref) Ref { return Ref{Path: append([]string(nil), r.Path...)} }
@@ -647,7 +653,7 @@ func TranslateApprox(e Expr, from, to Dialect) (Expr, []string, bool) {
 	if t, ok := Translate(e, from, to); ok {
 		return t, nil, true
 	}
-	if from.Class != ClassGitLab || to.Class != ClassGHA {
+	if !reads(e, from) || from.Class != ClassGitLab || to.Class != ClassGHA {
 		return nil, nil, false
 	}
 	var cav caveats

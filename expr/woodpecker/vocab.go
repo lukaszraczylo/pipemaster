@@ -12,7 +12,8 @@ const nativePrefix = "CI_"
 
 // Semantics is expr-lang over a map[string]string environment (pipeline/frontend/yaml/constraint,
 // v3.20.1): == compares same-typed values and never coerces. Eval cannot model the compile errors expr-lang
-// raises for a non-boolean operand of !, && and ||, so only the comparison rules are encoded here.
+// raises for a non-boolean operand of !, && and ||, so Lang.Reads keeps translation to the subset where
+// every operand is boolean.
 var Semantics = expr.Semantics{StrictTypes: true}
 
 // UnsetEnv reads a ref the wrapped env lacks as "": expr-lang over map[string]string yields the zero value
@@ -56,11 +57,11 @@ var Vocab = expr.Vocab{
 	},
 }
 
-// Events maps the canonical (GHA-named) event values the canonical table holds to CI_PIPELINE_EVENT values.
-// Woodpecker events with no canonical name (tag, deployment, release, pull_request_closed,
+// Events maps canonical (GHA-named) event values to CI_PIPELINE_EVENT values. Push is absent on purpose: GHA
+// and GitLab call a tag push a push, Woodpecker reports it as the tag event, so no literal stands for it
+// exactly. Woodpecker events with no canonical name (tag, deployment, release, pull_request_closed,
 // pull_request_metadata) stay unmapped.
 var Events = map[string]string{
-	"push":              "push",
 	"pull_request":      "pull_request",
 	"schedule":          "cron",
 	"workflow_dispatch": "manual",
@@ -80,12 +81,14 @@ func ref(name string) expr.Ref {
 
 func init() { expr.RegisterLang(&Lang) }
 
-// Lang is the Woodpecker dialect. Its class translates nothing: expr.Translate refuses every pair with it.
+// Lang is the Woodpecker dialect. It shares the GitLab class only on the subset that eval_woodpecker proves
+// (see inSubset); Reads and Supports confine Translate to it in both directions.
 var Lang = expr.Dialect{
 	ID:       Dialect,
-	Class:    expr.ClassWoodpecker,
+	Class:    expr.ClassGitLab,
 	Vocab:    Vocab,
 	Sem:      Semantics,
 	Events:   Events,
-	Supports: func(e expr.Expr) bool { _, err := Print(e); return err == nil },
+	Reads:    reads,
+	Supports: supports,
 }
