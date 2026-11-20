@@ -211,7 +211,17 @@ func dependencies(v any) ([]dep, error) {
 		if !ok {
 			return nil, fmt.Errorf("an entry needs a name")
 		}
-		opt, _ := boolOf(m.vals["optional"])
+		var opt bool
+		if ov, has := m.vals["optional"]; has {
+			if opt, ok = boolOf(ov); !ok {
+				return nil, fmt.Errorf("optional of %s must be a boolean", name)
+			}
+		}
+		for _, k := range m.keys {
+			if k != "name" && k != "optional" {
+				return nil, fmt.Errorf("an entry has the unknown key %s", k)
+			}
+		}
 		out = append(out, dep{name: name, optional: opt})
 	}
 	return out, nil

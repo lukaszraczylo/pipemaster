@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/fs"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/lukaszraczylo/pipemaster/provider"
@@ -146,5 +147,20 @@ func TestRegisteredAndEmitUnavailable(t *testing.T) {
 	}
 	if _, _, err := p.Emit(nil); !errors.Is(err, woodpecker.ErrNoEmitter) {
 		t.Fatalf("Emit error = %v", err)
+	}
+}
+
+func TestDependsOnEntryErrors(t *testing.T) {
+	for name, entry := range map[string]string{
+		"non-bool optional": "  - name: a\n    optional: maybe\n",
+		"extra key":         "  - name: a\n    optional: true\n    note: x\n",
+	} {
+		err := parseErr(t, map[string]string{
+			".woodpecker/a.yaml": minimal,
+			".woodpecker/b.yaml": "depends_on:\n" + entry + minimal,
+		})
+		if !strings.Contains(err.Error(), "depends_on") {
+			t.Errorf("%s: error does not name depends_on: %v", name, err)
+		}
 	}
 }
