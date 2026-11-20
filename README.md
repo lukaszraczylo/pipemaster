@@ -14,6 +14,7 @@ The provider ID is the value that you pass to `--from`, `--to`, `--via` and `--a
 | `gitea` | Gitea Actions | `.yml` and `.yaml` files in `.gitea/workflows`, then `.github/workflows` |
 | `forgejo` | Forgejo Actions | `.yml` and `.yaml` files in `.forgejo/workflows`, then `.gitea/workflows`, then `.github/workflows` |
 | `gitlab` | GitLab CI | `.gitlab-ci.yml` and its local includes |
+| `woodpecker` | Woodpecker CI | `.yml` and `.yaml` files in `.woodpecker`, then `.woodpecker.yaml`, then `.woodpecker.yml` |
 
 The parser reads the first directory of the list that exists and does not merge directories. The emitter writes only the first directory. If a repository holds both `.github/workflows` and `.gitea/workflows`, `detect` lists `gha` and `gitea`. Then `convert` needs `--from`. The pinned versions and the default action hosts are in [docs/versions.md](docs/versions.md).
 
@@ -266,3 +267,67 @@ The following table comes from `pipemaster caps --from gha --to gitlab --format 
 | trigger.resource | lost | lost | (GitLab CI has no resource triggers) |
 | trigger.schedule | native | external | pipeline schedule in project settings (GitLab keeps the cron string outside the CI file) |
 | trigger.tag | native | native |  |
+
+## Feature support from GHA to Woodpecker
+
+The following table comes from `pipemaster caps --from gha --to woodpecker --format md`. The columns follow the GitLab table.
+
+| Feature | Gha | Woodpecker | Strategy |
+| --- | --- | --- | --- |
+| config.name | native | native |  |
+| display.name | native | native | the step name (pipeline and job names that differ from the id are lost; the workflow name is the file name) |
+| expr.opaque | native | native | (only opaque expressions of the woodpecker dialect; others are lost) |
+| ext.passthrough | native | native |  |
+| job.allow_failure | native | emulated | failure ignore on every step (later steps still run after a failed step) |
+| job.artifacts | emulated | emulated | shared workspace of the steps in one workflow (other workflows cannot read the files) |
+| job.cache | emulated | emulated | shared workspace of the steps in one workflow (nothing persists between runs) |
+| job.container | native | native |  |
+| job.env | native | emulated | copied into the environment of every step (a step variable of the same name wins) |
+| job.environment | native | lost | (Woodpecker has no environment name or URL in the workflow) |
+| job.environment.approval | external | external | repo setting Require approval for |
+| job.if | native | native | workflow when (only the translatable expression subset; any other condition disables the workflow) |
+| job.manual | emulated | emulated | when event manual; a person starts the workflow from the UI or API (the workflow no longer runs on its normal events) |
+| job.matrix | native | native |  |
+| job.needs | native | native |  |
+| job.needs.artifacts | emulated | lost | (workflows do not share a workspace) |
+| job.outputs | native | lost | (Woodpecker steps cannot pass values to other workflows) |
+| job.retry | emulated | lost | (Woodpecker has no retry key; restarts are manual) |
+| job.runner | native | lost | (only a platform label has a Woodpecker form (labels.platform); other labels are lost) |
+| job.services | native | native |  |
+| job.timeout | native | external | repo setting Timeout (Woodpecker limits the whole pipeline, not a workflow) |
+| pipeline.concurrency | native | native | workflow concurrency limit 1 with group (cancel-in-progress has no Woodpecker form) |
+| pipeline.env | native | emulated | copied into the environment of every step (a step variable of the same name wins) |
+| pipeline.finally | emulated | emulated | a workflow that depends on every other workflow and runs on status success or failure (a skipped dependency is optional, so the workflow still runs) |
+| pipeline.inputs | native | lost | (Woodpecker has no typed pipeline inputs) |
+| pipeline.permissions | native | lost | (token scopes are forge and repo settings) |
+| project.multi_pipeline | native | emulated | each job of each pipeline is a workflow named <pipeline>-<job> (each workflow carries its pipeline's trigger condition) |
+| script.interpolation | native | native |  |
+| step.action | native | native | per actions.Lookup verdict; a plugin step is native (unknown actions are lost) |
+| step.continue_on_error | native | native |  |
+| step.env | native | native |  |
+| step.if | native | native |  |
+| step.image | emulated | native |  |
+| step.script | native | native |  |
+| step.shell | native | lost | (Woodpecker runs commands in the image entrypoint shell) |
+| step.timeout | native | lost | (Woodpecker has only a pipeline timeout in the repo settings) |
+| step.workdir | native | native |  |
+| trigger.api | native | lost | (Woodpecker starts API pipelines as manual events) |
+| trigger.filter.branches | native | native | branch filter (only exact globs are native; other patterns keep doublestar meaning) |
+| trigger.filter.paths | native | native |  |
+| trigger.filter.tags | native | emulated | ref filter refs/tags/<pattern> on the tag event (the glob dialect is doublestar; the parser reads it back as the tag trigger filter) |
+| trigger.manual | native | native |  |
+| trigger.pipeline_done | native | lost | (Woodpecker has no pipeline-completion trigger) |
+| trigger.pull_request | native | native |  |
+| trigger.push | native | native |  |
+| trigger.resource | lost | lost | (Woodpecker CI has no resource triggers) |
+| trigger.schedule | native | external | when event cron; the schedule is a repo cron job (Woodpecker keeps the cron string in the repo settings (Cron), not in the workflow file) |
+| trigger.tag | native | native |  |
+
+### Woodpecker notes
+
+- The emitter writes one workflow file for each job in `.woodpecker/`. The parser reads the first form that exists and does not merge forms.
+- Woodpecker substitutes `${NAME}` in the raw YAML and turns `$$` into a literal `$`. Thus the emitter writes `$` in script and environment text as `$$`. The parser reverses this.
+- Woodpecker filters use doublestar globs. If a GHA filter uses `+` or `?`, doublestar cannot express it. The emitter then writes an anchored regular expression in `evaluate`.
+- A cron schedule is external. Woodpecker keeps the cron string in the repository settings, not in the workflow file.
+- Environment approval is external. Set it with the repository setting Require approval for.
+- The runner is lost. Only a platform label becomes `labels.platform`.

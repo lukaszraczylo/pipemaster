@@ -1,6 +1,6 @@
 # Pinned versions
 
-These versions were verified on 2026-11-19. The Gitea and Forgejo dialects follow them.
+These versions were verified on 2026-11-19. The Gitea, Forgejo and Woodpecker dialects follow them.
 
 | Product | Version | Date |
 | --- | --- | --- |
@@ -30,6 +30,7 @@ The emitter writes only the first directory of each list. The parser reads the f
 | `gha` | `.github/workflows` |
 | `gitea` | `.gitea/workflows`, then `.github/workflows` (the Gitea `WORKFLOW_DIRS` default) |
 | `forgejo` | `.forgejo/workflows`, then `.gitea/workflows`, then `.github/workflows` (Forgejo `ListWorkflows`) |
+| `woodpecker` | `.woodpecker` (no subfolders), then `.woodpecker.yaml`, then `.woodpecker.yml` |
 
 ## Default action hosts
 
