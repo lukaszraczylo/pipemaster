@@ -44,6 +44,9 @@ required=(
   Pipemaster.Woodpecker.eq_empty_differs
   Pipemaster.Woodpecker.eq_null_differs
   Pipemaster.Woodpecker.not_gitlab_class
+  Pipemaster.Woodpecker.eval_woodpecker
+  Pipemaster.Woodpecker.woodpecker_sound
+  Pipemaster.Woodpecker.woodpecker_event_rx
   Pipemaster.RoundTrip.cross_roundtrip
   Pipemaster.RoundTrip.cross_roundtrip_rev
   Pipemaster.RoundTrip.both_iff
