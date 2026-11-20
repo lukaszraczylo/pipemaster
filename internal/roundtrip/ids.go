@@ -77,6 +77,16 @@ func RestoreIDs(p *ir.Project, ids map[string]string) {
 		}
 		emitkit.RewriteNeedsRefs(pl, jobs)
 		for _, j := range allJobs(pl) {
+			for _, st := range j.Steps {
+				if st == nil {
+					continue
+				}
+				if src, ok := ids["pipeline/"+old+"/job/"+j.ID+"/step/"+st.ID]; ok {
+					st.ID = src
+				}
+			}
+		}
+		for _, j := range allJobs(pl) {
 			if src, ok := jobs[j.ID]; ok {
 				j.ID = src
 			}

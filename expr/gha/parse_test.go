@@ -374,3 +374,18 @@ func TestParseTemplateWithAliases(t *testing.T) {
 		t.Errorf("got %#v", parts)
 	}
 }
+
+func TestParseFoldsTheBranchAndTagShapesToCanonicalRefs(t *testing.T) {
+	for src, want := range map[string]string{
+		"github.ref_type == 'branch' && github.ref_name || ''": expr.CtxBranch,
+		"github.ref_type == 'tag' && github.ref_name || ''":    expr.CtxTag,
+	} {
+		got, err := gha.Parse(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r, ok := got.(expr.Ref); !ok || len(r.Path) != 1 || r.Path[0] != want {
+			t.Errorf("Parse(%q) = %#v, want ref %s", src, got, want)
+		}
+	}
+}

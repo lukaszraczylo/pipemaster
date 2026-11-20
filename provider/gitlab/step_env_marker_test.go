@@ -62,7 +62,8 @@ func TestStepEnvMarkerReferenceEmitsToGHA(t *testing.T) {
 		wantLost bool
 	}{
 		{"mapped reference", `      export REV="$CI_COMMIT_SHA"`, "REV: ${{ github.sha }}", false},
-		{"unmapped reference is reported", `      export GREETING="hello $GITLAB_USER_LOGIN"`, "# pipemaster:lost expr.opaque", true},
+		{"mapped reference inside text", `      export GREETING="hello $GITLAB_USER_LOGIN"`, "GREETING: hello ${{ github.actor }}", false},
+		{"reference with no exact GHA value is reported", `      export GREETING="hello $CI_PIPELINE_SOURCE"`, "# pipemaster:lost expr.opaque", true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

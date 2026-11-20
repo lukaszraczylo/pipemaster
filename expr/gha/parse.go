@@ -58,7 +58,65 @@ func ParseWith(src string, aliases []string) (expr.Expr, error) {
 	if p.opaque {
 		return expr.Opaque{Dialect: Dialect, Text: strings.TrimSpace(src)}, nil
 	}
-	return e, nil
+	return foldRefs(e), nil
+}
+
+// foldRefs reads the text GHA needs for the canonical branch and tag refs, (ref_type == 'branch' && ref_name) || ”,
+// back as the ref, so the printer and the parser agree.
+func foldRefs(x expr.Expr) expr.Expr {
+	switch v := x.(type) {
+	case expr.Binary:
+		if kind, ok := refShape(v); ok {
+			return expr.Ref{Path: []string{kind}}
+		}
+		v.L, v.R = foldRefs(v.L), foldRefs(v.R)
+		return v
+	case expr.Unary:
+		v.X = foldRefs(v.X)
+		return v
+	case expr.Call:
+		if len(v.Args) == 0 {
+			return v
+		}
+		args := make([]expr.Expr, len(v.Args))
+		for i, a := range v.Args {
+			args[i] = foldRefs(a)
+		}
+		v.Args = args
+		return v
+	}
+	return x
+}
+
+func refShape(b expr.Binary) (string, bool) {
+	empty, ok := b.R.(expr.Lit)
+	if b.Op != expr.OpOr || !ok || empty.Kind != expr.LitStr || empty.Str != "" {
+		return "", false
+	}
+	and, ok := b.L.(expr.Binary)
+	if !ok || and.Op != expr.OpAnd || !isRef(and.R, expr.CtxRefName) {
+		return "", false
+	}
+	eq, ok := and.L.(expr.Binary)
+	if !ok || eq.Op != expr.OpEq || !isRef(eq.L, expr.CtxRefType) {
+		return "", false
+	}
+	kind, ok := eq.R.(expr.Lit)
+	if !ok || kind.Kind != expr.LitStr {
+		return "", false
+	}
+	switch kind.Str {
+	case "branch":
+		return expr.CtxBranch, true
+	case "tag":
+		return expr.CtxTag, true
+	}
+	return "", false
+}
+
+func isRef(x expr.Expr, name string) bool {
+	r, ok := x.(expr.Ref)
+	return ok && len(r.Path) == 1 && r.Path[0] == name
 }
 
 func (p *parser) peek() token { return p.toks[p.i] }
