@@ -167,7 +167,12 @@ func (e *emitter) jobNotes(c *wfCtx) {
 // pipeline and takes each as optional, so a workflow that a when filter skipped does not block it.
 func (e *emitter) dependsOn(c *wfCtx) *yaml.Node {
 	n := seqOf()
+	seen := map[string]bool{}
 	add := func(name string, optional bool) {
+		if seen[name] {
+			return
+		}
+		seen[name] = true
 		if !optional {
 			n.Content = append(n.Content, str(name))
 			return
@@ -177,16 +182,17 @@ func (e *emitter) dependsOn(c *wfCtx) *yaml.Node {
 		m.set("optional", boolNode(true))
 		n.Content = append(n.Content, m.n)
 	}
-	for _, nd := range c.j.Needs {
-		if name, ok := c.names[nd.JobID]; ok {
-			add(name, nd.Optional)
-		}
-	}
+	// The finally loop goes first so its optional entry wins over a required need on the same workflow.
 	if c.finally {
 		for _, j := range c.pl.Jobs {
 			if j != nil {
 				add(c.names[j.ID], true)
 			}
+		}
+	}
+	for _, nd := range c.j.Needs {
+		if name, ok := c.names[nd.JobID]; ok {
+			add(name, nd.Optional)
 		}
 	}
 	if len(n.Content) == 0 {

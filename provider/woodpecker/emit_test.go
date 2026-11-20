@@ -631,3 +631,18 @@ func TestDollarIsEscapedInEvaluate(t *testing.T) {
 		}
 	}
 }
+
+func TestFinallyDependsOnEachWorkflowOnce(t *testing.T) {
+	a := wpJob("a", wpStep("s", "x"))
+	done := wpJob("done", wpStep("s", "w"))
+	done.Needs = []ir.Need{{JobID: "a"}}
+	p := wpProject("woodpecker", a)
+	p.Pipelines[0].Finally = []*ir.Job{done}
+	files, _ := emitFiles(t, p)
+	if n := strings.Count(files[dirPrefix+"done.yaml"], "name: a\n"); n != 1 {
+		t.Errorf("workflow a is listed %d times:\n%s", n, files[dirPrefix+"done.yaml"])
+	}
+	if strings.Contains(files[dirPrefix+"done.yaml"], "- a\n") {
+		t.Errorf("the finally workflow must keep a optional:\n%s", files[dirPrefix+"done.yaml"])
+	}
+}
