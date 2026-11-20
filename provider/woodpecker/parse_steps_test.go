@@ -13,8 +13,30 @@ func TestStepsKeepOrderInBothForms(t *testing.T) {
 		t.Fatalf("map-form order lost: %s, %s", j.Steps[0].ID, j.Steps[1].ID)
 	}
 	_, j, _ = single(t, "steps:\n  - name: b\n    image: a\n    commands: [one]\n  - image: c\n    commands: [two]\n  - name: a\n    image: b\n    commands: [three]\n")
-	if len(j.Steps) != 3 || j.Steps[0].ID != "b" || j.Steps[1].ID != "" || j.Steps[2].ID != "a" {
+	if len(j.Steps) != 3 || j.Steps[0].ID != "b" || j.Steps[1].ID != "step-1" || j.Steps[2].ID != "a" {
 		t.Fatalf("list-form order or unnamed step wrong: %+v", j.Steps)
+	}
+	if ext(j.Steps[1].Ext)["_derived_id"] != true || ext(j.Steps[0].Ext)["_derived_id"] != nil {
+		t.Fatalf("only the unnamed step is marked derived: %v %v", j.Steps[1].Ext, j.Steps[0].Ext)
+	}
+}
+
+// Woodpecker names an unnamed list step step-<index>, so a depends_on that says so must find it.
+func TestDerivedStepIDMatchesDependsOn(t *testing.T) {
+	_, j, _ := single(t, "steps:\n  - image: a\n    commands: [x]\n  - name: b\n    image: a\n    commands: [x]\n    depends_on: [step-0]\n")
+	dep, _ := ext(step(t, j, "b").Ext)["depends_on"].([]any)
+	if step(t, j, "step-0") == nil || !reflect.DeepEqual(dep, []any{"step-0"}) {
+		t.Fatalf("depends_on %v does not resolve against %+v", dep, j.Steps)
+	}
+}
+
+// An explicit name wins over the map key, as in Woodpecker; the key stays recoverable.
+func TestMapFormExplicitNameWins(t *testing.T) {
+	_, j, rep := single(t, "steps:\n  key1:\n    name: real\n    image: a\n    commands: [x]\n")
+	st := step(t, j, "real")
+	e := ext(st.Ext)
+	if e["_map_key"] != "key1" || e["name"] != nil || len(rep.Entries) != 0 {
+		t.Fatalf("ext %v entries %+v", e, rep.Entries)
 	}
 }
 

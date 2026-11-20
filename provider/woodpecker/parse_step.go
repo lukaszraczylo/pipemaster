@@ -8,6 +8,14 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
+// Ext keys the parser writes under Ext[woodpecker] on a step. ExtDerivedID marks an ID the parser gave to an
+// unnamed list step (Woodpecker calls it step-<index>); ExtMapKey holds the map key of a map-form step whose
+// explicit name replaced it as the ID.
+const (
+	ExtDerivedID = "_derived_id"
+	ExtMapKey    = "_map_key"
+)
+
 const (
 	failureIgnore = "ignore"
 	failureFail   = "fail"
@@ -23,7 +31,11 @@ func (w *wf) steps(j *ir.Job, v any) error {
 				return fmt.Errorf("step %d must be a mapping", i+1)
 			}
 			name, _ := text(m.vals["name"])
-			st, err := w.step(m, name, i, true)
+			derived := name == ""
+			if derived {
+				name = "step-" + strconv.Itoa(i)
+			}
+			st, err := w.step(m, name, i, derived, "")
 			if err != nil {
 				return err
 			}
@@ -35,7 +47,11 @@ func (w *wf) steps(j *ir.Job, v any) error {
 			if !ok {
 				return fmt.Errorf("line %d: step %s must be a mapping", t.lines[k], k)
 			}
-			st, err := w.step(m, k, i, false)
+			id, mapKey := k, ""
+			if name, _ := text(m.vals["name"]); name != "" {
+				id, mapKey = name, k
+			}
+			st, err := w.step(m, id, i, false, mapKey)
 			if err != nil {
 				return err
 			}
@@ -54,11 +70,9 @@ func (w *wf) stepPath(id string, idx int) string {
 	return w.jobPath() + "/step/" + id
 }
 
-func (w *wf) step(m *omap, id string, idx int, nameField bool) (*ir.Step, error) {
+func (w *wf) step(m *omap, id string, idx int, derived bool, mapKey string) (*ir.Step, error) {
 	r := newReader(m)
-	if nameField {
-		r.take("name")
-	}
+	r.take("name")
 	sp := w.stepPath(id, idx)
 	k := newSink(w.rep, w.file, sp)
 	st := &ir.Step{ID: id}
@@ -141,6 +155,12 @@ func (w *wf) step(m *omap, id string, idx int, nameField bool) (*ir.Step, error)
 		}
 	}
 	k.keepRest(r, nil)
+	if derived {
+		k.vals[ExtDerivedID] = true
+	}
+	if mapKey != "" {
+		k.vals[ExtMapKey] = mapKey
+	}
 	st.Ext = k.ext()
 	return st, nil
 }
