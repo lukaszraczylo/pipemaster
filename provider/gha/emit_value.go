@@ -9,7 +9,6 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
-	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
@@ -30,15 +29,7 @@ type emitter struct {
 }
 
 // sourceDialect is the expression dialect of a project's origin; nil means GHA semantics already hold.
-func sourceDialect(origin string) *expr.Dialect {
-	switch origin {
-	case "", provider.GHA, provider.Gitea, provider.Forgejo:
-		return nil
-	case provider.GitLab:
-		return &exprgitlab.Lang
-	}
-	return &expr.Dialect{ID: origin}
-}
+func sourceDialect(origin string) *expr.Dialect { return expr.SourceFor(origin, exprgha.Lang) }
 
 // source rewrites x from the origin dialect's semantics into GHA's. An approximate result is
 // reported as emulated with the translator's caveats; ok is false when no translation exists.
@@ -54,7 +45,7 @@ func (e *emitter) source(path string, f caps.Feature, x expr.Expr) (expr.Expr, b
 	if t, ok := expr.Translate(x, *e.from, exprgha.Lang); ok {
 		// An exact translation can still change the shape, such as a tag test that GHA spells with ref_type.
 		if (f == caps.JobIf || f == caps.StepIf) && expr.String(t) != expr.String(x) {
-			if err := e.markArg(f, path, srcArg{Src: expr.String(x)}); err != nil {
+			if err := e.markArg(f, path, srcArg{Src: expr.String(x), From: markFrom(e.from)}); err != nil {
 				e.comment("expression source not carried: " + err.Error())
 			}
 		}
@@ -66,7 +57,7 @@ func (e *emitter) source(path string, f caps.Feature, x expr.Expr) (expr.Expr, b
 	}
 	e.emulate(path, f, "approximate expression translation", strings.Join(cav, "; "))
 	if f == caps.JobIf || f == caps.StepIf {
-		if err := e.markArg(f, path, srcArg{Src: expr.String(x)}); err != nil {
+		if err := e.markArg(f, path, srcArg{Src: expr.String(x), From: markFrom(e.from)}); err != nil {
 			e.comment("expression source not carried: " + err.Error())
 		}
 	}
@@ -75,7 +66,16 @@ func (e *emitter) source(path string, f caps.Feature, x expr.Expr) (expr.Expr, b
 
 // srcArg carries a condition as the source dialect wrote it, which the emitted one only approximates.
 type srcArg struct {
-	Src string `json:"src"`
+	Src  string `json:"src"`
+	From string `json:"from,omitempty"`
+}
+
+// markFrom names the source dialect in a marker. GitLab is the default and stays unnamed.
+func markFrom(d *expr.Dialect) string {
+	if d == nil || d.ID == provider.GitLab {
+		return ""
+	}
+	return d.ID
 }
 
 // isStatus is true for a job-status function, which both dialects' emitters share and no dialect translates.

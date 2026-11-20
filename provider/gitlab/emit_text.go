@@ -9,10 +9,8 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
-	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
 	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
-	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
@@ -29,15 +27,7 @@ type emitter struct {
 }
 
 // sourceDialect is the expression dialect of a project's origin; nil means GitLab semantics already hold.
-func sourceDialect(origin string) *expr.Dialect {
-	switch origin {
-	case "", provider.GitLab:
-		return nil
-	case provider.GHA, provider.Gitea, provider.Forgejo:
-		return &exprgha.Lang
-	}
-	return &expr.Dialect{ID: origin}
-}
+func sourceDialect(origin string) *expr.Dialect { return expr.SourceFor(origin, exprgitlab.Lang) }
 
 func (e *emitter) use(path string, f caps.Feature) ir.FeatureUse {
 	return ir.FeatureUse{IRPath: path, Feature: f}

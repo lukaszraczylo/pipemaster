@@ -264,15 +264,12 @@ func TestUntranslatableHashFiles(t *testing.T) {
 			t.Errorf("%s translated", name)
 		}
 	}
-	// An unsupported pair never translates.
-	if _, ok := expr.Translate(expr.Ref{Path: []string{"sha"}}, gha.Lang, gha.Lang); ok {
-		t.Error("gha to gha must not translate")
-	}
+	// A dialect without a class never translates; same-class pairs rename (lang_test.go).
 	if _, ok := expr.Translate(expr.Ref{Path: []string{"sha"}}, gitlab.Lang, expr.Dialect{ID: "drone"}); ok {
 		t.Error("gitlab to drone must not translate")
 	}
-	if expr.Translatable(expr.Ref{Path: []string{"sha"}}, gha.Lang, gha.Lang) {
-		t.Error("Translatable(gha, gha) must be false")
+	if expr.Translatable(expr.Ref{Path: []string{"sha"}}, gha.Lang, expr.Dialect{ID: "drone"}) {
+		t.Error("Translatable to a classless dialect must be false")
 	}
 	for _, src := range []string{`$CI_JOB_NAME`, `$CI_COMMIT_SHA == null`, `$X =~ /^a$/i`, `$CI_PIPELINE_SOURCE =~ /ab/`} {
 		if s, ok := toGHAText(t, src); ok {

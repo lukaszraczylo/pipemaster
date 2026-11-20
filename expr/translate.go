@@ -14,13 +14,8 @@ type Dialect struct {
 	ID     string
 	Vocab  Vocab
 	Sem    Semantics
+	Class  Class
 }
-
-// Provider ids the translator handles.
-const (
-	provGHA    = "gha"
-	provGitLab = "gitlab"
-)
 
 // caseFlag is the inline flag every translator-made pattern starts with.
 const caseFlag = "(?i)"
@@ -211,7 +206,10 @@ func rx(neg bool, x Expr, m Mode, s string) Expr {
 	return Binary{Op: op, L: x, R: Lit{Kind: LitStr, Str: Pattern(m, s)}}
 }
 
-// Translate converts e between the gha and gitlab dialects, exactly: on every environment related by the
+// Translate converts e between two dialects, exactly. Dialects of one class (ClassGHA or ClassGitLab) differ
+// only in the names their vocabularies give the canonical refs, so e is returned as it is, provided both
+// vocabularies name every ref in it (lean4/Pipemaster/TranslateClass.lean: rename_sound). Across classes the
+// rules below apply and the result must be nameable in the target vocabulary. Either way: on every environment related by the
 // vocabulary mapping the result has the same truthiness as e under the target's semantics, and the same
 // boolean where both are boolean-valued. It returns false exactly when e is not Translatable.
 //
@@ -238,25 +236,46 @@ func rx(neg bool, x Expr, m Mode, s string) Expr {
 //   - Only the four modelled events (push, pull_request, schedule, workflow_dispatch) exist; an event
 //     literal without an entry in both dialects' Events tables is untranslatable.
 func Translate(e Expr, from, to Dialect) (Expr, bool) {
+	var t Expr
+	var ok bool
 	switch {
-	case from.ID == provGHA && to.ID == provGitLab:
-		return toGitLab(e, from, to)
-	case from.ID == provGitLab && to.ID == provGHA:
-		return toGHA(e, from, to)
+	case from.Class == 0 || to.Class == 0:
+		return nil, false
+	case from.Class == to.Class:
+		t, ok = e, renamable(e, from, to)
+	case from.Class == ClassGHA:
+		t, ok = toGitLab(e, from, to)
+		ok = ok && from.names(e) && to.names(t)
+	default:
+		t, ok = toGHA(e, from, to)
+		ok = ok && from.names(e) && to.names(t)
 	}
-	return nil, false
+	if !ok {
+		return nil, false
+	}
+	return t, true
 }
 
-// Translatable reports whether e translates exactly; it is true exactly when Translate succeeds. It is
-// stated separately from Translate, as in the Lean model, so tests can hold the two together.
+// Translatable reports whether e translates exactly; it is true exactly when Translate succeeds. The class
+// rules are stated separately from Translate, as in the Lean model, so tests can hold the two together.
 func Translatable(e Expr, from, to Dialect) bool {
 	switch {
-	case from.ID == provGHA && to.ID == provGitLab:
-		return okFwd(e, from, to)
-	case from.ID == provGitLab && to.ID == provGHA:
-		return okRev(e, from)
+	case from.Class == 0 || to.Class == 0:
+		return false
+	case from.Class == to.Class:
+		return renamable(e, from, to)
+	case from.Class == ClassGHA:
+		if !okFwd(e, from, to) || !from.names(e) {
+			return false
+		}
+		t, _ := toGitLab(e, from, to)
+		return to.names(t)
 	}
-	return false
+	if !okRev(e, from) || !from.names(e) {
+		return false
+	}
+	t, _ := toGHA(e, from, to)
+	return to.names(t)
 }
 
 func copyRef(r Ref) Ref { return Ref{Path: append([]string(nil), r.Path...)} }
@@ -622,12 +641,12 @@ func TranslateApprox(e Expr, from, to Dialect) (Expr, []string, bool) {
 	if t, ok := Translate(e, from, to); ok {
 		return t, nil, true
 	}
-	if from.ID != provGitLab || to.ID != provGHA {
+	if from.Class != ClassGitLab || to.Class != ClassGHA {
 		return nil, nil, false
 	}
 	var cav caveats
 	t, ok := approxToGHA(e, from, to, &cav)
-	if !ok {
+	if !ok || !from.names(e) || !to.names(t) {
 		return nil, nil, false
 	}
 	return t, cav.list(), true

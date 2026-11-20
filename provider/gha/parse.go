@@ -39,7 +39,7 @@ func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	switch {
 	case !scan.restored():
 	case scan.mixed():
-		// Restored conditions read in GitLab's dialect and native ones in GHA's, and the project holds one
+		// Restored conditions read in their source dialect and native ones in GHA's, and the project holds one
 		// dialect, so no file restores its source conditions.
 		*rep = report.Report{Source: a.d.ID}
 		if proj, _, err = a.parseFiles(fsys, files, rep, false); err != nil {
@@ -49,12 +49,12 @@ func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 			rep.Add(report.Entry{
 				Feature: caps.ExprOpaque,
 				Level:   caps.Lost,
-				Detail:  fmt.Sprintf("source conditions of %s not restored: the directory also holds native %s conditions", f, a.d.ID),
+				Detail:  scan.mixedDetail(f, a.d.ID),
 			})
 		}
 	default:
-		// A restored condition reads in GitLab's dialect, so a later emit must translate it again.
-		proj.Origin.Provider, proj.Origin.Dialect = provider.GitLab, provider.GitLab
+		// A restored condition reads in its source dialect, so a later emit must translate it again.
+		proj.Origin.Provider, proj.Origin.Dialect = scan.origins[0], scan.origins[0]
 	}
 	return proj, rep, nil
 }
@@ -62,11 +62,24 @@ func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 // condScan records which files restored their source conditions and which hold conditions that stayed native.
 type condScan struct {
 	restoredFiles []string
-	nativeConds   bool
+	// origins holds the source dialect of each restored file, in the order of restoredFiles.
+	origins     []string
+	nativeConds bool
 }
 
 func (c condScan) restored() bool { return len(c.restoredFiles) > 0 }
-func (c condScan) mixed() bool    { return c.restored() && c.nativeConds }
+func (c condScan) mixed() bool    { return c.restored() && (c.nativeConds || !c.oneOrigin()) }
+
+func (c condScan) oneOrigin() bool {
+	return !slices.ContainsFunc(c.origins, func(o string) bool { return o != c.origins[0] })
+}
+
+func (c condScan) mixedDetail(file, dialect string) string {
+	if c.nativeConds {
+		return fmt.Sprintf("source conditions of %s not restored: the directory also holds native %s conditions", file, dialect)
+	}
+	return fmt.Sprintf("source conditions of %s not restored: the directory holds conditions from more than one source dialect", file)
+}
 
 // parseFiles parses each file into one pipeline. With restoreConds false, source condition markers are ignored.
 func (a *adapter) parseFiles(fsys fs.FS, files []string, rep *report.Report, restoreConds bool) (*ir.Project, condScan, error) {
@@ -89,8 +102,9 @@ func (a *adapter) parseFiles(fsys fs.FS, files []string, rep *report.Report, res
 		if err != nil {
 			return nil, scan, err
 		}
-		if collapseMarkers(&emitter{d: a.d, led: emitkit.NewLedger("", a.d.ID, a.Caps())}, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src), rep, restoreConds) {
+		if from := collapseMarkers(&emitter{d: a.d, led: emitkit.NewLedger("", a.d.ID, a.Caps())}, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src), rep, restoreConds); from != "" {
 			scan.restoredFiles = append(scan.restoredFiles, f)
+			scan.origins = append(scan.origins, from)
 		} else if hasConds(pl) {
 			scan.nativeConds = true
 		}

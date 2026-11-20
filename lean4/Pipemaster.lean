@@ -4,6 +4,7 @@ import Pipemaster.Matrix
 import Pipemaster.Ledger
 import Pipemaster.Expr
 import Pipemaster.Translate
+import Pipemaster.TranslateClass
 import Pipemaster.Core
 import Pipemaster.Gha
 import Pipemaster.Gitlab

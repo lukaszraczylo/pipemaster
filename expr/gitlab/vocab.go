@@ -81,9 +81,12 @@ func ref(name string) expr.Ref {
 	return expr.Ref{Path: []string{Dialect, name}}
 }
 
+func init() { expr.RegisterLang(&Lang) }
+
 // Lang is the GitLab dialect for expr.Translate.
 var Lang = expr.Dialect{
 	ID:       Dialect,
+	Class:    expr.ClassGitLab,
 	Vocab:    Vocab,
 	Sem:      Semantics,
 	Events:   Events,

@@ -9,7 +9,6 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
-	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -17,7 +16,7 @@ import (
 
 // collapseMarkers undoes the emulations another provider's emitter marked in the file, so a pipeline that
 // travelled through GHA and came back carries no trace of the detour.
-func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string, rep *report.Report, restoreConds bool) (condsRestored bool) {
+func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string, rep *report.Report, restoreConds bool) (condsFrom string) {
 	carriedDone := map[string]bool{}
 	finallyPaths := map[string]bool{}
 	for _, u := range uses {
@@ -67,11 +66,11 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			pl.Triggers = slices.DeleteFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerManual })
 		case caps.JobIf:
 			if j := markedJob(pl, u.IRPath); j != nil {
-				j.If, condsRestored = restoreSourceCond(rep, u, args[u], j.If, condsRestored)
+				j.If = sourceCond(rep, u, args[u], j.If, &condsFrom)
 			}
 		case caps.StepIf:
 			if st := markedStep(pl, u.IRPath); st != nil {
-				st.If, condsRestored = restoreSourceCond(rep, u, args[u], st.If, condsRestored)
+				st.If = sourceCond(rep, u, args[u], st.If, &condsFrom)
 			}
 		case caps.StepImage:
 			collapseImage(e, pl, rep, u, args[u])
@@ -85,13 +84,7 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			dropMatchAll(pl, ir.TriggerTag, func(t *ir.Trigger) *ir.Filter { return &t.Tags })
 		}
 	}
-	return condsRestored
-}
-
-// restoreSourceCond applies sourceCond and ORs whether it replaced the parsed condition into done.
-func restoreSourceCond(rep *report.Report, u ir.FeatureUse, args []string, parsed expr.Expr, done bool) (expr.Expr, bool) {
-	out := sourceCond(rep, u, args, parsed)
-	return out, done || (parsed != nil && expr.String(out) != expr.String(parsed))
+	return condsFrom
 }
 
 func markedJob(pl *ir.Pipeline, path string) *ir.Job {
@@ -177,8 +170,9 @@ func condRank(f caps.Feature) int {
 }
 
 // sourceCond reads the condition text the emitter carried. It applies only when writing that text again
-// gives the condition parsed from the file; a hand-edited condition stays and the report says so.
-func sourceCond(rep *report.Report, u ir.FeatureUse, args []string, parsed expr.Expr) expr.Expr {
+// gives the condition parsed from the file; a hand-edited condition stays and the report says so. *from
+// holds the source dialect of the conditions restored so far; one file restores from one dialect only.
+func sourceCond(rep *report.Report, u ir.FeatureUse, args []string, parsed expr.Expr, from *string) expr.Expr {
 	for _, a := range args {
 		var s srcArg
 		if json.Unmarshal([]byte(a), &s) != nil || s.Src == "" {
@@ -188,8 +182,12 @@ func sourceCond(rep *report.Report, u ir.FeatureUse, args []string, parsed expr.
 		if err != nil {
 			continue
 		}
-		if parsed != nil {
-			if r, ok := restoreCond(x, parsed); ok {
+		src, ok := foreignLang(s.From)
+		if ok && parsed != nil && (*from == "" || *from == src.ID) {
+			if r, ok := restoreCond(x, parsed, *src); ok {
+				if expr.String(r) != expr.String(parsed) {
+					*from = src.ID
+				}
 				parsed = r
 				continue
 			}
@@ -200,29 +198,39 @@ func sourceCond(rep *report.Report, u ir.FeatureUse, args []string, parsed expr.
 	return parsed
 }
 
+// foreignLang resolves the dialect a marker names; an empty name is GitLab, the only source before the
+// marker named one. Only a registered dialect of the GitLab class can be restored.
+func foreignLang(id string) (*expr.Dialect, bool) {
+	if id == "" {
+		id = provider.GitLab
+	}
+	d, ok := expr.LangOf(id)
+	return d, ok && d.Class == expr.ClassGitLab
+}
+
 // restoreCond puts src in place of the part of parsed it stands for. The emitter marks each side of a
 // status guard such as `failure() && cond` on its own, so the status call stays and only the other side is
 // replaced. ok is false when the emitter would not have written parsed from src.
-func restoreCond(src, parsed expr.Expr) (expr.Expr, bool) {
+func restoreCond(src, parsed expr.Expr, from expr.Dialect) (expr.Expr, bool) {
 	if b, ok := parsed.(expr.Binary); ok && b.Op == expr.OpAnd {
 		switch {
 		case isStatus(b.L) && !isStatus(b.R):
-			r, ok := restoreCond(src, b.R)
+			r, ok := restoreCond(src, b.R, from)
 			return expr.Binary{Op: b.Op, L: b.L, R: r}, ok
 		case isStatus(b.R) && !isStatus(b.L):
-			l, ok := restoreCond(src, b.L)
+			l, ok := restoreCond(src, b.L, from)
 			return expr.Binary{Op: b.Op, L: l, R: b.R}, ok
 		}
 	}
-	if rederives(src, parsed) {
+	if rederives(src, parsed, from) {
 		return src, true
 	}
 	return nil, false
 }
 
 // rederives is true when the emitter would write src as the condition parsed.
-func rederives(src, parsed expr.Expr) bool {
-	t, _, ok := expr.TranslateApprox(src, exprgitlab.Lang, exprgha.Lang)
+func rederives(src, parsed expr.Expr, from expr.Dialect) bool {
+	t, _, ok := expr.TranslateApprox(src, from, exprgha.Lang)
 	if !ok {
 		return false
 	}

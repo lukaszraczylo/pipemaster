@@ -3,11 +3,13 @@ package gha_test
 import (
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
+	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/gha"
@@ -402,5 +404,57 @@ jobs:
 		return e.Level == caps.Lost && strings.Contains(e.Detail, "source condition")
 	}) {
 		t.Errorf("no lost entry for the unrestored condition: %+v", rep.Entries)
+	}
+}
+
+var registerFakeGL sync.Once
+
+// fakeGitLabOrigin registers a second GitLab-class dialect, so the marker can name one that is not gitlab.
+func fakeGitLabOrigin() string {
+	const id = "fakegl"
+	registerFakeGL.Do(func() {
+		d := exprgitlab.Lang
+		d.ID = id
+		expr.RegisterLang(&d)
+	})
+	return id
+}
+
+func TestParseRestoresConditionFromAnyGitLabClassDialect(t *testing.T) {
+	id := fakeGitLabOrigin()
+	p := baseProject(t)
+	p.Origin = ir.Origin{Provider: id, Dialect: id}
+	cond, err := expr.ParseCanonical("branch == 'main'")
+	if err != nil {
+		t.Fatal(err)
+	}
+	job(p, "build").If = cond
+	back, text := viaGHA(t, p)
+	if got := expr.String(back.Pipelines[0].Jobs[0].If); got != expr.String(cond) {
+		t.Fatalf("condition = %s, want %s\n%s", got, expr.String(cond), text)
+	}
+	if back.Origin.Provider != id || back.Origin.Dialect != id {
+		t.Errorf("origin = %+v, want %q", back.Origin, id)
+	}
+	if !strings.Contains(text, `"from":"`+id+`"`) {
+		t.Errorf("marker does not name the source dialect:\n%s", text)
+	}
+}
+
+func TestParseRefusesMarkerNamingAGHAClassDialect(t *testing.T) {
+	p := gitlabCondProject(t)
+	files, _, err := gha.New(gha.GHA).Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for n, b := range files {
+		files[n] = []byte(strings.ReplaceAll(string(b), `{"src"`, `{"from":"gitea","src"`))
+	}
+	back, rep := parseGHAText(t, files)
+	if back.Origin.Provider == "gitea" || back.Origin.Provider == provider.GitLab {
+		t.Errorf("origin = %+v, want the marker ignored", back.Origin)
+	}
+	if !slices.ContainsFunc(rep.Entries, func(e report.Entry) bool { return e.Strategy == "marker ignored" }) {
+		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
 	}
 }

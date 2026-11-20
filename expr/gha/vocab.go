@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/expr"
+	"github.com/lukaszraczylo/pipemaster/provider"
 )
 
 // Semantics is the GitHub Actions evaluation rule set: string comparison ignores case, mismatched
@@ -63,9 +64,20 @@ func ref(path []string) expr.Ref {
 
 func isCanonRef(path []string, name string) bool { return strings.Join(path, ".") == name }
 
+// The Gitea and Forgejo expression languages are GHA's with the same vocabulary.
+func init() {
+	expr.RegisterLang(&Lang)
+	for _, id := range []string{provider.Gitea, provider.Forgejo} {
+		d := Lang
+		d.ID = id
+		expr.RegisterLang(&d)
+	}
+}
+
 // Lang is the GHA dialect for expr.Translate. GHA names events canonically, so its event table is the identity.
 var Lang = expr.Dialect{
 	ID:    Dialect,
+	Class: expr.ClassGHA,
 	Vocab: Vocab,
 	Sem:   Semantics,
 	Events: map[string]string{

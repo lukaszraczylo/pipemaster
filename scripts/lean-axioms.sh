@@ -31,6 +31,10 @@ required=(
   Pipemaster.Translate.tr_none_iff_rev
   Pipemaster.Translate.naive_eq_unsound
   Pipemaster.Translate.naive_and_unsound
+  Pipemaster.TranslateClass.eval_congr
+  Pipemaster.TranslateClass.rename_sound
+  Pipemaster.TranslateClass.tr_sound_dialect
+  Pipemaster.TranslateClass.tr_sound_rev_dialect
   Pipemaster.Gha.gha_from_to
   Pipemaster.Gitlab.gitlab_from_to
   Pipemaster.RoundTrip.cross_roundtrip
