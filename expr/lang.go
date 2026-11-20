@@ -92,9 +92,115 @@ func (d Dialect) names(e Expr) bool {
 	return walkRefs(e, func(r Ref) bool { _, ok := d.Vocab.Dialect(r.Path); return ok })
 }
 
-// renamable is the same-class rule: both vocabularies name every ref, and the target can print the result.
-// The canonical name sits between the two, so no node changes. An Opaque node is dialect text that no
-// vocabulary renames.
-func renamable(e Expr, from, to Dialect) bool {
-	return !HasOpaque(e) && from.names(e) && to.names(e) && (to.Supports == nil || to.Supports(e))
+// renameClass is the same-class rule: both vocabularies name every ref, and the target can print the result.
+// The canonical name sits between the two, so refs keep their nodes. Event literals are native strings, so
+// they map through the Events tables. An Opaque node is dialect text that no vocabulary renames.
+func renameClass(e Expr, from, to Dialect) (Expr, bool) {
+	if HasOpaque(e) || !from.names(e) || !to.names(e) {
+		return nil, false
+	}
+	t, ok := mapEvents(e, from, to)
+	if !ok || (to.Supports != nil && !to.Supports(t)) {
+		return nil, false
+	}
+	return t, true
+}
+
+// mapEvents rewrites each event literal from one Events table to the other (lean4/Pipemaster/TranslateClass.lean:
+// event_eq_rename, event_ne_rename, event_rx_rename). Equal tables need no rewrite. Otherwise both tables must be
+// injective after lowercasing and every use of the event ref must be a comparison with a literal that the
+// source table holds, because any other use could see a value the rewrite does not map.
+func mapEvents(e Expr, from, to Dialect) (Expr, bool) {
+	if maps.Equal(from.Events, to.Events) {
+		return e, true
+	}
+	if !eventTableOK(from.Events) || !eventTableOK(to.Events) {
+		return nil, false
+	}
+	return mapEventNode(e, from, to)
+}
+
+// eventTableOK: values are non-empty and stay distinct after lowercasing, so a literal names one event.
+func eventTableOK(t map[string]string) bool {
+	seen := make(map[string]bool, len(t))
+	for _, v := range t {
+		l := asciiLower(v)
+		if v == "" || seen[l] {
+			return false
+		}
+		seen[l] = true
+	}
+	return true
+}
+
+func mapEventNode(e Expr, from, to Dialect) (Expr, bool) {
+	switch v := e.(type) {
+	case Ref:
+		return e, pathName(v) != CtxEvent
+	case Unary:
+		x, ok := mapEventNode(v.X, from, to)
+		return Unary{Op: v.Op, X: x}, ok
+	case Call:
+		args := make([]Expr, len(v.Args))
+		for i, a := range v.Args {
+			var ok bool
+			if args[i], ok = mapEventNode(a, from, to); !ok {
+				return nil, false
+			}
+		}
+		return Call{Name: v.Name, Args: args}, true
+	case Binary:
+		return mapEventBinary(v, from, to)
+	}
+	return e, true
+}
+
+func mapEventBinary(b Binary, from, to Dialect) (Expr, bool) {
+	switch {
+	case (b.Op == OpEq || b.Op == OpNe) && (isRef(b.L, CtxEvent) || isRef(b.R, CtxEvent)):
+		l, r := b.L, b.R
+		lit := &r
+		if isRef(r, CtxEvent) {
+			lit = &l
+		}
+		s, ok := isStr(*lit)
+		if !ok {
+			return nil, false
+		}
+		t, ok := mapEventLit(from, to, s, from.Class == ClassGHA)
+		if !ok {
+			return nil, false
+		}
+		*lit = Lit{Kind: LitStr, Str: t}
+		return Binary{Op: b.Op, L: l, R: r}, true
+	case (b.Op == OpMatch || b.Op == OpNoMatch) && isRef(b.L, CtxEvent) && from.Class == ClassGitLab:
+		pat, ok := isStr(b.R)
+		m, s, pok := ParsePattern(pat)
+		if !ok || !pok || m != ModeExact {
+			return nil, false
+		}
+		t, ok := mapEventLit(from, to, s, true)
+		if !ok {
+			return nil, false
+		}
+		return Binary{Op: b.Op, L: b.L, R: Lit{Kind: LitStr, Str: Pattern(ModeExact, t)}}, true
+	}
+	l, ok := mapEventNode(b.L, from, to)
+	if !ok {
+		return nil, false
+	}
+	r, ok := mapEventNode(b.R, from, to)
+	return Binary{Op: b.Op, L: l, R: r}, ok
+}
+
+// mapEventLit maps a literal of from's table to the matching entry of to's table. A case-sensitive comparison
+// (GitLab ==) needs the exact entry; a case-insensitive one (GHA ==, a /i pattern) matches any case.
+func mapEventLit(from, to Dialect, lit string, fold bool) (string, bool) {
+	for canon, v := range from.Events {
+		if v == lit || fold && asciiLower(v) == asciiLower(lit) {
+			t, ok := to.Events[canon]
+			return t, ok && okEq(t)
+		}
+	}
+	return "", false
 }

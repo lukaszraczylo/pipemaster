@@ -242,7 +242,7 @@ func Translate(e Expr, from, to Dialect) (Expr, bool) {
 	case from.Class == 0 || to.Class == 0:
 		return nil, false
 	case from.Class == to.Class:
-		t, ok = e, renamable(e, from, to)
+		t, ok = renameClass(e, from, to)
 	case from.Class == ClassGHA:
 		t, ok = toGitLab(e, from, to)
 		ok = ok && from.names(e) && to.names(t)
@@ -263,7 +263,8 @@ func Translatable(e Expr, from, to Dialect) bool {
 	case from.Class == 0 || to.Class == 0:
 		return false
 	case from.Class == to.Class:
-		return renamable(e, from, to)
+		_, ok := renameClass(e, from, to)
+		return ok
 	case from.Class == ClassGHA:
 		if !okFwd(e, from, to) || !from.names(e) {
 			return false

@@ -107,5 +107,109 @@ theorem tr_sound_rev_dialect {e : E} (env : Env) (vA vB : View) (h : Translatabl
   unfold holds at hh ⊢
   rw [eval_congr .gha _ (hA e' he'), hh, eval_congr .gitlab _ hB]
 
+/-! ### Event literals
+
+Event values are native strings in the AST, so a same-class rename also maps them from one Events table to
+the other (Mirrors expr.Dialect (expr/translate.go): the Events field). The translator renames a literal only
+when both tables are injective after lowering and name no event with an empty string. -/
+
+/-- A dialect's event table: canonical event to the string the dialect reports. -/
+structure EvTab (t : Ev → String) : Prop where
+  inj : ∀ a b, lower (t a) = lower (t b) → a = b
+  ne : ∀ e, lower (t e) ≠ ""
+
+/-- The string comparison the class applies to `==`: GHA folds case, GitLab does not. -/
+def foldS : Sem → String → String
+  | .gha, s => lower s
+  | .gitlab, s => s
+
+theorem eqV_str (sem : Sem) (x y : String) : eqV sem (.str x) (.str y) = (foldS sem x == foldS sem y) := by
+  cases sem <;> simp [eqV, foldS]
+
+theorem foldS_empty (sem : Sem) : foldS sem "" = "" := by cases sem <;> simp [foldS, lower_empty]
+
+theorem evTab_ne {t : Ev → String} (h : EvTab t) (e : Ev) : t e ≠ "" := fun he => h.ne e (by rw [he, lower_empty])
+
+theorem fold_ne {t : Ev → String} (h : EvTab t) (sem : Sem) (e : Ev) : foldS sem (t e) ≠ "" := by
+  cases sem
+  · exact h.ne e
+  · exact evTab_ne h e
+
+/-- Two events share a folded string exactly when they are the same event. -/
+theorem fold_beq {t : Ev → String} (h : EvTab t) (sem : Sem) (a b : Ev) :
+    (foldS sem (t a) == foldS sem (t b)) = decide (a = b) := by
+  by_cases hab : a = b
+  · subst hab; simp
+  · have hne : foldS sem (t a) ≠ foldS sem (t b) := by
+      intro heq
+      apply hab
+      apply h.inj
+      cases sem
+      · exact heq
+      · exact congrArg lower heq
+    simp [hab, hne]
+
+theorem eqV_null (sem : Sem) {y : String} (hy : foldS sem y ≠ "") : eqV sem .null (.str y) = false := by
+  cases sem
+  · have : y ≠ "" := fun h => hy (by rw [h]; exact lower_empty)
+    simp [eqV, this]
+  · simp [eqV]
+
+/-- The comparison `event == literal` gives the same boolean on both tables, on every event. -/
+theorem event_cmp (sem : Sem) {tA tB : Ev → String} (hA : EvTab tA) (hB : EvTab tB) (env : Env)
+    {vA vB : View} (ha : vA .event = env.event.map tA) (hb : vB .event = env.event.map tB)
+    {e : Ev} {l : String} (hl : foldS sem l = foldS sem (tA e)) :
+    eqV sem (refV vB .event) (.str (tB e)) = eqV sem (refV vA .event) (.str l) := by
+  cases hev : env.event with
+  | none =>
+    have ha' : vA .event = none := by rw [ha, hev]; rfl
+    have hb' : vB .event = none := by rw [hb, hev]; rfl
+    have hl' : foldS sem l ≠ "" := by rw [hl]; exact fold_ne hA sem e
+    have hl2 : foldS sem (tB e) ≠ "" := fold_ne hB sem e
+    simp [refV, ha', hb', eqV_null sem hl', eqV_null sem hl2]
+  | some e0 =>
+    have ha' : vA .event = some (tA e0) := by rw [ha, hev]; rfl
+    have hb' : vB .event = some (tB e0) := by rw [hb, hev]; rfl
+    have h1 := fold_beq hA sem e0 e
+    have h2 := fold_beq hB sem e0 e
+    rw [← hl] at h1
+    simp [refV, ha', hb', eqV_str, h1, h2]
+
+/-- Mapping an event literal between two tables keeps `event == literal`, on every event, for either class. -/
+theorem event_eq_rename (sem : Sem) {tA tB : Ev → String} (hA : EvTab tA) (hB : EvTab tB) (env : Env)
+    {vA vB : View} (ha : vA .event = env.event.map tA) (hb : vB .event = env.event.map tB)
+    {e : Ev} {l : String} (hl : foldS sem l = foldS sem (tA e)) :
+    holds sem vB (.eq (.ref .event) (.str (tB e))) = holds sem vA (.eq (.ref .event) (.str l)) := by
+  simp [holds, eval, truthy, event_cmp sem hA hB env ha hb hl]
+
+/-- The same for `event != literal`. -/
+theorem event_ne_rename (sem : Sem) {tA tB : Ev → String} (hA : EvTab tA) (hB : EvTab tB) (env : Env)
+    {vA vB : View} (ha : vA .event = env.event.map tA) (hb : vB .event = env.event.map tB)
+    {e : Ev} {l : String} (hl : foldS sem l = foldS sem (tA e)) :
+    holds sem vB (.ne (.ref .event) (.str (tB e))) = holds sem vA (.ne (.ref .event) (.str l)) := by
+  simp [holds, eval, truthy, event_cmp sem hA hB env ha hb hl]
+
+/-- GitLab `event =~ /^literal$/i` (and `!~`) keeps its result when the literal maps between tables. -/
+theorem event_rx_rename {tA tB : Ev → String} (hA : EvTab tA) (hB : EvTab tB) (env : Env)
+    {vA vB : View} (ha : vA .event = env.event.map tA) (hb : vB .event = env.event.map tB)
+    {e : Ev} {s : String} (hs : lower s = lower (tA e)) :
+    holds .gitlab vB (.rx (.ref .event) .exact (tB e)) = holds .gitlab vA (.rx (.ref .event) .exact s) ∧
+    holds .gitlab vB (.nrx (.ref .event) .exact (tB e)) = holds .gitlab vA (.nrx (.ref .event) .exact s) := by
+  have key : matchV .exact (tB e) (refV vB .event) = matchV .exact s (refV vA .event) := by
+    cases hev : env.event with
+    | none =>
+      have ha' : vA .event = none := by rw [ha, hev]; rfl
+      have hb' : vB .event = none := by rw [hb, hev]; rfl
+      simp [refV, ha', hb', matchV]
+    | some e0 =>
+      have ha' : vA .event = some (tA e0) := by rw [ha, hev]; rfl
+      have hb' : vB .event = some (tB e0) := by rw [hb, hev]; rfl
+      have h1 := fold_beq hA .gha e0 e
+      have h2 := fold_beq hB .gha e0 e
+      simp only [foldS] at h1 h2
+      rw [← hs] at h1
+      simp [refV, ha', hb', matchV, modeTest, h1, h2]
+  constructor <;> simp [holds, eval, truthy, key]
+
 end TranslateClass
 end Pipemaster

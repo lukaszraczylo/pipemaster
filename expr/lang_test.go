@@ -218,3 +218,100 @@ func TestSourceFor(t *testing.T) {
 	}
 
 }
+
+var evOnce sync.Once
+
+// eventDialects registers two same-class dialects whose Events tables differ from gitlab's and gha's.
+func eventDialects() (gl, gh expr.Dialect) {
+	evOnce.Do(func() {
+		expr.RegisterLang(&expr.Dialect{
+			ID: "fakeev", Class: expr.ClassGitLab, Sem: gitlab.Semantics, Vocab: gitlab.Vocab,
+			Events: map[string]string{"push": "push", "pull_request": "mr", "schedule": "cron", "workflow_dispatch": "web"},
+		})
+		expr.RegisterLang(&expr.Dialect{
+			ID: "fakeevgha", Class: expr.ClassGHA, Sem: gha.Semantics, Vocab: gha.Vocab,
+			Events: map[string]string{"push": "Push", "pull_request": "PR", "schedule": "cron", "workflow_dispatch": "dispatch"},
+		})
+	})
+	a, _ := expr.LangOf("fakeev")
+	b, _ := expr.LangOf("fakeevgha")
+	return *a, *b
+}
+
+func evRef() expr.Expr { return expr.Ref{Path: []string{expr.CtxEvent}} }
+
+func TestSameClassMapsEventLiterals(t *testing.T) {
+	fgl, fgh := eventDialects()
+	for _, c := range []struct {
+		from, to *expr.Dialect
+		in, want expr.Expr
+		name     string
+	}{
+		{&gitlab.Lang, &fgl, expr.Binary{Op: expr.OpEq, L: evRef(), R: str("merge_request_event")}, expr.Binary{Op: expr.OpEq, L: evRef(), R: str("mr")}, "gitlab eq"},
+		{&gitlab.Lang, &fgl, expr.Binary{Op: expr.OpNe, L: str("web"), R: evRef()}, expr.Binary{Op: expr.OpNe, L: str("web"), R: evRef()}, "gitlab ne, literal first"},
+		{&gitlab.Lang, &fgl, expr.Binary{Op: expr.OpMatch, L: evRef(), R: str("(?i)^merge_request_event$")}, expr.Binary{Op: expr.OpMatch, L: evRef(), R: str("(?i)^mr$")}, "gitlab regex"},
+		{&gitlab.Lang, &fgl,
+			expr.Binary{Op: expr.OpAnd, L: expr.Binary{Op: expr.OpEq, L: evRef(), R: str("schedule")}, R: expr.Binary{Op: expr.OpNoMatch, L: evRef(), R: str("(?i)^web$")}},
+			expr.Binary{Op: expr.OpAnd, L: expr.Binary{Op: expr.OpEq, L: evRef(), R: str("cron")}, R: expr.Binary{Op: expr.OpNoMatch, L: evRef(), R: str("(?i)^web$")}},
+			"gitlab and"},
+		{&gha.Lang, &fgh, expr.Binary{Op: expr.OpEq, L: evRef(), R: str("Pull_Request")}, expr.Binary{Op: expr.OpEq, L: evRef(), R: str("PR")}, "gha eq ignores case"},
+		{&fgh, &gha.Lang, expr.Binary{Op: expr.OpEq, L: evRef(), R: str("pr")}, expr.Binary{Op: expr.OpEq, L: evRef(), R: str("pull_request")}, "gha back"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got, ok := expr.Translate(c.in, *c.from, *c.to)
+			if !ok || expr.String(got) != expr.String(c.want) {
+				t.Fatalf("Translate = %s, %v; want %s", expr.String(got), ok, expr.String(c.want))
+			}
+			if !expr.Translatable(c.in, *c.from, *c.to) {
+				t.Error("Translatable disagrees with Translate")
+			}
+		})
+	}
+}
+
+func TestSameClassRefusesUnmappableEvents(t *testing.T) {
+	fgl, fgh := eventDialects()
+	short := fgl
+	short.Events = map[string]string{"push": "push"}
+	dup := fgl
+	dup.Events = map[string]string{"push": "x", "pull_request": "X", "schedule": "cron", "workflow_dispatch": "web"}
+	for _, c := range []struct {
+		from, to *expr.Dialect
+		in       expr.Expr
+		name     string
+	}{
+		{&gitlab.Lang, &fgl, expr.Binary{Op: expr.OpEq, L: evRef(), R: str("mr")}, "literal not in source table"},
+		{&gitlab.Lang, &fgl, expr.Binary{Op: expr.OpEq, L: evRef(), R: str("PUSH")}, "gitlab compares case-sensitively"},
+		{&gitlab.Lang, &short, expr.Binary{Op: expr.OpEq, L: evRef(), R: str("web")}, "target table lacks the event"},
+		{&gitlab.Lang, &dup, expr.Binary{Op: expr.OpEq, L: evRef(), R: str("push")}, "target table not injective"},
+		{&gitlab.Lang, &fgl, expr.Binary{Op: expr.OpAnd, L: evRef(), R: expr.Binary{Op: expr.OpEq, L: evRef(), R: str("push")}}, "bare event ref"},
+		{&gitlab.Lang, &fgl, expr.Binary{Op: expr.OpMatch, L: evRef(), R: str("(?i)^merge")}, "prefix pattern"},
+		{&gha.Lang, &fgh, expr.Binary{Op: expr.OpEq, L: evRef(), R: expr.Ref{Path: []string{expr.CtxSHA}}}, "event against a ref"},
+		{&gha.Lang, &fgh, expr.Call{Name: "startsWith", Args: []expr.Expr{evRef(), str("pu")}}, "event in a call"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if out, ok := expr.Translate(c.in, *c.from, *c.to); ok {
+				t.Fatalf("Translate = %s, want refusal", expr.String(out))
+			}
+			if expr.Translatable(c.in, *c.from, *c.to) {
+				t.Error("Translatable disagrees with Translate")
+			}
+		})
+	}
+}
+
+func TestSameClassEqualEventTablesKeepEveryEventUse(t *testing.T) {
+	fake := fakeGL()
+	e := expr.Binary{Op: expr.OpAnd, L: evRef(), R: expr.Call{Name: "startsWith", Args: []expr.Expr{evRef(), str("pu")}}}
+	if out, ok := expr.Translate(e, gitlab.Lang, fake); !ok || expr.String(out) != expr.String(e) {
+		t.Errorf("equal tables: %v %v", out, ok)
+	}
+}
+
+func TestSameClassGHAHasNoEventPattern(t *testing.T) {
+	_, fgh := eventDialects()
+	e := expr.Binary{Op: expr.OpMatch, L: evRef(), R: str("(?i)^push$")}
+	if _, ok := expr.Translate(e, gha.Lang, fgh); ok {
+		t.Error("a GHA =~ node has no model and must not translate across different Events tables")
+	}
+}
