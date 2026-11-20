@@ -17,7 +17,8 @@ const (
 	pipelinePth = "pipeline/" + pipelineID
 )
 
-// Parse reads the workflows of the repo into one pipeline with ID woodpecker and one job per workflow.
+// Parse reads the workflows of the repo into one job per workflow. They form one pipeline with ID woodpecker,
+// unless markers name the pipelines an emitter folded into them.
 func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	d, err := discover(fsys)
 	if err != nil {
@@ -33,8 +34,7 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 			Detail: fmt.Sprintf("%s is ignored: Woodpecker reads only %s", f, d.files[0]), SourceLoc: f,
 		})
 	}
-	pl := &ir.Pipeline{ID: pipelineID}
-	var specs []*whenSpec
+	var wfs []*workflow
 	for _, f := range d.files {
 		data, err := fs.ReadFile(fsys, f)
 		if err != nil {
@@ -44,18 +44,20 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("%s: %w", f, err)
 		}
-		pl.Jobs = append(pl.Jobs, wf.job)
-		specs = append(specs, wf.when)
+		wf.file = f
+		wfs = append(wfs, wf)
 	}
-	pl.Triggers = sharedTriggers(specs)
-	for i, j := range pl.Jobs {
-		if err := specs[i].apply(rep, j, d.files[i], pl.Triggers != nil); err != nil {
-			return nil, nil, fmt.Errorf("%s: %w", d.files[i], err)
+	var pls []*ir.Pipeline
+	for _, g := range splitPipelines(wfs) {
+		pl, err := g.build(rep)
+		if err != nil {
+			return nil, nil, err
 		}
+		pls = append(pls, pl)
 	}
 	proj := &ir.Project{
 		Origin:    ir.Origin{Provider: dialect, Dialect: dialect, Files: d.files},
-		Pipelines: []*ir.Pipeline{pl},
+		Pipelines: pls,
 	}
 	if err := ir.Validate(proj); err != nil {
 		return nil, nil, err
@@ -127,4 +129,28 @@ func (k *sink) ext() ir.Ext {
 		return nil
 	}
 	return ir.Ext{dialect: k.vals}
+}
+
+// sharedConcurrency sets the pipeline concurrency when every workflow has the same group. Otherwise each
+// workflow keeps its key in Ext, as for any key the IR does not model.
+func sharedConcurrency(rep *report.Report, pl *ir.Pipeline, wfs []*workflow, files []string) {
+	same := len(wfs) > 0
+	for _, w := range wfs {
+		same = same && w.conc != nil && w.conc.ir == wfs[0].conc.ir
+	}
+	if same {
+		pl.Concurrency = &ir.Concurrency{Group: wfs[0].conc.ir.Group}
+		return
+	}
+	for i, w := range wfs {
+		if w.conc == nil {
+			continue
+		}
+		k := newSink(rep, files[i], pipelinePth+"/job/"+w.job.ID)
+		if m, ok := w.job.Ext[dialect].(map[string]any); ok {
+			k.vals = m
+		}
+		k.keep("concurrency", w.conc.raw, caps.PipelineConcurrency, "key concurrency has no IR field; kept in Ext", w.conc.line)
+		w.job.Ext = k.ext()
+	}
 }

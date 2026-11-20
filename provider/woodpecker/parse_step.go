@@ -3,6 +3,7 @@ package woodpecker
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
@@ -14,7 +15,16 @@ import (
 const (
 	ExtDerivedID = "_derived_id"
 	ExtMapKey    = "_map_key"
+	// ExtCommands records how the lines of a step script group into commands, because the IR keeps one script entry
+	// per line and a command may span lines.
+	ExtCommands = "_commands"
 )
+
+// commandShape is one command of a step: how many script lines it holds and whether its text ends in a newline.
+type commandShape struct {
+	Lines int  `json:"lines"`
+	Final bool `json:"final,omitempty"`
+}
 
 const (
 	failureIgnore = "ignore"
@@ -99,6 +109,7 @@ func (w *wf) step(m *omap, id string, idx int, derived bool, mapKey string) (*ir
 			st.Image.Entrypoint = append(st.Image.Entrypoint, t)
 		}
 	}
+	var cmdShapes []any
 	cmds, isScript := r.take("commands")
 	if isScript {
 		st.Kind = ir.StepScript
@@ -106,12 +117,20 @@ func (w *wf) step(m *omap, id string, idx int, derived bool, mapKey string) (*ir
 		if !ok {
 			return nil, fmt.Errorf("step %s: commands must be a string or a list of strings", id)
 		}
+		var shapes []any
+		spans := false
 		for _, c := range l {
 			t, err := w.tx.template(c)
 			if err != nil {
 				return nil, err
 			}
-			st.Script = append(st.Script, t)
+			lines := strings.Split(strings.TrimSuffix(t, "\n"), "\n")
+			st.Script = append(st.Script, lines...)
+			shapes = append(shapes, map[string]any{"lines": len(lines), "final": strings.HasSuffix(t, "\n")})
+			spans = spans || len(lines) > 1 || strings.HasSuffix(t, "\n")
+		}
+		if spans {
+			cmdShapes = shapes
 		}
 	} else {
 		st.Kind = ir.StepPlugin
@@ -155,6 +174,9 @@ func (w *wf) step(m *omap, id string, idx int, derived bool, mapKey string) (*ir
 		}
 	}
 	k.keepRest(r, nil)
+	if cmdShapes != nil {
+		k.vals[ExtCommands] = cmdShapes
+	}
 	if derived {
 		k.vals[ExtDerivedID] = true
 	}

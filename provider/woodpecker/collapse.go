@@ -1,0 +1,605 @@
+package woodpecker
+
+import (
+	"encoding/json"
+	"fmt"
+	"reflect"
+	"regexp"
+	"slices"
+	"strings"
+
+	"go.yaml.in/yaml/v3"
+
+	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
+	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/report"
+)
+
+const (
+	stepSep         = "/step/"
+	placeholderStep = placeholderName
+)
+
+var markerPipelineRE = regexp.MustCompile(`^pipeline/[^/]+`)
+
+// marks are the emulation markers of one workflow file, with their argument lines.
+type marks struct {
+	args map[ir.FeatureUse][]string
+	uses []ir.FeatureUse
+}
+
+// readMarks collects the markers of a file. The emitter writes the IR pipeline ID into every path, but Parse
+// builds one pipeline with a fixed ID, so only that prefix differs. Argument lines escape "$" as "$$".
+func readMarks(src []byte) *marks {
+	m := &marks{args: map[ir.FeatureUse][]string{}}
+	for _, u := range emitkit.ParseMarkers(src) {
+		u.IRPath = markerPipelineRE.ReplaceAllLiteralString(u.IRPath, pipelinePth)
+		m.uses = append(m.uses, u)
+	}
+	for u, lines := range emitkit.ParseArgs(src) {
+		u.IRPath = markerPipelineRE.ReplaceAllLiteralString(u.IRPath, pipelinePth)
+		for _, l := range lines {
+			m.args[u] = append(m.args[u], strings.ReplaceAll(l, dollarEsc, dollar))
+		}
+	}
+	return m
+}
+
+// collapseCtx is what a collapser works on: the job of the file and the marker with its argument.
+type collapseCtx struct {
+	j    *ir.Job
+	use  ir.FeatureUse
+	args []string
+}
+
+// collapser undoes one emulation and reports whether it found the construct the marker names.
+type collapser func(c *collapseCtx) bool
+
+// jobCollapsers run in this order: later ones read what earlier ones restore.
+var jobCollapsers = []struct {
+	run     collapser
+	feature caps.Feature
+}{
+	{collapseRefs, caps.ScriptInterpolation},
+	{collapseStepName, caps.DisplayName},
+	{collapseContainer, caps.JobContainer},
+	{collapseMatrix, caps.JobMatrix},
+	{collapseCache, caps.JobCache},
+	{collapseArtifacts, caps.JobArtifacts},
+	{collapseAllowFailure, caps.JobAllowFailure},
+	{collapseNoop, caps.StepScript},
+	{collapseLostEnv, caps.ExprOpaque},
+}
+
+// collapseJob undoes the emulations marked in one workflow file. A marker it cannot restore is reported, so the
+// construct stays visible as written.
+func collapseJob(rep *report.Report, j *ir.Job, m *marks) (pipeEnv []ir.Var) {
+	for _, cl := range jobCollapsers {
+		for _, u := range m.uses {
+			if u.Feature != cl.feature {
+				continue
+			}
+			if !cl.run(&collapseCtx{j: j, use: u, args: m.args[u]}) {
+				reportUncollapsed(rep, u, "no parser rule restores "+string(u.Feature)+" at this path")
+			}
+		}
+	}
+	keep := shadowed(j, m)
+	collapseActions(rep, j, m)
+	for _, u := range m.uses {
+		if u.Feature != caps.JobEnv && u.Feature != caps.PipelineEnv {
+			continue
+		}
+		vars, ok := collapseEnv(j, m.args[u], keep)
+		switch {
+		case !ok:
+			reportUncollapsed(rep, u, "its argument is not a list of variables")
+		case u.Feature == caps.JobEnv:
+			j.Env = vars
+		default:
+			pipeEnv = vars
+		}
+	}
+	return pipeEnv
+}
+
+func reportUncollapsed(rep *report.Report, u ir.FeatureUse, why string) {
+	rep.Add(report.Entry{
+		IRPath: u.IRPath, Feature: u.Feature, Level: caps.Emulated, Strategy: "kept as written",
+		Detail: "marker not collapsed: " + why,
+	})
+}
+
+// decodeArg reads the single JSON argument line of a marker.
+func decodeArg(args []string, v any) bool {
+	return len(args) == 1 && json.Unmarshal([]byte(args[0]), v) == nil
+}
+
+// decodeYAMLArg reads an argument that holds IR YAML text in a JSON string.
+func decodeYAMLArg(args []string, v any) bool {
+	var body string
+	return decodeArg(args, &body) && yaml.Unmarshal([]byte(body), v) == nil
+}
+
+// collapseRefs turns the run-time variables that stand for secrets, variables and inputs back into references.
+func collapseRefs(c *collapseCtx) bool {
+	var stray axesArg
+	if decodeArg(c.args, &stray) && len(stray.Axes) > 0 {
+		return true
+	}
+	var a posArg
+	if !decodeArg(c.args, &a) || a.Pos >= len(c.j.Steps) {
+		return false
+	}
+	st := c.j.Steps[a.Pos]
+	for _, ref := range a.Refs {
+		ns, name, ok := strings.Cut(ref, ".")
+		if !ok {
+			return false
+		}
+		for i, l := range st.Script {
+			st.Script[i] = strings.ReplaceAll(l, "${"+name+"}", "${{ "+ref+" }}")
+		}
+		if ns == expr.PrefixSecrets {
+			st.Env = slices.DeleteFunc(st.Env, func(v ir.Var) bool {
+				return v.Name == name && v.Value.Kind == ir.ValueSecret && v.Value.Secret == name
+			})
+		}
+	}
+	return true
+}
+
+// collapseStepName gives a step with a made-up id its display name back: Woodpecker named it by that text.
+func collapseStepName(c *collapseCtx) bool {
+	var a posArg
+	_, id, ok := strings.Cut(c.use.IRPath, stepSep)
+	if !ok || !decodeArg(c.args, &a) || a.Pos >= len(c.j.Steps) {
+		return false
+	}
+	wrote := a.Name
+	if a.Wrote != "" {
+		wrote = a.Wrote
+	}
+	if c.j.Steps[a.Pos].ID != wrote {
+		return false
+	}
+	st := c.j.Steps[a.Pos]
+	st.Name, st.ID = a.Name, id
+	st.Ext = markDerived(st.Ext)
+	return true
+}
+
+// collapseLostEnv puts back the variables of a step whose value had no Woodpecker spelling.
+func collapseLostEnv(c *collapseCtx) bool {
+	var a lostEnvArg
+	var vars []ir.Var
+	if !decodeArg(c.args, &a) || a.Pos >= len(c.j.Steps) ||
+		yaml.Unmarshal([]byte(a.Vars), &vars) != nil || len(vars) != len(a.At) {
+		return false
+	}
+	st := c.j.Steps[a.Pos]
+	for i, v := range vars {
+		st.Env = slices.Insert(st.Env, min(a.At[i], len(st.Env)), v)
+	}
+	return true
+}
+
+func markDerived(x ir.Ext) ir.Ext {
+	if x == nil {
+		x = ir.Ext{}
+	}
+	inner, _ := x[dialect].(map[string]any)
+	if inner == nil {
+		inner = map[string]any{}
+		x[dialect] = inner
+	}
+	inner[ExtDerivedID] = true
+	return x
+}
+
+// collapseContainer restores the job image. With an argument the job named it, and every step that took it
+// loses it again; without one the steps ran in the default image only because the job named none.
+func collapseContainer(c *collapseCtx) bool {
+	ref := defaultImage
+	if len(c.args) > 0 {
+		var img ir.Image
+		if !decodeArg(c.args, &img) {
+			return false
+		}
+		c.j.Container, ref = &img, img.Ref
+	}
+	for _, st := range c.j.Steps {
+		if st.Image != nil && st.Image.Ref == ref && len(st.Image.Entrypoint) == 0 {
+			st.Image = nil
+		}
+	}
+	return true
+}
+
+func collapseMatrix(c *collapseCtx) bool {
+	var mx ir.Matrix
+	if !decodeArg(c.args, &mx) {
+		return false
+	}
+	c.j.Matrix = &mx
+	return true
+}
+
+func collapseCache(c *collapseCtx) bool { return decodeArg(c.args, &c.j.Cache) }
+
+func collapseArtifacts(c *collapseCtx) bool { return decodeArg(c.args, &c.j.Artifacts) }
+
+// collapseAllowFailure moves failure: ignore from every step to the job. A step that ignores failure on its
+// own while a sibling does not keeps the flag.
+func collapseAllowFailure(c *collapseCtx) bool {
+	c.j.AllowFailure = true
+	if !slices.ContainsFunc(c.j.Steps, func(s *ir.Step) bool { return !s.ContinueOnError }) {
+		for _, st := range c.j.Steps {
+			st.ContinueOnError = false
+		}
+	}
+	return true
+}
+
+// collapseNoop drops the step that stood in for a workflow with no runnable step.
+func collapseNoop(c *collapseCtx) bool {
+	if len(c.j.Steps) == 1 && c.j.Steps[0].ID == placeholderStep {
+		c.j.Steps = nil
+	}
+	return true
+}
+
+// plainExt turns the nested maps the YAML decoder gives the type of the outer map back into plain maps, the
+// form every parser gives Ext.
+func plainExt(e ir.Ext) ir.Ext {
+	if e == nil {
+		return nil
+	}
+	out := make(ir.Ext, len(e))
+	for k, v := range e {
+		out[k] = plainAny(v)
+	}
+	return out
+}
+
+func plainAny(v any) any {
+	switch t := v.(type) {
+	case ir.Ext:
+		return plainAny(map[string]any(t))
+	case map[string]any:
+		out := make(map[string]any, len(t))
+		for k, x := range t {
+			out[k] = plainAny(x)
+		}
+		return out
+	case []any:
+		out := make([]any, len(t))
+		for i, x := range t {
+			out[i] = plainAny(x)
+		}
+		return out
+	}
+	return v
+}
+
+// actionMark is one StepAction marker with its decoded argument.
+type actionMark struct {
+	use ir.FeatureUse
+	arg actionArg
+	st  ir.Step
+}
+
+// collapseActions puts back the action steps the emitter replaced with a clone setting, an image or the shared
+// workspace, in their original order.
+func collapseActions(rep *report.Report, j *ir.Job, m *marks) {
+	var found []actionMark
+	for _, u := range m.uses {
+		if u.Feature != caps.StepAction {
+			continue
+		}
+		am := actionMark{use: u}
+		if !decodeArg(m.args[u], &am.arg) || yaml.Unmarshal([]byte(am.arg.Step), &am.st) != nil {
+			reportUncollapsed(rep, u, "its argument is not an action step")
+			continue
+		}
+		am.st.Ext = plainExt(am.st.Ext)
+		found = append(found, am)
+	}
+	slices.SortStableFunc(found, func(a, b actionMark) int { return a.arg.At - b.arg.At })
+	for _, am := range found {
+		st := am.st
+		at := min(am.arg.At, len(j.Steps))
+		if am.arg.Image != "" {
+			for _, later := range j.Steps[at:] {
+				if later.Image != nil && later.Image.Ref == am.arg.Image && len(later.Image.Entrypoint) == 0 {
+					later.Image = nil
+				}
+			}
+		}
+		j.Steps = slices.Insert(j.Steps, at, &st)
+	}
+}
+
+// collapseEnv undoes the copy of job and pipeline variables into every step. The marker holds the variables, so
+// each is restored exactly and removed from the steps that carry the same value.
+func collapseEnv(j *ir.Job, args []string, keep map[*ir.Step][]string) ([]ir.Var, bool) {
+	var vars []ir.Var
+	if !decodeYAMLArg(args, &vars) {
+		return nil, false
+	}
+	for _, st := range j.Steps {
+		st.Env = slices.DeleteFunc(st.Env, func(v ir.Var) bool {
+			return !slices.Contains(keep[st], v.Name) &&
+				slices.ContainsFunc(vars, func(w ir.Var) bool { return w.Name == v.Name && reflect.DeepEqual(w.Value, v.Value) })
+		})
+	}
+	return vars, true
+}
+
+// shadowed reads the markers of the variables that a step sets to the value it would inherit, by step place.
+func shadowed(j *ir.Job, m *marks) map[*ir.Step][]string {
+	out := map[*ir.Step][]string{}
+	for _, u := range m.uses {
+		var a shadowArg
+		if u.Feature == caps.StepEnv && decodeArg(m.args[u], &a) && a.Pos < len(j.Steps) {
+			out[j.Steps[a.Pos]] = append(out[j.Steps[a.Pos]], a.Names...)
+		}
+	}
+	return out
+}
+
+// triggerRead is the pipeline trigger list of a project and whether every workflow agreed on it.
+type triggerRead struct {
+	list   []ir.Trigger
+	shared bool
+}
+
+// representable keeps the triggers a Woodpecker file can hold.
+func representable(ts []ir.Trigger) []ir.Trigger {
+	var out []ir.Trigger
+	for _, t := range ts {
+		if _, ok := triggerEvents[t.Kind]; ok {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+var triggerEvents = map[ir.TriggerKind]string{
+	ir.TriggerPush: eventPush, ir.TriggerPR: eventPR, ir.TriggerTag: eventTag, ir.TriggerSchedule: eventCron, ir.TriggerManual: eventMan,
+}
+
+func kindsOf(ts []ir.Trigger) []ir.TriggerKind {
+	out := make([]ir.TriggerKind, len(ts))
+	for i, t := range ts {
+		out[i] = t.Kind
+	}
+	return out
+}
+
+// markedWith returns the marker of the feature at the given path, if the file has one.
+func (m *marks) markedWith(f caps.Feature, path string) (ir.FeatureUse, bool) {
+	for _, u := range m.uses {
+		if u.Feature == f && (path == "" || u.IRPath == path) {
+			return u, true
+		}
+	}
+	return ir.FeatureUse{}, false
+}
+
+// collapseTriggers reads the pipeline triggers. A manual workflow stands outside the shared list, and a marker
+// that holds the original triggers replaces the list a file can only approximate.
+func collapseTriggers(rep *report.Report, wfs []*workflow, specs []*whenSpec) triggerRead {
+	var sel []*whenSpec
+	var manual []*workflow
+	for i, w := range wfs {
+		if _, ok := w.marks.markedWith(caps.JobManual, ""); ok {
+			manual = append(manual, w)
+			continue
+		}
+		sel = append(sel, specs[i])
+	}
+	out := triggerRead{}
+	if len(sel) > 0 {
+		out.list = sharedTriggers(sel)
+		out.shared = out.list != nil
+	}
+	if len(sel) > 0 && !out.shared {
+		return out
+	}
+	for _, w := range wfs {
+		for _, f := range []caps.Feature{caps.TriggerFilterBranch, caps.TriggerFilterPaths, caps.TriggerFilterTags} {
+			if u, ok := w.marks.markedWith(f, pipelinePth); ok && len(sel) > 0 {
+				out.list = restoreTriggers(rep, u, w.marks.args[u], out.list)
+			}
+		}
+	}
+	for _, w := range manual {
+		u, _ := w.marks.markedWith(caps.JobManual, "")
+		if orig, ok := triggersArg(w.marks.args[u]); ok {
+			out.list = representable(orig)
+			out.shared = true
+			break
+		}
+	}
+	return out
+}
+
+func triggersArg(args []string) ([]ir.Trigger, bool) {
+	var ts []ir.Trigger
+	return ts, decodeYAMLArg(args, &ts)
+}
+
+// restoreTriggers replaces the parsed list with the original when both name the same kinds in the same order.
+func restoreTriggers(rep *report.Report, u ir.FeatureUse, args []string, parsed []ir.Trigger) []ir.Trigger {
+	orig, ok := triggersArg(args)
+	if !ok {
+		reportUncollapsed(rep, u, "its argument is not a list of triggers")
+		return parsed
+	}
+	orig = representable(orig)
+	if !slices.Equal(kindsOf(orig), kindsOf(parsed)) {
+		reportUncollapsed(rep, u, "the file edit changed the trigger events, so the original filters do not apply")
+		return parsed
+	}
+	return orig
+}
+
+// collapsePipeline undoes the emulations that span workflows: a manual workflow and a finally workflow.
+func collapsePipeline(rep *report.Report, pl *ir.Pipeline, wfs []*workflow) {
+	var finally []*ir.Job
+	for _, w := range wfs {
+		if _, ok := w.marks.markedWith(caps.JobManual, ""); ok {
+			w.job.Manual = true
+		}
+		if u, ok := w.marks.markedWith(caps.PipelineFinally, ""); ok {
+			var a finallyArg
+			if !decodeArg(w.marks.args[u], &a) {
+				reportUncollapsed(rep, u, "its argument is not a finally record")
+				continue
+			}
+			w.job.Needs = a.Needs
+			if a.NoIf && isAlways(w.job.If) {
+				w.job.If = nil
+			}
+			finally = append(finally, w.job)
+		}
+	}
+	if len(finally) == 0 {
+		return
+	}
+	pl.Jobs = slices.DeleteFunc(pl.Jobs, func(j *ir.Job) bool { return slices.Contains(finally, j) })
+	pl.Finally = finally
+}
+
+func isAlways(x expr.Expr) bool {
+	c, ok := x.(expr.Call)
+	return ok && c.Name == "always" && len(c.Args) == 0
+}
+
+// multiArg says which pipeline and job a workflow came from when an emitter folded several pipelines into one
+// directory, and where each stood, because the file name holds neither.
+type multiArg struct {
+	Pipeline string `json:"pipeline"`
+	Job      string `json:"job"`
+	P        int    `json:"p"`
+	J        int    `json:"j"`
+}
+
+// group is the workflows that form one pipeline.
+type group struct {
+	id  string
+	wfs []*workflow
+}
+
+// splitPipelines groups the workflows by the pipeline their marker names. A file without one belongs to the
+// default pipeline, and a lone default group is the usual case.
+func splitPipelines(wfs []*workflow) []*group {
+	type placed struct {
+		w *workflow
+		a multiArg
+	}
+	byID := map[string][]placed{}
+	var order []string
+	pos := map[string]int{}
+	for _, w := range wfs {
+		a, ok := multiOf(w)
+		id := pipelineID
+		if ok {
+			id = a.Pipeline
+		}
+		if _, seen := byID[id]; !seen {
+			order = append(order, id)
+			pos[id] = a.P
+		}
+		byID[id] = append(byID[id], placed{w, a})
+	}
+	slices.SortStableFunc(order, func(a, b string) int { return pos[a] - pos[b] })
+	var out []*group
+	for _, id := range order {
+		ps := byID[id]
+		slices.SortStableFunc(ps, func(a, b placed) int { return a.a.J - b.a.J })
+		g := &group{id: id}
+		for _, p := range ps {
+			g.wfs = append(g.wfs, p.w)
+		}
+		out = append(out, g)
+	}
+	return out
+}
+
+func multiOf(w *workflow) (multiArg, bool) {
+	u, ok := w.marks.markedWith(caps.ProjectMultiPipeline, "")
+	var a multiArg
+	return a, ok && decodeArg(w.marks.args[u], &a) && a.Pipeline != "" && a.Job != ""
+}
+
+// build assembles one pipeline from its workflows.
+func (g *group) build(rep *report.Report) (*ir.Pipeline, error) {
+	pl := &ir.Pipeline{ID: g.id}
+	specs := make([]*whenSpec, len(g.wfs))
+	files := make([]string, len(g.wfs))
+	for i, w := range g.wfs {
+		pl.Jobs = append(pl.Jobs, w.job)
+		specs[i], files[i] = w.when, w.file
+		if pl.Env == nil {
+			pl.Env = w.pipeEnv
+		}
+	}
+	for _, s := range specs {
+		if s != nil {
+			s.multi = len(g.wfs) > 1
+		}
+	}
+	triggers := collapseTriggers(rep, g.wfs, specs)
+	pl.Triggers = triggers.list
+	for i, j := range pl.Jobs {
+		if err := specs[i].apply(rep, j, files[i], pl.Triggers != nil); err != nil {
+			return nil, fmt.Errorf("%s: %w", files[i], err)
+		}
+	}
+	collapsePipeline(rep, pl, g.wfs)
+	for _, w := range g.wfs {
+		if _, empty := w.marks.markedWith(caps.StepScript, pipelinePth); empty {
+			pl.Jobs = slices.DeleteFunc(pl.Jobs, func(j *ir.Job) bool { return j == w.job })
+		}
+	}
+	sharedConcurrency(rep, pl, g.wfs, files)
+	g.rename(rep, pl)
+	return pl, nil
+}
+
+// rename gives the jobs of a folded pipeline their original IDs and points the report at them.
+func (g *group) rename(rep *report.Report, pl *ir.Pipeline) {
+	if g.id == pipelineID {
+		return
+	}
+	ids := map[string]string{}
+	for _, w := range g.wfs {
+		if a, ok := multiOf(w); ok {
+			ids[w.job.ID] = a.Job
+		}
+	}
+	for _, j := range append(slices.Clone(pl.Jobs), pl.Finally...) {
+		for i, n := range j.Needs {
+			if id, ok := ids[n.JobID]; ok {
+				j.Needs[i].JobID = id
+			}
+		}
+	}
+	for old, id := range ids {
+		from, to := pipelinePth+"/job/"+old, "pipeline/"+g.id+"/job/"+id
+		for i, e := range rep.Entries {
+			if e.IRPath == from || strings.HasPrefix(e.IRPath, from+"/") {
+				rep.Entries[i].IRPath = to + strings.TrimPrefix(e.IRPath, from)
+			}
+		}
+	}
+	for _, j := range append(slices.Clone(pl.Jobs), pl.Finally...) {
+		if id, ok := ids[j.ID]; ok {
+			j.ID = id
+		}
+	}
+}

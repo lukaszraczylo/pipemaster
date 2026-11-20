@@ -93,7 +93,17 @@ func whenNode(entries []whenEntry) *yaml.Node {
 }
 
 // neverEntries is the fail-safe for a condition Woodpecker cannot state: the construct never runs.
-func neverEntries() []whenEntry { return []whenEntry{{Item: wpexpr.Item{Evaluate: "false"}}} }
+// It keeps the event filters of base, so a trigger list still reads back from the file.
+func neverEntries(base []whenEntry) []whenEntry {
+	if len(base) == 0 {
+		return []whenEntry{{Item: wpexpr.Item{Evaluate: "false"}}}
+	}
+	out := slices.Clone(base)
+	for i := range out {
+		out[i].Evaluate = "false"
+	}
+	return out
+}
 
 // splitStatus pulls the always, failure and success calls out of an AND chain. ok is false when a status
 // function sits anywhere else or cancelled() is used, which Woodpecker has no step state for.
@@ -209,7 +219,7 @@ func (e *emitter) stepWhen(path string, x expr.Expr) *yaml.Node {
 	}
 	items, status, ok := e.condition(path, caps.StepIf, x, "the step")
 	if !ok {
-		return whenNode(neverEntries())
+		return whenNode(neverEntries(nil))
 	}
 	entries := make([]whenEntry, 0, len(items))
 	for _, it := range items {
@@ -247,6 +257,9 @@ func irGlobs(f ir.Filter, isPath bool) (out wpexpr.Filter, inexact []string) {
 func (e *emitter) globFilter(tp string, f caps.Feature, in ir.Filter, isPath bool) wpexpr.Filter {
 	out, inexact := irGlobs(in, isPath)
 	if len(inexact) > 0 {
+		if e.inexact == "" {
+			e.inexact = f
+		}
 		e.emulate(tp, f, "doublestar glob", "pattern "+strings.Join(inexact, ", ")+" has a different meaning in doublestar than in the source; it is written as is")
 	}
 	return out
@@ -329,29 +342,41 @@ func (e *emitter) tagRefs(tp string, in ir.Filter) wpexpr.Filter {
 }
 
 // jobWhen combines the trigger entries, the manual gate, the job condition and the status gate of one workflow.
-func (e *emitter) jobWhen(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) []whenEntry {
+func (e *emitter) jobWhen(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) ([]whenEntry, error) {
+	e.inexact = ""
 	base := e.triggerEntries(pl)
+	if e.inexact != "" {
+		if err := e.markTriggers(e.inexact, "pipeline/"+pl.ID, pl.Triggers); err != nil {
+			return nil, err
+		}
+	}
 	if len(pl.Triggers) > 0 && len(base) == 0 {
 		e.comment("trigger.* " + jp + ": no trigger of the pipeline has a Woodpecker event")
-		return neverEntries()
-	}
-	if j.Manual {
-		e.emulate(jp, caps.JobManual, "when event manual", "the workflow runs only when a person starts it from the UI or API")
-		e.mark(caps.JobManual, jp)
-		base = []whenEntry{{Item: wpexpr.Item{Event: wpexpr.Filter{Include: []string{eventMan}}}}}
+		e.lose(jp, caps.JobIf, "no trigger of the pipeline has a Woodpecker event; the workflow never runs")
+		return neverEntries(nil), nil
 	}
 	var cond []wpexpr.Item
 	var status []string
 	if j.If != nil {
 		var ok bool
 		if cond, status, ok = e.condition(jp, caps.JobIf, j.If, "the workflow"); !ok {
-			return neverEntries()
+			if j.Manual {
+				e.lose(jp, caps.JobManual, "a workflow that never runs has no manual start")
+			}
+			return neverEntries(base), nil
 		}
+	}
+	if j.Manual {
+		e.emulate(jp, caps.JobManual, "when event manual", "the workflow runs only when a person starts it from the UI or API")
+		if err := e.markTriggers(caps.JobManual, jp, pl.Triggers); err != nil {
+			return nil, err
+		}
+		base = []whenEntry{{Item: wpexpr.Item{Event: wpexpr.Filter{Include: []string{eventMan}}}}}
 	}
 	if finally && status == nil {
 		status = []string{statusOK, statusFail}
 	}
-	return withStatus(e.mergeCond(jp, j.If, base, cond), status)
+	return withStatus(e.mergeCond(jp, j.If, base, cond), status), nil
 }
 
 // mergeCond ANDs the condition with every base entry. Two entries cannot be merged key by key, so the
@@ -370,7 +395,7 @@ func (e *emitter) mergeCond(jp string, orig expr.Expr, base []whenEntry, cond []
 	x, err := wpexpr.WhenExpr(cond)
 	if err != nil {
 		e.disable(jp, caps.JobIf, orig, "the workflow")
-		return neverEntries()
+		return neverEntries(base)
 	}
 	if x == nil {
 		return base
@@ -378,7 +403,7 @@ func (e *emitter) mergeCond(jp string, orig expr.Expr, base []whenEntry, cond []
 	text, err := wpexpr.Print(x)
 	if err != nil {
 		e.disable(jp, caps.JobIf, orig, "the workflow")
-		return neverEntries()
+		return neverEntries(base)
 	}
 	out := slices.Clone(base)
 	for i := range out {

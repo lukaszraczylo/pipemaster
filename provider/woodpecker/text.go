@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	wpexpr "github.com/lukaszraczylo/pipemaster/expr/woodpecker"
 	"github.com/lukaszraczylo/pipemaster/ir"
@@ -18,6 +19,31 @@ type texts struct {
 	axes map[string]bool
 	// kept lists the ${...} forms left as written.
 	kept []string
+}
+
+// markAxes reads the names of the matrix an emitter replaced with plain variables, so text that names one reads
+// as a matrix reference.
+func (x *texts) markAxes(m *marks) {
+	for _, u := range m.uses {
+		var stray axesArg
+		if u.Feature == caps.ScriptInterpolation && decodeArg(m.args[u], &stray) {
+			for _, n := range stray.Axes {
+				x.axes[n] = true
+			}
+		}
+		var mx ir.Matrix
+		if u.Feature != caps.JobMatrix || !decodeArg(m.args[u], &mx) {
+			continue
+		}
+		for _, a := range mx.Axes {
+			x.axes[a.Name] = true
+		}
+		for _, c := range mx.Include {
+			for _, kv := range c {
+				x.axes[kv.Key] = true
+			}
+		}
+	}
 }
 
 func isIdent(s string) bool {
@@ -46,6 +72,28 @@ func (x *texts) ref(name string) (expr.Ref, bool) {
 	return r, ok
 }
 
+// escapedBuiltin reads {NAME} after "$$" as the built-in variable the shell reads at run time, which is how a
+// GitLab script writes the same reference.
+func (x *texts) escapedBuiltin(s string) (r expr.Ref, whole string, ok bool) {
+	end := strings.IndexByte(s, '}')
+	if !strings.HasPrefix(s, "{") || end < 0 {
+		return expr.Ref{}, "", false
+	}
+	name := s[1:end]
+	if !isIdent(name) || x.axes[name] {
+		return expr.Ref{}, "", false
+	}
+	e, err := wpexpr.Parse(name)
+	if err != nil {
+		return expr.Ref{}, "", false
+	}
+	r, ok = e.(expr.Ref)
+	if !ok || len(r.Path) == 0 || r.Path[0] == expr.PrefixEnv || r.Path[0] == wpexpr.Dialect {
+		return expr.Ref{}, "", false
+	}
+	return r, s[:end+1], true
+}
+
 func (x *texts) parts(s string) []expr.Part {
 	var parts []expr.Part
 	var lit strings.Builder
@@ -58,6 +106,12 @@ func (x *texts) parts(s string) []expr.Part {
 	for i := 0; i < len(s); {
 		switch {
 		case strings.HasPrefix(s[i:], "$$"):
+			if r, whole, ok := x.escapedBuiltin(s[i+2:]); ok {
+				flush()
+				parts = append(parts, expr.Part{Expr: r})
+				i += 2 + len(whole)
+				break
+			}
 			lit.WriteString(dollar)
 			i += 2
 		case strings.HasPrefix(s[i:], "${"):

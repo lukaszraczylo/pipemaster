@@ -45,7 +45,9 @@ func (s scal) plain() any {
 
 // builder resolves one document into omap, []any and scal values within a node budget.
 type builder struct {
-	nodes int
+	// skipped lists the lines of "<<" values that are not mappings.
+	skipped []int
+	nodes   int
 }
 
 func (b *builder) build(n *yaml.Node, depth int) (any, error) {
@@ -71,6 +73,12 @@ func (b *builder) build(n *yaml.Node, depth int) (any, error) {
 	case yaml.SequenceNode:
 		out := make([]any, 0, len(n.Content))
 		for _, c := range n.Content {
+			if items, ok, err := b.spliced(c, depth); err != nil {
+				return nil, err
+			} else if ok {
+				out = append(out, items...)
+				continue
+			}
 			v, err := b.build(c, depth+1)
 			if err != nil {
 				return nil, err
@@ -80,6 +88,38 @@ func (b *builder) build(n *yaml.Node, depth int) (any, error) {
 		return out, nil
 	}
 	return scal{n}, nil
+}
+
+// spliced reads the sequence form of a merge key that Woodpecker adds to YAML: a list item "<<: *anchor" whose
+// value is a list, or a list of lists, stands for the items of that list.
+func (b *builder) spliced(c *yaml.Node, depth int) ([]any, bool, error) {
+	m := deref(c)
+	if m == nil || m.Kind != yaml.MappingNode || len(m.Content) != 2 {
+		return nil, false, nil
+	}
+	if k := deref(m.Content[0]); k == nil || k.Kind != yaml.ScalarNode || k.Tag != tagMerge {
+		return nil, false, nil
+	}
+	v, err := b.build(m.Content[1], depth+1)
+	if err != nil {
+		return nil, false, err
+	}
+	list, ok := v.([]any)
+	if !ok {
+		return nil, false, nil
+	}
+	var out []any
+	for _, e := range list {
+		switch t := e.(type) {
+		case *omap:
+			return nil, false, nil
+		case []any:
+			out = append(out, t...)
+		default:
+			out = append(out, e)
+		}
+	}
+	return out, true, nil
 }
 
 func deref(n *yaml.Node) *yaml.Node {
@@ -133,7 +173,9 @@ func (b *builder) merge(m *omap, v *yaml.Node, depth int) error {
 	for _, s := range srcs {
 		sm, ok := s.(*omap)
 		if !ok {
-			return fmt.Errorf("line %d: merge key value must be a mapping or a list of mappings", v.Line)
+			// Woodpecker's linter accepts a sequence of scalars here, so the source is dropped and reported.
+			b.skipped = append(b.skipped, v.Line)
+			continue
 		}
 		for _, k := range sm.keys {
 			if _, have := m.vals[k]; !have {
@@ -150,12 +192,15 @@ func (m *omap) set(k string, v any, line int) {
 	m.lines[k] = line
 }
 
-func parseDocument(data []byte) (any, error) {
+// parseDocument returns the document and the lines of merge sources it could not apply.
+func parseDocument(data []byte) (any, []int, error) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return (&builder{}).build(&doc, 0)
+	b := &builder{}
+	v, err := b.build(&doc, 0)
+	return v, b.skipped, err
 }
 
 // plain converts a built value to the maps, slices and scalars that Ext holds.

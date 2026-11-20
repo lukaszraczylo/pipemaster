@@ -164,6 +164,20 @@ func TestWorkflowsWithSameWhenShareTriggers(t *testing.T) {
 	}
 }
 
+func TestRepeatedStatusAndEvaluateBelongToTheJob(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{
+		".woodpecker/a.yaml": "when:\n  - event: push\n    status: [success, failure]\n    evaluate: CI_COMMIT_AUTHOR == \"bot\"\n" + body,
+		".woodpecker/b.yaml": "when:\n  - event: push\n" + body,
+	})
+	pl := p.Pipelines[0]
+	if !reflect.DeepEqual(pl.Triggers, []ir.Trigger{{Kind: ir.TriggerPush}}) {
+		t.Fatalf("triggers = %+v", pl.Triggers)
+	}
+	if got := text(pl.Jobs[0].If); got != "(actor == 'bot') && always()" || pl.Jobs[1].If != nil {
+		t.Fatalf("conditions = %q, %v", got, pl.Jobs[1].If)
+	}
+}
+
 func TestOneWorkflowWithoutWhenKeepsAllConditions(t *testing.T) {
 	p, _ := parseFiles(t, map[string]string{
 		".woodpecker/a.yaml": "when:\n  event: push\n" + body,

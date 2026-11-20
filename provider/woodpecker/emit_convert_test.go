@@ -2,6 +2,7 @@ package woodpecker_test
 
 import (
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -127,5 +128,75 @@ func TestTagIncludeAndExcludeIdentity(t *testing.T) {
 	back := reparse(t, files)
 	if !reflect.DeepEqual(p.Pipelines[0].Triggers, back.Pipelines[0].Triggers) {
 		t.Errorf("want %+v, got %+v", p.Pipelines[0].Triggers, back.Pipelines[0].Triggers)
+	}
+}
+
+func TestMultiLineCommandKeepsItsShape(t *testing.T) {
+	for name, cmd := range map[string]string{"no newline": "a \\\n b", "one newline": "a \\\n b\n", "two newlines": "a\n\n"} {
+		t.Run(name, func(t *testing.T) {
+			p := parseProject(t, "woodpecker", map[string]string{".woodpecker.yaml": "steps:\n  - name: s\n    image: x\n    commands:\n      - " + strconv.Quote(cmd) + "\n      - tail\n"})
+			files, _ := emitFiles(t, p)
+			raw := map[string]string{}
+			for n, b := range files {
+				raw[n] = b
+			}
+			back := parseProject(t, "woodpecker", raw).Pipelines[0].Jobs[0].Steps[0]
+			if !reflect.DeepEqual(back.Script, p.Pipelines[0].Jobs[0].Steps[0].Script) || !reflect.DeepEqual(back.Ext, p.Pipelines[0].Jobs[0].Steps[0].Ext) {
+				t.Errorf("script %q ext %v, want %q ext %v", back.Script, back.Ext, p.Pipelines[0].Jobs[0].Steps[0].Script, p.Pipelines[0].Jobs[0].Steps[0].Ext)
+			}
+		})
+	}
+}
+
+func TestDerivedStepNameWithUnspellableExpressionIsReported(t *testing.T) {
+	p := parseProject(t, "gha", map[string]string{".github/workflows/ci.yml": "on: push\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Install ${{ inputs.name }}\n        run: make\n"})
+	files, rep := emitFiles(t, p)
+	for n, body := range files {
+		if strings.Contains(body, "${{") {
+			t.Errorf("%s holds a GHA expression:\n%s", n, body)
+		}
+	}
+	if !reportHas(rep, caps.DisplayName, caps.Lost) {
+		t.Errorf("the dropped expression must be reported: %+v", rep.Entries)
+	}
+}
+
+func TestStepEnvWithUnspellableExpressionSurvives(t *testing.T) {
+	p := parseProject(t, "gha", map[string]string{".github/workflows/ci.yml": "on: push\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make\n        env:\n          A: one\n          TOX: ${{ matrix.tox || format('py{0}', matrix.python) }}\n          C: three\n"})
+	want := p.Pipelines[0].Jobs[0].Steps[0].Env
+	files, _ := emitFiles(t, p)
+	raw := map[string]string{}
+	for n, b := range files {
+		raw[n] = b
+	}
+	got := parseProject(t, "woodpecker", raw).Pipelines[0].Jobs[0].Steps[0].Env
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("env = %+v, want %+v", got, want)
+	}
+}
+
+func TestMatrixReferenceWithoutDeclaredAxisStaysMatrix(t *testing.T) {
+	p := parseProject(t, "gha", map[string]string{".github/workflows/ci.yml": "on: push\njobs:\n  b:\n    runs-on: ubuntu-latest\n    strategy:\n      matrix:\n        lang: ${{ fromJson(needs.x.outputs.langs) }}\n    steps:\n      - run: make ${{ matrix.lang }}\n"})
+	files, _ := emitFiles(t, p)
+	raw := map[string]string{}
+	for n, b := range files {
+		raw[n] = b
+	}
+	got := parseProject(t, "woodpecker", raw).Pipelines[0].Jobs[0].Steps[0].Script
+	if !reflect.DeepEqual(got, []string{"make ${{ matrix.lang }}"}) {
+		t.Errorf("script = %q", got)
+	}
+}
+
+func TestStepVariableEqualToTheJobOneSurvives(t *testing.T) {
+	p := parseProject(t, "gha", map[string]string{".github/workflows/ci.yml": "on: push\nenv:\n  FLAGS: -w\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make\n        env:\n          FLAGS: -w\n"})
+	files, _ := emitFiles(t, p)
+	raw := map[string]string{}
+	for n, b := range files {
+		raw[n] = b
+	}
+	back := parseProject(t, "woodpecker", raw)
+	if got := back.Pipelines[0].Jobs[0].Steps[0].Env; !reflect.DeepEqual(got, p.Pipelines[0].Jobs[0].Steps[0].Env) {
+		t.Errorf("step env = %+v, want %+v", got, p.Pipelines[0].Jobs[0].Steps[0].Env)
 	}
 }

@@ -93,7 +93,7 @@ func TestSetupActionSelectsTheImageOfLaterSteps(t *testing.T) {
 	if !strings.Contains(body, "image: ubuntu:latest") || !strings.Contains(body, "image: golang:1.23") {
 		t.Errorf("only the later step takes the image:\n%s", body)
 	}
-	if strings.Index(body, "golang:1.23") < strings.Index(body, "name: after") {
+	if _, doc, _ := strings.Cut(body, "\nsteps:"); strings.Index(doc, "golang:1.23") < strings.Index(doc, "name: after") {
 		t.Errorf("the earlier step must keep the default image:\n%s", body)
 	}
 	if !reportHas(rep, caps.StepAction, caps.Emulated) {

@@ -40,20 +40,37 @@ type wfCtx struct {
 	j       *ir.Job
 	names   map[string]string
 	uploads map[string]bool
-	jp      string
-	name    string
+	// multi is set when several pipelines share the directory.
+	multi *multiArg
 	// image is what a step without its own image runs in; a setup action replaces it for the steps after it.
 	image string
+	name  string
 	// depth is the clone depth that an actions/checkout step asked for; empty means the default clone.
-	depth   string
+	depth string
+	jp    string
+	// pos is the place the step being written takes in the file, which the parser reads steps by.
+	pos     int
 	finally bool
 	defImg  bool
 	// mapForm is true when the steps are written as a map keyed by name.
 	mapForm bool
 }
 
-func (e *emitter) loseName(path, name, id string) {
-	if name != "" && name != id {
+// writtenNeeds names each needed job by its workflow name, which is the ID a reader gives it.
+func (c *wfCtx) writtenNeeds(ns []ir.Need) []ir.Need {
+	out := make([]ir.Need, len(ns))
+	for i, n := range ns {
+		out[i] = n
+		if w, ok := c.names[n.JobID]; ok {
+			out[i].JobID = w
+		}
+	}
+	return out
+}
+
+// loseName reports a display name. The parser gives a workflow no name, so one that equals its id is lost too.
+func (e *emitter) loseName(path, name string) {
+	if name != "" {
 		e.lose(path, caps.DisplayName, "the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata")
 	}
 }
@@ -62,11 +79,14 @@ func (e *emitter) loseName(path, name, id string) {
 func (e *emitter) workflow(c *wfCtx) (*yaml.Node, error) {
 	j := c.j
 	e.foreignExt(c.jp, j.Ext)
-	e.loseName(c.jp, j.Name, j.ID)
+	e.loseName(c.jp, j.Name)
 	ext := extOf(j.Ext)
 	if j.Container != nil {
 		c.image = j.Container.Ref
 		e.jobEntrypoint(c)
+		if err := e.markArg(caps.JobContainer, c.jp, j.Container); err != nil {
+			return nil, err
+		}
 	}
 	steps, err := e.steps(c)
 	if err != nil {
@@ -95,7 +115,11 @@ func (e *emitter) workflowHeader(m *wmap, c *wfCtx, ext map[string]any) error {
 		}
 		m.set(keyWhen, n)
 	} else {
-		m.set(keyWhen, whenNode(completeEvents(e.jobWhen(c.pl, c.j, c.jp, c.finally))))
+		entries, err := e.jobWhen(c.pl, c.j, c.jp, c.finally)
+		if err != nil {
+			return err
+		}
+		m.set(keyWhen, whenNode(completeEvents(entries)))
 	}
 	if c.j.Matrix != nil {
 		n, err := e.matrix(c.jp, c.j.Matrix, ext)
@@ -132,33 +156,44 @@ func (e *emitter) workflowBody(m *wmap, c *wfCtx, ext map[string]any, steps *yam
 		return err
 	}
 	m.set("services", svc)
-	e.jobNotes(c)
-	return nil
+	return e.jobNotes(c)
 }
 
 // jobNotes writes the markers and reports of the job features that Woodpecker has no key for.
-func (e *emitter) jobNotes(c *wfCtx) {
+func (e *emitter) jobNotes(c *wfCtx) error {
 	j, jp := c.j, c.jp
 	if j.Timeout != nil {
 		e.external(jp, caps.JobTimeout, "repo setting Timeout", "set the repo timeout to "+time.Duration(*j.Timeout).String()+"; Woodpecker limits the whole pipeline")
 	}
-	for _, f := range []struct {
-		feature caps.Feature
-		used    bool
-	}{
-		{caps.JobCache, len(j.Cache) > 0}, {caps.JobArtifacts, len(j.Artifacts) > 0}, {caps.JobAllowFailure, j.AllowFailure},
-		{caps.JobEnv, len(j.Env) > 0},
-	} {
-		if f.used {
-			e.mark(f.feature, jp)
+	if len(j.Cache) > 0 {
+		if err := e.markArg(caps.JobCache, jp, j.Cache); err != nil {
+			return err
+		}
+	}
+	if len(j.Artifacts) > 0 {
+		if err := e.markArg(caps.JobArtifacts, jp, j.Artifacts); err != nil {
+			return err
+		}
+	}
+	if j.AllowFailure {
+		e.mark(caps.JobAllowFailure, jp)
+	}
+	if len(j.Env) > 0 {
+		if err := e.markVars(caps.JobEnv, jp, j.Env); err != nil {
+			return err
 		}
 	}
 	if len(c.pl.Env) > 0 {
-		e.mark(caps.PipelineEnv, "pipeline/"+c.pl.ID)
+		if err := e.markVars(caps.PipelineEnv, "pipeline/"+c.pl.ID, c.pl.Env); err != nil {
+			return err
+		}
 	}
 	if c.finally {
-		e.mark(caps.PipelineFinally, "pipeline/"+c.pl.ID)
+		if err := e.markArg(caps.PipelineFinally, "pipeline/"+c.pl.ID, finallyArg{Needs: c.writtenNeeds(j.Needs), NoIf: j.If == nil}); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // dependsOn lists the workflows this one waits for. A finally workflow waits for every other workflow of its
@@ -308,7 +343,9 @@ func (e *emitter) matrix(jp string, mx *ir.Matrix, ext map[string]any) (*yaml.No
 		}
 		m.set(keyInc, inc)
 		e.emulate(jp, caps.JobMatrix, "explicit include entries", "axes beside include or exclude, and axes of more than 10 values, are expanded into explicit entries")
-		e.mark(caps.JobMatrix, jp)
+		if err := e.markArg(caps.JobMatrix, jp, mx); err != nil {
+			return nil, err
+		}
 	}
 	return m.n, nil
 }

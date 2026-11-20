@@ -64,12 +64,12 @@ func strSeq(ss []string) *yaml.Node {
 	return n
 }
 
-// block renders a multi-line command as a literal block scalar; the final newline is the one the parser drops.
+// block renders a multi-line command as a literal block scalar whose chomping indicator keeps the text exact.
 func block(s string) *yaml.Node {
 	if !strings.Contains(s, "\n") {
 		return str(s)
 	}
-	return &yaml.Node{Kind: yaml.ScalarNode, Tag: tagStr, Style: yaml.LiteralStyle, Value: s + "\n"}
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: tagStr, Style: yaml.LiteralStyle, Value: s}
 }
 
 // scalarOf writes a setting value: a plain boolean or integer keeps its YAML type, any other text stays a string.

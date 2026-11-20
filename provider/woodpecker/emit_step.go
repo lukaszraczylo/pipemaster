@@ -3,6 +3,7 @@ package woodpecker
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"go.yaml.in/yaml/v3"
 
@@ -28,6 +29,10 @@ const (
 type stepDone struct {
 	node *yaml.Node
 	key  string
+	// src is the step ID of the IR; read is the ID a reader derives for the step, empty when the written name is
+	// the ID. A step without a written name takes its position, which steps fills in.
+	src, read string
+	anon      bool
 }
 
 // derived reports whether any provider marked the step ID as made up from the step position.
@@ -55,6 +60,7 @@ func (e *emitter) steps(c *wfCtx) (*yaml.Node, error) {
 		if st == nil {
 			continue
 		}
+		c.pos = len(done)
 		d, err := e.step(c, st, i)
 		if err != nil {
 			return nil, fmt.Errorf("step %s: %w", st.ID, err)
@@ -63,6 +69,14 @@ func (e *emitter) steps(c *wfCtx) (*yaml.Node, error) {
 			continue
 		}
 		done = append(done, d)
+	}
+	for pos, d := range done {
+		if d.anon {
+			d.read = stepKey + strconv.Itoa(pos)
+		}
+		if d.read != "" && d.read != d.src {
+			e.stepIDs[c.jp+"/step/"+d.read] = d.src
+		}
 	}
 	if len(done) == 0 {
 		d, err := e.placeholder(c)
@@ -89,7 +103,12 @@ func (e *emitter) steps(c *wfCtx) (*yaml.Node, error) {
 // stepName picks the Woodpecker name: the ID, or the display name when the ID was made up from the position.
 func (e *emitter) stepName(sp string, st *ir.Step) string {
 	if derived(st) {
-		return st.Name
+		name, err := e.text(nil, sp, caps.DisplayName, valueText, st.Name)
+		if err != nil {
+			e.lose(sp, caps.DisplayName, "the display name is not valid template text and is dropped")
+			return ""
+		}
+		return name
 	}
 	if st.Name != "" && st.Name != st.ID {
 		e.lose(sp, caps.DisplayName, "a Woodpecker step has one name, which carries the id; the display name is kept in round-trip metadata")
@@ -103,9 +122,11 @@ func (e *emitter) step(c *wfCtx, st *ir.Step, idx int) (stepDone, error) {
 	e.cut = false
 	var m *wmap
 	var err error
+	carried := false
 	switch {
 	case st.Action != nil || st.Kind == ir.StepAction || st.Kind == ir.StepPipelineCall:
-		m, err = e.actionStep(c, sp, st)
+		m, err = e.actionStep(c, sp, st, idx)
+		carried = true
 	case st.Kind == ir.StepPlugin:
 		m, err = e.pluginStep(c, sp, st)
 	case st.Kind == ir.StepScript || len(st.Script) > 0:
@@ -114,7 +135,14 @@ func (e *emitter) step(c *wfCtx, st *ir.Step, idx int) (stepDone, error) {
 		e.lose(sp, caps.StepAction, "step kind "+string(st.Kind)+" has no Woodpecker form")
 		e.comment("step " + sp + " kind " + string(st.Kind))
 	}
-	if err != nil || m == nil {
+	if err != nil {
+		return stepDone{}, err
+	}
+	if m == nil {
+		if !carried {
+			e.unapplied(sp, st)
+			err = e.markAction(sp, st, idx, "")
+		}
 		return stepDone{}, err
 	}
 	return e.finishStep(c, sp, st, idx, m)
@@ -125,6 +153,7 @@ func (e *emitter) finishStep(c *wfCtx, sp string, st *ir.Step, idx int, body *wm
 	ext := extOf(st.Ext)
 	m := newMap()
 	key := st.ID
+	anon := false
 	if c.mapForm {
 		if k, ok := ext["_map_key"].(string); ok {
 			key = k
@@ -137,8 +166,18 @@ func (e *emitter) finishStep(c *wfCtx, sp string, st *ir.Step, idx int, body *wm
 		}
 	} else {
 		name := e.stepName(sp, st)
+		anon = name == ""
 		if name != "" {
 			m.set(nameKey, str(name))
+		}
+		if derived(st) && name != "" {
+			arg := posArg{Pos: c.pos, Name: st.Name}
+			if name != st.Name {
+				arg.Wrote = name
+			}
+			if err := e.markArg(caps.DisplayName, sp, arg); err != nil {
+				return stepDone{}, err
+			}
 		}
 		if key == "" || derived(st) {
 			key = stepKey + strconv.Itoa(idx)
@@ -153,7 +192,7 @@ func (e *emitter) finishStep(c *wfCtx, sp string, st *ir.Step, idx int, body *wm
 	if e.cut {
 		e.cut = false
 		e.comment("step " + sp + ": an image or workdir lost an expression, so the step is disabled")
-		m.set(keyWhen, whenNode(neverEntries()))
+		m.set(keyWhen, whenNode(neverEntries(nil)))
 	} else if raw, ok := ext[keyWhen]; ok {
 		n, err := plainNode(raw)
 		if err != nil {
@@ -164,7 +203,11 @@ func (e *emitter) finishStep(c *wfCtx, sp string, st *ir.Step, idx int, body *wm
 		m.set(keyWhen, e.stepWhen(sp, st.If))
 	}
 	skip := map[string]bool{envKey: true, settKey: true, keyWhen: true}
-	return stepDone{node: m.n, key: key}, m.addExtra(ext, skip)
+	d := stepDone{node: m.n, key: key, src: st.ID, anon: anon}
+	if c.mapForm && key != st.ID {
+		d.read = key
+	}
+	return d, m.addExtra(ext, skip)
 }
 
 // stepImage is the image of a step: its own, else the one a setup action or the job container gave, else the default.
@@ -178,6 +221,7 @@ func (e *emitter) stepImage(c *wfCtx, sp string, st *ir.Step) (string, error) {
 		if !c.defImg {
 			c.defImg = true
 			e.emulate(c.jp, caps.JobContainer, "default image "+defaultImage, "the job names no image, so steps without one run in "+defaultImage)
+			e.mark(caps.JobContainer, c.jp)
 		}
 		return ref, nil
 	}
@@ -187,7 +231,10 @@ func (e *emitter) stepImage(c *wfCtx, sp string, st *ir.Step) (string, error) {
 // stepEnv builds the environment of a step: its own variables, the secrets its text reads, then the job and pipeline variables.
 func (e *emitter) stepEnv(c *wfCtx, sp string, st *ir.Step, b *bindings, ext map[string]any) (*yaml.Node, error) {
 	env := newMap()
-	if err := e.envNode(sp, st.Env, env); err != nil {
+	if err := e.stepOwnEnv(c, sp, st, env); err != nil {
+		return nil, err
+	}
+	if err := e.markShadows(c, sp, st); err != nil {
 		return nil, err
 	}
 	if err := env.mergeMap(ext[envKey]); err != nil {
@@ -202,6 +249,11 @@ func (e *emitter) stepEnv(c *wfCtx, sp string, st *ir.Step, b *bindings, ext map
 		env.set(name, s.n)
 		e.emulate(sp, caps.ScriptInterpolation, "environment from_secret", "secret "+name+" is bound to the variable "+name+", which the command text reads at run time")
 	}
+	if len(b.refs) > 0 {
+		if err := e.markArg(caps.ScriptInterpolation, sp, posArg{Pos: c.pos, Refs: b.refs}); err != nil {
+			return nil, err
+		}
+	}
 	if err := e.envNode(c.jp, c.j.Env, env); err != nil {
 		return nil, err
 	}
@@ -212,6 +264,30 @@ func (e *emitter) stepEnv(c *wfCtx, sp string, st *ir.Step, b *bindings, ext map
 		return nil, nil
 	}
 	return env.n, nil
+}
+
+// stepOwnEnv writes the variables of the step. One whose value has no Woodpecker spelling goes into a marker.
+func (e *emitter) stepOwnEnv(c *wfCtx, sp string, st *ir.Step, env *wmap) error {
+	var lost []ir.Var
+	var at []int
+	for i, v := range st.Env {
+		if env.has(v.Name) {
+			continue
+		}
+		n, err := e.valueNode(sp, v.Value)
+		if err != nil {
+			return err
+		}
+		if n == nil {
+			lost, at = append(lost, v), append(at, i)
+			continue
+		}
+		env.set(v.Name, n)
+	}
+	if len(lost) == 0 {
+		return nil
+	}
+	return e.markLostEnv(sp, c.pos, at, lost)
 }
 
 // common sets the keys every step kind shares; the caller adds commands or settings between them.
@@ -235,7 +311,7 @@ func (e *emitter) common(c *wfCtx, sp string, st *ir.Step, m *wmap) error {
 func (e *emitter) scriptStep(c *wfCtx, sp string, st *ir.Step) (*wmap, error) {
 	b := &bindings{}
 	var lines []*yaml.Node
-	for _, l := range st.Script {
+	for _, l := range commandTexts(st) {
 		out, keep, err := e.command(b, sp, l)
 		if err != nil {
 			return nil, err
@@ -259,6 +335,50 @@ func (e *emitter) scriptStep(c *wfCtx, sp string, st *ir.Step) (*wmap, error) {
 	}
 	e.stepLosses(sp, st)
 	return m, nil
+}
+
+// commandTexts groups the script lines of a step into commands. The Ext of a step that came from Woodpecker
+// says how its lines group; any other step has one command per line.
+func commandTexts(st *ir.Step) []string {
+	raw, _ := extOf(st.Ext)[ExtCommands].([]any)
+	var shapes []commandShape
+	total := 0
+	for _, r := range raw {
+		m, ok := r.(map[string]any)
+		n, isNum := numOf(m["lines"])
+		if !ok || !isNum || n < 1 {
+			return st.Script
+		}
+		final, _ := m["final"].(bool)
+		shapes = append(shapes, commandShape{Lines: n, Final: final})
+		total += n
+	}
+	if len(shapes) == 0 || total != len(st.Script) {
+		return st.Script
+	}
+	var out []string
+	at := 0
+	for _, s := range shapes {
+		text := strings.Join(st.Script[at:at+s.Lines], "\n")
+		if s.Final {
+			text += "\n"
+		}
+		out = append(out, text)
+		at += s.Lines
+	}
+	return out
+}
+
+func numOf(v any) (int, bool) {
+	switch n := v.(type) {
+	case int:
+		return n, true
+	case int64:
+		return int(n), true
+	case float64:
+		return int(n), n == float64(int(n))
+	}
+	return 0, false
 }
 
 // stepTail adds the environment and the working directory.
@@ -330,6 +450,8 @@ func (e *emitter) settingNode(sp string, v ir.Value) (*yaml.Node, error) {
 // placeholder is the one step of a workflow that has none Woodpecker can run; Woodpecker rejects a workflow without steps.
 func (e *emitter) placeholder(c *wfCtx) (stepDone, error) {
 	e.emulate(c.jp, caps.StepScript, "no-op step", "Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in")
+	e.mark(caps.StepScript, c.jp)
+	e.lose(c.jp+"/step/script", caps.StepScript, "the job has no steps; a no-op step keeps the workflow valid")
 	m := newMap()
 	m.set(nameKey, str(placeholderName))
 	img, err := e.stepImage(c, c.jp, &ir.Step{})

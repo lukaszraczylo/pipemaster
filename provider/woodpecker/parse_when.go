@@ -21,6 +21,8 @@ const (
 	eventCron = "cron"
 	eventMan  = "manual"
 	whenKey   = "when"
+	// disabledText is the evaluate text of the fail-safe entry.
+	disabledText = "false"
 )
 
 // allEvents is every event of the pinned schema (server/model/const.go at v3.20.1). A filter that lists all
@@ -46,12 +48,102 @@ type itemInfo struct {
 
 // whenSpec is a parsed when, kept as written so a lossy part can go to Ext whole.
 type whenSpec struct {
-	raw    any
-	items  []itemInfo
-	runsOn []string
-	line   int
-	// runsLine is the line of runs_on.
+	raw any
+	// shared is the evaluate text every entry repeats: the emitter writes the job condition into each trigger entry.
+	shared   string
+	items    []itemInfo
+	runsOn   []string
+	line     int
 	runsLine int
+	// lenient reads an inexact glob as the trigger filter it was written from, because a marker names the source.
+	lenient bool
+	// ignoreStatus leaves the status gate of a finally workflow out of the trigger reading.
+	ignoreStatus bool
+	// multi is true when the pipeline has several workflows, which makes one workflow's repeated gate a shared one.
+	multi bool
+	// sharedStatus is true when every entry holds the same status list: the emitter writes the job status gate into each entry.
+	sharedStatus bool
+	disabled     bool
+}
+
+// configure sets how the trigger reading treats the when, from the markers of its file.
+func (s *whenSpec) configure(m *marks) {
+	if s == nil {
+		return
+	}
+	s.disabled = len(s.items) > 0 && !slices.ContainsFunc(s.items, func(it itemInfo) bool { return it.item.Evaluate != disabledText })
+	s.shared = s.sharedEvaluate()
+	s.sharedStatus = s.sharedStatusList()
+	for _, u := range m.uses {
+		switch u.Feature {
+		case caps.TriggerFilterBranch, caps.TriggerFilterPaths, caps.TriggerFilterTags:
+			s.lenient = s.lenient || u.IRPath == pipelinePth
+		case caps.PipelineFinally:
+			s.ignoreStatus = true
+		}
+	}
+}
+
+// sharedEvaluate returns the evaluate text that every entry holds, or "" when the entries differ or hold none. The
+// fail-safe text is not a condition and has its own reading.
+func (s *whenSpec) sharedEvaluate() string {
+	if len(s.items) < 1 || s.disabled {
+		return ""
+	}
+	first := s.items[0].item.Evaluate
+	if first == "" || slices.ContainsFunc(s.items, func(it itemInfo) bool { return it.item.Evaluate != first }) {
+		return ""
+	}
+	return first
+}
+
+// gates says whether a gate that every entry repeats belongs to the job, not to each trigger. A lone workflow with
+// one entry keeps the whole entry as its condition.
+func (s *whenSpec) gates() bool { return len(s.items) >= 2 || s.multi }
+
+func (s *whenSpec) sharedStatusList() bool {
+	if len(s.items) < 1 || !s.items[0].hasStatus {
+		return false
+	}
+	first := s.items[0].status
+	return !slices.ContainsFunc(s.items, func(it itemInfo) bool { return !it.hasStatus || !slices.Equal(it.status, first) })
+}
+
+// view is the entry as the trigger reading sees it: the markers say which gates are not triggers.
+func (s *whenSpec) view(it itemInfo) itemInfo {
+	if s.disabled || s.shared != "" && s.gates() {
+		it.item.Evaluate = ""
+	}
+	if s.ignoreStatus || s.sharedStatus && s.gates() {
+		it.status, it.hasStatus = nil, false
+	}
+	return it
+}
+
+// residual is the condition a shared trigger list leaves on one workflow: its fail-safe guard and its status gate.
+func (s *whenSpec) residual() expr.Expr {
+	if s == nil || len(s.items) == 0 {
+		return nil
+	}
+	var out expr.Expr
+	if s.disabled {
+		out = expr.Lit{Kind: expr.LitBool}
+	}
+	if s.shared != "" && s.gates() {
+		if e, err := wpexpr.WhenExpr([]wpexpr.Item{{Evaluate: s.shared}}); err == nil {
+			out = and(out, e)
+		}
+	}
+	if s.ignoreStatus && s.items[0].hasStatus {
+		if st, err := wpexpr.StatusExpr(s.items[0].status); err == nil {
+			out = and(out, st)
+		}
+	} else if s.sharedStatus && s.gates() {
+		if st, lossy, err := s.status(); err == nil && !lossy {
+			out = and(out, st)
+		}
+	}
+	return out
 }
 
 func unescapeAll(l []string) []string {
@@ -203,10 +295,10 @@ func exactGlob(p string, isPath bool) bool {
 	return !strings.ContainsAny(p, `?[]{}\`) && !strings.Contains(p, "**")
 }
 
-func irFilter(f wpexpr.Filter, isPath bool) (ir.Filter, bool) {
+func irFilter(f wpexpr.Filter, isPath, lenient bool) (ir.Filter, bool) {
 	var out ir.Filter
 	for _, p := range append(slices.Clone(f.Include), f.Exclude...) {
-		if !exactGlob(p, isPath) {
+		if !lenient && !exactGlob(p, isPath) {
 			return out, false
 		}
 	}
@@ -226,7 +318,8 @@ func (s *whenSpec) triggers() ([]ir.Trigger, bool) {
 		return nil, false
 	}
 	var out []ir.Trigger
-	for _, it := range s.items {
+	for _, raw := range s.items {
+		it := s.view(raw)
 		tagRef, tagOK := tagGlobs(it.item.Ref)
 		refBlocks := !it.item.Ref.Empty() && (!tagOK || !slices.Equal(it.item.Event.Include, []string{eventTag}))
 		if it.item.Evaluate != "" || refBlocks || !it.item.Repo.Empty() || !it.item.Instance.Empty() ||
@@ -242,10 +335,10 @@ func (s *whenSpec) triggers() ([]ir.Trigger, bool) {
 			switch ev {
 			case eventPush, eventPR:
 				var okB, okP bool
-				if t.Branches, okB = irFilter(it.item.Branch, false); !okB {
+				if t.Branches, okB = irFilter(it.item.Branch, false, s.lenient); !okB {
 					return nil, false
 				}
-				if t.Paths, okP = irFilter(it.path, true); !okP {
+				if t.Paths, okP = irFilter(it.path, true, s.lenient); !okP {
 					return nil, false
 				}
 			case eventTag:
@@ -254,7 +347,7 @@ func (s *whenSpec) triggers() ([]ir.Trigger, bool) {
 					return nil, false
 				}
 				var okT bool
-				if t.Tags, okT = irFilter(tagRef, false); !okT {
+				if t.Tags, okT = irFilter(tagRef, false, s.lenient); !okT {
 					return nil, false
 				}
 			default:
@@ -397,7 +490,11 @@ func (s *whenSpec) gate(sk *sink) (expr.Expr, error) {
 
 // apply sets the job condition from the workflow when, unless the pipeline triggers already carry it.
 func (s *whenSpec) apply(rep *report.Report, j *ir.Job, file string, triggersUsed bool) error {
-	if s == nil || triggersUsed {
+	if s == nil {
+		return nil
+	}
+	if triggersUsed {
+		j.If = s.residual()
 		return nil
 	}
 	sk := &sink{rep: rep, vals: map[string]any{}, path: pipelinePth + "/job/" + j.ID, file: file}

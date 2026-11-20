@@ -76,7 +76,7 @@ workspace:
   base: /w
   path: src
 concurrency:
-  limit: 1
+  limit: 2
   group: g
 clone:
   git:
@@ -137,5 +137,16 @@ steps:
 	}
 	if ok, diff := ir.Equal(p, back); !ok {
 		t.Fatalf("round trip differs: %s", diff)
+	}
+}
+
+func TestMatrixValuesReadTheDollarEscape(t *testing.T) {
+	_, j, _ := single(t, "matrix:\n  IMG:\n    - $${LATEST}\n  include:\n    - IMG: $${OLD}\nsteps:\n  - name: s\n    image: x\n    commands: [y]\n")
+	if j.Matrix == nil || len(j.Matrix.Include) != 1 || j.Matrix.Include[0][0].Value != "${OLD}" {
+		t.Fatalf("matrix = %+v", j.Matrix)
+	}
+	_, j, _ = single(t, "matrix:\n  IMG:\n    - $${LATEST}\nsteps:\n  - name: s\n    image: x\n    commands: [y]\n")
+	if got := j.Matrix.Axes[0].Values; len(got) != 1 || got[0] != "${LATEST}" {
+		t.Fatalf("axis values = %v", got)
 	}
 }

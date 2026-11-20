@@ -33,7 +33,13 @@ const (
 type emitter struct {
 	led  *emitkit.Ledger
 	from *expr.Dialect
-	head []string
+	// stepIDs maps the path of each step under the ID a reader derives for it to the ID in the IR.
+	stepIDs map[string]string
+	// inexact is the first trigger filter feature of the workflow being written whose globs changed meaning.
+	inexact caps.Feature
+	head    []string
+	// matrixRefs lists the matrix names the workflow being written reads.
+	matrixRefs []string
 	// cut is set when an image, workdir or service field lost an expression; the step or service being written owns it.
 	cut bool
 	// own is true when the project came from Woodpecker, where a name that is not a built-in is a
@@ -66,17 +72,36 @@ func (e *emitter) foreignExt(path string, x ir.Ext) {
 // mark writes the marker line of an emulated construct into the file head.
 func (e *emitter) mark(f caps.Feature, path string) { e.head = append(e.head, emitkit.Marker(f, path)) }
 
+// markArg writes a marker and one JSON argument line. Woodpecker substitutes ${NAME} in the raw file, comments
+// included, so the argument escapes every "$" the way commentSafe does; the parser reverses it.
+func (e *emitter) markArg(f caps.Feature, path string, v any) error {
+	line, err := emitkit.ArgLine(v)
+	if err != nil {
+		return err
+	}
+	e.mark(f, path)
+	e.head = append(e.head, strings.ReplaceAll(line, dollar, dollarEsc))
+	return nil
+}
+
 // comment queues a lost-text line for the file head; "${{" never reaches the output.
 func (e *emitter) comment(s string) { e.head = append(e.head, lostPrefix+commentSafe(s)) }
 
 // esc doubles each $ so the text reaches Woodpecker's pre-processor, and then the shell, unchanged.
 func esc(s string) string { return strings.ReplaceAll(s, dollar, dollarEsc) }
 
-// bindings are the secrets a step's text reads as run-time variables; the step must map each from a secret.
-type bindings struct{ secrets []string }
+// bindings are the references a step's text reads as run-time variables. The step must map each secret from a
+// secret; refs lists every converted reference as "<namespace>.<name>" so the parser can restore the text.
+type bindings struct{ secrets, refs []string }
 
-func (b *bindings) add(name string) {
-	if b != nil && !slices.Contains(b.secrets, name) {
+func (b *bindings) add(ns, name string) {
+	if b == nil {
+		return
+	}
+	if ref := ns + "." + name; !slices.Contains(b.refs, ref) {
+		b.refs = append(b.refs, ref)
+	}
+	if ns == expr.PrefixSecrets && !slices.Contains(b.secrets, name) {
 		b.secrets = append(b.secrets, name)
 	}
 }
@@ -86,6 +111,9 @@ func (e *emitter) refText(b *bindings, mode textMode, path []string) (string, bo
 	if len(path) == 2 && isIdent(path[1]) {
 		switch path[0] {
 		case expr.PrefixMatrix, dialect:
+			if path[0] == expr.PrefixMatrix && !slices.Contains(e.matrixRefs, path[1]) {
+				e.matrixRefs = append(e.matrixRefs, path[1])
+			}
 			return "${" + path[1] + "}", true
 		case expr.PrefixEnv:
 			if e.own {
@@ -96,9 +124,7 @@ func (e *emitter) refText(b *bindings, mode textMode, path []string) (string, bo
 			if mode != commandText {
 				return "", false
 			}
-			if path[0] == expr.PrefixSecrets {
-				b.add(path[1])
-			}
+			b.add(path[0], path[1])
 			return "$${" + path[1] + "}", true
 		}
 	}

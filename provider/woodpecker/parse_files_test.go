@@ -1,11 +1,13 @@
 package woodpecker_test
 
 import (
+	"fmt"
 	"io/fs"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/woodpecker"
 )
@@ -162,5 +164,42 @@ func TestDependsOnEntryErrors(t *testing.T) {
 		if !strings.Contains(err.Error(), "depends_on") {
 			t.Errorf("%s: error does not name depends_on: %v", name, err)
 		}
+	}
+}
+
+func TestMergeKeySplicesAListIntoAList(t *testing.T) {
+	p, _ := parseRaw(t, map[string]string{".woodpecker.yaml": `variables:
+  - &paths
+    - a.go
+steps:
+  build:
+    image: alpine
+    commands: [echo]
+    when:
+      path:
+        - <<: *paths
+        - 'b/**'
+`})
+	st := p.Pipelines[0].Jobs[0].Steps[0]
+	kept := fmt.Sprintf("%v", st.Ext["woodpecker"])
+	if !strings.Contains(kept, "map[path:[a.go b/**]]") {
+		t.Fatalf("the list must hold the spliced item and the next one, got %s", kept)
+	}
+}
+
+func TestMergeKeyWithNonMappingSourceIsReported(t *testing.T) {
+	_, rep := parseRaw(t, map[string]string{".woodpecker.yaml": `variables:
+  - &paths
+    - a.go
+steps:
+  build:
+    image: alpine
+    commands: [echo]
+    when:
+      - event: push
+        <<: *paths
+`})
+	if !reportHas(rep, caps.ExtPassthrough, caps.Lost) {
+		t.Fatalf("a dropped merge source must be reported: %+v", rep.Entries)
 	}
 }

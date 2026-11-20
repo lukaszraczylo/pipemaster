@@ -12,8 +12,13 @@ const platformLabel = "platform"
 
 // workflow is a parsed file: its job, and the when that Parse places once it knows every workflow.
 type workflow struct {
-	job  *ir.Job
-	when *whenSpec
+	job   *ir.Job
+	when  *whenSpec
+	marks *marks
+	conc  *concurrency
+	file  string
+	// pipeEnv holds the pipeline variables an emitter copied into the steps of this file.
+	pipeEnv []ir.Var
 }
 
 // wf is the state of one workflow parse.
@@ -28,9 +33,16 @@ type wf struct {
 func (w *wf) jobPath() string { return pipelinePth + "/job/" + w.id }
 
 func parseWorkflow(rep *report.Report, file string, data []byte) (*workflow, error) {
-	doc, err := parseDocument(data)
+	doc, skipped, err := parseDocument(data)
 	if err != nil {
 		return nil, err
+	}
+	for _, line := range skipped {
+		rep.Add(report.Entry{
+			IRPath: pipelinePth + "/job/" + workflowName(file), Feature: caps.ExtPassthrough, Level: caps.Lost, Strategy: "dropped",
+			Detail:    "a merge key (<<) whose value is not a mapping adds no key and is dropped",
+			SourceLoc: fmt.Sprintf("%s:%d", file, line),
+		})
 	}
 	top, ok := asMap(doc)
 	if !ok {
@@ -40,6 +52,8 @@ func parseWorkflow(rep *report.Report, file string, data []byte) (*workflow, err
 	w := &wf{tx: &texts{axes: map[string]bool{}}, rep: rep, file: file, id: workflowName(file)}
 	w.ext = newSink(rep, file, w.jobPath())
 	j := &ir.Job{ID: w.id}
+	m := readMarks(data)
+	w.tx.markAxes(m)
 	if err := w.matrix(j, r); err != nil {
 		return nil, err
 	}
@@ -59,14 +73,17 @@ func parseWorkflow(rep *report.Report, file string, data []byte) (*workflow, err
 	if err := w.needs(j, r); err != nil {
 		return nil, err
 	}
+	conc := w.concurrency(r)
 	spec, err := w.when(r)
 	if err != nil {
 		return nil, err
 	}
 	w.ext.keepRest(r, map[string]caps.Feature{"concurrency": caps.PipelineConcurrency})
+	spec.configure(m)
+	pipeEnv := collapseJob(rep, j, m)
 	w.noteKept()
 	j.Ext = w.ext.ext()
-	return &workflow{job: j, when: spec}, nil
+	return &workflow{job: j, when: spec, pipeEnv: pipeEnv, marks: m, conc: conc}, nil
 }
 
 // matrix maps the matrix. Woodpecker reads only include when it is present, so sibling axes are kept, not read.
@@ -102,7 +119,7 @@ func (w *wf) matrix(j *ir.Job, r *reader) error {
 			if !ok {
 				return fmt.Errorf("line %d: matrix axis %s must be a list of scalars", m.lines[k], k)
 			}
-			mx.Axes = append(mx.Axes, ir.Axis{Name: k, Values: vals})
+			mx.Axes = append(mx.Axes, ir.Axis{Name: k, Values: unescapeAll(vals)})
 			w.tx.axes[k] = true
 		}
 	}
@@ -130,7 +147,7 @@ func (w *wf) combos(v any, line int) ([]ir.Combo, error) {
 			if !ok {
 				return nil, fmt.Errorf("line %d: matrix include value %s must be a scalar", m.lines[k], k)
 			}
-			c = append(c, ir.KV{Key: k, Value: t})
+			c = append(c, ir.KV{Key: k, Value: unescape(t)})
 		}
 		out = append(out, c)
 	}
@@ -241,4 +258,31 @@ func (w *wf) noteKept() {
 			Detail: f + " is a Woodpecker substitution with no IR reference; it stays in the text as written", SourceLoc: w.file,
 		})
 	}
+}
+
+// concurrency is a workflow concurrency key the IR models: one run at a time in a named group.
+type concurrency struct {
+	raw   any
+	ir    ir.Concurrency
+	line  int
+	group bool
+}
+
+// concurrency reads {limit: 1, group: G}, the form the emitter writes for a pipeline concurrency group.
+// Any other shape stays in Ext.
+func (w *wf) concurrency(r *reader) *concurrency {
+	v, ok := r.take("concurrency")
+	if !ok {
+		return nil
+	}
+	m, isMap := asMap(v)
+	if isMap && len(m.keys) == 2 {
+		limit, _ := text(m.vals["limit"])
+		group, hasGroup := text(m.vals["group"])
+		if g, err := w.tx.template(group); limit == "1" && hasGroup && err == nil {
+			return &concurrency{raw: v, ir: ir.Concurrency{Group: g}, line: r.line("concurrency"), group: true}
+		}
+	}
+	r.release("concurrency")
+	return nil
 }

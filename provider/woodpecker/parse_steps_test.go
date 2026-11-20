@@ -234,3 +234,17 @@ func TestServicesMapForm(t *testing.T) {
 		t.Fatalf("services = %+v", j.Services)
 	}
 }
+
+func TestEscapedBuiltinVariableReadsAsReference(t *testing.T) {
+	_, j, _ := single(t, "steps:\n  - name: s\n    image: x\n    commands:\n      - 'echo $${CI_COMMIT_BRANCH} $${HOME} ${CI_COMMIT_SHA}'\n")
+	if got := j.Steps[0].Script[0]; got != "echo ${{ branch }} ${HOME} ${{ sha }}" {
+		t.Fatalf("script = %q", got)
+	}
+}
+
+func TestEscapedVariableWithoutCanonicalNameStaysText(t *testing.T) {
+	_, j, _ := single(t, "steps:\n  - name: s\n    image: x\n    commands:\n      - 'echo $${CI_JOB_TOKEN}'\n")
+	if got := j.Steps[0].Script[0]; got != "echo ${CI_JOB_TOKEN}" {
+		t.Fatalf("script = %q", got)
+	}
+}
