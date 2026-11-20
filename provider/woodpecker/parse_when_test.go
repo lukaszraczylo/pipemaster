@@ -252,3 +252,27 @@ func TestRunsOnReportedByUse(t *testing.T) {
 		t.Fatalf("runs_on not kept in Ext: %v", j.Ext)
 	}
 }
+
+const everyEvent = "[push, pull_request, pull_request_closed, pull_request_metadata, tag, release, deployment, cron, manual]"
+
+// A filter that lists every event restricts nothing; strict lint asks for an event filter, so the emitter writes it.
+func TestEveryEventFilterIsNoFilter(t *testing.T) {
+	pl, j, rep := single(t, "when:\n  - event: "+everyEvent+"\n"+body)
+	if len(pl.Triggers) != 0 || j.If != nil || j.Ext != nil {
+		t.Fatalf("triggers = %+v, If = %s, Ext = %v; want no restriction", pl.Triggers, text(j.If), j.Ext)
+	}
+	if len(rep.Entries) != 0 {
+		t.Errorf("entries: %+v", rep.Entries)
+	}
+	_, j, _ = single(t, "when:\n  - event: "+everyEvent+"\n    evaluate: CI_COMMIT_TAG != \"\"\n"+body)
+	if got := text(j.If); got != "tag != ''" {
+		t.Errorf("If = %q, want the evaluate alone", got)
+	}
+}
+
+func TestPartialEventListStaysAFilter(t *testing.T) {
+	pl, _, _ := single(t, "when:\n  - event: [push, pull_request, tag, cron, manual]\n"+body)
+	if len(pl.Triggers) != 5 {
+		t.Errorf("triggers = %+v", pl.Triggers)
+	}
+}

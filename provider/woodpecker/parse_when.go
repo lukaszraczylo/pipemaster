@@ -23,6 +23,12 @@ const (
 	whenKey   = "when"
 )
 
+// allEvents is every event of the pinned schema (server/model/const.go at v3.20.1). A filter that lists all
+// of them restricts nothing.
+var allEvents = []string{
+	eventPush, eventPR, "pull_request_closed", "pull_request_metadata", eventTag, "release", "deployment", eventCron, eventMan,
+}
+
 var triggerKinds = map[string]ir.TriggerKind{
 	eventPush: ir.TriggerPush, eventPR: ir.TriggerPR, eventTag: ir.TriggerTag,
 	eventCron: ir.TriggerSchedule, eventMan: ir.TriggerManual,
@@ -125,7 +131,14 @@ func parseItem(m *omap) itemInfo {
 		}
 		*slot = f
 	}
+	if out.item.Event.Exclude == nil && listsEveryEvent(out.item.Event.Include) {
+		out.item.Event = wpexpr.Filter{}
+	}
 	return out
+}
+
+func listsEveryEvent(include []string) bool {
+	return len(include) >= len(allEvents) && !slices.ContainsFunc(allEvents, func(ev string) bool { return !slices.Contains(include, ev) })
 }
 
 // parseWhen reads a when value: one entry, or a list of entries.
