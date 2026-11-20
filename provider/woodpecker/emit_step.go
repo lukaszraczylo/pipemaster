@@ -18,7 +18,6 @@ const (
 	settKey         = "settings"
 	cmdsKey         = "commands"
 	imageKey        = "image"
-	depKey          = "depends_on"
 	dirKey          = "directory"
 	nameKey         = "name"
 	entryKey        = "entrypoint"
