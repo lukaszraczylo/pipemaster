@@ -141,8 +141,10 @@ func marshalDoc(root *yaml.Node, head []string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// commentSafe makes s fit on one comment line and removes every "${{", which Woodpecker never expands.
+// commentSafe makes s fit on one comment line. Woodpecker substitutes ${NAME} in the raw file, comments
+// included, so every "$" is escaped.
 func commentSafe(s string) string {
 	s = strings.ReplaceAll(s, "${{", "{{")
+	s = strings.ReplaceAll(s, "$", dollarEsc)
 	return strings.NewReplacer("\r\n", `\n`, "\n", `\n`, "\r", `\n`).Replace(s)
 }

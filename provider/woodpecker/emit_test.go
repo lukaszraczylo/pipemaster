@@ -567,3 +567,19 @@ func ghaCond(t *testing.T, src string) expr.Expr {
 	}
 	return e
 }
+
+func TestCommentsEscapeDollar(t *testing.T) {
+	j := wpJob("ci", wpStep("s", "echo ${#a[@]} ${{ needs.x.outputs.v }} $HOME"))
+	body, _ := one(t, wpProject("gha", j))
+	for _, line := range strings.Split(body, "\n") {
+		if !strings.HasPrefix(line, "# pipemaster:") {
+			continue
+		}
+		if strings.Contains(strings.ReplaceAll(line, "$$", ""), "$") {
+			t.Errorf("a comment line holds an unescaped $: %s", line)
+		}
+	}
+	if !strings.Contains(body, "# pipemaster:lost") {
+		t.Fatalf("the case must produce a lost comment:\n%s", body)
+	}
+}
