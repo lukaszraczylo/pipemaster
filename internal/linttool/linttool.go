@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -16,9 +17,22 @@ const (
 	woodpeckerID = "woodpecker-cli"
 )
 
-// Find returns the path of a linter: first on PATH, then in .tools/bin of the enclosing module.
+// pinned maps a linter to the version its --version output must end with; scripts/install-linters.sh builds it.
+var pinned = map[string]string{woodpeckerID: "3.20.1"}
+
+// versionOK reports whether the binary at path is the pinned version. A linter without a pin always passes.
+func versionOK(name, path string) bool {
+	want, ok := pinned[name]
+	if !ok {
+		return true
+	}
+	out, err := exec.Command(path, "--version").Output() // #nosec G204 -- path of a local linter binary
+	return err == nil && strings.HasSuffix(strings.TrimSpace(string(out)), want)
+}
+
+// Find returns the path of a linter at its pinned version: first on PATH, then in .tools/bin of the enclosing module.
 func Find(name string) (string, bool) {
-	if p, err := exec.LookPath(name); err == nil {
+	if p, err := exec.LookPath(name); err == nil && versionOK(name, p) {
 		return p, true
 	}
 	dir, err := os.Getwd()
@@ -29,7 +43,7 @@ func Find(name string) (string, bool) {
 		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
 			p := filepath.Join(dir, toolsDir, name)
 			st, err := os.Stat(p)
-			return p, err == nil && st.Mode().IsRegular()
+			return p, err == nil && st.Mode().IsRegular() && versionOK(name, p)
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
@@ -39,18 +53,25 @@ func Find(name string) (string, bool) {
 	}
 }
 
+// Locate returns the path of the linter. When it is missing, Locate fails the test if RequireEnv is 1, and
+// otherwise reports false so the caller can go on without it.
+func Locate(t testing.TB, name string) (string, bool) {
+	t.Helper()
+	p, ok := Find(name)
+	if !ok && os.Getenv(RequireEnv) == "1" {
+		t.Fatalf("%s %s is not installed and %s=1; run scripts/install-linters.sh", name, pinned[name], RequireEnv)
+	}
+	return p, ok
+}
+
 // Require returns the path of the linter, or skips the test, or fails it when RequireEnv is 1.
 func Require(t testing.TB, name string) string {
 	t.Helper()
-	p, ok := Find(name)
-	if ok {
-		return p
+	p, ok := Locate(t, name)
+	if !ok {
+		t.Skipf("%s is not installed; run scripts/install-linters.sh", name)
 	}
-	if os.Getenv(RequireEnv) == "1" {
-		t.Fatalf("%s is not installed and %s=1; run scripts/install-linters.sh", name, RequireEnv)
-	}
-	t.Skipf("%s is not installed; run scripts/install-linters.sh", name)
-	return ""
+	return p
 }
 
 // RequireWoodpecker is Require for woodpecker-cli.

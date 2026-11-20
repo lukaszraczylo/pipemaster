@@ -1,7 +1,6 @@
 package woodpecker_test
 
 import (
-	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -53,10 +52,7 @@ func emitFiles(t *testing.T, p *ir.Project) (map[string]string, *report.Report) 
 
 func lint(t *testing.T, name string, data []byte) {
 	t.Helper()
-	if _, ok := linttool.Find("woodpecker-cli"); !ok {
-		if os.Getenv(linttool.RequireEnv) == "1" {
-			t.Fatalf("woodpecker-cli is not installed and %s=1; run scripts/install-linters.sh", linttool.RequireEnv)
-		}
+	if _, ok := linttool.Locate(t, "woodpecker-cli"); !ok {
 		return
 	}
 	if out, err := linttool.WoodpeckerLint(t, name, data); err != nil {
