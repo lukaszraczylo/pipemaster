@@ -493,6 +493,31 @@ def gitlabJson (g : Gitlab.Pipeline) : Json :=
     ("rules", match g.rules with | some rs => Json.arr (rs.map trig).toArray | none => Json.null),
     ("jobs", Json.arr (g.jobs.map glJobJson).toArray), ("marks", Json.arr (g.marks.map trig).toArray)]
 
+open Pipemaster.Woodpecker in
+def wpEntryJson (e : Woodpecker.Entry) : Json :=
+  Json.mkObj [("events", strsJson e.events), ("branch", strsJson e.branch), ("ref", strsJson e.ref),
+    ("status", strsJson e.status)]
+
+open Pipemaster.Woodpecker in
+def wpStepJson (s : Woodpecker.WStep) : Json :=
+  Json.mkObj [("name", s.name), ("cmds", strsJson s.cmds), ("env", varsJson s.env), ("ignore", s.ignore),
+    ("shadow", strsJson s.shadow)]
+
+open Pipemaster.Woodpecker in
+def wpTrigJson (t : Woodpecker.Trig) : Json := Json.mkObj [("kind", t.kind), ("include", strsJson t.incl)]
+
+open Pipemaster.Woodpecker in
+def wpFileJson (f : Woodpecker.WFile) : Json :=
+  Json.mkObj [("name", f.name), ("whens", Json.arr (f.whens.map wpEntryJson).toArray),
+    ("deps", Json.arr (f.deps.map fun d => Json.mkObj [("name", d.name), ("optional", d.optional)]).toArray),
+    ("steps", Json.arr (f.steps.map wpStepJson).toArray), ("noop", f.noop), ("job_env", varsJson f.jobEnv),
+    ("allow_failure", f.allowFailure),
+    ("manual", match f.manual with | some ts => Json.arr (ts.map wpTrigJson).toArray | none => Json.null),
+    ("finally", match f.fin with
+      | some (ns, noIf) => Json.mkObj [("needs", Json.arr (ns.map needJ).toArray), ("no_if", noIf)]
+      | none => Json.null),
+    ("tag_idx", optNat f.tagIdx)]
+
 section Adapters
 open Pipemaster.Core
 
@@ -576,6 +601,31 @@ def gitlabAdapterCases : List (Json × Json) :=
     (coreJson p, Json.mkObj [("gitlab", gitlabJson (Gitlab.toGitlab p)),
       ("core", coreJson (Gitlab.fromGitlab (Gitlab.toGitlab p) (Gitlab.gitlabMeta p)))])
 
+/-- Pipelines that exercise the Woodpecker-only markers: a job with no step, a step variable that repeats a job
+variable, `$` in commands and values, a tag filter next to other triggers, and a finally job with needs. -/
+def wpExtraPipes : List Core.Pipe :=
+  let noSteps : Core.Job := { cj "a" with steps := [] }
+  let shadow : Core.Job :=
+    { cj "a" with env := [⟨"K", "v"⟩, ⟨"M", "w"⟩],
+                  steps := [{ cstep "s1" ["echo 1"] with env := [⟨"K", "v"⟩, ⟨"N", "x"⟩] },
+                            { cstep "s2" ["echo 2"] with env := [⟨"K", "other"⟩] }] }
+  let dollar : Core.Job :=
+    { cj "a" with env := [⟨"P", "a$b"⟩, ⟨"Q", "$$"⟩],
+                  steps := [{ cstep "s1" ["echo $HOME", "echo ${X}", "echo $$"] with env := [⟨"R", "$y"⟩] }] }
+  [pushAll [noSteps] [], pushAll [noSteps, { cj "b" with steps := [] }] [{ cj "f" with steps := [] }],
+   pushAll [shadow] [], pushAll [dollar] [],
+   pipeOf [cj "a", { cj "b" with manual := true }] [] (some ["main"]) (some ["v1", "v2"]) (some ["dev"]),
+   pipeOf [cj "a"] [{ cj "f" with needs := needOn "a" true }] none (some ["v1"]) none,
+   pipeOf [{ cj "a" with manual := true }] [{ cj "f" with onFailure := true, steps := [] }] (some ["x"]) (some []) none]
+
+def wpPipes : List Core.Pipe :=
+  (allPipes ++ wpExtraPipes).filter fun p => decide (Wf p ∧ Woodpecker.WpOk p)
+
+def woodpeckerAdapterCases : List (Json × Json) :=
+  wpPipes.map fun p =>
+    (coreJson p, Json.mkObj [("woodpecker", Json.arr ((Woodpecker.toWp p).map wpFileJson).toArray),
+      ("core", coreJson (Woodpecker.fromWp (Woodpecker.toWp p) (Woodpecker.wpMeta p)))])
+
 def crossAdapterCases : List (Json × Json) :=
   ghaPipes.map fun p =>
     let viaGitlab := Gha.fromGha (Gha.toGha (Gitlab.fromGitlab (Gitlab.toGitlab p) (Gitlab.gitlabMeta p)))
@@ -584,10 +634,12 @@ def crossAdapterCases : List (Json × Json) :=
 
 /-! ## Chain vectors (Task 9)
 
-Every ordered choice of three distinct providers over `chainAdapters` (24 chains over four): the first is the
-origin, the other two are the hops. Each case holds the IR as the origin parsed it, the IR after each hop's parse
+Every ordered choice of three distinct providers over `chainAdapters` (51 of the 60 over five: `chainAdmissible`
+drops the 9 whose second hop is Woodpecker and third hop a GHA-family adapter): the first is the origin, the other
+two are the hops. Each case holds the IR as the origin parsed it, the IR after each hop's parse
 with no metadata applied, and the IR after unwinding the stack. The pipelines are a reduced subset of `allPipes`
-that lie in the fragment of every adapter (`Chain.ChainFrag`, with `Chain.chainFrag_pair` for the hops):
+that lie in the fragment of every adapter (`Chain.chainFrag_adapters5_iff`; the hops keep it by
+`Chain.chain_roundtrip_keeps` for the admissible chains):
 - triggers: push and pr over {absent, no filter, [x, y]} and a lone tag trigger, with one plain job;
 - one job: the 17 variants of `jobVariants`;
 - two main jobs: 3 variants of the first and 2 of the second, with needs none, plain or artifacts;
@@ -614,14 +666,19 @@ def chainPipes : List Core.Pipe :=
 
 /-- The pipelines in the fragment of every adapter (decided once per pipeline). -/
 def chainFragPipes : List Core.Pipe :=
-  chainPipes.filter fun p => decide (Chain.ChainFrag p Chain.adapters)
+  chainPipes.filter fun p => decide (RoundTrip.Both p ∧ (Wf p ∧ Woodpecker.WpOk p))
 
 def chainAdapters : List (String × Chain.Adapter) :=
-  [("gha", Chain.gha), ("gitea", Chain.gitea), ("forgejo", Chain.forgejo), ("gitlab", Chain.gitlab)]
+  [("gha", Chain.gha), ("gitea", Chain.gitea), ("forgejo", Chain.forgejo), ("gitlab", Chain.gitlab),
+   ("woodpecker", Chain.woodpecker)]
+
+/-- A hop through Woodpecker leaves the GHA fragment (`Chain.woodpecker_not_keeps_gha`), so no admissible chain
+runs a GHA-family hop after a Woodpecker hop. -/
+def chainAdmissible (b c : String) : Bool := !(b == "woodpecker" && (c == "gha" || c == "gitea" || c == "forgejo"))
 
 def chainTriples : List ((String × Chain.Adapter) × (String × Chain.Adapter) × (String × Chain.Adapter)) :=
   chainAdapters.flatMap fun a => chainAdapters.flatMap fun b => chainAdapters.flatMap fun c =>
-    if a.1 ≠ b.1 ∧ a.1 ≠ c.1 ∧ b.1 ≠ c.1 then [(a, b, c)] else []
+    if a.1 ≠ b.1 ∧ a.1 ≠ c.1 ∧ b.1 ≠ c.1 ∧ chainAdmissible b.1 c.1 then [(a, b, c)] else []
 
 /-- The pipelines per triple under the bound. -/
 def chainPerTriple : Nat :=
@@ -663,6 +720,7 @@ def main (args : List String) : IO UInt32 := do
      ("ledger", "Pipemaster.Ledger.complete", GenVectors.ledgerCases),
      ("gha", "Pipemaster.Gha.gha_from_to", GenVectors.ghaAdapterCases),
      ("gitlab", "Pipemaster.Gitlab.gitlab_from_to", GenVectors.gitlabAdapterCases),
+     ("woodpecker", "Pipemaster.Woodpecker.woodpecker_from_to", GenVectors.woodpeckerAdapterCases),
      ("cross", "Pipemaster.RoundTrip.cross_roundtrip", GenVectors.crossAdapterCases),
      ("chain", "Pipemaster.Chain.chain_roundtrip", GenVectors.chainCases)]
   for (name, thm, cases) in files do

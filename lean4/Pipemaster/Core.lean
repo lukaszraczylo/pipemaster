@@ -77,8 +77,13 @@ structure Meta where
   ids : String → Option String
   names : Path → Option String
   needs : Path → Option (List Need)
+  /-- The runner labels, retry runs and timeout of a job, kept for an emitter that reports them lost
+  (`Lost.Job` fields Runner, Retry and Timeout). A zero field is not recorded, because `copyNonZero` skips it. -/
+  runner : Path → Option (List String) := fun _ => none
+  retry : Path → Option Nat := fun _ => none
+  timeout : Path → Option Nat := fun _ => none
 
-def Meta.empty : Meta := ⟨fun _ => none, fun _ => none, fun _ => none⟩
+def Meta.empty : Meta := { ids := fun _ => none, names := fun _ => none, needs := fun _ => none }
 
 def nameOf (s : String) : Option String := if s = "" then none else some s
 
@@ -102,6 +107,10 @@ def metaOf (p : Pipe) : Meta where
       else none
     | _ => none
 
+theorem metaOf_runner (p : Pipe) (x : Path) : (metaOf p).runner x = none := rfl
+theorem metaOf_retry (p : Pipe) (x : Path) : (metaOf p).retry x = none := rfl
+theorem metaOf_timeout (p : Pipe) (x : Path) : (metaOf p).timeout x = none := rfl
+
 /-- Fills only an empty name (meta.fill). -/
 def fill (cur : String) (stored : Option String) : String :=
   if cur = "" then stored.getD "" else cur
@@ -113,6 +122,9 @@ def restoreJob (m : Meta) (pid : String) (j : Job) : Job :=
   { j with
     name := fill j.name (m.names (.job pid j.id))
     needs := (m.needs (.job pid j.id)).getD j.needs
+    runner := (m.runner (.job pid j.id)).getD j.runner
+    retry := (m.retry (.job pid j.id)).getD j.retry
+    timeout := (m.timeout (.job pid j.id)).getD j.timeout
     steps := j.steps.map (restoreStep m pid j.id) }
 
 /-- Mirrors roundtrip.Restore (internal/roundtrip/meta.go): undo the renames, then re-attach names and lost fields. -/
@@ -321,7 +333,7 @@ theorem restoreJob_self (p : Pipe) (hn : (p.all.map Job.id).Nodup)
   have hneeds : (metaOf p).needs (.job p.id j.id) =
       if j.needs.any (·.artifacts) = true then some j.needs else none := by simp [metaOf, hf]
   unfold restoreJob
-  simp only [hnames, hneeds, fill_self, hsteps]
+  simp only [hnames, hneeds, fill_self, hsteps, metaOf_runner, metaOf_retry, metaOf_timeout, Option.getD_none]
   by_cases hany : j.needs.any (·.artifacts) = true
   · simp [hany]
   · simp [hany]

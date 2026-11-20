@@ -57,7 +57,7 @@ func TestChainVectors(t *testing.T) {
 			return
 		}
 	}
-	if want := distinctChains(len(providers)); len(seen) != want {
+	if want := distinctChains(len(providers)) - skippedChains(providers); len(seen) != want {
 		t.Errorf("vectors cover %d chains over %d providers, want %d", len(seen), len(providers), want)
 	}
 }
@@ -70,6 +70,32 @@ func distinctChains(n int) int {
 	count := 1
 	for k := 0; k <= chainHops; k++ {
 		count *= n - k
+	}
+	return count
+}
+
+// ghaFamily lists the providers whose fragment a hop through Woodpecker leaves: the Woodpecker parser drops the
+// runner labels that the GHA fragment needs (Chain.woodpecker_not_keeps_gha in lean4/Pipemaster/Chain.lean).
+var ghaFamily = []string{"gha", "gitea", "forgejo"}
+
+const woodpeckerID = "woodpecker"
+
+// skippedChains counts the chains the generator leaves out: Woodpecker as the first hop and a GHA-family provider
+// as the second hop, with a distinct origin.
+func skippedChains(providers map[string]bool) int {
+	if !providers[woodpeckerID] {
+		return 0
+	}
+	count := 0
+	for _, last := range ghaFamily {
+		if !providers[last] {
+			continue
+		}
+		for origin := range providers {
+			if origin != woodpeckerID && origin != last {
+				count++
+			}
+		}
 	}
 	return count
 }
@@ -126,7 +152,7 @@ func runChain(t *testing.T, label string, chain []string, core json.RawMessage, 
 }
 
 func TestDistinctChains(t *testing.T) {
-	for n, want := range map[int]int{0: 0, 2: 0, 3: 6, 4: 24, 9: 504} {
+	for n, want := range map[int]int{0: 0, 2: 0, 3: 6, 4: 24, 5: 60, 9: 504} {
 		if got := distinctChains(n); got != want {
 			t.Errorf("distinctChains(%d) = %d, want %d", n, got, want)
 		}
@@ -140,5 +166,15 @@ func TestChainVectorsSizeBound(t *testing.T) {
 	}
 	if info.Size() > maxChainVectorBytes {
 		t.Errorf("chain.json is %d bytes, want at most %d; lower chainCaseCap in lean4/GenVectors.lean", info.Size(), maxChainVectorBytes)
+	}
+}
+
+func TestSkippedChains(t *testing.T) {
+	all := map[string]bool{"gha": true, "gitea": true, "forgejo": true, "gitlab": true, woodpeckerID: true}
+	if got := skippedChains(all); got != 9 {
+		t.Errorf("skippedChains over five providers = %d, want 9", got)
+	}
+	if got := skippedChains(map[string]bool{"gha": true, "gitlab": true, "gitea": true, "forgejo": true}); got != 0 {
+		t.Errorf("skippedChains without Woodpecker = %d, want 0", got)
 	}
 }

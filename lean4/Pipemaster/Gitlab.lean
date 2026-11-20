@@ -317,7 +317,8 @@ theorem restoreJob_strip (p : Pipe) (hn : (p.all.map Core.Job.id).Nodup)
       = j.steps := by
     rw [← List.map_map]; exact hsteps
   unfold restoreJob strip
-  simp only [hnames, hneeds, fill_nameOf, List.map_map]
+  simp only [hnames, hneeds, fill_nameOf, List.map_map, metaOf_runner, metaOf_retry, metaOf_timeout,
+    Option.getD_none]
   rw [hneeds', hsteps']
 
 theorem isFin_main (p : Pipe) (j : Core.Job) : isFin (mainJob p j) = false := by

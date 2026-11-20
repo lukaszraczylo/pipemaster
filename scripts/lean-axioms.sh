@@ -51,6 +51,9 @@ required=(
   Pipemaster.Woodpecker.eval_woodpecker
   Pipemaster.Woodpecker.woodpecker_sound
   Pipemaster.Woodpecker.woodpecker_event_rx
+  Pipemaster.Woodpecker.rawWp_toWp
+  Pipemaster.Woodpecker.rawWp_frag
+  Pipemaster.Woodpecker.woodpecker_from_to
   Pipemaster.RoundTrip.cross_roundtrip
   Pipemaster.RoundTrip.cross_roundtrip_rev
   Pipemaster.RoundTrip.both_iff
@@ -60,6 +63,15 @@ required=(
   Pipemaster.Chain.chainFrag_adapters_iff
   Pipemaster.Chain.chain_roundtrip
   Pipemaster.Chain.chain_gha_gitlab_gitea
+  Pipemaster.Chain.gitlab_keeps_woodpecker
+  Pipemaster.Chain.woodpecker_keeps_woodpecker
+  Pipemaster.Chain.woodpecker_keeps_gitlab
+  Pipemaster.Chain.woodpecker_not_keeps_gha
+  Pipemaster.Chain.runFrag_of_keeps
+  Pipemaster.Chain.chain_roundtrip_keeps
+  Pipemaster.Chain.chainFrag_adapters5_iff
+  Pipemaster.Chain.chain_gitlab_woodpecker_gitlab
+  Pipemaster.Chain.chain_woodpecker_gitlab_gha
 )
 required_lean="$(printf '`%s, ' "${required[@]}")"
 required_lean="[${required_lean%, }]"
