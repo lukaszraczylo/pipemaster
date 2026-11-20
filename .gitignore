@@ -7,4 +7,4 @@ lean4/.lake/
 /.tools/
 
 # rapid failure files
-testdata/rapid/
+**/testdata/rapid/
