@@ -1,0 +1,412 @@
+package woodpecker
+
+import (
+	"slices"
+	"strconv"
+	"strings"
+
+	"go.yaml.in/yaml/v3"
+
+	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
+	wpexpr "github.com/lukaszraczylo/pipemaster/expr/woodpecker"
+	"github.com/lukaszraczylo/pipemaster/ir"
+)
+
+const (
+	keyPath      = "path"
+	keyStatus    = "status"
+	keyEvaluate  = "evaluate"
+	statusOK     = "success"
+	statusFail   = "failure"
+	refTagPrefix = "refs/tags/"
+	negation     = "!"
+)
+
+// whenEntry is one when list item: its keys are ANDed, and items are ORed.
+type whenEntry struct {
+	wpexpr.Item
+	path   wpexpr.Filter
+	status []string
+}
+
+func (w whenEntry) empty() bool {
+	return w.Evaluate == "" && w.Event.Empty() && w.Branch.Empty() && w.Ref.Empty() && w.Repo.Empty() &&
+		w.Instance.Empty() && w.path.Empty() && len(w.status) == 0
+}
+
+func filterNode(f wpexpr.Filter) *yaml.Node {
+	escAll := func(vs []string) []string {
+		out := make([]string, len(vs))
+		for i, v := range vs {
+			out[i] = esc(v)
+		}
+		return out
+	}
+	if len(f.Exclude) == 0 {
+		if vs := escAll(f.Include); len(vs) == 1 {
+			return str(vs[0])
+		}
+		return strSeq(escAll(f.Include))
+	}
+	// The object form takes lists only (path.include and path.exclude in the pinned schema).
+	m := newMap()
+	if len(f.Include) > 0 {
+		m.set("include", strSeq(escAll(f.Include)))
+	}
+	m.set("exclude", strSeq(escAll(f.Exclude)))
+	return m.n
+}
+
+func (w whenEntry) node() *yaml.Node {
+	m := newMap()
+	for _, k := range []struct {
+		key string
+		f   wpexpr.Filter
+	}{
+		{wpexpr.KeyEvent, w.Event}, {wpexpr.KeyBranch, w.Branch}, {wpexpr.KeyRef, w.Ref},
+		{wpexpr.KeyRepo, w.Repo}, {wpexpr.KeyInstance, w.Instance}, {keyPath, w.path},
+	} {
+		if !k.f.Empty() {
+			m.set(k.key, filterNode(k.f))
+		}
+	}
+	if len(w.status) > 0 {
+		m.set(keyStatus, strSeq(w.status))
+	}
+	if w.Evaluate != "" {
+		m.set(keyEvaluate, str(esc(w.Evaluate)))
+	}
+	return m.n
+}
+
+// whenNode renders entries as a when list; nil when nothing restricts the run.
+func whenNode(entries []whenEntry) *yaml.Node {
+	if len(entries) == 0 || slices.ContainsFunc(entries, whenEntry.empty) {
+		return nil
+	}
+	n := seqOf()
+	for _, w := range entries {
+		n.Content = append(n.Content, w.node())
+	}
+	return n
+}
+
+// neverEntries is the fail-safe for a condition Woodpecker cannot state: the construct never runs.
+func neverEntries() []whenEntry { return []whenEntry{{Item: wpexpr.Item{Evaluate: "false"}}} }
+
+// splitStatus pulls the always, failure and success calls out of an AND chain. ok is false when a status
+// function sits anywhere else or cancelled() is used, which Woodpecker has no step state for.
+func splitStatus(x expr.Expr) (rest expr.Expr, status []string, ok bool) {
+	var conj []expr.Expr
+	flatten(x, &conj)
+	var kept []expr.Expr
+	seen := ""
+	for _, c := range conj {
+		call, isCall := c.(expr.Call)
+		if !isCall || len(call.Args) != 0 {
+			kept = append(kept, c)
+			continue
+		}
+		switch call.Name {
+		case "always", statusFail, statusOK:
+			if seen != "" && seen != call.Name {
+				return nil, nil, false
+			}
+			seen = call.Name
+		case "cancelled":
+			return nil, nil, false
+		default:
+			kept = append(kept, c)
+		}
+	}
+	if slices.ContainsFunc(kept, hasStatusCall) {
+		return nil, nil, false
+	}
+	for _, k := range kept {
+		if rest == nil {
+			rest = k
+			continue
+		}
+		rest = expr.Binary{Op: expr.OpAnd, L: rest, R: k}
+	}
+	switch seen {
+	case "always":
+		status = []string{statusOK, statusFail}
+	case statusFail:
+		status = []string{statusFail}
+	}
+	return rest, status, true
+}
+
+func flatten(x expr.Expr, out *[]expr.Expr) {
+	if b, ok := x.(expr.Binary); ok && b.Op == expr.OpAnd {
+		flatten(b.L, out)
+		flatten(b.R, out)
+		return
+	}
+	*out = append(*out, x)
+}
+
+func hasStatusCall(x expr.Expr) bool {
+	switch v := x.(type) {
+	case expr.Call:
+		switch v.Name {
+		case "always", statusFail, statusOK, "cancelled":
+			return true
+		}
+		return slices.ContainsFunc(v.Args, hasStatusCall)
+	case expr.Unary:
+		return hasStatusCall(v.X)
+	case expr.Binary:
+		return hasStatusCall(v.L) || hasStatusCall(v.R)
+	}
+	return false
+}
+
+// condition translates x from the source dialect into when entries and a status list. ok is false when
+// Woodpecker cannot state it; the caller then disables the construct.
+func (e *emitter) condition(path string, f caps.Feature, x expr.Expr, what string) (items []wpexpr.Item, status []string, ok bool) {
+	rest, status, ok := splitStatus(x)
+	if !ok {
+		e.disable(path, f, x, what)
+		return nil, nil, false
+	}
+	if rest == nil {
+		return nil, status, true
+	}
+	t := rest
+	if o, isOpaque := rest.(expr.Opaque); isOpaque && o.Dialect != wpexpr.Dialect {
+		e.disable(path, f, x, what)
+		return nil, nil, false
+	}
+	if e.from != nil {
+		if t, ok = expr.Translate(rest, *e.from, wpexpr.Lang); !ok {
+			e.disable(path, f, x, what)
+			return nil, nil, false
+		}
+	}
+	items, ok = wpexpr.SplitWhen(t)
+	if !ok {
+		e.disable(path, f, x, what)
+		return nil, nil, false
+	}
+	return items, status, true
+}
+
+func (e *emitter) disable(path string, f caps.Feature, x expr.Expr, what string) {
+	e.lose(path, f, "condition not expressible in Woodpecker CI; "+what+" disabled")
+	if expr.HasOpaque(x) && f != caps.ExprOpaque {
+		e.lose(path, caps.ExprOpaque, "an opaque expression of another dialect has no Woodpecker form")
+	}
+	e.comment(string(f) + " " + path + ": " + expr.String(x))
+}
+
+// stepWhen renders a step condition as a when list; nil means no restriction.
+func (e *emitter) stepWhen(path string, x expr.Expr) *yaml.Node {
+	if x == nil {
+		return nil
+	}
+	items, status, ok := e.condition(path, caps.StepIf, x, "the step")
+	if !ok {
+		return whenNode(neverEntries())
+	}
+	entries := make([]whenEntry, 0, len(items))
+	for _, it := range items {
+		entries = append(entries, whenEntry{Item: it, status: status})
+	}
+	if len(entries) == 0 && len(status) > 0 {
+		entries = []whenEntry{{status: status}}
+	}
+	return whenNode(entries)
+}
+
+// irGlobs maps IR glob lists to a when filter. A leading ! means "not" in GHA patterns and is written as an exclude.
+// inexact lists each pattern whose Woodpecker (doublestar) meaning can differ from the IR meaning.
+func irGlobs(f ir.Filter, isPath bool) (out wpexpr.Filter, inexact []string) {
+	for _, p := range f.Include {
+		if rest, neg := strings.CutPrefix(p, negation); neg {
+			out.Exclude = append(out.Exclude, rest)
+			inexact = append(inexact, p)
+			continue
+		}
+		out.Include = append(out.Include, p)
+		if !exactGlob(p, isPath) {
+			inexact = append(inexact, p)
+		}
+	}
+	for _, p := range f.Exclude {
+		out.Exclude = append(out.Exclude, p)
+		if !exactGlob(p, isPath) {
+			inexact = append(inexact, p)
+		}
+	}
+	return out, inexact
+}
+
+func (e *emitter) globFilter(tp string, f caps.Feature, in ir.Filter, isPath bool) wpexpr.Filter {
+	out, inexact := irGlobs(in, isPath)
+	if len(inexact) > 0 {
+		e.emulate(tp, f, "doublestar glob", "pattern "+strings.Join(inexact, ", ")+" has a different meaning in doublestar than in the source; it is written as is")
+	}
+	return out
+}
+
+// triggerEntries maps the pipeline triggers to when entries, one per trigger, in order.
+func (e *emitter) triggerEntries(pl *ir.Pipeline) []whenEntry {
+	var out []whenEntry
+	for i := range pl.Triggers {
+		t := &pl.Triggers[i]
+		tp := "pipeline/" + pl.ID + "/trigger/" + strconv.Itoa(i)
+		e.foreignExt(tp, t.Ext)
+		if w, ok := e.triggerEntry(tp, t); ok {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+func (e *emitter) triggerEntry(tp string, t *ir.Trigger) (whenEntry, bool) {
+	var w whenEntry
+	switch t.Kind {
+	case ir.TriggerPush, ir.TriggerPR:
+		w.Event.Include = []string{eventPush}
+		if t.Kind == ir.TriggerPR {
+			w.Event.Include = []string{eventPR}
+		}
+		w.Branch = e.globFilter(tp, caps.TriggerFilterBranch, t.Branches, false)
+		w.path = e.globFilter(tp, caps.TriggerFilterPaths, t.Paths, true)
+		if hasFilter(t.Tags) {
+			e.lose(tp, caps.TriggerFilterTags, "a "+string(t.Kind)+" trigger has no tag filter; tags belong to a tag trigger")
+		}
+	case ir.TriggerTag:
+		w.Event.Include = []string{eventTag}
+		w.Ref = e.tagRefs(tp, t.Tags)
+		e.dropFilters(tp, t, "a tag event")
+	case ir.TriggerSchedule:
+		w.Event.Include = []string{eventCron}
+		e.external(tp, caps.TriggerSchedule, "when event cron", "Woodpecker keeps the schedule in the repo settings: add a cron job with the schedule \""+t.Cron+"\" under Settings > Cron")
+		e.dropFilters(tp, t, "a cron event")
+	case ir.TriggerManual:
+		w.Event.Include = []string{eventMan}
+		e.dropFilters(tp, t, "a manual event")
+	default:
+		return w, false
+	}
+	return w, true
+}
+
+func hasFilter(f ir.Filter) bool { return len(f.Include) > 0 || len(f.Exclude) > 0 }
+
+// dropFilters reports the branch and path filters of a trigger that Woodpecker does not apply to the event.
+func (e *emitter) dropFilters(tp string, t *ir.Trigger, event string) {
+	if hasFilter(t.Branches) {
+		e.lose(tp, caps.TriggerFilterBranch, "Woodpecker does not apply a branch filter to "+event)
+	}
+	if hasFilter(t.Paths) {
+		e.lose(tp, caps.TriggerFilterPaths, "Woodpecker does not apply a path filter to "+event)
+	}
+	if t.Kind != ir.TriggerTag && hasFilter(t.Tags) {
+		e.lose(tp, caps.TriggerFilterTags, "Woodpecker does not apply a tag filter to "+event)
+	}
+}
+
+// tagRefs maps tag globs to a ref filter on the full ref; the tag event itself has no tag name filter.
+func (e *emitter) tagRefs(tp string, in ir.Filter) wpexpr.Filter {
+	if !hasFilter(in) {
+		return wpexpr.Filter{}
+	}
+	f := e.globFilter(tp, caps.TriggerFilterTags, in, false)
+	for i, p := range f.Include {
+		f.Include[i] = refTagPrefix + p
+	}
+	for i, p := range f.Exclude {
+		f.Exclude[i] = refTagPrefix + p
+	}
+	e.emulate(tp, caps.TriggerFilterTags, "ref filter refs/tags/<pattern>", "the tag name filter is written as a ref filter on the tag event")
+	e.mark(caps.TriggerFilterTags, tp)
+	return f
+}
+
+// jobWhen combines the trigger entries, the manual gate, the job condition and the status gate of one workflow.
+func (e *emitter) jobWhen(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) []whenEntry {
+	base := e.triggerEntries(pl)
+	if len(pl.Triggers) > 0 && len(base) == 0 {
+		e.comment("trigger.* " + jp + ": no trigger of the pipeline has a Woodpecker event")
+		return neverEntries()
+	}
+	if j.Manual {
+		e.emulate(jp, caps.JobManual, "when event manual", "the workflow runs only when a person starts it from the UI or API")
+		e.mark(caps.JobManual, jp)
+		base = []whenEntry{{Item: wpexpr.Item{Event: wpexpr.Filter{Include: []string{eventMan}}}}}
+	}
+	var cond []wpexpr.Item
+	var status []string
+	if j.If != nil {
+		var ok bool
+		if cond, status, ok = e.condition(jp, caps.JobIf, j.If, "the workflow"); !ok {
+			return neverEntries()
+		}
+	}
+	if finally && status == nil {
+		status = []string{statusOK, statusFail}
+	}
+	return withStatus(e.mergeCond(base, cond), status)
+}
+
+// mergeCond ANDs the condition with every base entry. Two entries cannot be merged key by key, so the
+// whole condition goes into the evaluate text of each base entry.
+func (e *emitter) mergeCond(base []whenEntry, cond []wpexpr.Item) []whenEntry {
+	if len(cond) == 0 {
+		return base
+	}
+	if len(base) == 0 {
+		out := make([]whenEntry, len(cond))
+		for i, it := range cond {
+			out[i] = whenEntry{Item: it}
+		}
+		return out
+	}
+	x, err := wpexpr.WhenExpr(cond)
+	if err != nil || x == nil {
+		return base
+	}
+	text, err := wpexpr.Print(x)
+	if err != nil {
+		return neverEntries()
+	}
+	out := slices.Clone(base)
+	for i := range out {
+		out[i].Evaluate = text
+	}
+	return out
+}
+
+func withStatus(entries []whenEntry, status []string) []whenEntry {
+	if len(status) == 0 {
+		return entries
+	}
+	if len(entries) == 0 {
+		entries = []whenEntry{{}}
+	}
+	out := slices.Clone(entries)
+	for i := range out {
+		out[i].status = status
+	}
+	return out
+}
+
+// completeEvents gives every entry an event filter: woodpecker-cli lint --strict rejects a workflow whose
+// when entries lack one. Listing all events keeps the run condition, because a run has exactly one of them.
+func completeEvents(entries []whenEntry) []whenEntry {
+	if len(entries) == 0 {
+		entries = []whenEntry{{}}
+	}
+	out := slices.Clone(entries)
+	for i := range out {
+		if out[i].Event.Empty() {
+			out[i].Event.Include = slices.Clone(allEvents)
+		}
+	}
+	return out
+}

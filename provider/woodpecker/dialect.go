@@ -6,9 +6,7 @@ import (
 	"io/fs"
 	"strings"
 
-	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
-	"github.com/lukaszraczylo/pipemaster/report"
 	"github.com/lukaszraczylo/pipemaster/validate"
 	"github.com/lukaszraczylo/pipemaster/validate/schemas"
 )
@@ -20,9 +18,6 @@ const (
 	fileYAML   = ".woodpecker.yaml"
 	fileYML    = ".woodpecker.yml"
 )
-
-// ErrNoEmitter is returned by Emit until the Woodpecker emitter exists.
-var ErrNoEmitter = errors.New("woodpecker: the emitter is not available yet")
 
 type adapter struct{}
 
@@ -40,11 +35,6 @@ func (adapter) ID() string { return dialect }
 func (a adapter) Detect(fsys fs.FS) bool {
 	d, err := discover(fsys)
 	return err == nil && len(d.files) > 0
-}
-
-// Emit is not available yet.
-func (adapter) Emit(*ir.Project) (map[string][]byte, *report.Report, error) {
-	return nil, nil, ErrNoEmitter
 }
 
 // SourceFiles lists the files Parse reads.

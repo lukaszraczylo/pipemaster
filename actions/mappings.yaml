@@ -44,6 +44,11 @@ actions:
           fetch-depth: {to: GIT_DEPTH, transform: depth}
           submodules: {to: GIT_SUBMODULE_STRATEGY, transform: submodules}
         support: {level: native, strategy: runner clones the repository before the job}
+      woodpecker:
+        kind: implicit
+        with:
+          fetch-depth: {to: depth, transform: depth}
+        support: {level: native, strategy: the default clone step runs before the steps}
 
   - match: actions/cache
     targets:
@@ -54,6 +59,12 @@ actions:
           key: key
           path: {to: paths, transform: lines}
         support: {level: native, strategy: gitlab cache keyword}
+      woodpecker:
+        kind: cache
+        with:
+          key: key
+          path: {to: paths, transform: lines}
+        support: {level: emulated, strategy: shared workspace of the steps in one workflow, caveat: nothing persists between runs}
 
   - match: actions/upload-artifact
     targets:
@@ -65,6 +76,12 @@ actions:
           path: {to: path, transform: lines, exclude: exclude}
           retention-days: {to: expire_in, transform: days}
         support: {level: native, strategy: gitlab artifacts keyword}
+      woodpecker:
+        kind: artifact_upload
+        with:
+          name: name
+          path: {to: path, transform: lines}
+        support: {level: emulated, strategy: shared workspace of the steps in one workflow, caveat: other workflows cannot read the files}
 
   - match: actions/download-artifact
     targets:
@@ -73,6 +90,10 @@ actions:
         kind: artifact_download
         with: {name: name, path: path}
         support: {level: native, strategy: needs with artifacts}
+      woodpecker:
+        kind: artifact_download
+        with: {name: name, path: path}
+        support: {level: emulated, strategy: shared workspace of the steps in one workflow, caveat: only an upload in the same workflow is visible}
 
   - match: actions/setup-go
     targets:
@@ -81,6 +102,10 @@ actions:
         kind: image
         image: "golang:{{go-version}}"
         support: {level: emulated, strategy: image selection, caveat: job image replaced}
+      woodpecker:
+        kind: image
+        image: "golang:{{go-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
 
   - match: actions/setup-node
     targets:
@@ -89,6 +114,10 @@ actions:
         kind: image
         image: "node:{{node-version}}"
         support: {level: emulated, strategy: image selection, caveat: job image replaced}
+      woodpecker:
+        kind: image
+        image: "node:{{node-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
 
   - match: actions/setup-python
     targets:
@@ -97,6 +126,10 @@ actions:
         kind: image
         image: "python:{{python-version}}"
         support: {level: emulated, strategy: image selection, caveat: job image replaced}
+      woodpecker:
+        kind: image
+        image: "python:{{python-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
 
   - match: actions/setup-java
     targets:
@@ -105,6 +138,10 @@ actions:
         kind: image
         image: "eclipse-temurin:{{java-version}}"
         support: {level: emulated, strategy: image selection, caveat: job image replaced}
+      woodpecker:
+        kind: image
+        image: "eclipse-temurin:{{java-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
 
 # Versions checked 2026-11-18 via the GitHub releases API (latest release, major tag).
 reverse:

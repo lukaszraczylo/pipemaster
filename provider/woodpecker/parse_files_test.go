@@ -1,7 +1,6 @@
 package woodpecker_test
 
 import (
-	"errors"
 	"io/fs"
 	"reflect"
 	"strings"
@@ -140,13 +139,14 @@ func TestDependsOn(t *testing.T) {
 	t.Fatal("deploy not found")
 }
 
-func TestRegisteredAndEmitUnavailable(t *testing.T) {
+func TestRegisteredAndEmitNilIsEmpty(t *testing.T) {
 	p, err := provider.Get(provider.Woodpecker)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := p.Emit(nil); !errors.Is(err, woodpecker.ErrNoEmitter) {
-		t.Fatalf("Emit error = %v", err)
+	files, rep, err := p.Emit(nil)
+	if err != nil || len(files) != 0 || rep == nil {
+		t.Fatalf("Emit(nil) = %v, %v, %v; want no files, a report and no error", files, rep, err)
 	}
 }
 
