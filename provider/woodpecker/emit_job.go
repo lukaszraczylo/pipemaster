@@ -44,6 +44,8 @@ type wfCtx struct {
 	name    string
 	// image is what a step without its own image runs in; a setup action replaces it for the steps after it.
 	image string
+	// entry is the job container entrypoint, which a step without its own image inherits.
+	entry []string
 	// depth is the clone depth that an actions/checkout step asked for; empty means the default clone.
 	depth   string
 	finally bool
@@ -66,6 +68,7 @@ func (e *emitter) workflow(c *wfCtx) (*yaml.Node, error) {
 	ext := extOf(j.Ext)
 	if j.Container != nil {
 		c.image = j.Container.Ref
+		c.entry = j.Container.Entrypoint
 	}
 	steps, err := e.steps(c)
 	if err != nil {

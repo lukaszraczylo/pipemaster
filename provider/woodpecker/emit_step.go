@@ -223,6 +223,11 @@ func (e *emitter) common(c *wfCtx, sp string, st *ir.Step, m *wmap) error {
 			return err
 		}
 		m.set(entryKey, ep)
+		return nil
+	}
+	if len(c.entry) > 0 && (st.Image == nil || st.Image.Ref == "") {
+		// Woodpecker replaces the entrypoint of a step that has commands, and a plugin step needs its own image.
+		e.lose(sp, caps.StepImage, "the job container entrypoint has no effect: Woodpecker sets its own entrypoint for commands")
 	}
 	return nil
 }
