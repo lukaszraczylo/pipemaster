@@ -41,6 +41,10 @@ required=(
   Pipemaster.TranslateClass.event_rx_rename
   Pipemaster.Gha.gha_from_to
   Pipemaster.Gitlab.gitlab_from_to
+  Pipemaster.Woodpecker.wpView_set
+  Pipemaster.Woodpecker.lower_ne_empty
+  Pipemaster.Woodpecker.modeTest_empty
+  Pipemaster.Woodpecker.matchV_unset
   Pipemaster.Woodpecker.eq_empty_differs
   Pipemaster.Woodpecker.eq_null_differs
   Pipemaster.Woodpecker.not_gitlab_class
