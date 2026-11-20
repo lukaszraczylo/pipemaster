@@ -9,6 +9,7 @@ import (
 	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/woodpecker"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 func TestEmitScriptWorkflow(t *testing.T) {
@@ -344,15 +345,21 @@ func TestEmitPluginStep(t *testing.T) {
 func TestDerivedIDIsNotWrittenAsName(t *testing.T) {
 	a, b := wpStep("step-0", "x"), wpStep("named", "y")
 	a.Ext = ir.Ext{"woodpecker": map[string]any{woodpecker.ExtDerivedID: true}}
-	body, _ := one(t, wpProject("woodpecker", wpJob("ci", a, b)))
+	body, rep := one(t, wpProject("woodpecker", wpJob("ci", a, b)))
 	if strings.Contains(body, "name: step-0") || !strings.Contains(body, "name: named") {
 		t.Errorf("a derived id must not become a name:\n%s", body)
 	}
+	if reportHas(rep, caps.ExtPassthrough, caps.Lost) || reportHas(rep, caps.ExtPassthrough, caps.Emulated) {
+		t.Errorf("bookkeeping keys are not data: %+v", rep.Entries)
+	}
 	ga := wpStep("ci-step-1", "x")
 	ga.Ext = ir.Ext{"gha": map[string]any{"_derived_id": true}}
-	body, _ = one(t, wpProject(ghaOrigin, wpJob("ci", ga)))
+	body, rep = one(t, wpProject(ghaOrigin, wpJob("ci", ga)))
 	if strings.Contains(body, "ci-step-1") {
 		t.Errorf("a GHA derived id leaked:\n%s", body)
+	}
+	if hasExtEntry(rep) {
+		t.Errorf("a GHA bookkeeping key is not data: %+v", rep.Entries)
 	}
 }
 
@@ -363,6 +370,10 @@ func TestMapKeyIsRestored(t *testing.T) {
 	body := files[dirPrefix+"woodpecker.yaml"]
 	if !strings.Contains(body, "steps:\n  build:\n    name: compile") || !strings.Contains(body, "\n  test:\n") {
 		t.Errorf("map form lost:\n%s", body)
+	}
+	_, rep := emitFiles(t, p)
+	if hasExtEntry(rep) {
+		t.Errorf("_map_key is bookkeeping, not data: %+v", rep.Entries)
 	}
 	if ok, diff := ir.Equal(p, reparse(t, files)); !ok {
 		t.Errorf("round trip differs:\n%s", diff)
@@ -671,4 +682,25 @@ func TestLostExpressionInWorkdirDisablesTheStep(t *testing.T) {
 	if !reportHas(rep, caps.StepWorkdir, caps.Lost) || !strings.Contains(body, `evaluate: "false"`) {
 		t.Errorf("a truncated workdir must disable the step:\n%s\n%+v", body, rep.Entries)
 	}
+}
+
+func TestKeptSubstitutionFormIsReportedOnParseAndEscapedOnEmit(t *testing.T) {
+	src := "steps:\n  - name: s\n    image: x\n    commands:\n      - echo ${CI_COMMIT_TAG##v}\n"
+	p, rep := parseFiles(t, map[string]string{".woodpecker.yaml": src})
+	if !hasEntry(rep, "${CI_COMMIT_TAG##v}") {
+		t.Fatalf("the parser must report the kept form: %+v", rep.Entries)
+	}
+	files, _ := emitFiles(t, p)
+	if !strings.Contains(files[dirPrefix+"woodpecker.yaml"], "echo $${CI_COMMIT_TAG##v}") {
+		t.Errorf("the kept form is shell text and is escaped on emit:\n%s", files[dirPrefix+"woodpecker.yaml"])
+	}
+}
+
+func hasExtEntry(rep *report.Report) bool {
+	for _, e := range rep.Entries {
+		if e.Feature == caps.ExtPassthrough {
+			return true
+		}
+	}
+	return false
 }
