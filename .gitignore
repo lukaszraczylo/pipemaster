@@ -5,3 +5,6 @@ lean4/.lake/
 .superpowers/
 .worktrees/
 /.tools/
+
+# rapid failure files
+testdata/rapid/
