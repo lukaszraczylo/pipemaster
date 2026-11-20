@@ -52,12 +52,12 @@ type (
 		Manual       *[]vTrig      `json:"manual"`
 		Finally      *vFinally     `json:"finally"`
 		TagIdx       *int          `json:"tag_idx"`
+		Platform     *string       `json:"platform"`
 		Name         string        `json:"name"`
 		Whens        []vEntry      `json:"whens"`
 		Deps         []vDep        `json:"deps"`
 		Steps        []vStep       `json:"steps"`
 		JobEnv       []vectors.Var `json:"job_env"`
-		Platform     *string       `json:"platform"`
 		Noop         bool          `json:"noop"`
 		AllowFailure bool          `json:"allow_failure"`
 	}
