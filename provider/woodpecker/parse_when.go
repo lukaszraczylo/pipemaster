@@ -44,6 +44,8 @@ type whenSpec struct {
 	items  []itemInfo
 	runsOn []string
 	line   int
+	// runsLine is the line of runs_on.
+	runsLine int
 }
 
 func unescapeAll(l []string) []string {
@@ -166,11 +168,7 @@ func (w *wf) when(r *reader) (*whenSpec, error) {
 		if spec == nil {
 			spec = &whenSpec{}
 		}
-		spec.runsOn = l
-		w.rep.Add(report.Entry{
-			IRPath: w.jobPath(), Feature: caps.JobIf, Level: caps.Emulated, Strategy: "read as when.status",
-			Detail: "runs_on is deprecated in Woodpecker; its list is read as when.status", SourceLoc: fmt.Sprintf("%s:%d", w.file, r.line("runs_on")),
-		})
+		spec.runsOn, spec.runsLine = l, r.line("runs_on")
 	}
 	return spec, nil
 }
@@ -347,6 +345,7 @@ func (s *whenSpec) gate(sk *sink) (expr.Expr, error) {
 		return nil, err
 	}
 	s.noteGlobs(sk)
+	s.noteRunsOn(sk)
 	if lossy := s.lossyKeys(statusLossy); len(lossy) > 0 {
 		sk.vals[whenKey] = plain(s.raw)
 		for _, k := range lossy {
@@ -391,4 +390,28 @@ func (s *whenSpec) noteGlobs(sk *sink) {
 			}
 		}
 	}
+}
+
+// noteRunsOn reports what became of the deprecated runs_on: it gates the run only when no entry sets a status.
+func (s *whenSpec) noteRunsOn(sk *sink) {
+	if len(s.runsOn) == 0 {
+		return
+	}
+	if slices.ContainsFunc(s.items, func(it itemInfo) bool { return it.hasStatus }) {
+		sk.vals["runs_on"] = toList(s.runsOn)
+		sk.note(caps.JobIf, "runs_on is ignored because when.status is set; kept in Ext", s.runsLine)
+		return
+	}
+	sk.rep.Add(report.Entry{
+		IRPath: sk.path, Feature: caps.JobIf, Level: caps.Emulated, Strategy: "read as when.status",
+		Detail: "runs_on is deprecated in Woodpecker; its list is read as when.status", SourceLoc: fmt.Sprintf("%s:%d", sk.file, s.runsLine),
+	})
+}
+
+func toList(l []string) []any {
+	out := make([]any, len(l))
+	for i, v := range l {
+		out[i] = v
+	}
+	return out
 }

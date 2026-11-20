@@ -235,3 +235,20 @@ func TestBadEvaluateIsAnError(t *testing.T) {
 		t.Fatalf("error does not name the when: %v", err)
 	}
 }
+
+func TestRunsOnReportedByUse(t *testing.T) {
+	_, j, rep := single(t, "runs_on: [success, failure]\n"+body)
+	if text(j.If) != "always()" || !hasEntry(rep, "read as when.status") {
+		t.Fatalf("If %q entries %+v", text(j.If), rep.Entries)
+	}
+	_, j, rep = single(t, "runs_on: [success, failure]\nwhen:\n  - status: failure\n"+body)
+	if text(j.If) != "failure()" {
+		t.Fatalf("when.status must gate the run: %q", text(j.If))
+	}
+	if hasEntry(rep, "read as when.status") || !hasEntry(rep, "runs_on is ignored") {
+		t.Fatalf("entries %+v", rep.Entries)
+	}
+	if got := ext(j.Ext)["runs_on"]; !reflect.DeepEqual(got, []any{"success", "failure"}) {
+		t.Fatalf("runs_on not kept in Ext: %v", j.Ext)
+	}
+}
