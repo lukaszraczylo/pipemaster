@@ -1,0 +1,5 @@
+Loss report: gitea -> woodpecker
+[lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
+[lost] pipeline/ci/job/test job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
+[emulated] pipeline/ci/job/test job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/ci/job/test job.matrix: explicit include entries (axes beside include or exclude, and axes of more than 10 values, are expanded into explicit entries)

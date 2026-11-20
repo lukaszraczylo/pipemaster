@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
 	"time"
 
@@ -332,7 +331,7 @@ func (e *emitter) matrix(jp string, mx *ir.Matrix, ext map[string]any) (*yaml.No
 			return nil, err
 		}
 	default:
-		combos := expandMatrix(mx)
+		combos := ir.Expand(mx)
 		if len(combos) > maxMatrixInclude {
 			e.lose(jp, caps.JobMatrix, "the matrix has "+strconv.Itoa(len(combos))+" combinations; Woodpecker allows "+strconv.Itoa(maxMatrixInclude)+" include entries, so the first "+strconv.Itoa(maxMatrixInclude)+" are kept")
 			combos = combos[:maxMatrixInclude]
@@ -376,40 +375,6 @@ func (e *emitter) comboList(jp string, cs []ir.Combo) (*yaml.Node, error) {
 		n.Content = append(n.Content, m.n)
 	}
 	return n, nil
-}
-
-// expandMatrix lists the cartesian product of the axes without the excluded combinations, then the include entries.
-func expandMatrix(mx *ir.Matrix) []ir.Combo {
-	var out []ir.Combo
-	if len(mx.Axes) > 0 {
-		out = []ir.Combo{{}}
-		for _, a := range mx.Axes {
-			var next []ir.Combo
-			for _, base := range out {
-				for _, v := range a.Values {
-					next = append(next, append(slices.Clone(base), ir.KV{Key: a.Name, Value: v}))
-				}
-			}
-			out = next
-		}
-	}
-	out = slices.DeleteFunc(out, func(c ir.Combo) bool {
-		return slices.ContainsFunc(mx.Exclude, func(x ir.Combo) bool { return comboHolds(c, x) })
-	})
-	for _, c := range out {
-		sort.Slice(c, func(i, j int) bool { return c[i].Key < c[j].Key })
-	}
-	return append(out, mx.Include...)
-}
-
-// comboHolds reports whether every pair of part appears in c.
-func comboHolds(c, part ir.Combo) bool {
-	for _, kv := range part {
-		if !slices.Contains(c, kv) {
-			return false
-		}
-	}
-	return true
 }
 
 // services writes the job services as a map keyed by name.

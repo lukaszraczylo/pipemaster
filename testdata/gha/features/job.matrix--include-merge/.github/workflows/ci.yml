@@ -1,0 +1,13 @@
+name: ci
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ['1.21', '1.22']
+        include:
+          - go: '1.22'
+            experimental: 'true'
+    steps:
+      - run: go test ${{ matrix.go }}

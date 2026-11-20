@@ -1,0 +1,20 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: ci
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go:
+          - "1.21"
+          - "1.22"
+        include:
+          - experimental: "true"
+            go: "1.22"
+    steps:
+      - run: go test ${{ matrix.go }}

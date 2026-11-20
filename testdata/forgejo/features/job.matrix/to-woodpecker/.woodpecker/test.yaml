@@ -8,13 +8,11 @@ matrix:
   include:
     - go: "1.24"
       os: ubuntu-latest
-    - go: "1.25"
-      os: ubuntu-latest
-    - go: "1.25"
-      os: macos-latest
     - experimental: "true"
       go: "1.25"
       os: ubuntu-latest
+    - go: "1.25"
+      os: macos-latest
 steps:
   - image: ubuntu:latest
     commands:
