@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"strings"
 
-	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -42,9 +41,6 @@ func (a adapter) Detect(fsys fs.FS) bool {
 	d, err := discover(fsys)
 	return err == nil && len(d.files) > 0
 }
-
-// Caps declares nothing until the emitter exists; the parser needs no capability matrix.
-func (adapter) Caps() caps.Matrix { return caps.Matrix{} }
 
 // Emit is not available yet.
 func (adapter) Emit(*ir.Project) (map[string][]byte, *report.Report, error) {
