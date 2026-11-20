@@ -43,7 +43,11 @@ required=(
   Pipemaster.Gitlab.gitlab_from_to
   Pipemaster.RoundTrip.cross_roundtrip
   Pipemaster.RoundTrip.cross_roundtrip_rev
+  Pipemaster.RoundTrip.both_iff
   Pipemaster.Core.fromGitlab_restore
+  Pipemaster.Chain.adapters_closed
+  Pipemaster.Chain.chainFrag_run
+  Pipemaster.Chain.chainFrag_adapters_iff
   Pipemaster.Chain.chain_roundtrip
   Pipemaster.Chain.chain_gha_gitlab_gitea
 )
