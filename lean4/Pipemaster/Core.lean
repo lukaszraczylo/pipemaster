@@ -69,9 +69,6 @@ inductive Path
   | step (pid jid sid : String)
   deriving DecidableEq, Repr
 
-/-- The pipeline ID the GitLab parser assigns (gitlab.pipelineID). -/
-def gitlabPipelineId : String := "gitlab-ci"
-
 /-- Mirrors meta.Meta (meta/meta.go) for the core subset. Each field is a Go map, read as a partial function:
 emitted pipeline ID to source ID (`IDs`), source IR path to display name (`Residual`), and source job path to
 the whole needs list of a job whose emit report holds a lost `job.needs.artifacts` entry (`Lost`, field Needs).
@@ -89,11 +86,11 @@ def findJob (p : Pipe) (jid : String) : Option Job := p.all.find? fun j => decid
 
 def findStep (j : Job) (sid : String) : Option Step := j.steps.find? fun s => decide (s.id = sid)
 
-/-- Mirrors roundtrip.NewMeta (internal/roundtrip/meta.go) for the core subset.
-GitLab renames the pipeline to `gitlab-ci` (roundtrip.IDsFor); the display names go to Residual; a job whose
-needs carry an artifacts flag the producer cannot honour goes to Lost (emitJob.needsNode reports it). -/
+/-- Mirrors roundtrip.NewMeta (internal/roundtrip/meta.go) for the core subset, without a pipeline rename.
+The display names go to Residual; a job whose needs carry an artifacts flag the producer cannot honour goes to
+Lost (emitJob.needsNode reports it). An adapter whose emitter renames the pipeline adds `ids` to its own record. -/
 def metaOf (p : Pipe) : Meta where
-  ids := fun q => if q = gitlabPipelineId ∧ p.id ≠ gitlabPipelineId then some p.id else none
+  ids := fun _ => none
   names := fun
     | .pipe pid => if pid = p.id then nameOf p.name else none
     | .job pid jid => if pid = p.id then (findJob p jid).bind fun j => nameOf j.name else none
@@ -286,14 +283,14 @@ def GitlabOk (p : Pipe) : Prop :=
 
 instance (p : Pipe) : Decidable (GitlabOk p) := by unfold GitlabOk; exact inferInstance
 
-/-- The GHA fragment (Mirrors gha.Caps (provider/gha/caps.go)): GHA's own needs, plus GitLab's because `cross_roundtrip` runs through GitLab. -/
-def InGha (p : Pipe) : Prop := Wf p ∧ GhaOk p ∧ GitlabOk p
+/-- The GHA fragment (Mirrors gha.Caps (provider/gha/caps.go)): the shared structure plus GHA's own needs. -/
+def GhaFrag (p : Pipe) : Prop := Wf p ∧ GhaOk p
 
-/-- The GitLab fragment (Mirrors gitlab.Caps (provider/gitlab/caps.go)): GitLab's own needs, plus GHA's because `cross_roundtrip_rev` runs through GHA. -/
-def InGitlab (p : Pipe) : Prop := Wf p ∧ GitlabOk p ∧ GhaOk p
+/-- The GitLab fragment (Mirrors gitlab.Caps (provider/gitlab/caps.go)): the shared structure plus GitLab's own needs. -/
+def GitlabFrag (p : Pipe) : Prop := Wf p ∧ GitlabOk p
 
-instance (p : Pipe) : Decidable (InGha p) := by unfold InGha; exact inferInstance
-instance (p : Pipe) : Decidable (InGitlab p) := by unfold InGitlab; exact inferInstance
+instance (p : Pipe) : Decidable (GhaFrag p) := by unfold GhaFrag; exact inferInstance
+instance (p : Pipe) : Decidable (GitlabFrag p) := by unfold GitlabFrag; exact inferInstance
 
 /-! ## The metadata of a pipeline restores that pipeline -/
 
@@ -331,7 +328,7 @@ theorem restoreJob_self (p : Pipe) (hn : (p.all.map Job.id).Nodup)
 
 theorem restore_metaOf_self (p : Pipe) (hn : (p.all.map Job.id).Nodup)
     (hs : ∀ j ∈ p.all, (j.steps.map Step.id).Nodup) : restore p (metaOf p) = p := by
-  have hid : (metaOf p).ids p.id = none := by simp [metaOf]
+  have hid : (metaOf p).ids p.id = none := rfl
   have hnm : (metaOf p).names (.pipe p.id) = nameOf p.name := by simp [metaOf]
   have e1 : p.jobs.map (restoreJob (metaOf p) p.id) = p.jobs :=
     map_self_mem _ _ fun j hj => restoreJob_self p hn hs j (by simp [Pipe.all, hj])

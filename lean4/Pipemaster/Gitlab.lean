@@ -169,6 +169,15 @@ def parseTriggers (g : Pipeline) (k : String) : Option (List String) :=
   | [], some rs => rs.findSome? fun m => if m.kind = k then some m.incl else none
   | ms, _ => ms.findSome? fun m => if m.kind = k then some m.incl else none
 
+/-- The pipeline ID the GitLab parser assigns (gitlab.pipelineID). -/
+def gitlabPipelineId : String := "gitlab-ci"
+
+/-- The metadata layer of the GitLab adapter: the core layer plus the pipeline rename to `gitlab-ci`
+(Mirrors roundtrip.IDsFor (internal/roundtrip/ids.go)), which maps the emitted ID back to the source ID. -/
+def gitlabMeta (p : Pipe) : Meta :=
+  { metaOf p with
+    ids := fun q => if q = gitlabPipelineId ∧ p.id ≠ gitlabPipelineId then some p.id else none }
+
 /-- The pipeline Parse builds before the round-trip metadata is applied. -/
 def rawGitlab (g : Pipeline) : Pipe :=
   { id := gitlabPipelineId
@@ -359,29 +368,29 @@ theorem rawGitlab_toGitlab (p : Pipe) (hw : Wf p) (hg : GitlabOk p) :
   · exact List.map_congr_left fun j hj => parse_main p j (hon j hj)
   · exact List.map_congr_left fun j hj => parse_fin p j (hman j hj) (hfree j hj)
 
-theorem gitlab_from_to (p : Pipe) (h : InGitlab p) : fromGitlab (toGitlab p) (metaOf p) = p := by
-  obtain ⟨hw, hg, _⟩ := h
+theorem gitlab_from_to (p : Pipe) (h : GitlabFrag p) : fromGitlab (toGitlab p) (gitlabMeta p) = p := by
+  obtain ⟨hw, hg⟩ := h
   have hraw := rawGitlab_toGitlab p hw hg
   obtain ⟨_, hnd, _, _, _, _, _, hsteps, _, _, _⟩ := hw
   have hn : (p.all.map Core.Job.id).Nodup := hnd
   unfold fromGitlab
   rw [hraw]
-  have hid : (metaOf p).ids gitlabPipelineId = if p.id ≠ gitlabPipelineId then some p.id else none := by
-    simp [metaOf]
-  have hjs : ∀ j ∈ p.jobs, restoreJob (metaOf p) p.id (strip j) = j := fun j hj =>
+  have hid : (gitlabMeta p).ids gitlabPipelineId = if p.id ≠ gitlabPipelineId then some p.id else none := by
+    simp [gitlabMeta]
+  have hjs : ∀ j ∈ p.jobs, restoreJob (gitlabMeta p) p.id (strip j) = j := fun j hj =>
     restoreJob_strip p hn (fun j hj => (hsteps j hj).2) j (by simp [Pipe.all, hj])
-  have hfs : ∀ j ∈ p.fin, restoreJob (metaOf p) p.id (strip j) = j := fun j hj =>
+  have hfs : ∀ j ∈ p.fin, restoreJob (gitlabMeta p) p.id (strip j) = j := fun j hj =>
     restoreJob_strip p hn (fun j hj => (hsteps j hj).2) j (by simp [Pipe.all, hj])
-  have hpid : ((metaOf p).ids gitlabPipelineId).getD gitlabPipelineId = p.id := by
+  have hpid : ((gitlabMeta p).ids gitlabPipelineId).getD gitlabPipelineId = p.id := by
     rw [hid]; by_cases h : p.id = gitlabPipelineId <;> simp [h]
-  have hnm : fill "" ((metaOf p).names (.pipe p.id)) = p.name := by
-    simp only [metaOf, if_true]; exact fill_nameOf _
+  have hnm : fill "" ((gitlabMeta p).names (.pipe p.id)) = p.name := by
+    simp only [gitlabMeta, metaOf, if_true]; exact fill_nameOf _
   unfold restore
   simp only [hpid, hnm, List.map_map]
-  have e1 : List.map (restoreJob (metaOf p) p.id ∘ strip) p.jobs = p.jobs :=
-    map_self_mem (restoreJob (metaOf p) p.id ∘ strip) p.jobs fun j hj => hjs j hj
-  have e2 : List.map (restoreJob (metaOf p) p.id ∘ strip) p.fin = p.fin :=
-    map_self_mem (restoreJob (metaOf p) p.id ∘ strip) p.fin fun j hj => hfs j hj
+  have e1 : List.map (restoreJob (gitlabMeta p) p.id ∘ strip) p.jobs = p.jobs :=
+    map_self_mem (restoreJob (gitlabMeta p) p.id ∘ strip) p.jobs fun j hj => hjs j hj
+  have e2 : List.map (restoreJob (gitlabMeta p) p.id ∘ strip) p.fin = p.fin :=
+    map_self_mem (restoreJob (gitlabMeta p) p.id ∘ strip) p.fin fun j hj => hfs j hj
   rw [e1, e2]
 
 end Gitlab

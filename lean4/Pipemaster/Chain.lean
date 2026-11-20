@@ -18,14 +18,31 @@ None of them touches a job, a step, an env var, a runner label, a timeout, a ret
 pr trigger. Both therefore reuse `Gha.rawGha_toGha`. The vectors check this claim against the Go dialects. -/
 
 /-- A provider adapter on the core subset (Mirrors provider.Provider (provider/provider.go)). `parse` is the parser
-before the metadata is applied; `metaOf q` is the layer that `roundtrip.NewMeta` stores when `q` is emitted. -/
+before the metadata is applied; `metaOf q` is the layer that `roundtrip.NewMeta` stores when `q` is emitted.
+`Own` is what the adapter needs beyond the shared structure `Wf`; the adapter's fragment is `Wf` and `Own`. -/
 structure Adapter where
   Ast : Type
   emit : Pipe → Ast
   parse : Ast → Pipe
   metaOf : Pipe → Meta
-  Frag : Pipe → Prop
-  exact : ∀ q, Frag q → restore (parse (emit q)) (metaOf q) = q
+  Own : Pipe → Prop
+  decOwn : DecidablePred Own
+  exact : ∀ q, Wf q → Own q → restore (parse (emit q)) (metaOf q) = q
+
+/-- The fragment of an adapter: the pipelines its round trip is proved for. -/
+def Adapter.Frag (a : Adapter) (p : Pipe) : Prop := Wf p ∧ a.Own p
+
+instance (a : Adapter) (p : Pipe) : Decidable (a.Frag p) := by
+  unfold Adapter.Frag; exact @instDecidableAnd _ _ inferInstance (a.decOwn p)
+
+/-- A hop through `a` keeps a pipeline of `a`'s fragment inside the fragment of `b`, when it was already there. -/
+def Adapter.Keeps (a b : Adapter) : Prop := ∀ q, a.Frag q → b.Frag q → b.Frag (a.parse (a.emit q))
+
+/-- A hop that returns the pipeline it received keeps every fragment. -/
+theorem Adapter.keeps_of_id (a : Adapter) (h : ∀ q, a.Frag q → a.parse (a.emit q) = q) (b : Adapter) :
+    a.Keeps b := by
+  intro q hq hb
+  rw [h q hq]; exact hb
 
 /-- Mirrors gha.GHA (provider/gha/dialect.go). -/
 def gha : Adapter where
@@ -33,10 +50,11 @@ def gha : Adapter where
   emit := Gha.toGha
   parse := Gha.rawGha
   metaOf := Core.metaOf
-  Frag := InGha
-  exact q h := by
-    rw [Gha.rawGha_toGha q h.1]
-    exact restore_metaOf_self q h.1.2.1 fun j hj => (h.1.2.2.2.2.2.2.2.1 j hj).2
+  Own := GhaOk
+  decOwn := fun _ => inferInstance
+  exact q hw _ := by
+    rw [Gha.rawGha_toGha q hw]
+    exact restore_metaOf_self q hw.2.1 fun j hj => (hw.2.2.2.2.2.2.2.1 j hj).2
 
 /-- Mirrors gha.Gitea (provider/gha/dialect.go): the GHA model, because no core field differs (see above). -/
 def gitea : Adapter := gha
@@ -49,9 +67,10 @@ def gitlab : Adapter where
   Ast := Gitlab.Pipeline
   emit := Gitlab.toGitlab
   parse := Gitlab.rawGitlab
-  metaOf := Core.metaOf
-  Frag := InGitlab
-  exact q h := Gitlab.gitlab_from_to q h
+  metaOf := Gitlab.gitlabMeta
+  Own := GitlabOk
+  decOwn := fun _ => inferInstance
+  exact q hw hg := Gitlab.gitlab_from_to q ⟨hw, hg⟩
 
 /-- Mirrors roundtrip.Hop (internal/roundtrip/chain.go), rule 4: each hop emits, parses and pushes a layer.
 The layers are oldest first, as in `meta.Stack`. `Hop` applies a stack only if its top layer targets the source
@@ -71,11 +90,17 @@ def unwind : Pipe → List Meta → Pipe
   | q, m :: ms => restore (unwind q ms) m
 
 /-- Each adapter's fragment holds for the pipeline it receives. -/
-def ChainFrag : Pipe → List Adapter → Prop
+def RunFrag : Pipe → List Adapter → Prop
   | _, [] => True
-  | p, a :: as => a.Frag p ∧ ChainFrag (a.parse (a.emit p)) as
+  | p, a :: as => a.Frag p ∧ RunFrag (a.parse (a.emit p)) as
 
-theorem chain_roundtrip (p : Pipe) (as : List Adapter) (h : ChainFrag p as) :
+/-- The intersection of the fragments of the adapters in a chain, all taken at the origin pipeline. -/
+def ChainFrag (p : Pipe) (as : List Adapter) : Prop := ∀ a ∈ as, a.Frag p
+
+instance (p : Pipe) (as : List Adapter) : Decidable (ChainFrag p as) := by
+  unfold ChainFrag; exact inferInstance
+
+theorem chain_roundtrip (p : Pipe) (as : List Adapter) (h : RunFrag p as) :
     unwind (hops p as).1 (hops p as).2 = p := by
   induction as generalizing p with
   | nil => rfl
@@ -83,10 +108,10 @@ theorem chain_roundtrip (p : Pipe) (as : List Adapter) (h : ChainFrag p as) :
     obtain ⟨hf, hc⟩ := h
     simp only [hops, unwind]
     rw [ih _ hc]
-    exact a.exact p hf
+    exact a.exact p hf.1 hf.2
 
 /-- The ID the GitLab parser assigns is a valid GHA job key. -/
-theorem validId_gitlabPipelineId : validId gitlabPipelineId := by
+theorem validId_gitlabPipelineId : validId Gitlab.gitlabPipelineId := by
   have hl : "gitlab-ci".toLower = "gitlab-ci" := by decide +kernel
   have ht : "gitlab-ci".toList = ['g','i','t','l','a','b','-','c','i'] := by decide +kernel
   refine ⟨?_, ?_, ?_, ?_⟩
@@ -116,9 +141,11 @@ theorem dagJobs_strip (js : List Core.Job) : dagJobs (js.map Gitlab.strip) = dag
 theorem jobIds_strip (js : List Core.Job) : jobIds (js.map Gitlab.strip) = jobIds js := by
   simp [jobIds, Gitlab.strip, List.map_map, Function.comp_def]
 
-/-- The pipeline GitLab hands to the next hop (no metadata applied) still lies in the GHA fragment. -/
-theorem inGha_rawGitlab (p : Pipe) (h : InGitlab p) : InGha (Gitlab.rawGitlab (Gitlab.toGitlab p)) := by
-  obtain ⟨hw, hg, ha⟩ := h
+/-- The pipeline GitLab hands to the next hop (no metadata applied) keeps the shared structure and GitLab's own
+needs, and keeps GHA's needs when the input meets them. -/
+theorem rawGitlab_frag (p : Pipe) (hw : Wf p) (hg : GitlabOk p) :
+    Wf (Gitlab.rawGitlab (Gitlab.toGitlab p)) ∧ (GhaOk p → GhaOk (Gitlab.rawGitlab (Gitlab.toGitlab p))) ∧
+    GitlabOk (Gitlab.rawGitlab (Gitlab.toGitlab p)) := by
   rw [Gitlab.rawGitlab_toGitlab p hw hg]
   obtain ⟨h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10⟩ := hw
   obtain ⟨hany, hretry, hfree⟩ := hg
@@ -168,7 +195,7 @@ theorem inGha_rawGitlab (p : Pipe) (h : InGitlab p) : InGha (Gitlab.rawGitlab (G
   · intro x hx
     obtain ⟨j, hj, rfl⟩ := List.mem_map.1 hx
     exact h10 j hj
-  · intro x hx
+  · intro ha x hx
     obtain ⟨j, hj, rfl⟩ := allm x hx
     obtain ⟨hr, hst, hsc⟩ := ha j hj
     refine ⟨hr, ?_, ?_⟩
@@ -190,32 +217,69 @@ theorem inGha_rawGitlab (p : Pipe) (h : InGitlab p) : InGha (Gitlab.rawGitlab (G
 /-- The four adapters. -/
 def adapters : List Adapter := [gha, gitea, forgejo, gitlab]
 
-/-- After one hop through any adapter, a GHA-fragment pipeline stays in the fragment of every adapter. -/
-theorem chainFrag_pair (p : Pipe) (h : InGha p) (b c : Adapter) (hb : b ∈ adapters) (hc : c ∈ adapters) :
-    ChainFrag p [b, c] := by
-  have hl : InGitlab p := ⟨h.1, h.2.2, h.2.1⟩
-  have hr : InGha (Gitlab.rawGitlab (Gitlab.toGitlab p)) := inGha_rawGitlab p hl
-  have hrl : InGitlab (Gitlab.rawGitlab (Gitlab.toGitlab p)) := ⟨hr.1, hr.2.2, hr.2.1⟩
-  have hp : Gha.rawGha (Gha.toGha p) = p := Gha.rawGha_toGha p h.1
-  have key : ∀ a ∈ adapters, a.Frag p ∧ a.Frag (Gitlab.rawGitlab (Gitlab.toGitlab p)) ∧
-      (a.parse (a.emit p) = p ∨ a.parse (a.emit p) = Gitlab.rawGitlab (Gitlab.toGitlab p)) := by
-    intro a ha
+/-- A list of adapters is closed when a hop through any member keeps a pipeline in the fragment of every member.
+Adding an adapter to a list means proving `Keeps` for the new pairs. -/
+def Closed (L : List Adapter) : Prop := ∀ a ∈ L, ∀ b ∈ L, a.Keeps b
+
+theorem gha_keeps (b : Adapter) : gha.Keeps b :=
+  Adapter.keeps_of_id _ (fun q hq => Gha.rawGha_toGha q hq.1) b
+
+theorem gitlab_keeps_gha : gitlab.Keeps gha := by
+  intro q hq hg
+  have h := rawGitlab_frag q hq.1 hq.2
+  exact ⟨h.1, h.2.1 hg.2⟩
+
+theorem gitlab_keeps_gitlab : gitlab.Keeps gitlab := by
+  intro q hq _
+  have h := rawGitlab_frag q hq.1 hq.2
+  exact ⟨h.1, h.2.2⟩
+
+theorem adapters_closed : Closed adapters := by
+  intro a ha b hb
+  simp only [adapters, List.mem_cons, List.not_mem_nil, or_false] at ha hb
+  rcases ha with rfl | rfl | rfl | rfl <;> rcases hb with rfl | rfl | rfl | rfl <;>
+    first | exact gha_keeps _ | exact gitlab_keeps_gha | exact gitlab_keeps_gitlab
+
+/-- One hop through a member of a closed list keeps a pipeline in the fragment of every member. -/
+theorem chainFrag_hop (L : List Adapter) (hL : Closed L) (p : Pipe) (h : ChainFrag p L) (a : Adapter)
+    (ha : a ∈ L) : ChainFrag (a.parse (a.emit p)) L :=
+  fun b hb => hL a ha b hb p (h a ha) (h b hb)
+
+/-- A pipeline in the intersection of a closed list passes every chain whose hops come from the list. -/
+theorem chainFrag_run (L : List Adapter) (hL : Closed L) (as : List Adapter) (has : ∀ a ∈ as, a ∈ L)
+    (p : Pipe) (h : ChainFrag p L) : RunFrag p as := by
+  induction as generalizing p with
+  | nil => trivial
+  | cons a as ih =>
+    exact ⟨h a (has a (by simp)), ih (fun b hb => has b (by simp [hb])) _
+      (chainFrag_hop L hL p h a (has a (by simp)))⟩
+
+/-- After one hop through any adapter of a closed list, a pipeline in the intersection stays in every fragment. -/
+theorem chainFrag_pair (L : List Adapter) (hL : Closed L) (p : Pipe) (h : ChainFrag p L) (b c : Adapter)
+    (hb : b ∈ L) (hc : c ∈ L) : RunFrag p [b, c] :=
+  chainFrag_run L hL [b, c] (by intro a ha; simp at ha; rcases ha with rfl | rfl <;> assumption) p h
+
+/-- The intersection over the four adapters is the pair of fragments the cross theorems use. -/
+theorem chainFrag_adapters_iff (p : Pipe) : ChainFrag p adapters ↔ RoundTrip.Both p := by
+  constructor
+  · intro h
+    exact ⟨h gha (by simp [adapters]), h gitlab (by simp [adapters])⟩
+  · intro h a ha
     simp only [adapters, List.mem_cons, List.not_mem_nil, or_false] at ha
     rcases ha with rfl | rfl | rfl | rfl
-    · exact ⟨h, hr, Or.inl hp⟩
-    · exact ⟨h, hr, Or.inl hp⟩
-    · exact ⟨h, hr, Or.inl hp⟩
-    · exact ⟨hl, hrl, Or.inr rfl⟩
-  refine ⟨(key b hb).1, ?_, trivial⟩
-  rcases (key b hb).2.2 with e | e <;> rw [e]
-  · exact (key c hc).1
-  · exact (key c hc).2.1
+    · exact h.1
+    · exact h.1
+    · exact h.1
+    · exact h.2
 
-theorem chain_gha_gitlab_gitea (p : Pipe) (h : InGha p) :
+theorem chain_gha_gitlab_gitea (p : Pipe) (h : RoundTrip.Both p) :
     unwind (hops p [gitlab, gitea]).1 (hops p [gitlab, gitea]).2 = p := by
   apply chain_roundtrip
-  have hl : InGitlab p := ⟨h.1, h.2.2, h.2.1⟩
-  exact ⟨hl, inGha_rawGitlab p hl, trivial⟩
+  apply chainFrag_run adapters adapters_closed _ _ p ((chainFrag_adapters_iff p).2 h)
+  intro a ha
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
+  simp only [adapters, List.mem_cons, List.not_mem_nil, or_false]
+  rcases ha with rfl | rfl <;> simp [gitea, gha, gitlab]
 
 end Chain
 end Pipemaster

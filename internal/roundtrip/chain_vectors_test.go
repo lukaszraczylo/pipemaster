@@ -3,6 +3,8 @@ package roundtrip_test
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
@@ -11,6 +13,9 @@ import (
 	"github.com/lukaszraczylo/pipemaster/meta"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
+
+// maxChainVectorBytes bounds chain.json; the generator caps the pipelines per triple so nine adapters fit.
+const maxChainVectorBytes = 3_000_000
 
 // chainHops is the number of conversions after the origin in every vector chain.
 const chainHops = 2
@@ -125,5 +130,15 @@ func TestDistinctChains(t *testing.T) {
 		if got := distinctChains(n); got != want {
 			t.Errorf("distinctChains(%d) = %d, want %d", n, got, want)
 		}
+	}
+}
+
+func TestChainVectorsSizeBound(t *testing.T) {
+	info, err := os.Stat(filepath.Join("..", "..", "testdata", "lean-vectors", "chain.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Size() > maxChainVectorBytes {
+		t.Errorf("chain.json is %d bytes, want at most %d; lower chainCaseCap in lean4/GenVectors.lean", info.Size(), maxChainVectorBytes)
 	}
 }

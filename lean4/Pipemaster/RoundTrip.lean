@@ -26,10 +26,10 @@ Left out, each on purpose:
   and the Go vector tests decode the emitted text into the same shape. String quoting is therefore a codec
   checked on the vector alphabet only.
 
-`metaOf` models what the round-trip metadata of Go carries and nothing else: the pipeline ID that GitLab renames,
-the display names (`meta.Residual`), and the needs list of a job whose artifacts flag GitLab cannot keep
-(`meta.Lost`, recorded by the GitLab emitter since Task 23). The fragments `InGha` and `InGitlab` come from the
-capability matrices (provider/gha/caps.go, provider/gitlab/caps.go): GitLab caps retry at three runs, and GHA
+`metaOf` models what the round-trip metadata of Go carries and nothing else: the display names (`meta.Residual`)
+and the needs list of a job whose artifacts flag GitLab cannot keep (`meta.Lost`, recorded by the GitLab emitter
+since Task 23). The pipeline ID that GitLab renames is added by `Gitlab.gitlabMeta`. The fragments `GhaFrag` and
+`GitlabFrag` come from the capability matrices (provider/gha/caps.go, provider/gitlab/caps.go): GitLab caps retry at three runs, and GHA
 needs a runner label and a script per job.
 
 A manual finally job is outside the fragment because it is a reported loss, not a silent one. The GitLab
@@ -38,24 +38,36 @@ finally branch and records a `lost` entry for `pipeline.finally` at the job path
 job. The GHA emitter keeps both guards (`always() && github.event_name == 'workflow_dispatch'`) and the parser
 restores the job, but the model `Gha.finJob` does not state that, so `Wf` excludes the case for both providers. -/
 
+/-- The pipelines both providers accept. The two cross theorems run through both, so they assume both fragments. -/
+def Both (p : Pipe) : Prop := GhaFrag p ∧ GitlabFrag p
+
+instance (p : Pipe) : Decidable (Both p) := by unfold Both; exact inferInstance
+
+/-- `Both` is the fragment the cross theorems assumed before the fragments were split (the GHA fragment with
+GitLab's needs added, and the GitLab fragment with GHA's needs added). -/
+theorem both_iff (p : Pipe) : Both p ↔ (Wf p ∧ GhaOk p ∧ GitlabOk p) ∧ (Wf p ∧ GitlabOk p ∧ GhaOk p) := by
+  unfold Both GhaFrag GitlabFrag
+  constructor
+  · rintro ⟨⟨w, a⟩, _, g⟩; exact ⟨⟨w, a, g⟩, w, g, a⟩
+  · rintro ⟨⟨w, a, g⟩, _⟩; exact ⟨⟨w, a⟩, w, g⟩
+
 /-- A pipeline that survives GHA, then GitLab, then GHA again. -/
-theorem cross_roundtrip (p : Pipe) (h : InGha p) :
-    Gha.fromGha (Gha.toGha (Gitlab.fromGitlab (Gitlab.toGitlab p) (metaOf p))) = p := by
-  have hg : Gitlab.fromGitlab (Gitlab.toGitlab p) (metaOf p) = p :=
-    Gitlab.gitlab_from_to p ⟨h.1, h.2.2, h.2.1⟩
+theorem cross_roundtrip (p : Pipe) (h : Both p) :
+    Gha.fromGha (Gha.toGha (Gitlab.fromGitlab (Gitlab.toGitlab p) (Gitlab.gitlabMeta p))) = p := by
+  have hg : Gitlab.fromGitlab (Gitlab.toGitlab p) (Gitlab.gitlabMeta p) = p :=
+    Gitlab.gitlab_from_to p h.2
   rw [hg]
-  exact Gha.gha_from_to p h
+  exact Gha.gha_from_to p h.1
 
 /-- A pipeline that survives GitLab, then GHA, then GitLab again. -/
-theorem cross_roundtrip_rev (p : Pipe) (h : InGitlab p) :
-    Gitlab.fromGitlab (Gitlab.toGitlab (Gha.fromGha (Gha.toGha p) (metaOf p))) (metaOf p) = p := by
+theorem cross_roundtrip_rev (p : Pipe) (h : Both p) :
+    Gitlab.fromGitlab (Gitlab.toGitlab (Gha.fromGha (Gha.toGha p) (metaOf p))) (Gitlab.gitlabMeta p) = p := by
   have hg : Gha.fromGha (Gha.toGha p) (metaOf p) = p := by
     unfold Gha.fromGha
-    rw [Gha.rawGha_toGha p h.1]
-    obtain ⟨hw, _⟩ := h
-    exact restore_metaOf_self p hw.2.1 fun j hj => (hw.2.2.2.2.2.2.2.1 j hj).2
+    rw [Gha.rawGha_toGha p h.1.1]
+    exact restore_metaOf_self p h.1.1.2.1 fun j hj => (h.1.1.2.2.2.2.2.2.2.1 j hj).2
   rw [hg]
-  exact Gitlab.gitlab_from_to p h
+  exact Gitlab.gitlab_from_to p h.2
 
 end RoundTrip
 end Pipemaster

@@ -606,7 +606,7 @@ theorem rawGha_toGha (p : Pipe) (hw : Wf p) : rawGha (toGha p) = p := by
   rw [jobs_eq p hw, fin_eq p hw, hpush]
   cases p; rfl
 
-theorem gha_from_to (p : Pipe) (h : InGha p) : fromGha (toGha p) = p := by
+theorem gha_from_to (p : Pipe) (h : GhaFrag p) : fromGha (toGha p) = p := by
   unfold fromGha
   rw [restore_empty]
   exact rawGha_toGha p h.1

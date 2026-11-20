@@ -563,8 +563,9 @@ def namePipes : List Core.Pipe :=
 def allPipes : List Core.Pipe :=
   triggerPipes ++ (jobVariants "a").map (fun a => pushAll [a] []) ++ twoJobPipes ++ finPipes ++ namePipes
 
-def ghaPipes : List Core.Pipe := allPipes.filter fun p => decide (InGha p)
-def gitlabPipes : List Core.Pipe := allPipes.filter fun p => decide (InGitlab p)
+/-- The pipelines both providers accept, so the GHA, GitLab and cross vectors share one set. -/
+def ghaPipes : List Core.Pipe := allPipes.filter fun p => decide (RoundTrip.Both p)
+def gitlabPipes : List Core.Pipe := ghaPipes
 
 def ghaAdapterCases : List (Json × Json) :=
   ghaPipes.map fun p =>
@@ -573,26 +574,35 @@ def ghaAdapterCases : List (Json × Json) :=
 def gitlabAdapterCases : List (Json × Json) :=
   gitlabPipes.map fun p =>
     (coreJson p, Json.mkObj [("gitlab", gitlabJson (Gitlab.toGitlab p)),
-      ("core", coreJson (Gitlab.fromGitlab (Gitlab.toGitlab p) (metaOf p)))])
+      ("core", coreJson (Gitlab.fromGitlab (Gitlab.toGitlab p) (Gitlab.gitlabMeta p)))])
 
 def crossAdapterCases : List (Json × Json) :=
   ghaPipes.map fun p =>
-    let viaGitlab := Gha.fromGha (Gha.toGha (Gitlab.fromGitlab (Gitlab.toGitlab p) (metaOf p)))
-    let viaGha := Gitlab.fromGitlab (Gitlab.toGitlab (Gha.fromGha (Gha.toGha p) (metaOf p))) (metaOf p)
+    let viaGitlab := Gha.fromGha (Gha.toGha (Gitlab.fromGitlab (Gitlab.toGitlab p) (Gitlab.gitlabMeta p)))
+    let viaGha := Gitlab.fromGitlab (Gitlab.toGitlab (Gha.fromGha (Gha.toGha p) (metaOf p))) (Gitlab.gitlabMeta p)
     (coreJson p, Json.mkObj [("cross", coreJson viaGitlab), ("rev", coreJson viaGha)])
 
 /-! ## Chain vectors (Task 9)
 
-Every ordered choice of three distinct providers over gha, gitea, forgejo, gitlab (24 chains): the first is the
+Every ordered choice of three distinct providers over `chainAdapters` (24 chains over four): the first is the
 origin, the other two are the hops. Each case holds the IR as the origin parsed it, the IR after each hop's parse
 with no metadata applied, and the IR after unwinding the stack. The pipelines are a reduced subset of `allPipes`
-that lie in the GHA fragment, which is the fragment of every adapter (`Chain.chainFrag_pair`):
+that lie in the fragment of every adapter (`Chain.ChainFrag`, with `Chain.chainFrag_pair` for the hops):
 - triggers: push and pr over {absent, no filter, [x, y]} and a lone tag trigger, with one plain job;
 - one job: the 17 variants of `jobVariants`;
 - two main jobs: 3 variants of the first and 2 of the second, with needs none, plain or artifacts;
 - finally: 2 main layouts (a; a and b needing a) times the 8 finally layouts;
 - pipeline name and ID: three cases.
-The full `allPipes` set gives a 10 MB file; this subset keeps the file near the size of the largest other one. -/
+The full `allPipes` set gives a 10 MB file; this subset keeps the file near the size of the largest other one.
+
+Bound: the number of ordered triples grows as n(n-1)(n-2), so at nine adapters (504 triples) the full subset
+would give about 57 times 504 cases, near 57 MB. Each triple therefore takes at most `chainCaseCap / triples`
+pipelines (at least one), picked by `chainPick` so that the triples together still cover every pipeline. A case is
+about 2 KB (1990 bytes measured at four adapters), so the cap of 1400 cases keeps `chain.json` under 3 MB
+(at most 2.8 MB; at nine adapters the bound gives 2 pipelines per triple, 1008 cases, about 2.0 MB). At four
+adapters the cap allows every pipeline. -/
+
+def chainCaseCap : Nat := 1400
 
 def chainPipes : List Core.Pipe :=
   (triggerPipes.filter fun p => p.jobs.all (fun j => !j.manual) && (p.tag.isNone || (p.push.isNone && p.pr.isNone))) ++
@@ -602,8 +612,9 @@ def chainPipes : List Core.Pipe :=
   [[cj "a"], [cj "a", { cj "b" with needs := needOn "a" false }]].flatMap (fun ms => finLayouts.map fun fs => pushAll ms fs) ++
   namePipes
 
-/-- The pipelines that satisfy `ChainFrag` for every chain: those of `ghaPipes` (decided once, in `ghaPipes`). -/
-def chainFragPipes : List Core.Pipe := chainPipes.filter fun p => decide (p ∈ ghaPipes)
+/-- The pipelines in the fragment of every adapter (decided once per pipeline). -/
+def chainFragPipes : List Core.Pipe :=
+  chainPipes.filter fun p => decide (Chain.ChainFrag p Chain.adapters)
 
 def chainAdapters : List (String × Chain.Adapter) :=
   [("gha", Chain.gha), ("gitea", Chain.gitea), ("forgejo", Chain.forgejo), ("gitlab", Chain.gitlab)]
@@ -612,9 +623,24 @@ def chainTriples : List ((String × Chain.Adapter) × (String × Chain.Adapter) 
   chainAdapters.flatMap fun a => chainAdapters.flatMap fun b => chainAdapters.flatMap fun c =>
     if a.1 ≠ b.1 ∧ a.1 ≠ c.1 ∧ b.1 ≠ c.1 then [(a, b, c)] else []
 
+/-- The pipelines per triple under the bound. -/
+def chainPerTriple : Nat :=
+  min chainFragPipes.length (max 1 (chainCaseCap / chainTriples.length))
+
+/-- The smallest stride above one that shares no factor with `n`, so that stepping by it visits every index. -/
+def chainStride (n : Nat) : Nat := ((List.range 64).find? fun s => 2 ≤ s ∧ Nat.gcd s n = 1).getD 1
+
+/-- The pipelines of triple number `t`: all of them when the bound allows, else `chainPerTriple` of them, taken
+at consecutive positions of the stride walk so that distinct triples start at distinct positions. -/
+def chainPick (t : Nat) : List Core.Pipe :=
+  let n := chainFragPipes.length
+  if chainPerTriple ≥ n then chainFragPipes
+  else (List.range chainPerTriple).filterMap fun i =>
+    chainFragPipes[((t * chainPerTriple + i) * chainStride n) % n]?
+
 def chainCases : List (Json × Json) :=
-  chainTriples.flatMap fun (a, b, c) =>
-    chainFragPipes.map fun p =>
+  chainTriples.zipIdx.flatMap fun ((a, b, c), t) =>
+    (chainPick t).map fun p =>
       let p1 := b.2.parse (b.2.emit p)
       let r := Chain.hops p [b.2, c.2]
       (Json.mkObj [("chain", strsJson [a.1, b.1, c.1]), ("core", coreJson p)],
