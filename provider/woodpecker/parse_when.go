@@ -63,7 +63,9 @@ type whenSpec struct {
 	multi bool
 	// sharedStatus is true when every entry holds the same status list: the emitter writes the job status gate into each entry.
 	sharedStatus bool
-	disabled     bool
+	// stripped is true when a marker named the evaluate text of a trigger filter, so what is left is the job condition.
+	stripped bool
+	disabled bool
 }
 
 // configure sets how the trigger reading treats the when, from the markers of its file.
@@ -100,8 +102,9 @@ func (s *whenSpec) dropGenerated(m *marks) {
 		for _, g := range gens {
 			if ev == g {
 				s.items[i].item.Evaluate = ""
-			} else if rest, ok := strings.CutPrefix(ev, g+" && ("); ok && strings.HasSuffix(rest, ")") {
+			} else if rest, ok := strings.CutPrefix(ev, "("+g+") && ("); ok && strings.HasSuffix(rest, ")") {
 				s.items[i].item.Evaluate = strings.TrimSuffix(rest, ")")
+				s.stripped = true
 			}
 		}
 	}
@@ -122,7 +125,7 @@ func (s *whenSpec) sharedEvaluate() string {
 
 // gates says whether a gate that every entry repeats belongs to the job, not to each trigger. A lone workflow with
 // one entry keeps the whole entry as its condition.
-func (s *whenSpec) gates() bool { return len(s.items) >= 2 || s.multi }
+func (s *whenSpec) gates() bool { return len(s.items) >= 2 || s.multi || s.stripped }
 
 func (s *whenSpec) sharedStatusList() bool {
 	if len(s.items) < 1 || !s.items[0].hasStatus {

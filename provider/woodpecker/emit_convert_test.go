@@ -8,6 +8,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
+	wpexpr "github.com/lukaszraczylo/pipemaster/expr/woodpecker"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gha"
@@ -267,5 +268,58 @@ func TestInexactTagFilterReportKeepsEveryCaveat(t *testing.T) {
 	_, rep := ghaTriggers(t, "  push:\n    tags: ['v**']\n")
 	if !reportDetail(rep, caps.TriggerFilterTags, "different meaning in doublestar") || !reportDetail(rep, caps.TriggerFilterTags, "tag name filter") {
 		t.Errorf("both caveats must survive in the report: %+v", rep.Entries)
+	}
+}
+
+// mapEnv is a run as the evaluator sees it: canonical names to values.
+type mapEnv map[string]expr.Value
+
+func (e mapEnv) Lookup(p []string) (expr.Value, bool) { v, ok := e[strings.Join(p, ".")]; return v, ok }
+func (mapEnv) Status() expr.Status                    { return expr.Success }
+
+func TestRegexFilterGuardsEveryPatternWithTheJobCondition(t *testing.T) {
+	for name, c := range map[string]struct {
+		env          mapEnv
+		on, wantEval string
+	}{
+		"two branch patterns on pull_request": {
+			mapEnv{"branch": "r-1", "sha": "zzz"},
+			"  pull_request:\n    branches: ['r-[0-9]+', 'q-[0-9]+']\n",
+			`(CI_COMMIT_BRANCH matches "^r-[0-9]+$$" || CI_COMMIT_BRANCH matches "^q-[0-9]+$$") && (CI_COMMIT_SHA matches "(?i)^abc$$")`,
+		},
+		"two tag patterns": {
+			mapEnv{"tag": "v1", "sha": "zzz"},
+			"  push:\n    tags: ['v[0-9]+', 'w[0-9]+']\n",
+			`(CI_COMMIT_TAG matches "^v[0-9]+$$" || CI_COMMIT_TAG matches "^w[0-9]+$$") && (CI_COMMIT_SHA matches "(?i)^abc$$")`,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := parseProject(t, "gha", map[string]string{".github/workflows/ci.yml": "on:\n" + c.on + "jobs:\n  b:\n    runs-on: ubuntu-latest\n    if: github.sha == 'abc'\n    steps:\n      - run: make\n"})
+			files, _ := emitFiles(t, p)
+			body := files[".woodpecker/b.yaml"]
+			if !strings.Contains(body, "evaluate: "+c.wantEval) {
+				t.Fatalf("evaluate text differs, want %s in\n%s", c.wantEval, body)
+			}
+			x, err := wpexpr.Parse(strings.ReplaceAll(c.wantEval, "$$", "$"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			v, err := expr.Eval(x, wpexpr.UnsetEnv{Env: c.env}, wpexpr.Semantics)
+			if err != nil || v != false {
+				t.Errorf("a first-pattern match with a false job condition must be false, got %v (%v)", v, err)
+			}
+			raw := map[string]string{}
+			for n, b := range files {
+				raw[n] = b
+			}
+			back := parseProject(t, "woodpecker", raw)
+			if !reflect.DeepEqual(back.Pipelines[0].Triggers, p.Pipelines[0].Triggers) {
+				t.Errorf("triggers changed:\nwant %+v\ngot  %+v", p.Pipelines[0].Triggers, back.Pipelines[0].Triggers)
+			}
+			got := expr.String(back.Pipelines[0].Jobs[0].If)
+			if !strings.Contains(got, "sha") || strings.Contains(got, "branch") || strings.Contains(got, "tag") {
+				t.Errorf("job condition = %s, want only the sha test", got)
+			}
+		})
 	}
 }

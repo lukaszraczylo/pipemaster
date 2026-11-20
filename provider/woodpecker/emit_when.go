@@ -387,7 +387,7 @@ func andText(a, b string) string {
 	case b == "":
 		return a
 	}
-	return a + " && (" + b + ")"
+	return "(" + a + ") && (" + b + ")"
 }
 
 func (e *emitter) globFilter(tp string, f caps.Feature, in ir.Filter, isPath bool) wpexpr.Filter {
