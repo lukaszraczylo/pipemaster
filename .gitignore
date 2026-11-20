@@ -4,3 +4,4 @@ docs/superpowers/
 lean4/.lake/
 .superpowers/
 .worktrees/
+/.tools/

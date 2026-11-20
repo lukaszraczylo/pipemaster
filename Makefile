@@ -1,10 +1,13 @@
-.PHONY: test lint lean vectors check
+.PHONY: test lint lean vectors check linters
 
 test:
 	go test ./...
 
 lint:
 	golangci-lint run
+
+linters:
+	scripts/install-linters.sh
 
 lean:
 	cd lean4 && lake build

@@ -49,13 +49,14 @@ var providerChecks = map[string]providerCheck{
 		schemaLag:  []string{"15-gitlab-charts-gitlab", "16-gitlab-cli", "20-gitlab-gitlab-runner", "24-gitlab-release-cli"},
 		noGHAExpr:  true,
 	},
+	provider.Woodpecker: {requireLinter: requireWoodpeckerCLI, lintFile: lintWoodpecker, lintFindings: woodpeckerFindings, lintFrom: provider.GHA, noGHAExpr: true},
 }
 
-// lintedProviders lists, sorted, the providers whose output has a linter.
+// lintedProviders lists, sorted, the registered providers whose output has a linter.
 func lintedProviders() []string {
 	var out []string
 	for id, c := range providerChecks {
-		if c.lintFile != nil {
+		if _, err := provider.Get(id); err == nil && c.lintFile != nil {
 			out = append(out, id)
 		}
 	}
