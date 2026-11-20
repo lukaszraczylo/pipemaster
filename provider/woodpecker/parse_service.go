@@ -83,9 +83,11 @@ func (w *wf) service(name string, m *omap) (ir.Service, *omap, error) {
 		}
 	}
 	if v, ok := r.take("ports"); ok {
-		if sv.Ports, ok = textList(v); !ok {
+		l, isList := textList(v)
+		if !isList {
 			return sv, nil, fmt.Errorf("service %s: ports must be a list", name)
 		}
+		sv.Ports = unescapeAll(l)
 	}
 	rest := &omap{vals: map[string]any{}, lines: map[string]int{}}
 	if v, ok := r.take("environment"); ok {

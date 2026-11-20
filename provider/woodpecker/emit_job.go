@@ -415,7 +415,11 @@ func (e *emitter) service(jp string, sv ir.Service, rest any) (*yaml.Node, error
 		m.set("environment", env.n)
 	}
 	if len(sv.Ports) > 0 {
-		m.set("ports", strSeq(sv.Ports))
+		ports := make([]string, len(sv.Ports))
+		for i, p := range sv.Ports {
+			ports[i] = esc(p)
+		}
+		m.set("ports", strSeq(ports))
 	}
 	if rm, ok := rest.(map[string]any); ok {
 		return m.n, m.addExtra(rm, map[string]bool{"environment": true})

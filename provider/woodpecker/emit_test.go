@@ -583,3 +583,35 @@ func TestCommentsEscapeDollar(t *testing.T) {
 		t.Fatalf("the case must produce a lost comment:\n%s", body)
 	}
 }
+
+func TestDollarIsEscapedInEveryStringField(t *testing.T) {
+	st := wpStep("s", "echo hi")
+	st.Env = []ir.Var{{Name: "V", Value: ir.Value{Lit: "a$b"}}}
+	st.Image = &ir.Image{Ref: "reg/i$m:1"}
+	pl := &ir.Step{ID: "p", Kind: ir.StepPlugin, Image: &ir.Image{Ref: "plugins/slack"}, With: map[string]ir.Value{"k": {Lit: "x$y"}}}
+	j := wpJob("ci", st, pl)
+	j.Services = []ir.Service{{Name: "db", Image: ir.Image{Ref: "pg"}, Ports: []string{"5432$"}}}
+	p := wpProject("woodpecker", j)
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush, Branches: ir.Filter{Include: []string{"rel$*"}, Exclude: []string{"wip$"}}}}
+	files, _ := emitFiles(t, p)
+	body := files[dirPrefix+"ci.yaml"]
+	for _, want := range []string{"a$$b", "reg/i$$m:1", "x$$y", "5432$$", "rel$$*", "wip$$"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q:\n%s", want, body)
+		}
+	}
+	for _, line := range strings.Split(body, "\n") {
+		if strings.Contains(strings.ReplaceAll(line, "$$", ""), "$") {
+			t.Errorf("unescaped $ in %q", line)
+		}
+	}
+	back := reparse(t, files)
+	got := back.Pipelines[0].Jobs[0]
+	if got.Steps[0].Env[0].Value.Lit != "a$b" || got.Steps[0].Image.Ref != "reg/i$m:1" || got.Steps[1].With["k"].Lit != "x$y" ||
+		got.Services[0].Ports[0] != "5432$" {
+		t.Errorf("reparse changed a value: %+v %+v", got.Steps, got.Services)
+	}
+	if tr := back.Pipelines[0].Triggers[0]; tr.Branches.Include[0] != "rel$*" || tr.Branches.Exclude[0] != "wip$" {
+		t.Errorf("filters changed: %+v", tr)
+	}
+}
