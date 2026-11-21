@@ -441,10 +441,11 @@ spec:
         steps: [{name: s, image: x, script: "true"}]
 `
 	p, _ := parseFiles(t, map[string]string{"p.yaml": src})
-	files, _ := emit(t, p)
+	files, rep := emit(t, p)
 	if !strings.Contains(joinFiles(files), "cel:") {
 		t.Fatalf("cel entry dropped:\n%s", joinFiles(files))
 	}
+	wantEntry(t, rep, caps.ExprOpaque, caps.External, "enable-api-fields: alpha")
 	back, _ := reparse(t, files)
 	if ok, diff := ir.Equal(p, back); !ok {
 		t.Fatalf("cel entry changed:\n%s", diff)

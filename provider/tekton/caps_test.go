@@ -77,7 +77,7 @@ func TestCapsCaveats(t *testing.T) {
 		caps.JobServices:        "localhost",
 		caps.JobCache:           "ReadWriteMany",
 		caps.ConfigName:         "ci-secrets",
-		caps.ExprOpaque:         "tekton dialect",
+		caps.ExprOpaque:         "enable-api-fields: alpha",
 	} {
 		s := m[f]
 		if !strings.Contains(s.Strategy+" "+s.Caveat, sub) {
