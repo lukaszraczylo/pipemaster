@@ -1,5 +1,5 @@
 # pipemaster:emulated pipeline.inputs pipeline/ci
-# pipemaster:arg [{"Name":"environment","Type":"choice","Default":"staging","Description":"Where to deploy","Required":false}]
+# pipemaster:arg [{"Name":"environment","Type":"string","Default":"staging","Description":"Where to deploy","Required":false}]
 variables:
   environment:
     value: staging

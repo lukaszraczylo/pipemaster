@@ -361,7 +361,9 @@ func (b *jobBuilder) collapseActions() {
 		h.step.Ext = plainExt(h.step.Ext)
 		held = append(held, h)
 	}
-	slices.SortFunc(held, func(x, y heldAction) int { return cmp.Or(x.arg.At-y.arg.At, x.arg.Seq-y.arg.Seq, strings.Compare(x.path, y.path)) })
+	slices.SortFunc(held, func(x, y heldAction) int {
+		return cmp.Or(x.arg.At-y.arg.At, x.arg.Seq-y.arg.Seq, strings.Compare(x.path, y.path))
+	})
 	added := 0
 	for _, h := range held {
 		st := *h.step

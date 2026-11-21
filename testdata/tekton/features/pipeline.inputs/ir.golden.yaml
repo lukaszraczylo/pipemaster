@@ -10,11 +10,11 @@ pipelines:
       name: inputs
       inputs:
         - name: environment
-          type: choice
+          type: string
           default: staging
           description: Where to deploy
         - name: dry-run
-          type: boolean
+          type: string
           default: "false"
           description: Skip the push
       jobs:

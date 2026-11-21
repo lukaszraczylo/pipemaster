@@ -7,11 +7,11 @@ on:
       environment:
         description: Where to deploy
         default: staging
-        type: choice
+        type: string
       dry-run:
         description: Skip the push
-        default: false
-        type: boolean
+        default: "false"
+        type: string
 jobs:
   build:
     runs-on: ubuntu-latest
