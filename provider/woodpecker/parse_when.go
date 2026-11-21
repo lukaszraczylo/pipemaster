@@ -62,6 +62,8 @@ type whenSpec struct {
 	ignoreStatus bool
 	// multi is true when the pipeline has several workflows, which makes one workflow's repeated gate a shared one.
 	multi bool
+	// gated is true when a marker says that the evaluate text of the one entry is the job condition.
+	gated bool
 	// sharedStatus is true when every entry holds the same status list: the emitter writes the job status gate into each entry.
 	sharedStatus bool
 	// stripped is true when a marker named the evaluate text of a trigger filter, so what is left is the job condition.
@@ -79,6 +81,10 @@ func (s *whenSpec) configure(m *marks) {
 	s.shared = s.sharedEvaluate()
 	s.sharedStatus = s.sharedStatusList()
 	for _, u := range m.uses {
+		var g gateArg
+		if u.Feature == caps.JobIf && decodeArg(m.args[u], &g) && g.Gate {
+			s.gated = true
+		}
 		switch u.Feature {
 		case caps.TriggerFilterBranch, caps.TriggerFilterPaths, caps.TriggerFilterTags:
 			s.lenient = s.lenient || u.IRPath == pipelinePth
@@ -126,7 +132,7 @@ func (s *whenSpec) sharedEvaluate() string {
 
 // gates says whether a gate that every entry repeats belongs to the job, not to each trigger. A lone workflow with
 // one entry keeps the whole entry as its condition.
-func (s *whenSpec) gates() bool { return len(s.items) >= 2 || s.multi || s.stripped }
+func (s *whenSpec) gates() bool { return len(s.items) >= 2 || s.multi || s.stripped || s.gated }
 
 func (s *whenSpec) sharedStatusList() bool {
 	if len(s.items) < 1 || !s.items[0].hasStatus {

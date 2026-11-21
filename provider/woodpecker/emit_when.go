@@ -385,6 +385,11 @@ func regexTest(ref string, f ir.Filter) (string, bool) {
 }
 
 // evalArg carries the evaluate text an emitter wrote for a trigger filter, so the parser can tell it from a condition.
+// gateArg says that the evaluate text of the one when entry is the job condition, not part of a trigger.
+type gateArg struct {
+	Gate bool `json:"gate"`
+}
+
 type evalArg struct {
 	Evaluate string `json:"evaluate"`
 }
@@ -585,6 +590,11 @@ func (e *emitter) mergeCond(jp string, orig expr.Expr, base []whenEntry, cond []
 	out := slices.Clone(base)
 	for i := range out {
 		out[i].Evaluate = andText(out[i].Evaluate, text)
+	}
+	if len(out) == 1 {
+		if err := e.markArg(caps.JobIf, jp, gateArg{Gate: true}); err != nil {
+			e.comment("job condition marker not carried: " + err.Error())
+		}
 	}
 	return out
 }

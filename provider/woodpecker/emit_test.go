@@ -817,3 +817,15 @@ func TestExplicitSuccessIsReportedLost(t *testing.T) {
 		t.Fatalf("entries: %+v", rep.Entries)
 	}
 }
+
+func TestJobConditionBesideAScheduleReturns(t *testing.T) {
+	j := wpJob("ci", wpStep("s", "x"))
+	j.If = expr.Binary{Op: expr.OpEq, L: ref("repo"), R: expr.Lit{Kind: expr.LitStr, Str: "acme/app"}}
+	p := wpProject("woodpecker", j)
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerSchedule, Cron: "0 3 * * 1"}}
+	files, _ := emitFiles(t, p)
+	back := reparse(t, files)
+	if got := back.Pipelines[0].Jobs[0].If; got == nil || expr.String(got) != expr.String(j.If) {
+		t.Fatalf("job condition = %v\n%v", got, files)
+	}
+}
