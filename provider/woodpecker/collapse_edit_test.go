@@ -251,3 +251,26 @@ func TestGitLabBranchAndTagRulesTranslateToWoodpecker(t *testing.T) {
 		})
 	}
 }
+
+func TestLiteralTemplateOpenerDoesNotFailTheGitLabConversion(t *testing.T) {
+	p := parseProject(t, "woodpecker", map[string]string{".woodpecker/ci.yaml": "steps:\n  - name: a\n    image: alpine\n    commands:\n      - echo \"$${{ x }}\"\n      - echo ok\n"})
+	gl, err := provider.Get("gitlab")
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, rep, err := gl.Emit(p)
+	if err != nil {
+		t.Fatalf("one literal line fails the whole conversion: %v", err)
+	}
+	for _, b := range files {
+		if strings.Contains(string(b), "echo ok") && !strings.Contains(string(b), "# ") && strings.Contains(string(b), "${{") {
+			t.Errorf("a raw expression opener is left in the file:\n%s", b)
+		}
+		if !strings.Contains(string(b), "echo ok") {
+			t.Errorf("the other line was dropped:\n%s", b)
+		}
+	}
+	if !reportHas(rep, caps.ScriptInterpolation, caps.Lost) {
+		t.Errorf("no Lost entry: %+v", rep.Entries)
+	}
+}

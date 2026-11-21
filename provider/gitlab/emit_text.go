@@ -211,6 +211,11 @@ func (e *emitter) scriptLine(path, s string) (out string, keep bool, err error) 
 	if dead := e.deadOutputRefs(s); len(dead) > 0 {
 		lost = append(lost, dead...)
 	}
+	if len(lost) == 0 && strings.Contains(out, rawExprOpen) {
+		e.lose(path, caps.ScriptInterpolation, "the text holds a literal "+rawExprOpen+" that GitLab never expands; the line is commented out")
+		e.comment("script.interpolation " + path + ": " + s)
+		return "", false, nil
+	}
 	if len(lost) == 0 {
 		return out, true, nil
 	}
