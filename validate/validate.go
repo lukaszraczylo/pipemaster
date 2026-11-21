@@ -119,7 +119,12 @@ func File(providerID, name string, data []byte) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", name, err)
 	}
+	known := 0
 	for _, v := range docs {
+		if !knownKind(providerID, v) {
+			continue
+		}
+		known++
 		if rules, ok := rulesFor(providerID); ok {
 			var err error
 			if v, err = stripDialect(v, rules); err != nil {
@@ -129,6 +134,9 @@ func File(providerID, name string, data []byte) error {
 		if err := validateDoc(sch, v); err != nil {
 			return fmt.Errorf("%s: invalid for %s schema: %w", name, providerID, err)
 		}
+	}
+	if known == 0 {
+		return fmt.Errorf("%w %q: no document of %s has a schema", ErrNoSchema, providerID, name)
 	}
 	return nil
 }

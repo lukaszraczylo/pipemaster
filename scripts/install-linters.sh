@@ -86,5 +86,54 @@ install_drone() {
 	echo "installed drone $tag in $dest"
 }
 
+# kubeconform ships static release tarballs. The sha256 values come from the release asset digests and the CHECKSUMS
+# file of v0.8.0.
+install_kubeconform() {
+	local tag="v0.8.0"
+	local os arch asset want
+	os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+	arch="$(uname -m)"
+	case "$arch" in
+	x86_64) arch="amd64" ;;
+	aarch64) arch="arm64" ;;
+	esac
+	asset="kubeconform-${os}-${arch}.tar.gz"
+	case "$asset" in
+	kubeconform-darwin-amd64.tar.gz) want="71dbc87ac9f24099a62b93570e65aa06312ba6ac8aea63b7f86e9d999edf5a92" ;;
+	kubeconform-darwin-arm64.tar.gz) want="f84f4dfbebf4a6b0b230385fa065a39ea35e02608c2b50d025dcf64775a69d67" ;;
+	kubeconform-linux-amd64.tar.gz) want="9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883" ;;
+	kubeconform-linux-arm64.tar.gz) want="1f53fc8e81258197a35e8603054162a5af1de8c5af13746c71ab680d9534ed87" ;;
+	*)
+		echo "no pinned kubeconform $tag release for $os/$arch" >&2
+		return 1
+		;;
+	esac
+	local stamp="$dest/.kubeconform-$tag-$want"
+
+	if [[ -x "$dest/kubeconform" && -f "$stamp" ]]; then
+		echo "kubeconform $tag is already installed in $dest"
+		return 0
+	fi
+
+	local tmp got
+	tmp="$(mktemp -d "${TMPDIR:-/tmp}/install-linters.XXXXXX")"
+	trap "rm -rf '$tmp'" EXIT
+	curl -fsSL -o "$tmp/$asset" "https://github.com/yannh/kubeconform/releases/download/$tag/$asset"
+	got="$( (sha256sum "$tmp/$asset" 2>/dev/null || shasum -a 256 "$tmp/$asset") | cut -d' ' -f1)"
+	if [[ "$got" != "$want" ]]; then
+		rm -rf "$tmp"
+		echo "$asset has sha256 $got, expected $want" >&2
+		return 1
+	fi
+	tar -xzf "$tmp/$asset" -C "$tmp" kubeconform
+	install -m 0755 "$tmp/kubeconform" "$dest/kubeconform"
+	rm -rf "$tmp"
+	trap - EXIT
+	rm -f "$dest"/.kubeconform-*
+	touch "$stamp"
+	echo "installed kubeconform $tag in $dest"
+}
+
 install_woodpecker
 install_drone
+install_kubeconform

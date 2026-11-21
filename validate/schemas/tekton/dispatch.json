@@ -1,0 +1,424 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pipemaster.invalid/schemas/tekton/dispatch.json",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "batch/v1"
+          },
+          "kind": {
+            "const": "CronJob"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/cronjob-batch-v1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "tekton.dev/v1"
+          },
+          "kind": {
+            "const": "Pipeline"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/pipeline_v1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "tekton.dev/v1"
+          },
+          "kind": {
+            "const": "PipelineRun"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/pipelinerun_v1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "tekton.dev/v1"
+          },
+          "kind": {
+            "const": "Task"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/task_v1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "tekton.dev/v1"
+          },
+          "kind": {
+            "const": "TaskRun"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/taskrun_v1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "tekton.dev/v1alpha1"
+          },
+          "kind": {
+            "const": "StepAction"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/stepaction_v1alpha1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "tekton.dev/v1beta1"
+          },
+          "kind": {
+            "const": "Pipeline"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/pipeline_v1beta1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "tekton.dev/v1beta1"
+          },
+          "kind": {
+            "const": "PipelineRun"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/pipelinerun_v1beta1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "tekton.dev/v1beta1"
+          },
+          "kind": {
+            "const": "StepAction"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/stepaction_v1beta1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "tekton.dev/v1beta1"
+          },
+          "kind": {
+            "const": "Task"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/task_v1beta1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "tekton.dev/v1beta1"
+          },
+          "kind": {
+            "const": "TaskRun"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/taskrun_v1beta1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "triggers.tekton.dev/v1alpha1"
+          },
+          "kind": {
+            "const": "ClusterInterceptor"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/clusterinterceptor_v1alpha1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "triggers.tekton.dev/v1alpha1"
+          },
+          "kind": {
+            "const": "ClusterTriggerBinding"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/clustertriggerbinding_v1alpha1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "triggers.tekton.dev/v1alpha1"
+          },
+          "kind": {
+            "const": "EventListener"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/eventlistener_v1alpha1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "triggers.tekton.dev/v1alpha1"
+          },
+          "kind": {
+            "const": "Trigger"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/trigger_v1alpha1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "triggers.tekton.dev/v1alpha1"
+          },
+          "kind": {
+            "const": "TriggerBinding"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/triggerbinding_v1alpha1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "triggers.tekton.dev/v1alpha1"
+          },
+          "kind": {
+            "const": "TriggerTemplate"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/triggertemplate_v1alpha1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "triggers.tekton.dev/v1beta1"
+          },
+          "kind": {
+            "const": "ClusterTriggerBinding"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/clustertriggerbinding_v1beta1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "triggers.tekton.dev/v1beta1"
+          },
+          "kind": {
+            "const": "EventListener"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/eventlistener_v1beta1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "triggers.tekton.dev/v1beta1"
+          },
+          "kind": {
+            "const": "Trigger"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/trigger_v1beta1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "triggers.tekton.dev/v1beta1"
+          },
+          "kind": {
+            "const": "TriggerBinding"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/triggerbinding_v1beta1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "triggers.tekton.dev/v1beta1"
+          },
+          "kind": {
+            "const": "TriggerTemplate"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/tekton/triggertemplate_v1beta1.json"
+      }
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 // Package schemas embeds the pinned provider JSON Schemas.
 package schemas
 
-import _ "embed"
+import "embed"
 
 // GitHubWorkflow is the GitHub Actions workflow schema.
 //
@@ -27,3 +27,9 @@ var Drone []byte
 //
 //go:embed kubernetes-definitions.json
 var KubernetesDefinitions []byte
+
+// Tekton holds the generated Tekton CRD schemas, the batch/v1 CronJob schema and dispatch.json, which routes a
+// document to its schema by apiVersion and kind.
+//
+//go:embed tekton/*.json
+var Tekton embed.FS
