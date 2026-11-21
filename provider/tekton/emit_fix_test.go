@@ -294,3 +294,10 @@ func TestRequiredInputKeepsItsDefault(t *testing.T) {
 	}
 	wantEntry(t, rep, caps.PipelineInputs, caps.Lost, "required")
 }
+
+func TestAlwaysOnStepIsReported(t *testing.T) {
+	j := scriptJob("a", "true")
+	j.Steps = append(j.Steps, &ir.Step{ID: "cleanup", Kind: ir.StepScript, Script: []string{"echo done"}, If: expr.Call{Name: "always"}})
+	_, rep := emit(t, project(j))
+	wantEntry(t, rep, caps.StepIf, caps.Lost, "always()")
+}
