@@ -27,12 +27,12 @@ func TestCapsLedger(t *testing.T) {
 			caps.TriggerPush, caps.TriggerPullRequest, caps.TriggerTag, caps.TriggerFilterBranch,
 			caps.TriggerFilterTags, caps.TriggerFilterPaths, caps.TriggerSchedule, caps.JobServices,
 			caps.JobCache, caps.JobArtifacts, caps.JobNeedsArtifacts, caps.PipelineEnv, caps.StepAction,
-			caps.ProjectMultiPipeline, caps.ConfigName,
+			caps.ProjectMultiPipeline, caps.ConfigName, caps.TriggerAPI,
 		},
 		caps.External: {caps.TriggerManual},
 		caps.Lost: {
 			caps.JobRunner, caps.JobEnvironment, caps.JobEnvironmentApproval, caps.JobManual,
-			caps.PipelineConcurrency, caps.PipelinePermissions, caps.TriggerAPI, caps.TriggerPipelineDone,
+			caps.PipelineConcurrency, caps.PipelinePermissions, caps.TriggerPipelineDone,
 			caps.TriggerResource,
 		},
 	}

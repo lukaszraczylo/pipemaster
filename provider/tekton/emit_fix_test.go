@@ -342,3 +342,21 @@ func TestRenamedPushEntryReportsMarkerIgnored(t *testing.T) {
 		t.Fatalf("renamed entry lost:\n%s", joinFiles(out))
 	}
 }
+
+func TestKeptListenerEntryIsNotReportedLost(t *testing.T) {
+	back, _, _ := renamedListener(t, "ci-schedule-0", "mine")
+	out, rep := emit(t, back)
+	if !strings.Contains(joinFiles(out), "name: mine") {
+		t.Fatalf("kept entry not written:\n%s", joinFiles(out))
+	}
+	if e := entry(rep, caps.TriggerAPI, ""); e != nil && e.Level == caps.Lost {
+		t.Fatalf("false lost entry: %v", e)
+	}
+}
+
+func TestForeignAPITriggerIsReportedLost(t *testing.T) {
+	p := project(scriptJob("a", "true"))
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerAPI}}
+	_, rep := emit(t, p)
+	wantEntry(t, rep, caps.TriggerAPI, caps.Lost, "API trigger")
+}

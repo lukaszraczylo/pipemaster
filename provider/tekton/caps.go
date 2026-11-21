@@ -41,7 +41,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.JobManual:              {Level: caps.Lost, Caveat: "Tekton has no manual job gate"},
 		caps.PipelineConcurrency:    {Level: caps.Lost, Caveat: "Tekton has no concurrency group or cancel-in-progress"},
 		caps.PipelinePermissions:    {Level: caps.Lost, Caveat: "permissions come from the ServiceAccount of the run"},
-		caps.TriggerAPI:             {Level: caps.Lost, Caveat: "Tekton has no API trigger kind"},
+		caps.TriggerAPI:             {Level: caps.Emulated, Strategy: "EventListener entry of the Tekton file", Caveat: "only an entry that a Tekton file held is written; any other API trigger is lost"},
 		caps.TriggerPipelineDone:    {Level: caps.Lost, Caveat: "Tekton has no pipeline-completion trigger"},
 		caps.TriggerResource:        {Level: caps.Lost, Caveat: "Tekton has no resource trigger"},
 	} {

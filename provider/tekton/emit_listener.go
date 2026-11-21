@@ -182,6 +182,9 @@ func (e *emitter) pipelineTriggers(pp *plan, crons *[]*outDoc) (binding, templat
 			}
 			g.paths = append(g.paths, path)
 			g.kinds = append(g.kinds, t.Kind)
+			if t.Kind == ir.TriggerAPI {
+				e.emulate(path, caps.TriggerAPI, "EventListener entry of the Tekton file", "the entry is written as the Tekton file had it")
+			}
 			continue
 		}
 		l := e.listenerFor(kindEventListenerName)
@@ -200,6 +203,9 @@ func (e *emitter) pipelineTriggers(pp *plan, crons *[]*outDoc) (binding, templat
 				*crons = append(*crons, cj)
 			}
 		default:
+			if t.Kind == ir.TriggerAPI {
+				e.lose(path, caps.TriggerAPI, "Tekton has no API trigger kind; only an EventListener entry of a Tekton file is kept")
+			}
 			continue
 		}
 		if err != nil {
