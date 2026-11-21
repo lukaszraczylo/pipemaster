@@ -609,3 +609,33 @@ func TestJobGuardOnAStepWithNoScriptLineReturns(t *testing.T) {
 		t.Fatalf("job %q, steps %q %q\n%s", cond(got.If), cond(got.Steps[0].If), cond(got.Steps[1].If), joinFiles(files))
 	}
 }
+
+func TestInputTypeWithoutTektonFormIsWrittenAsString(t *testing.T) {
+	for _, typ := range []string{"choice", "boolean", "number"} {
+		t.Run(typ, func(t *testing.T) {
+			p := project(scriptJob("a", "true"))
+			p.Pipelines[0].Inputs = []ir.Input{{Name: "mode", Type: typ, Default: "x"}}
+			files, rep := emit(t, p)
+			params := list(get(pipelineDoc(t, files, "ci"), "spec", "params"))
+			if len(params) != 1 || get(params[0], "type") != "string" {
+				t.Fatalf("type = %v", params)
+			}
+			wantEntry(t, rep, caps.PipelineInputs, caps.Lost, typ)
+		})
+	}
+}
+
+func TestTektonParamTypesAreKept(t *testing.T) {
+	p := project(scriptJob("a", "true"))
+	p.Pipelines[0].Inputs = []ir.Input{{Name: "l", Type: "array"}, {Name: "o", Type: "object"}, {Name: "s", Type: "string"}}
+	files, rep := emit(t, p)
+	params := list(get(pipelineDoc(t, files, "ci"), "spec", "params"))
+	for i, want := range []string{"array", "object", "string"} {
+		if get(params[i], "type") != want {
+			t.Fatalf("param %d: %v", i, params[i])
+		}
+	}
+	if hasEntry(rep, "has no Tekton param type") {
+		t.Fatalf("native type reported: %+v", rep.Entries)
+	}
+}

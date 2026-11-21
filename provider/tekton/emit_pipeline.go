@@ -1,6 +1,7 @@
 package tekton
 
 import (
+	"slices"
 	"strings"
 	"time"
 
@@ -126,6 +127,19 @@ func (e *emitter) loseUnknownExt(path string, x map[string]any, known map[string
 	}
 }
 
+// paramTypes are the param types that Tekton knows.
+var paramTypes = []string{"string", "array", "object"}
+
+// paramType gives the Tekton type of an input. A type with no Tekton form is written as string, which the
+// metadata restores.
+func (e *emitter) paramType(path string, in ir.Input) string {
+	if slices.Contains(paramTypes, in.Type) {
+		return in.Type
+	}
+	e.lose(path, caps.PipelineInputs, "input "+in.Name+": type "+in.Type+" has no Tekton param type; it is written as string")
+	return "string"
+}
+
 // pipelineParams lists the input params, then the ctx-* params that a task reads.
 func (e *emitter) pipelineParams(pp *plan, x map[string]any) *yaml.Node {
 	extra, _ := x["params"].(map[string]any)
@@ -134,7 +148,7 @@ func (e *emitter) pipelineParams(pp *plan, x map[string]any) *yaml.Node {
 		m := newMap()
 		m.setStr("name", pp.inputs[in.Name])
 		if in.Type != "" {
-			m.setStr("type", in.Type)
+			m.setStr("type", e.paramType(pp.path, in))
 		}
 		if in.Description != "" {
 			m.setStr("description", in.Description)

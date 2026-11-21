@@ -1,6 +1,6 @@
 Loss report: gitea -> tekton
 [lost] pipeline/ci/job/test job.runner (Tekton schedules pods, not runner labels)
-[lost] pipeline/deploy pipeline.inputs (input target: a Tekton param with a default is optional, so required is lost)
+[lost] pipeline/deploy pipeline.inputs (input target: type choice has no Tekton param type; it is written as string; input target: a Tekton param with a default is optional, so required is lost)
 [lost] pipeline/deploy/job/deploy job.runner (Tekton schedules pods, not runner labels)
 [lost] pipeline/deploy/trigger/0 ext.passthrough (Ext of provider gha (inputs) is not written to the Tekton file; it is kept in round-trip metadata)
 [external] pipeline/ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)

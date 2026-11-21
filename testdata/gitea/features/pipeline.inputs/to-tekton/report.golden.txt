@@ -1,5 +1,5 @@
 Loss report: gitea -> tekton
-[lost] pipeline/ci pipeline.inputs (input environment: a Tekton param with a default is optional, so required is lost)
+[lost] pipeline/ci pipeline.inputs (input environment: type choice has no Tekton param type; it is written as string; input environment: a Tekton param with a default is optional, so required is lost; input dry-run: type boolean has no Tekton param type; it is written as string)
 [lost] pipeline/ci/job/build job.runner (Tekton schedules pods, not runner labels)
 [lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider gha (inputs) is not written to the Tekton file; it is kept in round-trip metadata)
 [external] pipeline/ci/trigger/0 trigger.manual: tkn pipeline start ci (a person starts the run with `tkn pipeline start ci`)

@@ -19,7 +19,7 @@ spec:
   displayName: Deploy
   params:
     - name: target
-      type: choice
+      type: string
       description: Where to deploy
       default: staging
   tasks:
