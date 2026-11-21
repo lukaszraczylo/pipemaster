@@ -179,6 +179,7 @@ func TestEditedEnvKeepsTheParsedValue(t *testing.T) {
 			return regexp.MustCompile(`\n +TOKEN:\n +from_secret: tok`).ReplaceAllLiteralString(s, "")
 		},
 		"the document environment emptied": func(s string) string { return strings.Replace(s, "  KEEP: one\n", "", 1) },
+		"a job value changed":              func(s string) string { return strings.Replace(s, "  KEEP: one\n", "  KEEP: two\n", 1) },
 	}
 	for name, edit := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -751,5 +752,14 @@ func TestFoldedGuardRoundTripsExactly(t *testing.T) {
 				t.Errorf("condition = %v, want %s; entries %+v", x, expr.String(cond), rep.Entries)
 			}
 		})
+	}
+}
+
+func TestEditedEnvValueWins(t *testing.T) {
+	p, _ := back(t, envProject(), func(s string) string { return strings.Replace(s, "  KEEP: one\n", "  KEEP: two\n", 1) })
+	for _, v := range jobOf(t, p, "b").Env {
+		if v.Name == "KEEP" && v.Value.Lit != "two" {
+			t.Errorf("KEEP = %+v, want the edited value", v.Value)
+		}
 	}
 }

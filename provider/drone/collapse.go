@@ -361,7 +361,7 @@ func collapseEnv(d *doc) {
 	if !hasJ && !hasP {
 		return
 	}
-	if !envAsEmitted(j, append(slices.Clone(jvars), pvars...)) {
+	if !envAsEmitted(j, jvars, pvars) {
 		for _, u := range []struct {
 			use ir.FeatureUse
 			ok  bool
@@ -391,9 +391,12 @@ func collapseEnv(d *doc) {
 }
 
 // envAsEmitted is true when every command step still carries each secret of the marker and the document
-// environment holds each other variable; a variable that is gone means the file was edited. An expression value
-// can have no spelling, so the emitter may not have copied it.
-func envAsEmitted(j *ir.Job, vars []ir.Var) bool {
+// environment holds each other variable; a variable that is gone, or a job variable with another value, means
+// the file was edited. A pipeline variable with another value is a job variable that shadows it, and
+// collapseEnv keeps that value on the job. An expression value can have no spelling, so the emitter may not have
+// copied it.
+func envAsEmitted(j *ir.Job, jvars, pvars []ir.Var) bool {
+	vars := append(slices.Clone(jvars), pvars...)
 	for _, st := range j.Steps {
 		if len(st.Script) == 0 || isPlaceholder(st) {
 			continue
@@ -404,8 +407,10 @@ func envAsEmitted(j *ir.Job, vars []ir.Var) bool {
 			}
 		}
 	}
-	for _, v := range vars {
-		if v.Value.Kind == ir.ValueLit && !slices.ContainsFunc(j.Env, func(w ir.Var) bool { return w.Name == v.Name }) {
+	for i, v := range vars {
+		if v.Value.Kind == ir.ValueLit && !slices.ContainsFunc(j.Env, func(w ir.Var) bool {
+			return w.Name == v.Name && (i >= len(jvars) || reflect.DeepEqual(w.Value, v.Value))
+		}) {
 			return false
 		}
 	}
