@@ -7,6 +7,8 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
+	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
@@ -41,6 +43,11 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 	e.owners[jp.path] = tc.doc
 	jc := tc.cond(jp.path, caps.JobIf, j.If, pipelineScope)
 	b := &stepBook{guard: jc.guard, names: map[string]bool{}}
+	if jc.guard != nil {
+		if err := tc.markJobGuard(jp.path, j.If, jc.guard); err != nil {
+			return nil, err
+		}
+	}
 	if j.Container != nil && len(j.Container.Entrypoint) > 0 {
 		tc.e.lose(jp.path, caps.JobContainer, "the container entrypoint has no Tekton form beside a script")
 	}
@@ -545,4 +552,18 @@ func (tc *taskCtx) pipelineWorkspaceBindings(x map[string]any) *yaml.Node {
 		return nil
 	}
 	return out
+}
+
+// markJobGuard records the job condition that the guard line of every script step stands for, and what the
+// guard reads back as, so the parser can tell an unedited guard.
+func (tc *taskCtx) markJobGuard(path string, orig, guard expr.Expr) error {
+	lines, err := exprtekton.AddGuard([]string{"true"}, guard)
+	if err != nil {
+		return err
+	}
+	back := ""
+	if _, e, ok := exprtekton.RemoveGuard(lines); ok {
+		back = expr.String(e)
+	}
+	return tc.e.markArg(caps.JobIf, path, guardArg{If: expr.String(orig), Back: back})
 }

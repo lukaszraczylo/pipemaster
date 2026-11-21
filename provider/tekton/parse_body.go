@@ -94,6 +94,7 @@ func (b *jobBuilder) remote(rm *omap, line int, why string) {
 
 // document reads the Task document that a taskRef names.
 func (b *jobBuilder) document(doc *rawDoc, name string) error {
+	b.marks = readMarks(doc.head)
 	meta, _ := asMap(doc.top.vals["metadata"])
 	if meta != nil {
 		rest := &omap{vals: map[string]any{}, lines: map[string]int{}}

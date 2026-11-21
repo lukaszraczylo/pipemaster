@@ -57,6 +57,13 @@ func (e *emitter) pipeline(pp *plan) error {
 	}
 	if len(pl.Env) > 0 {
 		e.emulate(pp.path, caps.PipelineEnv, "stepTemplate env", "the pipeline env is copied into the stepTemplate of every Task")
+		body, err := carryYAML(pl.Env)
+		if err != nil {
+			return err
+		}
+		if err := e.markArg(caps.PipelineEnv, pp.path, envArg{Env: body}); err != nil {
+			return err
+		}
 	}
 	var tasks, finally []*yaml.Node
 	for _, jp := range pp.jobs {
@@ -236,6 +243,7 @@ func join(ss []string) string {
 // edge is lost. An edge that a result reference already implies is left out when the Tekton file had it so.
 func (e *emitter) runAfter(pp *plan, jp *jobPlan, pt *wmap, needed map[string]bool) {
 	var after []string
+	var held []ir.Need
 	implicit := map[string]bool{}
 	if e.own {
 		if l, ok := extOf(jp.j.Ext)["implicit_needs"].([]any); ok {
@@ -254,7 +262,7 @@ func (e *emitter) runAfter(pp *plan, jp *jobPlan, pt *wmap, needed map[string]bo
 		case jp.finally && nj.finally:
 			e.lose(jp.path, caps.JobNeeds, "the finally task cannot wait for the finally task "+n.JobID+"; Tekton runs finally tasks together")
 		case jp.finally:
-			// A finally task runs after every other task, so the edge holds already.
+			held = append(held, n)
 		case nj.finally:
 			e.lose(jp.path, caps.JobNeeds, "a task cannot wait for the finally task "+n.JobID)
 		case implicit[n.JobID] && needed[n.JobID]:
@@ -264,6 +272,12 @@ func (e *emitter) runAfter(pp *plan, jp *jobPlan, pt *wmap, needed map[string]bo
 	}
 	if len(after) > 0 {
 		pt.set("runAfter", strSeq(after))
+	}
+	if len(held) > 0 {
+		e.emulate(jp.path, caps.JobNeeds, "implied by finally", "a finally task runs after every other task, so the needs are not written; the marker holds them")
+		if err := e.markArg(caps.JobNeeds, jp.path, needsArg{Needs: held}); err != nil {
+			e.lose(jp.path, caps.JobNeeds, err.Error())
+		}
 	}
 }
 
@@ -281,6 +295,9 @@ func (tc *taskCtx) matrixNode(pt *wmap) error {
 	var include []*yaml.Node
 	if len(mx.Exclude) > 0 && len(mx.Axes) > 0 {
 		tc.e.emulate(tc.jp.path, caps.JobMatrix, "expanded combinations", "exclude entries are applied by writing the remaining combinations as include entries")
+		if err := tc.e.markArg(caps.JobMatrix, tc.jp.path, matrixArg{Axes: mx.Axes, Exclude: mx.Exclude, Include: mx.Include}); err != nil {
+			return err
+		}
 		for _, c := range expandAxes(mx.Axes) {
 			if !excluded(c, mx.Exclude) {
 				include = append(include, includeNode("", c))

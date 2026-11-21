@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"go.yaml.in/yaml/v3"
+
 	"github.com/lukaszraczylo/pipemaster/caps"
 	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
 	"github.com/lukaszraczylo/pipemaster/ir"
@@ -13,6 +15,8 @@ const pacPrefix = "pipelinesascode.tekton.dev/"
 
 // plCtx is the pipeline being read: the task names that references can point at.
 type plCtx struct {
+	// env holds the pipeline variables that the emitter copied into every Task, by name.
+	env  map[string]ir.Var
 	p    *project
 	k    *sink
 	ids  map[string]string
@@ -20,6 +24,8 @@ type plCtx struct {
 	plID string
 	// ws is true when a job restored the workspace marker.
 	ws bool
+	// envBad is true when a Task no longer holds the copied variables as written.
+	envBad bool
 }
 
 func (c *plCtx) taskID(name string) (string, bool) {
@@ -62,8 +68,12 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 	}
 	finally, _ := r.take("finally")
 	k.keepRest(r)
+	envVars := c.copiedEnv(src, id)
 	if err := c.jobs(pl, tasks, finally); err != nil {
 		return nil, fmt.Errorf("%s: %w", src.doc.file, err)
+	}
+	if envVars != nil && !c.envBad {
+		pl.Env = envVars
 	}
 	if hasWS {
 		if c.ws {
@@ -172,4 +182,21 @@ func (p *project) params(pl *ir.Pipeline, k *sink, r *reader) error {
 		k.vals["params"] = plain(extra)
 	}
 	return nil
+}
+
+// copiedEnv reads the pipeline env that the marker holds; the jobs check it against their stepTemplate.
+func (c *plCtx) copiedEnv(src *pipeSrc, id string) []ir.Var {
+	var a envArg
+	if !readMarks(src.doc.head).arg(caps.PipelineEnv, "pipeline/"+id, &a) {
+		return nil
+	}
+	var vars []ir.Var
+	if yaml.Unmarshal([]byte(a.Env), &vars) != nil || len(vars) == 0 {
+		return nil
+	}
+	c.env = map[string]ir.Var{}
+	for _, v := range vars {
+		c.env[v.Name] = v
+	}
+	return vars
 }

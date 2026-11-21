@@ -13,6 +13,9 @@ import (
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
+// shellMark brackets a reference in converted script text until resolve writes the shell variable.
+const shellMark = "\x00"
+
 const (
 	secretStore = "ci-secrets"
 	configStore = "ci-vars"
@@ -36,10 +39,19 @@ const (
 // stepScope collects the env entries that the text of one step needs.
 type stepScope struct {
 	names map[string]bool
+	// shell maps the reference of each env, secret or variable that the script reads as a shell variable to that variable.
+	shell map[string]string
 	env   []*yaml.Node
 }
 
-func newScope() *stepScope { return &stepScope{names: map[string]bool{}} }
+func newScope() *stepScope { return &stepScope{names: map[string]bool{}, shell: map[string]string{}} }
+
+// shellVar returns the placeholder for a reference that the script reads as the shell variable name; resolve
+// turns it into the variable and records where it stood.
+func (s *stepScope) shellVar(ref, name string) string {
+	s.shell[ref] = name
+	return shellMark + ref + shellMark
+}
 
 func (s *stepScope) add(name string, n *yaml.Node) {
 	if s.names[name] {
@@ -205,10 +217,10 @@ func (tc *taskCtx) refText(sc *stepScope, m textMode, r expr.Ref) (string, bool)
 	case len(r.Path) == 2 && m == scriptText && isIdent(r.Path[1]):
 		switch r.Path[0] {
 		case expr.PrefixEnv:
-			return "${" + r.Path[1] + "}", true
+			return sc.shellVar(r.Path[0]+"."+r.Path[1], r.Path[1]), true
 		case expr.PrefixSecrets, expr.PrefixVars:
 			if n, ok := tc.storeEnv(sc, r.Path[0], r.Path[1]); ok {
-				return "${" + n + "}", true
+				return sc.shellVar(r.Path[0]+"."+r.Path[1], n), true
 			}
 		}
 	}

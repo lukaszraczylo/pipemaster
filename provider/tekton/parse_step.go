@@ -34,6 +34,10 @@ func (b *jobBuilder) steps(v any) error {
 		if err != nil {
 			return err
 		}
+		if b.prints == nil {
+			b.prints = map[string]string{}
+		}
+		b.prints[st.ID] = printValue(m)
 		b.job.Steps = append(b.job.Steps, st)
 	}
 	return nil
@@ -271,6 +275,10 @@ func (b *jobBuilder) envList(v any, skip []exprtekton.EnvVar) ([]ir.Var, map[str
 		}
 		raw, hasValue := text(m.vals["value"])
 		if vf, ok := m.vals["valueFrom"]; ok {
+			if v, held := storeValue(vf); held {
+				vars = append(vars, ir.Var{Name: name, Value: v})
+				continue
+			}
 			from[name] = plain(vf)
 			continue
 		}
@@ -283,6 +291,32 @@ func (b *jobBuilder) envList(v any, skip []exprtekton.EnvVar) ([]ir.Var, map[str
 		vars = append(vars, ir.Var{Name: name, Value: b.tx.value(raw)})
 	}
 	return vars, from, nil
+}
+
+// storeValue reads the Secret or ConfigMap key that the emitter writes for a secret or a variable.
+func storeValue(vf any) (ir.Value, bool) {
+	m, ok := asMap(vf)
+	if !ok || len(m.keys) != 1 {
+		return ir.Value{}, false
+	}
+	store, key := secretStore, ""
+	switch m.keys[0] {
+	case kindSecretRef:
+	case kindConfigRef:
+		store = configStore
+	default:
+		return ir.Value{}, false
+	}
+	ref, _ := asMap(m.vals[m.keys[0]])
+	name, _ := text(valueOf(ref, "name"))
+	key, _ = text(valueOf(ref, "key"))
+	if ref == nil || len(ref.keys) != 2 || name != store || key == "" {
+		return ir.Value{}, false
+	}
+	if store == secretStore {
+		return ir.Value{Kind: ir.ValueSecret, Secret: key}, true
+	}
+	return ir.Value{Kind: ir.ValueExpr, Expr: expr.Ref{Path: []string{expr.PrefixVars, key}}}, true
 }
 
 // stepTemplate reads the defaults of every step: the image is the job container and the env is the job env.
@@ -351,7 +385,7 @@ func (b *jobBuilder) sidecars(v any) error {
 		}
 		if pv, ok := r.take("ports"); ok {
 			ports, whole := containerPorts(pv)
-			sv.Ports = ports
+			sv.Ports = b.servicePorts(name, ports)
 			if !whole {
 				r.release("ports")
 			}

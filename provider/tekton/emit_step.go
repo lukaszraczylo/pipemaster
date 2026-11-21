@@ -2,6 +2,7 @@ package tekton
 
 import (
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -50,6 +51,7 @@ func (tc *taskCtx) step(b *stepBook, st *ir.Step, sp string) (*wmap, error) {
 	default:
 		tc.e.lose(sp, caps.StepAction, "step kind "+string(st.Kind)+" has no Tekton form")
 		tc.e.comment(sp, "step "+sp+" has kind "+string(st.Kind))
+		err = tc.markAction(b, sp, st, "", nil)
 	}
 	if m != nil && comment != "" {
 		m.n.HeadComment = comment
@@ -83,6 +85,9 @@ func (tc *taskCtx) scriptStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 	guard := andGuard(b.guard, cond.guard)
 	lines, err := tc.scriptLines(sc, st, sp)
 	if err != nil {
+		return nil, err
+	}
+	if err := tc.markShell(sc, sp, lines); err != nil {
 		return nil, err
 	}
 	if guard != nil {
@@ -203,6 +208,9 @@ func (tc *taskCtx) stepImage(sc *stepScope, st *ir.Step, sp string) (string, err
 		return "", nil
 	}
 	tc.e.emulate(sp, caps.StepImage, "default image", "the step names no image and Tekton requires one; "+defaultImage+" runs it")
+	if err := tc.e.markArg(caps.StepImage, sp, imageArg{Image: defaultImage}); err != nil {
+		return "", err
+	}
 	return defaultImage, nil
 }
 
@@ -241,4 +249,73 @@ func (tc *taskCtx) commandForm(m *wmap, st *ir.Step, sp string, guard expr.Expr)
 		}
 	}
 	return true
+}
+
+// shellUse is one reference that a script reads as a shell variable.
+type shellUse struct {
+	Ref  string `json:"ref"`
+	Name string `json:"name"`
+	// At lists which occurrences of ${Name} in the script, counted from 0, the reference wrote.
+	At []int `json:"at"`
+	// Of is how many occurrences of ${Name} the script holds.
+	Of int `json:"of"`
+}
+
+// shellArg lists the references of a step script that became shell variables.
+type shellArg struct {
+	Refs []shellUse `json:"refs"`
+}
+
+// markShell writes the shell variable of each reference in place of its placeholder, and the marker that says
+// where they stand. It changes lines in place.
+func (tc *taskCtx) markShell(sc *stepScope, sp string, lines []string) error {
+	if len(sc.shell) == 0 {
+		return nil
+	}
+	names := map[string]bool{}
+	for _, n := range sc.shell {
+		names[n] = true
+	}
+	var alt []string
+	for n := range names {
+		alt = append(alt, regexp.QuoteMeta("${"+n+"}"))
+	}
+	re := regexp.MustCompile(strings.Join(alt, "|") + "|" + shellMark + "[^" + shellMark + "]+" + shellMark)
+	seen := map[string]int{}
+	uses := map[string]*shellUse{}
+	for i, l := range lines {
+		lines[i] = re.ReplaceAllStringFunc(l, func(m string) string {
+			ref, isRef := strings.CutPrefix(m, shellMark)
+			if !isRef {
+				seen[m[2:len(m)-1]]++
+				return m
+			}
+			ref = strings.TrimSuffix(ref, shellMark)
+			name := sc.shell[ref]
+			u := uses[ref]
+			if u == nil {
+				u = &shellUse{Ref: ref, Name: name}
+				uses[ref] = u
+			}
+			u.At = append(u.At, seen[name])
+			seen[name]++
+			return "${" + name + "}"
+		})
+	}
+	var arg shellArg
+	for _, ref := range sortedKeys(uses) {
+		u := uses[ref]
+		u.Of = seen[u.Name]
+		arg.Refs = append(arg.Refs, *u)
+	}
+	if len(arg.Refs) == 0 {
+		return nil
+	}
+	for _, u := range arg.Refs {
+		if !strings.HasPrefix(u.Ref, expr.PrefixEnv+".") {
+			tc.e.emulate(sp, caps.ScriptInterpolation, "shell variable", "a secret or variable in the script is read as a shell variable from the step env")
+			break
+		}
+	}
+	return tc.e.markArg(caps.ScriptInterpolation, sp, arg)
 }

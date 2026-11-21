@@ -139,7 +139,8 @@ func TestWorkspaceMarkerRestoresJobSettings(t *testing.T) {
 func TestEditedWorkspaceIsNotRestored(t *testing.T) {
 	for name, edit := range map[string]func(string) string{
 		"copy step": func(s string) string {
-			return strings.Replace(s, "mkdir -p '/pipemaster/artifacts/bin'", "mkdir -p /elsewhere", 1)
+			i := strings.LastIndex(s, "mkdir -p '/pipemaster/artifacts/bin'")
+			return s[:i] + "mkdir -p /elsewhere" + s[i+len("mkdir -p '/pipemaster/artifacts/bin'"):]
 		},
 		"mount path": func(s string) string { return strings.Replace(s, "mountPath: /pipemaster", "mountPath: /data", 1) },
 	} {

@@ -2,6 +2,7 @@ package tekton
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -58,6 +59,11 @@ func (x *texts) keep(form string) {
 		}
 	}
 	x.kept = append(x.kept, form)
+}
+
+// unkeep forgets a variable that a collapsed marker accounts for.
+func (x *texts) unkeep(form string) {
+	x.kept = slices.DeleteFunc(x.kept, func(k string) bool { return k == form })
 }
 
 // ref reads one whole variable as a canonical reference.

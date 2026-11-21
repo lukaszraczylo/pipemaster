@@ -84,7 +84,9 @@ type jobBuilder struct {
 	c            *plCtx
 	k            *sink
 	raw          map[string]string
+	prints       map[string]string
 	ws           *workspaceArg
+	marks        *marks
 	containerRef string
 	path         string
 	finally      bool
@@ -294,6 +296,7 @@ func (b *jobBuilder) bindings(v any) error {
 
 // finish adds the needs that references imply, the kept-variable entries and the Ext.
 func (b *jobBuilder) finish() {
+	b.collapse()
 	names := map[string]bool{}
 	for _, t := range []*texts{b.px, b.tx} {
 		for n := range t.needs {

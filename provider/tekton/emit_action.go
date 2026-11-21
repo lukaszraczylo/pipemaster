@@ -1,6 +1,7 @@
 package tekton
 
 import (
+	"encoding/json"
 	"regexp"
 	"strings"
 
@@ -27,7 +28,22 @@ const (
 type actionArg struct {
 	Step  string `json:"step"`
 	Image string `json:"image,omitempty"`
+	// Wrote is the fingerprint of the step that the file holds for the action; empty when the action wrote none.
+	Wrote string `json:"wrote,omitempty"`
 	At    int    `json:"at"`
+}
+
+// printNode fingerprints written YAML, so the parser can tell a step that is still as written from an edited one.
+func printNode(n *yaml.Node) string {
+	var v any
+	if n == nil || n.Decode(&v) != nil {
+		return ""
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 func carryYAML(v any) (string, error) {
@@ -101,7 +117,7 @@ func withoutBookkeeping(x ir.Ext) ir.Ext {
 
 // markAction writes the marker that holds a step the file does not have as written. The step keeps no condition:
 // the IR states conditions in the dialect of its origin, and a restored one would read in the wrong dialect.
-func (tc *taskCtx) markAction(b *stepBook, sp string, st *ir.Step, image string) error {
+func (tc *taskCtx) markAction(b *stepBook, sp string, st *ir.Step, image string, written *wmap) error {
 	held := *st
 	held.If = nil
 	held.Ext = withoutBookkeeping(st.Ext)
@@ -109,13 +125,21 @@ func (tc *taskCtx) markAction(b *stepBook, sp string, st *ir.Step, image string)
 	if err != nil {
 		return err
 	}
-	return tc.e.markArg(caps.StepAction, sp, actionArg{Step: body, At: len(b.nodes), Image: image})
+	var wrote string
+	if written != nil {
+		wrote = printNode(written.n)
+	}
+	return tc.e.markArg(caps.StepAction, sp, actionArg{Step: body, At: len(b.nodes), Image: image, Wrote: wrote})
 }
 
 // actionStep maps an action step through the actions table. Every mapped action leaves a marker that holds the step.
 func (tc *taskCtx) actionStep(b *stepBook, st *ir.Step, sp, name string) (*wmap, error) {
 	if st.Action == nil || st.Kind == ir.StepPipelineCall {
-		return tc.extAction(st, sp, name), nil
+		m := tc.extAction(st, sp, name)
+		if m == nil {
+			return nil, tc.markAction(b, sp, st, "", nil)
+		}
+		return m, nil
 	}
 	with := map[string]string{}
 	for k, v := range st.With {
@@ -129,7 +153,7 @@ func (tc *taskCtx) actionStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 	t, ok := actions.Lookup(*st.Action, dialect, with)
 	if !ok {
 		tc.dropAction(st, sp, "no Tekton mapping for action "+actionRef(st.Action))
-		return nil, nil
+		return nil, tc.markAction(b, sp, st, "", nil)
 	}
 	tc.e.led.Note(use(sp, caps.StepAction), t.Support, t.Support.Caveat)
 	for _, k := range t.Unmapped {
@@ -137,13 +161,13 @@ func (tc *taskCtx) actionStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 	}
 	if t.Support.Level == caps.Lost {
 		tc.dropAction(st, sp, t.Support.Caveat)
-		return nil, nil
+		return nil, tc.markAction(b, sp, st, "", nil)
 	}
 	m, image, err := tc.applyTarget(b, st, sp, name, t)
 	if err != nil {
 		return nil, err
 	}
-	return m, tc.markAction(b, sp, st, image)
+	return m, tc.markAction(b, sp, st, image, m)
 }
 
 func (tc *taskCtx) dropAction(st *ir.Step, sp, why string) {
