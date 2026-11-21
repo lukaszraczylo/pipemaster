@@ -140,3 +140,53 @@ func optsOf(opts []Option) options {
 
 // exact reports whether s reads the same on both sides, or the caller accepted the difference.
 func (o options) exact(s string, sem expr.Semantics) bool { return o.fold || exactValue(s, sem) }
+
+// headRefPrefix starts the full ref of a branch.
+const headRefPrefix = "refs/heads/"
+
+// readRefName rewrites each ref_name comparison with a string literal into the branch-or-tag pair that Drone
+// can state: ref_name is the branch name on a branch run and the tag name on a tag run. It applies only
+// under AllowFold, because only a source that names ref_name needs it.
+func (o options) readRefName(e expr.Expr) expr.Expr {
+	if !o.fold {
+		return e
+	}
+	return rewriteRefName(e)
+}
+
+func rewriteRefName(e expr.Expr) expr.Expr {
+	switch v := e.(type) {
+	case expr.Unary:
+		v.X = rewriteRefName(v.X)
+		return v
+	case expr.Binary:
+		if v.Op == expr.OpEq || v.Op == expr.OpNe {
+			if lit, ok := refNameLiteral(v); ok {
+				var pair expr.Expr = expr.Binary{Op: expr.OpOr,
+					L: expr.Binary{Op: expr.OpEq, L: keyRefs[KeyRef], R: expr.Lit{Kind: expr.LitStr, Str: headRefPrefix + lit}},
+					R: expr.Binary{Op: expr.OpEq, L: tagRef, R: expr.Lit{Kind: expr.LitStr, Str: lit}}}
+				if v.Op == expr.OpNe {
+					pair = expr.Unary{Op: expr.OpNot, X: pair}
+				}
+				return pair
+			}
+		}
+		v.L, v.R = rewriteRefName(v.L), rewriteRefName(v.R)
+		return v
+	}
+	return e
+}
+
+// refNameLiteral reads ref_name compared with a non-empty string literal, on either side.
+func refNameLiteral(b expr.Binary) (string, bool) {
+	name, lit := b.L, b.R
+	if _, ok := name.(expr.Ref); !ok {
+		name, lit = b.R, b.L
+	}
+	r, isRef := name.(expr.Ref)
+	l, isLit := lit.(expr.Lit)
+	if !isRef || !isLit || len(r.Path) != 1 || r.Path[0] != expr.CtxRefName || l.Kind != expr.LitStr || l.Str == "" {
+		return "", false
+	}
+	return l.Str, true
+}

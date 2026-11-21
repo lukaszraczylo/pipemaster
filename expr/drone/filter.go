@@ -372,6 +372,7 @@ func (rd reader) filterOf(e expr.Expr) (string, Filter, bool) {
 // cased-literal limit.
 func FromExpr(e expr.Expr, sem expr.Semantics, opts ...Option) (Conditions, bool) {
 	rd := reader{sem, optsOf(opts)}
+	e = rd.opt.readRefName(e)
 	var c Conditions
 	if e == nil {
 		return c, true

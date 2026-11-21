@@ -504,3 +504,26 @@ func TestAllowFoldFilters(t *testing.T) {
 		t.Errorf("AllowFold changed an event literal: %#v, want %#v", got, plain)
 	}
 }
+
+func TestAllowFoldReadsRefName(t *testing.T) {
+	name := r("ref_name")
+	if _, ok := drone.FromExpr(eq(name, "main"), folding); ok {
+		t.Fatal("the default must not read ref_name")
+	}
+	want := drone.Conditions{Ref: drone.Filter{Include: []string{"refs/heads/main", "refs/tags/main"}}}
+	if got, ok := drone.FromExpr(eq(name, "main"), folding, drone.AllowFold); !ok || !reflect.DeepEqual(got, want) {
+		t.Errorf("ref_name == main = %#v, %v; want %#v", got, ok, want)
+	}
+	swapped := bin(expr.OpEq, str("main"), name)
+	if got, ok := drone.FromExpr(swapped, folding, drone.AllowFold); !ok || !reflect.DeepEqual(got, want) {
+		t.Errorf("main == ref_name = %#v, %v", got, ok)
+	}
+	wantNot := drone.Conditions{Ref: drone.Filter{Exclude: []string{"refs/heads/main", "refs/tags/main"}}}
+	if got, ok := drone.FromExpr(bin(expr.OpNe, name, str("main")), folding, drone.AllowFold); !ok || !reflect.DeepEqual(got, wantNot) {
+		t.Errorf("ref_name != main = %#v, %v; want %#v", got, ok, wantNot)
+	}
+	line, err := drone.PrintGuard(bin(expr.OpOr, eq(name, "main"), eq(event, "pull_request")), folding, drone.AllowFold)
+	if err != nil || !strings.Contains(line, `[ "$DRONE_COMMIT_REF" = 'refs/heads/main' ] || [ "$DRONE_TAG" = 'main' ]`) {
+		t.Errorf("ref_name guard = %q, %v", line, err)
+	}
+}

@@ -22,7 +22,8 @@ var ErrNotGuardable = errors.New("drone guard: condition has no shell test form"
 
 // Guardable reports whether PrintGuard accepts e under sem.
 func Guardable(e expr.Expr, sem expr.Semantics, opts ...Option) bool {
-	_, err := printer{sem, optsOf(opts)}.test(e)
+	o := optsOf(opts)
+	_, err := printer{sem, o}.test(o.readRefName(e))
 	return err == nil
 }
 
@@ -38,7 +39,8 @@ func Guardable(e expr.Expr, sem expr.Semantics, opts ...Option) bool {
 // so the caller that puts the line in a document must apply Drone `$` escaping and reverse it before
 // ParseGuard, which compares the exact text.
 func PrintGuard(e expr.Expr, sem expr.Semantics, opts ...Option) (string, error) {
-	t, err := printer{sem, optsOf(opts)}.test(e)
+	o := optsOf(opts)
+	t, err := printer{sem, o}.test(o.readRefName(e))
 	if err != nil {
 		return "", err
 	}
