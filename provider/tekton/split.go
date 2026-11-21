@@ -79,7 +79,7 @@ func readDocsData(data []byte, file string, rep *report.Report) ([]*rawDoc, erro
 				Detail: "key " + rp.key + " is defined twice; the last value wins and the earlier one is lost", SourceLoc: fmt.Sprintf("%s:%d", file, rp.line),
 			})
 		}
-		if v == nil {
+		if sc, isNull := v.(scal); v == nil || (isNull && sc.null()) {
 			continue
 		}
 		top, ok := asMap(v)

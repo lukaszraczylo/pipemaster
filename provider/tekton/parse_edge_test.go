@@ -69,3 +69,21 @@ func TestStepWhenAndDuplicateTask(t *testing.T) {
 func TestPipelineTaskWithoutBody(t *testing.T) {
 	parseErr(t, pipelineWith("  tasks:\n  - name: a\n"))
 }
+
+const edgePipeline = `apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: p
+spec:
+  tasks:
+    - name: a
+      taskSpec:
+        steps: [{name: s, image: x, script: "true"}]
+`
+
+func TestTrailingEmptyDocumentIsSkipped(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"p.yaml": edgePipeline + "---\n"})
+	if len(p.Pipelines) != 1 {
+		t.Fatalf("pipelines = %d", len(p.Pipelines))
+	}
+}
