@@ -15,8 +15,12 @@ import (
 const (
 	typeBoolean = "boolean"
 	typeNumber  = "number"
+	typeString  = "string"
 	negate      = "!"
 )
+
+// dispatchTypes lists the input types that GHA accepts.
+var dispatchTypes = map[string]bool{typeString: true, typeNumber: true, typeBoolean: true, "choice": true, "environment": true}
 
 var plainNumber = regexp.MustCompile(`^(-?[1-9][0-9]*|0|-?(0|[1-9][0-9]*)\.[0-9]*[1-9])$`)
 
@@ -334,6 +338,10 @@ func (e *emitter) dispatchBody(path string, pl *ir.Pipeline, ext map[string]any)
 	if len(pl.Inputs) > 0 {
 		in := newMap()
 		for _, input := range pl.Inputs {
+			if e.from != nil && input.Type != "" && !dispatchTypes[input.Type] {
+				e.lose(path, caps.PipelineInputs, "input "+input.Name+" has type "+input.Type+", which GHA does not know; it is written as a string")
+				input.Type = typeString
+			}
 			n, err := inputNode(input, extras[input.Name])
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", path, err)

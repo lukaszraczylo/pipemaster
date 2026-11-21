@@ -425,3 +425,19 @@ func TestShellOfAnImageStepIsReportedLost(t *testing.T) {
 		t.Fatalf("no lost entry: %v", rep.Entries)
 	}
 }
+
+func TestInputTypeWithNoGHAFormIsReportedLost(t *testing.T) {
+	p := &ir.Project{Origin: ir.Origin{Provider: "tekton", Dialect: "tekton"}, Pipelines: []*ir.Pipeline{{ID: "ci", Triggers: []ir.Trigger{{Kind: ir.TriggerManual}},
+		Inputs: []ir.Input{{Name: "branches", Type: "array"}},
+		Jobs:   []*ir.Job{{ID: "b", Steps: []*ir.Step{{ID: "s", Kind: ir.StepScript, Script: []string{"true"}}}}}}}}
+	files, rep, err := gha.New(gha.GHA).Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(files[".github/workflows/ci.yml"]), "type: array") {
+		t.Fatalf("array type written:\n%s", files[".github/workflows/ci.yml"])
+	}
+	if e := entry(rep, caps.PipelineInputs); e == nil || e.Level != caps.Lost {
+		t.Fatalf("no lost entry: %v", rep.Entries)
+	}
+}
