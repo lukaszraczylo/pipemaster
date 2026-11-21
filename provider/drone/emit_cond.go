@@ -164,19 +164,7 @@ func mergeSets(a, b condSet) (condSet, bool) {
 // condNode writes the condition as a mapping; extra holds Ext keys of the source that the condition does not
 // set. A paths key never enters the output: the Drone OSS server does not evaluate it.
 func condNode(s condSet, extra map[string]any) (*yaml.Node, error) {
-	all := map[string]any{}
-	esc := escConditions(s.c)
-	for _, p := range []struct {
-		key string
-		f   dexpr.Filter
-	}{{dexpr.KeyEvent, esc.Event}, {dexpr.KeyBranch, esc.Branch}, {dexpr.KeyRef, esc.Ref}, {dexpr.KeyRepo, esc.Repo}} {
-		if !empty(p.f) {
-			all[p.key] = filterValue(p.f)
-		}
-	}
-	if len(esc.Status) > 0 {
-		all[dexpr.KeyStatus] = esc.Status
-	}
+	all := condFilters(escConditions(s.c))
 	for k, v := range s.raw {
 		if _, dup := all[k]; !dup {
 			all[k] = v
@@ -207,6 +195,23 @@ func condNode(s condSet, extra map[string]any) (*yaml.Node, error) {
 
 // filterValue writes a filter as a list, or as an include/exclude mapping of lists: the SchemaStore schema reads
 // no scalar there, and Drone reads every form.
+// condFilters is the when mapping of c: every filter as a list, or an include and exclude map.
+func condFilters(c dexpr.Conditions) map[string]any {
+	all := map[string]any{}
+	for _, p := range []struct {
+		key string
+		f   dexpr.Filter
+	}{{dexpr.KeyEvent, c.Event}, {dexpr.KeyBranch, c.Branch}, {dexpr.KeyRef, c.Ref}, {dexpr.KeyRepo, c.Repo}} {
+		if !empty(p.f) {
+			all[p.key] = filterValue(p.f)
+		}
+	}
+	if len(c.Status) > 0 {
+		all[dexpr.KeyStatus] = c.Status
+	}
+	return all
+}
+
 func filterValue(f dexpr.Filter) any {
 	if len(f.Exclude) == 0 {
 		return f.Include
@@ -275,6 +280,9 @@ func (e *emitter) stepWhen(sp string, st *ir.Step, script bool) (n *yaml.Node, g
 		if cs.folded {
 			e.noteFold(sp, caps.StepIf)
 		}
+		if err := e.markCond(caps.StepIf, sp, st.If, cs, nil); err != nil {
+			return nil, false, err
+		}
 		n, err = condNode(cs, extra)
 		return n, false, err
 	}
@@ -290,6 +298,42 @@ func (e *emitter) stepWhen(sp string, st *ir.Step, script bool) (n *yaml.Node, g
 	e.disable(sp, caps.StepIf, st.If, "the step")
 	n, err = condNode(disabledSet(), nil)
 	return n, false, err
+}
+
+// condArg carries a condition that the file reads back as another expression: the IR condition, and what the
+// parser reads from the file, so the parser can tell an unedited file. Triggers holds the pipeline triggers that
+// a job condition merged with.
+type condArg struct {
+	If       string `json:"if"`
+	Back     string `json:"back"`
+	Triggers string `json:"triggers,omitempty"`
+}
+
+// markCond writes the marker that holds a condition with a filter form, when the file does not read back as the
+// same expression or when pipeline triggers merged into it.
+func (e *emitter) markCond(f caps.Feature, path string, orig expr.Expr, cs condSet, triggers []ir.Trigger) error {
+	if _, own := orig.(expr.Opaque); own {
+		return nil
+	}
+	back, err := dexpr.ToExpr(cs.c)
+	if err != nil {
+		// The parser keeps a condition with no expression form as Drone text.
+		raw, jerr := json.Marshal(condFilters(cs.c))
+		if jerr != nil {
+			return nil
+		}
+		back = opaque(raw)
+	}
+	if back == nil || (len(triggers) == 0 && expr.String(back) == expr.String(orig)) {
+		return nil
+	}
+	arg := condArg{If: expr.String(orig), Back: expr.String(back)}
+	if len(triggers) > 0 {
+		if arg.Triggers, err = carryYAML(triggers); err != nil {
+			return err
+		}
+	}
+	return e.markArg(f, path, arg)
 }
 
 // eventOf names the Drone event of a trigger kind.
@@ -434,6 +478,19 @@ func (e *emitter) noteGlobs(tp string, f caps.Feature, inexact []string) {
 	}
 }
 
+// markGlobs writes the marker of a trigger filter. It holds the original patterns when the file spells them another way.
+func (e *emitter) markGlobs(f caps.Feature, tp string, a globArg, spelledOther bool) {
+	if !spelledOther {
+		if f == caps.TriggerFilterTags {
+			e.mark(f, tp)
+		}
+		return
+	}
+	if err := e.markArg(f, tp, a); err != nil {
+		e.comment("trigger filter text not carried: " + err.Error())
+	}
+}
+
 // triggerSet maps the pipeline triggers to one condition. Drone ANDs the keys of a trigger, so triggers join
 // only when their filters fit one event list, one branch filter, or one list of refs. ok is false when they do not.
 func (e *emitter) triggerSet(t trigs) (cs condSet, ok bool) {
@@ -455,7 +512,7 @@ func (e *emitter) triggerSet(t trigs) (cs condSet, ok bool) {
 			cs.c.Ref.Exclude = append(cs.c.Ref.Exclude, f.Exclude...)
 			e.noteGlobs(tp, caps.TriggerFilterTags, inexact)
 			e.emulate(tp, caps.TriggerFilterTags, "ref filter refs/tags/<pattern>", "the tag name filter is written as a ref filter on the tag event")
-			e.mark(caps.TriggerFilterTags, tp)
+			e.markGlobs(caps.TriggerFilterTags, tp, globArg{Tags: pl.Triggers[i].Tags}, len(inexact) > 0)
 		}
 		return cs, true
 	case !anyFilter(branchFs) && !anyFilter(tagFs):
@@ -464,6 +521,7 @@ func (e *emitter) triggerSet(t trigs) (cs condSet, ok bool) {
 		f, inexact := irGlobs(pl.Triggers[pushPR[0]].Branches, "")
 		cs.c.Branch = f
 		e.noteGlobs(triggerPath(pl.ID, pushPR[0]), caps.TriggerFilterBranch, inexact)
+		e.markGlobs(caps.TriggerFilterBranch, triggerPath(pl.ID, pushPR[0]), globArg{Branches: pl.Triggers[pushPR[0]].Branches}, len(inexact) > 0)
 	default:
 		return e.refSet(t, cs)
 	}
@@ -568,11 +626,13 @@ type jobCond struct {
 // jobSet combines the trigger entries, the manual gate, the job condition and the status gate of one document.
 func (e *emitter) jobSet(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (jobCond, error) {
 	var out jobCond
+	filtered := false
 	if len(pl.Triggers) > 0 {
 		cs, ok := e.triggerSet(e.classify(pl))
 		if !ok {
 			e.comment("trigger.* " + jp + ": the triggers of the pipeline have no single Drone condition")
 			e.lose(jp, caps.JobIf, "the triggers of the pipeline have no single Drone condition; the document never runs")
+			e.loseTriggers(pl)
 			return jobCond{set: disabledSet(), has: true}, nil
 		}
 		out.set, out.has = cs, true
@@ -608,7 +668,7 @@ func (e *emitter) jobSet(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (j
 				e.disable(jp, caps.JobIf, j.If, "the document, whose trigger filters cannot join the condition,")
 				return jobCond{set: disabledSet(), has: true}, nil
 			}
-			out.set, out.has = merged, true
+			out.set, out.has, filtered = merged, true, true
 		case guardableSteps(j.Steps) && gok:
 			e.emulate(jp, caps.JobIf, "shell guard on the first script line of every step", "the condition has no Drone filter; each step shows success instead of skipped")
 			if gfolded {
@@ -618,13 +678,41 @@ func (e *emitter) jobSet(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (j
 			out.guard = j.If
 		default:
 			e.disable(jp, caps.JobIf, j.If, "the document")
+			e.loseTriggers(pl)
 			return jobCond{set: disabledSet(), has: true}, nil
 		}
 	}
 	if finally && len(out.set.c.Status) == 0 {
 		out.set.c.Status, out.has = []string{statusOK, statusFail}, true
 	}
+	if filtered && !j.Manual && (j.Environment == nil || !j.Environment.Approval) {
+		if err := e.markCond(caps.JobIf, jp, j.If, out.set, pl.Triggers); err != nil {
+			return jobCond{}, err
+		}
+	}
 	return out, nil
+}
+
+// loseTriggers reports the pipeline triggers that a disabled document does not hold.
+func (e *emitter) loseTriggers(pl *ir.Pipeline) {
+	for i := range pl.Triggers {
+		e.lose(triggerPath(pl.ID, i), triggerFeature(&pl.Triggers[i]), "the document is disabled, so the trigger is not written")
+	}
+}
+
+// triggerFeature names the feature that a trigger of the pipeline exercises most specifically.
+func triggerFeature(t *ir.Trigger) caps.Feature {
+	switch {
+	case hasFilter(t.Tags):
+		return caps.TriggerFilterTags
+	case hasFilter(t.Branches):
+		return caps.TriggerFilterBranch
+	}
+	return map[ir.TriggerKind]caps.Feature{
+		ir.TriggerPush: caps.TriggerPush, ir.TriggerPR: caps.TriggerPullRequest, ir.TriggerTag: caps.TriggerTag,
+		ir.TriggerSchedule: caps.TriggerSchedule, ir.TriggerManual: caps.TriggerManual, ir.TriggerAPI: caps.TriggerAPI,
+		ir.TriggerPipelineDone: caps.TriggerPipelineDone, ir.TriggerResource: caps.TriggerResource,
+	}[t.Kind]
 }
 
 // guardableSteps reports whether every step that Drone runs has a script, the only step a guard line can open.

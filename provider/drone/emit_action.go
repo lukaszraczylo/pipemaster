@@ -41,12 +41,42 @@ type multiArg struct {
 	J        int    `json:"j"`
 }
 
-// cellArg names the IR job and the matrix cell of a document. Matrix is set on the first cell only.
+// cellArg names the IR job and the matrix cell of a document. Matrix and Held are set on the first cell only.
 type cellArg struct {
 	Matrix *ir.Matrix `json:"matrix,omitempty"`
-	Job    string     `json:"job"`
-	Cell   ir.Combo   `json:"cell"`
-	Index  int        `json:"index"`
+	// Services holds the image of each service whose image reads a matrix name, by service name.
+	Services map[string]string `json:"services,omitempty"`
+	Job      string            `json:"job"`
+	// Env is a YAML list of the job variables whose value reads a matrix name.
+	Env   string     `json:"env,omitempty"`
+	Cell  ir.Combo   `json:"cell"`
+	Held  []heldText `json:"held,omitempty"`
+	Index int        `json:"index"`
+}
+
+// heldText is the text of a written step that reads a matrix name, as the IR had it before the cell values
+// replaced the references. Pos is the place of the step in the document.
+type heldText struct {
+	Image   string `json:"image,omitempty"`
+	WorkDir string `json:"workdir,omitempty"`
+	// Env and With are YAML lists of the variables and settings whose value reads a matrix name.
+	Env    string   `json:"env,omitempty"`
+	With   string   `json:"with,omitempty"`
+	Script []string `json:"script,omitempty"`
+	Pos    int      `json:"pos"`
+}
+
+// renameArg carries the job id of a document whose name is the id made valid.
+type renameArg struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// globArg carries the glob filter of a trigger whose patterns the file spells another way, such as a ! entry
+// that becomes an exclude.
+type globArg struct {
+	Branches ir.Filter `json:"branches"`
+	Tags     ir.Filter `json:"tags"`
 }
 
 // actionArg carries the step an action became, so the parser can put it back where it stood.

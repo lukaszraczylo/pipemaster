@@ -52,6 +52,10 @@ type trigger struct {
 	// extraKeys lists the keys of extra in order.
 	extraKeys []string
 	pure      []ir.Trigger
+	// pureFinally is the pipeline trigger form with the status gate of a finally document taken off.
+	pureFinally []ir.Trigger
+	raw         map[string]any
+	c           dexpr.Conditions
 }
 
 // condJSON writes a condition value as JSON, a form that drone.Parse reads and an Opaque holds. Scalars keep
@@ -178,7 +182,10 @@ func (d *doc) readTrigger(v any, line int) (*trigger, error) {
 	if err != nil {
 		return nil, err
 	}
-	t := &trigger{cond: p.cond, lines: map[string]int{}}
+	t := &trigger{cond: p.cond, lines: map[string]int{}, c: p.c}
+	if raw, err := condJSON(v); err == nil {
+		_ = json.Unmarshal(raw, &t.raw) // a condition that is not a mapping has no keys to read
+	}
 	if p.opaque {
 		t.report = func() { d.noteOpaque(d.ext, keyTrigger, p.why, line) }
 	}
@@ -199,7 +206,13 @@ func (d *doc) readTrigger(v any, line int) (*trigger, error) {
 			t.paths = &pathsSpec{filter: f, line: m.lines[keyPaths]}
 		}
 	}
-	if t.pure = pureTriggers(p.c, p.rest, t.paths); t.pure == nil {
+	t.pure = pureTriggers(p.c, p.rest, t.paths)
+	if t.pure == nil && slices.Equal(p.c.Status, []string{statusOK, statusFail}) {
+		open := p.c
+		open.Status = nil
+		t.pureFinally = pureTriggers(open, p.rest, t.paths)
+	}
+	if t.pure == nil && t.pureFinally == nil {
 		t.paths = nil
 	}
 	return t, nil
@@ -276,7 +289,8 @@ func pureTriggers(c dexpr.Conditions, rest []string, paths *pathsSpec) []ir.Trig
 		return nil
 	}
 	for _, k := range rest {
-		if k != keyPaths || paths == nil {
+		cron := k == keyCron && slices.Equal(c.Event.Include, []string{eventCron})
+		if !cron && (k != keyPaths || paths == nil) {
 			return nil
 		}
 	}

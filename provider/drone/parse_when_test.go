@@ -122,7 +122,6 @@ func TestNotPureTriggerGoesToJobIf(t *testing.T) {
 		"event exclude":   "  event:\n    exclude: [tag]\n",
 		"promote":         "  event: [promote]\n",
 		"glob event":      "  event: ['p*']\n",
-		"cron name":       "  event: [cron]\n  cron: [nightly]\n",
 		"unknown key":     "  event: [push]\n  action: [opened]\n",
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -232,5 +231,15 @@ func TestRefFilterThatIsNotATagFilterStaysACondition(t *testing.T) {
 				t.Fatalf("triggers = %+v if = %v", pl.Triggers, pl.Jobs[0].If)
 			}
 		})
+	}
+}
+
+func TestCronNameIsTheScheduleTrigger(t *testing.T) {
+	pl, rep := parseYML(t, trigYML("  event: [cron]\n  cron: [nightly]\n"))
+	if len(pl.Triggers) != 1 || pl.Triggers[0].Kind != ir.TriggerSchedule || pl.Jobs[0].If != nil {
+		t.Fatalf("triggers = %+v if %v", pl.Triggers, pl.Jobs[0].If)
+	}
+	if !hasEntry(rep, "trigger.cron names cron jobs") {
+		t.Errorf("the cron name must be reported: %+v", rep.Entries)
 	}
 }

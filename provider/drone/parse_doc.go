@@ -17,17 +17,25 @@ const (
 
 // doc is the state of one kind: pipeline document.
 type doc struct {
-	tx   *texts
-	rep  *report.Report
-	ext  *sink
-	job  *ir.Job
-	trig *trigger
-	file string
-	id   string
+	tx     *texts
+	rep    *report.Report
+	ext    *sink
+	job    *ir.Job
+	trig   *trigger
+	marks  *marks
+	merged *merged
+	file   string
+	id     string
+	// written is the step list as the file holds it, before an action marker puts steps back.
+	written []*ir.Step
+	// pipeEnv is the pipeline environment that the marker holds.
+	pipeEnv []ir.Var
 	// base is the number of file lines before the document.
 	base int
 	// docker is true when the type is empty or docker; other types are read as Docker steps and keep their type.
 	docker bool
+	// noop is true when the only step was the placeholder that stands in for a job with no step.
+	noop bool
 }
 
 // resource is a document that is not a pipeline and has an Ext form.
@@ -75,6 +83,8 @@ func parseChunk(rep *report.Report, c chunk) (*doc, *resource, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	d.marks = readMarks(c.text)
+	collapseDoc(d)
 	return d, nil, nil
 }
 

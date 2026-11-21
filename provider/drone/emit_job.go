@@ -43,6 +43,8 @@ type docCtx struct {
 	jp    string
 	// secretVars are the variables that a document-level environment cannot hold; every step gets them.
 	secretVars []ir.Var
+	// held is the text of the written steps that read a matrix name.
+	held []heldText
 	// pos is the place the step being written takes in the document.
 	pos    int
 	defImg bool
@@ -77,15 +79,16 @@ func (e *emitter) document(c *docCtx) (*yaml.Node, error) {
 		cond = jobCond{set: disabledSet(), has: true}
 	}
 	c.guard = cond.guard
-	if err := e.cellNotes(c); err != nil {
-		return nil, err
-	}
+	e.cellNotes(c)
 	env, err := e.docEnv(c, ext)
 	if err != nil {
 		return nil, err
 	}
 	steps, err := e.steps(c)
 	if err != nil {
+		return nil, err
+	}
+	if err := e.cellMarker(c); err != nil {
 		return nil, err
 	}
 	m := newYMap()
@@ -118,11 +121,11 @@ func (e *emitter) document(c *docCtx) (*yaml.Node, error) {
 	return m.n, nil
 }
 
-// cellNotes writes the matrix marker of a cell document and reports the matrix settings Drone cannot hold.
-func (e *emitter) cellNotes(c *docCtx) error {
+// cellNotes reports the matrix settings Drone cannot hold.
+func (e *emitter) cellNotes(c *docCtx) {
 	p := c.plan
 	if c.j.Matrix == nil {
-		return nil
+		return
 	}
 	if p.first {
 		if c.j.Matrix.FailFast != nil {
@@ -135,9 +138,28 @@ func (e *emitter) cellNotes(c *docCtx) error {
 			e.lose(c.jp, caps.JobMatrix, "the matrix has no combination; the document is written disabled")
 		}
 	}
+}
+
+// cellMarker writes the matrix marker of a cell document, after its steps, because the first cell holds their text.
+func (e *emitter) cellMarker(c *docCtx) error {
+	p := c.plan
+	if c.j.Matrix == nil {
+		return nil
+	}
 	arg := cellArg{Job: c.j.ID, Cell: p.cell, Index: p.index}
 	if p.first {
-		arg.Matrix = c.j.Matrix
+		arg.Matrix, arg.Held = c.j.Matrix, c.held
+		if env := slices.DeleteFunc(slices.Clone(c.j.Env), func(v ir.Var) bool { return !valueReadsMatrix(v.Value) }); len(env) > 0 {
+			arg.Env = heldYAML(env)
+		}
+		for _, sv := range c.j.Services {
+			if readsMatrix(sv.Image.Ref) {
+				if arg.Services == nil {
+					arg.Services = map[string]string{}
+				}
+				arg.Services[sv.Name] = sv.Image.Ref
+			}
+		}
 	}
 	return e.markArg(caps.JobMatrix, c.jp, arg)
 }
@@ -171,7 +193,9 @@ func (e *emitter) docHeader(m *ymap, c *docCtx, ext map[string]any, cond jobCond
 			m.set(keyClone, clone.n)
 		}
 	}
-	m.set(keyEnv, env)
+	if len(env.Content) > 0 {
+		m.set(keyEnv, env)
+	}
 	if cond.has || extOf(c.j.Ext)[keyTrigger] != nil {
 		extra, _ := ext[keyTrigger].(map[string]any)
 		n, err := condNode(cond.set, extra)
@@ -216,7 +240,7 @@ func (e *emitter) docEnv(c *docCtx, ext map[string]any) (*yaml.Node, error) {
 	}
 	if len(c.secretVars) > 0 {
 		e.emulate(c.jp, caps.JobEnv, "environment of every step", "a document environment holds strings only, so a secret variable is set on each step")
-		if err := e.markVars(caps.JobEnv, c.jp, c.secretVars); err != nil {
+		if err := e.markVars(caps.JobEnv, c.jp, c.j.Env); err != nil {
 			return nil, err
 		}
 	}

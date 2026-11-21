@@ -1,6 +1,7 @@
 package drone_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -37,9 +38,8 @@ func TestDocumentHeader(t *testing.T) {
 	if d["kind"] != "pipeline" || d["type"] != "docker" || d["name"] != "build" {
 		t.Fatalf("header = %v %v %v", d["kind"], d["type"], d["name"])
 	}
-	env, ok := d["environment"].(map[string]any)
-	if !ok || len(env) != 0 {
-		t.Fatalf("environment = %#v, want an empty map", d["environment"])
+	if _, has := d["environment"]; has {
+		t.Fatalf("environment = %#v; a pipeline without variables has no environment key, which a kubernetes pipeline does not allow", d["environment"])
 	}
 }
 
@@ -209,6 +209,7 @@ func TestEntrypointOnCommandStep(t *testing.T) {
 		t.Fatalf("a plugin step keeps its entrypoint: %v", steps[2])
 	}
 	wantLevel(t, rep, caps.JobContainer, "step/lose", caps.Lost)
+	wantLevel(t, rep, caps.StepImage, "step/keep", caps.Lost)
 }
 
 func TestJobContainerEntrypointIsLostForInheritingSteps(t *testing.T) {
@@ -377,7 +378,7 @@ func TestMultiPipelineNames(t *testing.T) {
 }
 
 func TestStepNamesAreMadeValid(t *testing.T) {
-	out, _ := emitText(t, gproject(ghaOrigin, gjob("my job", gstep("build & test", "1"), gstep("build - test", "2"))))
+	out, _ := emitText(t, gproject(ghaOrigin, gjob("my job", gstep("build $ test", "1"), gstep("build - test", "2"))))
 	d := docsOf(t, out)[0]
 	if d["name"] != "my-job" {
 		t.Fatalf("name = %v", d["name"])
@@ -391,9 +392,25 @@ func TestStepNamesAreMadeValid(t *testing.T) {
 	}
 	ids := drone.New().(interface {
 		EmittedIDs(*ir.Project) map[string]string
-	}).EmittedIDs(gproject(ghaOrigin, gjob("my job", gstep("build & test", "1"))))
-	if ids["pipeline/drone/job/my-job"] != "my job" || ids["pipeline/drone/job/my-job/step/build---test"] != "build & test" {
+	}).EmittedIDs(gproject(ghaOrigin, gjob("my job", gstep("build $ test", "1"))))
+	if ids["pipeline/drone/job/my-job"] != "my job" || ids["pipeline/drone/job/my-job/step/build---test"] != "build $ test" {
 		t.Fatalf("EmittedIDs = %v", ids)
+	}
+}
+
+func TestStepNamesKeepSpacesAndColons(t *testing.T) {
+	out, rep := emitText(t, gproject(ghaOrigin, gjob("build", gstep("Build API", "1"), gstep("build:webui", "2"), gstep(" pad ", "3"))))
+	names := []string{}
+	for _, s := range stepsOf(docsOf(t, out)[0]) {
+		names = append(names, s["name"].(string))
+	}
+	if want := []string{"Build API", "build:webui", "-pad-"}; !slices.Equal(names, want) {
+		t.Fatalf("names = %q, want %q", names, want)
+	}
+	for _, e := range rep.Entries {
+		if e.Feature == caps.ExtPassthrough && strings.Contains(e.Strategy, "renamed") && strings.Contains(e.IRPath, "Build API") {
+			t.Fatalf("a name Drone reads as written is not a rename: %+v", e)
+		}
 	}
 }
 
@@ -606,5 +623,44 @@ func TestRenamedJobIDIsReported(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("the rename has no report entry: %v", rep.Entries)
+	}
+}
+
+func TestBlankScriptLinesSurviveTheFile(t *testing.T) {
+	for name, script := range map[string][]string{
+		"inner":    {"echo a", "", "echo b"},
+		"run":      {"echo a", "", "", "echo b"},
+		"trailing": {"echo a", ""},
+		"leading":  {"", "echo a"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			st := gstep("s", script...)
+			out, _ := emitText(t, gproject(ghaOrigin, gjob("build", st)))
+			if strings.Contains(out, `""`) {
+				t.Fatalf("a command must not be empty:\n%s", out)
+			}
+			pl, _ := parseYML(t, out)
+			if got := pl.Jobs[0].Steps[0].Script; !slices.Equal(got, st.Script) {
+				t.Fatalf("script = %q, want %q", got, st.Script)
+			}
+		})
+	}
+}
+
+func TestExtKeysWithUnderscoreAreWritten(t *testing.T) {
+	j := gjob("build", gstep("x", "echo"))
+	j.Ext = ir.Ext{"drone": map[string]any{"__buildenv": map[string]any{"image": "golang"}}}
+	p := gproject("drone", j)
+	ir.Normalize(p)
+	files, _, err := drone.New().Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(files[ymlName])
+	if got, _ := docsOf(t, out)[0]["__buildenv"].(map[string]any); got["image"] != "golang" {
+		t.Fatalf("a helper key of the source file is kept:\n%s", out)
+	}
+	if strings.Contains(out, drone.ExtCommands) {
+		t.Fatal("the step grouping record is not a file key")
 	}
 }

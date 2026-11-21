@@ -2,9 +2,11 @@ package drone
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	dexpr "github.com/lukaszraczylo/pipemaster/expr/drone"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
 )
@@ -39,7 +41,27 @@ func (d *doc) steps(v any) error {
 		}
 		d.job.Steps = append(d.job.Steps, st)
 	}
+	dropRootDeps(d.job.Steps)
 	return nil
+}
+
+// dropRootDeps removes an empty depends_on from the steps when another step names a dependency: the step is a
+// root either way, and the emitter writes the empty list on every root.
+func dropRootDeps(steps []*ir.Step) {
+	named := func(st *ir.Step) bool { return len(listOf2(extOf(st.Ext)[keyDependsOn])) > 0 }
+	if !slices.ContainsFunc(steps, named) {
+		return
+	}
+	for _, st := range steps {
+		deps, has := extOf(st.Ext)[keyDependsOn]
+		if !has || len(listOf2(deps)) > 0 {
+			continue
+		}
+		delete(extOf(st.Ext), keyDependsOn)
+		if len(extOf(st.Ext)) == 0 {
+			st.Ext = nil
+		}
+	}
 }
 
 func (d *doc) step(m *omap, id string) (*ir.Step, error) {
@@ -110,6 +132,11 @@ func (d *doc) script(id string, v any) (lines []string, shapes []any, err error)
 	var all []any
 	spans := false
 	for _, c := range l {
+		if _, guard := dexpr.ParseGuard(unescape(c)); guard {
+			lines = append(lines, unescape(c))
+			all = append(all, map[string]any{"lines": 1, "final": false})
+			continue
+		}
 		t, err := d.tx.template(c)
 		if err != nil {
 			return nil, nil, err

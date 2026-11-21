@@ -12,6 +12,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	dexpr "github.com/lukaszraczylo/pipemaster/expr/drone"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -61,14 +62,14 @@ func commandTexts(st *ir.Step) []string {
 		m, ok := r.(map[string]any)
 		n, isNum := numOf(m["lines"])
 		if !ok || !isNum || n < 1 {
-			return st.Script
+			return foldBlankLines(st.Script)
 		}
 		final, _ := m["final"].(bool)
 		shapes = append(shapes, commandShape{Lines: n, Final: final})
 		total += n
 	}
 	if len(shapes) == 0 || total != len(st.Script) {
-		return st.Script
+		return foldBlankLines(st.Script)
 	}
 	var out []string
 	at := 0
@@ -83,6 +84,29 @@ func commandTexts(st *ir.Step) []string {
 	return out
 }
 
+// foldBlankLines makes one command per line and joins each blank line to the command before it, because a Drone
+// command must not be empty. A blank line before the first command joins the one after it.
+func foldBlankLines(lines []string) []string {
+	var out []string
+	lead := ""
+	trailing := false
+	for _, l := range lines {
+		switch {
+		case l != "":
+			out = append(out, lead+l)
+			lead, trailing = "", false
+		case len(out) == 0:
+			lead += "\n"
+		case trailing:
+			out[len(out)-1] += "\n"
+		default:
+			out[len(out)-1] += "\n\n"
+			trailing = true
+		}
+	}
+	return out
+}
+
 // steps writes the step list. Names are the IDs made valid and unique; each rename is recorded for EmittedIDs.
 func (e *emitter) steps(c *docCtx) (*yaml.Node, error) {
 	var ids []string
@@ -91,7 +115,7 @@ func (e *emitter) steps(c *docCtx) (*yaml.Node, error) {
 			ids = append(ids, st.ID)
 		}
 	}
-	names := uniqueNames(ids)
+	names := uniqueNames(ids, validStepName)
 	c.written = map[string]string{}
 	var done []stepDone
 	at := 0
@@ -113,6 +137,7 @@ func (e *emitter) steps(c *docCtx) (*yaml.Node, error) {
 		if name != st.ID {
 			e.stepIDs[pipelinePth+"/job/"+c.name+"/step/"+name] = st.ID
 		}
+		c.hold(st, len(done))
 		done = append(done, d)
 	}
 	if len(done) == 0 {
@@ -128,6 +153,82 @@ func (e *emitter) steps(c *docCtx) (*yaml.Node, error) {
 		n.Content = append(n.Content, d.m.n)
 	}
 	return n, nil
+}
+
+// hold records the text of a step of the first matrix cell that reads a matrix name, so the parser can put the
+// references back.
+func (c *docCtx) hold(st *ir.Step, pos int) {
+	if c.j.Matrix == nil || !c.plan.first {
+		return
+	}
+	h := heldText{Pos: pos}
+	if st.Image != nil && readsMatrix(st.Image.Ref) {
+		h.Image = st.Image.Ref
+	}
+	if readsMatrix(st.WorkDir) {
+		h.WorkDir = st.WorkDir
+	}
+	if slices.ContainsFunc(st.Script, readsMatrix) {
+		h.Script = st.Script
+	}
+	if env := slices.DeleteFunc(slices.Clone(st.Env), func(v ir.Var) bool { return !valueReadsMatrix(v.Value) }); len(env) > 0 {
+		h.Env = heldYAML(env)
+	}
+	with := map[string]ir.Value{}
+	for k, v := range st.With {
+		if valueReadsMatrix(v) {
+			with[k] = v
+		}
+	}
+	if len(with) > 0 {
+		h.With = heldYAML(with)
+	}
+	if h.Image != "" || h.WorkDir != "" || h.Script != nil || h.Env != "" || h.With != "" {
+		c.held = append(c.held, h)
+	}
+}
+
+// heldYAML carries v as YAML. A value that does not encode is carried as nothing, and the parser keeps the cell text.
+func heldYAML(v any) string {
+	y, err := carryYAML(v)
+	if err != nil {
+		return ""
+	}
+	return y
+}
+
+// valueReadsMatrix reports whether the value is an expression that reads a matrix name.
+func valueReadsMatrix(v ir.Value) bool {
+	parts, ok := valueParts(v)
+	return ok && slices.ContainsFunc(parts, func(p expr.Part) bool {
+		r, isRef := p.Expr.(expr.Ref)
+		return isRef && len(r.Path) == 2 && r.Path[0] == expr.PrefixMatrix
+	})
+}
+
+// valueParts reads an expression value as template parts, as the emitter spells it.
+func valueParts(v ir.Value) ([]expr.Part, bool) {
+	if v.Kind != ir.ValueExpr || v.Expr == nil {
+		return nil, false
+	}
+	if c, ok := v.Expr.(expr.Call); ok {
+		if mixed, ok := emitkit.UnmixFormat(c); ok {
+			return mixed, true
+		}
+	}
+	return []expr.Part{{Expr: v.Expr}}, true
+}
+
+// readsMatrix reports whether the template text holds a reference to a matrix name.
+func readsMatrix(s string) bool {
+	parts, err := expr.ParseScriptTemplate(s)
+	if err != nil {
+		return false
+	}
+	return slices.ContainsFunc(parts, func(p expr.Part) bool {
+		r, ok := p.Expr.(expr.Ref)
+		return ok && len(r.Path) == 2 && r.Path[0] == expr.PrefixMatrix
+	})
 }
 
 // dependencies writes depends_on on every step once one step has it: Drone needs it on all steps (research
@@ -327,6 +428,8 @@ func (e *emitter) common(c *docCtx, sp string, st *ir.Step, m *ymap, commands bo
 	if commands {
 		if slices.ContainsFunc(st.Image.Entrypoint, func(s string) bool { return s != "" }) {
 			e.lose(sp, caps.JobContainer, "Drone replaces the entrypoint of a command step with the script runner, so the entrypoint is not written")
+		} else {
+			e.lose(sp, caps.StepImage, "an empty entrypoint changes nothing on a Drone command step, so it is not written")
 		}
 		return nil
 	}
@@ -490,14 +593,21 @@ func (e *emitter) placeholder(c *docCtx) (stepDone, error) {
 	return stepDone{m: m}, nil
 }
 
-// uniqueNames makes each base a valid name and gives duplicates a -2, -3 suffix. A base that is already valid
-// keeps its name, so the result never depends on map order.
-func uniqueNames(bases []string) []string {
+// validStepName is true for a step name that Drone files use as written. Real files name steps with spaces and
+// colons, and Drone reads the name as free text; a dollar sign would start a substitution, so it is not kept.
+func validStepName(s string) bool {
+	return s != "" && len(s) <= maxName && s == strings.TrimSpace(s) &&
+		!strings.ContainsFunc(s, func(r rune) bool { return r < ' ' || r > '~' || r == '$' })
+}
+
+// uniqueNames makes each base a valid name and gives duplicates a -2, -3 suffix. A base that is already valid, by
+// the strict rule or by valid, keeps its name, so the result never depends on map order.
+func uniqueNames(bases []string, valid func(string) bool) []string {
 	a := adapter{}
 	out := make([]string, len(bases))
 	taken := map[string]bool{}
 	for i, b := range bases {
-		if a.SanitizeID(b) == b && !taken[b] {
+		if (a.SanitizeID(b) == b || valid != nil && valid(b)) && !taken[b] {
 			out[i], taken[b] = b, true
 		}
 	}

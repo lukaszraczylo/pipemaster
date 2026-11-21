@@ -3,7 +3,6 @@ package drone
 import (
 	"fmt"
 	"io/fs"
-	"reflect"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
@@ -41,7 +40,6 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	pl := &ir.Pipeline{ID: pipelineID}
 	res := newSink(rep, fileYML, pipelinePth, 0)
 	var docs []*doc
 	for _, c := range splitDocuments(string(data)) {
@@ -52,17 +50,18 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		switch {
 		case d != nil:
 			docs = append(docs, d)
-			pl.Jobs = append(pl.Jobs, d.job)
 		case res1 != nil:
 			res.vals[ExtResources] = append(listOf(res.vals[ExtResources]), res1.value)
 		}
 	}
-	pl.Triggers = sharedTriggers(docs)
-	placeConditions(docs, len(pl.Triggers) > 0)
-	pl.Ext = res.ext()
+	pls, err := buildPipelines(rep, docs)
+	if err != nil {
+		return nil, nil, err
+	}
+	pls[0].Ext = res.ext()
 	proj := &ir.Project{
 		Origin:    ir.Origin{Provider: dialect, Dialect: dialect, Files: []string{fileYML}},
-		Pipelines: []*ir.Pipeline{pl},
+		Pipelines: pls,
 	}
 	if err := ir.Validate(proj); err != nil {
 		return nil, nil, err
@@ -74,48 +73,6 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 func listOf(v any) []any {
 	l, _ := v.([]any)
 	return l
-}
-
-// sharedTriggers returns the pipeline triggers when every pipeline document has the same pure trigger filter,
-// else nil: one pipeline holds all the jobs, so a trigger stands only for a filter that every job shares.
-func sharedTriggers(docs []*doc) []ir.Trigger {
-	var first []ir.Trigger
-	for i, d := range docs {
-		if d.trig == nil || d.trig.pure == nil {
-			return nil
-		}
-		if i > 0 && !reflect.DeepEqual(d.trig.pure, first) {
-			return nil
-		}
-		first = d.trig.pure
-	}
-	return first
-}
-
-// placeConditions puts each trigger that did not become a pipeline trigger on its job.
-func placeConditions(docs []*doc, shared bool) {
-	for _, d := range docs {
-		if d.trig == nil {
-			continue
-		}
-		if shared && d.trig.pure != nil {
-			if p := d.trig.paths; p != nil {
-				d.ext.note(caps.TriggerFilterPaths, "trigger.paths is kept as the trigger paths filter; the Drone OSS server does not evaluate it", p.line)
-			}
-			continue
-		}
-		d.job.If = d.trig.cond
-		if d.trig.report != nil {
-			d.trig.report()
-		}
-		if len(d.trig.extra) > 0 {
-			d.ext.vals[keyTrigger] = d.trig.extra
-			for _, k := range d.trig.extraKeys {
-				d.ext.note(caps.ExtPassthrough, "trigger."+k+" has no IR field; kept in Ext", d.trig.lines[k])
-			}
-			d.job.Ext = d.ext.ext()
-		}
-	}
 }
 
 // sink collects the keys a parser could not map; they become Ext[drone] and each has a report entry.

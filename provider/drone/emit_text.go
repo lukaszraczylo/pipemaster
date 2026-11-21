@@ -166,9 +166,7 @@ func (e *emitter) refText(b *bindings, mode textMode, path []string) (string, bo
 			if mode != commandText {
 				return "", false
 			}
-			if path[0] != expr.PrefixEnv {
-				b.add(path[0], path[1])
-			}
+			b.add(path[0], path[1])
 			return dollarEsc + "{" + path[1] + "}", true
 		}
 	}

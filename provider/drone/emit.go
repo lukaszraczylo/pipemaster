@@ -151,7 +151,7 @@ func newPlanSet(pls []*ir.Pipeline, own bool) *planSet {
 			}
 		}
 	}
-	for i, n := range uniqueNames(bases) {
+	for i, n := range uniqueNames(bases, nil) {
 		pln := s.plans[i]
 		pln.name = n
 		k := jobKey(pln.pl, pln.j.ID)
@@ -170,8 +170,12 @@ func (e *emitter) noteRename(pln *docPlan, prefixed bool) {
 		want = pln.pl.ID + "-" + want
 	}
 	if pln.name != want {
-		e.emulate("pipeline/"+pln.pl.ID+"/job/"+pln.j.ID, caps.ExtPassthrough, "job id renamed",
+		path := "pipeline/" + pln.pl.ID + "/job/" + pln.j.ID
+		e.emulate(path, caps.ExtPassthrough, "job id renamed",
 			"job id "+pln.j.ID+" is not a valid Drone document name; written as "+pln.name)
+		if err := e.markArg(caps.ExtPassthrough, path, renameArg{ID: pln.j.ID, Name: pln.name}); err != nil {
+			e.comment("job id not carried: " + err.Error())
+		}
 	}
 }
 
