@@ -242,12 +242,14 @@ func collapseMatrix(c *collapseCtx) bool {
 	return true
 }
 
-// matrixAsEmitted is true when the parsed matrix lists exactly the combinations the emitter wrote for mx.
+// matrixAsEmitted is true when the parsed matrix lists exactly the combinations the emitter wrote for mx, which
+// cuts the list at maxMatrixInclude.
 func matrixAsEmitted(parsed, mx *ir.Matrix) bool {
 	if parsed == nil || len(parsed.Axes) > 0 || len(parsed.Exclude) > 0 {
 		return false
 	}
 	want := ir.Expand(mx)
+	want = want[:min(len(want), maxMatrixInclude)]
 	if len(want) != len(parsed.Include) {
 		return false
 	}

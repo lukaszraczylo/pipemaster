@@ -1,6 +1,7 @@
 package woodpecker_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -67,6 +68,53 @@ func TestEditedMatrixKeepsTheParsedValue(t *testing.T) {
 	}
 	if got := j.Matrix.Include[0][0].Value; got != "1.20" {
 		t.Errorf("first entry = %q, want the edited 1.20", got)
+	}
+	if !ignoredMarker(rep, caps.JobMatrix) {
+		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
+	}
+}
+
+// bigMatrixRoundTrip converts a one-axis matrix of 70 values, which the emitter writes as include entries cut at 64.
+func bigMatrixRoundTrip(t *testing.T, edit func(string) string) (*ir.Job, *report.Report) {
+	t.Helper()
+	vals := make([]string, 70)
+	for i := range vals {
+		vals[i] = fmt.Sprintf("'v%02d'", i+1)
+	}
+	src := "on: push\njobs:\n  b:\n    runs-on: ubuntu-latest\n    strategy:\n      matrix:\n        n: [" +
+		strings.Join(vals, ", ") + "]\n    steps:\n      - run: echo a\n"
+	files, _ := emitFiles(t, parseProject(t, "gha", map[string]string{".github/workflows/ci.yml": src}))
+	raw := map[string]string{}
+	for n, body := range files {
+		raw[n] = edit(body)
+	}
+	wp, err := provider.Get("woodpecker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, rep, err := wp.Parse(repo(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p.Pipelines[0].Jobs[0], rep
+}
+
+func TestUneditedTruncatedMatrixRestoresInFull(t *testing.T) {
+	j, rep := bigMatrixRoundTrip(t, func(s string) string { return s })
+	if j.Matrix == nil || len(j.Matrix.Axes) != 1 || len(ir.Expand(j.Matrix)) != 70 {
+		t.Errorf("the full matrix was not restored: %+v", j.Matrix)
+	}
+	if ignoredMarker(rep, caps.JobMatrix) {
+		t.Errorf("a false marker-ignored entry: %+v", rep.Entries)
+	}
+}
+
+func TestEditedTruncatedMatrixStillReportsTheEdit(t *testing.T) {
+	j, rep := bigMatrixRoundTrip(t, func(s string) string {
+		return s[:strings.LastIndex(s, "v05")] + "v99" + s[strings.LastIndex(s, "v05")+3:]
+	})
+	if j.Matrix == nil || len(j.Matrix.Axes) != 0 {
+		t.Errorf("the marker restored the matrix over the edit: %+v", j.Matrix)
 	}
 	if !ignoredMarker(rep, caps.JobMatrix) {
 		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
