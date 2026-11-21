@@ -13,12 +13,14 @@ import (
 )
 
 const (
-	noopScript      = "true"
-	noopStepName    = "noop"
-	outputsStep     = "pipemaster-outputs"
-	outputEnvPrefix = "PM_OUT_"
-	saveStep        = "pipemaster-artifacts-save"
-	restoreStep     = "pipemaster-artifacts-restore"
+	noopScript   = "true"
+	noopStepName = "noop"
+	// placeholderStepID is the step ID that every provider reports for the step it adds to a job without steps.
+	placeholderStepID = "script"
+	outputsStep       = "pipemaster-outputs"
+	outputEnvPrefix   = "PM_OUT_"
+	saveStep          = "pipemaster-artifacts-save"
+	restoreStep       = "pipemaster-artifacts-restore"
 )
 
 // workspaceArg carries the cache and artifact settings of a job whose files the shared workspace stands in for.
@@ -83,6 +85,7 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 		return nil, err
 	}
 	if len(b.nodes) == 0 {
+		tc.e.lose(jp.path+"/step/"+placeholderStepID, caps.StepScript, "the job has no steps; a no-op step keeps the Task valid")
 		tc.e.emulate(jp.path, caps.StepScript, "placeholder step", "the job has no step and a Task needs one; a step that runs "+noopScript+" stands in")
 		image := firstNonEmpty(tc.containerRef, defaultImage)
 		if err := tc.e.markArg(caps.StepScript, jp.path, imageArg{Image: image}); err != nil {

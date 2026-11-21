@@ -577,3 +577,14 @@ func TestCommandFormSurvivesASplitScript(t *testing.T) {
 		t.Fatalf("command form lost\n%s", src)
 	}
 }
+
+func TestJobWithNoStepReportsThePlaceholderAsLost(t *testing.T) {
+	_, rep := emit(t, project(&ir.Job{ID: "a"}))
+	var found bool
+	for _, e := range rep.Entries {
+		found = found || (e.Feature == caps.StepScript && e.Level == caps.Lost && e.IRPath == "pipeline/ci/job/a/step/script")
+	}
+	if !found {
+		t.Fatalf("no lost placeholder entry: %v", rep.Entries)
+	}
+}
