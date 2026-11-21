@@ -40,8 +40,7 @@ func corpusEntries(t *testing.T) []fixture {
 		}
 		dir := filepath.Join(corpusRoot, e.Name())
 		id := corpusProvider(t, e.Name())
-		// A Tekton entry may hold only trigger resources, which carry no Pipeline for Detect to find.
-		if id != "tekton" && !prov(t, id).Detect(os.DirFS(dir)) {
+		if !prov(t, id).Detect(os.DirFS(dir)) {
 			t.Fatalf("%s: provider %s does not detect the entry", e.Name(), id)
 		}
 		out = append(out, fixture{id, e.Name(), dir, dir})
