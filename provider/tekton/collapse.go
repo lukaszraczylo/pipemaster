@@ -511,7 +511,7 @@ func (b *jobBuilder) collapseJobGuard() {
 	}
 	var steps []*ir.Step
 	for _, st := range b.job.Steps {
-		if len(st.Script) > 0 {
+		if len(st.Script) > 0 || st.If != nil {
 			steps = append(steps, st)
 		}
 	}

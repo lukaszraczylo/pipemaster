@@ -597,3 +597,15 @@ func TestCommentedScriptLineBindsNoEnv(t *testing.T) {
 		t.Fatalf("a commented line left its env binding\n%s", src)
 	}
 }
+
+func TestJobGuardOnAStepWithNoScriptLineReturns(t *testing.T) {
+	j := scriptJob("a", "make")
+	j.If = expr.Binary{Op: expr.OpOr, L: eqStr([]string{"branch"}, "main"), R: eqStr([]string{"event"}, "schedule")}
+	j.Steps = append([]*ir.Step{{ID: "empty", Kind: ir.StepScript}}, j.Steps...)
+	files, _ := emit(t, project(j))
+	back, _ := reparse(t, files)
+	got := back.Pipelines[0].Jobs[0]
+	if cond(got.If) != cond(j.If) || got.Steps[0].If != nil || got.Steps[1].If != nil {
+		t.Fatalf("job %q, steps %q %q\n%s", cond(got.If), cond(got.Steps[0].If), cond(got.Steps[1].If), joinFiles(files))
+	}
+}
