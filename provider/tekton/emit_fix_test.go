@@ -466,3 +466,10 @@ func TestRelativeWorkDirReturnsAsWritten(t *testing.T) {
 		}
 	}
 }
+
+func TestOptionalNeedIsReportedLost(t *testing.T) {
+	a, b := scriptJob("a", "true"), scriptJob("b", "true")
+	b.Needs = []ir.Need{{JobID: "a", Optional: true}}
+	_, rep := emit(t, project(a, b))
+	wantEntry(t, rep, caps.JobNeeds, caps.Lost, "optional")
+}

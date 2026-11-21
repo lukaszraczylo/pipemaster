@@ -279,6 +279,9 @@ func (e *emitter) runAfter(pp *plan, jp *jobPlan, pt *wmap, needed map[string]bo
 	}
 	for _, n := range jp.j.Needs {
 		nj, ok := pp.byID[n.JobID]
+		if n.Optional {
+			e.lose(jp.path, caps.JobNeeds, "Tekton has no optional dependency; the need on "+n.JobID+" is required")
+		}
 		switch {
 		case !ok:
 			e.lose(jp.path, caps.JobNeeds, "need "+n.JobID+" names no job")
