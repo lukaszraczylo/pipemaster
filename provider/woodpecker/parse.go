@@ -31,7 +31,7 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	for _, f := range d.ignored {
 		rep.Add(report.Entry{
 			IRPath: pipelinePth, Feature: caps.ExtPassthrough, Level: caps.Lost, Strategy: "ignored",
-			Detail: fmt.Sprintf("%s is ignored: Woodpecker reads only %s", f, d.files[0]), SourceLoc: f,
+			Detail: fmt.Sprintf("%s is ignored: Woodpecker reads only %s", f, d.winner()), SourceLoc: f,
 		})
 	}
 	var wfs []*workflow

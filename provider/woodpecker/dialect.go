@@ -89,3 +89,11 @@ func discover(fsys fs.FS) (found, error) {
 	}
 	return d, nil
 }
+
+// winner names the form Woodpecker reads: the directory, or the single file.
+func (d found) winner() string {
+	if strings.HasPrefix(d.files[0], dirName+"/") {
+		return "the " + dirName + " directory"
+	}
+	return d.files[0]
+}

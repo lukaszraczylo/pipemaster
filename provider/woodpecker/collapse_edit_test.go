@@ -288,3 +288,18 @@ func TestKeptSubstitutionReportNamesTheWholeForm(t *testing.T) {
 		t.Errorf("entries: %+v", rep.Entries)
 	}
 }
+
+func TestIgnoredFileReportNamesTheDirectory(t *testing.T) {
+	src, err := provider.Get("woodpecker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	step := "steps:\n  - name: s\n    image: alpine\n    commands: [echo]\n"
+	_, rep, err := src.Parse(repo(map[string]string{".woodpecker/a.yaml": step, ".woodpecker/b.yaml": step, ".woodpecker.yaml": step}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reportDetailHas(rep, "Woodpecker reads only the .woodpecker directory") {
+		t.Errorf("entries: %+v", rep.Entries)
+	}
+}
