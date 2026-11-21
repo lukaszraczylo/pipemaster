@@ -263,7 +263,8 @@ def varNames (vs : List Var) : List String := vs.map Var.name
 
 /-- A manual finally job is excluded because the GitLab emitter reports it as lost (see RoundTrip.lean).
 Structure both adapters need: unique valid IDs, needs on main jobs forming a DAG (Dag.layers succeeds),
-finally jobs waiting only for main jobs, unique env and step IDs, `onFailure` only on finally jobs. -/
+finally jobs waiting only for main jobs, unique env and step IDs, `onFailure` only on finally jobs.
+The theorems hold over `ir.Normalize`d IR, where runners and needs are sorted (ir/normalize.go:54-56). -/
 def Wf (p : Pipe) : Prop :=
   validId p.id ∧
   (jobIds p.all).Nodup ∧ (∀ j ∈ p.all, validId j.id) ∧
