@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/lukaszraczylo/pipemaster/internal/cli"
+	_ "github.com/lukaszraczylo/pipemaster/provider/drone"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gha"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gitlab"
 	_ "github.com/lukaszraczylo/pipemaster/provider/woodpecker"

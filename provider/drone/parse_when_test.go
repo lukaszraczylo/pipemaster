@@ -1,0 +1,182 @@
+package drone_test
+
+import (
+	"reflect"
+	"testing"
+
+	"github.com/lukaszraczylo/pipemaster/expr"
+	"github.com/lukaszraczylo/pipemaster/ir"
+)
+
+func whenOf(t *testing.T, when string) (*ir.Step, *ir.Job) {
+	t.Helper()
+	j, _ := parseJob(t, stepHead+"- name: s\n  image: x\n  when:\n"+when)
+	return step(t, j, "s"), j
+}
+
+func TestStepWhenBecomesIf(t *testing.T) {
+	s, _ := whenOf(t, "    branch: [main]\n    event: [pull_request]\n")
+	if got := condText(s.If); got != "(event == 'pull_request') && (branch == 'main')" && got != "event == 'pull_request' && branch == 'main'" {
+		t.Fatalf("if = %q", got)
+	}
+	if s.Ext != nil {
+		t.Fatalf("ext = %v", s.Ext)
+	}
+}
+
+func TestEventPushAloneStaysOpaque(t *testing.T) {
+	s, _ := whenOf(t, "    event: push\n")
+	o, ok := s.If.(expr.Opaque)
+	if !ok || o.Dialect != "drone" || o.Text != `{"event":"push"}` {
+		t.Fatalf("if = %#v", s.If)
+	}
+}
+
+func TestStepWhenStrictFormsAreOpaqueWithEntry(t *testing.T) {
+	for name, when := range map[string]string{
+		"scalar include": "    branch:\n      include: main\n",
+		"null":           "    branch:\n",
+		"nested map":     "    branch:\n      x:\n        y: 1\n",
+		"repeated key":   "    branch: a\n    branch: b\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			j, rep := parseJob(t, stepHead+"- name: s\n  image: x\n  when:\n"+when)
+			s := step(t, j, "s")
+			if _, ok := s.If.(expr.Opaque); !ok {
+				t.Fatalf("if = %#v, want opaque", s.If)
+			}
+			if !hasEntry(rep, "kept as opaque Drone text") {
+				t.Fatal("no report entry")
+			}
+		})
+	}
+}
+
+func TestStepWhenUnmodelledKeysStayInExt(t *testing.T) {
+	s, _ := whenOf(t, "    branch: main\n    action: opened\n    instance: ci.example.com\n")
+	if condText(s.If) != "branch == 'main'" {
+		t.Fatalf("if = %q", condText(s.If))
+	}
+	w, _ := ext(s.Ext)["when"].(map[string]any)
+	if !reflect.DeepEqual(w, map[string]any{"action": "opened", "instance": "ci.example.com"}) {
+		t.Fatalf("when ext = %v", s.Ext)
+	}
+}
+
+func TestStepWhenStatus(t *testing.T) {
+	s, _ := whenOf(t, "    status: [success, failure]\n")
+	if condText(s.If) != "always()" {
+		t.Fatalf("if = %q", condText(s.If))
+	}
+}
+
+func TestDollarEscapeInWhenValue(t *testing.T) {
+	s, _ := whenOf(t, "    branch: 'a$$b'\n")
+	if condText(s.If) != "branch == 'a$b'" {
+		t.Fatalf("if = %q", condText(s.If))
+	}
+}
+
+func trigYML(trigger string) string {
+	return "kind: pipeline\nname: p\ntrigger:\n" + trigger + "steps:\n- {name: s, image: x}\n"
+}
+
+func TestPureTriggerFilters(t *testing.T) {
+	pl, _ := parseYML(t, trigYML("  event: [push, pull_request, tag, cron, custom]\n"))
+	// Normalize sorts triggers by kind.
+	want := []ir.Trigger{{Kind: ir.TriggerManual}, {Kind: ir.TriggerPR}, {Kind: ir.TriggerPush}, {Kind: ir.TriggerSchedule}, {Kind: ir.TriggerTag}}
+	if !reflect.DeepEqual(pl.Triggers, want) {
+		t.Fatalf("triggers = %+v", pl.Triggers)
+	}
+	if pl.Jobs[0].If != nil {
+		t.Fatalf("a pure trigger must not become Job.If: %v", pl.Jobs[0].If)
+	}
+}
+
+func TestTriggerBranchFilter(t *testing.T) {
+	pl, _ := parseYML(t, trigYML("  event: [push, pull_request]\n  branch:\n    include: [main, 'release/*']\n    exclude: [wip]\n"))
+	f := ir.Filter{Include: []string{"main", "release/*"}, Exclude: []string{"wip"}}
+	want := []ir.Trigger{{Kind: ir.TriggerPR, Branches: f}, {Kind: ir.TriggerPush, Branches: f}}
+	if !reflect.DeepEqual(pl.Triggers, want) {
+		t.Fatalf("triggers = %+v", pl.Triggers)
+	}
+}
+
+func TestTriggerPathsKeepsFilterWithEntry(t *testing.T) {
+	pl, rep := parseYML(t, trigYML("  event: [push]\n  paths: ['docs/**']\n"))
+	if len(pl.Triggers) != 1 || !reflect.DeepEqual(pl.Triggers[0].Paths, ir.Filter{Include: []string{"docs/**"}}) {
+		t.Fatalf("triggers = %+v", pl.Triggers)
+	}
+	if !hasEntry(rep, "does not evaluate it") {
+		t.Fatal("paths must have a report entry")
+	}
+}
+
+func TestNotPureTriggerGoesToJobIf(t *testing.T) {
+	for name, trig := range map[string]string{
+		"ref":             "  ref: ['refs/tags/v*']\n",
+		"repo":            "  repo: [acme/app]\n",
+		"status":          "  status: [failure]\n",
+		"branch only":     "  branch: [main]\n",
+		"branch with tag": "  event: [tag]\n  branch: [main]\n",
+		"event exclude":   "  event:\n    exclude: [tag]\n",
+		"promote":         "  event: [promote]\n",
+		"glob event":      "  event: ['p*']\n",
+		"cron name":       "  event: [cron]\n  cron: [nightly]\n",
+		"unknown key":     "  event: [push]\n  action: [opened]\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			pl, _ := parseYML(t, trigYML(trig))
+			if len(pl.Triggers) != 0 {
+				t.Fatalf("triggers = %+v, want none", pl.Triggers)
+			}
+			if pl.Jobs[0].If == nil && name != "unknown key" {
+				t.Fatal("the condition must not vanish")
+			}
+		})
+	}
+}
+
+func TestTriggerExtraKeysStayInJobExt(t *testing.T) {
+	pl, rep := parseYML(t, trigYML("  event: [pull_request]\n  action: [opened]\n"))
+	j := pl.Jobs[0]
+	tr, _ := ext(j.Ext)["trigger"].(map[string]any)
+	if !reflect.DeepEqual(tr, map[string]any{"action": []any{"opened"}}) || !hasEntry(rep, "trigger.action has no IR field") {
+		t.Fatalf("trigger ext = %v", j.Ext)
+	}
+	if condText(j.If) != "event == 'pull_request'" {
+		t.Fatalf("if = %q", condText(j.If))
+	}
+}
+
+func TestTriggerOpaqueOnPushAloneWithBranchGoesToIf(t *testing.T) {
+	pl, rep := parseYML(t, trigYML("  event: push\n  ref: refs/heads/main\n"))
+	o, ok := pl.Jobs[0].If.(expr.Opaque)
+	if !ok || o.Dialect != "drone" || len(pl.Triggers) != 0 {
+		t.Fatalf("if = %#v triggers=%v", pl.Jobs[0].If, pl.Triggers)
+	}
+	if !hasEntry(rep, "kept as opaque Drone text") {
+		t.Fatal("no entry")
+	}
+}
+
+func TestStrictTriggerIsOpaqueNotUnguarded(t *testing.T) {
+	pl, rep := parseYML(t, trigYML("  branch:\n    include: main\n"))
+	if _, ok := pl.Jobs[0].If.(expr.Opaque); !ok || !hasEntry(rep, "kept as opaque Drone text") {
+		t.Fatalf("if = %#v", pl.Jobs[0].If)
+	}
+}
+
+func TestTriggersShareOnlyWhenEveryPipelineAgrees(t *testing.T) {
+	a := "kind: pipeline\nname: a\ntrigger:\n  event: [push]\n  branch: [main]\nsteps:\n- {name: s, image: x}\n"
+	b := "---\nkind: pipeline\nname: b\ntrigger:\n  event: [push]\n  branch: [main]\nsteps:\n- {name: s, image: x}\n"
+	pl, _ := parseYML(t, a+b)
+	if len(pl.Triggers) != 1 || pl.Jobs[0].If != nil || pl.Jobs[1].If != nil {
+		t.Fatalf("shared triggers: %+v ifs=%v %v", pl.Triggers, pl.Jobs[0].If, pl.Jobs[1].If)
+	}
+	c := "---\nkind: pipeline\nname: c\nsteps:\n- {name: s, image: x}\n"
+	pl, _ = parseYML(t, a+c)
+	if len(pl.Triggers) != 0 || pl.Jobs[0].If == nil {
+		t.Fatalf("a pipeline without a trigger forces the others onto Job.If: %+v", pl.Triggers)
+	}
+}
