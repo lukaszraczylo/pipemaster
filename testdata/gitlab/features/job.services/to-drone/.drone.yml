@@ -1,5 +1,5 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/test
-# pipemaster:arg {"Ref":"golang:1.22","Entrypoint":null}
+# pipemaster:arg {"Ref":"golang:1.22","Entrypoint":null,"taken":1}
 kind: pipeline
 type: docker
 name: test

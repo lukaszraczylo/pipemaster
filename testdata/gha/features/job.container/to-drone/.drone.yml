@@ -1,5 +1,5 @@
 # pipemaster:emulated job.container pipeline/ci/job/build
-# pipemaster:arg {"Ref":"golang:1.24","Entrypoint":null}
+# pipemaster:arg {"Ref":"golang:1.24","Entrypoint":null,"taken":1}
 kind: pipeline
 type: docker
 name: build

@@ -351,6 +351,8 @@ func (e *emitter) stepImage(c *docCtx, sp string, st *ir.Step) (string, error) {
 	ref := c.image
 	if st.Image != nil && st.Image.Ref != "" {
 		ref = st.Image.Ref
+	} else if ref != "" && c.j.Container != nil && ref == c.j.Container.Ref {
+		c.took++
 	}
 	if ref == "" {
 		if !c.defImg {

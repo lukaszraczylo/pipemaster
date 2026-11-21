@@ -1,5 +1,5 @@
 # pipemaster:emulated job.container pipeline/woodpecker/job/ci
-# pipemaster:arg {"Ref":"node:22","Entrypoint":null}
+# pipemaster:arg {"Ref":"node:22","Entrypoint":null,"taken":1}
 kind: pipeline
 type: docker
 name: ci

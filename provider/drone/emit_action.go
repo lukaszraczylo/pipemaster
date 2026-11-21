@@ -66,6 +66,12 @@ type heldText struct {
 	Pos    int      `json:"pos"`
 }
 
+// containerArg is the job image, and the number of steps that took it when the file was written.
+type containerArg struct {
+	ir.Image
+	Taken int `json:"taken,omitempty"`
+}
+
 // renameArg carries the job id of a document whose name is the id made valid.
 type renameArg struct {
 	ID   string `json:"id"`

@@ -267,14 +267,21 @@ func collapseRefs(c *collapseCtx) bool {
 func collapseContainer(c *collapseCtx) bool {
 	ref := defaultImage
 	if len(c.args) > 0 {
-		var img ir.Image
-		if !decodeArg(c.args, &img) {
+		var a containerArg
+		if !decodeArg(c.args, &a) {
 			return false
 		}
-		if !slices.ContainsFunc(c.j.Steps, func(st *ir.Step) bool { return st.Image != nil && st.Image.Ref == img.Ref }) {
+		held := 0
+		for _, st := range c.j.Steps {
+			if st.Image != nil && st.Image.Ref == a.Ref {
+				held++
+			}
+		}
+		if held < a.Taken {
 			reportIgnored(c.rep, c.use, "the job image")
 			return true
 		}
+		img := a.Image
 		c.j.Container, ref = &img, img.Ref
 	}
 	for _, st := range c.j.Steps {

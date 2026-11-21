@@ -46,7 +46,9 @@ type docCtx struct {
 	// held is the text of the written steps that read a matrix name.
 	held []heldText
 	// pos is the place the step being written takes in the document.
-	pos    int
+	pos int
+	// took counts the steps that ran in the job container image.
+	took   int
 	defImg bool
 }
 
@@ -67,9 +69,6 @@ func (e *emitter) document(c *docCtx) (*yaml.Node, error) {
 	if j.Container != nil {
 		c.image = j.Container.Ref
 		e.jobEntrypoint(c)
-		if err := e.markArg(caps.JobContainer, c.jp, j.Container); err != nil {
-			return nil, err
-		}
 	}
 	cond, err := e.jobSet(c.pl, j, c.jp, c.plan.finally)
 	if err != nil {
@@ -87,6 +86,11 @@ func (e *emitter) document(c *docCtx) (*yaml.Node, error) {
 	steps, err := e.steps(c)
 	if err != nil {
 		return nil, err
+	}
+	if j.Container != nil {
+		if err := e.markArg(caps.JobContainer, c.jp, containerArg{Image: *j.Container, Taken: c.took}); err != nil {
+			return nil, err
+		}
 	}
 	if err := e.cellMarker(c); err != nil {
 		return nil, err
