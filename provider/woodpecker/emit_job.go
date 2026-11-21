@@ -349,9 +349,21 @@ func (e *emitter) matrix(jp string, mx *ir.Matrix, ext map[string]any) (*yaml.No
 	return m.n, nil
 }
 
+// yamlSpecial matches what can end a plain YAML scalar or open a quoted one, in text that Woodpecker substitutes
+// into the raw file before it parses it.
+var yamlSpecial = regexp.MustCompile(`: | #|:$|["'\\\n]`)
+
+// noteMatrixValue reports a value that can break the file when Woodpecker substitutes it.
+func (e *emitter) noteMatrixValue(jp, v string) {
+	if yamlSpecial.MatchString(v) {
+		e.emulate(jp, caps.JobMatrix, "values substituted into the raw file", "a matrix value holds YAML-significant characters ("+strconv.Quote(v)+"); Woodpecker substitutes it before parsing, so the file can fail at run time")
+	}
+}
+
 func (e *emitter) matrixValues(jp string, vs []string) ([]string, error) {
 	out := make([]string, len(vs))
 	for i, v := range vs {
+		e.noteMatrixValue(jp, v)
 		t, err := e.text(nil, jp, caps.JobMatrix, valueText, v)
 		if err != nil {
 			return nil, err
@@ -366,6 +378,7 @@ func (e *emitter) comboList(jp string, cs []ir.Combo) (*yaml.Node, error) {
 	for _, c := range cs {
 		m := newMap()
 		for _, kv := range c {
+			e.noteMatrixValue(jp, kv.Value)
 			t, err := e.text(nil, jp, caps.JobMatrix, valueText, kv.Value)
 			if err != nil {
 				return nil, err

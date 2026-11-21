@@ -303,3 +303,15 @@ func TestIgnoredFileReportNamesTheDirectory(t *testing.T) {
 		t.Errorf("entries: %+v", rep.Entries)
 	}
 }
+
+func TestMatrixValueWithYAMLCharactersIsReported(t *testing.T) {
+	for name, vals := range map[string]string{"axis": "[ 'a: b', 'c' ]", "plain": "[ '1.21', '1.22' ]"} {
+		t.Run(name, func(t *testing.T) {
+			p := parseProject(t, "gha", map[string]string{".github/workflows/ci.yml": "on: push\njobs:\n  b:\n    runs-on: ubuntu-latest\n    strategy:\n      matrix:\n        v: " + vals + "\n    steps:\n      - run: echo ${{ matrix.v }}\n"})
+			_, rep := emitFiles(t, p)
+			if got := reportDetailHas(rep, "YAML-significant"); got != (name == "axis") {
+				t.Errorf("reported = %v: %+v", got, rep.Entries)
+			}
+		})
+	}
+}
