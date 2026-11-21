@@ -748,7 +748,14 @@ func (d *doc) placeCondition(list []ir.Trigger, restored bool) {
 	if t == nil {
 		return
 	}
-	switch d.gate() {
+	gate := d.gate()
+	if ev := map[caps.Feature]string{caps.JobManual: eventCustom, caps.JobEnvironmentApproval: eventPromote}[gate]; gate != "" && !t.hasEvent(ev) {
+		u, _ := d.marks.markedWith(gate, "")
+		reportIgnored(d.rep, u, "the job gate")
+		d.job.If = t.cond
+		return
+	}
+	switch gate {
 	case caps.JobManual:
 		d.job.Manual = true
 		if t.only(eventCustom, "") {
@@ -787,6 +794,12 @@ func (d *doc) placeCondition(list []ir.Trigger, restored bool) {
 		}
 		d.job.Ext = d.ext.ext()
 	}
+}
+
+// hasEvent is true when the condition lists event.
+func (t *trigger) hasEvent(event string) bool {
+	ev, _ := t.raw[dexpr.KeyEvent].([]any)
+	return slices.Contains(ev, any(event))
 }
 
 // only is true when the condition holds the one event and, if key is not empty, that key, and nothing else.

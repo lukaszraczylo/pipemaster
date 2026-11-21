@@ -538,3 +538,60 @@ func TestEditedContainerImageKeepsTheFile(t *testing.T) {
 		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
 	}
 }
+
+func TestEditedGlobFilterStays(t *testing.T) {
+	mk := func() *ir.Project {
+		p := gproject(ghaOrigin, gjob("b", gstep("x", "a")))
+		p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush, Branches: ir.Filter{Include: []string{"main", "feat/**"}}}}
+		return p
+	}
+	got, rep := back(t, mk(), func(s string) string { return strings.Replace(s, "    - feat/**\n", "    - feat/*\n", 1) })
+	if inc := got.Pipelines[0].Triggers[0].Branches.Include; !slices.Equal(inc, []string{"main", "feat/*"}) {
+		t.Errorf("include = %v", inc)
+	}
+	if !ignored(rep, caps.TriggerFilterBranch) {
+		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
+	}
+}
+
+func TestEditedMergedConditionStays(t *testing.T) {
+	j := gjob("b", gstep("x", "a"))
+	j.If = expr.Lit{Kind: expr.LitBool, Bool: false}
+	p := gproject(ghaOrigin, j)
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush}, {Kind: ir.TriggerTag}}
+	got, rep := back(t, p, func(s string) string { return strings.Replace(s, "- '**'", "- push", 1) })
+	if len(got.Pipelines[0].Triggers) != 0 {
+		t.Errorf("an edited condition must not restore triggers: %+v", got.Pipelines[0].Triggers)
+	}
+	if !ignored(rep, caps.JobIf) {
+		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
+	}
+}
+
+func TestEditedGateKeepsTheFile(t *testing.T) {
+	man := gjob("deploy", gstep("x", "a"))
+	man.Manual = true
+	p := gproject(ghaOrigin, man)
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush}}
+	got, rep := back(t, p, func(s string) string { return strings.Replace(s, "- custom", "- push", 1) })
+	if jobOf(t, got, "deploy").Manual {
+		t.Errorf("an edited gate must not restore the manual flag")
+	}
+	if !ignored(rep, caps.JobManual) {
+		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
+	}
+}
+
+func TestEditedApprovalGateKeepsTheFile(t *testing.T) {
+	ap := gjob("promote", gstep("y", "b"))
+	ap.Environment = &ir.Environment{Name: "prod", Approval: true}
+	p := gproject(ghaOrigin, ap)
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush}}
+	got, rep := back(t, p, func(s string) string { return strings.Replace(s, "- promote", "- push", 1) })
+	if e := jobOf(t, got, "promote").Environment; e != nil && e.Approval {
+		t.Errorf("an edited gate must not restore the approval: %+v", e)
+	}
+	if !ignored(rep, caps.JobEnvironmentApproval) {
+		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
+	}
+}
