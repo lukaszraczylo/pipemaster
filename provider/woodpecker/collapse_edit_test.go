@@ -274,3 +274,10 @@ func TestLiteralTemplateOpenerDoesNotFailTheGitLabConversion(t *testing.T) {
 		t.Errorf("no Lost entry: %+v", rep.Entries)
 	}
 }
+
+func TestStepDependsOnReportSaysTheDAGIsNotApplied(t *testing.T) {
+	_, rep := parseWoodpecker(t, "steps:\n  - name: b\n    image: alpine\n    depends_on: [a]\n    commands: [echo b]\n  - name: a\n    image: alpine\n    commands: [echo a]\n")
+	if !reportDetailHas(rep, "the step DAG is not applied") {
+		t.Errorf("entries: %+v", rep.Entries)
+	}
+}
