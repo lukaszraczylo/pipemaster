@@ -9,5 +9,6 @@ import Pipemaster.Core
 import Pipemaster.Gha
 import Pipemaster.Gitlab
 import Pipemaster.Woodpecker
+import Pipemaster.Drone
 import Pipemaster.RoundTrip
 import Pipemaster.Chain

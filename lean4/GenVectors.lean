@@ -518,6 +518,26 @@ def wpFileJson (f : Woodpecker.WFile) : Json :=
       | none => Json.null),
     ("tag_idx", optNat f.tagIdx), ("platform", match f.platform with | some x => Json.str x | none => Json.null)]
 
+open Pipemaster.Drone in
+def droneStepJson (s : Drone.DStep) : Json :=
+  Json.mkObj [("name", s.name), ("cmds", strsJson s.cmds), ("env", varsJson s.env), ("ignore", s.ignore)]
+
+open Pipemaster.Drone in
+def droneDocJson (d : Drone.DDoc) : Json :=
+  Json.mkObj [("name", d.name),
+    ("trigger", match d.trigger with
+      | some t => Json.mkObj [("events", strsJson t.events), ("branch", strsJson t.branch), ("ref", strsJson t.ref),
+          ("status", strsJson t.status)]
+      | none => Json.null),
+    ("deps", strsJson d.deps), ("steps", Json.arr (d.steps.map droneStepJson).toArray), ("env", varsJson d.env),
+    ("platform", match d.platform with | some x => Json.str x | none => Json.null),
+    ("noop", d.noop), ("allow_failure", d.allowFailure),
+    ("manual", match d.manual with | some ts => Json.arr (ts.map wpTrigJson).toArray | none => Json.null),
+    ("finally", match d.fin with
+      | some (ns, noIf) => Json.mkObj [("needs", Json.arr (ns.map needJ).toArray), ("no_if", noIf)]
+      | none => Json.null),
+    ("if_trigs", match d.ifTrigs with | some ts => Json.arr (ts.map wpTrigJson).toArray | none => Json.null)]
+
 section Adapters
 open Pipemaster.Core
 
@@ -630,6 +650,15 @@ def woodpeckerAdapterCases : List (Json × Json) :=
       ("raw", coreJson (Woodpecker.rawWp (Woodpecker.toWp p))),
       ("core", coreJson (Woodpecker.fromWp (Woodpecker.toWp p) (Woodpecker.wpMeta p)))])
 
+def dronePipes : List Core.Pipe :=
+  (allPipes ++ wpExtraPipes).filter fun p => decide (Wf p ∧ Drone.DroneOk p)
+
+def droneAdapterCases : List (Json × Json) :=
+  dronePipes.map fun p =>
+    (coreJson p, Json.mkObj [("drone", Json.arr ((Drone.toDrone p).map droneDocJson).toArray),
+      ("raw", coreJson (Drone.rawDrone (Drone.toDrone p))),
+      ("core", coreJson (Drone.fromDrone (Drone.toDrone p) (Drone.droneMeta p)))])
+
 def crossAdapterCases : List (Json × Json) :=
   ghaPipes.map fun p =>
     let viaGitlab := Gha.fromGha (Gha.toGha (Gitlab.fromGitlab (Gitlab.toGitlab p) (Gitlab.gitlabMeta p)))
@@ -638,7 +667,7 @@ def crossAdapterCases : List (Json × Json) :=
 
 /-! ## Chain vectors (Task 9)
 
-Every ordered choice of three distinct providers over `chainAdapters` (60 over five): the first is the origin, the other
+Every ordered choice of three distinct providers over `chainAdapters` (120 over six): the first is the origin, the other
 two are the hops. Each case holds the IR as the origin parsed it, the IR after each hop's parse
 with no metadata applied, and the IR after unwinding the stack. The pipelines are a reduced subset of `allPipes`
 that lie in the fragment of every adapter (`Chain.chainFrag_adapters_iff`, with `Chain.chainFrag_run` for the hops):
@@ -671,11 +700,11 @@ def chainPipes : List Core.Pipe :=
 
 /-- The pipelines in the fragment of every adapter (decided once per pipeline). -/
 def chainFragPipes : List Core.Pipe :=
-  chainPipes.filter fun p => decide (RoundTrip.Both p ∧ (Wf p ∧ Woodpecker.WpOk p))
+  chainPipes.filter fun p => decide (RoundTrip.Both p ∧ (Wf p ∧ Woodpecker.WpOk p) ∧ Drone.DroneOk p)
 
 def chainAdapters : List (String × Chain.Adapter) :=
   [("gha", Chain.gha), ("gitea", Chain.gitea), ("forgejo", Chain.forgejo), ("gitlab", Chain.gitlab),
-   ("woodpecker", Chain.woodpecker)]
+   ("woodpecker", Chain.woodpecker), ("drone", Chain.drone)]
 
 def chainTriples : List ((String × Chain.Adapter) × (String × Chain.Adapter) × (String × Chain.Adapter)) :=
   chainAdapters.flatMap fun a => chainAdapters.flatMap fun b => chainAdapters.flatMap fun c =>
@@ -722,6 +751,7 @@ def main (args : List String) : IO UInt32 := do
      ("gha", "Pipemaster.Gha.gha_from_to", GenVectors.ghaAdapterCases),
      ("gitlab", "Pipemaster.Gitlab.gitlab_from_to", GenVectors.gitlabAdapterCases),
      ("woodpecker", "Pipemaster.Woodpecker.woodpecker_from_to", GenVectors.woodpeckerAdapterCases),
+     ("drone", "Pipemaster.Drone.drone_from_to", GenVectors.droneAdapterCases),
      ("cross", "Pipemaster.RoundTrip.cross_roundtrip", GenVectors.crossAdapterCases),
      ("chain", "Pipemaster.Chain.chain_roundtrip", GenVectors.chainCases)]
   for (name, thm, cases) in files do

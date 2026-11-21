@@ -58,6 +58,25 @@ required=(
   Pipemaster.Woodpecker.restoreJob_wpFin
   Pipemaster.Woodpecker.wpMeta_fields
   Pipemaster.Woodpecker.validId_wpPipelineId
+  Pipemaster.Drone.unesc_esc
+  Pipemaster.Drone.pureOf_trigBlock
+  Pipemaster.Drone.pickShared_ok
+  Pipemaster.Drone.readTriggers_toDrone
+  Pipemaster.Drone.rawDrone_toDrone
+  Pipemaster.Drone.rawDrone_frag
+  Pipemaster.Drone.restoreJob_droneMain
+  Pipemaster.Drone.restoreJob_droneFin
+  Pipemaster.Drone.droneMeta_fields
+  Pipemaster.Drone.validId_dronePipelineId
+  Pipemaster.Drone.drone_from_to
+  Pipemaster.Drone.foldOk_emitted
+  Pipemaster.Drone.foldOk_edited
+  Pipemaster.Drone.cellDocCount_eq
+  Pipemaster.Drone.cell_origin
+  Pipemaster.Drone.valueE_eval
+  Pipemaster.Drone.orChain_eval
+  Pipemaster.Drone.filterE_eval
+  Pipemaster.Drone.toE_eval
   Pipemaster.RoundTrip.cross_roundtrip
   Pipemaster.RoundTrip.cross_roundtrip_rev
   Pipemaster.RoundTrip.both_iff
@@ -76,6 +95,17 @@ required=(
   Pipemaster.Chain.woodpecker_keeps_gha
   Pipemaster.Chain.chain_woodpecker_gha
   Pipemaster.Chain.chain_gha_woodpecker_gitlab
+  Pipemaster.Chain.gitlab_keeps_drone
+  Pipemaster.Chain.woodpecker_keeps_drone
+  Pipemaster.Chain.drone_keeps_drone
+  Pipemaster.Chain.drone_keeps_woodpecker
+  Pipemaster.Chain.drone_keeps_gitlab
+  Pipemaster.Chain.drone_keeps_gha
+  Pipemaster.Chain.chain_drone_gha
+  Pipemaster.Chain.chain_gha_drone_glb
+  Pipemaster.Chain.chain_gitlab_drone_woodpecker
+  Pipemaster.Chain.cross_drone_gha
+  Pipemaster.Chain.cross_drone_gitlab
 )
 required_lean="$(printf '`%s, ' "${required[@]}")"
 required_lean="[${required_lean%, }]"

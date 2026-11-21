@@ -1,5 +1,6 @@
 import Pipemaster.RoundTrip
 import Pipemaster.Woodpecker
+import Pipemaster.Drone
 
 namespace Pipemaster
 namespace Chain
@@ -82,6 +83,16 @@ def woodpecker : Adapter where
   Own := Woodpecker.WpOk
   decOwn := fun _ => inferInstance
   exact q hw ho := Woodpecker.woodpecker_from_to q ⟨hw, ho⟩
+
+/-- Mirrors drone.New (provider/drone/dialect.go). -/
+def drone : Adapter where
+  Ast := List Drone.DDoc
+  emit := Drone.toDrone
+  parse := Drone.rawDrone
+  metaOf := Drone.droneMeta
+  Own := Drone.DroneOk
+  decOwn := fun _ => inferInstance
+  exact q hw ho := Drone.drone_from_to q ⟨hw, ho⟩
 
 /-- Mirrors roundtrip.Hop (internal/roundtrip/chain.go), rule 4: each hop emits, parses and pushes a layer.
 The layers are oldest first, as in `meta.Stack`. `Hop` applies a stack only if its top layer targets the source
@@ -295,16 +306,66 @@ theorem woodpecker_keeps_gha : woodpecker.Keeps gha := by
   have h := Woodpecker.rawWp_frag q hq.1 hq.2
   exact ⟨h.1, h.2.2.1 hg.2⟩
 
-/-- The five adapters. -/
-def adapters : List Adapter := [gha, gitea, forgejo, gitlab, woodpecker]
+/-! ## Drone in a chain
+
+The Drone parser returns every job with no runner label, or with the `os/arch` part of its platform label
+(`Drone.droneStripMain`), and keeps no name. The raw parse differs from the Woodpecker one only in the runner and
+the pipeline ID, so it keeps every fragment the same way (`Drone.frag_of_shape`). -/
+
+theorem keep_strip (j : Core.Job) : Drone.Keep j (Gitlab.strip j) :=
+  ⟨rfl, strip_needs_job j, rfl, rfl, rfl, rfl, by simp [Gitlab.strip], fun h => h⟩
+
+theorem keep_of_same {j x : Core.Job} (h : Woodpecker.Same j x) : Drone.Keep j x :=
+  ⟨h.1, h.2.1, h.2.2.1, h.2.2.2.1, h.2.2.2.2.1, h.2.2.2.2.2.1, h.2.2.2.2.2.2.1, fun _ => h.2.2.2.2.2.2.2⟩
+
+theorem gitlab_keeps_drone : gitlab.Keeps drone := by
+  intro q hq hd
+  have hraw := Gitlab.rawGitlab_toGitlab q hq.1 hq.2
+  have hf := rawGitlab_frag q hq.1 hq.2
+  refine ⟨hf.1, ?_⟩
+  exact (Drone.frag_of_shape q Gitlab.gitlabPipelineId validId_gitlabPipelineId Gitlab.strip Gitlab.strip
+    keep_strip keep_strip _ hraw).2.2.1 hd.2
+
+theorem woodpecker_keeps_drone : woodpecker.Keeps drone := by
+  intro q hq hd
+  have hraw := Woodpecker.rawWp_toWp q hq.1 hq.2
+  have hf := Woodpecker.rawWp_frag q hq.1 hq.2
+  refine ⟨hf.1, ?_⟩
+  exact (Drone.frag_of_shape q Woodpecker.wpPipelineId Woodpecker.validId_wpPipelineId Woodpecker.wpStripMain
+    Woodpecker.wpStripFin (fun j => keep_of_same (Woodpecker.same_main j)) (fun j => keep_of_same (Woodpecker.same_fin j))
+    _ hraw).2.2.1 hd.2
+
+theorem drone_keeps_drone : drone.Keeps drone := by
+  intro q hq _
+  have h := Drone.rawDrone_frag q hq.1 hq.2
+  exact ⟨h.1, h.2.1⟩
+
+theorem drone_keeps_woodpecker : drone.Keeps woodpecker := by
+  intro q hq hw
+  have h := Drone.rawDrone_frag q hq.1 hq.2
+  exact ⟨h.1, h.2.2.1 hw.2⟩
+
+theorem drone_keeps_gitlab : drone.Keeps gitlab := by
+  intro q hq hg
+  have h := Drone.rawDrone_frag q hq.1 hq.2
+  exact ⟨h.1, h.2.2.2.2 hg.2⟩
+
+theorem drone_keeps_gha : drone.Keeps gha := by
+  intro q hq hg
+  have h := Drone.rawDrone_frag q hq.1 hq.2
+  exact ⟨h.1, h.2.2.2.1 hg.2⟩
+
+/-- The six adapters. -/
+def adapters : List Adapter := [gha, gitea, forgejo, gitlab, woodpecker, drone]
 
 theorem adapters_closed : Closed adapters := by
   intro a ha b hb
   simp only [adapters, List.mem_cons, List.not_mem_nil, or_false] at ha hb
-  rcases ha with rfl | rfl | rfl | rfl | rfl <;> rcases hb with rfl | rfl | rfl | rfl | rfl <;>
+  rcases ha with rfl | rfl | rfl | rfl | rfl | rfl <;> rcases hb with rfl | rfl | rfl | rfl | rfl | rfl <;>
     first | exact gha_keeps _ | exact gitlab_keeps_gha | exact gitlab_keeps_gitlab |
       exact gitlab_keeps_woodpecker | exact woodpecker_keeps_woodpecker | exact woodpecker_keeps_gitlab |
-      exact woodpecker_keeps_gha
+      exact woodpecker_keeps_gha | exact gitlab_keeps_drone | exact woodpecker_keeps_drone |
+      exact drone_keeps_drone | exact drone_keeps_woodpecker | exact drone_keeps_gitlab | exact drone_keeps_gha
 
 /-- One hop through a member of a closed list keeps a pipeline in the fragment of every member. -/
 theorem chainFrag_hop (L : List Adapter) (hL : Closed L) (p : Pipe) (h : ChainFrag p L) (a : Adapter)
@@ -325,19 +386,22 @@ theorem chainFrag_pair (L : List Adapter) (hL : Closed L) (p : Pipe) (h : ChainF
     (hb : b ∈ L) (hc : c ∈ L) : RunFrag p [b, c] :=
   chainFrag_run L hL [b, c] (by intro a ha; simp at ha; rcases ha with rfl | rfl <;> assumption) p h
 
-/-- The intersection over the five adapters: both cross fragments and the Woodpecker fragment. -/
-theorem chainFrag_adapters_iff (p : Pipe) : ChainFrag p adapters ↔ RoundTrip.Both p ∧ woodpecker.Frag p := by
+/-- The intersection over the six adapters: both cross fragments, the Woodpecker fragment and the Drone fragment. -/
+theorem chainFrag_adapters_iff (p : Pipe) :
+    ChainFrag p adapters ↔ RoundTrip.Both p ∧ woodpecker.Frag p ∧ drone.Frag p := by
   constructor
   · intro h
-    exact ⟨⟨h gha (by simp [adapters]), h gitlab (by simp [adapters])⟩, h woodpecker (by simp [adapters])⟩
+    exact ⟨⟨h gha (by simp [adapters]), h gitlab (by simp [adapters])⟩, h woodpecker (by simp [adapters]),
+      h drone (by simp [adapters])⟩
   · intro h a ha
     simp only [adapters, List.mem_cons, List.not_mem_nil, or_false] at ha
-    rcases ha with rfl | rfl | rfl | rfl | rfl
+    rcases ha with rfl | rfl | rfl | rfl | rfl | rfl
     · exact h.1.1
     · exact h.1.1
     · exact h.1.1
     · exact h.1.2
-    · exact h.2
+    · exact h.2.1
+    · exact h.2.2
 
 /-- The four adapters that are not Woodpecker. -/
 def crossAdapters : List Adapter := [gha, gitea, forgejo, gitlab]
@@ -367,21 +431,54 @@ theorem chain_gha_gitlab_gitea (p : Pipe) (h : RoundTrip.Both p) :
 theorem chain_woodpecker_gha (p : Pipe) (h : RoundTrip.Both p ∧ woodpecker.Frag p) :
     unwind (hops p [woodpecker, gha]).1 (hops p [woodpecker, gha]).2 = p := by
   apply chain_roundtrip
-  apply chainFrag_run adapters adapters_closed _ _ p ((chainFrag_adapters_iff p).2 h)
-  intro a ha
-  simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
-  simp only [adapters, List.mem_cons, List.not_mem_nil, or_false]
-  rcases ha with rfl | rfl <;> simp [gha, woodpecker]
+  exact ⟨h.2, woodpecker_keeps_gha p h.2 h.1.1, trivial⟩
 
 /-- GHA, then Woodpecker, then GitLab. -/
 theorem chain_gha_woodpecker_gitlab (p : Pipe) (h : RoundTrip.Both p ∧ woodpecker.Frag p) :
     unwind (hops p [gha, woodpecker, gitlab]).1 (hops p [gha, woodpecker, gitlab]).2 = p := by
   apply chain_roundtrip
+  have hid : gha.parse (gha.emit p) = p := Gha.rawGha_toGha p h.1.1.1
+  refine ⟨h.1.1, ?_⟩
+  rw [hid]
+  exact ⟨h.2, woodpecker_keeps_gitlab p h.2 h.1.2, trivial⟩
+
+/-- Drone as the first hop, then GHA. -/
+theorem chain_drone_gha (p : Pipe) (h : RoundTrip.Both p ∧ drone.Frag p) :
+    unwind (hops p [drone, gha]).1 (hops p [drone, gha]).2 = p := by
+  apply chain_roundtrip
+  exact ⟨h.2, drone_keeps_gha p h.2 h.1.1, trivial⟩
+
+/-- GHA, then Drone, then GitLab. -/
+theorem chain_gha_drone_glb (p : Pipe) (h : RoundTrip.Both p ∧ drone.Frag p) :
+    unwind (hops p [gha, drone, gitlab]).1 (hops p [gha, drone, gitlab]).2 = p := by
+  apply chain_roundtrip
+  have hid : gha.parse (gha.emit p) = p := Gha.rawGha_toGha p h.1.1.1
+  refine ⟨h.1.1, ?_⟩
+  rw [hid]
+  exact ⟨h.2, drone_keeps_gitlab p h.2 h.1.2, trivial⟩
+
+/-- GitLab, then Drone, then Woodpecker: the three adapters whose raw parses differ most. -/
+theorem chain_gitlab_drone_woodpecker (p : Pipe) (h : RoundTrip.Both p ∧ woodpecker.Frag p ∧ drone.Frag p) :
+    unwind (hops p [gitlab, drone, woodpecker]).1 (hops p [gitlab, drone, woodpecker]).2 = p := by
+  apply chain_roundtrip
   apply chainFrag_run adapters adapters_closed _ _ p ((chainFrag_adapters_iff p).2 h)
   intro a ha
   simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
   simp only [adapters, List.mem_cons, List.not_mem_nil, or_false]
-  rcases ha with rfl | rfl | rfl <;> simp [gha, woodpecker, gitlab]
+  rcases ha with rfl | rfl | rfl <;> simp [gitlab, drone, woodpecker]
+
+/-- The cross round trip with metadata: a pipeline that survives Drone, then GHA, comes back from GHA. -/
+theorem cross_drone_gha (p : Pipe) (h : RoundTrip.Both p ∧ drone.Frag p) :
+    Gha.fromGha (Gha.toGha (Drone.fromDrone (Drone.toDrone p) (Drone.droneMeta p))) = p := by
+  rw [Drone.drone_from_to p h.2]
+  exact Gha.gha_from_to p h.1.1
+
+/-- The cross round trip with metadata: a pipeline that survives Drone, then GitLab, comes back from GitLab. -/
+theorem cross_drone_gitlab (p : Pipe) (h : RoundTrip.Both p ∧ drone.Frag p) :
+    Gitlab.fromGitlab (Gitlab.toGitlab (Drone.fromDrone (Drone.toDrone p) (Drone.droneMeta p)))
+      (Gitlab.gitlabMeta p) = p := by
+  rw [Drone.drone_from_to p h.2]
+  exact Gitlab.gitlab_from_to p h.1.2
 
 end Chain
 end Pipemaster
