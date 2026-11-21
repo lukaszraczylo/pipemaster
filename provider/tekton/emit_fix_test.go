@@ -537,3 +537,30 @@ func TestFinallyNeedFromAResultIsNotDuplicated(t *testing.T) {
 		t.Fatalf("needs = %v\n%s", got, joinFiles(files))
 	}
 }
+
+func TestResultReferenceInARemoteTaskKeepsItsImpliedNeed(t *testing.T) {
+	identityOf(t, map[string]string{"p.yaml": `apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: p
+spec:
+  tasks:
+    - name: first
+      taskSpec:
+        results:
+          - name: sha
+        steps:
+          - name: s
+            image: alpine
+            script: "true"
+    - name: second
+      taskRef:
+        resolver: git
+        params:
+          - name: repo
+            value: r
+      params:
+        - name: COMMIT
+          value: $(tasks.first.results.sha)
+`})
+}

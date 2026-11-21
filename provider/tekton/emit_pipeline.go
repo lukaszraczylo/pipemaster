@@ -1,6 +1,7 @@
 package tekton
 
 import (
+	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -277,6 +278,12 @@ func (e *emitter) runAfter(pp *plan, jp *jobPlan, pt *wmap, needed map[string]bo
 			}
 		}
 	}
+	written := ""
+	if len(implicit) > 0 {
+		if b, err := yaml.Marshal(pt.n); err == nil {
+			written = string(b)
+		}
+	}
 	for _, n := range jp.j.Needs {
 		nj, ok := pp.byID[n.JobID]
 		if n.Optional {
@@ -291,7 +298,7 @@ func (e *emitter) runAfter(pp *plan, jp *jobPlan, pt *wmap, needed map[string]bo
 			held = append(held, n)
 		case nj.finally:
 			e.lose(jp.path, caps.JobNeeds, "a task cannot wait for the finally task "+n.JobID)
-		case implicit[n.JobID] && needed[n.JobID]:
+		case implicit[n.JobID] && (needed[n.JobID] || strings.Contains(written, "$(tasks."+nj.tname+".")):
 		default:
 			after = append(after, nj.tname)
 		}
