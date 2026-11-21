@@ -33,3 +33,29 @@ func TestFindRejectsAnotherVersionOnPath(t *testing.T) {
 		t.Fatalf("Find returned the PATH binary of another version: %s", p)
 	}
 }
+
+func fakeDrone(t *testing.T, version string) string {
+	t.Helper()
+	dir := t.TempDir()
+	script := "#!/bin/sh\necho 'drone version " + version + "'\n"
+	if err := os.WriteFile(filepath.Join(dir, "drone"), []byte(script), 0o700); err != nil { // #nosec G306 -- test stub must be executable
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	return dir
+}
+
+func TestFindAcceptsThePinnedDroneVersion(t *testing.T) {
+	dir := fakeDrone(t, "1.9.0")
+	p, ok := linttool.Find("drone")
+	if !ok || p != filepath.Join(dir, "drone") {
+		t.Fatalf("Find = %q, %v; want the PATH binary", p, ok)
+	}
+}
+
+func TestFindRejectsAnotherDroneVersionOnPath(t *testing.T) {
+	dir := fakeDrone(t, "1.8.0")
+	if p, _ := linttool.Find("drone"); p == filepath.Join(dir, "drone") {
+		t.Fatalf("Find returned the PATH binary of another version: %s", p)
+	}
+}

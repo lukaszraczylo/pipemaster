@@ -15,10 +15,11 @@ const RequireEnv = "PIPEMASTER_REQUIRE_LINTERS"
 const (
 	toolsDir     = ".tools/bin"
 	woodpeckerID = "woodpecker-cli"
+	droneID      = "drone"
 )
 
 // pinned maps a linter to the version its --version output must end with; scripts/install-linters.sh builds it.
-var pinned = map[string]string{woodpeckerID: "3.20.1"}
+var pinned = map[string]string{woodpeckerID: "3.20.1", droneID: "1.9.0"}
 
 // versionOK reports whether the binary at path is the pinned version. A linter without a pin always passes.
 func versionOK(name, path string) bool {
@@ -91,5 +92,21 @@ func WoodpeckerLint(t testing.TB, name string, data []byte, extra ...string) (st
 	}
 	args := append([]string{"--disable-update-check", "lint", "--strict", "--plugins-privileged", privilegedPlugin}, extra...)
 	out, err := exec.Command(bin, append(args, p)...).CombinedOutput() // #nosec G204 -- pinned local binary, temp path
+	return string(out), err
+}
+
+// RequireDrone is Require for drone.
+func RequireDrone(t testing.TB) string { return Require(t, droneID) }
+
+// DroneLint runs `drone lint --trusted` on one file and returns its output. The error is non-nil when the
+// linter reports a problem. The linter checks only documents with an explicit type (research drone.md 9).
+func DroneLint(t testing.TB, name string, data []byte) (string, error) {
+	t.Helper()
+	bin := RequireDrone(t)
+	p := filepath.Join(t.TempDir(), filepath.Base(name))
+	if err := os.WriteFile(p, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := exec.Command(bin, "lint", "--trusted", p).CombinedOutput() // #nosec G204 -- pinned local binary, temp path
 	return string(out), err
 }
