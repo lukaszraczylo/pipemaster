@@ -454,3 +454,20 @@ func TestSecondUploadWithOtherExpiryIsReported(t *testing.T) {
 		t.Errorf("the dropped second expiry is not reported: %+v", rep.Entries)
 	}
 }
+
+func TestMovedAlwaysStepWithEnvKeepsItsID(t *testing.T) {
+	cleanup := &ir.Step{
+		ID: "cleanup", Kind: ir.StepScript, Script: []string{"rm -rf tmp"}, If: expr.Call{Name: "always"},
+		Env: []ir.Var{{Name: "DIR", Value: ir.Value{Lit: "tmp"}}},
+	}
+	back, files := roundTrip(t, glProject("gitlab", glJob("build", glStep("make"), cleanup)))
+	var got *ir.Step
+	for _, st := range back.Pipelines[0].Jobs[0].Steps {
+		if st.ID == "cleanup" {
+			got = st
+		}
+	}
+	if got == nil || got.If == nil || expr.String(got.If) != "always()" {
+		t.Fatalf("the moved step is not rebuilt from its marker: %+v\n%s", back.Pipelines[0].Jobs[0].Steps, dumpFiles(files))
+	}
+}

@@ -244,6 +244,7 @@ func (e *emitter) placeLines(p *jobPrep, st *ir.Step, lines []string) error {
 			marks = append(marks, a)
 		}
 	}
+	ifEnd := len(marks)
 	if dir != "" {
 		marks = append(marks, emitkit.Marker(caps.StepWorkdir, sp))
 	}
@@ -268,7 +269,8 @@ func (e *emitter) placeLines(p *jobPrep, st *ir.Step, lines []string) error {
 		if err != nil {
 			return err
 		}
-		marks = append(marks, a)
+		// The argument must follow its own marker; after another marker it would not read as the argument of this one.
+		marks = slices.Insert(marks, ifEnd, a)
 	}
 	head := append(marks, e.drain()...)
 	for i, it := range items {
