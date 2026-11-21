@@ -412,3 +412,16 @@ func TestTaskStepEmitsAPlaceholderAndReportsLoss(t *testing.T) {
 		t.Fatalf("no lost entry: %v", rep.Entries)
 	}
 }
+
+func TestShellOfAnImageStepIsReportedLost(t *testing.T) {
+	p := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "ci", Triggers: []ir.Trigger{{Kind: ir.TriggerPush}}, Jobs: []*ir.Job{{
+		ID: "b", Steps: []*ir.Step{{ID: "s", Kind: ir.StepScript, Script: []string{"true"}, Image: &ir.Image{Ref: "alpine:3"}, Shell: "/bin/sh"}},
+	}}}}}
+	_, rep, err := gha.New(gha.GHA).Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e := entry(rep, caps.StepShell); e == nil || e.Level != caps.Lost {
+		t.Fatalf("no lost entry: %v", rep.Entries)
+	}
+}

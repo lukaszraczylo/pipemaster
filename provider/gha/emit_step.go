@@ -234,8 +234,12 @@ func (e *emitter) withKey(m *omap, sp string, w map[string]ir.Value, first *omap
 }
 
 func (e *emitter) stepTail(m *omap, sp string, st *ir.Step, ext map[string]any) error {
-	if st.Shell != "" && st.Image == nil {
-		m.set("shell", str(st.Shell))
+	if st.Shell != "" {
+		if st.Image == nil {
+			m.set("shell", str(st.Shell))
+		} else {
+			e.lose(sp, caps.StepShell, "a step that runs in an image has no shell setting")
+		}
 	}
 	switch {
 	case st.WorkDir != "" && st.Image != nil && m.has("uses"):
