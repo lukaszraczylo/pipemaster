@@ -18,7 +18,9 @@ install_woodpecker() {
 	fi
 
 	local tmp
-	tmp="$(mktemp -d)"
+	tmp="$(mktemp -d "${TMPDIR:-/tmp}/install-linters.XXXXXX")"
+	trap "rm -rf '$tmp'" EXIT
+	# The path expands now: the local variable is gone when the trap runs at script exit.
 	git clone --quiet --depth 1 --branch "$tag" https://github.com/woodpecker-ci/woodpecker "$tmp/src"
 	local got
 	got="$(git -C "$tmp/src" rev-parse HEAD)"
@@ -30,6 +32,7 @@ install_woodpecker() {
 	# The linttool package reads this version to reject a different woodpecker-cli.
 	(cd "$tmp/src" && go build -ldflags "-X go.woodpecker-ci.org/woodpecker/v3/version.Version=${tag#v}" -o "$dest/woodpecker-cli" ./cmd/cli)
 	rm -rf "$tmp"
+	trap - EXIT
 	rm -f "$dest"/.woodpecker-cli-*
 	touch "$stamp"
 	echo "built woodpecker-cli $tag in $dest"
@@ -65,7 +68,8 @@ install_drone() {
 	fi
 
 	local tmp got
-	tmp="$(mktemp -d)"
+	tmp="$(mktemp -d "${TMPDIR:-/tmp}/install-linters.XXXXXX")"
+	trap "rm -rf '$tmp'" EXIT
 	curl -fsSL -o "$tmp/$asset" "https://github.com/harness/drone-cli/releases/download/$tag/$asset"
 	got="$( (sha256sum "$tmp/$asset" 2>/dev/null || shasum -a 256 "$tmp/$asset") | cut -d' ' -f1)"
 	if [[ "$got" != "$want" ]]; then
@@ -76,6 +80,7 @@ install_drone() {
 	tar -xzf "$tmp/$asset" -C "$tmp" drone
 	install -m 0755 "$tmp/drone" "$dest/drone"
 	rm -rf "$tmp"
+	trap - EXIT
 	rm -f "$dest"/.drone-*
 	touch "$stamp"
 	echo "installed drone $tag in $dest"
