@@ -281,3 +281,10 @@ func TestStepDependsOnReportSaysTheDAGIsNotApplied(t *testing.T) {
 		t.Errorf("entries: %+v", rep.Entries)
 	}
 }
+
+func TestKeptSubstitutionReportNamesTheWholeForm(t *testing.T) {
+	_, rep := parseWoodpecker(t, "steps:\n  - name: s\n    image: alpine\n    commands:\n      - echo ${{ x }}\n")
+	if !reportDetailHas(rep, "${{ x }} is a Woodpecker substitution") {
+		t.Errorf("entries: %+v", rep.Entries)
+	}
+}

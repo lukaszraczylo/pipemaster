@@ -135,12 +135,17 @@ func (x *texts) parts(s string) []expr.Part {
 			lit.WriteString(dollar)
 			i += 2
 		case strings.HasPrefix(s[i:], "${"):
-			end := strings.IndexByte(s[i:], '}')
+			closer := "}"
+			if strings.HasPrefix(s[i:], "${{") {
+				closer = "}}"
+			}
+			end := strings.Index(s[i:], closer)
 			if end < 0 {
 				lit.WriteString(s[i:])
 				i = len(s)
 				break
 			}
+			end += len(closer) - 1
 			whole, name := s[i:i+end+1], s[i+2:i+end]
 			if r, ok := x.ref(name); ok && isIdent(name) {
 				flush()
