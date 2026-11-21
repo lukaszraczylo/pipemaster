@@ -384,12 +384,12 @@ func regexTest(ref string, f ir.Filter) (string, bool) {
 	return text, err == nil
 }
 
-// evalArg carries the evaluate text an emitter wrote for a trigger filter, so the parser can tell it from a condition.
 // gateArg says that the evaluate text of the one when entry is the job condition, not part of a trigger.
 type gateArg struct {
 	Gate bool `json:"gate"`
 }
 
+// evalArg carries the evaluate text an emitter wrote for a trigger filter, so the parser can tell it from a condition.
 type evalArg struct {
 	Evaluate string `json:"evaluate"`
 }
