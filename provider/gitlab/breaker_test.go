@@ -120,3 +120,14 @@ func TestEditedMatrixAndOutputLineKeepsFileText(t *testing.T) {
 		t.Error("edited line gave no marker-ignored note")
 	}
 }
+
+func TestStepEnvAndOutputsRestoreTogether(t *testing.T) {
+	const line = "echo ${{ needs.prod.outputs.v }}"
+	mk := glStep("make")
+	mk.Env = []ir.Var{{Name: "A", Value: ir.Value{Lit: "one"}}}
+	_, back, _ := emitParse(t, glProject("gitlab", bkProducer(mk), bkConsumer(line, false)), nil)
+	p := jobByID(t, back, "prod")
+	if len(p.Outputs) != 1 || len(p.Steps) != 1 || len(p.Steps[0].Env) != 1 || strings.Join(p.Steps[0].Script, "|") != "make" {
+		t.Fatalf("producer = outputs %+v, env %+v, script %q", p.Outputs, p.Steps[0].Env, p.Steps[0].Script)
+	}
+}

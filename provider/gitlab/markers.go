@@ -57,8 +57,18 @@ func (s *state) collapseMarkers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[
 	extractMoved(pl, uses, args)
 	s.restoreTriggers(pl, uses, args)
 	stepDone := map[string]map[caps.Feature]bool{}
+	// The dotenv writer lines end a step script, so they go before the step wrappers that enclose the lines.
+	outputsDone := map[ir.FeatureUse]bool{}
+	for _, u := range uses {
+		if u.Feature == caps.JobOutputs {
+			outputsDone[u] = collapseOutputs(s.ctx(pl, u, args))
+		}
+	}
 	for _, u := range uses {
 		if isTriggerMark(u) {
+			continue
+		}
+		if outputsDone[u] {
 			continue
 		}
 		if isStepFeature(u.Feature) {
