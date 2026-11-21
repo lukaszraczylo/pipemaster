@@ -54,3 +54,8 @@ func TestEvents(t *testing.T) {
 		t.Error("push must stay unmapped: a Drone tag push is the tag event")
 	}
 }
+
+var (
+	exact   = expr.Semantics{}
+	folding = expr.Semantics{CaseInsensitiveEq: true}
+)

@@ -113,22 +113,33 @@ func ParseGlob(o expr.Opaque) (key, pattern string, ok bool) {
 
 func strLit(s string) expr.Lit { return expr.Lit{Kind: expr.LitStr, Str: s} }
 
-func valueExpr(key, v string) expr.Expr {
+func valueExpr(key, v string) (expr.Expr, error) {
 	if !IsLiteral(v) {
-		return GlobOpaque(key, v)
+		return GlobOpaque(key, v), nil
+	}
+	if key == KeyEvent {
+		c, ok := canonEvent(v)
+		if !ok {
+			return nil, fmt.Errorf("drone when: event %q has no canonical name", v)
+		}
+		v = c
 	}
 	if tag, ok := strings.CutPrefix(v, tagRefPrefix); ok && key == KeyRef && tag != "" {
-		return expr.Binary{Op: expr.OpEq, L: tagRef, R: strLit(tag)}
+		return expr.Binary{Op: expr.OpEq, L: tagRef, R: strLit(tag)}, nil
 	}
-	return expr.Binary{Op: expr.OpEq, L: keyRefs[key], R: strLit(v)}
+	return expr.Binary{Op: expr.OpEq, L: keyRefs[key], R: strLit(v)}, nil
 }
 
-func orChain(key string, vs []string) expr.Expr {
+func orChain(key string, vs []string) (expr.Expr, error) {
 	var out expr.Expr
 	for _, v := range vs {
-		out = or(out, valueExpr(key, v))
+		e, err := valueExpr(key, v)
+		if err != nil {
+			return nil, err
+		}
+		out = or(out, e)
 	}
-	return out
+	return out, nil
 }
 
 func and(l, r expr.Expr) expr.Expr {
@@ -153,18 +164,26 @@ func or(l, r expr.Expr) expr.Expr {
 
 // FilterExpr maps one when key to an expression: include-OR AND NOT exclude-OR, as Condition.Match in
 // manifest/cond.go. A literal value is an equality, a glob is a GlobOpaque, and `ref: refs/tags/x` is the tag
-// x. Branch carries no tag-event guard: on a pull request Drone matches it against the target branch. A nil
+// x. An event value maps to its canonical name (cron is schedule); one with none, such as push, is an error.
+// Branch carries no tag-event guard: on a pull request Drone matches it against the target branch. A nil
 // result means the filter holds no value and matches every run.
 func FilterExpr(key string, f Filter) (expr.Expr, error) {
 	if _, ok := keyRefs[key]; !ok {
 		return nil, fmt.Errorf("drone when: key %q has no expression form", key)
 	}
 	var out expr.Expr
+	var err error
 	if len(f.Include) > 0 {
-		out = orChain(key, f.Include)
+		if out, err = orChain(key, f.Include); err != nil {
+			return nil, err
+		}
 	}
 	if len(f.Exclude) > 0 {
-		out = and(out, expr.Unary{Op: expr.OpNot, X: orChain(key, f.Exclude)})
+		exc, err := orChain(key, f.Exclude)
+		if err != nil {
+			return nil, err
+		}
+		out = and(out, expr.Unary{Op: expr.OpNot, X: exc})
 	}
 	return out, nil
 }
@@ -245,9 +264,12 @@ func flattenOr(e expr.Expr) []expr.Expr {
 	return []expr.Expr{e}
 }
 
+// reader reads an AST under the equality semantics of its source dialect.
+type reader struct{ sem expr.Semantics }
+
 // valueOf reads one disjunct as a filter value of some key: an equality of a key ref with a string, a tag
 // equality, or a glob.
-func valueOf(e expr.Expr) (key, v string, ok bool) {
+func (rd reader) valueOf(e expr.Expr) (key, v string, ok bool) {
 	switch x := e.(type) {
 	case expr.Opaque:
 		k, p, ok := ParseGlob(x)
@@ -258,24 +280,29 @@ func valueOf(e expr.Expr) (key, v string, ok bool) {
 		if x.Op != expr.OpEq || !isLit || !isRef || lit.Kind != expr.LitStr || !IsLiteral(lit.Str) {
 			return "", "", false
 		}
-		if slices.Equal(r.Path, tagRef.Path) && lit.Str != "" {
+		if slices.Equal(r.Path, tagRef.Path) && lit.Str != "" && exactValue(lit.Str, rd.sem) {
 			return KeyRef, tagRefPrefix + lit.Str, true
 		}
 		for _, k := range keyOrder {
-			if slices.Equal(keyRefs[k].Path, r.Path) {
-				return k, lit.Str, true
+			if !slices.Equal(keyRefs[k].Path, r.Path) {
+				continue
 			}
+			if k == KeyEvent {
+				v, ok := droneEvent(lit.Str, rd.sem.CaseInsensitiveEq)
+				return k, v, ok
+			}
+			return k, lit.Str, exactValue(lit.Str, rd.sem)
 		}
 	}
 	return "", "", false
 }
 
 // valuesOf reads an OR chain whose disjuncts all belong to one key.
-func valuesOf(e expr.Expr) (string, []string, bool) {
+func (rd reader) valuesOf(e expr.Expr) (string, []string, bool) {
 	var key string
 	var vs []string
 	for _, d := range flattenOr(e) {
-		k, v, ok := valueOf(d)
+		k, v, ok := rd.valueOf(d)
 		if !ok || (key != "" && k != key) {
 			return "", nil, false
 		}
@@ -286,29 +313,33 @@ func valuesOf(e expr.Expr) (string, []string, bool) {
 }
 
 // filterOf reads include, NOT exclude, or both ANDed.
-func filterOf(e expr.Expr) (string, Filter, bool) {
+func (rd reader) filterOf(e expr.Expr) (string, Filter, bool) {
 	if b, ok := e.(expr.Binary); ok && b.Op == expr.OpAnd {
 		n, isNot := b.R.(expr.Unary)
 		if !isNot || n.Op != expr.OpNot {
 			return "", Filter{}, false
 		}
-		k1, inc, ok1 := valuesOf(b.L)
-		k2, exc, ok2 := valuesOf(n.X)
+		k1, inc, ok1 := rd.valuesOf(b.L)
+		k2, exc, ok2 := rd.valuesOf(n.X)
 		return k1, Filter{Include: inc, Exclude: exc}, ok1 && ok2 && k1 == k2
 	}
 	if n, ok := e.(expr.Unary); ok && n.Op == expr.OpNot {
-		k, exc, ok := valuesOf(n.X)
+		k, exc, ok := rd.valuesOf(n.X)
 		return k, Filter{Exclude: exc}, ok
 	}
-	k, inc, ok := valuesOf(e)
+	k, inc, ok := rd.valuesOf(e)
 	return k, Filter{Include: inc}, ok
 }
 
-// FromExpr inverts ToExpr. It succeeds only for an AND of per-key ORs over branch, tag, event, ref and repo
+// FromExpr inverts ToExpr. sem is the equality semantics of the dialect that wrote e. Drone globs are case
+// sensitive, so under a folding source a comparison becomes a filter value only when its literal has no cased
+// character; an event literal is lowered first and maps to its DRONE_BUILD_EVENT value, and one with no Drone
+// value (push) fails. It succeeds only for an AND of per-key ORs over branch, tag, event, ref and repo
 // refs, with at most one filter per key and an optional status call. Any other shape, including an OR across
 // keys, a ref with no Drone filter such as pr.head_ref, or an Opaque that is not a glob, fails: Drone ANDs
 // the keys of one when block and has no OR between them. A nil e matches every run.
-func FromExpr(e expr.Expr) (Conditions, bool) {
+func FromExpr(e expr.Expr, sem expr.Semantics) (Conditions, bool) {
+	rd := reader{sem}
 	var c Conditions
 	if e == nil {
 		return c, true
@@ -329,7 +360,7 @@ func FromExpr(e expr.Expr) (Conditions, bool) {
 			seenStatus, c.Status = true, s
 			continue
 		}
-		k, f, ok := filterOf(conj)
+		k, f, ok := rd.filterOf(conj)
 		if !ok {
 			return Conditions{}, false
 		}

@@ -4,6 +4,8 @@ package drone
 
 import (
 	"regexp"
+	"strings"
+	"unicode"
 
 	"github.com/lukaszraczylo/pipemaster/expr"
 )
@@ -12,7 +14,8 @@ import (
 const Dialect = "drone"
 
 // Vocab maps Drone built-in variable names (one-segment paths) to canonical refs. Any other name is a user
-// env ref; see Ref.
+// env ref; see Ref. Assumption: DRONE_BRANCH is the target branch on a pull request, as the branch filter is
+// (research drone.md 4.4); the docs text for the variable is unverified (research drone.md 6).
 var Vocab = expr.Vocab{
 	ToCanon: map[string][]string{
 		"DRONE_BRANCH":        {expr.CtxBranch},
@@ -44,6 +47,46 @@ var Events = map[string]string{
 	"schedule":          "cron",
 	"workflow_dispatch": "custom",
 }
+
+// nativeEvents are Drone event values with no canonical name; they stand for themselves in the AST.
+var nativeEvents = map[string]bool{"tag": true, "promote": true, "rollback": true}
+
+// droneEvent maps a canonical event literal to the DRONE_BUILD_EVENT value. A folding source compares event
+// names without case and Drone values are lowercase, so the literal is lowered first. A literal with no Drone
+// value, such as push, fails: GHA push includes tag pushes, which Drone reports as the tag event.
+func droneEvent(canon string, fold bool) (string, bool) {
+	if fold {
+		canon = strings.ToLower(canon)
+	}
+	if v, ok := Events[canon]; ok {
+		return v, true
+	}
+	return canon, nativeEvents[canon]
+}
+
+// canonEvent inverts droneEvent for a DRONE_BUILD_EVENT value.
+func canonEvent(native string) (string, bool) {
+	for c, v := range Events {
+		if v == native {
+			return c, true
+		}
+	}
+	return native, nativeEvents[native]
+}
+
+// cased reports whether s holds a character that case folding changes.
+func cased(s string) bool {
+	for _, r := range s {
+		if unicode.ToLower(r) != r || unicode.ToUpper(r) != r {
+			return true
+		}
+	}
+	return false
+}
+
+// exactValue reports whether a string compared with == reads the same under sem and under Drone's
+// case-sensitive equality: always for an exact source, and for a folding one only when s has no cased character.
+func exactValue(s string, sem expr.Semantics) bool { return !sem.CaseInsensitiveEq || !cased(s) }
 
 var envName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 

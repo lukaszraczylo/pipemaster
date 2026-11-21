@@ -2,6 +2,7 @@ package drone_test
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"go.yaml.in/yaml/v3"
@@ -24,9 +25,9 @@ func TestFilterExpr(t *testing.T) {
 		f    drone.Filter
 	}{
 		{nil, "empty matches all", "event", drone.Filter{}},
-		{eq(event, "push"), "single literal", "event", drone.Filter{Include: []string{"push"}}},
-		{bin(expr.OpOr, eq(event, "push"), eq(event, "tag")), "list is OR", "event",
-			drone.Filter{Include: []string{"push", "tag"}}},
+		{eq(event, "pull_request"), "single literal", "event", drone.Filter{Include: []string{"pull_request"}}},
+		{bin(expr.OpOr, eq(event, "pull_request"), eq(event, "tag")), "list is OR", "event",
+			drone.Filter{Include: []string{"pull_request", "tag"}}},
 		{bin(expr.OpAnd, eq(r("repo"), "a/b"), not(eq(r("repo"), "a/c"))), "include and exclude", "repo",
 			drone.Filter{Include: []string{"a/b"}, Exclude: []string{"a/c"}}},
 		{not(eq(r("repo"), "a/c")), "exclude only", "repo", drone.Filter{Exclude: []string{"a/c"}}},
@@ -82,7 +83,7 @@ func TestFromExprIdentity(t *testing.T) {
 	}{
 		{"empty", drone.Conditions{}},
 		{"keys AND", drone.Conditions{
-			Event:  drone.Filter{Include: []string{"push", "tag"}},
+			Event:  drone.Filter{Include: []string{"cron", "tag"}},
 			Branch: drone.Filter{Include: []string{"main", "release/*"}, Exclude: []string{"wip"}},
 			Ref:    drone.Filter{Include: []string{"refs/tags/v1", "refs/heads/x"}},
 			Repo:   drone.Filter{Exclude: []string{"a/*"}},
@@ -96,7 +97,7 @@ func TestFromExprIdentity(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got, ok := drone.FromExpr(e)
+			got, ok := drone.FromExpr(e, exact)
 			if !ok || !reflect.DeepEqual(got, c.c) {
 				t.Errorf("FromExpr(ToExpr(c)) = %#v, %v; want %#v", got, ok, c.c)
 			}
@@ -107,29 +108,43 @@ func TestFromExprIdentity(t *testing.T) {
 // Review Focus 1: Drone ANDs the keys of one when, so an OR across keys has no filter form.
 func TestNoOrAcrossKeys(t *testing.T) {
 	gha := bin(expr.OpOr,
-		bin(expr.OpAnd, eq(event, "push"), eq(branch, "main")),
-		eq(event, "tag"))
-	if c, ok := drone.FromExpr(gha); ok {
+		bin(expr.OpAnd, eq(event, "pull_request"), eq(branch, "main")),
+		eq(event, "schedule"))
+	if c, ok := drone.FromExpr(gha, exact); ok {
 		t.Fatalf("an OR across keys became one when: %#v", c)
 	}
-	if !drone.Guardable(gha) {
+	if !drone.Guardable(gha, exact) {
 		t.Fatal("the condition must fall back to a shell guard")
 	}
-	line, err := drone.PrintGuard(gha)
+	line, err := drone.PrintGuard(gha, exact)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, ok := drone.ParseGuard(line); !ok || !reflect.DeepEqual(got, gha) {
+	if !strings.Contains(line, `'cron'`) {
+		t.Errorf("guard %q must compare the Drone event value", line)
+	}
+	want := bin(expr.OpOr,
+		bin(expr.OpAnd, eq(event, "pull_request"), eq(branch, "main")),
+		eq(event, "schedule"))
+	if got, ok := drone.ParseGuard(line); !ok || !reflect.DeepEqual(got, want) {
 		t.Errorf("guard %q parsed to %#v, %v", line, got, ok)
 	}
+	// The GHA push event has no Drone literal, so the plan's own example cannot be guarded.
+	push := bin(expr.OpOr, bin(expr.OpAnd, eq(event, "push"), eq(branch, "main")), eq(event, "tag"))
+	if drone.Guardable(push, exact) {
+		t.Error("a push condition was guardable")
+	}
+	if c, ok := drone.FromExpr(push, exact); ok {
+		t.Errorf("a push condition became a filter: %#v", c)
+	}
 	// Same key in both arms of an OR is a value list, so it stays a filter.
-	same := bin(expr.OpOr, eq(event, "push"), eq(event, "tag"))
-	if c, ok := drone.FromExpr(same); !ok || !reflect.DeepEqual(c.Event.Include, []string{"push", "tag"}) {
+	same := bin(expr.OpOr, eq(event, "pull_request"), eq(event, "tag"))
+	if c, ok := drone.FromExpr(same, exact); !ok || !reflect.DeepEqual(c.Event.Include, []string{"pull_request", "tag"}) {
 		t.Errorf("same-key OR = %#v, %v", c, ok)
 	}
 	// A key repeated under AND with a different half has no single filter.
-	twice := bin(expr.OpAnd, eq(event, "push"), eq(event, "tag"))
-	if c, ok := drone.FromExpr(twice); ok {
+	twice := bin(expr.OpAnd, eq(event, "pull_request"), eq(event, "tag"))
+	if c, ok := drone.FromExpr(twice, exact); ok {
 		t.Errorf("two filters for one key merged: %#v", c)
 	}
 }
@@ -137,7 +152,7 @@ func TestNoOrAcrossKeys(t *testing.T) {
 // Review Focus 2: Drone branch is the target branch on a pull request, so GHA branches maps without a caveat.
 func TestBranchOnPullRequest(t *testing.T) {
 	ghaPR := bin(expr.OpAnd, eq(event, "pull_request"), eq(branch, "main"))
-	c, ok := drone.FromExpr(ghaPR)
+	c, ok := drone.FromExpr(ghaPR, exact)
 	want := drone.Conditions{Event: drone.Filter{Include: []string{"pull_request"}}, Branch: drone.Filter{Include: []string{"main"}}}
 	if !ok || !reflect.DeepEqual(c, want) {
 		t.Fatalf("FromExpr = %#v, %v; want %#v", c, ok, want)
@@ -147,7 +162,7 @@ func TestBranchOnPullRequest(t *testing.T) {
 		t.Errorf("ToExpr = %#v, %v; want no tag guard and no caveat node", e, err)
 	}
 	for _, ref := range []expr.Ref{r("pr", "head_ref"), r("pr", "base_ref"), r("sha"), r("actor")} {
-		if c, ok := drone.FromExpr(eq(ref, "x")); ok {
+		if c, ok := drone.FromExpr(eq(ref, "x"), exact); ok {
 			t.Errorf("%v has no Drone filter but gave %#v", ref.Path, c)
 		}
 	}
@@ -166,7 +181,7 @@ func TestFromExprRefusals(t *testing.T) {
 		"status argument": expr.Call{Name: "failure", Args: []expr.Expr{str("x")}},
 		"env ref":         eq(r("env", "X"), "1"),
 	} {
-		if c, ok := drone.FromExpr(e); ok {
+		if c, ok := drone.FromExpr(e, exact); ok {
 			t.Errorf("%s: FromExpr = %#v; want a refusal", name, c)
 		}
 	}
@@ -180,11 +195,11 @@ func TestDisabledFilter(t *testing.T) {
 	if !reflect.DeepEqual(d.Event.Exclude, []string{"**"}) || len(d.Event.Include) != 0 {
 		t.Errorf("disabled = %#v; want event exclude **", d)
 	}
-	got, ok := drone.FromExpr(expr.Lit{Kind: expr.LitBool})
+	got, ok := drone.FromExpr(expr.Lit{Kind: expr.LitBool}, exact)
 	if !ok || !reflect.DeepEqual(got, d) {
 		t.Errorf("false = %#v, %v; want the disabled filter", got, ok)
 	}
-	if got, ok := drone.FromExpr(expr.Lit{Kind: expr.LitBool, Bool: true}); !ok || !reflect.DeepEqual(got, drone.Conditions{}) {
+	if got, ok := drone.FromExpr(expr.Lit{Kind: expr.LitBool, Bool: true}, exact); !ok || !reflect.DeepEqual(got, drone.Conditions{}) {
 		t.Errorf("true = %#v, %v; want no conditions", got, ok)
 	}
 	parsed, _, err := drone.Parse([]byte("event:\n  exclude: ['**']\n"))
@@ -257,9 +272,21 @@ func genFilter(t *rapid.T, label string) drone.Filter {
 	return f
 }
 
+func genEventFilter(t *rapid.T) drone.Filter {
+	val := rapid.SampledFrom([]string{"pull_request", "cron", "custom", "tag", "promote", "rollback", "p*", "**"})
+	f := drone.Filter{Include: rapid.SliceOfN(val, 0, 3).Draw(t, "eventinc"), Exclude: rapid.SliceOfN(val, 0, 3).Draw(t, "eventexc")}
+	if len(f.Include) == 0 {
+		f.Include = nil
+	}
+	if len(f.Exclude) == 0 {
+		f.Exclude = nil
+	}
+	return f
+}
+
 func genConditions(t *rapid.T) drone.Conditions {
 	return drone.Conditions{
-		Event: genFilter(t, "event"), Branch: genFilter(t, "branch"), Ref: genFilter(t, "ref"), Repo: genFilter(t, "repo"),
+		Event: genEventFilter(t), Branch: genFilter(t, "branch"), Ref: genFilter(t, "ref"), Repo: genFilter(t, "repo"),
 		Status: rapid.SampledFrom([][]string{nil, {"failure"}, {"success", "failure"}}).Draw(t, "status"),
 	}
 }
@@ -279,7 +306,7 @@ func TestConditionsRoundTrips(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		got, ok := drone.FromExpr(e)
+		got, ok := drone.FromExpr(e, exact)
 		if !ok || !reflect.DeepEqual(got, c) {
 			t.Fatalf("expression round trip of %#v gave %#v, %v", c, got, ok)
 		}
@@ -308,10 +335,72 @@ func FuzzParse(f *testing.F) {
 		}
 		e, err := drone.ToExpr(c)
 		if err != nil {
-			t.Fatalf("ToExpr of %#v: %v", c, err)
+			return // an event value with no canonical name, such as push
 		}
-		if got, ok := drone.FromExpr(e); !ok || !reflect.DeepEqual(got, c) {
+		if got, ok := drone.FromExpr(e, exact); !ok || !reflect.DeepEqual(got, c) {
 			t.Fatalf("expression round trip of %#v gave %#v, %v", c, got, ok)
 		}
 	})
+}
+
+func TestEventsTranslate(t *testing.T) {
+	for _, c := range []struct{ native, canon string }{
+		{"cron", "schedule"}, {"custom", "workflow_dispatch"}, {"pull_request", "pull_request"},
+		{"tag", "tag"}, {"promote", "promote"}, {"rollback", "rollback"},
+	} {
+		inc, err := drone.ToExpr(drone.Conditions{Event: drone.Filter{Include: []string{c.native}}})
+		if err != nil || !reflect.DeepEqual(inc, eq(event, c.canon)) {
+			t.Errorf("ToExpr(event %s) = %#v, %v; want event == %q", c.native, inc, err, c.canon)
+		}
+		got, ok := drone.FromExpr(eq(event, c.canon), exact)
+		if !ok || !reflect.DeepEqual(got.Event.Include, []string{c.native}) {
+			t.Errorf("FromExpr(event == %q) = %#v, %v; want %s", c.canon, got, ok, c.native)
+		}
+		exc, ok := drone.FromExpr(not(eq(event, c.canon)), exact)
+		if !ok || !reflect.DeepEqual(exc.Event.Exclude, []string{c.native}) {
+			t.Errorf("FromExpr(event != %q) = %#v, %v; want exclude %s", c.canon, exc, ok, c.native)
+		}
+	}
+}
+
+func TestEventsWithoutDroneLiteral(t *testing.T) {
+	for _, v := range []string{"push", "foo", "cron-ish"} {
+		if c, ok := drone.FromExpr(eq(event, v), exact); ok {
+			t.Errorf("FromExpr(event == %q) = %#v; want a refusal", v, c)
+		}
+	}
+	// Native names with no canonical meaning cannot stand in the canonical AST.
+	for _, v := range []string{"push", "schedule", "workflow_dispatch", "foo"} {
+		if e, err := drone.ToExpr(drone.Conditions{Event: drone.Filter{Include: []string{v}}}); err == nil {
+			t.Errorf("ToExpr(event %s) = %#v; want an error", v, e)
+		}
+	}
+	if c, ok := drone.FromExpr(bin(expr.OpEq, event, r("branch")), exact); ok {
+		t.Errorf("event against a ref became a filter: %#v", c)
+	}
+}
+
+// A GHA-style source folds case in ==, and Drone globs do not: only a value with no cased character agrees.
+func TestFoldingSourceFilters(t *testing.T) {
+	if c, ok := drone.FromExpr(eq(branch, "Main"), folding); ok {
+		t.Errorf("a folded branch comparison became a case-sensitive filter: %#v", c)
+	}
+	if _, ok := drone.FromExpr(eq(branch, "Main"), exact); !ok {
+		t.Error("an exact source keeps the filter")
+	}
+	for _, e := range []expr.Expr{eq(branch, "main"), eq(r("tag"), "v1"), eq(r("repo"), "a/b")} {
+		if c, ok := drone.FromExpr(e, folding); ok {
+			t.Errorf("%#v became a filter under folding: %#v", e, c)
+		}
+	}
+	if c, ok := drone.FromExpr(eq(branch, "2024-01"), folding); !ok || !reflect.DeepEqual(c.Branch.Include, []string{"2024-01"}) {
+		t.Errorf("an uncased value stays exact: %#v, %v", c, ok)
+	}
+	// Event values are lowercase on both sides, so the literal is folded before the table lookup.
+	if c, ok := drone.FromExpr(eq(event, "Schedule"), folding); !ok || !reflect.DeepEqual(c.Event.Include, []string{"cron"}) {
+		t.Errorf("folded event = %#v, %v; want cron", c, ok)
+	}
+	if c, ok := drone.FromExpr(eq(event, "Schedule"), exact); ok {
+		t.Errorf("an exact source matched a cased event: %#v", c)
+	}
 }

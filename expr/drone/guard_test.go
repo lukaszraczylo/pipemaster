@@ -28,14 +28,14 @@ func TestPrintGuard(t *testing.T) {
 		{eq(branch, `a "b" c`), "spaces and double quote", `if ! [ "$DRONE_BRANCH" = 'a "b" c' ]; then exit 0; fi # pipemaster:guard`},
 		{eq(branch, "-n"), "test operators as data", `if ! [ "$DRONE_BRANCH" = '-n' ]; then exit 0; fi # pipemaster:guard`},
 		{bin(expr.OpAnd, bin(expr.OpAnd, eq(branch, "a"), eq(r("repo"), "b")), eq(r("tag"), "c")), "and chains bare", `if ! ( [ "$DRONE_BRANCH" = 'a' ] && [ "$DRONE_REPO" = 'b' ] && [ "$DRONE_TAG" = 'c' ] ); then exit 0; fi # pipemaster:guard`},
-		{bin(expr.OpOr, bin(expr.OpAnd, eq(event, "push"), eq(branch, "main")), eq(event, "tag")), "mixed operators group", `if ! ( ( [ "$DRONE_BUILD_EVENT" = 'push' ] && [ "$DRONE_BRANCH" = 'main' ] ) || [ "$DRONE_BUILD_EVENT" = 'tag' ] ); then exit 0; fi # pipemaster:guard`},
+		{bin(expr.OpOr, bin(expr.OpAnd, eq(event, "pull_request"), eq(branch, "main")), eq(event, "schedule")), "mixed operators group", `if ! ( ( [ "$DRONE_BUILD_EVENT" = 'pull_request' ] && [ "$DRONE_BRANCH" = 'main' ] ) || [ "$DRONE_BUILD_EVENT" = 'cron' ] ); then exit 0; fi # pipemaster:guard`},
 		{bin(expr.OpAnd, eq(branch, "a"), bin(expr.OpAnd, eq(r("repo"), "b"), eq(r("tag"), "c"))), "right nesting groups", `if ! ( [ "$DRONE_BRANCH" = 'a' ] && ( [ "$DRONE_REPO" = 'b' ] && [ "$DRONE_TAG" = 'c' ] ) ); then exit 0; fi # pipemaster:guard`},
 		{not(eq(branch, "a")), "not", `if ! ( ! [ "$DRONE_BRANCH" = 'a' ] ); then exit 0; fi # pipemaster:guard`},
 		{not(bin(expr.OpOr, eq(branch, "a"), eq(branch, "b"))), "not of group", `if ! ( ! ( [ "$DRONE_BRANCH" = 'a' ] || [ "$DRONE_BRANCH" = 'b' ] ) ); then exit 0; fi # pipemaster:guard`},
 		{not(not(eq(branch, "a"))), "double not", `if ! ( ! ( ! [ "$DRONE_BRANCH" = 'a' ] ) ); then exit 0; fi # pipemaster:guard`},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			got, err := drone.PrintGuard(c.e)
+			got, err := drone.PrintGuard(c.e, exact)
 			if err != nil || got != c.want {
 				t.Fatalf("PrintGuard =\n%s\nerr %v; want\n%s", got, err, c.want)
 			}
@@ -71,17 +71,17 @@ func TestNotGuardable(t *testing.T) {
 		"right of or":     bin(expr.OpOr, eq(branch, "a"), drone.GlobOpaque("branch", "*")),
 		"foreign opaque":  expr.Opaque{Dialect: "gha", Text: "x"},
 	} {
-		if drone.Guardable(e) {
+		if drone.Guardable(e, exact) {
 			t.Errorf("%s: Guardable = true", name)
 		}
-		if line, err := drone.PrintGuard(e); !errors.Is(err, drone.ErrNotGuardable) {
+		if line, err := drone.PrintGuard(e, exact); !errors.Is(err, drone.ErrNotGuardable) {
 			t.Errorf("%s: PrintGuard = %q, %v; want ErrNotGuardable", name, line, err)
 		}
 	}
 }
 
 func TestParseGuardRejectsOtherText(t *testing.T) {
-	good, err := drone.PrintGuard(eq(branch, "main"))
+	good, err := drone.PrintGuard(eq(branch, "main"), exact)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,9 +107,9 @@ func TestParseGuardRejectsOtherText(t *testing.T) {
 }
 
 func TestAddRemoveGuard(t *testing.T) {
-	e := bin(expr.OpAnd, eq(event, "push"), eq(branch, "it's"))
+	e := bin(expr.OpAnd, eq(event, "pull_request"), eq(branch, "it's"))
 	script := []string{"make test", "make release"}
-	guarded, err := drone.AddGuard(script, e)
+	guarded, err := drone.AddGuard(script, e, exact)
 	if err != nil || len(guarded) != 3 || !reflect.DeepEqual(guarded[1:], script) {
 		t.Fatalf("AddGuard = %q, %v", guarded, err)
 	}
@@ -126,7 +126,7 @@ func TestAddRemoveGuard(t *testing.T) {
 	if _, _, ok := drone.RemoveGuard(nil); ok {
 		t.Error("RemoveGuard on no script")
 	}
-	if _, err := drone.AddGuard(script, expr.Call{Name: "success"}); !errors.Is(err, drone.ErrNotGuardable) {
+	if _, err := drone.AddGuard(script, expr.Call{Name: "success"}, exact); !errors.Is(err, drone.ErrNotGuardable) {
 		t.Errorf("AddGuard on a call = %v", err)
 	}
 	// A guard anywhere but first is the author's line.
@@ -138,7 +138,7 @@ func TestAddRemoveGuard(t *testing.T) {
 var hostile = []string{"main", "", "it's", `a "b"`, "$HOME", "`id`", "a b", `\`, "-n", "!", "(", "*", "x;rm", "a'b'c", "é", "'"}
 
 var guardRefs = []expr.Ref{
-	r("branch"), r("tag"), r("event"), r("sha"), r("repo"), r("actor"), r("pr", "number"), r("ref"), r("env", "FOO"), r("env", "_b1"),
+	r("branch"), r("tag"), r("sha"), r("repo"), r("actor"), r("pr", "number"), r("ref"), r("env", "FOO"), r("env", "_b1"),
 }
 
 func genOperand(t *rapid.T, label string) expr.Expr {
@@ -163,7 +163,7 @@ func genGuardable(t *rapid.T, depth int) expr.Expr {
 func TestGuardRoundTrips(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		e := genGuardable(t, 4)
-		line, err := drone.PrintGuard(e)
+		line, err := drone.PrintGuard(e, exact)
 		if err != nil {
 			t.Fatalf("PrintGuard(%#v): %v", e, err)
 		}
@@ -171,7 +171,7 @@ func TestGuardRoundTrips(t *testing.T) {
 		if !ok || !reflect.DeepEqual(back, e) {
 			t.Fatalf("ParseGuard(%s) = %#v, %v; want %#v", line, back, ok, e)
 		}
-		if again, err := drone.PrintGuard(back); err != nil || again != line {
+		if again, err := drone.PrintGuard(back, exact); err != nil || again != line {
 			t.Fatalf("reprint = %q, %v; want %q", again, err, line)
 		}
 	})
@@ -210,7 +210,7 @@ func TestGuardAgreesWithShell(t *testing.T) {
 	}
 	rapid.Check(t, func(t *rapid.T) {
 		e := genGuardable(t, 3)
-		line, err := drone.PrintGuard(e)
+		line, err := drone.PrintGuard(e, exact)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -231,4 +231,87 @@ func TestGuardAgreesWithShell(t *testing.T) {
 			t.Fatalf("%s with %v: shell ran=%v, AST says %v (output %q)", line, environ, ran, want, out)
 		}
 	})
+}
+
+func TestGuardEventsTranslate(t *testing.T) {
+	got, err := drone.PrintGuard(bin(expr.OpNe, event, str("schedule")), exact)
+	want := `if ! [ "$DRONE_BUILD_EVENT" != 'cron' ]; then exit 0; fi # pipemaster:guard`
+	if err != nil || got != want {
+		t.Fatalf("PrintGuard = %q, %v; want %q", got, err, want)
+	}
+	back, ok := drone.ParseGuard(got)
+	if !ok || !reflect.DeepEqual(back, bin(expr.OpNe, event, str("schedule"))) {
+		t.Errorf("ParseGuard = %#v, %v; want the canonical event", back, ok)
+	}
+	if e, ok := drone.ParseGuard(`if ! [ "$DRONE_BUILD_EVENT" = 'push' ]; then exit 0; fi # pipemaster:guard`); ok {
+		t.Errorf("a Drone push guard parsed as %#v", e)
+	}
+}
+
+// Under the shell, the guard must run the step exactly when the canonical event test holds for the Drone value.
+func TestGuardEventsAgreeWithShell(t *testing.T) {
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("no sh")
+	}
+	canon := map[string]string{"cron": "schedule", "custom": "workflow_dispatch", "pull_request": "pull_request",
+		"tag": "tag", "promote": "promote", "rollback": "rollback"}
+	for lit := range canon {
+		for _, op := range []string{expr.OpEq, expr.OpNe} {
+			e := bin(op, event, str(canon[lit]))
+			line, err := drone.PrintGuard(e, exact)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for env := range canon {
+				cmd := exec.Command(sh, "-c", line+"\necho ran") //nolint:gosec // generated test script
+				cmd.Env = []string{"DRONE_BUILD_EVENT=" + env}
+				out, err := cmd.CombinedOutput()
+				if err != nil {
+					t.Fatalf("%s: %v %s", line, err, out)
+				}
+				holds := env == lit
+				if op == expr.OpNe {
+					holds = !holds
+				}
+				if ran := string(out) == "ran\n"; ran != holds {
+					t.Errorf("%s with event %s: ran=%v want %v", line, env, ran, holds)
+				}
+			}
+		}
+	}
+}
+
+// A folding source compares case-insensitively and the shell test does not, so only an uncased literal agrees.
+func TestFoldingSourceGuards(t *testing.T) {
+	for name, e := range map[string]expr.Expr{
+		"cased literal":   eq(branch, "Main"),
+		"lower literal":   eq(branch, "main"),
+		"inequality":      bin(expr.OpNe, branch, str("main")),
+		"ref against ref": bin(expr.OpEq, branch, r("repo")),
+		"two literals":    bin(expr.OpEq, str("a"), str("b")),
+		"inside not":      not(eq(branch, "main")),
+		"non-ASCII":       eq(branch, "é"),
+	} {
+		if drone.Guardable(e, folding) {
+			t.Errorf("%s: guardable under a folding source", name)
+		}
+		if !drone.Guardable(e, exact) {
+			t.Errorf("%s: must stay guardable for an exact source", name)
+		}
+	}
+	for name, e := range map[string]expr.Expr{
+		"digits":        eq(r("pr", "number"), "42"),
+		"punctuation":   bin(expr.OpNe, branch, str("-")),
+		"empty":         eq(r("tag"), ""),
+		"event literal": eq(event, "Schedule"),
+	} {
+		if !drone.Guardable(e, folding) {
+			t.Errorf("%s: an uncased comparison is exact and must stay guardable", name)
+		}
+	}
+	line, err := drone.PrintGuard(eq(event, "Schedule"), folding)
+	if err != nil || !strings.Contains(line, `'cron'`) {
+		t.Errorf("folded event guard = %q, %v; want the lowercase Drone value", line, err)
+	}
 }
