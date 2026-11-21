@@ -729,7 +729,13 @@
             "environment": {},
             "when": {},
             "depends_on": {},
-            "user": {}
+            "user": {},
+            "working_dir": {
+              "type": "string"
+            },
+            "entrypoint": {
+              "$ref": "#/definitions/commands"
+            }
           }
         }
       ]

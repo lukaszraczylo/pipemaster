@@ -49,3 +49,15 @@ func TestConvertFromGiteaReadsOnlyGiteaDir(t *testing.T) {
 		t.Fatalf("output is not from .gitea only:\n%s", got)
 	}
 }
+
+func TestConvertToDroneKeepsWorkingDirectory(t *testing.T) {
+	src, out := t.TempDir(), t.TempDir()
+	write(t, src, ".github/workflows/ci.yml", "name: ci\non: push\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ls\n        working-directory: sub\n")
+	code, _, errs := run(t, "convert", src, "--from", "gha", "--to", "drone", "-o", out)
+	if code != 0 {
+		t.Fatalf("code=%d stderr=%q", code, errs)
+	}
+	if got := read(t, out, ".drone.yml"); !strings.Contains(got, "working_dir: sub") {
+		t.Fatalf("working_dir missing:\n%s", got)
+	}
+}

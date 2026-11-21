@@ -47,7 +47,7 @@ func emitText(t *testing.T, p *ir.Project) (string, *report.Report) {
 		t.Fatalf("want one %s, got %d files", ymlName, len(raw))
 	}
 	data := raw[ymlName]
-	if err := validate.File(drone.New().ID(), ymlName, withoutSchemaGaps(t, data)); err != nil {
+	if err := validate.File(drone.New().ID(), ymlName, data); err != nil {
 		t.Errorf("the file fails the schema: %v\n%s", err, data)
 	}
 	if _, ok := linttool.Locate(t, "drone"); ok {
@@ -144,50 +144,6 @@ func reparse(t *testing.T, text string) *ir.Project {
 	return p
 }
 
-// schemaGaps are the step keys that the docker runner reads and the SchemaStore schema rejects, because its
-// step_docker object lists a fixed set of keys (research drone.md 8, "Gaps vs code").
-var schemaGaps = []string{"working_dir", "entrypoint"}
-
-// withoutSchemaGaps removes the schemaGaps keys from every step so the rest of the file is validated.
-func withoutSchemaGaps(t *testing.T, data []byte) []byte {
-	t.Helper()
-	var docs []any
-	dec := yaml.NewDecoder(strings.NewReader(string(data)))
-	for {
-		var d any
-		err := dec.Decode(&d)
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			t.Fatalf("decode: %v", err)
-		}
-		docs = append(docs, d)
-	}
-	var out strings.Builder
-	for i, d := range docs {
-		if m, ok := d.(map[string]any); ok {
-			steps, _ := m["steps"].([]any)
-			for _, s := range steps {
-				if sm, ok := s.(map[string]any); ok {
-					for _, k := range schemaGaps {
-						delete(sm, k)
-					}
-				}
-			}
-		}
-		b, err := yaml.Marshal(d)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if i > 0 {
-			out.WriteString("---\n")
-		}
-		out.Write(b)
-	}
-	return []byte(out.String())
-}
-
 // emitUnchecked emits p without the schema, for a verbatim Drone form that the SchemaStore schema does not read.
 func emitUnchecked(t *testing.T, p *ir.Project) string {
 	t.Helper()
@@ -197,19 +153,4 @@ func emitUnchecked(t *testing.T, p *ir.Project) string {
 		t.Fatalf("Emit: %v", err)
 	}
 	return string(raw[ymlName])
-}
-
-func TestSchemaGapsAreReal(t *testing.T) {
-	st := gstep("x", "true")
-	st.WorkDir = "/src"
-	raw, _, err := drone.New().Emit(gproject(ghaOrigin, gjob("build", st)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if validate.File(drone.New().ID(), ymlName, raw[ymlName]) == nil {
-		t.Fatal("the schema now reads working_dir; drop it from schemaGaps")
-	}
-	if validate.File(drone.New().ID(), ymlName, withoutSchemaGaps(t, raw[ymlName])) != nil {
-		t.Fatal("the file fails the schema for another reason")
-	}
 }
