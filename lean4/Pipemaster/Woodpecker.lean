@@ -440,7 +440,7 @@ def readTriggers (fs : List WFile) : List Trig :=
 def trigFind (k : String) (ts : List Trig) : Option (List String) :=
   ts.findSome? fun t => if t.kind = k then some t.incl else none
 
-/-- Mirrors woodpecker.collapseEnv (provider/woodpecker/collapse.go): drop the copies of the job variables, except
+/-- Mirrors woodpecker.dropCopies (provider/woodpecker/collapse.go): drop the copies of the job variables, except
 the variables the step marker names. -/
 def parseStep (jobEnv : List Var) (s : WStep) : Core.Step :=
   ⟨s.name, "", s.cmds, s.env.filter fun v => s.shadow.contains v.name || !jobEnv.contains v⟩
