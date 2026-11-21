@@ -87,3 +87,24 @@ func TestTrailingEmptyDocumentIsSkipped(t *testing.T) {
 		t.Fatalf("pipelines = %d", len(p.Pipelines))
 	}
 }
+
+func TestUnquotedTemplateVariableReadsAsText(t *testing.T) {
+	src := `apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: r
+spec:
+  params:
+    - name: repo_url
+      value: {{repo_url}}
+  pipelineSpec:
+    tasks:
+      - name: a
+        taskSpec:
+          steps: [{name: s, image: x, script: "true"}]
+`
+	p, _ := parseFiles(t, map[string]string{"r.yaml": src})
+	if len(p.Pipelines) != 1 {
+		t.Fatalf("pipelines = %d", len(p.Pipelines))
+	}
+}

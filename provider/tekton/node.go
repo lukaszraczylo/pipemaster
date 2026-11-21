@@ -81,6 +81,9 @@ func (b *builder) build(n *yaml.Node, depth int) (any, error) {
 		}
 		return b.build(n.Alias, depth+1)
 	case yaml.MappingNode:
+		if t, ok := templateVar(n); ok {
+			return scalOf(t), nil
+		}
 		return b.mapping(n, depth)
 	case yaml.SequenceNode:
 		out := make([]any, 0, len(n.Content))
@@ -102,6 +105,20 @@ func deref(n *yaml.Node) *yaml.Node {
 	}
 	return n
 }
+
+// templateVar reads an unquoted `{{name}}` as the text it stands for: YAML sees a flow mapping whose key is a flow mapping.
+func templateVar(n *yaml.Node) (string, bool) {
+	if n.Kind != yaml.MappingNode || len(n.Content) != 2 || !isNullScalar(n.Content[1]) {
+		return "", false
+	}
+	k := n.Content[0]
+	if k.Kind != yaml.MappingNode || len(k.Content) != 2 || k.Content[0].Kind != yaml.ScalarNode || !isNullScalar(k.Content[1]) {
+		return "", false
+	}
+	return "{{" + k.Content[0].Value + "}}", true
+}
+
+func isNullScalar(n *yaml.Node) bool { return n.Kind == yaml.ScalarNode && n.Tag == tagNull }
 
 func (b *builder) mapping(n *yaml.Node, depth int) (*omap, error) {
 	m := &omap{vals: map[string]any{}, lines: map[string]int{}, marks: map[string]string{}}
