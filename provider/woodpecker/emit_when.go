@@ -150,6 +150,16 @@ func splitStatus(x expr.Expr) (rest expr.Expr, status []string, ok bool) {
 	return rest, status, true
 }
 
+// hasSuccessCall reports whether an AND chain holds an explicit success() call.
+func hasSuccessCall(x expr.Expr) bool {
+	var conj []expr.Expr
+	flatten(x, &conj)
+	return slices.ContainsFunc(conj, func(c expr.Expr) bool {
+		call, ok := c.(expr.Call)
+		return ok && call.Name == statusOK && len(call.Args) == 0
+	})
+}
+
 func flatten(x expr.Expr, out *[]expr.Expr) {
 	if b, ok := x.(expr.Binary); ok && b.Op == expr.OpAnd {
 		flatten(b.L, out)
@@ -182,6 +192,9 @@ func (e *emitter) condition(path string, f caps.Feature, x expr.Expr, what strin
 	if !ok {
 		e.disable(path, f, x, what)
 		return nil, nil, false
+	}
+	if status == nil && hasSuccessCall(x) {
+		e.lose(path, f, "success() is the Woodpecker default, so the file reads back with no "+what+" condition")
 	}
 	if rest == nil {
 		return nil, status, true

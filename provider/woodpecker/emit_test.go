@@ -808,3 +808,12 @@ func TestPluginStepNeverHoldsEnvironmentAndSettings(t *testing.T) {
 		t.Errorf("the dropped environment must be reported: %+v", rep.Entries)
 	}
 }
+
+func TestExplicitSuccessIsReportedLost(t *testing.T) {
+	j := wpJob("ci", wpStep("s", "x"))
+	j.If = expr.Call{Name: "success"}
+	_, rep := one(t, wpProject(ghaOrigin, j))
+	if !reportHas(rep, caps.JobIf, caps.Lost) {
+		t.Fatalf("entries: %+v", rep.Entries)
+	}
+}
