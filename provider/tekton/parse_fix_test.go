@@ -164,3 +164,23 @@ func TestMatrixWithNonListValueGoesToExt(t *testing.T) {
 		t.Fatalf("matrix=%+v ext=%v", j.Matrix, j.Ext)
 	}
 }
+
+func TestMatrixParamValueMustBeAList(t *testing.T) {
+	for name, val := range map[string]string{
+		"array param reference": `"$(params.versions[*])"`,
+		"plain scalar":          `"1.22"`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			pl, rep := parseYAML(t, pipelineWith(`  tasks:
+  - name: a
+    matrix:
+      params: [{name: go, value: `+val+`}]
+    taskSpec: {steps: [{name: s, image: x, script: "true"}]}
+`))
+			j := job(t, pl, "a")
+			if j.Matrix != nil || ext(j.Ext)["matrix"] == nil || !hasEntry(rep, "matrix") {
+				t.Fatalf("matrix=%+v ext=%v", j.Matrix, j.Ext)
+			}
+		})
+	}
+}

@@ -214,7 +214,7 @@ func (b *jobBuilder) matrix(v any, line int) error {
 		for _, e := range list {
 			em, _ := asMap(e)
 			name, _ := text(valueOf(em, "name"))
-			vals, ok := textList(valueOf(em, "value"))
+			vals, ok := stringList(valueOf(em, "value"))
 			if name == "" || !ok {
 				return fmt.Errorf("matrix.params needs a name and a list of strings")
 			}
@@ -333,4 +333,12 @@ func (b *jobBuilder) finish() {
 		}
 	}
 	b.job.Ext = b.k.ext()
+}
+
+// stringList reads a YAML sequence of scalars. A bare scalar is no list: it may be a reference to an array param.
+func stringList(v any) ([]string, bool) {
+	if _, isSeq := v.([]any); !isSeq {
+		return nil, false
+	}
+	return textList(v)
 }
