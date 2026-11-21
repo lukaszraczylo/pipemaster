@@ -3,7 +3,7 @@
 # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/build
 # pipemaster:arg {"kind":"script","image":{"Ref":"rust:1.85","Entrypoint":null},"script":["cargo build --release"]}
 # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/publish
-# pipemaster:arg {"kind":"plugin","image":{"Ref":"woodpeckerci/plugin-docker-buildx","Entrypoint":null}}
+# pipemaster:arg {"kind":"plugin","image":{"Ref":"woodpeckerci/plugin-docker-buildx","Entrypoint":null},"settings":["repo","tags"]}
 on:
   push:
     branches:
@@ -21,6 +21,6 @@ jobs:
       # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/publish
       - id: publish
         uses: docker://woodpeckerci/plugin-docker-buildx
-        with:
-          repo: example/app
-          tags: latest
+        env:
+          PLUGIN_REPO: example/app
+          PLUGIN_TAGS: latest

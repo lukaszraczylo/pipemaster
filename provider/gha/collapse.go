@@ -382,7 +382,8 @@ func collapseImage(e *emitter, pl *ir.Pipeline, rep *report.Report, u ir.Feature
 	ref, entrypoint, argText, err := e.imageParts(u.IRPath, &ir.Step{Image: &a.Image, Script: a.Script})
 	text := func(k string) string { return valueText(st.With[k]) }
 	// A key the emitter did not write is the step's own input, such as a plugin setting named args.
-	if err != nil || st.Action.Image != ref || entrypoint != "" && text("entrypoint") != entrypoint || argText != "" && text("args") != argText {
+	if err != nil || st.Action.Image != ref || entrypoint != "" && text("entrypoint") != entrypoint || argText != "" && text("args") != argText ||
+		!hasSettings(st, a.Settings) {
 		rep.Add(report.Entry{IRPath: u.IRPath, Feature: u.Feature, Level: caps.Lost, Strategy: "marker ignored",
 			Detail: "marker ignored: the docker step was edited after conversion, so the parsed step stands"})
 		return
@@ -394,6 +395,11 @@ func collapseImage(e *emitter, pl *ir.Pipeline, rep *report.Report, u ir.Feature
 		}
 		with[k] = v
 	}
+	for _, name := range a.Settings {
+		i := slices.IndexFunc(st.Env, func(v ir.Var) bool { return v.Name == pluginEnvName(name) })
+		with[name] = st.Env[i].Value
+		st.Env = slices.Delete(st.Env, i, i+1)
+	}
 	if len(with) == 0 {
 		with = nil
 	}
@@ -404,6 +410,16 @@ func collapseImage(e *emitter, pl *ir.Pipeline, rep *report.Report, u ir.Feature
 	if st.WorkDir == "" {
 		st.WorkDir = a.WorkDir
 	}
+}
+
+// hasSettings is true when the step still carries the variable of every plugin setting the marker names.
+func hasSettings(st *ir.Step, settings []string) bool {
+	for _, name := range settings {
+		if !slices.ContainsFunc(st.Env, func(v ir.Var) bool { return v.Name == pluginEnvName(name) }) {
+			return false
+		}
+	}
+	return true
 }
 
 // collapseHost restores the host a bare ref had in its source when the parsed step still holds the dialect default.

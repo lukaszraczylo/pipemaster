@@ -172,3 +172,59 @@ func TestVariableReferenceIsBoundAndReported(t *testing.T) {
 		t.Errorf("round trip lost the references: env %+v script %q", back.Env, back.Script)
 	}
 }
+
+const pluginSource = `steps:
+  - name: upload
+    image: woodpeckerci/plugin-s3
+    settings:
+      bucket: my-bucket
+      access_key:
+        from_secret: s3_key
+`
+
+func TestPluginSettingsReachGHAAsPluginVariablesAndRoundTrip(t *testing.T) {
+	p := parseProject(t, "woodpecker", map[string]string{".woodpecker/rel.yaml": pluginSource})
+	gha, err := provider.Get("gha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, rep, err := gha.Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := map[string]string{}
+	for n, b := range files {
+		raw[n] = string(b)
+		for _, want := range []string{"PLUGIN_BUCKET: my-bucket", "PLUGIN_ACCESS_KEY: ${{ secrets.s3_key }}"} {
+			if !strings.Contains(string(b), want) {
+				t.Errorf("GHA file lacks %q:\n%s", want, b)
+			}
+		}
+		if strings.Contains(string(b), "with:\n        bucket") || strings.Contains(string(b), "access_key:") && !strings.Contains(string(b), "PLUGIN_ACCESS_KEY") {
+			t.Errorf("settings are still written as inputs:\n%s", b)
+		}
+	}
+	if !reportHas(rep, caps.StepImage, caps.Emulated) || !reportDetailHas(rep, "INPUT_") {
+		t.Errorf("the emulation caveat is missing: %+v", rep.Entries)
+	}
+	src, err := provider.Get("gha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, _, err := src.Parse(repo(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wpFiles, _ := emitFiles(t, back)
+	for _, b := range wpFiles {
+		for _, want := range []string{"bucket: my-bucket", "access_key:\n        from_secret: s3_key"} {
+			if !strings.Contains(b, want) {
+				t.Errorf("round trip lost %q:\n%s", want, b)
+			}
+		}
+	}
+	st := back.Pipelines[0].Jobs[0].Steps[0]
+	if st.Kind != ir.StepPlugin || len(st.Env) != 0 || len(st.With) != 2 {
+		t.Errorf("step = kind %v env %+v with %+v", st.Kind, st.Env, st.With)
+	}
+}

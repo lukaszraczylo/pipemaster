@@ -27,7 +27,9 @@ type emitter struct {
 	marks    []string
 	// stepIDs maps the step IDs of the job being written to the IDs written.
 	stepIDs map[string]string
-	d       Dialect
+	// pluginVars holds the PLUGIN_ variables of the plugin step being written, for stepTail to add to its env.
+	pluginVars *yaml.Node
+	d          Dialect
 }
 
 // sourceDialect is the expression dialect of a project's origin; nil means GHA semantics already hold.

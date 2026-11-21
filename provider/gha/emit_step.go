@@ -2,7 +2,9 @@ package gha
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -11,6 +13,9 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
+
+// pluginEnvPrefix starts the variable a plugin reads each setting from.
+const pluginEnvPrefix = "PLUGIN_"
 
 const (
 	defaultEntrypoint = "/bin/sh"
@@ -239,14 +244,16 @@ func (e *emitter) stepTail(m *omap, sp string, st *ir.Step, ext map[string]any) 
 		}
 		m.set("working-directory", str(t))
 	}
-	if len(st.Env) > 0 {
-		env, err := e.vars(sp, st.Env)
-		if err != nil {
-			return err
-		}
-		if len(env.Content) > 0 {
-			m.set("env", env)
-		}
+	env, err := e.vars(sp, st.Env)
+	if err != nil {
+		return err
+	}
+	if e.pluginVars != nil {
+		env.Content = append(env.Content, e.pluginVars.Content...)
+		e.pluginVars = nil
+	}
+	if len(env.Content) > 0 {
+		m.set("env", env)
 	}
 	if st.ContinueOnError {
 		m.set("continue-on-error", boolNodeOf(true))
@@ -305,18 +312,56 @@ func (e *emitter) imageStep(m *omap, sp string, st *ir.Step) error {
 	if argText != "" {
 		args.set("args", str(argText))
 	}
-	if err := e.markArg(caps.StepImage, sp, imageArg{Image: *st.Image, Script: st.Script, Kind: st.Kind, WorkDir: st.WorkDir}); err != nil {
+	arg := imageArg{Image: *st.Image, Script: st.Script, Kind: st.Kind, WorkDir: st.WorkDir}
+	with := st.With
+	if st.Kind == ir.StepPlugin && len(with) > 0 {
+		vars, names, err := e.pluginEnv(sp, st.With)
+		if err != nil {
+			return err
+		}
+		e.pluginVars, arg.Settings, with = vars, names, nil
+		e.emulate(sp, caps.StepImage, "settings as PLUGIN_ environment variables", "the plugin settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a GHA docker action reads its inputs as INPUT_<NAME>")
+	}
+	if err := e.markArg(caps.StepImage, sp, arg); err != nil {
 		return err
 	}
-	return e.withKey(m, sp, st.With, args)
+	return e.withKey(m, sp, with, args)
+}
+
+// pluginEnvName is the variable a plugin reads a setting from.
+func pluginEnvName(setting string) string {
+	return pluginEnvPrefix + strings.Map(func(r rune) rune {
+		if r == '-' || r == '.' {
+			return '_'
+		}
+		return r
+	}, strings.ToUpper(setting))
+}
+
+// pluginEnv writes the settings of a plugin step as the PLUGIN_ variables it reads, and returns the names of
+// the settings it could write.
+func (e *emitter) pluginEnv(sp string, with map[string]ir.Value) (env *yaml.Node, names []string, err error) {
+	env = newMap().n
+	for _, k := range slices.Sorted(maps.Keys(with)) {
+		n, err := e.value(sp, with[k])
+		if err != nil {
+			return nil, nil, err
+		}
+		if n != nil {
+			env.Content = append(env.Content, str(pluginEnvName(k)), n)
+			names = append(names, k)
+		}
+	}
+	return env, names, nil
 }
 
 // imageArg is the marker argument of an image step: what the step ran before it became a docker action.
 type imageArg struct {
-	Kind    ir.StepKind `json:"kind,omitempty"`
-	WorkDir string      `json:"workdir,omitempty"`
-	Image   ir.Image    `json:"image"`
-	Script  []string    `json:"script,omitempty"`
+	Kind     ir.StepKind `json:"kind,omitempty"`
+	WorkDir  string      `json:"workdir,omitempty"`
+	Image    ir.Image    `json:"image"`
+	Script   []string    `json:"script,omitempty"`
+	Settings []string    `json:"settings,omitempty"`
 }
 
 // jobSteps lists a job's steps with the emulation steps around them: downloads and cache first, uploads last.
