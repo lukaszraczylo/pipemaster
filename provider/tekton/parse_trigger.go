@@ -1,0 +1,343 @@
+package tekton
+
+import (
+	"encoding/json"
+	"regexp"
+
+	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
+	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/report"
+)
+
+const (
+	interceptorGitHub = "github"
+	interceptorCEL    = "cel"
+	paramEventTypes   = "eventTypes"
+	paramFilter       = "filter"
+	eventPush         = "push"
+	eventPullRequest  = "pull_request"
+)
+
+// listenerHost reads the EventListener service name in the URL that a cron job posts to.
+var listenerHost = regexp.MustCompile(`(?:^|[/\s"'=])el-([a-z0-9]([a-z0-9-]*[a-z0-9])?)(?:[.:/\s"']|$)`)
+
+// interceptor is one interceptor in either form: ref with params, or the legacy name with a mapping.
+type interceptor struct {
+	params map[string]any
+	raw    *omap
+	name   string
+}
+
+func readInterceptor(v any) (interceptor, bool) {
+	m, ok := asMap(v)
+	if !ok {
+		return interceptor{}, false
+	}
+	in := interceptor{raw: m, params: map[string]any{}}
+	if ref, ok := asMap(m.vals["ref"]); ok {
+		in.name, _ = text(ref.vals["name"])
+		if ps, ok := m.vals["params"].([]any); ok {
+			for _, e := range ps {
+				pm, _ := asMap(e)
+				if n, ok := text(valueOf(pm, "name")); ok {
+					in.params[n] = valueOf(pm, "value")
+				}
+			}
+		}
+		return in, in.name != ""
+	}
+	if len(m.keys) == 1 {
+		in.name = m.keys[0]
+		if body, ok := asMap(m.vals[in.name]); ok {
+			for _, k := range body.keys {
+				in.params[k] = body.vals[k]
+			}
+		}
+		return in, true
+	}
+	return interceptor{}, false
+}
+
+// listenerTrigger is one trigger of an EventListener with the EventListener it came from.
+type listenerTrigger struct {
+	doc  *rawDoc
+	m    *omap
+	spec *omap
+	el   string
+}
+
+// triggers maps each EventListener trigger to triggers of the pipeline that its template runs.
+func (p *project) triggers(byName map[string]*ir.Pipeline) {
+	for _, d := range p.listeners {
+		meta, _ := asMap(d.top.vals["metadata"])
+		el, _ := text(valueOf(meta, "name"))
+		spec, _ := asMap(d.top.vals["spec"])
+		list, _ := valueOf(spec, "triggers").([]any)
+		mapped := false
+		for _, e := range list {
+			m, ok := asMap(e)
+			if !ok {
+				continue
+			}
+			if ref, ok := text(valueOf(m, "triggerRef")); ok {
+				if td, found := p.trigDocs[ref]; found {
+					p.trigUsed[ref] = true
+					if tm, ok := asMap(td.top.vals["spec"]); ok {
+						m = tm
+					}
+				}
+			}
+			lt := listenerTrigger{doc: d, m: m, spec: spec, el: el}
+			mapped = p.trigger(lt, byName) || mapped
+		}
+		if !mapped {
+			p.resources = append(p.resources, d)
+		}
+	}
+}
+
+// templateName reads the TriggerTemplate that a trigger names.
+func templateName(m *omap) string {
+	tm, ok := asMap(m.vals["template"])
+	if !ok {
+		return ""
+	}
+	if n, ok := text(tm.vals["ref"]); ok {
+		return n
+	}
+	n, _ := text(tm.vals["name"])
+	return n
+}
+
+// pipelineOf finds the pipeline that the PipelineRun of a TriggerTemplate runs.
+func (p *project) pipelineOf(tpl string) string {
+	d, ok := p.templates[tpl]
+	if !ok {
+		return ""
+	}
+	spec, _ := asMap(d.top.vals["spec"])
+	rts, _ := valueOf(spec, "resourcetemplates").([]any)
+	for _, e := range rts {
+		rm, _ := asMap(e)
+		if k, _ := text(valueOf(rm, "kind")); k != kindPipelineRun {
+			continue
+		}
+		rspec, _ := asMap(valueOf(rm, "spec"))
+		ref, _ := asMap(valueOf(rspec, "pipelineRef"))
+		if n, ok := text(valueOf(ref, "name")); ok {
+			return n
+		}
+	}
+	return ""
+}
+
+// trigger adds the triggers of one EventListener trigger to its pipeline. It reports whether it found one.
+func (p *project) trigger(lt listenerTrigger, byName map[string]*ir.Pipeline) bool {
+	tpl := templateName(lt.m)
+	pl, ok := byName[p.pipelineOf(tpl)]
+	if !ok {
+		return false
+	}
+	path := "pipeline/" + pl.ID + "/trigger/" + lt.el
+	k := newSink(p.rep, lt.doc.file, path)
+	k.vals["listener"] = lt.el
+	name, _ := text(lt.m.vals["name"])
+	if name != "" {
+		k.vals["name"] = name
+	}
+	if tpl != "" {
+		k.vals["template"] = tpl
+	}
+	if b := lt.m.vals["bindings"]; b != nil {
+		k.vals["bindings"] = plain(b)
+	}
+	if sa, ok := text(lt.m.vals["serviceAccountName"]); ok {
+		k.vals["serviceAccountName"] = sa
+	} else if sa, ok := text(valueOf(lt.spec, "serviceAccountName")); ok {
+		k.vals["serviceAccountName"] = sa
+	}
+	if lt.spec != nil {
+		rest := &omap{vals: map[string]any{}, lines: map[string]int{}}
+		for _, key := range lt.spec.keys {
+			if key != "triggers" && key != "serviceAccountName" {
+				rest.set(key, lt.spec.vals[key], lt.spec.lines[key])
+			}
+		}
+		if len(rest.keys) > 0 {
+			k.keep("listenerSpec", rest, caps.ExtPassthrough, "EventListener keys beside triggers have no IR field; kept in Ext", lt.doc.line)
+		}
+	}
+	events := p.interceptors(lt, k)
+	pl.Triggers = append(pl.Triggers, buildTriggers(events, k)...)
+	return true
+}
+
+// interceptors reads the interceptor list. It returns the IR kinds that the github interceptor names. A CEL
+// filter becomes an opaque expression text in Ext; the pipemaster filter format belongs to the emitter.
+func (p *project) interceptors(lt listenerTrigger, k *sink) []ir.TriggerKind {
+	list, _ := lt.m.vals["interceptors"].([]any)
+	var kinds []ir.TriggerKind
+	var rest []any
+	for _, e := range list {
+		in, ok := readInterceptor(e)
+		switch {
+		case ok && in.name == interceptorGitHub:
+			ks, whole := githubKinds(in)
+			kinds = append(kinds, ks...)
+			if !whole {
+				rest = append(rest, plain(e))
+			}
+			if _, ok := in.params["secretRef"]; ok {
+				rest = append(rest, plain(e))
+			}
+		case ok && in.name == interceptorCEL:
+			filter, _ := text(in.params[paramFilter])
+			raw, _ := json.Marshal(map[string]any{"cel": filter})
+			k.vals["filter"] = expr.String(expr.Opaque{Dialect: dialect, Text: string(raw)})
+			p.rep.Add(report.Entry{
+				IRPath: k.path, Feature: caps.ExprOpaque, Level: caps.Lost, Strategy: "kept as opaque Tekton text",
+				Detail: "a CEL filter has no IR trigger condition; it is kept as opaque Tekton text in Ext: " + filter, SourceLoc: lt.doc.loc(0),
+			})
+		default:
+			rest = append(rest, plain(e))
+		}
+	}
+	if len(rest) > 0 {
+		k.vals["interceptors"] = dedupe(rest)
+		k.note(caps.ExtPassthrough, "interceptors other than the event types of github have no IR field; kept in Ext", lt.doc.line)
+	}
+	return kinds
+}
+
+func dedupe(l []any) []any {
+	var out []any
+	seen := map[string]bool{}
+	for _, v := range l {
+		b, _ := json.Marshal(v)
+		if !seen[string(b)] {
+			seen[string(b)] = true
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// githubKinds maps the eventTypes of the github interceptor. whole is false when the interceptor holds
+// anything else than a push or pull_request event type.
+func githubKinds(in interceptor) (kinds []ir.TriggerKind, whole bool) {
+	types, _ := textList(in.params[paramEventTypes])
+	whole = len(in.params) == 1 && len(types) > 0
+	for _, t := range types {
+		switch t {
+		case eventPush:
+			kinds = append(kinds, ir.TriggerPush)
+		case eventPullRequest:
+			kinds = append(kinds, ir.TriggerPR)
+		default:
+			whole = false
+		}
+	}
+	return kinds, whole
+}
+
+// buildTriggers makes one trigger per kind, or one api trigger for an endpoint that names no event.
+func buildTriggers(kinds []ir.TriggerKind, k *sink) []ir.Trigger {
+	if len(kinds) == 0 {
+		kinds = []ir.TriggerKind{ir.TriggerAPI}
+	}
+	var out []ir.Trigger
+	for _, kind := range kinds {
+		out = append(out, ir.Trigger{Kind: kind, Ext: ir.Ext{dialect: cloneMap(k.vals)}})
+	}
+	return out
+}
+
+func cloneMap(m map[string]any) map[string]any {
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
+
+// cronJobs maps a CronJob that posts to an EventListener service to schedule triggers of its pipelines.
+func (p *project) cronJobs(byName map[string]*ir.Pipeline) {
+	for _, d := range p.crons {
+		spec, _ := asMap(d.top.vals["spec"])
+		sched, ok := text(valueOf(spec, "schedule"))
+		els := listenersIn(spec)
+		pls := p.pipelinesOf(els, byName)
+		if !ok || len(pls) == 0 {
+			p.resources = append(p.resources, d)
+			continue
+		}
+		meta, _ := asMap(d.top.vals["metadata"])
+		name, _ := text(valueOf(meta, "name"))
+		rest := &omap{vals: map[string]any{}, lines: map[string]int{}}
+		for _, key := range spec.keys {
+			if key != "schedule" {
+				rest.set(key, spec.vals[key], spec.lines[key])
+			}
+		}
+		for _, pl := range pls {
+			k := newSink(p.rep, d.file, "pipeline/"+pl.ID+"/trigger/"+name)
+			k.keep("cronjob", &omap{
+				vals: map[string]any{"name": scalOf(name), "spec": rest}, keys: []string{"name", "spec"},
+				lines: map[string]int{},
+			}, caps.TriggerSchedule, "the CronJob that posts to the EventListener has no IR field beside the schedule; kept in Ext", d.line)
+			pl.Triggers = append(pl.Triggers, ir.Trigger{Kind: ir.TriggerSchedule, Cron: sched, Ext: k.ext()})
+		}
+	}
+}
+
+// listenersIn finds the EventListener names in every string of a CronJob spec.
+func listenersIn(v any) []string {
+	var out []string
+	var walk func(any)
+	walk = func(v any) {
+		switch t := v.(type) {
+		case *omap:
+			for _, k := range t.keys {
+				walk(t.vals[k])
+			}
+		case []any:
+			for _, e := range t {
+				walk(e)
+			}
+		case scal:
+			if m := listenerHost.FindStringSubmatch(" " + t.text()); m != nil {
+				out = append(out, m[1])
+			}
+		}
+	}
+	walk(v)
+	return out
+}
+
+// pipelinesOf lists the pipelines that the named EventListeners run, in the order of first use.
+func (p *project) pipelinesOf(els []string, byName map[string]*ir.Pipeline) []*ir.Pipeline {
+	var out []*ir.Pipeline
+	seen := map[*ir.Pipeline]bool{}
+	for _, el := range els {
+		for _, d := range p.listeners {
+			meta, _ := asMap(d.top.vals["metadata"])
+			if n, _ := text(valueOf(meta, "name")); n != el {
+				continue
+			}
+			spec, _ := asMap(d.top.vals["spec"])
+			list, _ := valueOf(spec, "triggers").([]any)
+			for _, e := range list {
+				m, ok := asMap(e)
+				if !ok {
+					continue
+				}
+				if pl, ok := byName[p.pipelineOf(templateName(m))]; ok && !seen[pl] {
+					seen[pl] = true
+					out = append(out, pl)
+				}
+			}
+		}
+	}
+	return out
+}
