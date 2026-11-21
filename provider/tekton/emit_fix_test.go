@@ -395,3 +395,31 @@ spec:
 		t.Fatalf("PipelineTask keys changed:\n%s\n%s", diff, joinFiles(files))
 	}
 }
+
+func TestPipelineRunSpecKeysSurviveEmit(t *testing.T) {
+	src := `apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: ci-
+spec:
+  taskRunTemplate:
+    serviceAccountName: default
+  params:
+    - name: repo
+      value: "{{repo}}"
+  pipelineSpec:
+    tasks:
+      - name: a
+        taskSpec:
+          steps: [{name: s, image: x, script: "true"}]
+`
+	p, _ := parseFiles(t, map[string]string{"r.yaml": src})
+	files, rep := emit(t, p)
+	back, _ := reparse(t, files)
+	if ok, diff := ir.Equal(p, back); !ok {
+		t.Fatalf("PipelineRun keys changed:\n%s\n%s", diff, joinFiles(files))
+	}
+	if e := entry(rep, caps.ExtPassthrough, "pipelineRun"); e != nil && e.Level == caps.Lost {
+		t.Fatalf("keys reported lost but written: %v", e)
+	}
+}

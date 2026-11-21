@@ -32,19 +32,24 @@ func (e *emitter) pipeline(pp *plan) error {
 	e.foreignExt(pp.path, pl.Ext)
 	root := newMap()
 	root.setStr("apiVersion", apiPipelinesV1)
-	root.setStr("kind", pipelineKey)
-	meta := newMap()
-	meta.setStr("name", pp.name)
 	x := map[string]any{}
 	if e.own {
 		x = extOf(pl.Ext)
 	}
-	if md, ok := x["metadata"].(map[string]any); ok {
+	// A pipeline that came from a PipelineRun with an embedded spec goes back into one, with the run keys.
+	run, isRun := x["pipelineRun"].(map[string]any)
+	root.setStr("kind", map[bool]string{false: pipelineKey, true: kindPipelineRun}[isRun])
+	meta := newMap()
+	md, hasMeta := x["metadata"].(map[string]any)
+	if _, generated := md["generateName"]; !isRun || !generated {
+		meta.setStr("name", pp.name)
+	}
+	if hasMeta {
 		if err := meta.addExtra(md, nil); err != nil {
 			return err
 		}
 	}
-	if pp.name != pl.ID {
+	if pp.name != pl.ID && meta.has("name") {
 		meta.keyComment("name", idComment(pl.ID))
 	}
 	root.set("metadata", meta.n)
@@ -94,6 +99,14 @@ func (e *emitter) pipeline(pp *plan) error {
 	spec.set("tasks", seqOf(tasks...))
 	if len(finally) > 0 {
 		spec.set("finally", seqOf(finally...))
+	}
+	if isRun {
+		runSpec := newMap()
+		runSpec.set("pipelineSpec", spec.n)
+		if err := runSpec.addExtra(run, nil); err != nil {
+			return err
+		}
+		spec = runSpec
 	}
 	root.set("spec", spec.n)
 	e.loseUnknownExt(pp.path, x, map[string]bool{"metadata": true, "description": true, "workspaces": true, "results": true, "params": true, "pipelineRun": true, ExtResources: true})
