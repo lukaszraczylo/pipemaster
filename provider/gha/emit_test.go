@@ -396,3 +396,19 @@ func prefixExtKeys(p *ir.Project) {
 		}
 	}
 }
+
+func TestTaskStepEmitsAPlaceholderAndReportsLoss(t *testing.T) {
+	p := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "ci", Triggers: []ir.Trigger{{Kind: ir.TriggerPush}}, Jobs: []*ir.Job{{
+		ID: "b", Steps: []*ir.Step{{ID: "t", Kind: ir.StepTask}},
+	}}}}}
+	files, rep, err := gha.New(gha.GHA).Emit(p)
+	if err != nil {
+		t.Fatalf("emit failed: %v", err)
+	}
+	if !strings.Contains(string(files[".github/workflows/ci.yml"]), "run: ") {
+		t.Fatalf("no placeholder step:\n%s", files[".github/workflows/ci.yml"])
+	}
+	if e := entry(rep, caps.StepAction); e == nil || e.Level != caps.Lost {
+		t.Fatalf("no lost entry: %v", rep.Entries)
+	}
+}
