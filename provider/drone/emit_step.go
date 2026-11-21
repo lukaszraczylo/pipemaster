@@ -9,6 +9,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
 	dexpr "github.com/lukaszraczylo/pipemaster/expr/drone"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
@@ -379,22 +380,32 @@ func (e *emitter) scriptStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
 func (e *emitter) guards(c *docCtx, st *ir.Step) ([]*yaml.Node, error) {
 	var out []*yaml.Node
 	if st.If != nil {
-		if _, ok := e.exprSet(st.If); !ok && dexpr.Guardable(st.If, e.sem) {
-			line, err := dexpr.PrintGuard(st.If, e.sem)
-			if err != nil {
-				return nil, err
+		if _, filter := e.exprSet(st.If); !filter {
+			if ok, _ := e.guardable(st.If); ok {
+				line, err := e.printGuard(st.If)
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, ystr(esc(line)))
 			}
-			out = append(out, ystr(esc(line)))
 		}
 	}
 	if c.guard != nil {
-		line, err := dexpr.PrintGuard(c.guard, e.sem)
+		line, err := e.printGuard(c.guard)
 		if err != nil {
 			return nil, err
 		}
 		out = append([]*yaml.Node{ystr(esc(line))}, out...)
 	}
 	return out, nil
+}
+
+// printGuard writes the guard line of x, reading a folded comparison case-sensitively when it must.
+func (e *emitter) printGuard(x expr.Expr) (string, error) {
+	if dexpr.Guardable(x, e.sem) {
+		return dexpr.PrintGuard(x, e.sem)
+	}
+	return dexpr.PrintGuard(x, e.sem, dexpr.AllowFold)
 }
 
 // stepTail adds the environment and the working directory.

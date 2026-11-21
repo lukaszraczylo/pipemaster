@@ -9,6 +9,7 @@ import (
 	dexpr "github.com/lukaszraczylo/pipemaster/expr/drone"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/drone"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 func ref(p ...string) expr.Ref { return expr.Ref{Path: p} }
@@ -504,4 +505,84 @@ func TestUnknownOpaqueIsLost(t *testing.T) {
 	st.If = expr.Opaque{Dialect: "gitlab", Text: "$X"}
 	_, rep := emitText(t, gproject(ghaOrigin, gjob("build", st)))
 	wantLevel(t, rep, caps.StepIf, "step/x", caps.Lost)
+}
+
+const foldCaveatText = "Drone compares case-sensitively; GHA ignores case"
+
+func foldEntry(t *testing.T, rep *report.Report, f caps.Feature, pathHas string) (report.Entry, bool) {
+	t.Helper()
+	for _, e := range rep.Entries {
+		if e.Feature == f && strings.Contains(e.IRPath, pathHas) && strings.Contains(e.Detail, foldCaveatText) {
+			return e, true
+		}
+	}
+	return report.Entry{}, false
+}
+
+func TestFoldedComparisonBecomesFilter(t *testing.T) {
+	for _, c := range []struct {
+		cond expr.Expr
+		name string
+		want []string
+	}{
+		{eq(ref(expr.CtxRef), "refs/heads/main"), "github.ref", []string{"refs/heads/main"}},
+		{eq(ref(expr.CtxRefName), "main"), "github.ref_name", []string{"refs/heads/main", "refs/tags/main"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			st := gstep("x", "echo hi")
+			st.If = c.cond
+			out, rep := emitText(t, gproject(ghaOrigin, gjob("build", st)))
+			when := stepsOf(docsOf(t, out)[0])[0]["when"].(map[string]any)
+			got, _ := when["ref"].([]any)
+			if len(got) != len(c.want) {
+				t.Fatalf("when = %v\n%s", when, out)
+			}
+			for i, w := range c.want {
+				if got[i] != w {
+					t.Fatalf("when = %v", when)
+				}
+			}
+			if ent, ok := foldEntry(t, rep, caps.StepIf, "step/x"); !ok || ent.Level != caps.Emulated {
+				t.Fatalf("no emulated fold entry: %v", rep.Entries)
+			}
+		})
+	}
+}
+
+func TestFoldedComparisonBecomesGuard(t *testing.T) {
+	st := gstep("x", "echo hi")
+	st.If = or(eq(ref(expr.CtxRef), "refs/heads/Main"), eq(ref(expr.CtxEvent), "pull_request"))
+	out, rep := emitText(t, gproject(ghaOrigin, gjob("build", st)))
+	s := stepsOf(docsOf(t, out)[0])[0]
+	first := s["commands"].([]any)[0].(string)
+	if !strings.HasPrefix(first, "if ! ") || !strings.Contains(first, "'refs/heads/Main'") || s["when"] != nil {
+		t.Fatalf("guard line %q when %v", first, s["when"])
+	}
+	if ent, ok := foldEntry(t, rep, caps.StepIf, "step/x"); !ok || ent.Level != caps.Emulated {
+		t.Fatalf("no emulated fold entry: %v", rep.Entries)
+	}
+}
+
+func TestFoldedJobConditionIsEmulated(t *testing.T) {
+	j := gjob("a", gstep("x", "1"))
+	j.If = eq(ref(expr.CtxBranch), "Main")
+	out, rep := emitText(t, gproject(ghaOrigin, j))
+	if b, _ := docsOf(t, out)[0]["trigger"].(map[string]any)["branch"].([]any); len(b) != 1 || b[0] != "Main" {
+		t.Fatalf("the job filter is not the trigger:\n%s", out)
+	}
+	if ent, ok := foldEntry(t, rep, caps.JobIf, "job/a"); !ok || ent.Level != caps.Emulated {
+		t.Fatalf("no emulated fold entry: %v", rep.Entries)
+	}
+}
+
+func TestDroneOriginComparisonStaysExact(t *testing.T) {
+	st := gstep("x", "echo hi")
+	st.If = eq(ref(expr.CtxBranch), "Main")
+	out, rep := emitText(t, gproject("drone", gjob("build", st)))
+	if b, _ := stepsOf(docsOf(t, out)[0])[0]["when"].(map[string]any)["branch"].([]any); len(b) != 1 || b[0] != "Main" {
+		t.Fatalf("when = %v", out)
+	}
+	if _, ok := foldEntry(t, rep, caps.StepIf, "step/x"); ok {
+		t.Fatalf("a Drone-origin condition must not carry the fold caveat: %v", rep.Entries)
+	}
 }

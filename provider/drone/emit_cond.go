@@ -33,9 +33,12 @@ var condKeyOrder = []string{dexpr.KeyEvent, dexpr.KeyBranch, dexpr.KeyRef, dexpr
 // condSet is a condition under construction: the keys with an expression form, and keys that only have YAML.
 // Its text is already escaped.
 type condSet struct {
-	raw map[string]any
-	c   dexpr.Conditions
+	raw    map[string]any
+	c      dexpr.Conditions
+	folded bool
 }
+
+const foldCaveat = "Drone compares case-sensitively; GHA ignores case"
 
 func disabledSet() condSet { return condSet{c: dexpr.Disabled()} }
 
@@ -220,6 +223,9 @@ func (e *emitter) exprSet(x expr.Expr) (condSet, bool) {
 	if c, ok := dexpr.FromExpr(x, e.sem); ok {
 		return condSet{c: c}, true
 	}
+	if c, ok := dexpr.FromExpr(x, e.sem, dexpr.AllowFold); ok {
+		return condSet{c: c, folded: true}, true
+	}
 	o, isOpaque := x.(expr.Opaque)
 	if !isOpaque || o.Dialect != dexpr.Dialect {
 		return condSet{}, false
@@ -232,6 +238,19 @@ func (e *emitter) exprSet(x expr.Expr) (condSet, bool) {
 		return condSet{}, false
 	}
 	return condSet{raw: escAny(m).(map[string]any)}, true
+}
+
+// noteFold reports a filter or guard that reads a folded comparison case-sensitively.
+func (e *emitter) noteFold(path string, f caps.Feature) {
+	e.emulate(path, f, "case-sensitive comparison", foldCaveat)
+}
+
+// guardable reports whether x has a shell guard, and whether that guard reads a folded comparison.
+func (e *emitter) guardable(x expr.Expr) (ok, folded bool) {
+	if dexpr.Guardable(x, e.sem) {
+		return true, false
+	}
+	return dexpr.Guardable(x, e.sem, dexpr.AllowFold), true
 }
 
 // disable reports a condition that Drone cannot state; the caller then writes the disabled filter.
@@ -253,11 +272,17 @@ func (e *emitter) stepWhen(sp string, st *ir.Step, script bool) (n *yaml.Node, g
 		return n, false, err
 	}
 	if cs, ok := e.exprSet(st.If); ok {
+		if cs.folded {
+			e.noteFold(sp, caps.StepIf)
+		}
 		n, err = condNode(cs, extra)
 		return n, false, err
 	}
-	if script && dexpr.Guardable(st.If, e.sem) {
+	if gok, folded := e.guardable(st.If); script && gok {
 		e.emulate(sp, caps.StepIf, "shell guard on the first script line", "the condition has no Drone filter; the step shows success instead of skipped")
+		if folded {
+			e.noteFold(sp, caps.StepIf)
+		}
 		e.mark(caps.StepIf, sp)
 		n, err = condNode(condSet{}, extra)
 		return n, true, err
@@ -572,16 +597,23 @@ func (e *emitter) jobSet(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (j
 	}
 	if j.If != nil {
 		cs, ok := e.exprSet(j.If)
+		gok, gfolded := e.guardable(j.If)
 		switch {
 		case ok:
+			if cs.folded {
+				e.noteFold(jp, caps.JobIf)
+			}
 			merged, mok := mergeSets(out.set, cs)
 			if !mok {
 				e.disable(jp, caps.JobIf, j.If, "the document, whose trigger filters cannot join the condition,")
 				return jobCond{set: disabledSet(), has: true}, nil
 			}
 			out.set, out.has = merged, true
-		case guardableSteps(j.Steps) && dexpr.Guardable(j.If, e.sem):
+		case guardableSteps(j.Steps) && gok:
 			e.emulate(jp, caps.JobIf, "shell guard on the first script line of every step", "the condition has no Drone filter; each step shows success instead of skipped")
+			if gfolded {
+				e.noteFold(jp, caps.JobIf)
+			}
 			e.mark(caps.JobIf, jp)
 			out.guard = j.If
 		default:
