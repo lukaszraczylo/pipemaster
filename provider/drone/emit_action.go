@@ -22,8 +22,10 @@ func triggerPath(pid string, i int) string { return "pipeline/" + pid + "/trigge
 
 // posArg points a marker at a step by its place in the document.
 type posArg struct {
-	Refs []string `json:"refs,omitempty"`
-	Pos  int      `json:"pos"`
+	// At is set for a script step: where its converted references stand among the ${NAME} of the script.
+	At   map[string]refAt `json:"at,omitempty"`
+	Refs []string         `json:"refs,omitempty"`
+	Pos  int              `json:"pos"`
 }
 
 // finallyArg carries what the finally document lost: its own needs, which the all-documents dependency

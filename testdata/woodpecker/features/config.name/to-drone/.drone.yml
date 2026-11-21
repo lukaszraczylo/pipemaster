@@ -1,5 +1,5 @@
 # pipemaster:emulated script.interpolation pipeline/woodpecker/job/ci/step/build
-# pipemaster:arg {"refs":["secrets.TOKEN","vars.REGION"],"pos":0}
+# pipemaster:arg {"at":{"secrets.TOKEN":{"at":[0],"of":1},"vars.REGION":{"at":[0],"of":1}},"refs":["secrets.TOKEN","vars.REGION"],"pos":0}
 kind: pipeline
 type: docker
 name: ci

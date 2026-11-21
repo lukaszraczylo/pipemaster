@@ -4,7 +4,7 @@
 # pipemaster:arg "- name: API_TOKEN\n  value:\n    secret: API_TOKEN\n"
 # pipemaster:emulated job.container pipeline/ci/job/build
 # pipemaster:emulated script.interpolation pipeline/ci/job/build/step/build-step-1
-# pipemaster:arg {"refs":["vars.REGION"],"pos":0}
+# pipemaster:arg {"at":{"vars.REGION":{"at":[0],"of":1}},"refs":["vars.REGION"],"pos":0}
 kind: pipeline
 type: docker
 name: build

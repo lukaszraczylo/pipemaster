@@ -1,6 +1,7 @@
 package drone
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 
@@ -123,7 +124,27 @@ func escAll(l []string) []string {
 
 // bindings are the references a step's text reads as run-time variables. The step must map each secret from a
 // secret; refs lists every converted reference as "<namespace>.<name>" so the parser can restore the text.
-type bindings struct{ secrets, vars, inputs, refs []string }
+type bindings struct {
+	// hits lists the references that the command being written converted, with their place in its text.
+	hits []refHit
+	// at holds, for each reference, the ordinals of its variable among every ${NAME} of the script.
+	at                          map[string]refAt
+	secrets, vars, inputs, refs []string
+}
+
+// refHit is one converted reference and the offset of its variable in the written command.
+type refHit struct {
+	ref  string
+	name string
+	off  int
+}
+
+// refAt says which ${NAME} of a step script the conversion wrote for a reference, and how many there are of that
+// name, so the parser can tell them from a ${NAME} that the author wrote.
+type refAt struct {
+	At []int `json:"at"`
+	Of int   `json:"of"`
+}
 
 func (b *bindings) add(ns, name string) {
 	if b == nil {
@@ -142,6 +163,36 @@ func (b *bindings) add(ns, name string) {
 	}
 }
 
+var escVarUseRE = regexp.MustCompile(`\$\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+
+// place numbers the ${NAME} of a written command among those of the script and records the ones that the
+// conversion wrote. seen counts the occurrences of each name so far.
+func (b *bindings) place(out string, seen map[string]int) {
+	for _, m := range escVarUseRE.FindAllStringSubmatchIndex(out, -1) {
+		name := out[m[2]:m[3]]
+		for _, h := range b.hits {
+			if h.off == m[0] && h.name == name {
+				if b.at == nil {
+					b.at = map[string]refAt{}
+				}
+				a := b.at[h.ref]
+				a.At = append(a.At, seen[name])
+				b.at[h.ref] = a
+			}
+		}
+		seen[name]++
+	}
+}
+
+// total records how many ${NAME} the script holds for each converted reference.
+func (b *bindings) total(seen map[string]int) {
+	for ref, a := range b.at {
+		_, name, _ := strings.Cut(ref, ".")
+		a.Of = seen[name]
+		b.at[ref] = a
+	}
+}
+
 func appendNew(l []string, name string) []string {
 	if slices.Contains(l, name) {
 		return l
@@ -150,7 +201,7 @@ func appendNew(l []string, name string) []string {
 }
 
 // refText spells one canonical reference in Drone text. ok is false when Drone has no spelling.
-func (e *emitter) refText(b *bindings, mode textMode, path []string) (string, bool) {
+func (e *emitter) refText(b *bindings, mode textMode, path []string, off int) (string, bool) {
 	if len(path) == 2 && path[0] == expr.PrefixMatrix {
 		if v, ok := e.cell[path[1]]; ok {
 			return esc(v), true
@@ -167,6 +218,9 @@ func (e *emitter) refText(b *bindings, mode textMode, path []string) (string, bo
 				return "", false
 			}
 			b.add(path[0], path[1])
+			if b != nil {
+				b.hits = append(b.hits, refHit{ref: path[0] + "." + path[1], name: path[1], off: off})
+			}
 			return dollarEsc + "{" + path[1] + "}", true
 		}
 	}
@@ -199,7 +253,7 @@ func (e *emitter) convertParts(b *bindings, mode textMode, parts []expr.Part) (o
 		case expr.Lit:
 			sb.WriteString(esc(litText(x)))
 		case expr.Ref:
-			if t, ok := e.refText(b, mode, x.Path); ok {
+			if t, ok := e.refText(b, mode, x.Path, sb.Len()); ok {
 				sb.WriteString(t)
 			} else {
 				lost = append(lost, expr.String(x))

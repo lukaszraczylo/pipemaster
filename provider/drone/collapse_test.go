@@ -784,3 +784,27 @@ func TestMatrixMarkerWithoutCellsOrWithBadPositionDoesNotPanic(t *testing.T) {
 		})
 	}
 }
+
+func TestShellVariableBesideSecretReferenceStaysAVariable(t *testing.T) {
+	want := []string{"echo ${TOKEN}", "curl -H ${{ secrets.TOKEN }} ${TOKEN}", "echo ${{ secrets.TOKEN }}"}
+	p, rep := back(t, gproject(ghaOrigin, gjob("b", gstep("x", want...))), nil)
+	if got := jobOf(t, p, "b").Steps[0].Script; !slices.Equal(got, want) {
+		t.Errorf("script %q, want %q", got, want)
+	}
+	if hasEntry(rep, "marker not collapsed") || ignored(rep, caps.ScriptInterpolation) {
+		t.Errorf("entries: %+v", rep.Entries)
+	}
+}
+
+func TestAddedVariableUseKeepsTheReferencesAsWritten(t *testing.T) {
+	p, rep := back(t, gproject(ghaOrigin, gjob("b", gstep("x", "curl -H ${{ secrets.TOKEN }}"))),
+		func(s string) string {
+			return strings.Replace(s, "curl -H $${TOKEN}", "echo $${TOKEN} && curl -H $${TOKEN}", 1)
+		})
+	if got := jobOf(t, p, "b").Steps[0].Script[0]; strings.Contains(got, "${{") {
+		t.Errorf("the parser guessed which occurrence the conversion made: %q", got)
+	}
+	if !ignored(rep, caps.ScriptInterpolation) {
+		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
+	}
+}

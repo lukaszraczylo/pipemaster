@@ -401,7 +401,7 @@ func (e *emitter) stepEnv(c *docCtx, sp string, st *ir.Step, b *bindings) (*yaml
 		e.external(sp, caps.ScriptInterpolation, "environment variable for input", "input "+name+" is read as the variable "+name+", which nothing sets; define it in the Drone environment")
 	}
 	if len(b.refs) > 0 {
-		if err := e.markArg(caps.ScriptInterpolation, sp, posArg{Pos: c.pos, Refs: b.refs}); err != nil {
+		if err := e.markArg(caps.ScriptInterpolation, sp, posArg{Pos: c.pos, Refs: b.refs, At: b.at}); err != nil {
 			return nil, err
 		}
 	}
@@ -450,15 +450,19 @@ func (e *emitter) common(c *docCtx, sp string, st *ir.Step, m *ymap, commands bo
 func (e *emitter) scriptStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
 	b := &bindings{}
 	var lines []*yaml.Node
+	seen := map[string]int{}
 	for _, l := range commandTexts(st) {
+		b.hits = nil
 		out, keep, err := e.command(b, sp, l)
 		if err != nil {
 			return nil, err
 		}
 		if keep {
 			lines = append(lines, block(out))
+			b.place(out, seen)
 		}
 	}
+	b.total(seen)
 	if len(lines) == 0 {
 		e.comment("step.script " + sp + ": the step has no command left")
 		e.lose(sp, caps.StepScript, "no command of the step has a Drone spelling; the step is not written")

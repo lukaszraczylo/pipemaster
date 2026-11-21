@@ -258,13 +258,20 @@ func collapseStepCond(c *collapseCtx, st *ir.Step) bool {
 	return true
 }
 
+// varUseRE finds a ${NAME} in parsed script text, where "$$" is already one "$".
+var varUseRE = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+
 // collapseRefs turns the run-time variables that stand for secrets, variables and inputs back into references.
+// A marker that knows which ${NAME} the conversion wrote rewrites only those; one that finds another count of
+// them than the conversion wrote is ignored, because the file was edited.
 func collapseRefs(c *collapseCtx) bool {
 	var a posArg
 	if !decodeArg(c.args, &a) || !validPos(c.j, a.Pos) {
 		return false
 	}
 	st := c.j.Steps[a.Pos]
+	targets := map[string]map[int]string{}
+	var whole []string
 	for _, ref := range a.Refs {
 		ns, name, ok := strings.Cut(ref, ".")
 		if !ok {
@@ -275,8 +282,19 @@ func collapseRefs(c *collapseCtx) bool {
 			reportIgnored(c.rep, c.use, "the reference "+ref)
 			continue
 		}
-		for i, l := range st.Script {
-			st.Script[i] = strings.ReplaceAll(l, held, "${{ "+ref+" }}")
+		if at, known := a.At[ref]; known {
+			if countUses(st.Script, name) != at.Of {
+				reportIgnored(c.rep, c.use, "the reference "+ref)
+				continue
+			}
+			if targets[name] == nil {
+				targets[name] = map[int]string{}
+			}
+			for _, n := range at.At {
+				targets[name][n] = ref
+			}
+		} else {
+			whole = append(whole, ref)
 		}
 		if ns == expr.PrefixSecrets || ns == expr.PrefixVars {
 			st.Env = slices.DeleteFunc(st.Env, func(v ir.Var) bool {
@@ -284,7 +302,33 @@ func collapseRefs(c *collapseCtx) bool {
 			})
 		}
 	}
+	seen := map[string]int{}
+	for i, l := range st.Script {
+		st.Script[i] = varUseRE.ReplaceAllStringFunc(l, func(m string) string {
+			name := m[2 : len(m)-1]
+			n := seen[name]
+			seen[name]++
+			if ref, ok := targets[name][n]; ok {
+				return "${{ " + ref + " }}"
+			}
+			for _, ref := range whole {
+				if strings.HasSuffix(ref, "."+name) {
+					return "${{ " + ref + " }}"
+				}
+			}
+			return m
+		})
+	}
 	return true
+}
+
+// countUses counts the ${name} of a script.
+func countUses(script []string, name string) int {
+	n := 0
+	for _, l := range script {
+		n += strings.Count(l, "${"+name+"}")
+	}
+	return n
 }
 
 // collapseContainer restores the job image. With an argument the job named it, and every step that took it
