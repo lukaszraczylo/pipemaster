@@ -2,6 +2,7 @@ package tekton
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"time"
@@ -322,7 +323,9 @@ func (b *jobBuilder) finish() {
 	sort.Strings(implicit)
 	var list []any
 	for _, id := range implicit {
-		b.job.Needs = append(b.job.Needs, ir.Need{JobID: id})
+		if !slices.ContainsFunc(b.job.Needs, func(n ir.Need) bool { return n.JobID == id }) {
+			b.job.Needs = append(b.job.Needs, ir.Need{JobID: id})
+		}
 		list = append(list, id)
 	}
 	if len(list) > 0 {
