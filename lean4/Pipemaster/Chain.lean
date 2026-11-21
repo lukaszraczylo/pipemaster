@@ -339,14 +339,29 @@ theorem chainFrag_adapters_iff (p : Pipe) : ChainFrag p adapters ↔ RoundTrip.B
     · exact h.1.2
     · exact h.2
 
-theorem chain_gha_gitlab_gitea (p : Pipe) (h : RoundTrip.Both p ∧ woodpecker.Frag p) :
+/-- The four adapters that are not Woodpecker. -/
+def crossAdapters : List Adapter := [gha, gitea, forgejo, gitlab]
+
+theorem crossAdapters_closed : Closed crossAdapters := by
+  intro a ha b hb
+  apply adapters_closed a _ b _ <;> simp only [crossAdapters, adapters, List.mem_cons, List.not_mem_nil, or_false] at ha hb ⊢ <;>
+    tauto
+
+theorem chain_gha_gitlab_gitea (p : Pipe) (h : RoundTrip.Both p) :
     unwind (hops p [gitlab, gitea]).1 (hops p [gitlab, gitea]).2 = p := by
   apply chain_roundtrip
-  apply chainFrag_run adapters adapters_closed _ _ p ((chainFrag_adapters_iff p).2 h)
-  intro a ha
-  simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
-  simp only [adapters, List.mem_cons, List.not_mem_nil, or_false]
-  rcases ha with rfl | rfl <;> simp [gitea, gha, gitlab]
+  apply chainFrag_run crossAdapters crossAdapters_closed _ _ p
+  · intro a ha
+    simp only [crossAdapters, List.mem_cons, List.not_mem_nil, or_false] at ha
+    rcases ha with rfl | rfl | rfl | rfl
+    · exact h.1
+    · exact h.1
+    · exact h.1
+    · exact h.2
+  · intro a ha
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
+    simp only [crossAdapters, List.mem_cons, List.not_mem_nil, or_false]
+    rcases ha with rfl | rfl <;> simp [gitea, gha, gitlab]
 
 /-- Woodpecker as the first hop, then GHA: the chain the earlier model had to leave out. -/
 theorem chain_woodpecker_gha (p : Pipe) (h : RoundTrip.Both p ∧ woodpecker.Frag p) :
