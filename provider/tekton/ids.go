@@ -32,13 +32,18 @@ func (adapter) SanitizeID(id string) string {
 		}
 	}
 	out := strings.Trim(b.String(), "-")
-	if len(out) > maxName {
-		sum := sha256.Sum256([]byte(id))
-		keep := maxName - hashLen - 1
-		out = strings.TrimRight(out[:keep], "-") + "-" + hex.EncodeToString(sum[:])[:hashLen]
-	}
 	if out == "" {
 		return fallbackID
 	}
-	return out
+	return fit(out, id, maxName)
+}
+
+// fit shortens name to at most limit bytes. A shortened name ends in a dash and a digest of id.
+func fit(name, id string, limit int) string {
+	if len(name) <= limit {
+		return name
+	}
+	sum := sha256.Sum256([]byte(id))
+	keep := limit - hashLen - 1
+	return strings.TrimRight(name[:keep], "-") + "-" + hex.EncodeToString(sum[:])[:hashLen]
 }

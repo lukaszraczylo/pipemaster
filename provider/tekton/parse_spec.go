@@ -37,7 +37,7 @@ func (b *jobBuilder) body(spec *omap, r *reader) error {
 	if v, ok := r.take("results"); ok {
 		b.results(v, r.line("results"))
 	}
-	if v, ok := r.take("workspaces"); ok {
+	if v, ok := r.take("workspaces"); ok && b.ws == nil {
 		b.k.keep("task_workspaces", v, caps.ExtPassthrough, "Task workspaces have no IR field; kept in Ext", r.line("workspaces"))
 	}
 	if v, ok := r.take("description"); ok {

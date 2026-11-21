@@ -75,16 +75,16 @@ func (c *plCtx) taskList(v any, what string) ([]*omap, error) {
 
 // jobBuilder reads one PipelineTask and its Task body.
 type jobBuilder struct {
-	c   *plCtx
-	k   *sink
-	job *ir.Job
-	// px reads pipeline scope text: param values and when entries. tx reads the Task body.
-	px, tx    *texts
-	explicit  map[string]bool
-	whenNeeds map[string]bool
-	rawParams any
-	raw       map[string]string
-	// containerRef is the stepTemplate image, which a step with the same image does not repeat.
+	rawParams    any
+	whenNeeds    map[string]bool
+	job          *ir.Job
+	px           *texts
+	tx           *texts
+	explicit     map[string]bool
+	c            *plCtx
+	k            *sink
+	raw          map[string]string
+	ws           *workspaceArg
 	containerRef string
 	path         string
 	finally      bool
@@ -99,6 +99,8 @@ func (c *plCtx) job(m *omap, finally bool) (*ir.Job, error) {
 		px:   newTexts(c.taskID, false), tx: newTexts(c.taskID, true),
 	}
 	b.k = newSink(c.p.rep, c.file, b.path)
+	b.ws = c.p.workspaceOf(m, b.path)
+	c.ws = c.ws || b.ws != nil
 	r := newReader(m)
 	r.take("name")
 	if err := b.header(r); err != nil {
@@ -150,7 +152,7 @@ func (b *jobBuilder) header(r *reader) error {
 			b.k.keep("onError", v, caps.JobAllowFailure, "onError other than continue has no IR form; kept in Ext", r.line("onError"))
 		}
 	}
-	if v, ok := r.take("workspaces"); ok {
+	if v, ok := r.take("workspaces"); ok && b.ws == nil {
 		b.k.keep("workspaces", v, caps.ExtPassthrough, "task workspaces have no IR field; kept in Ext", r.line("workspaces"))
 	}
 	if v, ok := r.take("matrix"); ok {
@@ -331,6 +333,9 @@ func (b *jobBuilder) finish() {
 				Detail: f + " is a Tekton variable with no IR reference; it stays in the text as written", SourceLoc: b.c.file,
 			})
 		}
+	}
+	if b.ws != nil {
+		b.restoreWorkspace()
 	}
 	b.job.Ext = b.k.ext()
 }

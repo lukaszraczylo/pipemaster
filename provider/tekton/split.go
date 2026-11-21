@@ -19,6 +19,8 @@ type rawDoc struct {
 	// view, when set, is what Ext holds instead of top: a copy with the parts that the parser consumed removed.
 	view any
 	file string
+	// head holds the comment lines above the document: the markers the emitter writes.
+	head string
 	kind string
 	api  string
 	line int
@@ -37,6 +39,15 @@ func readDocs(fsys fs.FS, file string, rep *report.Report) ([]*rawDoc, error) {
 	if err != nil {
 		return nil, err
 	}
+	return readDocsData(data, file, rep)
+}
+
+// readDocsBytes reads documents that the emitter built in memory.
+func readDocsBytes(data []byte) ([]*rawDoc, error) {
+	return readDocsData(data, "", &report.Report{})
+}
+
+func readDocsData(data []byte, file string, rep *report.Report) ([]*rawDoc, error) {
 	dec := yaml.NewDecoder(strings.NewReader(string(data)))
 	var out []*rawDoc
 	for {
@@ -77,6 +88,19 @@ func readDocs(fsys fs.FS, file string, rep *report.Report) ([]*rawDoc, error) {
 		}
 		kind, _ := text(top.vals["kind"])
 		api, _ := text(top.vals["apiVersion"])
-		out = append(out, &rawDoc{top: top, file: file, kind: kind, api: api, line: line})
+		out = append(out, &rawDoc{top: top, file: file, kind: kind, api: api, line: line, head: headComments(&n)})
 	}
+}
+
+// headComments joins the comments above a document, wherever the YAML decoder attached them.
+func headComments(n *yaml.Node) string {
+	parts := []string{n.HeadComment}
+	if len(n.Content) > 0 {
+		root := n.Content[0]
+		parts = append(parts, root.HeadComment)
+		if len(root.Content) > 0 {
+			parts = append(parts, root.Content[0].HeadComment)
+		}
+	}
+	return strings.Join(parts, "\n")
 }

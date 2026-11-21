@@ -88,6 +88,7 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		}
 	}
 	sort.SliceStable(pls, func(i, j int) bool { return pls[i].ID < pls[j].ID })
+	p.dropGenerated()
 	p.attachResources(pls[0])
 	proj := &ir.Project{
 		Origin:    ir.Origin{Provider: dialect, Dialect: dialect, Files: files},
@@ -143,9 +144,27 @@ func (p *project) classify(d *rawDoc) {
 		p.resources = append(p.resources, d)
 	case apiIs(d, apiBatch) && d.kind == kindCronJob:
 		p.crons = append(p.crons, d)
+	case d.kind == kindKustomization && strings.HasPrefix(d.api, kustomizeAPI) && p.isIndex(d):
+		p.rep.Add(report.Entry{
+			IRPath: "pipeline/", Feature: caps.ExtPassthrough, Level: caps.Emulated, Strategy: "kustomization index ignored",
+			Detail: "the kustomization lists the files of the project and holds no pipeline data; it is written again on emit", SourceLoc: d.loc(0),
+		})
 	default:
 		p.resources = append(p.resources, d)
 	}
+}
+
+// isIndex tells the kustomization that the emitter writes from a hand-made one: it has only apiVersion, kind and resources.
+func (p *project) isIndex(d *rawDoc) bool {
+	if d.file != dirName+"/kustomization.yaml" {
+		return false
+	}
+	for _, k := range d.top.keys {
+		if k != "apiVersion" && k != "kind" && k != "resources" {
+			return false
+		}
+	}
+	return true
 }
 
 func valueOf(m *omap, key string) any {

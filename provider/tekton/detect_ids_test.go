@@ -46,12 +46,6 @@ func TestSourceFiles(t *testing.T) {
 	}
 }
 
-func TestEmitIsNotAvailableYet(t *testing.T) {
-	if _, _, err := tekton.New().Emit(nil); err == nil {
-		t.Fatal("Emit must fail until the emitter exists")
-	}
-}
-
 func TestSanitizeID(t *testing.T) {
 	r, ok := tekton.New().(provider.IDRules)
 	if !ok {

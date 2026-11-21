@@ -27,6 +27,9 @@ func (b *jobBuilder) steps(v any) error {
 		if !ok {
 			return fmt.Errorf("step %d must be a mapping", i+1)
 		}
+		if b.ws != nil && isCopyStep(m) {
+			continue
+		}
 		st, err := b.step(m, i+1)
 		if err != nil {
 			return err
@@ -135,9 +138,11 @@ func (b *jobBuilder) command(st *ir.Step, k *sink, r *reader) error {
 			return fmt.Errorf("script must be a string")
 		}
 		var err error
-		if guardEnv, err = b.script(st, t); err != nil {
+		ctxEnv := ctxEnvOf(r.m.vals["env"])
+		if guardEnv, err = b.script(st, ctxEnv.restore(t)); err != nil {
 			return err
 		}
+		guardEnv = append(guardEnv, ctxEnv.vars...)
 	case hasCmd || hasArgs:
 		if err := b.commandLine(st, k, cmd, args); err != nil {
 			return err
@@ -399,4 +404,48 @@ func (b *jobBuilder) results(v any, line int) {
 	if !whole {
 		b.k.keep("results", v, caps.JobOutputs, "result keys beside name have no IR field; kept in Ext", line)
 	}
+}
+
+// ctxEnvs holds the step env entries that carry a ctx-* param for the script, as the emitter writes them.
+type ctxEnvs struct {
+	repl *strings.Replacer
+	vars []exprtekton.EnvVar
+}
+
+// ctxEnvOf finds the env entries whose name and value are the pair that the emitter writes for a context ref.
+func ctxEnvOf(v any) ctxEnvs {
+	list, _ := v.([]any)
+	var out ctxEnvs
+	var pairs []string
+	for _, e := range list {
+		m, ok := asMap(e)
+		if !ok {
+			continue
+		}
+		name, _ := text(valueOf(m, "name"))
+		val, isText := text(m.vals["value"])
+		ref, ok := exprtekton.EnvRef(name)
+		if !ok || !isText {
+			continue
+		}
+		if _, ctx := exprtekton.CtxParam(ref.Path); !ctx {
+			continue
+		}
+		if word, ok := exprtekton.RefWord(ref); ok && word == val {
+			pairs = append(pairs, "${"+name+"}", word)
+			out.vars = append(out.vars, exprtekton.EnvVar{Name: name, Value: val})
+		}
+	}
+	if len(pairs) > 0 {
+		out.repl = strings.NewReplacer(pairs...)
+	}
+	return out
+}
+
+// restore puts the Tekton variable back where the script reads its env name.
+func (c ctxEnvs) restore(script string) string {
+	if c.repl == nil {
+		return script
+	}
+	return c.repl.Replace(script)
 }

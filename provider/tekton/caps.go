@@ -10,6 +10,7 @@ func (adapter) Caps() caps.Matrix {
 	}
 	const ghOnly = "the EventListener serves GitHub webhooks only"
 	for f, s := range map[caps.Feature]caps.Support{
+		caps.ExprOpaque:             {Level: caps.Native, Caveat: "only opaque expressions of the tekton dialect without a cel entry; others are lost"},
 		caps.JobIf:                  {Level: caps.Native, Strategy: "PipelineTask when", Caveat: "only the input/operator/values subset; any other condition is emulated or lost"},
 		caps.StepIf:                 {Level: caps.Native, Strategy: "step when", Caveat: "only the input/operator/values subset; any other condition is emulated or lost"},
 		caps.JobContainer:           {Level: caps.Native, Strategy: "stepTemplate image"},

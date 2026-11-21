@@ -18,6 +18,8 @@ type plCtx struct {
 	ids  map[string]string
 	file string
 	plID string
+	// ws is true when a job restored the workspace marker.
+	ws bool
 }
 
 func (c *plCtx) taskID(name string) (string, bool) {
@@ -50,10 +52,9 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 	if err := p.params(pl, k, r); err != nil {
 		return nil, err
 	}
-	for _, key := range []string{"workspaces", "results"} {
-		if v, ok := r.take(key); ok {
-			k.keep(key, v, caps.ExtPassthrough, "pipeline "+key+" have no IR field; kept in Ext", r.line(key))
-		}
+	pipeWS, hasWS := r.take("workspaces")
+	if v, ok := r.take("results"); ok {
+		k.keep("results", v, caps.ExtPassthrough, "pipeline results have no IR field; kept in Ext", r.line("results"))
 	}
 	tasks, ok := r.take("tasks")
 	if !ok {
@@ -63,6 +64,14 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 	k.keepRest(r)
 	if err := c.jobs(pl, tasks, finally); err != nil {
 		return nil, fmt.Errorf("%s: %w", src.doc.file, err)
+	}
+	if hasWS {
+		if c.ws {
+			pipeWS = withoutWorkspace(pipeWS)
+		}
+		if pipeWS != nil {
+			k.keep("workspaces", pipeWS, caps.ExtPassthrough, "pipeline workspaces have no IR field; kept in Ext", r.line("workspaces"))
+		}
 	}
 	pl.Ext = k.ext()
 	return pl, nil

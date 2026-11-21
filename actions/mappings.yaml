@@ -54,6 +54,11 @@ actions:
         with:
           fetch-depth: {to: depth, transform: depth}
         support: {level: native, strategy: the default clone step runs before the steps}
+      tekton:
+        kind: implicit
+        with:
+          fetch-depth: {to: depth, transform: depth}
+        support: {level: emulated, strategy: StepAction ref to the tektoncd-catalog git-clone through the git resolver, caveat: the ctx-repo and ctx-sha params carry the repository and the commit}
 
   - match: actions/cache
     targets:
@@ -76,6 +81,12 @@ actions:
           key: key
           path: {to: paths, transform: lines}
         support: {level: emulated, strategy: shared workspace of the steps in one document, caveat: nothing persists between runs}
+      tekton:
+        kind: cache
+        with:
+          key: key
+          path: {to: paths, transform: lines}
+        support: {level: emulated, strategy: shared workspace on a PVC, caveat: nothing persists between runs and the paths are not copied}
 
   - match: actions/upload-artifact
     targets:
@@ -99,6 +110,12 @@ actions:
           name: name
           path: {to: path, transform: lines}
         support: {level: emulated, strategy: shared workspace of the steps in one document, caveat: other documents cannot read the files}
+      tekton:
+        kind: artifact_upload
+        with:
+          name: name
+          path: {to: path, transform: lines}
+        support: {level: emulated, strategy: shared workspace on a PVC, caveat: tasks of the same run only}
 
   - match: actions/download-artifact
     targets:
@@ -115,6 +132,10 @@ actions:
         kind: artifact_download
         with: {name: name, path: path}
         support: {level: emulated, strategy: shared workspace of the steps in one document, caveat: only an upload in the same document is visible}
+      tekton:
+        kind: artifact_download
+        with: {name: name, path: path}
+        support: {level: emulated, strategy: shared workspace on a PVC, caveat: only an upload in the same run is visible}
 
   - match: actions/setup-go
     targets:
@@ -128,6 +149,10 @@ actions:
         image: "golang:{{go-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
       drone:
+        kind: image
+        image: "golang:{{go-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
+      tekton:
         kind: image
         image: "golang:{{go-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
@@ -147,6 +172,10 @@ actions:
         kind: image
         image: "node:{{node-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
+      tekton:
+        kind: image
+        image: "node:{{node-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
 
   - match: actions/setup-python
     targets:
@@ -163,6 +192,10 @@ actions:
         kind: image
         image: "python:{{python-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
+      tekton:
+        kind: image
+        image: "python:{{python-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
 
   - match: actions/setup-java
     targets:
@@ -176,6 +209,10 @@ actions:
         image: "eclipse-temurin:{{java-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
       drone:
+        kind: image
+        image: "eclipse-temurin:{{java-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
+      tekton:
         kind: image
         image: "eclipse-temurin:{{java-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
