@@ -5,6 +5,9 @@ import (
 	"slices"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
 )
 
 const (
@@ -186,6 +189,21 @@ func (b *builder) merge(m *omap, v *yaml.Node, depth int) error {
 	return nil
 }
 
+// Keys lists the keys in source order.
+func (m *omap) Keys() []string { return m.keys }
+
+// Get returns the value of a key.
+func (m *omap) Get(key string) any { return m.vals[key] }
+
+// subset returns the named keys with their values and lines.
+func (m *omap) subset(keys []string) *omap {
+	out := &omap{vals: map[string]any{}, lines: map[string]int{}}
+	for _, k := range keys {
+		out.set(k, m.vals[k], m.lines[k])
+	}
+	return out
+}
+
 func (m *omap) set(k string, v any, line int) {
 	m.keys = append(m.keys, k)
 	m.vals[k] = v
@@ -310,3 +328,23 @@ func sortedKeys[V any](m map[string]V) []string {
 	slices.Sort(out)
 	return out
 }
+
+// decoder adapts the values of the parser to container.Decoder.
+type decoder struct{ tx *texts }
+
+func (w *wf) decoder() decoder { return decoder{w.tx} }
+
+func (decoder) Text(v any) (string, bool)       { return text(v) }
+func (decoder) TextList(v any) ([]string, bool) { return textList(v) }
+
+func (decoder) Mapping(v any) (container.Mapping, bool) {
+	m, ok := asMap(v)
+	if !ok {
+		return nil, false
+	}
+	return m, true
+}
+
+func (d decoder) Template(s string) (string, error) { return d.tx.template(s) }
+
+func (d decoder) Value(s string) ir.Value { return d.tx.value(s) }

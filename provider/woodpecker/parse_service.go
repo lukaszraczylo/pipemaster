@@ -5,6 +5,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
 )
 
 // services reads the service list or map. Keys without a Service field stay in Ext under services.<name>.
@@ -57,54 +58,14 @@ func (w *wf) services(j *ir.Job, v any) error {
 
 func (w *wf) service(name string, m *omap) (ir.Service, *omap, error) {
 	r := newReader(m)
-	r.take("name")
-	sv := ir.Service{Name: name}
-	img, ok := text(m.vals["image"])
-	if !ok {
-		return sv, nil, fmt.Errorf("service %s: image is required", name)
-	}
-	r.take("image")
-	ref, err := w.tx.template(img)
+	sv, leftEnv, err := container.Service(w.decoder(), name, dollarEsc, r.take)
 	if err != nil {
 		return sv, nil, err
 	}
-	sv.Image.Ref = ref
-	if v, ok := r.take("entrypoint"); ok {
-		l, isList := textList(v)
-		if !isList {
-			return sv, nil, fmt.Errorf("service %s: entrypoint must be a string or a list", name)
-		}
-		for _, e := range l {
-			t, err := w.tx.template(e)
-			if err != nil {
-				return sv, nil, err
-			}
-			sv.Image.Entrypoint = append(sv.Image.Entrypoint, t)
-		}
-	}
-	if v, ok := r.take("ports"); ok {
-		l, isList := textList(v)
-		if !isList {
-			return sv, nil, fmt.Errorf("service %s: ports must be a list", name)
-		}
-		sv.Ports = unescapeAll(l)
-	}
 	rest := &omap{vals: map[string]any{}, lines: map[string]int{}}
-	if v, ok := r.take("environment"); ok {
-		em, isMap := asMap(v)
-		if !isMap {
-			return sv, nil, fmt.Errorf("service %s: environment must be a mapping", name)
-		}
-		left := &omap{vals: map[string]any{}, lines: map[string]int{}}
-		for _, k := range em.keys {
-			if val, ok := w.envValue(em.vals[k]); ok {
-				sv.Env = append(sv.Env, ir.Var{Name: k, Value: val})
-				continue
-			}
-			left.set(k, em.vals[k], em.lines[k])
-		}
-		if len(left.keys) > 0 {
-			rest.set("environment", left, r.line("environment"))
+	if len(leftEnv) > 0 {
+		if em, ok := asMap(m.vals["environment"]); ok {
+			rest.set("environment", em.subset(leftEnv), r.line("environment"))
 		}
 	}
 	for _, k := range r.rest() {

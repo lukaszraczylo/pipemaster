@@ -11,6 +11,7 @@ import (
 	wpexpr "github.com/lukaszraczylo/pipemaster/expr/woodpecker"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
 )
 
 const (
@@ -110,7 +111,7 @@ func (e *emitter) markArg(f caps.Feature, path string, v any) error {
 		return err
 	}
 	e.mark(f, path)
-	e.head = append(e.head, strings.ReplaceAll(line, dollar, dollarEsc))
+	e.head = append(e.head, container.Escape(line, dollarEsc))
 	return nil
 }
 
@@ -118,7 +119,7 @@ func (e *emitter) markArg(f caps.Feature, path string, v any) error {
 func (e *emitter) comment(s string) { e.head = append(e.head, lostPrefix+commentSafe(s)) }
 
 // esc doubles each $ so the text reaches Woodpecker's pre-processor, and then the shell, unchanged.
-func esc(s string) string { return strings.ReplaceAll(s, dollar, dollarEsc) }
+func esc(s string) string { return container.Escape(s, dollarEsc) }
 
 // bindings are the references a step's text reads as run-time variables. The step must map each secret from a
 // secret; refs lists every converted reference as "<namespace>.<name>" so the parser can restore the text.

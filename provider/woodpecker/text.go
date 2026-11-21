@@ -8,6 +8,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	wpexpr "github.com/lukaszraczylo/pipemaster/expr/woodpecker"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
 )
 
 const dollar = "$"
@@ -217,4 +218,4 @@ func mixFormat(parts []expr.Part) expr.Expr {
 }
 
 // unescape turns $$ into $ and leaves ${...} alone, for text that has no IR substitution form (when values).
-func unescape(s string) string { return strings.ReplaceAll(s, "$$", dollar) }
+func unescape(s string) string { return container.Unescape(s, dollarEsc) }

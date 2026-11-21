@@ -7,6 +7,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
 )
 
 // Ext keys the parser writes under Ext[woodpecker] on a step. ExtDerivedID marks an ID the parser gave to an
@@ -86,29 +87,11 @@ func (w *wf) step(m *omap, id string, idx int, derived bool, mapKey string) (*ir
 	sp := w.stepPath(id, idx)
 	k := newSink(w.rep, w.file, sp)
 	st := &ir.Step{ID: id}
-	img, ok := text(m.vals["image"])
-	if !ok {
-		return nil, fmt.Errorf("step %s: image is required", id)
-	}
-	r.take("image")
-	ref, err := w.tx.template(img)
+	img, err := container.ReadImage(w.decoder(), "step "+id, r.take)
 	if err != nil {
 		return nil, err
 	}
-	st.Image = &ir.Image{Ref: ref}
-	if v, ok := r.take("entrypoint"); ok {
-		l, isList := textList(v)
-		if !isList {
-			return nil, fmt.Errorf("step %s: entrypoint must be a string or a list", id)
-		}
-		for _, e := range l {
-			t, err := w.tx.template(e)
-			if err != nil {
-				return nil, err
-			}
-			st.Image.Entrypoint = append(st.Image.Entrypoint, t)
-		}
-	}
+	st.Image = &img
 	var cmdShapes []any
 	cmds, isScript := r.take("commands")
 	if isScript {
@@ -187,33 +170,15 @@ func (w *wf) step(m *omap, id string, idx int, derived bool, mapKey string) (*ir
 	return st, nil
 }
 
-// envValue reads an environment or setting value: a scalar, or {from_secret}. ok is false for any other shape.
-func (w *wf) envValue(v any) (ir.Value, bool) {
-	if t, ok := text(v); ok {
-		return w.tx.value(t), true
-	}
-	if m, ok := asMap(v); ok && len(m.keys) == 1 {
-		if name, ok := text(m.vals["from_secret"]); ok {
-			return ir.Value{Kind: ir.ValueSecret, Secret: name}, true
-		}
-	}
-	return ir.Value{}, false
-}
-
 func (w *wf) env(st *ir.Step, k *sink, v any, line int) error {
 	m, ok := asMap(v)
 	if !ok {
 		return fmt.Errorf("line %d: environment must be a mapping", line)
 	}
-	rest := &omap{vals: map[string]any{}, lines: map[string]int{}}
-	for _, name := range m.keys {
-		if val, ok := w.envValue(m.vals[name]); ok {
-			st.Env = append(st.Env, ir.Var{Name: name, Value: val})
-			continue
-		}
-		rest.set(name, m.vals[name], m.lines[name])
-	}
-	if len(rest.keys) > 0 {
+	vars, left := container.Env(w.decoder(), m)
+	st.Env = append(st.Env, vars...)
+	if len(left) > 0 {
+		rest := m.subset(left)
 		k.vals["environment"] = plain(rest)
 		for _, name := range rest.keys {
 			k.note(caps.StepEnv, "environment."+name+" has no Value form; kept in Ext", rest.lines[name])
@@ -229,18 +194,12 @@ func (w *wf) settings(st *ir.Step, k *sink, v any, isScript bool, line int) erro
 	if !ok {
 		return fmt.Errorf("line %d: settings must be a mapping", line)
 	}
-	rest := &omap{vals: map[string]any{}, lines: map[string]int{}}
-	for _, name := range m.keys {
-		if val, ok := w.envValue(m.vals[name]); ok && !isScript {
-			if st.With == nil {
-				st.With = map[string]ir.Value{}
-			}
-			st.With[name] = val
-			continue
-		}
-		rest.set(name, m.vals[name], m.lines[name])
+	with, left := container.Settings(w.decoder(), m, isScript)
+	if with != nil {
+		st.With = with
 	}
-	if len(rest.keys) > 0 {
+	if len(left) > 0 {
+		rest := m.subset(left)
 		k.vals["settings"] = plain(rest)
 		for _, name := range rest.keys {
 			k.note(caps.ExtPassthrough, "settings."+name+" has no Value form; kept in Ext", rest.lines[name])

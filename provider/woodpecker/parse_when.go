@@ -9,6 +9,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	wpexpr "github.com/lukaszraczylo/pipemaster/expr/woodpecker"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
@@ -172,13 +173,7 @@ func (s *whenSpec) residual() expr.Expr {
 	return out
 }
 
-func unescapeAll(l []string) []string {
-	out := make([]string, len(l))
-	for i, s := range l {
-		out[i] = unescape(s)
-	}
-	return out
-}
+func unescapeAll(l []string) []string { return container.UnescapeAll(l, dollarEsc) }
 
 // filterOf reads a filter value: a scalar, a list, or {include, exclude}. Any other shape is not a filter.
 func filterOf(v any) (wpexpr.Filter, bool) {
