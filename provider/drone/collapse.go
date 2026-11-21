@@ -205,6 +205,12 @@ func collapseStepGuard(c *collapseCtx) bool {
 	if len(c.args) > 0 {
 		return collapseStepCond(c, st)
 	}
+	if st.If != nil {
+		// The emitter never writes a filter beside a guard, so the filter is the author's. The guard line stays in
+		// the script and the step runs only where both allow it.
+		reportIgnored(c.rep, c.use, "the step guard")
+		return true
+	}
 	rest, e, ok := dexpr.RemoveGuard(st.Script)
 	if !ok {
 		reportIgnored(c.rep, c.use, "the step guard")

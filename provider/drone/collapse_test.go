@@ -684,3 +684,20 @@ func TestEditedTriggerBesideManualGateKeepsTheFile(t *testing.T) {
 		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
 	}
 }
+
+func TestWhenAddedBesideStepGuardKeepsBoth(t *testing.T) {
+	p, rep := back(t, guardJobs(), func(s string) string {
+		return strings.Replace(s, "      - two\n", "      - two\n    when:\n      branch:\n        - main\n", 1)
+	})
+	st := jobOf(t, p, "b").Steps[0]
+	if st.If == nil || !strings.Contains(expr.String(st.If), "main") {
+		t.Errorf("the author's filter was replaced: %v", st.If)
+	}
+	if !ignored(rep, caps.StepIf) {
+		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
+	}
+	if !slices.ContainsFunc(st.Script, func(l string) bool { return strings.Contains(l, "pipemaster:guard") }) {
+		t.Errorf("the guard line was dropped, so the step runs where the guard skipped it: %v", st.Script)
+	}
+}
+
