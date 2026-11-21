@@ -76,7 +76,7 @@ func TestPushTriggerBecomesCELFilter(t *testing.T) {
 	if named(t, get(run, "spec", "params"), "ctx-sha")["value"] != "$(tt.params.ctx-sha)" {
 		t.Fatalf("run params = %v", get(run, "spec", "params"))
 	}
-	wantEntry(t, rep, caps.TriggerPush, caps.Emulated, "")
+	wantEntry(t, rep, caps.TriggerPush, caps.External, "pipemaster-github-webhook")
 	if !strings.Contains(files[listenerFile], "# pipemaster:emulated trigger.push pipeline/ci/trigger/0") ||
 		!strings.Contains(files[listenerFile], "# pipemaster:arg ") {
 		t.Fatalf("marker missing:\n%s", files[listenerFile])

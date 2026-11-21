@@ -201,6 +201,7 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, cmd, args any) error {
 		}
 	}
 	st.Script = []string{strings.Join(words, " ")}
+	k.vals[ExtScriptLine] = st.Script[0]
 	k.vals[ExtCommand] = plain(cmd)
 	k.vals[ExtArgs] = plain(args)
 	k.note(caps.StepScript, "command and args are written as one script line; both lists are kept in Ext", 0)

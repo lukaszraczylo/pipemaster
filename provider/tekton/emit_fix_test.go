@@ -1,0 +1,148 @@
+package tekton_test
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
+	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/tekton"
+	"github.com/lukaszraczylo/pipemaster/report"
+)
+
+// identityOf parses Tekton files, emits them and parses the result; it requires both parses to be equal.
+func identityOf(t *testing.T, in map[string]string) (map[string]string, *report.Report) {
+	t.Helper()
+	p, _ := parseFiles(t, in)
+	raw, rep, err := tekton.New().Emit(p)
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	files := map[string]string{}
+	for n, b := range raw {
+		files[n] = string(b)
+	}
+	back, _ := reparse(t, files)
+	if ok, diff := ir.Equal(p, back); !ok {
+		t.Fatalf("identity broken:\n%s\n%s", diff, joinFiles(files))
+	}
+	return files, rep
+}
+
+func TestSecretRefSurvivesTektonRoundTrip(t *testing.T) {
+	files, _ := identityOf(t, map[string]string{"pipeline.yaml": triggerFiles, "triggers.yaml": listener})
+	src := joinFiles(files)
+	for _, want := range []string{"secretName: s", "secretKey: k", "serviceAccountName: tekton-triggers", "gh-binding"} {
+		if !strings.Contains(src, want) {
+			t.Fatalf("%q missing:\n%s", want, src)
+		}
+	}
+	if strings.Contains(src, "pipemaster-github-webhook") {
+		t.Fatalf("a Tekton secretRef was replaced:\n%s", src)
+	}
+}
+
+func TestForeignGitHubInterceptorCarriesSecretRef(t *testing.T) {
+	p := project(scriptJob("a", "true"))
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush}}
+	files, rep := emit(t, p)
+	if !strings.Contains(joinFiles(files), "secretName: pipemaster-github-webhook") {
+		t.Fatalf("no secretRef:\n%s", joinFiles(files))
+	}
+	wantEntry(t, rep, caps.TriggerPush, caps.External, "pipemaster-github-webhook")
+}
+
+const workspacePipeline = `apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata: {name: ci}
+spec:
+  workspaces: [{name: shared}]
+  tasks:
+  - name: a
+    workspaces: [{name: shared, workspace: shared}]
+    computeResources: {requests: {cpu: "1"}}
+    taskSpec:
+      workspaces: [{name: shared}]
+      volumes: [{name: v, emptyDir: {}}]
+      steps: [{name: s, image: x, script: "true"}]
+`
+
+func TestJobExtSurvivesTektonRoundTrip(t *testing.T) {
+	files, _ := identityOf(t, map[string]string{"pipeline.yaml": workspacePipeline})
+	pt := list(get(pipelineDoc(t, files, "ci"), "spec", "tasks"))[0].(doc)
+	if len(list(pt["workspaces"])) != 1 || pt["computeResources"] == nil {
+		t.Fatalf("PipelineTask lost keys: %v", pt)
+	}
+	if !strings.Contains(joinFiles(files), "emptyDir") {
+		t.Fatalf("taskSpec volumes lost:\n%s", joinFiles(files))
+	}
+}
+
+const commandPipeline = `apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata: {name: ci}
+spec:
+  tasks:
+  - name: a
+    taskSpec:
+      steps:
+      - {name: s, image: gcr.io/distroless/static, command: [/app/run], args: [--x, $(params.y)]}
+`
+
+func TestCommandStepStaysCommandOnTektonRoundTrip(t *testing.T) {
+	files, _ := identityOf(t, map[string]string{"pipeline.yaml": commandPipeline})
+	src := joinFiles(files)
+	if !strings.Contains(src, "command:") || strings.Contains(src, "script:") {
+		t.Fatalf("command step became a script:\n%s", src)
+	}
+}
+
+func TestOutputValueReachesShellThroughEnv(t *testing.T) {
+	j := scriptJob("a", "true")
+	j.Outputs = []ir.Output{{Name: "v", Value: "${{ branch }}-${{ inputs.x }}-$(date)"}}
+	p := project(j)
+	p.Pipelines[0].Inputs = []ir.Input{{Name: "x", Default: "it's $(whoami)"}}
+	files, rep := emit(t, p)
+	var step doc
+	for _, s := range list(get(taskDoc(t, files, "ci-a"), "spec", "steps")) {
+		if s.(doc)["name"] == "pipemaster-outputs" {
+			step = s.(doc)
+		}
+	}
+	script := step["script"].(string)
+	if strings.Contains(script, "$(params") || strings.Contains(script, "'${") || !strings.Contains(script, `"${PM_OUT_0}"`) {
+		t.Fatalf("script = %q", script)
+	}
+	env := named(t, step["env"], "PM_OUT_0")["value"].(string)
+	if !strings.Contains(env, "$(params.x)") || !strings.Contains(env, "$(params.ctx-branch)") {
+		t.Fatalf("env = %q", env)
+	}
+	if entry(rep, caps.ScriptInterpolation, "results") != nil {
+		t.Fatalf("false lost entry: %v", rep.Entries)
+	}
+}
+
+func TestAlwaysOnNeedingJobIsReported(t *testing.T) {
+	a, b := scriptJob("a", "true"), scriptJob("b", "true")
+	b.Needs = []ir.Need{{JobID: "a"}}
+	b.If = expr.Call{Name: "always"}
+	_, rep := emit(t, project(a, b))
+	wantEntry(t, rep, caps.JobIf, caps.Lost, "always()")
+}
+
+func TestUnwritableExtIsReported(t *testing.T) {
+	p := project(scriptJob("a", "true"))
+	p.Origin = ir.Origin{Provider: "tekton", Dialect: "tekton"}
+	p.Pipelines[0].Ext = ir.Ext{"tekton": map[string]any{"description": make(chan int)}}
+	_, rep := emit(t, p)
+	wantEntry(t, rep, caps.ExtPassthrough, caps.Lost, "description")
+}
+
+func TestRequiredInputWithoutDefaultIsReportedOnTrigger(t *testing.T) {
+	p := project(scriptJob("a", "true"))
+	p.Pipelines[0].Inputs = []ir.Input{{Name: "ver", Required: true}}
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush}}
+	_, rep := emit(t, p)
+	wantEntry(t, rep, caps.TriggerPush, caps.External, "required input ver")
+}

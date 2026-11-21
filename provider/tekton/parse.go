@@ -181,6 +181,12 @@ func (p *project) attachResources(pl *ir.Pipeline) {
 	}
 	sort.SliceStable(p.resources, func(i, j int) bool {
 		a, b := p.resources[i], p.resources[j]
+		if a.kind != b.kind {
+			return a.kind < b.kind
+		}
+		if an, bn := a.name(), b.name(); an != bn {
+			return an < bn
+		}
 		if a.file != b.file {
 			return a.file < b.file
 		}
@@ -210,4 +216,11 @@ func (d *rawDoc) ext() any {
 		return d.view
 	}
 	return plain(d.top)
+}
+
+// name is the metadata name of the document, empty when it has none.
+func (d *rawDoc) name() string {
+	md, _ := valueOf(d.top, "metadata").(*omap)
+	n, _ := text(valueOf(md, "name"))
+	return n
 }

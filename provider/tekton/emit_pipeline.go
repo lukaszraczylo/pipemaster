@@ -1,7 +1,6 @@
 package tekton
 
 import (
-	"sort"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -73,8 +72,7 @@ func (e *emitter) pipeline(pp *plan) error {
 	}
 	spec := newMap()
 	if v, ok := x["description"]; ok {
-		n, _ := plainNode(v)
-		spec.set("description", n)
+		spec.set("description", e.node(pp.path, "description", v))
 	}
 	if pl.Name != "" {
 		spec.setStr("displayName", pl.Name)
@@ -84,8 +82,7 @@ func (e *emitter) pipeline(pp *plan) error {
 		spec.set("workspaces", e.pipelineWorkspaces(pp, x))
 	}
 	if v, ok := x["results"]; ok {
-		n, _ := plainNode(v)
-		spec.set("results", n)
+		spec.set("results", e.node(pp.path, "results", v))
 	}
 	spec.set("tasks", seqOf(tasks...))
 	if len(finally) > 0 {
@@ -148,7 +145,7 @@ func (e *emitter) pipelineWorkspaces(pp *plan, x map[string]any) *yaml.Node {
 	out := seqOf()
 	if raw, ok := x["workspaces"].([]any); ok {
 		for _, r := range raw {
-			if n, err := plainNode(r); err == nil {
+			if n := e.node(pp.path, "workspaces", r); n != nil {
 				out.Content = append(out.Content, n)
 			}
 		}
@@ -181,6 +178,7 @@ func (tc *taskCtx) pipelineTask(jc condition) (*wmap, error) {
 			params.Content = append(params.Content, nameValue(p, v))
 		}
 	}
+	tc.extraParams(params)
 	if len(params.Content) > 0 {
 		pt.set("params", params)
 	}
@@ -205,11 +203,17 @@ func (tc *taskCtx) pipelineTask(jc condition) (*wmap, error) {
 	if j.AllowFailure {
 		pt.setStr("onError", onErrorContinue)
 	}
-	if tc.ws {
-		w := newMap()
-		w.setStr("name", workspaceName)
-		w.setStr("workspace", workspaceName)
-		pt.set("workspaces", seqOf(w.n))
+	px, _ := tc.jobExt()
+	x := extOf(j.Ext)
+	if !tc.e.own {
+		x = nil
+	}
+	pt.set("workspaces", tc.pipelineWorkspaceBindings(x))
+	if v, ok := x["description"]; ok {
+		pt.set("description", tc.e.node(tc.jp.path, "description", v))
+	}
+	for _, k := range sortedKeys(px) {
+		pt.set(k, tc.e.node(tc.jp.path, "key "+k, px[k]))
 	}
 	return pt, nil
 }
@@ -376,18 +380,29 @@ func (e *emitter) resources(pls []*ir.Pipeline) {
 			docs = append(docs, resourceDoc{kind: kind, name: name, body: m, path: pp.path})
 		}
 	}
-	sort.Slice(docs, func(i, j int) bool { return docs[i].kind+docs[i].name < docs[j].kind+docs[j].name })
 	for _, d := range docs {
-		n, err := plainNode(d.body)
-		if err != nil {
-			e.lose(d.path, caps.ExtPassthrough, "resource "+d.kind+" "+d.name+" cannot be written: "+err.Error())
+		if d.kind == kindEventListener {
+			if e.pendingEL == nil {
+				e.pendingEL = map[string][]resourceDoc{}
+			}
+			e.pendingEL[d.name] = append(e.pendingEL[d.name], d)
 			continue
 		}
-		file := resourcesDir + sanitizeFile(d.kind+"-"+d.name) + ".yaml"
-		e.made[d.kind+" "+d.name] = true
-		e.add(file, &outDoc{root: n}, d.path+"#resource/"+d.kind+"/"+d.name)
+		e.writeResource(d)
 	}
 	_ = pls
+}
+
+// writeResource writes a document that a Tekton file kept whole.
+func (e *emitter) writeResource(d resourceDoc) {
+	n, err := plainNode(d.body)
+	if err != nil {
+		e.lose(d.path, caps.ExtPassthrough, "resource "+d.kind+" "+d.name+" cannot be written: "+err.Error())
+		return
+	}
+	file := resourcesDir + sanitizeFile(d.kind+"-"+d.name) + ".yaml"
+	e.made[d.kind+" "+d.name] = true
+	e.add(file, &outDoc{root: n}, d.path+"#resource/"+d.kind+"/"+d.name)
 }
 
 type resourceDoc struct {

@@ -17,8 +17,14 @@ const (
 	paramFilter       = "filter"
 	paramOverlays     = "overlays"
 	paramChangedFiles = "addChangedFiles"
-	eventPush         = "push"
-	eventPullRequest  = "pull_request"
+	paramSecretRef    = "secretRef"
+	// extOverlays keeps the overlays of a CEL interceptor whose filter has no marker.
+	extOverlays = "overlays"
+	// extSAScope says that serviceAccountName came from the EventListener spec, not from the trigger.
+	extSAScope       = "serviceAccountScope"
+	saScopeSpec      = "spec"
+	eventPush        = "push"
+	eventPullRequest = "pull_request"
 )
 
 // listenerHost reads the EventListener service name in the URL that a cron job posts to.
@@ -191,6 +197,7 @@ func (p *project) trigger(lt listenerTrigger, byName map[string]*ir.Pipeline) bo
 		k.vals["serviceAccountName"] = sa
 	} else if sa, ok := text(valueOf(lt.spec, "serviceAccountName")); ok {
 		k.vals["serviceAccountName"] = sa
+		k.vals[extSAScope] = saScopeSpec
 	}
 	if lt.spec != nil {
 		rest := &omap{vals: map[string]any{}, lines: map[string]int{}}
@@ -224,6 +231,7 @@ func (p *project) interceptors(lt listenerTrigger, k *sink) ([]ir.TriggerKind, *
 	var kinds []ir.TriggerKind
 	var rest []any
 	var cel *interceptor
+	var defaultSecret []any
 	for _, e := range list {
 		in, ok := readInterceptor(e)
 		switch {
@@ -233,8 +241,12 @@ func (p *project) interceptors(lt listenerTrigger, k *sink) ([]ir.TriggerKind, *
 			if !whole {
 				rest = append(rest, plain(e))
 			}
-			if _, ok := in.params["secretRef"]; ok {
-				rest = append(rest, plain(e))
+			if _, ok := in.params[paramSecretRef]; ok {
+				if hasDefaultSecret(in) {
+					defaultSecret = append(defaultSecret, plain(e))
+				} else {
+					rest = append(rest, plain(e))
+				}
 			}
 		case ok && in.name == interceptorCEL && cel == nil:
 			c := in
@@ -247,6 +259,10 @@ func (p *project) interceptors(lt listenerTrigger, k *sink) ([]ir.TriggerKind, *
 	if cel != nil {
 		restored = p.celFilterOf(lt, k, *cel, kinds)
 	}
+	if restored == nil {
+		// Only a marked trigger is one that pipemaster wrote; the default secret of any other is the author's.
+		rest = append(rest, defaultSecret...)
+	}
 	if len(rest) > 0 {
 		k.vals["interceptors"] = dedupe(rest)
 		k.note(caps.ExtPassthrough, "interceptors other than the event types of github have no IR field; kept in Ext", lt.doc.line)
@@ -255,9 +271,12 @@ func (p *project) interceptors(lt listenerTrigger, k *sink) ([]ir.TriggerKind, *
 }
 
 // keepFilter keeps a CEL filter as opaque Tekton text.
-func (p *project) keepFilter(lt listenerTrigger, k *sink, filter, why string) {
+func (p *project) keepFilter(lt listenerTrigger, k *sink, in interceptor, filter, why string) {
 	raw, _ := json.Marshal(map[string]any{"cel": filter})
 	k.vals["filter"] = expr.String(expr.Opaque{Dialect: dialect, Text: string(raw)})
+	if ov, ok := in.params[paramOverlays]; ok {
+		k.vals[extOverlays] = plain(ov)
+	}
 	p.rep.Add(report.Entry{
 		IRPath: k.path, Feature: caps.ExprOpaque, Level: caps.Lost, Strategy: "kept as opaque Tekton text",
 		Detail: why + "a CEL filter has no IR trigger condition; it is kept as opaque Tekton text in Ext: " + filter, SourceLoc: lt.doc.loc(0),
@@ -288,6 +307,9 @@ func githubKinds(in interceptor) (kinds []ir.TriggerKind, whole bool) {
 				n++
 			}
 		}
+	}
+	if hasDefaultSecret(in) {
+		n++
 	}
 	whole = len(in.params) == n && len(types) > 0
 	for _, t := range types {

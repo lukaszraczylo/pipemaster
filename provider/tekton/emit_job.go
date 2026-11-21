@@ -11,11 +11,12 @@ import (
 )
 
 const (
-	noopScript   = "true"
-	noopStepName = "noop"
-	outputsStep  = "pipemaster-outputs"
-	saveStep     = "pipemaster-artifacts-save"
-	restoreStep  = "pipemaster-artifacts-restore"
+	noopScript      = "true"
+	noopStepName    = "noop"
+	outputsStep     = "pipemaster-outputs"
+	outputEnvPrefix = "PM_OUT_"
+	saveStep        = "pipemaster-artifacts-save"
+	restoreStep     = "pipemaster-artifacts-restore"
 )
 
 // workspaceArg carries the cache and artifact settings of a job whose files the shared workspace stands in for.
@@ -109,15 +110,13 @@ func (e *emitter) remoteTask(pp *plan, jp *jobPlan) (*wmap, bool) {
 	}
 	pt := newMap()
 	pt.setStr("name", jp.tname)
-	n, err := plainNode(ref)
-	if err != nil {
+	n := e.node(jp.path, "taskRef", ref)
+	if n == nil {
 		return nil, false
 	}
 	pt.set("taskRef", n)
 	if v, ok := extOf(j.Ext)["params"]; ok {
-		if pn, err := plainNode(v); err == nil {
-			pt.set("params", pn)
-		}
+		pt.set("params", e.node(jp.path, "params", v))
 	}
 	e.runAfter(pp, jp, pt, nil)
 	return pt, true
@@ -210,15 +209,20 @@ func (tc *taskCtx) outputStep(b *stepBook) error {
 	j := tc.jp.j
 	var lines []string
 	sc := newScope()
-	for _, o := range j.Outputs {
+	for i, o := range j.Outputs {
 		if o.Value == "" {
 			continue
 		}
-		line, err := tc.scriptLine(sc, tc.jp.path, "printf '%s' "+shq(o.Value)+" > "+shq("$(results."+o.Name+".path)"))
+		val, ok, err := tc.text(sc, tc.jp.path, caps.JobOutputs, valueText, o.Value)
 		if err != nil {
 			return err
 		}
-		lines = append(lines, line)
+		if !ok {
+			continue
+		}
+		name := outputEnvPrefix + strconv.Itoa(i)
+		sc.add(name, nameValue(name, val))
+		lines = append(lines, "printf '%s' \"${"+name+"}\" > "+shq("$(results."+o.Name+".path)"))
 	}
 	if len(lines) == 0 {
 		return nil
@@ -263,15 +267,18 @@ func (tc *taskCtx) taskDoc(b *stepBook) (*outDoc, error) {
 		return nil, err
 	}
 	if v, ok := x["task_description"]; ok {
-		n, _ := plainNode(v)
-		spec.set("description", n)
+		spec.set("description", tc.e.node(tc.jp.path, "task description", v))
 	}
+	_, body := tc.jobExt()
 	spec.set("params", tc.paramNodes(x))
 	spec.set("stepTemplate", tpl)
 	spec.set("steps", seqOf(b.nodes...))
 	spec.set("sidecars", sidecars)
 	spec.set("results", tc.resultNodes(x))
 	spec.set("workspaces", tc.workspaceNodes(x))
+	for _, k := range sortedKeys(body) {
+		spec.set(k, tc.e.node(tc.jp.path, "Task key "+k, body[k]))
+	}
 	root.set("spec", spec.n)
 	return &outDoc{root: root.n}, nil
 }
@@ -285,7 +292,7 @@ func (tc *taskCtx) paramNodes(x map[string]any) *yaml.Node {
 	}
 	if kept, ok := x["task_params"].([]any); ok {
 		for _, k := range kept {
-			if n, err := plainNode(k); err == nil {
+			if n := tc.e.node(tc.jp.path, "task params", k); n != nil {
 				out.Content = append(out.Content, n)
 			}
 		}
@@ -298,7 +305,7 @@ func (tc *taskCtx) paramNodes(x map[string]any) *yaml.Node {
 
 func (tc *taskCtx) resultNodes(x map[string]any) *yaml.Node {
 	if raw, ok := x["results"]; ok {
-		if n, err := plainNode(raw); err == nil {
+		if n := tc.e.node(tc.jp.path, "results", raw); n != nil {
 			return n
 		}
 	}
@@ -319,7 +326,7 @@ func (tc *taskCtx) workspaceNodes(x map[string]any) *yaml.Node {
 	out := seqOf()
 	if raw, ok := x["task_workspaces"].([]any); ok {
 		for _, r := range raw {
-			if n, err := plainNode(r); err == nil {
+			if n := tc.e.node(tc.jp.path, "task workspaces", r); n != nil {
 				out.Content = append(out.Content, n)
 			}
 		}
@@ -434,6 +441,83 @@ func (tc *taskCtx) ports(sp string, ps []string) *yaml.Node {
 		m := newMap()
 		m.set("containerPort", intNode(n))
 		out.Content = append(out.Content, m.n)
+	}
+	return out
+}
+
+// jobHandled lists the job Ext keys that the emitter writes in a place of its own.
+var jobHandled = map[string]bool{
+	ExtImplicitNeeds: true, "task_name": true, "matrix_include_names": true, "array_params": true, "unused_params": true,
+	"params": true, "stepTemplate": true, "results": true, "task_metadata": true, "task_params": true, "task_workspaces": true,
+	"task_description": true, "workspaces": true, "description": true,
+}
+
+// jobExt returns the Ext keys of the job: the PipelineTask keys, and the Task body keys without their prefix.
+func (tc *taskCtx) jobExt() (pipelineTask, taskBody map[string]any) {
+	pipelineTask, taskBody = map[string]any{}, map[string]any{}
+	if !tc.e.own {
+		return
+	}
+	for k, v := range extOf(tc.jp.j.Ext) {
+		switch rest, isTask := strings.CutPrefix(k, taskKeyPrefix); {
+		case jobHandled[k] || k == "sidecars":
+		case isTask:
+			taskBody[rest] = v
+		default:
+			pipelineTask[k] = v
+		}
+	}
+	if _, ok := extOf(tc.jp.j.Ext)["sidecars"]; ok {
+		tc.e.lose(tc.jp.path, caps.ExtPassthrough, "sidecar keys beside name, image, env and ports have no place in the emitted Tekton files")
+	}
+	return
+}
+
+// extraParams adds the PipelineTask params that the parser kept: array values and values that no text read.
+func (tc *taskCtx) extraParams(params *yaml.Node) {
+	x := extOf(tc.jp.j.Ext)
+	if !tc.e.own {
+		return
+	}
+	have := map[string]bool{}
+	for _, p := range tc.params {
+		have[p] = true
+	}
+	arrays, _ := x["array_params"].(map[string]any)
+	for _, name := range sortedKeys(arrays) {
+		if n := tc.e.node(tc.jp.path, "param "+name, arrays[name]); n != nil && !have[name] {
+			m := newMap()
+			m.setStr("name", name)
+			m.set("value", n)
+			params.Content = append(params.Content, m.n)
+		}
+	}
+	unused, _ := x["unused_params"].(map[string]any)
+	for _, name := range sortedKeys(unused) {
+		if s, ok := unused[name].(string); ok && !have[name] {
+			params.Content = append(params.Content, nameValue(name, s))
+		}
+	}
+}
+
+// pipelineWorkspaceBindings lists the workspace bindings of the PipelineTask: those of the Tekton file, then ours.
+func (tc *taskCtx) pipelineWorkspaceBindings(x map[string]any) *yaml.Node {
+	out := seqOf()
+	if raw, ok := x["workspaces"].([]any); ok && tc.e.own {
+		for _, r := range raw {
+			if n := tc.e.node(tc.jp.path, "workspaces binding", r); n != nil {
+				out.Content = append(out.Content, n)
+			}
+		}
+	}
+	if tc.ws {
+		w := newMap()
+		w.setStr("name", workspaceName)
+		w.setStr("workspace", workspaceName)
+		out.Content = append(out.Content, w.n)
+	}
+	if len(out.Content) == 0 {
+		return nil
 	}
 	return out
 }

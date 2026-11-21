@@ -27,6 +27,8 @@ const (
 	changedFilesExpr  = "(extensions.changed_files.added + extensions.changed_files.modified + extensions.changed_files.removed)"
 	utcZone           = "Etc/UTC"
 	cronContainerName = "trigger"
+	githubSecretName  = "pipemaster-github-webhook"
+	githubSecretKey   = "token"
 	// generatedMarker tags a document that the emitter writes whole; the parser drops it when nobody edited it.
 	generatedMarker    = "# pipemaster:generated"
 	templateNameSuffix = "-run"
@@ -244,53 +246,6 @@ func ctxOverlay(kind ir.TriggerKind, ctx string) string {
 	return "''"
 }
 
-func (e *emitter) triggers() error {
-	if len(e.plans) == 0 {
-		return nil
-	}
-	el := newMap()
-	el.setStr("apiVersion", apiTriggersV1)
-	el.setStr("kind", kindEventListener)
-	meta := newMap()
-	meta.setStr("name", kindEventListenerName)
-	el.set("metadata", meta.n)
-	var entries []*yaml.Node
-	var crons, bindings, templates []*outDoc
-	d := &outDoc{}
-	for _, pp := range e.plans {
-		b, t, err := e.pipelineTriggers(pp, d, &entries, &crons)
-		if err != nil {
-			return err
-		}
-		if b != nil {
-			bindings = append(bindings, b)
-		}
-		if t != nil {
-			templates = append(templates, t)
-		}
-	}
-	if len(entries) == 0 && len(crons) == 0 {
-		return nil
-	}
-	spec := newMap()
-	spec.setStr("serviceAccountName", triggersAccount)
-	spec.set("triggers", seqOf(entries...))
-	el.set("spec", spec.n)
-	d.root = el.n
-	e.add(triggersDir+"eventlistener.yaml", d)
-	for _, d := range bindings {
-		e.add(triggersDir+"triggerbinding.yaml", d)
-	}
-	for _, d := range templates {
-		e.add(triggersDir+"triggertemplate.yaml", d)
-	}
-	for _, d := range crons {
-		e.add(cronDir+cronFile(d), d)
-	}
-	e.rbac()
-	return nil
-}
-
 func cronFile(d *outDoc) string {
 	for i := 0; i+1 < len(d.root.Content); i += 2 {
 		if d.root.Content[i].Value == "metadata" {
@@ -303,60 +258,6 @@ func cronFile(d *outDoc) string {
 		}
 	}
 	return "cron.yaml"
-}
-
-// pipelineTriggers writes the EventListener entries, the binding, the template and the CronJobs of one pipeline.
-func (e *emitter) pipelineTriggers(pp *plan, listener *outDoc, entries *[]*yaml.Node, crons *[]*outDoc) (binding, template *outDoc, err error) {
-	var ctxs []string
-	for _, c := range ctxOrder {
-		if p, _ := exprtekton.CtxParam(strings.Split(c, ".")); pp.ctx[p] {
-			ctxs = append(ctxs, c)
-		}
-	}
-	tname, bname := pp.name+templateNameSuffix, pp.name+bindingNameSuffix
-	tname, bname = fit(tname, tname, maxName), fit(bname, bname, maxName)
-	used := false
-	sched := 0
-	for i, t := range pp.pl.Triggers {
-		path := pp.path + "/trigger/" + strconv.Itoa(i)
-		e.owners[path] = listener
-		e.foreignExt(path, t.Ext)
-		if t.Kind == ir.TriggerManual {
-			e.note(path, caps.TriggerManual, caps.External, "tkn pipeline start "+pp.name, "a person starts the run with `tkn pipeline start "+pp.name+"`")
-			continue
-		}
-		var entry *yaml.Node
-		switch t.Kind {
-		case ir.TriggerPush, ir.TriggerTag, ir.TriggerPR:
-			entry, err = e.eventTrigger(pp, i, path, t, ctxs, bname, tname)
-		case ir.TriggerSchedule:
-			var cj *outDoc
-			entry, cj, err = e.scheduleTrigger(pp, sched, path, t, ctxs, bname, tname)
-			sched++
-			if cj != nil {
-				*crons = append(*crons, cj)
-			}
-		default:
-			continue
-		}
-		if err != nil {
-			return nil, nil, err
-		}
-		if entry != nil {
-			used = true
-			*entries = append(*entries, entry)
-		}
-	}
-	if !used {
-		return nil, nil, nil
-	}
-	if !e.made["TriggerBinding "+bname] {
-		binding = e.bindingDoc(bname, ctxs)
-	}
-	if !e.made["TriggerTemplate "+tname] {
-		template = e.templateDoc(pp, tname, ctxs)
-	}
-	return binding, template, nil
 }
 
 func (e *emitter) eventTrigger(pp *plan, i int, path string, t ir.Trigger, ctxs []string, bname, tname string) (*yaml.Node, error) {
@@ -388,6 +289,12 @@ func (e *emitter) eventTrigger(pp *plan, i int, path string, t ir.Trigger, ctxs 
 		en.set("enabled", boolNode(true))
 		gh = append(gh, nameNode("addChangedFiles", en.n))
 	}
+	sec := newMap()
+	sec.setStr("secretName", githubSecretName)
+	sec.setStr("secretKey", githubSecretKey)
+	gh = append(gh, nameNode(paramSecretRef, sec.n))
+	e.note(path, kindFeature[t.Kind], caps.External, "Secret "+githubSecretName,
+		"create the Secret "+githubSecretName+" with key "+githubSecretKey+" holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign")
 	return e.triggerEntry(tn, t.Kind, filter, gh, ctxs, bname, tname), nil
 }
 

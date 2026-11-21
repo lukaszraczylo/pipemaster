@@ -184,6 +184,9 @@ func (tc *taskCtx) cond(path string, f caps.Feature, e expr.Expr, sc scope) cond
 	if e == nil {
 		return condition{}
 	}
+	if f == caps.JobIf && !tc.jp.finally && len(tc.jp.j.Needs) > 0 && callsAlways(e) {
+		tc.e.lose(path, f, "always() has no Tekton form outside finally; Tekton skips the task when a dependency fails")
+	}
 	if en, ok := tc.whenEntries(e, sc); ok {
 		return condition{when: en}
 	}
@@ -246,4 +249,15 @@ func whenNode(es []exprtekton.Entry) *yaml.Node {
 		out.Content = append(out.Content, m.n)
 	}
 	return out
+}
+
+// callsAlways reports whether the condition calls always() outside a negation.
+func callsAlways(e expr.Expr) bool {
+	switch v := e.(type) {
+	case expr.Call:
+		return v.Name == "always" && len(v.Args) == 0
+	case expr.Binary:
+		return callsAlways(v.L) || callsAlways(v.R)
+	}
+	return false
 }

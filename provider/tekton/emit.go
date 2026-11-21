@@ -1,6 +1,8 @@
 package tekton
 
 import (
+	"go.yaml.in/yaml/v3"
+
 	"fmt"
 	"sort"
 	"strconv"
@@ -85,12 +87,17 @@ type emitter struct {
 	marked map[ir.FeatureUse]bool
 	// taken holds the Task names in use; made holds "kind name" of every generated object, so a resource kept in
 	// Ext is not written a second time.
-	taken  map[string]bool
-	made   map[string]bool
-	origin string
-	plans  []*plan
+	taken map[string]bool
+	made  map[string]bool
+	// pendingEL holds the EventListeners that a Tekton file kept as resources, by name.
+	pendingEL map[string][]resourceDoc
+	origin    string
+	plans     []*plan
+	// listeners are the EventListeners in order of first use.
+	listeners []*listener
 	// own is true when the project came from Tekton, so its Ext keys are ours to write back.
-	own bool
+	own               bool
+	generatedListener bool
 }
 
 func use(path string, f caps.Feature) ir.FeatureUse { return ir.FeatureUse{IRPath: path, Feature: f} }
@@ -270,3 +277,13 @@ const (
 
 // idComment is the head comment that carries the IR ID of a node whose written name differs.
 func idComment(id string) string { return idMarkerPrefix + commentSafe(id) }
+
+// node encodes an Ext value; a value that cannot be written is reported lost and gives nil.
+func (e *emitter) node(path, what string, v any) *yaml.Node {
+	n, err := plainNode(v)
+	if err != nil {
+		e.lose(path, caps.ExtPassthrough, what+" of the Tekton file cannot be written: "+err.Error())
+		return nil
+	}
+	return n
+}

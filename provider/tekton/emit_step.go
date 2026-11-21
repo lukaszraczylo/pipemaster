@@ -94,7 +94,7 @@ func (tc *taskCtx) scriptStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 	if st.Shell != "" {
 		lines = append([]string{shebang + st.Shell}, lines...)
 	}
-	if len(lines) > 0 {
+	if len(lines) > 0 && !tc.commandForm(m, st, sp, guard) {
 		m.set("script", block(strings.Join(lines, "\n")))
 	}
 	if len(userEnv)+len(sc.env) > 0 {
@@ -144,7 +144,7 @@ func (tc *taskCtx) stepExt(m *wmap, st *ir.Step, sp string) error {
 	if len(x) == 0 || !tc.e.own {
 		return nil
 	}
-	skip := map[string]bool{ExtCommand: true, ExtArgs: true, "ref": true, "params": true, "taskRef": true}
+	skip := map[string]bool{ExtCommand: true, ExtArgs: true, ExtScriptLine: true, "ref": true, "params": true, "taskRef": true}
 	for _, k := range sortedKeys(x) {
 		if k == "timeout" || k == "onError" {
 			continue
@@ -219,4 +219,26 @@ func andGuard(a, b expr.Expr) expr.Expr {
 		return a
 	}
 	return expr.Binary{Op: expr.OpAnd, L: a, R: b}
+}
+
+// commandForm writes command and args back for a step that came as command and args, while its line is as
+// the parser wrote it. A step that changed becomes a script and reports that a shell must exist in the image.
+func (tc *taskCtx) commandForm(m *wmap, st *ir.Step, sp string, guard expr.Expr) bool {
+	x := extOf(st.Ext)
+	if !tc.e.own || x[ExtCommand] == nil {
+		return false
+	}
+	line, _ := x[ExtScriptLine].(string)
+	if guard != nil || st.Shell != "" || len(st.Script) != 1 || st.Script[0] != line {
+		tc.e.emulate(sp, caps.StepScript, "script step", "command and args are written as a script, so the image needs a shell")
+		return false
+	}
+	for _, k := range []string{ExtCommand, ExtArgs} {
+		if v, ok := x[k]; ok {
+			if n := tc.e.node(sp, k, v); n != nil {
+				m.set(k, n)
+			}
+		}
+	}
+	return true
 }

@@ -94,11 +94,17 @@ func nameValue(name, value string) *yaml.Node {
 }
 
 // plainNode encodes a provider-native Ext value; map keys come out sorted so output is stable.
-func plainNode(v any) (*yaml.Node, error) {
+func plainNode(v any) (n *yaml.Node, err error) {
+	// yaml panics on a type it cannot marshal.
+	defer func() {
+		if r := recover(); r != nil {
+			n, err = nil, fmt.Errorf("encode ext value: %v", r)
+		}
+	}()
 	if f, ok := v.(float64); ok && f == math.Trunc(f) && math.Abs(f) < 1e15 {
 		v = int64(f)
 	}
-	n := &yaml.Node{}
+	n = &yaml.Node{}
 	if err := n.Encode(v); err != nil {
 		return nil, fmt.Errorf("encode ext value: %w", err)
 	}

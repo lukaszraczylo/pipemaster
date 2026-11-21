@@ -52,7 +52,7 @@ func (p *project) celFilterOf(lt listenerTrigger, k *sink, in interceptor, kinds
 		if overlaysMatch(in, a.Kind) {
 			return &a
 		}
-		p.keepFilter(lt, k, filter, "marker ignored: the overlays were edited after pipemaster wrote them; ")
+		p.keepFilter(lt, k, in, filter, "marker ignored: the overlays were edited after pipemaster wrote them; ")
 		return nil
 	}
 	name, _ := text(lt.m.vals["name"])
@@ -66,17 +66,17 @@ func (p *project) celFilterOf(lt listenerTrigger, k *sink, in interceptor, kinds
 		}
 		switch {
 		case want != filter:
-			p.keepFilter(lt, k, filter, "marker ignored: the filter was edited after pipemaster wrote it; ")
+			p.keepFilter(lt, k, in, filter, "marker ignored: the filter was edited after pipemaster wrote it; ")
 		case len(kinds) != 1 || kinds[0] != githubKind(a.Kind):
-			p.keepFilter(lt, k, filter, "marker ignored: the event types were edited after pipemaster wrote them; ")
+			p.keepFilter(lt, k, in, filter, "marker ignored: the event types were edited after pipemaster wrote them; ")
 		case !overlaysMatch(in, a.Kind):
-			p.keepFilter(lt, k, filter, "marker ignored: the overlays were edited after pipemaster wrote them; ")
+			p.keepFilter(lt, k, in, filter, "marker ignored: the overlays were edited after pipemaster wrote them; ")
 		default:
 			return &a
 		}
 		return nil
 	}
-	p.keepFilter(lt, k, filter, "")
+	p.keepFilter(lt, k, in, filter, "")
 	return nil
 }
 
@@ -368,4 +368,13 @@ func pruneGenerated(vals map[string]any, trigger, pipeline string) {
 	same("template", fit(pipeline+templateNameSuffix, pipeline+templateNameSuffix, maxName))
 	same("bindings", []any{map[string]any{"ref": fit(pipeline+bindingNameSuffix, pipeline+bindingNameSuffix, maxName)}})
 	same("serviceAccountName", triggersAccount)
+	if _, kept := vals["serviceAccountName"]; !kept {
+		delete(vals, extSAScope)
+	}
+}
+
+// hasDefaultSecret reports whether the github interceptor carries the secretRef that the emitter writes.
+func hasDefaultSecret(in interceptor) bool {
+	v, ok := in.params[paramSecretRef]
+	return ok && onlyKeys(v, map[string]string{"secretName": githubSecretName, "secretKey": githubSecretKey})
 }

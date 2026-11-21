@@ -6,6 +6,9 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 )
 
+// taskKeyPrefix marks an Ext key that belongs to the Task body, not to the PipelineTask.
+const taskKeyPrefix = "task_"
+
 // body reads a Task spec into the steps, container, env, services and outputs of the job. r is the reader of
 // the spec when keys were already consumed from it.
 func (b *jobBuilder) body(spec *omap, r *reader) error {
@@ -43,7 +46,7 @@ func (b *jobBuilder) body(spec *omap, r *reader) error {
 	if v, ok := r.take("description"); ok {
 		b.k.vals["task_description"] = plain(v)
 	}
-	b.k.keepRest(r)
+	b.k.keepRestAs(r, taskKeyPrefix)
 	b.unused()
 	return nil
 }

@@ -20,6 +20,8 @@ const (
 	ExtCommand = "command"
 	// ExtArgs is the step Ext key that keeps the args list beside ExtCommand.
 	ExtArgs = "args"
+	// ExtScriptLine is the step Ext key that holds the script line the parser built, to tell an edited step from an unedited one.
+	ExtScriptLine = "script_line"
 )
 
 // sink collects the keys a parser could not map; they become Ext[tekton] and each has a report entry.
@@ -71,5 +73,12 @@ func (k *sink) keepMeta(key string, top *omap, what string, line int) {
 	meta, _ := asMap(top.vals["metadata"])
 	if rest := metaRest(meta); len(rest.keys) > 0 {
 		k.keep(key, rest, caps.ExtPassthrough, what+" metadata has no IR field; kept in Ext", line)
+	}
+}
+
+// keepRestAs is keepRest with a key prefix, for the keys of a Task body that share an Ext with its PipelineTask.
+func (k *sink) keepRestAs(r *reader, prefix string) {
+	for _, key := range r.rest() {
+		k.keep(prefix+key, r.m.vals[key], caps.ExtPassthrough, "key "+key+" has no IR field; kept in Ext", r.line(key))
 	}
 }
