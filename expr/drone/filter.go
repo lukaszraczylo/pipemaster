@@ -293,7 +293,10 @@ func flattenOr(e expr.Expr) []expr.Expr {
 }
 
 // reader reads an AST under the equality semantics of its source dialect.
-type reader struct{ sem expr.Semantics }
+type reader struct {
+	sem expr.Semantics
+	opt options
+}
 
 // valueOf reads one disjunct as a filter value of some key: an equality of a key ref with a string, a tag
 // equality, or a glob.
@@ -308,7 +311,7 @@ func (rd reader) valueOf(e expr.Expr) (key string, vs []string, ok bool) {
 		if x.Op != expr.OpEq || !isLit || !isRef || lit.Kind != expr.LitStr || !IsLiteral(lit.Str) {
 			return "", nil, false
 		}
-		if slices.Equal(r.Path, tagRef.Path) && lit.Str != "" && exactValue(lit.Str, rd.sem) {
+		if slices.Equal(r.Path, tagRef.Path) && lit.Str != "" && rd.opt.exact(lit.Str, rd.sem) {
 			return KeyRef, []string{tagRefPrefix + lit.Str}, true
 		}
 		for _, k := range keyOrder {
@@ -319,7 +322,7 @@ func (rd reader) valueOf(e expr.Expr) (key string, vs []string, ok bool) {
 				vs, ok := droneEvents(lit.Str, rd.sem.CaseInsensitiveEq)
 				return k, vs, ok
 			}
-			return k, []string{lit.Str}, exactValue(lit.Str, rd.sem)
+			return k, []string{lit.Str}, rd.opt.exact(lit.Str, rd.sem)
 		}
 	}
 	return "", nil, false
@@ -365,9 +368,10 @@ func (rd reader) filterOf(e expr.Expr) (string, Filter, bool) {
 // value (push) fails. It succeeds only for an AND of per-key ORs over branch, tag, event, ref and repo
 // refs, with at most one filter per key and an optional status call. Any other shape, including an OR across
 // keys, a ref with no Drone filter such as pr.head_ref, or an Opaque that is not a glob, fails: Drone ANDs
-// the keys of one when block and has no OR between them. A nil e matches every run.
-func FromExpr(e expr.Expr, sem expr.Semantics) (Conditions, bool) {
-	rd := reader{sem}
+// the keys of one when block and has no OR between them. A nil e matches every run. AllowFold lifts the
+// cased-literal limit.
+func FromExpr(e expr.Expr, sem expr.Semantics, opts ...Option) (Conditions, bool) {
+	rd := reader{sem, optsOf(opts)}
 	var c Conditions
 	if e == nil {
 		return c, true

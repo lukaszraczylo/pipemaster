@@ -476,3 +476,31 @@ func TestPushIsPushAndTag(t *testing.T) {
 		t.Errorf("FromExpr(push && main) = %#v, %v", got, ok)
 	}
 }
+
+// AllowFold is the opt-in that reads a folded comparison as the case-sensitive Drone value. The default stays exact.
+func TestAllowFoldFilters(t *testing.T) {
+	for _, c := range []struct {
+		e    expr.Expr
+		name string
+		want drone.Conditions
+	}{
+		{eq(branch, "main"), "branch", drone.Conditions{Branch: drone.Filter{Include: []string{"main"}}}},
+		{eq(r("ref"), "refs/heads/Main"), "ref", drone.Conditions{Ref: drone.Filter{Include: []string{"refs/heads/Main"}}}},
+		{eq(r("tag"), "v1"), "tag", drone.Conditions{Ref: drone.Filter{Include: []string{"refs/tags/v1"}}}},
+		{not(eq(branch, "main")), "inequality", drone.Conditions{Branch: drone.Filter{Exclude: []string{"main"}}}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if _, ok := drone.FromExpr(c.e, folding); ok {
+				t.Fatal("the default must stay exact")
+			}
+			got, ok := drone.FromExpr(c.e, folding, drone.AllowFold)
+			if !ok || !reflect.DeepEqual(got, c.want) {
+				t.Errorf("got %#v, %v; want %#v", got, ok, c.want)
+			}
+		})
+	}
+	plain, _ := drone.FromExpr(eq(event, "Schedule"), folding)
+	if got, _ := drone.FromExpr(eq(event, "Schedule"), folding, drone.AllowFold); !reflect.DeepEqual(got, plain) {
+		t.Errorf("AllowFold changed an event literal: %#v, want %#v", got, plain)
+	}
+}

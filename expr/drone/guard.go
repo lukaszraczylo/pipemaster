@@ -21,8 +21,8 @@ const (
 var ErrNotGuardable = errors.New("drone guard: condition has no shell test form")
 
 // Guardable reports whether PrintGuard accepts e under sem.
-func Guardable(e expr.Expr, sem expr.Semantics) bool {
-	_, err := printer{sem}.test(e)
+func Guardable(e expr.Expr, sem expr.Semantics, opts ...Option) bool {
+	_, err := printer{sem, optsOf(opts)}.test(e)
 	return err == nil
 }
 
@@ -32,13 +32,13 @@ func Guardable(e expr.Expr, sem expr.Semantics) bool {
 // sem is the equality semantics of the dialect that wrote e. The shell test is case sensitive, so under a
 // folding source (GHA) a comparison is guardable only when its literal has no cased character and the other
 // side is a ref; any other folded comparison fails. An event literal maps to its DRONE_BUILD_EVENT value
-// (schedule is cron), and one with none, such as push, fails.
+// (schedule is cron), and one with none, such as push, fails. AllowFold lifts the cased-literal limit.
 //
 // Literals are written as they are. Drone substitutes ${NAME} in the raw YAML text (research drone.md 6.1),
 // so the caller that puts the line in a document must apply Drone `$` escaping and reverse it before
 // ParseGuard, which compares the exact text.
-func PrintGuard(e expr.Expr, sem expr.Semantics) (string, error) {
-	t, err := printer{sem}.test(e)
+func PrintGuard(e expr.Expr, sem expr.Semantics, opts ...Option) (string, error) {
+	t, err := printer{sem, optsOf(opts)}.test(e)
 	if err != nil {
 		return "", err
 	}
@@ -89,7 +89,10 @@ func RemoveGuard(script []string) ([]string, expr.Expr, bool) {
 
 // printTest writes e as a shell test. It wraps every node that is not a single [ ] test in a group, so that
 // `!` and the left-to-right `&&`/`||` of the shell cannot regroup the AST.
-type printer struct{ sem expr.Semantics }
+type printer struct {
+	sem expr.Semantics
+	opt options
+}
 
 func (p printer) test(e expr.Expr) (string, error) {
 	t, err := p.node(e)
@@ -208,7 +211,7 @@ func (p printer) operands(b expr.Binary) (string, string, error) {
 	_, rIsRef := b.R.(expr.Ref)
 	lLit, lIsLit := b.L.(expr.Lit)
 	rLit, rIsLit := b.R.(expr.Lit)
-	uncasedPair := lIsRef && rIsLit && !cased(rLit.Str) || lIsLit && rIsRef && !cased(lLit.Str)
+	uncasedPair := lIsRef && rIsLit && p.opt.exact(rLit.Str, p.sem) || lIsLit && rIsRef && p.opt.exact(lLit.Str, p.sem)
 	if p.sem.CaseInsensitiveEq && !uncasedPair {
 		return "", "", fmt.Errorf("%w: a case-insensitive comparison needs a ref and an uncased literal", ErrNotGuardable)
 	}

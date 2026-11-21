@@ -120,3 +120,23 @@ func VarName(r expr.Ref) (string, bool) {
 	}
 	return r.Path[1], true
 }
+
+// Option changes how FromExpr, Guardable and PrintGuard read a comparison.
+type Option func(*options)
+
+type options struct{ fold bool }
+
+// AllowFold accepts a comparison that a case-folding source writes with a cased literal. Drone compares case
+// sensitively, so the result approximates the source and the caller must report it as an emulation.
+func AllowFold(o *options) { o.fold = true }
+
+func optsOf(opts []Option) options {
+	var o options
+	for _, f := range opts {
+		f(&o)
+	}
+	return o
+}
+
+// exact reports whether s reads the same on both sides, or the caller accepted the difference.
+func (o options) exact(s string, sem expr.Semantics) bool { return o.fold || exactValue(s, sem) }

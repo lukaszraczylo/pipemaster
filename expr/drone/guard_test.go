@@ -434,3 +434,23 @@ func TestEventGuardsRoundTripAndAgreeWithShell(t *testing.T) {
 		}
 	})
 }
+
+func TestAllowFoldGuard(t *testing.T) {
+	e := bin(expr.OpAnd, eq(branch, "Main"), not(eq(r("repo"), "A/b")))
+	if drone.Guardable(e, folding) {
+		t.Fatal("the default must stay exact")
+	}
+	if !drone.Guardable(e, folding, drone.AllowFold) {
+		t.Fatal("AllowFold must accept a cased literal against a ref")
+	}
+	line, err := drone.PrintGuard(e, folding, drone.AllowFold)
+	if err != nil || !strings.Contains(line, `"$DRONE_BRANCH" = 'Main'`) {
+		t.Errorf("guard = %q, %v", line, err)
+	}
+	if _, err := drone.PrintGuard(bin(expr.OpEq, eq(branch, "a"), eq(branch, "b")), folding, drone.AllowFold); err == nil {
+		t.Error("AllowFold must still refuse a comparison that is not ref against literal")
+	}
+	if got, ok := drone.ParseGuard(line); !ok || !drone.Guardable(got, exact) {
+		t.Errorf("the guard does not round-trip exactly: %v", ok)
+	}
+}
