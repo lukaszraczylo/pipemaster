@@ -1,7 +1,8 @@
 package expr_test
 
 // The Woodpecker dialect shares the GitLab class on the subset lean4/Pipemaster/Woodpecker.lean proves
-// (eval_woodpecker, woodpecker_event_rx): regex tests of a ref against a non-empty literal under !, && and ||.
+// (eval_woodpecker, woodpecker_event_rx, woodpecker_bare): regex and equality tests of a ref against a non-empty
+// literal under !, && and ||, and a bare ref as the whole condition.
 // These tests run the Lean vectors of the gha-gitlab and gitlab-gha directions through Woodpecker.
 
 import (
@@ -52,21 +53,38 @@ func woodpeckerHolds(t fataler, e expr.Expr, v expr.Env) bool {
 }
 
 // inSubset restates the proved subset for a gitlab-class expression over canonical refs, independently of
-// the Go predicate: regex tests of branch, tag, sha or event, combined with !, && and ||. Event tests are
-// exact and name a gitlab event value that has a Woodpecker counterpart other than push.
+// the Go predicate: regex tests of branch, tag, sha or event, and equality tests of branch, tag or sha, combined
+// with !, && and ||, or a bare branch, tag or sha. Event tests are exact and name a gitlab event value that has a
+// Woodpecker counterpart other than push.
 func inSubset(e expr.Expr) bool {
+	if r, ok := e.(expr.Ref); ok {
+		return len(r.Path) == 1 && (r.Path[0] == "branch" || r.Path[0] == "tag" || r.Path[0] == "sha")
+	}
+	return inSubsetTree(e)
+}
+
+func inSubsetTree(e expr.Expr) bool {
 	switch v := e.(type) {
 	case expr.Unary:
-		return inSubset(v.X)
+		return inSubsetTree(v.X)
 	case expr.Binary:
 		switch v.Op {
 		case expr.OpAnd, expr.OpOr:
-			return inSubset(v.L) && inSubset(v.R)
+			return inSubsetTree(v.L) && inSubsetTree(v.R)
 		case expr.OpMatch, expr.OpNoMatch:
 			return rxInSubset(v)
+		case expr.OpEq, expr.OpNe:
+			return eqInSubset(v)
 		}
 	}
 	return false
+}
+
+func eqInSubset(b expr.Binary) bool {
+	r, ok := b.L.(expr.Ref)
+	lit, isLit := b.R.(expr.Lit)
+	return ok && isLit && lit.Kind == expr.LitStr && lit.Str != "" && len(r.Path) == 1 &&
+		(r.Path[0] == "branch" || r.Path[0] == "tag" || r.Path[0] == "sha")
 }
 
 func rxInSubset(b expr.Binary) bool {
@@ -149,7 +167,7 @@ func TestWoodpeckerVectors(t *testing.T) {
 			}
 		}
 		if in.Dir == dirRev {
-			checkOut(t, i, got, envs, out, count)
+			checkOut(t, i, woodpecker.ReadIf(got), envs, out, count)
 		}
 	}
 	for _, k := range []string{dirFwd + " translated", dirFwd + " refused", dirRev + " translated", dirRev + " refused", "woodpecker->gha"} {
@@ -218,7 +236,7 @@ func TestWoodpeckerTranslateTable(t *testing.T) {
 		// A tag run has CI_PIPELINE_EVENT "tag", GHA calls it push, so push has no exact counterpart.
 		{"gha", "woodpecker", `github.event_name == 'push'`, ``},
 		{"gha", "woodpecker", `github.ref_name == 'main'`, ``},
-		{"gha", "woodpecker", `github.sha`, ``},
+		{"gha", "woodpecker", `github.sha`, `CI_COMMIT_SHA != ""`},
 		{"gha", "woodpecker", `!github.sha`, ``},
 		{"gitlab", "woodpecker", `$CI_COMMIT_BRANCH =~ /^release-/i`, `CI_COMMIT_BRANCH matches "(?i)^release-"`},
 		{"gitlab", "woodpecker", `$CI_PIPELINE_SOURCE =~ /^web$/i`, `CI_PIPELINE_EVENT matches "(?i)^manual$"`},
@@ -226,8 +244,13 @@ func TestWoodpeckerTranslateTable(t *testing.T) {
 		// Outside the subset: an unset name is null in GitLab and "" in Woodpecker (Woodpecker.lean: not_gitlab_class).
 		{"gitlab", "woodpecker", `$CI_COMMIT_TAG == ""`, ``},
 		{"gitlab", "woodpecker", `$CI_COMMIT_TAG == null`, ``},
-		{"gitlab", "woodpecker", `$CI_COMMIT_TAG`, ``},
-		{"gitlab", "woodpecker", `$CI_COMMIT_BRANCH == "main"`, ``},
+		{"gitlab", "woodpecker", `$CI_COMMIT_TAG`, `CI_COMMIT_TAG != ""`},
+		{"gitlab", "woodpecker", `$CI_COMMIT_BRANCH == "main"`, `CI_COMMIT_BRANCH == "main"`},
+		{"gitlab", "woodpecker", `$CI_COMMIT_BRANCH != "main" && $CI_COMMIT_TAG =~ /^v/i`, `CI_COMMIT_BRANCH != "main" && CI_COMMIT_TAG matches "(?i)^v"`},
+		{"gitlab", "woodpecker", `$CI_COMMIT_BRANCH =~ /^main$/`, ``},
+		{"gitlab", "woodpecker", `$CI_COMMIT_TAG && $CI_COMMIT_BRANCH`, ``},
+		{"gitlab", "woodpecker", `$CI_PIPELINE_SOURCE == "web"`, ``},
+		{"gitlab", "woodpecker", `$CI_PIPELINE_SOURCE`, ``},
 		{"gitlab", "woodpecker", `$CI_COMMIT_BRANCH =~ /^v\d+/`, ``},
 		{"gitlab", "woodpecker", `$CI_PIPELINE_SOURCE =~ /^push$/i`, ``},
 		{"gitlab", "woodpecker", `$CI_COMMIT_REF_NAME =~ /^main$/i`, ``},
@@ -238,8 +261,14 @@ func TestWoodpeckerTranslateTable(t *testing.T) {
 		{"woodpecker", "gha", `CI_COMMIT_SHA matches "(?i)^abc"`, `startsWith(github.sha, 'abc')`},
 		{"woodpecker", "gitlab", `CI_COMMIT_TAG == ""`, ``},
 		{"woodpecker", "gitlab", `CI_COMMIT_TAG != nil`, ``},
-		{"woodpecker", "gitlab", `CI_COMMIT_SHA`, ``},
+		// A bare ref is how the IR holds ref != "" (woodpecker.ReadIf); the provider keeps a bare name that
+		// expr-lang rejects as text, so the dialect only sees the bare form where it means non-empty.
+		{"woodpecker", "gitlab", `CI_COMMIT_SHA`, `$CI_COMMIT_SHA`},
+		{"woodpecker", "gha", `CI_COMMIT_SHA`, `github.sha`},
+		{"woodpecker", "gitlab", `CI_PIPELINE_EVENT`, ``},
+		{"woodpecker", "gitlab", `CI_COMMIT_SHA && CI_COMMIT_TAG`, ``},
 		{"woodpecker", "gha", `!CI_COMMIT_SHA`, ``},
+		{"woodpecker", "gitlab", `CI_COMMIT_SHA != ""`, ``},
 		{"woodpecker", "gitlab", `CI_COMMIT_SHA contains "ab"`, ``},
 		{"woodpecker", "gitlab", `CI_COMMIT_BRANCH matches "^v\\d+"`, ``},
 		{"woodpecker", "gitlab", `CI_PIPELINE_EVENT matches "(?i)^tag$"`, ``},
@@ -296,7 +325,7 @@ func TestWoodpeckerRandomAgreement(t *testing.T) {
 		if !gitlab.Lang.Supports(e) {
 			return
 		}
-		if back, ok := expr.Translate(out, woodpecker.Lang, gitlab.Lang); !ok || !reflect.DeepEqual(back, e) {
+		if back, ok := expr.Translate(woodpecker.ReadIf(out), woodpecker.Lang, gitlab.Lang); !ok || !reflect.DeepEqual(back, e) {
 			t.Fatalf("%s did not return from Woodpecker: %v, %v", expr.String(e), back, ok)
 		}
 	})

@@ -1,0 +1,21 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - if: branch == 'main'
+          id: deploy
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make deploy

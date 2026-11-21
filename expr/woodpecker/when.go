@@ -306,7 +306,7 @@ func SplitItem(e expr.Expr) (Item, bool) {
 		if slot := it.filter(k); ok && slot != nil && slot.merge(f) {
 			continue
 		}
-		rest = and(rest, c)
+		rest = and(rest, Boolean(c))
 	}
 	if rest != nil {
 		text, err := Print(rest)
@@ -324,6 +324,7 @@ func SplitWhen(e expr.Expr) ([]Item, bool) {
 	if e == nil {
 		return nil, true
 	}
+	e = Boolean(e)
 	if it, ok := SplitItem(e); ok && (it.Evaluate == "" || len(flatten(e, expr.OpOr)) == 1) {
 		return []Item{it}, true
 	}

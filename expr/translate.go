@@ -14,6 +14,8 @@ type Dialect struct {
 	Reads func(Expr) bool
 	// Supports, when set, accepts the expressions the dialect can print and that stay inside its subset.
 	Supports func(Expr) bool
+	// Native, when set, rewrites a translation result into the dialect's own spelling before Supports sees it.
+	Native func(Expr) Expr
 	// Events maps canonical event values to this dialect's values.
 	Events map[string]string
 	ID     string
@@ -217,6 +219,13 @@ func supported(t Expr, to Dialect) bool { return to.Supports == nil || to.Suppor
 // reads reports whether e lies in the subset of from that shares its class semantics.
 func reads(e Expr, from Dialect) bool { return from.Reads == nil || from.Reads(e) }
 
+func native(t Expr, to Dialect) Expr {
+	if to.Native == nil {
+		return t
+	}
+	return to.Native(t)
+}
+
 // Translate converts e between two dialects, exactly. Dialects of one class (ClassGHA or ClassGitLab) differ
 // only in the names their vocabularies give the canonical refs, so e is returned as it is, provided both
 // vocabularies name every ref in it (lean4/Pipemaster/TranslateClass.lean: rename_sound). Across classes the
@@ -256,6 +265,7 @@ func Translate(e Expr, from, to Dialect) (Expr, bool) {
 		t, ok = renameClass(e, from, to)
 	case from.Class == ClassGHA:
 		t, ok = toGitLab(e, from, to)
+		t = native(t, to)
 		ok = ok && from.names(e) && to.names(t) && supported(t, to)
 	default:
 		t, ok = toGHA(e, from, to)
@@ -281,6 +291,7 @@ func Translatable(e Expr, from, to Dialect) bool {
 			return false
 		}
 		t, _ := toGitLab(e, from, to)
+		t = native(t, to)
 		return to.names(t) && supported(t, to)
 	}
 	if !okRev(e, from) || !from.names(e) {

@@ -14,8 +14,8 @@ open Pipemaster.Expr Pipemaster.Translate
 A name the map lacks reads as "" there, not as null; the GitLab class reads an unset variable as null
 and never equates null with "". The two rules disagree, so Woodpecker is not in the GitLab class
 (whole-class claim refused). The model below covers the part that decides this: == between strings and
-null. `GlSub` is the subset the translator uses (matches against a non-empty literal under !, && and ||),
-where the two readings agree. -/
+null. `GlSub` is the subset the translator uses (matches and equality tests of a ref against a non-empty
+literal under !, && and ||), where the two readings agree. -/
 
 /-- Mirrors woodpecker.UnsetEnv (expr/woodpecker/vocab.go): a ref the pipeline does not set reads as "". -/
 def wpView (v : View) : View := fun r => some ((v r).getD "")
@@ -52,12 +52,13 @@ theorem not_gitlab_class :
 
 /-! ### The subset where Woodpecker agrees with the GitLab class
 
-`GlSub` holds for regex tests of a ref against a non-empty literal, combined with `!`, `&&` and `||`. Every
-node is boolean-valued, so expr-lang type-checks them, and a ref is read only inside a regex test. -/
+`GlSub` holds for regex and equality tests of a ref against a non-empty literal, combined with `!`, `&&` and
+`||`. Every node is boolean-valued, so expr-lang type-checks them, and a ref is read only inside a test. -/
 
 /-- Mirrors woodpecker.inSubset (expr/woodpecker/subset.go). -/
 def GlSub : E → Bool
   | .rx (.ref _) _ s | .nrx (.ref _) _ s => s != ""
+  | .eq (.ref _) (.str s) | .ne (.ref _) (.str s) => s != ""
   | .not x => GlSub x
   | .and l r | .or l r => GlSub l && GlSub r
   | _ => false
@@ -90,6 +91,16 @@ theorem matchV_unset (m : Mode) {s : String} (h : s ≠ "") (vA vB : View) (r : 
   | none => simp [refV, hr, hA, matchV, lower_empty, modeTest_empty m h]
   | some x => simp [refV, hr, hA]
 
+/-- A string equality against a non-empty literal reads an unset ref ("" in Woodpecker) as it reads null. -/
+theorem eqV_unset {s : String} (h : s ≠ "") (vA vB : View) (r : Ref)
+    (hr : vB r = some ((vA r).getD "")) :
+    eqV .gitlab (refV vB r) (.str s) = eqV .gitlab (refV vA r) (.str s) := by
+  cases hA : vA r with
+  | none =>
+    have hne : ("" == s) = false := by simpa [beq_eq_false_iff_ne] using Ne.symm h
+    simp [refV, hr, hA, eqV, hne]
+  | some x => simp [refV, hr, hA]
+
 /-- On `GlSub` expressions, Woodpecker evaluation (an unset ref reads "") equals GitLab-class evaluation. -/
 theorem eval_woodpecker (vA vB : View) :
     ∀ e : E, GlSub e = true → (∀ r ∈ TranslateClass.refs e, vB r = some ((vA r).getD "")) →
@@ -111,6 +122,28 @@ theorem eval_woodpecker (vA vB : View) :
       have hs : s ≠ "" := by simpa [GlSub] using h
       have hr' := hr r (by simp [TranslateClass.refs])
       simp [eval, matchV_unset m hs vA vB r hr']
+    | _ => simp [GlSub] at h
+  | eq l r _ _ =>
+    intro h hr
+    cases l with
+    | ref x =>
+      cases r with
+      | str s =>
+        have hs : s ≠ "" := by simpa [GlSub] using h
+        have hr' := hr x (by simp [TranslateClass.refs])
+        simp [eval, eqV_unset hs vA vB x hr']
+      | _ => simp [GlSub] at h
+    | _ => simp [GlSub] at h
+  | ne l r _ _ =>
+    intro h hr
+    cases l with
+    | ref x =>
+      cases r with
+      | str s =>
+        have hs : s ≠ "" := by simpa [GlSub] using h
+        have hr' := hr x (by simp [TranslateClass.refs])
+        simp [eval, eqV_unset hs vA vB x hr']
+      | _ => simp [GlSub] at h
     | _ => simp [GlSub] at h
   | not x ih =>
     intro h hr
@@ -136,6 +169,14 @@ theorem woodpecker_sound (vA vB : View) {e : E} (h : GlSub e = true)
     (hr : ∀ r ∈ TranslateClass.refs e, vB r = some ((vA r).getD "")) :
     holds .gitlab vB e = holds .gitlab vA e := by
   unfold holds; rw [eval_woodpecker vA vB e h hr]
+
+/-- A bare ref as the whole condition holds in the GitLab class exactly when `ref != ""` holds in Woodpecker,
+where an unset ref reads "". The emitter spells the bare ref that way (woodpecker.Boolean, expr/woodpecker/when.go). -/
+theorem woodpecker_bare (vA vB : View) (r : Ref) (hr : vB r = some ((vA r).getD "")) :
+    holds .gitlab vB (.ne (.ref r) (.str "")) = holds .gitlab vA (.ref r) := by
+  cases hA : vA r with
+  | none => simp [holds, eval, truthy, refV, eqV, hr, hA]
+  | some x => simp [holds, eval, truthy, refV, eqV, hr, hA, bne]
 
 /-- An event test `event =~ /^literal$/i` keeps its result when the literal moves from the GitLab-class
 event table `tA` (unset is null) to the Woodpecker table `tB` (unset is ""). -/

@@ -511,7 +511,7 @@ func (s *whenSpec) gate(sk *sink) (expr.Expr, error) {
 			sk.note(caps.JobIf, "when."+k+" has no IR form and is not evaluated; the when is kept in Ext", s.line)
 		}
 	}
-	return and(e, st), nil
+	return wpexpr.ReadIf(and(e, st)), nil
 }
 
 // apply sets the job condition from the workflow when, unless the pipeline triggers already carry it.
@@ -520,7 +520,7 @@ func (s *whenSpec) apply(rep *report.Report, j *ir.Job, file string, triggersUse
 		return nil
 	}
 	if triggersUsed {
-		j.If = s.residual()
+		j.If = wpexpr.ReadIf(s.residual())
 		return nil
 	}
 	sk := &sink{rep: rep, vals: map[string]any{}, path: pipelinePth + "/job/" + j.ID, file: file}

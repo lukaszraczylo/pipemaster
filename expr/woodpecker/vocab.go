@@ -91,4 +91,5 @@ var Lang = expr.Dialect{
 	Events:   Events,
 	Reads:    reads,
 	Supports: supports,
+	Native:   native,
 }

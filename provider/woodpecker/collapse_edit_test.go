@@ -218,7 +218,7 @@ func TestPluginSettingsReachGHAAsPluginVariablesAndRoundTrip(t *testing.T) {
 	wpFiles, _ := emitFiles(t, back)
 	for _, b := range wpFiles {
 		for _, want := range []string{"bucket: my-bucket", "access_key:\n        from_secret: s3_key"} {
-			if !strings.Contains(b, want) {
+			if !strings.Contains(strings.ReplaceAll(b, `\"`, `"`), want) {
 				t.Errorf("round trip lost %q:\n%s", want, b)
 			}
 		}
@@ -226,5 +226,28 @@ func TestPluginSettingsReachGHAAsPluginVariablesAndRoundTrip(t *testing.T) {
 	st := back.Pipelines[0].Jobs[0].Steps[0]
 	if st.Kind != ir.StepPlugin || len(st.Env) != 0 || len(st.With) != 2 {
 		t.Errorf("step = kind %v env %+v with %+v", st.Kind, st.Env, st.With)
+	}
+}
+
+func TestGitLabBranchAndTagRulesTranslateToWoodpecker(t *testing.T) {
+	for name, c := range map[string][2]string{
+		"branch equality": {`$CI_COMMIT_BRANCH == "main"`, `CI_COMMIT_BRANCH == "main"`},
+		"tag truthiness":  {`$CI_COMMIT_TAG`, `CI_COMMIT_TAG != ""`},
+	} {
+		cond, want := c[0], c[1]
+		t.Run(name, func(t *testing.T) {
+			p := parseProject(t, "gitlab", map[string]string{".gitlab-ci.yml": "build:\n  script: [make]\n  rules:\n    - if: '" + cond + "'\n"})
+			files, rep := emitFiles(t, p)
+			for n, b := range files {
+				if strings.Contains(b, `evaluate: "false"`) || !strings.Contains(strings.ReplaceAll(b, `\"`, `"`), want) {
+					t.Errorf("%s: want evaluate %s:\n%s", n, want, b)
+				}
+			}
+			for _, e := range rep.Entries {
+				if e.Level == caps.Lost && strings.Contains(e.Detail, "condition not expressible") {
+					t.Errorf("condition reported as lost: %+v", e)
+				}
+			}
+		})
 	}
 }

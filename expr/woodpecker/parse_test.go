@@ -238,15 +238,15 @@ func TestLangConfinesTranslationToTheSubset(t *testing.T) {
 	}
 	in := bin(expr.OpMatch, branch, str("(?i)^main$"))
 	for name, e := range map[string]expr.Expr{
-		"eq string":    bin(expr.OpEq, branch, str("main")),
 		"eq empty":     bin(expr.OpEq, r("tag"), str("")),
 		"ne nil":       bin(expr.OpNe, r("tag"), null),
-		"bare ref":     branch,
+		"eq event":     bin(expr.OpEq, r("event"), str("pull_request")),
+		"eq on right":  bin(expr.OpEq, str("main"), branch),
 		"not ref":      not(branch),
 		"call":         call("contains", branch, str("a")),
 		"raw pattern":  bin(expr.OpMatch, branch, str(`^v\d+`)),
 		"and bare ref": bin(expr.OpAnd, in, branch),
-		"or eq":        bin(expr.OpOr, in, bin(expr.OpEq, branch, str("x"))),
+		"or bare ref":  bin(expr.OpOr, branch, in),
 	} {
 		if woodpecker.Lang.Reads(e) || woodpecker.Lang.Supports(e) {
 			t.Errorf("%s: outside the subset but accepted", name)
@@ -255,10 +255,23 @@ func TestLangConfinesTranslationToTheSubset(t *testing.T) {
 	for name, e := range map[string]expr.Expr{
 		"match": in, "no match": bin(expr.OpNoMatch, branch, str("(?i)abc")),
 		"not": not(in), "and or": bin(expr.OpOr, bin(expr.OpAnd, in, not(in)), in),
+		"eq": bin(expr.OpEq, branch, str("main")), "ne": bin(expr.OpNe, r("tag"), str("v1")),
+		"or eq": bin(expr.OpOr, in, bin(expr.OpEq, branch, str("x"))),
 	} {
 		if !woodpecker.Lang.Reads(e) || !woodpecker.Lang.Supports(e) {
 			t.Errorf("%s: inside the subset but refused", name)
 		}
+	}
+	// The IR holds ref != "" as a bare ref, so the dialect reads the bare form and writes the comparison.
+	nonEmpty := bin(expr.OpNe, branch, str(""))
+	if woodpecker.Lang.Reads(nonEmpty) || !woodpecker.Lang.Supports(nonEmpty) || !woodpecker.Lang.Reads(branch) || woodpecker.Lang.Supports(branch) {
+		t.Error("a bare ref must be read and not supported, ref != \"\" supported and not read")
+	}
+	if got := woodpecker.ReadIf(nonEmpty); !reflect.DeepEqual(got, branch) {
+		t.Errorf("ReadIf(ref != \"\") = %#v, want the bare ref", got)
+	}
+	if got := woodpecker.ReadIf(branch); !reflect.DeepEqual(got, expr.Opaque{Dialect: woodpecker.Dialect, Text: "CI_COMMIT_BRANCH"}) {
+		t.Errorf("ReadIf(bare name) = %#v, want opaque text", got)
 	}
 	if got, ok := expr.LangOf("woodpecker"); !ok || got.ID != "woodpecker" {
 		t.Errorf("LangOf(woodpecker) = %v, %v", got, ok)

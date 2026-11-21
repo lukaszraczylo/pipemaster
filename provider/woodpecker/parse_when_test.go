@@ -279,8 +279,8 @@ func TestEveryEventFilterIsNoFilter(t *testing.T) {
 		t.Errorf("entries: %+v", rep.Entries)
 	}
 	_, j, _ = single(t, "when:\n  - event: "+everyEvent+"\n    evaluate: CI_COMMIT_TAG != \"\"\n"+body)
-	if got := text(j.If); got != "tag != ''" {
-		t.Errorf("If = %q, want the evaluate alone", got)
+	if got := text(j.If); got != "tag" {
+		t.Errorf("If = %q, want the evaluate alone, as the bare ref", got)
 	}
 }
 

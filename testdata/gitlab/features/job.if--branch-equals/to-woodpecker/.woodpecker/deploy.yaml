@@ -1,0 +1,11 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/deploy
+when:
+  - event: push
+    evaluate: CI_COMMIT_BRANCH == "main"
+  - event: tag
+    evaluate: CI_COMMIT_BRANCH == "main"
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make deploy

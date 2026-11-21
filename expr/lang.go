@@ -100,7 +100,11 @@ func renameClass(e Expr, from, to Dialect) (Expr, bool) {
 		return nil, false
 	}
 	t, ok := mapEvents(e, from, to)
-	if !ok || (to.Supports != nil && !to.Supports(t)) {
+	if !ok {
+		return nil, false
+	}
+	t = native(t, to)
+	if to.Supports != nil && !to.Supports(t) {
 		return nil, false
 	}
 	return t, true
