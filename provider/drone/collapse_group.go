@@ -1,6 +1,7 @@
 package drone
 
 import (
+	"encoding/json"
 	"maps"
 	"reflect"
 	"slices"
@@ -132,7 +133,7 @@ func foldCells(rep *report.Report, g []cellDoc) bool {
 	}
 	if asEmitted && len(combos) > 0 {
 		asEmitted = heldMatches(first.arg.Held, g, combos) && jobVarsAre(first.arg.Env, g, combos) &&
-			servicesAre(first.arg.Services, g, combos)
+			servicesAre(first.arg.Services, g, combos) && cellsAlike(first.arg, g)
 	}
 	if !asEmitted {
 		reportIgnored(rep, first.use, "the matrix cells")
@@ -159,6 +160,126 @@ func foldCells(rep *report.Report, g []cellDoc) bool {
 		restoreVars(h, st)
 	}
 	return true
+}
+
+// cellsAlike is true when every cell document is the first one apart from the texts that read a matrix name. Those
+// texts are checked against the cell values elsewhere; anything else that differs was edited in one cell.
+func cellsAlike(a cellArg, g []cellDoc) bool {
+	want := cellPrint(a, g[0])
+	for _, c := range g[1:] {
+		if cellPrint(a, c) != want {
+			return false
+		}
+	}
+	return true
+}
+
+// cellPrint renders a cell document with the matrix-dependent texts blanked, so that two cells compare equal
+// when they differ only in those texts.
+func cellPrint(a cellArg, c cellDoc) string {
+	d := c.d
+	blank := map[*ir.Step]heldText{}
+	for _, h := range a.Held {
+		if h.Pos >= 0 && h.Pos < len(d.written) {
+			blank[d.written[h.Pos]] = h
+		}
+	}
+	jobEnv, _ := heldNames(a.Env)
+	j := *d.job
+	j.ID = ""
+	j.Env = blankVars(j.Env, jobEnv)
+	j.Services = slices.Clone(j.Services)
+	for i := range j.Services {
+		if _, ok := a.Services[j.Services[i].Name]; ok {
+			j.Services[i].Image.Ref = ""
+		}
+	}
+	steps := make([]*ir.Step, len(j.Steps))
+	conds := []string{expr.String(j.If)}
+	for i, st := range j.Steps {
+		cp := *st
+		conds = append(conds, expr.String(st.If))
+		if h, ok := blank[st]; ok {
+			blankHeld(&cp, h)
+		}
+		steps[i] = &cp
+	}
+	j.Steps = steps
+	pf := struct {
+		Trig  string
+		Pipe  []ir.Var
+		Conds []string
+		Job   ir.Job
+	}{trigPrint(d.trig), d.pipeEnv, conds, j}
+	b, err := yaml.Marshal(pf)
+	if err != nil {
+		return err.Error()
+	}
+	return string(b)
+}
+
+// trigPrint renders the trigger block of a document, which every cell of a job shares.
+func trigPrint(t *trigger) string {
+	if t == nil {
+		return ""
+	}
+	raw, _ := json.Marshal(t.raw)
+	extra, _ := json.Marshal(t.extra)
+	return expr.String(t.cond) + "\x00" + string(raw) + "\x00" + string(extra)
+}
+
+// heldNames lists the names of the variables in a held YAML list.
+func heldNames(list string) ([]string, bool) {
+	var vars []ir.Var
+	if list == "" || yaml.Unmarshal([]byte(list), &vars) != nil {
+		return nil, false
+	}
+	names := make([]string, len(vars))
+	for i, v := range vars {
+		names[i] = v.Name
+	}
+	return names, true
+}
+
+// blankVars clears the value of each variable in names.
+func blankVars(vars []ir.Var, names []string) []ir.Var {
+	out := slices.Clone(vars)
+	for i := range out {
+		if slices.Contains(names, out[i].Name) {
+			out[i].Value = ir.Value{}
+		}
+	}
+	return out
+}
+
+// blankHeld clears the fields of a step that a held text covers.
+func blankHeld(st *ir.Step, h heldText) {
+	if h.Script != nil {
+		st.Script = nil
+	}
+	if h.WorkDir != "" {
+		st.WorkDir = ""
+	}
+	if h.Image != "" && st.Image != nil {
+		img := *st.Image
+		img.Ref = ""
+		st.Image = &img
+	}
+	env, with, _ := heldVars(h)
+	names := make([]string, len(env))
+	for i, v := range env {
+		names[i] = v.Name
+	}
+	st.Env = blankVars(st.Env, names)
+	if len(with) > 0 {
+		w := maps.Clone(st.With)
+		for k := range with {
+			if _, ok := w[k]; ok {
+				w[k] = ir.Value{}
+			}
+		}
+		st.With = w
+	}
 }
 
 // servicesAre is true when each held service image, with the cell values put in, is what the cell holds. A service

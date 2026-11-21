@@ -625,3 +625,40 @@ func TestContainerMarkerMissesAnEditBesideAnEqualOwnImage(t *testing.T) {
 		t.Errorf("the edited step image must stay: %+v", st.Image)
 	}
 }
+
+// lastCell applies edit to the last document of the file only.
+func lastCell(edit func(string) string) func(string) string {
+	return func(s string) string {
+		i := strings.LastIndex(s, "\n---\n") + 5
+		return s[:i] + edit(s[i:])
+	}
+}
+
+func TestEditInLaterMatrixCellKeepsTheCells(t *testing.T) {
+	cases := map[string]func(string) string{
+		"a plain command": func(s string) string { return strings.Replace(s, "make test", "make test-race", 1) },
+		"an added when": func(s string) string {
+			return strings.Replace(s, "      - make test\n", "      - make test\n    when:\n      branch:\n        - main\n", 1)
+		},
+		"the image": func(s string) string { return strings.Replace(s, "image: alpine:3", "image: busybox", 1) },
+		"the trigger": func(s string) string {
+			return strings.Replace(s, "    - push\n    - tag\n", "    - pull_request\n", 1)
+		},
+	}
+	for name, edit := range cases {
+		t.Run(name, func(t *testing.T) {
+			j := gjob("test", gstep("run", "go test ${{ matrix.go }}"), gstep("two", "make test"))
+			j.Container = &ir.Image{Ref: "golang:1.22"}
+			j.Matrix = &ir.Matrix{Axes: []ir.Axis{{Name: "go", Values: []string{"1.21", "1.22"}}}}
+			pr := gproject(ghaOrigin, j)
+			pr.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush}, {Kind: ir.TriggerTag}}
+			p, rep := back(t, pr, lastCell(edit))
+			if len(p.Pipelines[0].Jobs) != 2 {
+				t.Errorf("the edited cell was folded away: %d jobs", len(p.Pipelines[0].Jobs))
+			}
+			if !ignored(rep, caps.JobMatrix) {
+				t.Errorf("no marker-ignored entry: %+v", rep.Entries)
+			}
+		})
+	}
+}
