@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
@@ -16,6 +17,9 @@ const (
 	keyWhen    = "when"
 	keyTrigger = "trigger"
 	keyPaths   = "paths"
+
+	// tagRefPrefix starts the ref of a tag.
+	tagRefPrefix = "refs/tags/"
 
 	eventPush   = "push"
 	eventPR     = "pull_request"
@@ -236,12 +240,39 @@ func unescapeAll(l []string) []string {
 	return out
 }
 
+// tagGlobs reads a ref filter whose every value is refs/tags/<pattern> as the tag name filter.
+func tagGlobs(f dexpr.Filter) (ir.Filter, bool) {
+	strip := func(l []string) ([]string, bool) {
+		var out []string
+		for _, v := range l {
+			name, ok := strings.CutPrefix(v, tagRefPrefix)
+			if !ok || name == "" {
+				return nil, false
+			}
+			out = append(out, name)
+		}
+		return out, true
+	}
+	inc, ok1 := strip(f.Include)
+	exc, ok2 := strip(f.Exclude)
+	return ir.Filter{Include: inc, Exclude: exc}, ok1 && ok2
+}
+
 // pureTriggers returns the pipeline triggers for conditions that are a pure trigger filter, else nil: a literal
-// event list, a branch filter and a paths filter, with no ref, repo, status or other key. Branch and paths apply
-// to push and pull request events only.
+// event list, a branch filter and a paths filter, with no repo, status or other key. Branch and paths apply to
+// push and pull request events only. A ref filter of refs/tags/ globs is the tag filter of a tag-only event list.
+// The IR push trigger is a branch push: Drone starts tag builds with the separate event tag, so a bare event push
+// maps to Trigger push and no tag trigger.
 func pureTriggers(c dexpr.Conditions, rest []string, paths *pathsSpec) []ir.Trigger {
 	empty := func(f dexpr.Filter) bool { return len(f.Include) == 0 && len(f.Exclude) == 0 }
-	if !empty(c.Ref) || !empty(c.Repo) || c.Status != nil || len(c.Event.Exclude) > 0 || len(c.Event.Include) == 0 {
+	var tags ir.Filter
+	if !empty(c.Ref) {
+		var ok bool
+		if tags, ok = tagGlobs(c.Ref); !ok || !slices.Equal(c.Event.Include, []string{eventTag}) || !empty(c.Branch) || paths != nil {
+			return nil
+		}
+	}
+	if !empty(c.Repo) || c.Status != nil || len(c.Event.Exclude) > 0 || len(c.Event.Include) == 0 {
 		return nil
 	}
 	for _, k := range rest {
@@ -261,7 +292,7 @@ func pureTriggers(c dexpr.Conditions, rest []string, paths *pathsSpec) []ir.Trig
 			continue
 		}
 		seen[ev] = true
-		tr := ir.Trigger{Kind: kind}
+		tr := ir.Trigger{Kind: kind, Tags: tags}
 		if filtered {
 			tr.Branches = ir.Filter{Include: slices.Clone(c.Branch.Include), Exclude: slices.Clone(c.Branch.Exclude)}
 			if paths != nil {

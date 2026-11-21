@@ -17,7 +17,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.DisplayName:            {Level: caps.Native, Strategy: "the pipeline and step names", Caveat: "a name that differs from the id is lost"},
 		caps.ExprOpaque:             {Level: caps.Native, Caveat: "only opaque expressions of the drone dialect; others are lost"},
 		caps.TriggerFilterPaths:     {Level: caps.Lost, Caveat: "the Drone OSS server does not evaluate trigger.paths, so the emitter never writes it"},
-		caps.TriggerFilterTags:      {Level: caps.Lost, Caveat: "Drone matches doublestar globs on the ref; a glob that is not exact has no equal meaning"},
+		caps.TriggerFilterTags:      {Level: caps.Emulated, Strategy: "ref filter refs/tags/<pattern> on the tag event", Caveat: "the glob dialect is doublestar; the parser reads it back as the tag trigger filter, and branch is not available on tag events"},
 		caps.TriggerAPI:             {Level: caps.Lost, Caveat: "Drone starts API builds as event custom"},
 		caps.TriggerPipelineDone:    {Level: caps.Lost, Caveat: "Drone has no pipeline-completion trigger"},
 		caps.TriggerResource:        {Level: caps.Lost, Caveat: "Drone CI has no resource triggers"},

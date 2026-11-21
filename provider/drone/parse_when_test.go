@@ -16,7 +16,7 @@ func whenOf(t *testing.T, when string) (*ir.Step, *ir.Job) {
 
 func TestStepWhenBecomesIf(t *testing.T) {
 	s, _ := whenOf(t, "    branch: [main]\n    event: [pull_request]\n")
-	if got := condText(s.If); got != "(event == 'pull_request') && (branch == 'main')" && got != "event == 'pull_request' && branch == 'main'" {
+	if got := condText(s.If); got != "(event == 'pull_request') && (branch == 'main')" {
 		t.Fatalf("if = %q", got)
 	}
 	if s.Ext != nil {
@@ -178,5 +178,59 @@ func TestTriggersShareOnlyWhenEveryPipelineAgrees(t *testing.T) {
 	pl, _ = parseYML(t, a+c)
 	if len(pl.Triggers) != 0 || pl.Jobs[0].If == nil {
 		t.Fatalf("a pipeline without a trigger forces the others onto Job.If: %+v", pl.Triggers)
+	}
+}
+
+func TestTriggerPushIsBranchPushesOnly(t *testing.T) {
+	pl, rep := parseYML(t, trigYML("  event: [push]\n"))
+	if want := []ir.Trigger{{Kind: ir.TriggerPush}}; !reflect.DeepEqual(pl.Triggers, want) {
+		t.Fatalf("triggers = %+v, want a push trigger and no tag trigger", pl.Triggers)
+	}
+	if pl.Jobs[0].If != nil || len(rep.Entries) != 0 {
+		t.Fatalf("if = %v, entries = %+v", pl.Jobs[0].If, rep.Entries)
+	}
+	pl, _ = parseYML(t, trigYML("  event: [push, tag]\n"))
+	if want := []ir.Trigger{{Kind: ir.TriggerPush}, {Kind: ir.TriggerTag}}; !reflect.DeepEqual(pl.Triggers, want) {
+		t.Fatalf("triggers = %+v", pl.Triggers)
+	}
+}
+
+func TestTriggersThatDifferGoToJobIf(t *testing.T) {
+	doc := func(name, event string) string {
+		return "kind: pipeline\nname: " + name + "\ntrigger:\n  event: [" + event + "]\nsteps:\n- {name: s, image: x}\n"
+	}
+	pl, _ := parseYML(t, doc("a", "push")+"---\n"+doc("b", "pull_request"))
+	if len(pl.Triggers) != 0 {
+		t.Fatalf("triggers = %+v, want none: the documents disagree", pl.Triggers)
+	}
+	if condText(pl.Jobs[1].If) != "event == 'pull_request'" {
+		t.Fatalf("job b if = %q", condText(pl.Jobs[1].If))
+	}
+	if _, ok := pl.Jobs[0].If.(expr.Opaque); !ok {
+		t.Fatalf("job a if = %#v, want the opaque push-only condition", pl.Jobs[0].If)
+	}
+}
+
+func TestTagTriggerReadsRefFilter(t *testing.T) {
+	pl, _ := parseYML(t, trigYML("  event: [tag]\n  ref:\n    include: ['refs/tags/v*']\n    exclude: ['refs/tags/v0*']\n"))
+	want := []ir.Trigger{{Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{"v*"}, Exclude: []string{"v0*"}}}}
+	if !reflect.DeepEqual(pl.Triggers, want) || pl.Jobs[0].If != nil {
+		t.Fatalf("triggers = %+v if = %v", pl.Triggers, pl.Jobs[0].If)
+	}
+}
+
+func TestRefFilterThatIsNotATagFilterStaysACondition(t *testing.T) {
+	for name, trig := range map[string]string{
+		"branch ref":    "  event: [tag]\n  ref: ['refs/heads/main']\n",
+		"push and tag":  "  event: [push, tag]\n  ref: ['refs/tags/v*']\n",
+		"bare tags ref": "  event: [tag]\n  ref: ['refs/tags/']\n",
+		"with branch":   "  event: [tag]\n  branch: [main]\n  ref: ['refs/tags/v*']\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			pl, _ := parseYML(t, trigYML(trig))
+			if len(pl.Triggers) != 0 || pl.Jobs[0].If == nil {
+				t.Fatalf("triggers = %+v if = %v", pl.Triggers, pl.Jobs[0].If)
+			}
+		})
 	}
 }

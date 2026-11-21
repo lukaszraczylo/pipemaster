@@ -151,3 +151,13 @@ func TestOpaqueUsesDroneDialect(t *testing.T) {
 		t.Fatalf("if = %#v", step(t, j, "s").If)
 	}
 }
+
+func TestNonScalarNodeStaysInExt(t *testing.T) {
+	j, rep := parseJob(t, "kind: pipeline\nname: p\nnode:\n  disk: [ssd, nvme]\nsteps:\n- name: s\n  image: x\n")
+	if j.Runner.Selector != nil {
+		t.Fatalf("selector = %v, want none", j.Runner.Selector)
+	}
+	if _, ok := ext(j.Ext)["node"]; !ok || !hasEntry(rep, "key node has no IR field") {
+		t.Fatalf("node must stay in Ext with an entry: %v", j.Ext)
+	}
+}
