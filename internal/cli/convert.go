@@ -191,6 +191,18 @@ func removeStaleSidecar(dir, why string, rep *report.Report) error {
 // braceVar matches ${NAME}. The GitLab emitter prints it as $NAME where both spell the same variable.
 var braceVar = regexp.MustCompile(`\$\{(\w+)\}`)
 
+// propsComplaint matches the property list of an "additional properties" complaint. The validator takes the
+// order from map iteration, so the same complaint can read differently between runs.
+var propsComplaint = regexp.MustCompile(`additional properties ('[^']*'(?:, '[^']*')*) not allowed`)
+
+func sortProps(line string) string {
+	return propsComplaint.ReplaceAllStringFunc(line, func(m string) string {
+		names := strings.Split(propsComplaint.FindStringSubmatch(m)[1], ", ")
+		slices.Sort(names)
+		return "additional properties " + strings.Join(names, ", ") + " not allowed"
+	})
+}
+
 // schemaFindings lists the schema complaints in err without the file name, so findings compare across names.
 // A braced variable reads as the bare one.
 func schemaFindings(name string, err error) []string {
@@ -202,7 +214,7 @@ func schemaFindings(name string, err error) []string {
 	var out []string
 	for _, l := range lines {
 		if l = strings.TrimSpace(l); l != "" {
-			out = append(out, l)
+			out = append(out, sortProps(l))
 		}
 	}
 	return out
