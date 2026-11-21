@@ -471,10 +471,19 @@ func sameFilters(fs []ir.Filter) bool {
 
 func anyFilter(fs []ir.Filter) bool { return slices.ContainsFunc(fs, hasFilter) }
 
-// noteGlobs reports the patterns that doublestar reads differently from the IR.
+// noteGlobs reports the patterns that doublestar reads differently from the IR. A pattern with the GHA "+"
+// quantifier matches no ref in Drone, so it is lost; the other patterns are emulated.
 func (e *emitter) noteGlobs(tp string, f caps.Feature, inexact []string) {
-	if len(inexact) > 0 {
-		e.emulate(tp, f, "doublestar glob", "pattern "+strings.Join(inexact, ", ")+" has a different meaning in doublestar than in the source; it is written as is")
+	var other []string
+	for _, p := range inexact {
+		if !strings.HasPrefix(p, negation) && strings.Contains(p, "+") {
+			e.lose(tp, f, "pattern "+p+" uses GHA syntax that doublestar reads literally; Drone matches no ref with it")
+			continue
+		}
+		other = append(other, p)
+	}
+	if len(other) > 0 {
+		e.emulate(tp, f, "doublestar glob", "pattern "+strings.Join(other, ", ")+" has a different meaning in doublestar than in the source; it is written as is")
 	}
 }
 

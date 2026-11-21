@@ -205,3 +205,27 @@ func TestLostPipelineFeatures(t *testing.T) {
 		t.Fatalf("a lost feature is written:\n%s", out)
 	}
 }
+
+func TestPlusGlobIsLostAndOtherInexactGlobsAreEmulated(t *testing.T) {
+	cases := []struct {
+		name    string
+		pattern string
+		detail  string
+		level   caps.Level
+	}{
+		{"plus quantifier", "v[0-9]+.[0-9]+", "pattern v[0-9]+.[0-9]+ uses GHA syntax that doublestar reads literally; Drone matches no ref with it", caps.Lost},
+		{"double star", "rel/**", "pattern rel/** has a different meaning in doublestar", caps.Emulated},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p := gproject(ghaOrigin, gjob("b", gstep("x", "a")))
+			p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{c.pattern}}}}
+			_, rep := emitText(t, p)
+			if !slices.ContainsFunc(rep.Entries, func(e report.Entry) bool {
+				return e.Feature == caps.TriggerFilterTags && e.Level == c.level && strings.Contains(e.Detail, c.detail)
+			}) {
+				t.Errorf("no %v entry %q: %+v", c.level, c.detail, rep.Entries)
+			}
+		})
+	}
+}
