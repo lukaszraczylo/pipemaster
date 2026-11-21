@@ -41,6 +41,9 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 	e.owners[jp.path] = tc.doc
 	jc := tc.cond(jp.path, caps.JobIf, j.If, pipelineScope)
 	b := &stepBook{guard: jc.guard, names: map[string]bool{}}
+	if j.Container != nil && len(j.Container.Entrypoint) > 0 {
+		tc.e.lose(jp.path, caps.JobContainer, "the container entrypoint has no Tekton form beside a script")
+	}
 	if j.Container != nil && j.Container.Ref != "" {
 		ref, ok, err := tc.text(newScope(), jp.path, caps.JobContainer, valueText, j.Container.Ref)
 		if err != nil {
@@ -74,9 +77,13 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 	}
 	if len(b.nodes) == 0 {
 		tc.e.emulate(jp.path, caps.StepScript, "placeholder step", "the job has no step and a Task needs one; a step that runs "+noopScript+" stands in")
+		image := firstNonEmpty(tc.containerRef, defaultImage)
+		if err := tc.e.markArg(caps.StepScript, jp.path, imageArg{Image: image}); err != nil {
+			return nil, err
+		}
 		m := newMap()
 		m.setStr("name", noopStepName)
-		m.setStr("image", firstNonEmpty(tc.containerRef, defaultImage))
+		m.setStr("image", image)
 		m.setStr("script", noopScript)
 		b.nodes = append(b.nodes, m.n)
 	}
@@ -208,6 +215,7 @@ func (tc *taskCtx) workspaceStep(name string, lines []string) (*yaml.Node, strin
 func (tc *taskCtx) outputStep(b *stepBook) error {
 	j := tc.jp.j
 	var lines []string
+	var held []heldOutput
 	sc := newScope()
 	for i, o := range j.Outputs {
 		if o.Value == "" {
@@ -223,6 +231,7 @@ func (tc *taskCtx) outputStep(b *stepBook) error {
 		name := outputEnvPrefix + strconv.Itoa(i)
 		sc.add(name, nameValue(name, val))
 		lines = append(lines, "printf '%s' \"${"+name+"}\" > "+shq("$(results."+o.Name+".path)"))
+		held = append(held, heldOutput{Name: o.Name, Env: name})
 	}
 	if len(lines) == 0 {
 		return nil
@@ -230,13 +239,15 @@ func (tc *taskCtx) outputStep(b *stepBook) error {
 	tc.e.emulate(tc.jp.path, caps.JobOutputs, "result step", "an output with a value is written to its result file by the step "+outputsStep)
 	m := newMap()
 	m.setStr("name", outputsStep)
-	m.setStr("image", firstNonEmpty(tc.containerRef, tc.image, defaultImage))
-	m.set("script", block(strings.Join(lines, "\n")))
+	image := firstNonEmpty(tc.containerRef, tc.image, defaultImage)
+	script := strings.Join(lines, "\n")
+	m.setStr("image", image)
+	m.set("script", block(script))
 	if len(sc.env) > 0 {
 		m.set("env", seqOf(sc.env...))
 	}
 	b.nodes = append(b.nodes, m.n)
-	return nil
+	return tc.e.markArg(caps.JobOutputs, tc.jp.path, outputsArg{Image: image, Script: script, Outputs: held})
 }
 
 // taskDoc assembles the Task document.
@@ -364,9 +375,16 @@ func (tc *taskCtx) stepTemplate(x map[string]any) (*yaml.Node, error) {
 	if err != nil {
 		return nil, err
 	}
+	var copied []string
 	for _, n := range pipeEnv {
 		if !taken[envName(n)] {
 			env = append(env, n)
+			copied = append(copied, envName(n))
+		}
+	}
+	if len(copied) > 0 {
+		if err := tc.e.markArg(caps.PipelineEnv, tc.jp.path, copiedArg{Names: copied}); err != nil {
+			return nil, err
 		}
 	}
 	env = append(env, jobEnv...)
@@ -428,10 +446,12 @@ func (tc *taskCtx) sidecars() (*yaml.Node, error) {
 // ports writes the container ports of a service; a port text with a host part keeps the container part.
 func (tc *taskCtx) ports(sp string, ps []string) *yaml.Node {
 	out := seqOf()
+	mapped := false
 	for _, p := range ps {
 		c := p
 		if i := strings.LastIndex(p, ":"); i >= 0 {
 			c = p[i+1:]
+			mapped = true
 		}
 		n, err := strconv.Atoi(c)
 		if err != nil || n <= 0 {
@@ -441,6 +461,11 @@ func (tc *taskCtx) ports(sp string, ps []string) *yaml.Node {
 		m := newMap()
 		m.set("containerPort", intNode(n))
 		out.Content = append(out.Content, m.n)
+	}
+	if mapped {
+		if err := tc.e.markArg(caps.JobServices, sp, portsArg{Ports: ps}); err != nil {
+			tc.e.lose(sp, caps.JobServices, err.Error())
+		}
 	}
 	return out
 }

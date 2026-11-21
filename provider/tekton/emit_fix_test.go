@@ -301,3 +301,10 @@ func TestAlwaysOnStepIsReported(t *testing.T) {
 	_, rep := emit(t, project(j))
 	wantEntry(t, rep, caps.StepIf, caps.Lost, "always()")
 }
+
+func TestJobContainerEntrypointIsReported(t *testing.T) {
+	j := scriptJob("a", "true")
+	j.Container = &ir.Image{Ref: "golang:1.22", Entrypoint: []string{""}}
+	_, rep := emit(t, project(j))
+	wantEntry(t, rep, caps.JobContainer, caps.Lost, "entrypoint")
+}
