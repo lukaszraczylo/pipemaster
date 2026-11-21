@@ -291,7 +291,9 @@ func (e *emitter) stepWhen(sp string, st *ir.Step, script bool) (n *yaml.Node, g
 		if folded {
 			e.noteFold(sp, caps.StepIf)
 		}
-		e.mark(caps.StepIf, sp)
+		if err := e.markGuard(caps.StepIf, sp, st.If); err != nil {
+			return nil, false, err
+		}
 		n, err = condNode(condSet{}, extra)
 		return n, true, err
 	}
@@ -307,6 +309,23 @@ type condArg struct {
 	If       string `json:"if"`
 	Back     string `json:"back"`
 	Triggers string `json:"triggers,omitempty"`
+	// Guard is true when the condition is a shell guard on the script, not a filter.
+	Guard bool `json:"guard,omitempty"`
+}
+
+// markGuard writes the marker of a shell guard. It holds the condition when the guard reads back as another
+// expression, which happens when a folded comparison is printed case-sensitively.
+func (e *emitter) markGuard(f caps.Feature, path string, orig expr.Expr) error {
+	line, err := e.printGuard(orig)
+	if err != nil {
+		return err
+	}
+	back, ok := dexpr.ParseGuard(line)
+	if !ok || expr.String(back) == expr.String(orig) {
+		e.mark(f, path)
+		return nil
+	}
+	return e.markArg(f, path, condArg{If: expr.String(orig), Back: expr.String(back), Guard: true})
 }
 
 // markCond writes the marker that holds a condition with a filter form, when the file does not read back as the
@@ -705,7 +724,9 @@ func (e *emitter) jobSet(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (j
 			if gfolded {
 				e.noteFold(jp, caps.JobIf)
 			}
-			e.mark(caps.JobIf, jp)
+			if err := e.markGuard(caps.JobIf, jp, j.If); err != nil {
+				return jobCond{}, err
+			}
 			out.guard = j.If
 		default:
 			e.disable(jp, caps.JobIf, j.If, "the document")

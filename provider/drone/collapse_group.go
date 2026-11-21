@@ -671,6 +671,9 @@ func (d *doc) readMerged(rep *report.Report) {
 		reportUncollapsed(rep, u, "its argument is not a condition")
 		return
 	}
+	if a.Guard {
+		return
+	}
 	orig, err := expr.ParseCanonical(a.If)
 	if err != nil || (a.Triggers != "" && yaml.Unmarshal([]byte(a.Triggers), &ts) != nil) {
 		reportUncollapsed(rep, u, "its argument is not a condition")

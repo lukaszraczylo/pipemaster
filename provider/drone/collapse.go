@@ -159,9 +159,28 @@ func dropGuardShape(st *ir.Step) {
 	}
 }
 
+// guardArg reads the argument of a guard marker. ok is false when the marker holds no guard condition.
+func guardArg(args []string) (condArg, bool) {
+	var a condArg
+	return a, decodeArg(args, &a) && a.Guard
+}
+
+// restoreGuard gives back the condition that a guard marker holds when the parsed guard is the one that the
+// marker says the file reads back as.
+func restoreGuard(args []string, parsed expr.Expr) expr.Expr {
+	a, ok := guardArg(args)
+	if !ok || expr.String(parsed) != a.Back {
+		return parsed
+	}
+	if orig, err := expr.ParseCanonical(a.If); err == nil {
+		return orig
+	}
+	return parsed
+}
+
 // collapseJobGuard takes the job condition back from the guard line that opens every script step.
 func collapseJobGuard(c *collapseCtx) bool {
-	if len(c.args) > 0 {
+	if _, guard := guardArg(c.args); len(c.args) > 0 && !guard {
 		return true
 	}
 	var cond expr.Expr
@@ -187,7 +206,7 @@ func collapseJobGuard(c *collapseCtx) bool {
 		st.Script = rests[i]
 		dropGuardShape(st)
 	}
-	c.j.If = cond
+	c.j.If = restoreGuard(c.args, cond)
 	return true
 }
 
@@ -202,7 +221,7 @@ func collapseStepGuard(c *collapseCtx) bool {
 		return false
 	}
 	st := c.j.Steps[i]
-	if len(c.args) > 0 {
+	if _, guard := guardArg(c.args); len(c.args) > 0 && !guard {
 		return collapseStepCond(c, st)
 	}
 	if st.If != nil {
@@ -216,7 +235,7 @@ func collapseStepGuard(c *collapseCtx) bool {
 		reportIgnored(c.rep, c.use, "the step guard")
 		return true
 	}
-	st.Script, st.If = rest, e
+	st.Script, st.If = rest, restoreGuard(c.args, e)
 	dropGuardShape(st)
 	return true
 }

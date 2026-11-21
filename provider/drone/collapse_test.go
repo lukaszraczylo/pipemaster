@@ -725,3 +725,31 @@ func TestFinallyJobGuardReturns(t *testing.T) {
 		t.Errorf("the finally guard was lost: %q", txt)
 	}
 }
+
+func TestFoldedGuardRoundTripsExactly(t *testing.T) {
+	cond := and(eq(ref(expr.CtxRefName), "main"), expr.Binary{Op: expr.OpNe, L: ref(expr.CtxActor), R: slit("bot")})
+	for name, mk := range map[string]func() *ir.Project{
+		"job": func() *ir.Project {
+			j := gjob("deploy", gstep("x", "./deploy"))
+			j.If = cond
+			return gproject(ghaOrigin, j)
+		},
+		"step": func() *ir.Project {
+			s := gstep("x", "./deploy")
+			s.If = cond
+			return gproject(ghaOrigin, gjob("deploy", s))
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, rep := back(t, mk(), nil)
+			j := jobOf(t, got, "deploy")
+			x := j.If
+			if name == "step" {
+				x = j.Steps[0].If
+			}
+			if x == nil || expr.String(x) != expr.String(cond) {
+				t.Errorf("condition = %v, want %s; entries %+v", x, expr.String(cond), rep.Entries)
+			}
+		})
+	}
+}
