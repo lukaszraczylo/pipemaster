@@ -2,32 +2,34 @@
 package drone
 
 import (
-	"errors"
 	"io/fs"
 
-	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
-	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/validate"
+	"github.com/lukaszraczylo/pipemaster/validate/schemas"
 )
 
 const (
 	dialect    = provider.Drone
 	pipelineID = "drone"
 	fileYML    = ".drone.yml"
+	// kubernetesDefsURL is where drone.json refers to the Kubernetes definitions, resolved against its $id.
+	kubernetesDefsURL = "https://json.schemastore.org/kubernetes-definitions.json"
 )
 
 // scripted lists the generator files that Drone reads when a repo setting names them. The parser reads none.
 var scripted = []string{".drone.jsonnet", ".drone.star"}
-
-// ErrNoEmitter is returned by Emit until the Drone emitter exists.
-var ErrNoEmitter = errors.New("drone: the emitter is not available yet")
 
 type adapter struct{}
 
 // New returns the Drone CI provider.
 func New() provider.Provider { return adapter{} }
 
-func init() { provider.Register(New()) }
+func init() {
+	provider.Register(New())
+	validate.RegisterResource(kubernetesDefsURL, schemas.KubernetesDefinitions)
+	validate.Register(dialect, schemas.Drone, []string{fileYML})
+}
 
 func (adapter) ID() string { return dialect }
 
@@ -40,11 +42,6 @@ func (adapter) SourceFiles(fsys fs.FS) ([]string, error) {
 		return []string{fileYML}, nil
 	}
 	return nil, nil
-}
-
-// Emit is not available yet.
-func (adapter) Emit(*ir.Project) (map[string][]byte, *report.Report, error) {
-	return nil, nil, ErrNoEmitter
 }
 
 func regular(fsys fs.FS, name string) bool {

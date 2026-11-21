@@ -1,0 +1,507 @@
+package drone_test
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
+	dexpr "github.com/lukaszraczylo/pipemaster/expr/drone"
+	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/drone"
+)
+
+func ref(p ...string) expr.Ref { return expr.Ref{Path: p} }
+
+func slit(s string) expr.Lit { return expr.Lit{Kind: expr.LitStr, Str: s} }
+
+func eq(l expr.Expr, s string) expr.Expr { return expr.Binary{Op: expr.OpEq, L: l, R: slit(s)} }
+
+func or(a, b expr.Expr) expr.Expr  { return expr.Binary{Op: expr.OpOr, L: a, R: b} }
+func and(a, b expr.Expr) expr.Expr { return expr.Binary{Op: expr.OpAnd, L: a, R: b} }
+
+func TestEmitNil(t *testing.T) {
+	files, rep, err := drone.New().Emit(nil)
+	if err != nil {
+		t.Fatalf("Emit(nil): %v", err)
+	}
+	if len(files) != 0 || rep == nil {
+		t.Fatalf("Emit(nil) = %d files, report %v", len(files), rep)
+	}
+}
+
+func TestDocumentHeader(t *testing.T) {
+	out, _ := emitText(t, gproject(ghaOrigin, gjob("build", gstep("test", "go test ./..."))))
+	d := docsOf(t, out)[0]
+	if d["kind"] != "pipeline" || d["type"] != "docker" || d["name"] != "build" {
+		t.Fatalf("header = %v %v %v", d["kind"], d["type"], d["name"])
+	}
+	env, ok := d["environment"].(map[string]any)
+	if !ok || len(env) != 0 {
+		t.Fatalf("environment = %#v, want an empty map", d["environment"])
+	}
+}
+
+func TestOneDocumentPerJob(t *testing.T) {
+	j2 := gjob("deploy", gstep("ship", "make ship"))
+	j2.Needs = []ir.Need{{JobID: "build"}}
+	out, _ := emitText(t, gproject(ghaOrigin, gjob("build", gstep("test", "go test")), j2))
+	docs := docsOf(t, out)
+	if len(docs) != 2 || countLines(out, "---") != 1 {
+		t.Fatalf("want two documents joined by one separator, got %d\n%s", len(docs), out)
+	}
+	dep, _ := docNamed(t, docs, "deploy")["depends_on"].([]any)
+	if len(dep) != 1 || dep[0] != "build" {
+		t.Fatalf("depends_on = %v", dep)
+	}
+}
+
+func TestSequentialStepsHaveNoDependsOn(t *testing.T) {
+	out, _ := emitText(t, gproject(ghaOrigin, gjob("build", gstep("a", "one"), gstep("b", "two"), gstep("c", "three"))))
+	for _, s := range stepsOf(docsOf(t, out)[0]) {
+		if _, has := s["depends_on"]; has {
+			t.Fatalf("a sequential step has depends_on: %v", s)
+		}
+	}
+}
+
+func TestStepDAGPutsDependsOnOnEveryStep(t *testing.T) {
+	root, mid, leaf := gstep("root", "a"), gstep("mid", "b"), gstep("leaf", "c")
+	mid.Ext = ir.Ext{"drone": map[string]any{"depends_on": []any{"root"}}}
+	leaf.Ext = ir.Ext{"drone": map[string]any{"depends_on": []any{"root", "mid"}}}
+	out, _ := emitText(t, gproject("drone", gjob("build", root, mid, leaf)))
+	steps := stepsOf(docsOf(t, out)[0])
+	want := map[string]int{"root": 0, "mid": 1, "leaf": 2}
+	for _, s := range steps {
+		dep, has := s["depends_on"].([]any)
+		if !has {
+			t.Fatalf("step %v lacks depends_on\n%s", s["name"], out)
+		}
+		if len(dep) != want[s["name"].(string)] {
+			t.Fatalf("step %v depends_on = %v", s["name"], dep)
+		}
+	}
+	if !strings.Contains(out, "depends_on: []") {
+		t.Fatalf("the root step needs an empty list:\n%s", out)
+	}
+}
+
+func TestMatrixCells(t *testing.T) {
+	j := gjob("test", gstep("run", "go test ${{ matrix.go }} ${{ matrix.os }}"))
+	j.Matrix = &ir.Matrix{Axes: []ir.Axis{{Name: "go", Values: []string{"1.21", "1.22"}}, {Name: "os", Values: []string{"a b", "a-b"}}}}
+	after := gjob("deploy", gstep("ship", "make"))
+	after.Needs = []ir.Need{{JobID: "test"}}
+	out, rep := emitText(t, gproject(ghaOrigin, j, after))
+	docs := docsOf(t, out)
+	if len(docs) != 5 {
+		t.Fatalf("want four cells and one job, got %d\n%s", len(docs), out)
+	}
+	seen := map[string]bool{}
+	for _, d := range docs {
+		name := d["name"].(string)
+		if name == "deploy" {
+			continue
+		}
+		if seen[name] || !strings.HasPrefix(name, "test-1.2") {
+			t.Fatalf("cell name %q is a duplicate or has the wrong form", name)
+		}
+		seen[name] = true
+	}
+	if len(seen) != 4 {
+		t.Fatalf("want 4 distinct cells, got %v", seen)
+	}
+	dep := docNamed(t, docs, "deploy")["depends_on"].([]any)
+	if len(dep) != 4 {
+		t.Fatalf("depends_on lists %d cells, want 4: %v", len(dep), dep)
+	}
+	for _, d := range dep {
+		if !seen[d.(string)] {
+			t.Fatalf("depends_on names %v, which is no cell", d)
+		}
+	}
+	cmd := stepsOf(docNamed(t, docs, "test-1.21-a-b"))[0]["commands"].([]any)[0].(string)
+	if !strings.HasPrefix(cmd, "go test 1.21 a") {
+		t.Fatalf("cell values are not substituted: %q", cmd)
+	}
+	if n := countLines(out, "# pipemaster:emulated job.matrix pipeline/drone/job/test"); n != 4 {
+		t.Fatalf("want one marker per cell, got %d\n%s", n, out)
+	}
+	for _, c := range []string{`"job":"test"`, `"Key":"go"`} {
+		if !strings.Contains(out, c) {
+			t.Fatalf("a cell marker lacks %s\n%s", c, out)
+		}
+	}
+	wantLevel(t, rep, caps.JobMatrix, "job/test", caps.Emulated)
+}
+
+func TestMatrixCellNamesNeverCollide(t *testing.T) {
+	j := gjob("t", gstep("run", "true"))
+	j.Matrix = &ir.Matrix{Axes: []ir.Axis{{Name: "v", Values: []string{"a b", "a-b", "a/b", "a_b"}}}}
+	clash := gjob("t-a-b", gstep("run", "true"))
+	out, _ := emitText(t, gproject(ghaOrigin, j, clash))
+	seen := map[string]bool{}
+	for _, d := range docsOf(t, out) {
+		n := d["name"].(string)
+		if seen[n] {
+			t.Fatalf("document name %q repeats\n%s", n, out)
+		}
+		seen[n] = true
+	}
+	if len(seen) != 5 {
+		t.Fatalf("want 5 documents, got %d", len(seen))
+	}
+}
+
+func TestMatrixNamesStayWithinTheLimit(t *testing.T) {
+	long := strings.Repeat("x", 120)
+	j := gjob("t", gstep("run", "true"))
+	j.Matrix = &ir.Matrix{Axes: []ir.Axis{{Name: "v", Values: []string{long + "1", long + "2"}}}}
+	out, _ := emitText(t, gproject(ghaOrigin, j))
+	seen := map[string]bool{}
+	for _, d := range docsOf(t, out) {
+		n := d["name"].(string)
+		if len(n) > 100 || seen[n] {
+			t.Fatalf("name %q has %d bytes or repeats", n, len(n))
+		}
+		seen[n] = true
+	}
+}
+
+func TestMatrixSettingsAreLost(t *testing.T) {
+	ff := true
+	j := gjob("t", gstep("run", "true"))
+	j.Matrix = &ir.Matrix{Axes: []ir.Axis{{Name: "v", Values: []string{"1"}}}, FailFast: &ff, MaxParallel: 2}
+	_, rep := emitText(t, gproject(ghaOrigin, j))
+	if !hasEntry(rep, "fail-fast") || !hasEntry(rep, "max-parallel") {
+		t.Fatalf("the report lacks the lost matrix settings: %v", rep.Entries)
+	}
+}
+
+func TestDollarEscape(t *testing.T) {
+	st := gstep("run", "echo $HOME ${{ sha }}")
+	st.Env = []ir.Var{{Name: "P", Value: ir.Value{Lit: "a$b"}}}
+	out, _ := emitText(t, gproject(ghaOrigin, gjob("build", st)))
+	if !strings.Contains(out, "echo $$HOME $${DRONE_COMMIT_SHA}") || !strings.Contains(out, "P: a$$b") {
+		t.Fatalf("$ is not escaped:\n%s", out)
+	}
+	back := reparse(t, out).Pipelines[0].Jobs[0].Steps[0]
+	if back.Script[0] != "echo $HOME ${{ sha }}" || back.Env[0].Value.Lit != "a$b" {
+		t.Fatalf("parse does not invert the escape: %q %v", back.Script, back.Env)
+	}
+}
+
+func TestEntrypointOnCommandStep(t *testing.T) {
+	keep := gstep("keep", "true")
+	keep.Image.Entrypoint = []string{""}
+	lose := gstep("lose", "true")
+	lose.Image.Entrypoint = []string{"/bin/bash", "-c"}
+	plugin := &ir.Step{ID: "plug", Kind: ir.StepPlugin, Image: &ir.Image{Ref: "plugins/x", Entrypoint: []string{"/run"}}, With: map[string]ir.Value{"a": {Lit: "b"}}}
+	out, rep := emitText(t, gproject(ghaOrigin, gjob("build", keep, lose, plugin)))
+	steps := stepsOf(docsOf(t, out)[0])
+	if _, has := steps[0]["entrypoint"]; has {
+		t.Fatalf("an empty entrypoint changes nothing on a command step and is not written: %v", steps[0])
+	}
+	if _, has := steps[1]["entrypoint"]; has {
+		t.Fatalf("a replaced entrypoint is written: %v", steps[1])
+	}
+	if ep, _ := steps[2]["entrypoint"].([]any); len(ep) != 1 || ep[0] != "/run" {
+		t.Fatalf("a plugin step keeps its entrypoint: %v", steps[2])
+	}
+	wantLevel(t, rep, caps.JobContainer, "step/lose", caps.Lost)
+}
+
+func TestJobContainerEntrypointIsLostForInheritingSteps(t *testing.T) {
+	j := gjob("build", &ir.Step{ID: "a", Kind: ir.StepScript, Script: []string{"true"}})
+	j.Container = &ir.Image{Ref: "golang:1.22", Entrypoint: []string{"/x"}}
+	out, rep := emitText(t, gproject(ghaOrigin, j))
+	if !strings.Contains(out, "image: golang:1.22") || strings.Contains(out, "entrypoint:\n") || hasLine(out, "    entrypoint") || strings.Contains(out, "      entrypoint") {
+		t.Fatalf("the step takes the image and not the entrypoint:\n%s", out)
+	}
+	wantLevel(t, rep, caps.JobContainer, "job/build", caps.Lost)
+}
+
+func TestDefaultImageIsReported(t *testing.T) {
+	out, rep := emitText(t, gproject(ghaOrigin, gjob("build", &ir.Step{ID: "a", Kind: ir.StepScript, Script: []string{"true"}})))
+	if !strings.Contains(out, "image: ubuntu:latest") {
+		t.Fatalf("no default image:\n%s", out)
+	}
+	wantLevel(t, rep, caps.JobContainer, "job/build", caps.Emulated)
+}
+
+func TestSecretsAndEnvironment(t *testing.T) {
+	st := gstep("run", "curl -u ${{ secrets.TOKEN }} x")
+	st.Env = []ir.Var{{Name: "KEY", Value: ir.Value{Kind: ir.ValueSecret, Secret: "api_key"}}, {Name: "PLAIN", Value: ir.Value{Lit: "v"}}}
+	j := gjob("build", st)
+	j.Env = []ir.Var{{Name: "JOB", Value: ir.Value{Lit: "j"}}, {Name: "SEC", Value: ir.Value{Kind: ir.ValueSecret, Secret: "s"}}}
+	p := gproject(ghaOrigin, j)
+	p.Pipelines[0].Env = []ir.Var{{Name: "PIPE", Value: ir.Value{Lit: "p"}}}
+	out, rep := emitText(t, p)
+	d := docsOf(t, out)[0]
+	env := d["environment"].(map[string]any)
+	if env["JOB"] != "j" || env["PIPE"] != "p" || len(env) != 2 {
+		t.Fatalf("document environment = %v", env)
+	}
+	senv := stepsOf(d)[0]["environment"].(map[string]any)
+	for name, secret := range map[string]string{"KEY": "api_key", "TOKEN": "TOKEN", "SEC": "s"} {
+		m, _ := senv[name].(map[string]any)
+		if m["from_secret"] != secret {
+			t.Fatalf("step environment %s = %v, want from_secret %s", name, senv[name], secret)
+		}
+	}
+	if !strings.Contains(out, "$${TOKEN}") || !hasLine(out, "# pipemaster:emulated pipeline.env pipeline/drone") {
+		t.Fatalf("the secret text or the pipeline.env marker is missing:\n%s", out)
+	}
+	wantLevel(t, rep, caps.PipelineEnv, "pipeline/drone", caps.Emulated)
+}
+
+func TestAllowFailureAndContinueOnError(t *testing.T) {
+	a, b := gstep("a", "x"), gstep("b", "y")
+	b.ContinueOnError = true
+	j := gjob("one", a)
+	j.AllowFailure = true
+	out, rep := emitText(t, gproject(ghaOrigin, j, gjob("two", b)))
+	docs := docsOf(t, out)
+	if stepsOf(docNamed(t, docs, "one"))[0]["failure"] != "ignore" || stepsOf(docNamed(t, docs, "two"))[0]["failure"] != "ignore" {
+		t.Fatalf("failure: ignore is missing\n%s", out)
+	}
+	if !hasLine(out, "# pipemaster:emulated job.allow_failure pipeline/drone/job/one") {
+		t.Fatalf("no allow_failure marker:\n%s", out)
+	}
+	wantLevel(t, rep, caps.JobAllowFailure, "job/one", caps.Emulated)
+}
+
+func TestFinallyDocument(t *testing.T) {
+	p := gproject(ghaOrigin, gjob("a", gstep("x", "1")), gjob("b", gstep("y", "2")))
+	p.Pipelines[0].Finally = []*ir.Job{gjob("cleanup", gstep("z", "3"))}
+	out, rep := emitText(t, p)
+	d := docNamed(t, docsOf(t, out), "cleanup")
+	dep := d["depends_on"].([]any)
+	st := d["trigger"].(map[string]any)["status"].([]any)
+	if len(dep) != 2 || len(st) != 2 {
+		t.Fatalf("finally depends_on %v status %v", dep, st)
+	}
+	wantLevel(t, rep, caps.PipelineFinally, "pipeline/drone", caps.Emulated)
+	if !hasLine(out, "# pipemaster:emulated pipeline.finally pipeline/drone") {
+		t.Fatalf("no finally marker:\n%s", out)
+	}
+}
+
+func TestRunnerPlatformAndNode(t *testing.T) {
+	j := gjob("build", gstep("x", "1"))
+	j.Runner = ir.Runner{Labels: []string{"linux/arm64", "ubuntu-latest"}, Selector: map[string]string{"disk": "ssd"}}
+	out, rep := emitText(t, gproject(ghaOrigin, j))
+	d := docsOf(t, out)[0]
+	pf := d["platform"].(map[string]any)
+	if pf["os"] != "linux" || pf["arch"] != "arm64" || d["node"].(map[string]any)["disk"] != "ssd" {
+		t.Fatalf("platform %v node %v", pf, d["node"])
+	}
+	wantLevel(t, rep, caps.JobRunner, "job/build", caps.Lost)
+}
+
+func TestEmitServices(t *testing.T) {
+	j := gjob("build", gstep("x", "1"))
+	j.Services = []ir.Service{{Name: "db", Image: ir.Image{Ref: "postgres:16"}, Env: []ir.Var{{Name: "P", Value: ir.Value{Lit: "x"}}}, Ports: []string{"5432"}}}
+	out, _ := emitText(t, gproject(ghaOrigin, j))
+	svc := docsOf(t, out)[0]["services"].([]any)[0].(map[string]any)
+	if svc["name"] != "db" || svc["image"] != "postgres:16" {
+		t.Fatalf("service = %v", svc)
+	}
+}
+
+func TestTimeoutIsExternal(t *testing.T) {
+	j := gjob("build", gstep("x", "1"))
+	d := ir.Duration(600e9)
+	j.Timeout = &d
+	_, rep := emitText(t, gproject(ghaOrigin, j))
+	wantLevel(t, rep, caps.JobTimeout, "job/build", caps.External)
+}
+
+func TestLostStepFields(t *testing.T) {
+	st := gstep("x", "1")
+	d := ir.Duration(60e9)
+	st.Timeout, st.Shell = &d, "bash"
+	_, rep := emitText(t, gproject(ghaOrigin, gjob("build", st)))
+	wantLevel(t, rep, caps.StepTimeout, "step/x", caps.Lost)
+	wantLevel(t, rep, caps.StepShell, "step/x", caps.Lost)
+}
+
+func TestForeignExtIsReported(t *testing.T) {
+	st := gstep("x", "1")
+	st.Ext = ir.Ext{"gitlab": map[string]any{"retry": 2}}
+	out, rep := emitText(t, gproject("gitlab", gjob("build", st)))
+	if strings.Contains(out, "retry") {
+		t.Fatalf("foreign Ext is written:\n%s", out)
+	}
+	wantLevel(t, rep, caps.ExtPassthrough, "step/x", caps.Lost)
+}
+
+func TestOwnExtIsWritten(t *testing.T) {
+	st := gstep("x", "1")
+	st.Ext = ir.Ext{"drone": map[string]any{"pull": "always", "privileged": true}}
+	j := gjob("build", st)
+	j.Ext = ir.Ext{"drone": map[string]any{"clone": map[string]any{"depth": 1}, "workspace": map[string]any{"path": "src"}}}
+	p := gproject("drone", j)
+	p.Pipelines[0].Ext = ir.Ext{"drone": map[string]any{drone.ExtResources: []any{map[string]any{"kind": "secret", "name": "s", "data": "abc"}}}}
+	out, _ := emitText(t, p)
+	docs := docsOf(t, out)
+	if len(docs) != 2 || docs[1]["kind"] != "secret" {
+		t.Fatalf("the secret resource is not appended:\n%s", out)
+	}
+	s := stepsOf(docs[0])[0]
+	if s["pull"] != "always" || s["privileged"] != true || docs[0]["clone"] == nil || docs[0]["workspace"] == nil {
+		t.Fatalf("own Ext keys are lost:\n%s", out)
+	}
+}
+
+func TestPipelineWithoutJobsGetsAPlaceholder(t *testing.T) {
+	p := gproject(ghaOrigin)
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush}}
+	out, rep := emitText(t, p)
+	if !strings.Contains(out, "name: noop") {
+		t.Fatalf("no placeholder step:\n%s", out)
+	}
+	wantLevel(t, rep, caps.StepScript, "job/empty", caps.Emulated)
+}
+
+func TestMultiPipelineNames(t *testing.T) {
+	p := gproject(ghaOrigin, gjob("build", gstep("x", "1")))
+	p.Pipelines = append(p.Pipelines, &ir.Pipeline{ID: "docs", Jobs: []*ir.Job{gjob("build", gstep("x", "1"))}})
+	out, _ := emitText(t, p)
+	docs := docsOf(t, out)
+	docNamed(t, docs, "drone-build")
+	docNamed(t, docs, "docs-build")
+	if n := countLines(out, "# pipemaster:emulated project.multi_pipeline"); n != 2 {
+		t.Fatalf("want a marker per pipeline job, got %d\n%s", n, out)
+	}
+}
+
+func TestStepNamesAreMadeValid(t *testing.T) {
+	out, _ := emitText(t, gproject(ghaOrigin, gjob("my job", gstep("build & test", "1"), gstep("build - test", "2"))))
+	d := docsOf(t, out)[0]
+	if d["name"] != "my-job" {
+		t.Fatalf("name = %v", d["name"])
+	}
+	seen := map[any]bool{}
+	for _, s := range stepsOf(d) {
+		if seen[s["name"]] {
+			t.Fatalf("step name repeats: %v", s["name"])
+		}
+		seen[s["name"]] = true
+	}
+	ids := drone.New().(interface {
+		EmittedIDs(*ir.Project) map[string]string
+	}).EmittedIDs(gproject(ghaOrigin, gjob("my job", gstep("build & test", "1"))))
+	if ids["pipeline/drone/job/my-job"] != "my job" || ids["pipeline/drone/job/my-job/step/build---test"] != "build & test" {
+		t.Fatalf("EmittedIDs = %v", ids)
+	}
+}
+
+func TestUnguardableEntryIsCommentedOut(t *testing.T) {
+	out, rep := emitText(t, gproject(ghaOrigin, gjob("build", gstep("x", "echo ${{ steps.a.outputs.b }}", "ok"))))
+	if !strings.Contains(out, "# pipemaster:lost script.interpolation") || strings.Contains(out, "${{") {
+		t.Fatalf("the unspellable line must be reported and absent:\n%s", out)
+	}
+	wantLevel(t, rep, caps.ScriptInterpolation, "step/x", caps.Lost)
+}
+
+func TestConditionOnStepFilterGuardDisabled(t *testing.T) {
+	branch := eq(ref(expr.CtxBranch), "main")
+	cases := []struct {
+		cond  expr.Expr
+		check func(t *testing.T, out string, step map[string]any)
+		name  string
+		level caps.Level
+	}{
+		{name: "filter", cond: branch, check: func(t *testing.T, _ string, s map[string]any) {
+			if b, _ := s["when"].(map[string]any)["branch"].([]any); len(b) != 1 || b[0] != "main" {
+				t.Fatalf("when = %v", s["when"])
+			}
+		}, level: caps.Native},
+		{name: "guard", cond: or(eq(ref(expr.CtxEvent), "pull_request"), eq(ref(expr.CtxBranch), "1.0")), check: func(t *testing.T, out string, s map[string]any) {
+			first := s["commands"].([]any)[0].(string)
+			if !strings.HasPrefix(first, "if ! ") || !strings.Contains(first, "$$DRONE_BUILD_EVENT") || s["when"] != nil {
+				t.Fatalf("guard line %q when %v", first, s["when"])
+			}
+			if !hasLine(out, "# pipemaster:emulated step.if pipeline/drone/job/build/step/x") {
+				t.Fatalf("no guard marker:\n%s", out)
+			}
+			plain := strings.ReplaceAll(first, "$$", "$")
+			if _, cond, ok := dexpr.RemoveGuard([]string{plain}); !ok || cond == nil {
+				t.Fatalf("the guard does not survive unescape: %q", plain)
+			}
+		}, level: caps.Emulated},
+		{name: "disabled", cond: and(or(branch, eq(ref(expr.CtxTag), "v1")), expr.Call{Name: "hashFiles", Args: []expr.Expr{slit("x")}}), check: func(t *testing.T, _ string, s map[string]any) {
+			ev := s["when"].(map[string]any)["event"].(map[string]any)["exclude"].([]any)
+			if len(ev) != 1 || ev[0] != "**" {
+				t.Fatalf("when = %v", s["when"])
+			}
+		}, level: caps.Lost},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			st := gstep("x", "echo hi")
+			st.If = c.cond
+			out, rep := emitText(t, gproject("drone", gjob("build", st)))
+			c.check(t, out, stepsOf(docsOf(t, out)[0])[0])
+			if c.level != caps.Native {
+				wantLevel(t, rep, caps.StepIf, "step/x", c.level)
+			}
+		})
+	}
+}
+
+func TestNoOrAcrossKeys(t *testing.T) {
+	cond := or(and(eq(ref(expr.CtxEvent), "push"), eq(ref(expr.CtxBranch), "main")), eq(ref(expr.CtxEvent), "tag"))
+	st := gstep("x", "echo hi")
+	st.If = cond
+	out, rep := emitText(t, gproject("drone", gjob("build", st)))
+	s := stepsOf(docsOf(t, out)[0])[0]
+	if s["when"] != nil {
+		t.Fatalf("the OR became one AND when:\n%s", out)
+	}
+	if first := s["commands"].([]any)[0].(string); !strings.HasPrefix(first, "if ! ") || !strings.Contains(first, "$$DRONE_BRANCH") {
+		t.Fatalf("the OR is not a shell guard: %q", first)
+	}
+	wantLevel(t, rep, caps.StepIf, "step/x", caps.Emulated)
+}
+
+func TestJobConditionFilterAndGuard(t *testing.T) {
+	filter := gjob("a", gstep("x", "1"))
+	filter.If = eq(ref(expr.CtxBranch), "main")
+	guard := gjob("b", gstep("x", "1"), gstep("y", "2"))
+	guard.If = or(eq(ref(expr.CtxEvent), "pull_request"), eq(ref(expr.CtxBranch), "1.0"))
+	plug := gjob("c", &ir.Step{ID: "p", Kind: ir.StepPlugin, Image: &ir.Image{Ref: "plugins/x"}})
+	plug.If = guard.If
+	out, rep := emitText(t, gproject("drone", filter, guard, plug))
+	docs := docsOf(t, out)
+	if b, _ := docNamed(t, docs, "a")["trigger"].(map[string]any)["branch"].([]any); len(b) != 1 || b[0] != "main" {
+		t.Fatalf("the job filter is not the trigger:\n%s", out)
+	}
+	for _, s := range stepsOf(docNamed(t, docs, "b")) {
+		if !strings.HasPrefix(s["commands"].([]any)[0].(string), "if ! ") {
+			t.Fatalf("a step lacks the job guard: %v", s)
+		}
+	}
+	if docNamed(t, docs, "c")["trigger"].(map[string]any)["event"].(map[string]any)["exclude"] == nil {
+		t.Fatalf("a job with a plugin step cannot be guarded, so it must be disabled:\n%s", out)
+	}
+	wantLevel(t, rep, caps.JobIf, "job/b", caps.Emulated)
+	wantLevel(t, rep, caps.JobIf, "job/c", caps.Lost)
+}
+
+func TestOpaqueDroneConditionIsVerbatim(t *testing.T) {
+	st := gstep("x", "1")
+	st.If = expr.Opaque{Dialect: "drone", Text: `{"event":"push","action":"opened","branch":"a$b"}`}
+	out := emitUnchecked(t, gproject("drone", gjob("build", st)))
+	w := stepsOf(docsOf(t, out)[0])[0]["when"].(map[string]any)
+	if w["event"] != "push" || w["action"] != "opened" || w["branch"] != "a$$b" {
+		t.Fatalf("when = %v", w)
+	}
+}
+
+func TestUnknownOpaqueIsLost(t *testing.T) {
+	st := gstep("x", "1")
+	st.If = expr.Opaque{Dialect: "gitlab", Text: "$X"}
+	_, rep := emitText(t, gproject(ghaOrigin, gjob("build", st)))
+	wantLevel(t, rep, caps.StepIf, "step/x", caps.Lost)
+}

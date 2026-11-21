@@ -317,7 +317,7 @@ func TestValidateCommand(t *testing.T) {
 	if code != 1 || !strings.Contains(errs, "no files") {
 		t.Fatalf("code=%d stderr=%q", code, errs)
 	}
-	if code, _, _ = run(t, "validate", empty, "--as", "drone"); code != 2 {
+	if code, _, _ = run(t, "validate", empty, "--as", "fake"); code != 2 {
 		t.Fatalf("no-schema provider code=%d", code)
 	}
 }

@@ -17,3 +17,13 @@ var GitLabCI []byte
 //
 //go:embed woodpecker.json
 var Woodpecker []byte
+
+// Drone is the Drone CI pipeline schema.
+//
+//go:embed drone.json
+var Drone []byte
+
+// KubernetesDefinitions is the Kubernetes schema file that drone.json references.
+//
+//go:embed kubernetes-definitions.json
+var KubernetesDefinitions []byte

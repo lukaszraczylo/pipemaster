@@ -128,9 +128,3 @@ func TestIDRules(t *testing.T) {
 		t.Fatalf("SanitizeID(empty) = %q", got)
 	}
 }
-
-func TestEmitIsNotAvailableYet(t *testing.T) {
-	if _, _, err := drone.New().Emit(nil); err != drone.ErrNoEmitter {
-		t.Fatalf("Emit err = %v, want ErrNoEmitter", err)
-	}
-}

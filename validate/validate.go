@@ -32,7 +32,16 @@ var (
 	pinned     = map[string]*entry{}
 	patterns   = map[string][]string{}
 	sharedByID = map[[sha256.Size]byte]*entry{}
+	resources  = map[string][]byte{}
 )
+
+// RegisterResource makes a schema file that a pinned schema references by URL available offline. A second
+// registration of the same URL replaces the first.
+func RegisterResource(url string, data []byte) {
+	regMu.Lock()
+	defer regMu.Unlock()
+	resources[url] = data
+}
 
 // Register pins schema (JSON) for provider id and the fs.Glob patterns of its files. Providers with
 // identical schema bytes share one compiled schema. It panics on a duplicate id or an unparsable schema.
@@ -58,11 +67,17 @@ func Register(id string, schema []byte, patternList []string) {
 	patterns[id] = append([]string(nil), patternList...)
 }
 
-// offlineLoader makes any reference outside the embedded schema an error.
+// offlineLoader serves the registered resources and makes any other reference outside the embedded schema an error.
 type offlineLoader struct{}
 
 func (offlineLoader) Load(url string) (any, error) {
-	return nil, fmt.Errorf("network access refused for %s", url)
+	regMu.RLock()
+	data, ok := resources[url]
+	regMu.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("network access refused for %s", url)
+	}
+	return jsonschema.UnmarshalJSON(bytes.NewReader(data))
 }
 
 func compileDoc(id string, raw []byte) (*jsonschema.Schema, error) {
