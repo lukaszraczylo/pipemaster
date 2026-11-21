@@ -486,3 +486,14 @@ func TestJobGuardBesideStepConditionsReturns(t *testing.T) {
 		t.Fatalf("conditions changed: job %q, steps %q %q\n%s", cond(got.If), cond(got.Steps[0].If), cond(got.Steps[1].If), joinFiles(files))
 	}
 }
+
+func TestJobGuardOnAPlaceholderStepReturns(t *testing.T) {
+	j := &ir.Job{ID: "a", Steps: []*ir.Step{{ID: "p", Kind: ir.StepPlugin, Image: &ir.Image{Ref: "plugins/docker"}, With: map[string]ir.Value{"repo": {Lit: "x"}}}}}
+	j.If = expr.Binary{Op: expr.OpOr, L: eqStr([]string{"branch"}, "main"), R: eqStr([]string{"event"}, "schedule")}
+	files, _ := emit(t, project(j))
+	back, _ := reparse(t, files)
+	got := back.Pipelines[0].Jobs[0]
+	if cond(got.If) != cond(j.If) || len(got.Steps) != 1 || got.Steps[0].ID != "p" {
+		t.Fatalf("job condition = %q, steps = %d\n%s", cond(got.If), len(got.Steps), joinFiles(files))
+	}
+}

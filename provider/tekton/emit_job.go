@@ -91,7 +91,22 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 		m := newMap()
 		m.setStr("name", noopStepName)
 		m.setStr("image", image)
-		m.setStr("script", noopScript)
+		lines, sc := []string{noopScript}, newScope()
+		if b.guard != nil {
+			var err error
+			if lines, err = exprtekton.AddGuard(lines, b.guard); err != nil {
+				return nil, err
+			}
+			guardEnv(sc, b.guard)
+		}
+		if len(lines) == 1 {
+			m.setStr("script", lines[0])
+		} else {
+			m.set("script", block(strings.Join(lines, "\n")))
+		}
+		if len(sc.env) > 0 {
+			m.set("env", seqOf(sc.env...))
+		}
 		b.nodes = append(b.nodes, m.n)
 	}
 	task, err := tc.taskDoc(b)

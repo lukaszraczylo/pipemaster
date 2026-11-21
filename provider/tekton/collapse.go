@@ -101,11 +101,11 @@ func (b *jobBuilder) collapse() {
 	if b.marks == nil {
 		return
 	}
+	b.collapseJobGuard()
 	b.collapseNoop()
 	b.collapseImages()
 	b.collapseShell()
 	b.collapseWorkdirs()
-	b.collapseJobGuard()
 	b.collapseActions()
 	b.collapseOutputs()
 	b.collapseMatrix()
