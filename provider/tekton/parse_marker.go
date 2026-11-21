@@ -76,7 +76,13 @@ func (p *project) celFilterOf(lt listenerTrigger, k *sink, in interceptor, kinds
 		}
 		return nil
 	}
-	p.keepFilter(lt, k, in, filter, "")
+	why := ""
+	for _, a := range markedFilters(lt.doc.head) {
+		if want, ok := celFilter(a); ok && want == filter {
+			why = "marker ignored: the trigger was renamed after pipemaster wrote it; "
+		}
+	}
+	p.keepFilter(lt, k, in, filter, why)
 	return nil
 }
 

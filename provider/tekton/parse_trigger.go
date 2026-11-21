@@ -3,6 +3,7 @@ package tekton
 import (
 	"encoding/json"
 	"regexp"
+	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
@@ -262,6 +263,10 @@ func (p *project) interceptors(lt listenerTrigger, k *sink, pipeline string) ([]
 		want = "c"
 	}
 	name, _ := text(lt.m.vals["name"])
+	if restored != nil && restored.Kind == ir.TriggerSchedule {
+		// The emitter names the entry after the CronJob; any other name is an edit.
+		name = scheduleEntryName(restored.Name, name)
+	}
 	if restored != nil && (extra || shape != want || p.editedAround(k, name, pipeline)) {
 		filter, _ := text(cel.params[paramFilter])
 		p.keepFilter(lt, k, *cel, filter, "marker ignored: the trigger was edited after pipemaster wrote it; ")
@@ -481,4 +486,15 @@ func metaRest(meta *omap) *omap {
 		}
 	}
 	return rest
+}
+
+// scheduleEntryName gives the name that the emitter writes for the listener entry of a schedule tag
+// (pipeline/index), or actual when the tag has no index. The name differs from actual when the entry was renamed.
+func scheduleEntryName(tag, actual string) string {
+	i := strings.LastIndex(tag, "/")
+	if i < 0 {
+		return actual
+	}
+	n := tag[:i] + "-schedule-" + tag[i+1:]
+	return fit(n, n, cronNameMax)
 }

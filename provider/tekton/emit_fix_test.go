@@ -308,3 +308,37 @@ func TestJobContainerEntrypointIsReported(t *testing.T) {
 	_, rep := emit(t, project(j))
 	wantEntry(t, rep, caps.JobContainer, caps.Lost, "entrypoint")
 }
+
+func renamedListener(t *testing.T, from, to string) (*ir.Project, *report.Report, map[string]string) {
+	t.Helper()
+	files, _ := emit(t, scheduleProject())
+	const el = ".tekton/triggers/eventlistener.yaml"
+	files[el] = strings.Replace(files[el], "    - name: "+from+"\n", "    - name: "+to+"\n", 1)
+	if !strings.Contains(files[el], "name: "+to) {
+		t.Fatalf("rename did not apply:\n%s", files[el])
+	}
+	back, rep := reparse(t, files)
+	return back, rep, files
+}
+
+func TestRenamedScheduleEntryIsKept(t *testing.T) {
+	back, rep, _ := renamedListener(t, "ci-schedule-0", "mine")
+	if !hasEntry(rep, "marker ignored") {
+		t.Fatalf("no marker ignored entry: %v", rep.Entries)
+	}
+	out, _ := emit(t, back)
+	if !strings.Contains(joinFiles(out), "name: mine") {
+		t.Fatalf("renamed entry lost:\n%s", joinFiles(out))
+	}
+}
+
+func TestRenamedPushEntryReportsMarkerIgnored(t *testing.T) {
+	back, rep, _ := renamedListener(t, "ci-push-0", "mine")
+	if !hasEntry(rep, "marker ignored") {
+		t.Fatalf("no marker ignored entry: %v", rep.Entries)
+	}
+	out, _ := emit(t, back)
+	if !strings.Contains(joinFiles(out), "name: mine") {
+		t.Fatalf("renamed entry lost:\n%s", joinFiles(out))
+	}
+}
