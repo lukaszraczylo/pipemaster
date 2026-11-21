@@ -39,9 +39,9 @@ var Vocab = expr.Vocab{
 	},
 }
 
-// Events maps canonical (GHA-named) event values to DRONE_BUILD_EVENT values. Push is absent on purpose: GHA
-// calls a tag push a push, Drone reports it as the tag event, so no literal stands for it exactly. The
-// remaining Drone events (tag, promote, rollback) have no canonical name.
+// Events maps canonical (GHA-named) event values to DRONE_BUILD_EVENT values. Push is absent on purpose, as in
+// the Woodpecker table: it stands for the set {push, tag} and has no single value (see eventPush). The remaining
+// Drone events (tag, promote, rollback) have no canonical name.
 var Events = map[string]string{
 	"pull_request":      "pull_request",
 	"schedule":          "cron",
@@ -51,20 +51,28 @@ var Events = map[string]string{
 // nativeEvents are Drone event values with no canonical name; they stand for themselves in the AST.
 var nativeEvents = map[string]bool{"tag": true, "promote": true, "rollback": true}
 
-// droneEvent maps a canonical event literal to the DRONE_BUILD_EVENT value. A folding source compares event
-// names without case and Drone values are lowercase, so the literal is lowered first. A literal with no Drone
-// value, such as push, fails: GHA push includes tag pushes, which Drone reports as the tag event.
-func droneEvent(canon string, fold bool) (string, bool) {
+// eventPush is the canonical GHA push event. It covers branch and tag pushes, which Drone splits into the
+// events push and tag (research drone.md 4.4, 6), so it stands for the set {push, tag}.
+const eventPush = "push"
+
+// droneEvents maps a canonical event literal to the DRONE_BUILD_EVENT values it stands for. A folding source
+// compares event names without case and Drone values are lowercase, so the literal is lowered first. A
+// literal with no Drone value fails.
+func droneEvents(canon string, fold bool) ([]string, bool) {
 	if fold {
 		canon = strings.ToLower(canon)
 	}
-	if v, ok := Events[canon]; ok {
-		return v, true
+	if canon == eventPush {
+		return []string{"push", "tag"}, true
 	}
-	return canon, nativeEvents[canon]
+	if v, ok := Events[canon]; ok {
+		return []string{v}, true
+	}
+	return []string{canon}, nativeEvents[canon]
 }
 
-// canonEvent inverts droneEvent for a DRONE_BUILD_EVENT value.
+// canonEvent inverts droneEvents for one DRONE_BUILD_EVENT value, except push, which alone has no canonical
+// form: it is push without tag (see canonEventList).
 func canonEvent(native string) (string, bool) {
 	for c, v := range Events {
 		if v == native {

@@ -117,20 +117,47 @@ func valueExpr(key, v string) (expr.Expr, error) {
 	if !IsLiteral(v) {
 		return GlobOpaque(key, v), nil
 	}
-	if key == KeyEvent {
-		c, ok := canonEvent(v)
-		if !ok {
-			return nil, fmt.Errorf("drone when: event %q has no canonical name", v)
-		}
-		v = c
-	}
 	if tag, ok := strings.CutPrefix(v, tagRefPrefix); ok && key == KeyRef && tag != "" {
 		return expr.Binary{Op: expr.OpEq, L: tagRef, R: strLit(tag)}, nil
 	}
 	return expr.Binary{Op: expr.OpEq, L: keyRefs[key], R: strLit(v)}, nil
 }
 
+// canonEventList maps Drone event values to canonical names. The pair push and tag is the canonical push, and
+// the tag entries then drop out. Push without tag is Drone's push-only event; the AST has no exact node for it
+// (it would need a ref test that the filter reader cannot invert), so it is an error and the caller keeps the
+// filter native. A glob stays as written.
+func canonEventList(vs []string) ([]string, error) {
+	hasPush, hasTag := slices.Contains(vs, "push"), slices.Contains(vs, "tag")
+	if hasPush && !hasTag {
+		return nil, errors.New("drone when: event push without tag has no canonical form")
+	}
+	var out []string
+	for _, v := range vs {
+		switch {
+		case !IsLiteral(v):
+			out = append(out, v)
+		case v == "tag" && hasPush:
+		case v == "push":
+			out = append(out, eventPush)
+		default:
+			c, ok := canonEvent(v)
+			if !ok {
+				return nil, fmt.Errorf("drone when: event %q has no canonical name", v)
+			}
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
 func orChain(key string, vs []string) (expr.Expr, error) {
+	if key == KeyEvent {
+		var err error
+		if vs, err = canonEventList(vs); err != nil {
+			return nil, err
+		}
+	}
 	var out expr.Expr
 	for _, v := range vs {
 		e, err := valueExpr(key, v)
@@ -164,7 +191,8 @@ func or(l, r expr.Expr) expr.Expr {
 
 // FilterExpr maps one when key to an expression: include-OR AND NOT exclude-OR, as Condition.Match in
 // manifest/cond.go. A literal value is an equality, a glob is a GlobOpaque, and `ref: refs/tags/x` is the tag
-// x. An event value maps to its canonical name (cron is schedule); one with none, such as push, is an error.
+// x. An event value maps to its canonical name (cron is schedule) and the pair push and tag to push; a value
+// with none, and push without tag, is an error.
 // Branch carries no tag-event guard: on a pull request Drone matches it against the target branch. A nil
 // result means the filter holds no value and matches every run.
 func FilterExpr(key string, f Filter) (expr.Expr, error) {
@@ -269,32 +297,32 @@ type reader struct{ sem expr.Semantics }
 
 // valueOf reads one disjunct as a filter value of some key: an equality of a key ref with a string, a tag
 // equality, or a glob.
-func (rd reader) valueOf(e expr.Expr) (key, v string, ok bool) {
+func (rd reader) valueOf(e expr.Expr) (key string, vs []string, ok bool) {
 	switch x := e.(type) {
 	case expr.Opaque:
 		k, p, ok := ParseGlob(x)
-		return k, p, ok
+		return k, []string{p}, ok
 	case expr.Binary:
 		lit, isLit := x.R.(expr.Lit)
 		r, isRef := x.L.(expr.Ref)
 		if x.Op != expr.OpEq || !isLit || !isRef || lit.Kind != expr.LitStr || !IsLiteral(lit.Str) {
-			return "", "", false
+			return "", nil, false
 		}
 		if slices.Equal(r.Path, tagRef.Path) && lit.Str != "" && exactValue(lit.Str, rd.sem) {
-			return KeyRef, tagRefPrefix + lit.Str, true
+			return KeyRef, []string{tagRefPrefix + lit.Str}, true
 		}
 		for _, k := range keyOrder {
 			if !slices.Equal(keyRefs[k].Path, r.Path) {
 				continue
 			}
 			if k == KeyEvent {
-				v, ok := droneEvent(lit.Str, rd.sem.CaseInsensitiveEq)
-				return k, v, ok
+				vs, ok := droneEvents(lit.Str, rd.sem.CaseInsensitiveEq)
+				return k, vs, ok
 			}
-			return k, lit.Str, exactValue(lit.Str, rd.sem)
+			return k, []string{lit.Str}, exactValue(lit.Str, rd.sem)
 		}
 	}
-	return "", "", false
+	return "", nil, false
 }
 
 // valuesOf reads an OR chain whose disjuncts all belong to one key.
@@ -307,7 +335,7 @@ func (rd reader) valuesOf(e expr.Expr) (string, []string, bool) {
 			return "", nil, false
 		}
 		key = k
-		vs = append(vs, v)
+		vs = append(vs, v...)
 	}
 	return key, vs, key != ""
 }

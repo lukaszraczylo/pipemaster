@@ -243,6 +243,7 @@ func TestGuardEventsTranslate(t *testing.T) {
 	if !ok || !reflect.DeepEqual(back, bin(expr.OpNe, event, str("schedule"))) {
 		t.Errorf("ParseGuard = %#v, %v; want the canonical event", back, ok)
 	}
+	// A bare Drone push is push without tag; the canonical AST has no node for it.
 	if e, ok := drone.ParseGuard(`if ! [ "$DRONE_BUILD_EVENT" = 'push' ]; then exit 0; fi # pipemaster:guard`); ok {
 		t.Errorf("a Drone push guard parsed as %#v", e)
 	}
@@ -314,4 +315,122 @@ func TestFoldingSourceGuards(t *testing.T) {
 	if err != nil || !strings.Contains(line, `'cron'`) {
 		t.Errorf("folded event guard = %q, %v; want the lowercase Drone value", line, err)
 	}
+}
+
+func TestGuardPush(t *testing.T) {
+	const v = `"$DRONE_BUILD_EVENT"`
+	for _, c := range []struct {
+		e    expr.Expr
+		name string
+		want string
+	}{
+		{eq(event, "push"), "equals", `if ! ( [ ` + v + ` = 'push' ] || [ ` + v + ` = 'tag' ] ); then exit 0; fi # pipemaster:guard`},
+		{bin(expr.OpNe, event, str("push")), "not equals", `if ! ( [ ` + v + ` != 'push' ] && [ ` + v + ` != 'tag' ] ); then exit 0; fi # pipemaster:guard`},
+		{not(eq(event, "push")), "negation", `if ! ( ! ( [ ` + v + ` = 'push' ] || [ ` + v + ` = 'tag' ] ) ); then exit 0; fi # pipemaster:guard`},
+		{bin(expr.OpAnd, eq(event, "push"), eq(branch, "main")), "with branch",
+			`if ! ( ( [ ` + v + ` = 'push' ] || [ ` + v + ` = 'tag' ] ) && [ "$DRONE_BRANCH" = 'main' ] ); then exit 0; fi # pipemaster:guard`},
+		{bin(expr.OpOr, eq(event, "push"), eq(event, "tag")), "push or tag",
+			`if ! ( ( [ ` + v + ` = 'push' ] || [ ` + v + ` = 'tag' ] ) || [ ` + v + ` = 'tag' ] ); then exit 0; fi # pipemaster:guard`},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := drone.PrintGuard(c.e, exact)
+			if err != nil || got != c.want {
+				t.Fatalf("PrintGuard =\n%s\nerr %v; want\n%s", got, err, c.want)
+			}
+			back, ok := drone.ParseGuard(got)
+			if !ok || !reflect.DeepEqual(back, c.e) {
+				t.Errorf("ParseGuard = %#v, %v; want %#v", back, ok, c.e)
+			}
+		})
+	}
+	if g, err := drone.PrintGuard(eq(event, "Push"), folding); err != nil || !strings.Contains(g, `= 'push' ] || `) {
+		t.Errorf("folded push guard = %q, %v", g, err)
+	}
+	if g, err := drone.PrintGuard(eq(event, "Push"), exact); err == nil {
+		t.Errorf("an exact source printed a cased push: %q", g)
+	}
+	// Half a pair is the Drone push-without-tag set, which the canonical AST cannot name.
+	for _, in := range []string{
+		`if ! ( [ ` + v + ` = 'push' ] || [ ` + v + ` = 'cron' ] ); then exit 0; fi # pipemaster:guard`,
+		`if ! ( [ ` + v + ` = 'tag' ] || [ ` + v + ` = 'push' ] ); then exit 0; fi # pipemaster:guard`,
+		`if ! ( [ ` + v + ` != 'push' ] || [ ` + v + ` != 'tag' ] ); then exit 0; fi # pipemaster:guard`,
+	} {
+		if e, ok := drone.ParseGuard(in); ok {
+			t.Errorf("ParseGuard(%q) = %#v; want a refusal", in, e)
+		}
+	}
+}
+
+var guardEvents = []string{"push", "schedule", "workflow_dispatch", "pull_request", "tag", "promote", "rollback"}
+
+func genEventGuard(t *rapid.T, depth int) expr.Expr {
+	k := rapid.IntRange(0, 3).Draw(t, "k")
+	if depth <= 0 || k == 0 {
+		op := rapid.SampledFrom([]string{expr.OpEq, expr.OpNe}).Draw(t, "cmp")
+		return bin(op, event, str(rapid.SampledFrom(guardEvents).Draw(t, "ev")))
+	}
+	if k == 1 {
+		return not(genEventGuard(t, depth-1))
+	}
+	return bin(rapid.SampledFrom([]string{expr.OpAnd, expr.OpOr}).Draw(t, "op"), genEventGuard(t, depth-1), genEventGuard(t, depth-1))
+}
+
+// droneSet is the DRONE_BUILD_EVENT values that a canonical event literal stands for.
+func droneSet(canon string) []string {
+	switch canon {
+	case "push":
+		return []string{"push", "tag"}
+	case "schedule":
+		return []string{"cron"}
+	case "workflow_dispatch":
+		return []string{"custom"}
+	}
+	return []string{canon}
+}
+
+func evalEvent(e expr.Expr, env string) bool {
+	switch v := e.(type) {
+	case expr.Unary:
+		return !evalEvent(v.X, env)
+	case expr.Binary:
+		switch v.Op {
+		case expr.OpAnd:
+			return evalEvent(v.L, env) && evalEvent(v.R, env)
+		case expr.OpOr:
+			return evalEvent(v.L, env) || evalEvent(v.R, env)
+		}
+		in := false
+		for _, d := range droneSet(v.R.(expr.Lit).Str) {
+			in = in || d == env
+		}
+		return in == (v.Op == expr.OpEq)
+	}
+	panic("unreachable")
+}
+
+func TestEventGuardsRoundTripAndAgreeWithShell(t *testing.T) {
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("no sh")
+	}
+	rapid.Check(t, func(t *rapid.T) {
+		e := genEventGuard(t, 3)
+		line, err := drone.PrintGuard(e, exact)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if back, ok := drone.ParseGuard(line); !ok || !reflect.DeepEqual(back, e) {
+			t.Fatalf("ParseGuard(%s) = %#v, %v; want %#v", line, back, ok, e)
+		}
+		env := rapid.SampledFrom([]string{"push", "tag", "cron", "custom", "pull_request", "promote", "rollback"}).Draw(t, "env")
+		cmd := exec.Command(sh, "-c", line+"\necho ran") //nolint:gosec // generated test script
+		cmd.Env = []string{"DRONE_BUILD_EVENT=" + env}
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%s: %v %s", line, err, out)
+		}
+		if ran, want := string(out) == "ran\n", evalEvent(e, env); ran != want {
+			t.Fatalf("%s with event %s: ran=%v, canonical says %v", line, env, ran, want)
+		}
+	})
 }

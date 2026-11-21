@@ -129,13 +129,17 @@ func TestNoOrAcrossKeys(t *testing.T) {
 	if got, ok := drone.ParseGuard(line); !ok || !reflect.DeepEqual(got, want) {
 		t.Errorf("guard %q parsed to %#v, %v", line, got, ok)
 	}
-	// The GHA push event has no Drone literal, so the plan's own example cannot be guarded.
+	// The plan's own example: GHA push is the Drone set {push, tag}, so it guards.
 	push := bin(expr.OpOr, bin(expr.OpAnd, eq(event, "push"), eq(branch, "main")), eq(event, "tag"))
-	if drone.Guardable(push, exact) {
-		t.Error("a push condition was guardable")
-	}
 	if c, ok := drone.FromExpr(push, exact); ok {
-		t.Errorf("a push condition became a filter: %#v", c)
+		t.Errorf("a push condition with an OR across keys became a filter: %#v", c)
+	}
+	pline, err := drone.PrintGuard(push, exact)
+	if err != nil {
+		t.Fatalf("the plan example must be a guard: %v", err)
+	}
+	if got, ok := drone.ParseGuard(pline); !ok || !reflect.DeepEqual(got, push) {
+		t.Errorf("guard %q parsed to %#v, %v", pline, got, ok)
 	}
 	// Same key in both arms of an OR is a value list, so it stays a filter.
 	same := bin(expr.OpOr, eq(event, "pull_request"), eq(event, "tag"))
@@ -273,8 +277,20 @@ func genFilter(t *rapid.T, label string) drone.Filter {
 }
 
 func genEventFilter(t *rapid.T) drone.Filter {
-	val := rapid.SampledFrom([]string{"pull_request", "cron", "custom", "tag", "promote", "rollback", "p*", "**"})
-	f := drone.Filter{Include: rapid.SliceOfN(val, 0, 3).Draw(t, "eventinc"), Exclude: rapid.SliceOfN(val, 0, 3).Draw(t, "eventexc")}
+	// "push+tag" stands for the pair that reads back as canonical push; each alone has no canonical form here.
+	val := rapid.SampledFrom([]string{"pull_request", "cron", "custom", "promote", "rollback", "p*", "**", "push+tag"})
+	expand := func(vs []string) []string {
+		var out []string
+		for _, v := range vs {
+			if v == "push+tag" {
+				out = append(out, "push", "tag")
+			} else {
+				out = append(out, v)
+			}
+		}
+		return out
+	}
+	f := drone.Filter{Include: expand(rapid.SliceOfN(val, 0, 3).Draw(t, "eventinc")), Exclude: expand(rapid.SliceOfN(val, 0, 3).Draw(t, "eventexc"))}
 	if len(f.Include) == 0 {
 		f.Include = nil
 	}
@@ -337,8 +353,13 @@ func FuzzParse(f *testing.F) {
 		if err != nil {
 			return // an event value with no canonical name, such as push
 		}
-		if got, ok := drone.FromExpr(e, exact); !ok || !reflect.DeepEqual(got, c) {
-			t.Fatalf("expression round trip of %#v gave %#v, %v", c, got, ok)
+		got, ok := drone.FromExpr(e, exact)
+		if !ok {
+			t.Fatalf("expression of %#v is not readable: %#v", c, e)
+		}
+		// push and tag collapse to one canonical push, so equality is up to that normalisation.
+		if again, err := drone.ToExpr(got); err != nil || !reflect.DeepEqual(again, e) {
+			t.Fatalf("expression round trip of %#v gave %#v, %v", c, again, err)
 		}
 	})
 }
@@ -364,13 +385,13 @@ func TestEventsTranslate(t *testing.T) {
 }
 
 func TestEventsWithoutDroneLiteral(t *testing.T) {
-	for _, v := range []string{"push", "foo", "cron-ish"} {
+	for _, v := range []string{"foo", "cron-ish"} {
 		if c, ok := drone.FromExpr(eq(event, v), exact); ok {
 			t.Errorf("FromExpr(event == %q) = %#v; want a refusal", v, c)
 		}
 	}
 	// Native names with no canonical meaning cannot stand in the canonical AST.
-	for _, v := range []string{"push", "schedule", "workflow_dispatch", "foo"} {
+	for _, v := range []string{"push", "schedule", "workflow_dispatch", "foo"} { // push alone is push without tag
 		if e, err := drone.ToExpr(drone.Conditions{Event: drone.Filter{Include: []string{v}}}); err == nil {
 			t.Errorf("ToExpr(event %s) = %#v; want an error", v, e)
 		}
@@ -402,5 +423,56 @@ func TestFoldingSourceFilters(t *testing.T) {
 	}
 	if c, ok := drone.FromExpr(eq(event, "Schedule"), exact); ok {
 		t.Errorf("an exact source matched a cased event: %#v", c)
+	}
+}
+
+func TestPushIsPushAndTag(t *testing.T) {
+	pair := drone.Filter{Include: []string{"push", "tag"}}
+	e, err := drone.FilterExpr("event", pair)
+	if err != nil || !reflect.DeepEqual(e, eq(event, "push")) {
+		t.Errorf("FilterExpr(push, tag) = %#v, %v; want event == push", e, err)
+	}
+	if e, err := drone.FilterExpr("event", drone.Filter{Include: []string{"tag", "push"}}); err != nil || !reflect.DeepEqual(e, eq(event, "push")) {
+		t.Errorf("FilterExpr(tag, push) = %#v, %v; want event == push", e, err)
+	}
+	if e, err := drone.FilterExpr("event", drone.Filter{Exclude: pair.Include}); err != nil || !reflect.DeepEqual(e, not(eq(event, "push"))) {
+		t.Errorf("exclude push, tag = %#v, %v; want not (event == push)", e, err)
+	}
+	mixed := drone.Filter{Include: []string{"push", "cron", "tag"}}
+	e, err = drone.FilterExpr("event", mixed)
+	if err != nil || !reflect.DeepEqual(e, bin(expr.OpOr, eq(event, "push"), eq(event, "schedule"))) {
+		t.Errorf("FilterExpr(push, cron, tag) = %#v, %v", e, err)
+	}
+	for _, f := range []drone.Filter{{Include: []string{"push"}}, {Exclude: []string{"push"}}, {Include: []string{"push", "cron"}}} {
+		if e, err := drone.FilterExpr("event", f); err == nil {
+			t.Errorf("FilterExpr(%v) = %#v; push without tag has no canonical form, want an error", f, e)
+		}
+	}
+	got, ok := drone.FromExpr(eq(event, "push"), exact)
+	if !ok || !reflect.DeepEqual(got.Event, pair) {
+		t.Errorf("FromExpr(event == push) = %#v, %v; want push and tag", got, ok)
+	}
+	got, ok = drone.FromExpr(not(eq(event, "push")), exact)
+	if !ok || !reflect.DeepEqual(got.Event, drone.Filter{Exclude: pair.Include}) {
+		t.Errorf("FromExpr(event != push) = %#v, %v; want exclude push and tag", got, ok)
+	}
+	got, ok = drone.FromExpr(bin(expr.OpOr, eq(event, "push"), eq(event, "schedule")), exact)
+	if !ok || !reflect.DeepEqual(got.Event.Include, []string{"push", "tag", "cron"}) {
+		t.Errorf("FromExpr(push || schedule) = %#v, %v", got, ok)
+	}
+	// Tag alone stays tag, so a filter for both names reads as push without losing the tag-only case.
+	if got, ok := drone.FromExpr(eq(event, "tag"), exact); !ok || !reflect.DeepEqual(got.Event.Include, []string{"tag"}) {
+		t.Errorf("FromExpr(event == tag) = %#v, %v", got, ok)
+	}
+	if got, ok := drone.FromExpr(eq(event, "Push"), folding); !ok || !reflect.DeepEqual(got.Event, pair) {
+		t.Errorf("folded push = %#v, %v", got, ok)
+	}
+	if got, ok := drone.FromExpr(eq(event, "Push"), exact); ok {
+		t.Errorf("exact source matched a cased push: %#v", got)
+	}
+	branchPush := bin(expr.OpAnd, eq(event, "push"), eq(branch, "main"))
+	got, ok = drone.FromExpr(branchPush, exact)
+	if !ok || !reflect.DeepEqual(got.Event, pair) || !reflect.DeepEqual(got.Branch.Include, []string{"main"}) {
+		t.Errorf("FromExpr(push && main) = %#v, %v", got, ok)
 	}
 }

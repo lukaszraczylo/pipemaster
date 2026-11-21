@@ -135,6 +135,9 @@ func (p printer) binary(b expr.Binary) (string, error) {
 		}
 		return l + " " + b.Op + " " + r, nil
 	case expr.OpEq, expr.OpNe:
+		if isEventRef(b.L) || isEventRef(b.R) {
+			return p.eventCompare(b)
+		}
 		l, r, err := p.operands(b)
 		if err != nil {
 			return "", err
@@ -155,26 +158,58 @@ func (p printer) chainLeft(b expr.Binary) (string, error) {
 	return p.test(b.L)
 }
 
-// operands writes both sides of a comparison. An event ref pairs only with a string literal, which maps to
-// the Drone value. A folding source needs one ref and one uncased literal, the only pair that the
-// case-sensitive shell test reads as the source does.
+// eventVar is the shell expansion of the build event.
+const eventVar = `"$DRONE_BUILD_EVENT"`
+
+func isEventRef(e expr.Expr) bool {
+	r, ok := e.(expr.Ref)
+	return ok && slices.Equal(r.Path, keyRefs[KeyEvent].Path)
+}
+
+// eventCompare writes a comparison of the event ref with a canonical literal. Canonical push stands for the
+// Drone values push and tag, so == is an OR and != an AND of the two tests, in a group of their own. The pair
+// needs the ref on the left: ParseGuard reads only that order back.
+func (p printer) eventCompare(b expr.Binary) (string, error) {
+	refLeft := isEventRef(b.L)
+	other := b.R
+	if !refLeft {
+		other = b.L
+	}
+	lit, ok := other.(expr.Lit)
+	if !ok || lit.Kind != expr.LitStr {
+		return "", fmt.Errorf("%w: an event ref compares only with a string literal", ErrNotGuardable)
+	}
+	vals, ok := droneEvents(lit.Str, p.sem.CaseInsensitiveEq)
+	if !ok || len(vals) > 1 && !refLeft {
+		return "", fmt.Errorf("%w: event literal %q has no Drone test here", ErrNotGuardable, lit.Str)
+	}
+	op, join := "=", " || "
+	if b.Op == expr.OpNe {
+		op, join = "!=", " && "
+	}
+	tests := make([]string, len(vals))
+	for i, v := range vals {
+		if refLeft {
+			tests[i] = "[ " + eventVar + " " + op + " " + quote(v) + " ]"
+		} else {
+			tests[i] = "[ " + quote(v) + " " + op + " " + eventVar + " ]"
+		}
+	}
+	if len(tests) == 1 {
+		return tests[0], nil
+	}
+	return "( " + strings.Join(tests, join) + " )", nil
+}
+
+// operands writes both sides of a comparison. A folding source needs one ref and one uncased literal, the
+// only pair that the case-sensitive shell test reads as the source does.
 func (p printer) operands(b expr.Binary) (string, string, error) {
-	lRef, lIsRef := b.L.(expr.Ref)
-	rRef, rIsRef := b.R.(expr.Ref)
+	_, lIsRef := b.L.(expr.Ref)
+	_, rIsRef := b.R.(expr.Ref)
 	lLit, lIsLit := b.L.(expr.Lit)
 	rLit, rIsLit := b.R.(expr.Lit)
-	isEvent := func(r expr.Ref, ok bool) bool { return ok && slices.Equal(r.Path, keyRefs[KeyEvent].Path) }
 	uncasedPair := lIsRef && rIsLit && !cased(rLit.Str) || lIsLit && rIsRef && !cased(lLit.Str)
-	switch {
-	case isEvent(lRef, lIsRef) && !rIsLit, isEvent(rRef, rIsRef) && !lIsLit:
-		return "", "", fmt.Errorf("%w: an event ref compares only with a string literal", ErrNotGuardable)
-	case isEvent(lRef, lIsRef):
-		rLit, err := p.eventLit(rLit)
-		return `"$DRONE_BUILD_EVENT"`, quote(rLit), err
-	case isEvent(rRef, rIsRef):
-		lLit, err := p.eventLit(lLit)
-		return quote(lLit), `"$DRONE_BUILD_EVENT"`, err
-	case p.sem.CaseInsensitiveEq && !uncasedPair:
+	if p.sem.CaseInsensitiveEq && !uncasedPair {
 		return "", "", fmt.Errorf("%w: a case-insensitive comparison needs a ref and an uncased literal", ErrNotGuardable)
 	}
 	l, err := operand(b.L)
@@ -183,14 +218,6 @@ func (p printer) operands(b expr.Binary) (string, string, error) {
 	}
 	r, err := operand(b.R)
 	return l, r, err
-}
-
-func (p printer) eventLit(l expr.Lit) (string, error) {
-	v, ok := droneEvent(l.Str, p.sem.CaseInsensitiveEq)
-	if l.Kind != expr.LitStr || !ok {
-		return "", fmt.Errorf("%w: event literal %+v has no Drone value", ErrNotGuardable, l)
-	}
-	return v, nil
 }
 
 func quote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
@@ -267,7 +294,7 @@ func (p *guardParser) unit() (expr.Expr, bool) {
 func (p *guardParser) primary() (expr.Expr, bool) {
 	if p.eat("( ") {
 		e, ok := p.expr()
-		return e, ok && p.eat(" )")
+		return collapsePush(e), ok && p.eat(" )")
 	}
 	if !p.eat("[ ") {
 		return nil, false
@@ -337,6 +364,9 @@ func canonEventCompare(b expr.Binary) (expr.Expr, bool) {
 		if !isLit {
 			return nil, false
 		}
+		if l.Str == "push" {
+			return strLit(rawPush), true
+		}
 		c, ok := canonEvent(l.Str)
 		return strLit(c), ok
 	}
@@ -349,4 +379,31 @@ func canonEventCompare(b expr.Binary) (expr.Expr, bool) {
 		return nil, false
 	}
 	return expr.Binary{Op: b.Op, L: l, R: r}, true
+}
+
+// rawPush marks a Drone push test that is not yet part of a push and tag pair. It holds a NUL, so PrintGuard
+// refuses any tree that still has it and ParseGuard fails on a lone push test.
+const rawPush = "\x00push"
+
+// collapsePush reads the group that PrintGuard writes for canonical push: push or tag, or neither push nor tag.
+func collapsePush(e expr.Expr) expr.Expr {
+	b, ok := e.(expr.Binary)
+	if !ok {
+		return e
+	}
+	op, join := expr.OpEq, expr.OpOr
+	if b.Op == expr.OpAnd {
+		op, join = expr.OpNe, expr.OpAnd
+	}
+	l, lok := b.L.(expr.Binary)
+	r, rok := b.R.(expr.Binary)
+	if b.Op != join || !lok || !rok || l.Op != op || r.Op != op || !isEventRef(l.L) || !isEventRef(r.L) {
+		return e
+	}
+	ll, lLit := l.R.(expr.Lit)
+	rl, rLit := r.R.(expr.Lit)
+	if !lLit || !rLit || ll.Str != rawPush || rl.Str != "tag" {
+		return e
+	}
+	return expr.Binary{Op: op, L: l.L, R: strLit(eventPush)}
 }

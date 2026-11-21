@@ -51,7 +51,7 @@ func TestEvents(t *testing.T) {
 		t.Errorf("Events = %v; want %v", drone.Events, want)
 	}
 	if _, ok := drone.Events["push"]; ok {
-		t.Error("push must stay unmapped: a Drone tag push is the tag event")
+		t.Error("push is the set {push, tag}, not one table value")
 	}
 }
 
