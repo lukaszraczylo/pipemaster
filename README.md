@@ -15,6 +15,7 @@ The provider ID is the value that you pass to `--from`, `--to`, `--via` and `--a
 | `forgejo` | Forgejo Actions | `.yml` and `.yaml` files in `.forgejo/workflows`, then `.gitea/workflows`, then `.github/workflows` |
 | `gitlab` | GitLab CI | `.gitlab-ci.yml` and its local includes |
 | `woodpecker` | Woodpecker CI | `.yml` and `.yaml` files in `.woodpecker`, then `.woodpecker.yaml`, then `.woodpecker.yml` |
+| `drone` | Drone CI | `.drone.yml` |
 
 The parser reads the first directory of the list that exists and does not merge directories. The emitter writes only the first directory. If a repository holds both `.github/workflows` and `.gitea/workflows`, `detect` lists `gha` and `gitea`. Then `convert` needs `--from`. The pinned versions and the default action hosts are in [docs/versions.md](docs/versions.md).
 
@@ -332,3 +333,64 @@ The following table comes from `pipemaster caps --from gha --to woodpecker --for
 - A cron schedule is external. Woodpecker keeps the cron string in the repository settings, not in the workflow file.
 - Environment approval is external. Set it with the repository setting Require approval for.
 - The runner is lost. Only a platform label becomes `labels.platform`.
+
+## Feature support from GHA to Drone
+
+The following table comes from `pipemaster caps --from gha --to drone --format md`.
+
+| Feature | Gha | Drone | Strategy |
+| --- | --- | --- | --- |
+| config.name | native | native |  |
+| display.name | native | native | the pipeline and step names (a name that differs from the id is lost) |
+| expr.opaque | native | native | (only opaque expressions of the drone dialect; others are lost) |
+| ext.passthrough | native | native |  |
+| job.allow_failure | native | emulated | failure ignore on every step (later steps still run after a failed step) |
+| job.artifacts | emulated | emulated | shared workspace of the steps in one document (other documents cannot read the files) |
+| job.cache | emulated | emulated | shared workspace of the steps in one document (nothing persists between runs) |
+| job.container | native | native |  |
+| job.env | native | native | pipeline environment |
+| job.environment | native | lost | (Drone has no environment name or URL in the pipeline file) |
+| job.environment.approval | external | emulated | trigger event promote with target set to the environment (a person starts the build with drone build promote) |
+| job.if | native | native | pipeline trigger conditions (only the translatable expression subset; any other condition is emulated or lost) |
+| job.manual | emulated | emulated | trigger event custom (a person starts the build through the API or drone build create; the pipeline no longer runs on its normal events) |
+| job.matrix | native | emulated | one pipeline document per cell (fail-fast and max-parallel are lost; a failed sibling stops the others without order) |
+| job.needs | native | native |  |
+| job.needs.artifacts | emulated | lost | (documents share no workspace) |
+| job.outputs | native | lost | (Drone steps cannot pass values to other pipelines) |
+| job.retry | emulated | lost | (Drone has no retry key; only clone.retries exists) |
+| job.runner | native | lost | (only the platform has a Drone form; other runner labels are lost) |
+| job.services | native | native |  |
+| job.timeout | native | external | repo setting timeout (the setting has no per-pipeline or per-step form) |
+| pipeline.concurrency | native | lost | (Drone concurrency.limit is a count and the IR models a group and cancel-in-progress, not a limit) |
+| pipeline.env | native | emulated | copied into the environment of every pipeline document (a step variable of the same name wins) |
+| pipeline.finally | emulated | emulated | a document that depends on every other document and runs on trigger status success and failure (the server skips a stage whose status filter does not match the build result) |
+| pipeline.inputs | native | lost | (Drone has no typed pipeline inputs) |
+| pipeline.permissions | native | lost | (token scopes are server and repo settings) |
+| project.multi_pipeline | native | emulated | each pipeline is a document named <pipeline>-<job> (each document carries its pipeline's trigger condition) |
+| script.interpolation | native | native |  |
+| step.action | native | emulated | per actions.Lookup verdict; a plugin step with settings (unknown actions are lost) |
+| step.continue_on_error | native | native |  |
+| step.env | native | native |  |
+| step.if | native | native | step when (only the translatable expression subset; any other condition is emulated or lost) |
+| step.image | emulated | native |  |
+| step.script | native | native |  |
+| step.shell | native | lost | (Drone compiles commands into its own set -e script) |
+| step.timeout | native | lost | (the docker runner ignores a step timeout) |
+| step.workdir | native | native |  |
+| trigger.api | native | lost | (Drone starts API builds as event custom) |
+| trigger.filter.branches | native | native | trigger branch (only exact globs are native; for a pull request Drone matches the target branch) |
+| trigger.filter.paths | native | lost | (the Drone OSS server does not evaluate trigger.paths, so the emitter never writes it) |
+| trigger.filter.tags | native | emulated | ref filter refs/tags/<pattern> on the tag event (the glob dialect is doublestar; the parser reads it back as the tag trigger filter, and branch is not available on tag events) |
+| trigger.manual | native | emulated | trigger event custom (a person starts the build through the API or drone build create) |
+| trigger.pipeline_done | native | lost | (Drone has no pipeline-completion trigger) |
+| trigger.pull_request | native | native |  |
+| trigger.push | native | native |  |
+| trigger.resource | lost | lost | (Drone CI has no resource triggers) |
+| trigger.schedule | native | external | trigger event cron with the cron job name (cron jobs are set in the UI or with drone cron add; the report names the command) |
+| trigger.tag | native | native |  |
+
+Notes on the Drone provider:
+
+- Drone replaces `${NAME}` in the raw YAML before it parses the file. The literal `$` escape is `$$`.
+- A matrix becomes one pipeline document per cell. Each document carries a marker, so a return conversion can fold the cells into one matrix job.
+- The Drone OSS server does not evaluate `paths` filters. The converter reports them as lost and never emits them.

@@ -1,6 +1,6 @@
 # Pinned versions
 
-These versions were verified on 2026-11-19. The Gitea, Forgejo and Woodpecker dialects follow them.
+These versions were verified on 2026-11-19. The Gitea, Forgejo, Woodpecker and Drone dialects follow them.
 
 | Product | Version | Date |
 | --- | --- | --- |
@@ -10,6 +10,9 @@ These versions were verified on 2026-11-19. The Gitea, Forgejo and Woodpecker di
 | Forgejo LTS | v15.0.12 | |
 | forgejo-runner | v13.2.1 | 2026-10-29 |
 | Woodpecker CI | v3.20.1 | 2026-10-29 |
+| Drone server | v2.28.2 | 2026-04-20 |
+| Drone docker runner | v1.8.5 | |
+| drone-cli | v1.9.0 | |
 
 ## Sources
 
@@ -20,6 +23,10 @@ These versions were verified on 2026-11-19. The Gitea, Forgejo and Woodpecker di
 - <https://forgejo.org/docs/latest/user/actions/basic-concepts/>
 - <https://github.com/woodpecker-ci/woodpecker/releases/tag/v3.20.1>
 - <https://woodpecker-ci.org/docs/usage/workflow-syntax>
+- <https://github.com/harness/harness/releases/tag/v2.28.2>
+- <https://docs.drone.io/pipeline/docker/syntax/>
+
+Drone is in maintenance mode. Harness ships occasional server releases from the `drone` branch, and no release has followed v2.28.2.
 
 ## Workflow directories
 
@@ -31,6 +38,7 @@ The emitter writes only the first directory of each list. The parser reads the f
 | `gitea` | `.gitea/workflows`, then `.github/workflows` (the Gitea `WORKFLOW_DIRS` default) |
 | `forgejo` | `.forgejo/workflows`, then `.gitea/workflows`, then `.github/workflows` (Forgejo `ListWorkflows`) |
 | `woodpecker` | `.woodpecker` (no subfolders), then `.woodpecker.yaml`, then `.woodpecker.yml` |
+| `drone` | `.drone.yml` |
 
 ## Default action hosts
 
