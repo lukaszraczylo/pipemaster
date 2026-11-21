@@ -701,3 +701,27 @@ func TestWhenAddedBesideStepGuardKeepsBoth(t *testing.T) {
 	}
 }
 
+func TestTriggerEditedBesideJobGuardKeepsTheGuard(t *testing.T) {
+	j := gjob("deploy", gstep("x", "./deploy"))
+	j.If = eq(ref(expr.CtxActor), "bob")
+	p, rep := back(t, gproject(ghaOrigin, j), func(s string) string {
+		return strings.Replace(s, "steps:\n", "trigger:\n  repo:\n    - acme/app\nsteps:\n", 1)
+	})
+	got := jobOf(t, p, "deploy")
+	txt := expr.String(got.If)
+	if !strings.Contains(txt, "bob") || !strings.Contains(txt, "acme/app") {
+		t.Errorf("job condition %q lost the guard or the edited trigger; entries %+v", txt, rep.Entries)
+	}
+}
+
+func TestFinallyJobGuardReturns(t *testing.T) {
+	p := gproject(ghaOrigin, gjob("build", gstep("x", "a")))
+	fin := gjob("notify", gstep("n", "b"))
+	fin.Needs = []ir.Need{{JobID: "build"}}
+	fin.If = eq(ref(expr.CtxActor), "bob")
+	p.Pipelines[0].Finally = []*ir.Job{fin}
+	got, _ := back(t, p, nil)
+	if txt := expr.String(jobOf(t, got, "notify").If); !strings.Contains(txt, "bob") {
+		t.Errorf("the finally guard was lost: %q", txt)
+	}
+}

@@ -877,7 +877,7 @@ func (d *doc) placeCondition(list []ir.Trigger, restored bool) {
 	if ev := map[caps.Feature]string{caps.JobManual: eventCustom, caps.JobEnvironmentApproval: eventPromote}[gate]; gate != "" && !t.hasEvent(ev) && !t.c.IsDisabled() {
 		u, _ := d.marks.markedWith(gate, "")
 		reportIgnored(d.rep, u, "the job gate")
-		d.job.If = t.cond
+		d.setCond(t.cond)
 		return
 	}
 	switch gate {
@@ -908,7 +908,7 @@ func (d *doc) placeCondition(list []ir.Trigger, restored bool) {
 			return
 		}
 	}
-	d.job.If = t.cond
+	d.setCond(t.cond)
 	if t.report != nil {
 		t.report()
 	}
@@ -918,6 +918,19 @@ func (d *doc) placeCondition(list []ir.Trigger, restored bool) {
 			d.ext.note(caps.ExtPassthrough, "trigger."+k+" has no IR field; kept in Ext", t.lines[k])
 		}
 		d.job.Ext = d.ext.ext()
+	}
+}
+
+// setCond puts the trigger condition on the job beside a guard that collapseJobGuard restored: the file skips the
+// job unless both hold. The status gate of a finally document adds nothing to the guard.
+func (d *doc) setCond(c expr.Expr) {
+	g := d.job.If
+	switch {
+	case g == nil:
+		d.job.If = c
+	case c == nil || isAlways(c):
+	default:
+		d.job.If = expr.Binary{Op: expr.OpAnd, L: g, R: c}
 	}
 }
 
