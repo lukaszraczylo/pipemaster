@@ -505,3 +505,36 @@ func TestScriptStepHoldingSettingsFoldsWithoutPanic(t *testing.T) {
 		t.Errorf("job = %+v", got)
 	}
 }
+
+func TestEditedSecretReferenceKeepsTheFile(t *testing.T) {
+	p, rep := back(t, gproject(ghaOrigin, gjob("b", gstep("x", "curl -H ${{ secrets.TOKEN }}"))),
+		func(s string) string { return strings.Replace(s, "$${TOKEN}", "plain", 1) })
+	st := jobOf(t, p, "b").Steps[0]
+	if st.Script[0] != "curl -H plain" || len(st.Env) != 1 {
+		t.Errorf("script %q env %+v", st.Script, st.Env)
+	}
+	if !ignored(rep, caps.ScriptInterpolation) {
+		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
+	}
+}
+
+func TestEditedContainerImageKeepsTheFile(t *testing.T) {
+	j := gjob("b", &ir.Step{ID: "x", Kind: ir.StepScript, Script: []string{"a"}})
+	j.Container = &ir.Image{Ref: "node:22"}
+	p, rep := back(t, gproject(ghaOrigin, j), func(s string) string {
+		lines := strings.Split(s, "\n")
+		for i, l := range lines {
+			if !strings.HasPrefix(l, "#") {
+				lines[i] = strings.ReplaceAll(l, "node:22", "node:99")
+			}
+		}
+		return strings.Join(lines, "\n")
+	})
+	got := jobOf(t, p, "b")
+	if got.Container != nil || got.Steps[0].Image == nil || got.Steps[0].Image.Ref != "node:99" {
+		t.Errorf("container = %+v, step image = %+v", got.Container, got.Steps[0].Image)
+	}
+	if !ignored(rep, caps.JobContainer) {
+		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
+	}
+}

@@ -245,8 +245,13 @@ func collapseRefs(c *collapseCtx) bool {
 		if !ok {
 			return false
 		}
+		held := "${" + name + "}"
+		if !slices.ContainsFunc(st.Script, func(l string) bool { return strings.Contains(l, held) }) {
+			reportIgnored(c.rep, c.use, "the reference "+ref)
+			continue
+		}
 		for i, l := range st.Script {
-			st.Script[i] = strings.ReplaceAll(l, "${"+name+"}", "${{ "+ref+" }}")
+			st.Script[i] = strings.ReplaceAll(l, held, "${{ "+ref+" }}")
 		}
 		if ns == expr.PrefixSecrets || ns == expr.PrefixVars {
 			st.Env = slices.DeleteFunc(st.Env, func(v ir.Var) bool {
@@ -265,6 +270,10 @@ func collapseContainer(c *collapseCtx) bool {
 		var img ir.Image
 		if !decodeArg(c.args, &img) {
 			return false
+		}
+		if !slices.ContainsFunc(c.j.Steps, func(st *ir.Step) bool { return st.Image != nil && st.Image.Ref == img.Ref }) {
+			reportIgnored(c.rep, c.use, "the job image")
+			return true
 		}
 		c.j.Container, ref = &img, img.Ref
 	}
