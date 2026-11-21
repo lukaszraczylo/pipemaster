@@ -256,6 +256,8 @@ func (e *emitter) dependencies(c *docCtx, done []stepDone) {
 				out = append(out, w)
 			case !slices.ContainsFunc(c.j.Steps, func(s *ir.Step) bool { return s != nil && s.ID == dep }):
 				out = append(out, dep)
+			default:
+				e.lose(c.jp+stepSep+d.src, caps.ExtPassthrough, "depends_on names the step "+dep+", which is not written; the dependency is dropped")
 			}
 		}
 		d.m.set(keyDependsOn, ystrSeq(out))

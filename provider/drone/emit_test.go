@@ -702,3 +702,15 @@ func TestNoPosixGuardOnWindows(t *testing.T) {
 		})
 	}
 }
+
+func TestDependencyOnAnUnwrittenStepIsReported(t *testing.T) {
+	a := gstep("a", "echo ${{ steps.x.outputs.y }}")
+	b := gstep("b", "make")
+	b.Ext = ir.Ext{"drone": map[string]any{"depends_on": []any{"a"}}}
+	_, rep := emitText(t, gproject("drone", gjob("j", a, b)))
+	if !slices.ContainsFunc(rep.Entries, func(e report.Entry) bool {
+		return e.Level == caps.Lost && strings.Contains(e.IRPath, "step/b") && strings.Contains(e.Detail, "depends_on")
+	}) {
+		t.Errorf("no lost entry for the dropped depends_on: %+v", rep.Entries)
+	}
+}
