@@ -1,0 +1,26 @@
+origin:
+    provider: tekton
+    dialect: tekton
+    files:
+        - .tekton/kustomization.yaml
+        - .tekton/pipeline.yaml
+        - .tekton/rbac/triggers.yaml
+        - .tekton/tasks/ci-build.yaml
+        - .tekton/triggers/eventlistener.yaml
+        - .tekton/triggers/triggerbinding.yaml
+        - .tekton/triggers/triggertemplate.yaml
+pipelines:
+    - id: ci
+      name: container
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - container:
+            ref: golang:1.24
+          id: build
+          steps:
+            - id: build-step-1
+              kind: script
+              script:
+                - go version

@@ -1,0 +1,13 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: woodpecker-ci
+spec:
+  stepTemplate:
+    env:
+      - name: GOFLAGS
+        value: -trimpath
+  steps:
+    - name: build
+      image: golang:1.25
+      script: go build ./...

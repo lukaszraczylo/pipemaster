@@ -1,0 +1,22 @@
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg {"workspace":"pipemaster-workspace","save":"set -e\nmkdir -p '/pipemaster/artifacts/pkg-____sha___'\ntar -cf - 'out/' | tar -xf - -C '/pipemaster/artifacts/pkg-____sha___'","artifacts":[{"Name":"pkg-$\u007b{ sha }}","Expire":"","Paths":["out/"]}]}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-build
+spec:
+  steps:
+    - name: script
+      image: alpine:3.22
+      script: make
+    - name: pipemaster-artifacts-save
+      image: alpine:3.22
+      script: |-
+        set -e
+        mkdir -p '/pipemaster/artifacts/pkg-____sha___'
+        tar -cf - 'out/' | tar -xf - -C '/pipemaster/artifacts/pkg-____sha___'
+  workspaces:
+    - name: pipemaster-workspace
+      mountPath: /pipemaster

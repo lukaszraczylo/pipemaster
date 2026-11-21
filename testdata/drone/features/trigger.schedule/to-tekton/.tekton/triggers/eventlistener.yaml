@@ -1,0 +1,19 @@
+# pipemaster:emulated trigger.schedule pipeline/drone/trigger/0
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: pipemaster
+spec:
+  serviceAccountName: pipemaster-triggers
+  triggers:
+    - name: drone-schedule-0
+      interceptors:
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: header.canonical('X-Pipemaster-Schedule') == 'drone/0'
+      bindings:
+        - ref: drone-github
+      template:
+        ref: drone-run

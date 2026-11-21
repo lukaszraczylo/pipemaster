@@ -1,0 +1,15 @@
+# pipemaster:emulated job.runner pipeline/ci/job/build
+name: env
+on:
+  push:
+env:
+  CGO_ENABLED: "0"
+  VERSION: "3.1"
+  TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # pipemaster:lost expr.opaque pipeline/ci: format('build-{0}', gha.github.run_number)
+      - id: build-step-1
+        run: echo ok

@@ -1,0 +1,8 @@
+build:
+  needs: []
+  variables:
+    GOFLAGS: -trimpath
+    API: $API_KEY
+  script:
+    # pipemaster:step build-step-1
+    - echo ok

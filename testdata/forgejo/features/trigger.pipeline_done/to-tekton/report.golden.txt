@@ -1,0 +1,6 @@
+Loss report: forgejo -> tekton
+[lost] pipeline/ci/job/build job.runner (Tekton schedules pods, not runner labels)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider gha (types, workflows) is not written to the Tekton file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/0 trigger.pipeline_done (Tekton has no pipeline-completion trigger)
+[emulated] pipeline/ci/job/build/step/build-step-1 step.image: default image (the step names no image and Tekton requires one; alpine:3.22 runs it)
+[emulated] pipeline/ci/trigger/0 trigger.filter.branches: CEL interceptor filter on the ref (the EventListener serves GitHub webhooks only)

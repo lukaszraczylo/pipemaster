@@ -1,0 +1,28 @@
+# pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated script.interpolation pipeline/ci/job/test/step/test-step-1
+# pipemaster:arg {"refs":[{"ref":"env.REGION","name":"REGION","at":[0],"of":1},{"ref":"vars.LEVEL","name":"LEVEL","at":[0],"of":1}]}
+# pipemaster:emulated pipeline.env pipeline/ci/job/test
+# pipemaster:arg {"names":["REGION"]}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-test
+spec:
+  params:
+    - name: os
+    - name: target
+  stepTemplate:
+    env:
+      - name: REGION
+        value: eu
+  steps:
+    - name: test-step-1
+      image: alpine:3.22
+      script: echo $(params.os) $(params.target) ${REGION} ${LEVEL}
+      env:
+        - name: LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: ci-vars
+              key: LEVEL

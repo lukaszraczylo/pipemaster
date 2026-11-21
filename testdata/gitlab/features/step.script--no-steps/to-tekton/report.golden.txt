@@ -1,0 +1,7 @@
+Loss report: gitlab -> tekton
+[lost] pipeline/gitlab-ci/job/downstream ext.passthrough (Ext of provider gitlab (trigger) is not written to the Tekton file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/job/downstream/step/script step.script (the job has no steps; a no-op step keeps the Task valid)
+[external] pipeline/gitlab-ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[external] pipeline/gitlab-ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[emulated] pipeline/gitlab-ci/job/build/step/script step.image: default image (the step names no image and Tekton requires one; alpine:3.22 runs it)
+[emulated] pipeline/gitlab-ci/job/downstream step.script: placeholder step (the job has no step and a Task needs one; a step that runs true stands in)

@@ -1,0 +1,17 @@
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/deploy/step/script
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci/job/deploy
+# pipemaster:arg {"names":["TAG"]}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-deploy
+spec:
+  stepTemplate:
+    env:
+      - name: TAG
+        value: $[[ inputs.image_tag ]]
+  steps:
+    - name: script
+      image: alpine:3.22
+      script: echo deploy

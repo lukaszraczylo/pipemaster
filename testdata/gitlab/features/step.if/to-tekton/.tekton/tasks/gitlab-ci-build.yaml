@@ -1,0 +1,23 @@
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/build-step-1
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/build-step-2
+# pipemaster:arg {"image":"alpine:3.22"}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-build
+spec:
+  params:
+    - name: ctx-event
+  steps:
+    - name: build-step-1
+      image: alpine:3.22
+      script: echo cleanup
+    - name: build-step-2
+      image: alpine:3.22
+      script: echo push
+      when:
+        - input: $(params.ctx-event)
+          operator: in
+          values:
+            - push

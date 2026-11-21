@@ -1,0 +1,30 @@
+# pipemaster:emulated trigger.pull_request pipeline/drone/trigger/0
+# pipemaster:arg {"kind":"pr","name":"drone-pr-0","branches":{"Include":null,"Exclude":null},"tags":{"Include":null,"Exclude":null},"paths":{"Include":null,"Exclude":null}}
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: pipemaster
+spec:
+  serviceAccountName: pipemaster-triggers
+  triggers:
+    - name: drone-pr-0
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: eventTypes
+              value:
+                - pull_request
+            - name: secretRef
+              value:
+                secretName: pipemaster-github-webhook
+                secretKey: token
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: body.action in ['opened','synchronize','reopened']
+      bindings:
+        - ref: drone-github
+      template:
+        ref: drone-run

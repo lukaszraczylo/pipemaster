@@ -1,0 +1,5 @@
+build:
+  needs: []
+  script:
+    - make
+  retry: 2

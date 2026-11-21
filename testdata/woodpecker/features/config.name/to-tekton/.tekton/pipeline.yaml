@@ -1,0 +1,11 @@
+# pipemaster:emulated config.name pipeline/woodpecker/ref/secrets.TOKEN
+# pipemaster:emulated config.name pipeline/woodpecker/ref/vars.REGION
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: woodpecker
+spec:
+  tasks:
+    - name: ci
+      taskRef:
+        name: woodpecker-ci

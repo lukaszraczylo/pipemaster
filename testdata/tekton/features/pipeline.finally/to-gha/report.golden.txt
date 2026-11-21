@@ -1,0 +1,5 @@
+Loss report: tekton -> gha
+[emulated] pipeline/gitlab-ci pipeline.finally: job with if: always() that needs every other job
+[emulated] pipeline/gitlab-ci/job/alert job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/gitlab-ci/job/build job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/gitlab-ci/job/report job.runner: default runner label ubuntu-latest (the pipeline named no runner)

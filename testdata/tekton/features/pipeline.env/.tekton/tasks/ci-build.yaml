@@ -1,0 +1,24 @@
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated pipeline.env pipeline/ci/job/build
+# pipemaster:arg {"names":["CGO_ENABLED","VERSION","TOKEN"]}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-build
+spec:
+  stepTemplate:
+    env:
+      - name: CGO_ENABLED
+        value: "0"
+      - name: VERSION
+        value: "3.1"
+      - name: TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: ci-secrets
+            key: DEPLOY_TOKEN
+  steps:
+    - name: build-step-1
+      image: alpine:3.22
+      script: echo ok

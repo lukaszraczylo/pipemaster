@@ -1,0 +1,35 @@
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-2
+# pipemaster:arg {"image":"alpine:3.22"}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-build
+spec:
+  params:
+    - name: ctx-ref-name
+    - name: ctx-sha
+  steps:
+    - name: build-step-1
+      image: alpine:3.22
+      script: echo ${PM_CTX_REF_NAME}
+      env:
+        - name: PM_CTX_REF_NAME
+          value: $(params.ctx-ref-name)
+      when:
+        - input: $(params.ctx-ref-name)
+          operator: in
+          values:
+            - main
+    - name: build-step-2
+      image: alpine:3.22
+      script: echo ${PM_CTX_SHA}
+      env:
+        - name: PM_CTX_SHA
+          value: $(params.ctx-sha)
+      when:
+        - input: $(params.ctx-sha)
+          operator: notin
+          values:
+            - ""

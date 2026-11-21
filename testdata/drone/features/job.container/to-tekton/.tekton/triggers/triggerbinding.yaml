@@ -1,0 +1,7 @@
+# pipemaster:generated
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: drone-github
+spec:
+  params: []

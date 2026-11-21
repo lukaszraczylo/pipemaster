@@ -1,0 +1,12 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  tasks:
+    - name: call
+      taskRef:
+        name: ci-call
+    - name: plain
+      taskRef:
+        name: ci-plain

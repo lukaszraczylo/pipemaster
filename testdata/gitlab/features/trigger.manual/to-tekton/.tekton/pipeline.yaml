@@ -1,0 +1,10 @@
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  tasks:
+    - name: adhoc
+      taskRef:
+        name: gitlab-ci-adhoc

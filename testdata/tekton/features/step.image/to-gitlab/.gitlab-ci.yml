@@ -1,0 +1,16 @@
+stages:
+  - stage-0
+  - stage-1
+build:
+  stage: stage-0
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - make build
+deploy:
+  stage: stage-1
+  needs:
+    - build
+  script:
+    # pipemaster:step deploy-step-1
+    - make deploy

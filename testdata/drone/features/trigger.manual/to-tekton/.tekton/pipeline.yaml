@@ -1,0 +1,10 @@
+# pipemaster:emulated trigger.manual pipeline/drone/trigger/0
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: drone
+spec:
+  tasks:
+    - name: ci
+      taskRef:
+        name: drone-ci

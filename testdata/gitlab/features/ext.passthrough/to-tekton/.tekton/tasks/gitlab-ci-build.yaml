@@ -1,0 +1,15 @@
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci/job/build
+# pipemaster:arg {"names":["SHARED"]}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-build
+spec:
+  stepTemplate:
+    image: alpine:3
+    env:
+      - name: SHARED
+        value: "1"
+  steps:
+    - name: script
+      script: make

@@ -1,0 +1,2 @@
+Loss report: tekton -> drone
+[lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)

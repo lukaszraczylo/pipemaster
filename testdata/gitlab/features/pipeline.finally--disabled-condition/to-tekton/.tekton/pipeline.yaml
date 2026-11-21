@@ -1,0 +1,18 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  tasks:
+    - name: compile
+      taskRef:
+        name: gitlab-ci-compile
+  finally:
+    - name: cleanup
+      taskRef:
+        name: gitlab-ci-cleanup
+      when:
+        - input: pipemaster-disabled
+          operator: in
+          values:
+            - never

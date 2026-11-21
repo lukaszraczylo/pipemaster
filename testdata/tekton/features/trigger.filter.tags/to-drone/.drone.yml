@@ -1,0 +1,19 @@
+# pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/0
+# pipemaster:arg {"branches":{"Include":null,"Exclude":null},"tags":{"Include":["v[0-9]+.[0-9]+.[0-9]+","!v*-rc*"],"Exclude":null}}
+# pipemaster:emulated job.container pipeline/ci/job/build
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - tag
+  ref:
+    exclude:
+      - refs/tags/v*-rc*
+    include:
+      - refs/tags/v[0-9]+.[0-9]+.[0-9]+
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok

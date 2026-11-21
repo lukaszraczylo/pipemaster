@@ -1,0 +1,9 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: woodpecker-ci
+spec:
+  steps:
+    - name: flaky
+      image: alpine:3.20
+      script: ./flaky.sh

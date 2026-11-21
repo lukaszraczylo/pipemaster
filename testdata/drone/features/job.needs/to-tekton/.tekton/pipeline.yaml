@@ -1,0 +1,14 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: drone
+spec:
+  tasks:
+    - name: lint
+      taskRef:
+        name: drone-lint
+    - name: ship
+      taskRef:
+        name: drone-ship
+      runAfter:
+        - lint

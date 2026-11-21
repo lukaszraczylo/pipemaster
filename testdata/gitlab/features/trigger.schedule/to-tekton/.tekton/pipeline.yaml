@@ -1,0 +1,9 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  tasks:
+    - name: nightly
+      taskRef:
+        name: gitlab-ci-nightly

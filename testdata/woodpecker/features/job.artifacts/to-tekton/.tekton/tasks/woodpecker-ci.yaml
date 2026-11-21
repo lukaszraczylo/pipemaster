@@ -1,0 +1,20 @@
+# pipemaster:emulated job.artifacts pipeline/woodpecker/job/ci
+# pipemaster:arg {"workspace":"pipemaster-workspace","save":"set -e\nmkdir -p '/pipemaster/artifacts/dist'\ntar -cf - 'dist/' | tar -xf - -C '/pipemaster/artifacts/dist'","artifacts":[{"Name":"dist","Expire":"7d","Paths":["dist/"]}]}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: woodpecker-ci
+spec:
+  steps:
+    - name: build
+      image: golang:1.25
+      script: go build ./...
+    - name: pipemaster-artifacts-save
+      image: alpine:3.22
+      script: |-
+        set -e
+        mkdir -p '/pipemaster/artifacts/dist'
+        tar -cf - 'dist/' | tar -xf - -C '/pipemaster/artifacts/dist'
+  workspaces:
+    - name: pipemaster-workspace
+      mountPath: /pipemaster

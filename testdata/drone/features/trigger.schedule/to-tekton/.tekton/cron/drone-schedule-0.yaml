@@ -1,0 +1,28 @@
+# pipemaster:generated
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: drone-schedule-0
+spec:
+  schedule: ""
+  timeZone: Etc/UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: trigger
+              image: curlimages/curl:8.11.1
+              args:
+                - -sS
+                - --fail
+                - -X
+                - POST
+                - -H
+                - 'Content-Type: application/json'
+                - -H
+                - 'X-Pipemaster-Schedule: drone/0'
+                - -d
+                - '{}'
+                - http://el-pipemaster.default.svc.cluster.local:8080

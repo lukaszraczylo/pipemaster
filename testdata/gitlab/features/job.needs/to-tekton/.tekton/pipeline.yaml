@@ -1,0 +1,24 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  tasks:
+    - name: compile
+      taskRef:
+        name: gitlab-ci-compile
+    - name: lint
+      taskRef:
+        name: gitlab-ci-lint
+    - name: ship
+      taskRef:
+        name: gitlab-ci-ship
+      runAfter:
+        - compile
+        - lint
+        - unit
+    - name: unit
+      taskRef:
+        name: gitlab-ci-unit
+      runAfter:
+        - compile

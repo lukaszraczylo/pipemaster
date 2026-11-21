@@ -1,0 +1,16 @@
+# pipemaster:generated
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: drone-run
+spec:
+  params: []
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: drone-run-
+      spec:
+        pipelineRef:
+          name: drone
+        params: []

@@ -1,0 +1,23 @@
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:arg {"if":"(branch == 'main') || ((event == 'schedule') \u0026\u0026 !(branch == 'main'))","back":"(branch == 'main') || ((event == 'schedule') \u0026\u0026 !(branch == 'main'))"}
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
+# pipemaster:arg {"image":"alpine:3.22"}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-build
+spec:
+  params:
+    - name: ctx-branch
+    - name: ctx-event
+  steps:
+    - name: script
+      image: alpine:3.22
+      script: |-
+        if ! ( [ "$PM_CTX_BRANCH" = 'main' ] || ( [ "$PM_CTX_EVENT" = 'schedule' ] && ( ! [ "$PM_CTX_BRANCH" = 'main' ] ) ) ); then exit 0; fi # pipemaster:guard
+        make
+      env:
+        - name: PM_CTX_BRANCH
+          value: $(params.ctx-branch)
+        - name: PM_CTX_EVENT
+          value: $(params.ctx-event)

@@ -1,0 +1,14 @@
+# pipemaster:emulated pipeline.inputs pipeline/ci
+# pipemaster:arg [{"Name":"environment","Type":"choice","Default":"staging","Description":"Where to deploy","Required":false}]
+variables:
+  environment:
+    value: staging
+    description: Where to deploy
+workflow:
+  rules:
+    - when: never
+build:
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - echo ok

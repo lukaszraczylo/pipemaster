@@ -1,0 +1,13 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: woodpecker
+spec:
+  tasks:
+    - name: build
+      taskRef:
+        name: woodpecker-build
+  finally:
+    - name: notify
+      taskRef:
+        name: woodpecker-notify

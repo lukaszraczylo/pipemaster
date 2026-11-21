@@ -1,0 +1,13 @@
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:emulated job.runner pipeline/ci/job/build
+name: CI
+on:
+  push:
+    branches:
+      - '**'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - id: build-step-1
+        run: echo build

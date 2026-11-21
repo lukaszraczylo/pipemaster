@@ -1,0 +1,17 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: drone-ci
+spec:
+  steps:
+    - name: build
+      image: golang:1.25
+      script: go build ./...
+      env:
+        - name: GOFLAGS
+          value: -trimpath
+        - name: TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ci-secrets
+              key: deploy_token

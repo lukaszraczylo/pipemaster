@@ -1,0 +1,11 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: allow
+  tasks:
+    - name: flaky
+      taskRef:
+        name: ci-flaky
+      onError: continue

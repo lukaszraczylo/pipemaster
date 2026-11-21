@@ -1,0 +1,9 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: woodpecker-lint
+spec:
+  steps:
+    - name: lint
+      image: golangci/golangci-lint:v2
+      script: golangci-lint run

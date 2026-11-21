@@ -1,0 +1,16 @@
+# pipemaster:emulated job.services pipeline/drone/job/ci
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: drone-ci
+spec:
+  steps:
+    - name: test
+      image: golang:1.25
+      script: go test ./...
+  sidecars:
+    - name: db
+      image: postgres:17
+      env:
+        - name: POSTGRES_PASSWORD
+          value: example

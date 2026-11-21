@@ -1,0 +1,20 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: expression label
+  tasks:
+    - name: test
+      taskRef:
+        name: ci-test
+      matrix:
+        include:
+          - params:
+              - name: python
+                value: "3.13"
+          - params:
+              - name: os
+                value: macos-latest
+              - name: python
+                value: "3.14"

@@ -1,0 +1,14 @@
+# pipemaster:emulated step.image pipeline/ci/job/version/step/tag
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:lost job.outputs pipeline/ci/job/version: {{ steps.tag.outputs.value }}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-version
+spec:
+  steps:
+    - name: tag
+      image: alpine:3.22
+      script: echo "value=v1" >> "$GITHUB_OUTPUT"
+  results:
+    - name: tag

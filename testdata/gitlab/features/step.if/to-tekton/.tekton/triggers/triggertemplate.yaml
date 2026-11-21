@@ -1,0 +1,20 @@
+# pipemaster:generated
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: gitlab-ci-run
+spec:
+  params:
+    - name: ctx-event
+      default: ""
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: gitlab-ci-run-
+      spec:
+        pipelineRef:
+          name: gitlab-ci
+        params:
+          - name: ctx-event
+            value: $(tt.params.ctx-event)

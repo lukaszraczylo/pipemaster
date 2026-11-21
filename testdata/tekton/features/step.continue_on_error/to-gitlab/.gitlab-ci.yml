@@ -1,0 +1,6 @@
+build:
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    # pipemaster:emulated step.continue_on_error pipeline/ci/job/build/step/build-step-1
+    - echo ok || true

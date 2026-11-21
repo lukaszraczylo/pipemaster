@@ -1,0 +1,11 @@
+# pipemaster:emulated job.needs pipeline/drone/job/notify
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}]}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: drone-notify
+spec:
+  steps:
+    - name: notify
+      image: alpine:3.20
+      script: ./notify.sh

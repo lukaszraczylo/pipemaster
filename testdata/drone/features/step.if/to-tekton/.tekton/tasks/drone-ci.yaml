@@ -1,0 +1,23 @@
+# pipemaster:emulated step.if pipeline/drone/job/ci/step/deploy
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: drone-ci
+spec:
+  params:
+    - name: ctx-event
+    - name: ctx-branch
+    - name: ctx-actor
+  steps:
+    - name: deploy
+      image: alpine:3.20
+      script: |-
+        if ! ( ( [ "$PM_CTX_EVENT" = 'tag' ] || [ "$PM_CTX_BRANCH" = 'main' ] ) && [ "$PM_CTX_ACTOR" = 'release-bot' ] ); then exit 0; fi # pipemaster:guard
+        ./deploy.sh
+      env:
+        - name: PM_CTX_EVENT
+          value: $(params.ctx-event)
+        - name: PM_CTX_BRANCH
+          value: $(params.ctx-branch)
+        - name: PM_CTX_ACTOR
+          value: $(params.ctx-actor)

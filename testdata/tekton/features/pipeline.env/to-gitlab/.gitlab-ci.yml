@@ -1,0 +1,11 @@
+variables:
+  CGO_ENABLED: "0"
+  VERSION: "3.1"
+  TOKEN: $DEPLOY_TOKEN
+  LABEL: build-
+# pipemaster:lost expr.opaque pipeline/ci: gha.github.run_number
+build:
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - echo ok

@@ -1,0 +1,24 @@
+# pipemaster:emulated script.interpolation pipeline/ci
+# pipemaster:arg [{"k":"t","p":"job/use/step/use-step-1/script/0","g":"echo $tag","s":"echo $\u007b{ needs.version.outputs.tag }}"}]
+stages:
+  - stage-0
+  - stage-1
+use:
+  stage: stage-1
+  needs:
+    - version
+  script:
+    # pipemaster:step use-step-1
+    - echo $tag
+version:
+  stage: stage-0
+  needs: []
+  script:
+    # pipemaster:step tag
+    - echo "value=v1" >> "$GITHUB_OUTPUT"
+    # pipemaster:emulated job.outputs pipeline/ci/job/version
+    # pipemaster:arg {"lines":["echo $tag"]}
+    - echo "tag=" >> outputs.env
+  artifacts:
+    reports:
+      dotenv: outputs.env

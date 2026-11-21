@@ -1,0 +1,16 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+# pipemaster:lost step.if pipeline/ci/job/build/step/build-step-2: event == 'push'
+when:
+  - event: push
+  - event: tag
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo cleanup
+  - name: build-step-2
+    image: ubuntu:latest
+    commands:
+      - echo push
+    when:
+      - evaluate: "false"

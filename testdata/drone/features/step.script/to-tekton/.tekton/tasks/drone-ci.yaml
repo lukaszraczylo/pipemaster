@@ -1,0 +1,11 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: drone-ci
+spec:
+  steps:
+    - name: build
+      image: golang:1.25
+      script: |-
+        go build ./...
+        go test ./...

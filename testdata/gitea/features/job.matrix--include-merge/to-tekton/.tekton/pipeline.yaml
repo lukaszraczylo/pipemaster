@@ -1,0 +1,22 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: ci
+  tasks:
+    - name: test
+      taskRef:
+        name: ci-test
+      matrix:
+        params:
+          - name: go
+            value:
+              - "1.21"
+              - "1.22"
+        include:
+          - params:
+              - name: experimental
+                value: "true"
+              - name: go
+                value: "1.22"

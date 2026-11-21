@@ -1,0 +1,17 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+when:
+  - event:
+      - push
+      - pull_request
+      - pull_request_closed
+      - pull_request_metadata
+      - tag
+      - release
+      - deployment
+      - cron
+      - manual
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok

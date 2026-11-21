@@ -1,0 +1,8 @@
+# pipemaster:lost job.if pipeline/ci/job/deploy: (ref == 'refs/heads/main') && (event == 'push')
+deploy:
+  needs: []
+  rules:
+    - when: never
+  script:
+    # pipemaster:step deploy-step-1
+    - echo deploy

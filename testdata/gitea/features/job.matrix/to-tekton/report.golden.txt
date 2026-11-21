@@ -1,0 +1,6 @@
+Loss report: gitea -> tekton
+[lost] pipeline/ci/job/test job.matrix (fail-fast and max-parallel have no Tekton form)
+[lost] pipeline/ci/job/test job.runner (Tekton schedules pods, not runner labels)
+[external] pipeline/ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[external] pipeline/ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[emulated] pipeline/ci/job/test/step/test-step-1 step.image: default image (the step names no image and Tekton requires one; alpine:3.22 runs it)

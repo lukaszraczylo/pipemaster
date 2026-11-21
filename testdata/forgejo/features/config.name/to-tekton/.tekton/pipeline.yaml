@@ -1,0 +1,13 @@
+# pipemaster:emulated config.name pipeline/ci/ref/secrets.DEPLOY_KEY
+# pipemaster:emulated config.name pipeline/ci/ref/vars.CI
+# pipemaster:emulated config.name pipeline/ci/ref/vars.FORGEJO_REGION
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: config
+  tasks:
+    - name: build
+      taskRef:
+        name: ci-build

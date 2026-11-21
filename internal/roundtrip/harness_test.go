@@ -17,6 +17,7 @@ import (
 	_ "github.com/lukaszraczylo/pipemaster/provider/drone"
 	"github.com/lukaszraczylo/pipemaster/provider/gha"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gitlab"
+	_ "github.com/lukaszraczylo/pipemaster/provider/tekton"
 	_ "github.com/lukaszraczylo/pipemaster/provider/woodpecker"
 	"github.com/lukaszraczylo/pipemaster/report"
 )

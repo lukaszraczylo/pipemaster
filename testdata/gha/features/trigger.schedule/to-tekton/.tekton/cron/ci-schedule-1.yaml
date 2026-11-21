@@ -1,0 +1,28 @@
+# pipemaster:generated
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ci-schedule-1
+spec:
+  schedule: 30 5 * * 1-5
+  timeZone: Etc/UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: trigger
+              image: curlimages/curl:8.11.1
+              args:
+                - -sS
+                - --fail
+                - -X
+                - POST
+                - -H
+                - 'Content-Type: application/json'
+                - -H
+                - 'X-Pipemaster-Schedule: ci/1'
+                - -d
+                - '{}'
+                - http://el-pipemaster.default.svc.cluster.local:8080

@@ -1,0 +1,21 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  tasks:
+    - name: test
+      taskRef:
+        name: ci-test
+---
+# pipemaster:emulated project.multi_pipeline pipeline/deploy
+# pipemaster:emulated trigger.manual pipeline/deploy/trigger/0
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: deploy
+spec:
+  tasks:
+    - name: ship
+      taskRef:
+        name: deploy-ship

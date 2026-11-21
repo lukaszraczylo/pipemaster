@@ -1,0 +1,5 @@
+Loss report: tekton -> woodpecker
+[lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/ci/trigger/0 trigger.filter.branches: doublestar glob (pattern wip/** has a different meaning in doublestar than in the source; it is written as is)
+[emulated] pipeline/ci/trigger/1 trigger.filter.branches: doublestar glob (pattern release/**, !release/old has a different meaning in doublestar than in the source; it is written as is)

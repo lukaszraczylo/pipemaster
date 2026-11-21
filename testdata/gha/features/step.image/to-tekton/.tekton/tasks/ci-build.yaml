@@ -1,0 +1,9 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-build
+spec:
+  steps:
+    - name: build-step-1
+      image: alpine:3.20
+      script: make build

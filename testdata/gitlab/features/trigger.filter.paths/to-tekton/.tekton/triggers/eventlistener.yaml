@@ -1,0 +1,60 @@
+# pipemaster:emulated trigger.pull_request pipeline/gitlab-ci/trigger/0
+# pipemaster:arg {"kind":"pr","name":"gitlab-ci-pr-0","branches":{"Include":null,"Exclude":null},"tags":{"Include":null,"Exclude":null},"paths":{"Include":null,"Exclude":["**.md"]}}
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/1
+# pipemaster:arg {"kind":"push","name":"gitlab-ci-push-1","branches":{"Include":null,"Exclude":null},"tags":{"Include":null,"Exclude":null},"paths":{"Include":["src/**","!src/docs/**"],"Exclude":null}}
+# pipemaster:emulated trigger.filter.paths pipeline/gitlab-ci/trigger/0
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: pipemaster
+spec:
+  serviceAccountName: pipemaster-triggers
+  triggers:
+    - name: gitlab-ci-pr-0
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: eventTypes
+              value:
+                - pull_request
+            - name: addChangedFiles
+              value:
+                enabled: true
+            - name: secretRef
+              value:
+                secretName: pipemaster-github-webhook
+                secretKey: token
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: body.action in ['opened','synchronize','reopened'] && (extensions.changed_files.added + extensions.changed_files.modified + extensions.changed_files.removed).exists(f, !(f.matches(r'^.*\.md$')))
+      bindings:
+        - ref: gitlab-ci-github
+      template:
+        ref: gitlab-ci-run
+    - name: gitlab-ci-push-1
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: eventTypes
+              value:
+                - push
+            - name: addChangedFiles
+              value:
+                enabled: true
+            - name: secretRef
+              value:
+                secretName: pipemaster-github-webhook
+                secretKey: token
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: "false"
+      bindings:
+        - ref: gitlab-ci-github
+      template:
+        ref: gitlab-ci-run

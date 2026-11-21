@@ -1,0 +1,13 @@
+# pipemaster:emulated step.action pipeline/ci/job/call/step/call-step-1
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'self:'\n    owner: org\n    repo: shared\n    path: .gitea/workflows/build.yml\n    ref: main\next:\n    gha:\n        _derived_id: true\nid: call-step-1\nkind: pipeline_call\n","at":0}
+# pipemaster:emulated step.script pipeline/ci/job/call
+# pipemaster:arg {"image":"alpine:3.22"}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-call
+spec:
+  steps:
+    - name: noop
+      image: alpine:3.22
+      script: "true"

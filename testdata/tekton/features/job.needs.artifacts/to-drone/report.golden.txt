@@ -1,0 +1,6 @@
+Loss report: tekton -> drone
+[lost] pipeline/gitlab-ci/job/unit job.needs.artifacts (documents share no workspace)
+[emulated] pipeline/gitlab-ci/job/compile job.artifacts: shared workspace of the steps in one document (other documents cannot read the files)
+[emulated] pipeline/gitlab-ci/job/compile job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/docs job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/unit job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

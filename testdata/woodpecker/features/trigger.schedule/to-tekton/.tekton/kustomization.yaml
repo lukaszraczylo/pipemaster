@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - cron/woodpecker-schedule-0.yaml
+  - pipeline.yaml
+  - rbac/triggers.yaml
+  - tasks/woodpecker-ci.yaml
+  - triggers/eventlistener.yaml
+  - triggers/triggerbinding.yaml
+  - triggers/triggertemplate.yaml

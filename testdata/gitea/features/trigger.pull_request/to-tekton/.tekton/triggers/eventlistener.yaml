@@ -1,0 +1,31 @@
+# pipemaster:emulated trigger.pull_request pipeline/ci/trigger/0
+# pipemaster:arg {"kind":"pr","name":"ci-pr-0","branches":{"Include":["main"],"Exclude":null},"tags":{"Include":null,"Exclude":null},"paths":{"Include":null,"Exclude":null}}
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: pipemaster
+spec:
+  serviceAccountName: pipemaster-triggers
+  triggers:
+    - name: ci-pr-0
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: eventTypes
+              value:
+                - pull_request
+            - name: secretRef
+              value:
+                secretName: pipemaster-github-webhook
+                secretKey: token
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: body.action in ['opened','synchronize','reopened'] && (body.pull_request.base.ref.matches(r'^main$'))
+      bindings:
+        - ref: ci-github
+      template:
+        ref: ci-run

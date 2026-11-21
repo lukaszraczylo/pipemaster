@@ -1,0 +1,28 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: CI
+  tasks:
+    - name: test
+      taskRef:
+        name: ci-test
+---
+# pipemaster:emulated project.multi_pipeline pipeline/deploy
+# pipemaster:emulated trigger.manual pipeline/deploy/trigger/0
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: deploy
+spec:
+  displayName: Deploy
+  params:
+    - name: target
+      type: choice
+      description: Where to deploy
+      default: staging
+  tasks:
+    - name: deploy
+      taskRef:
+        name: deploy-deploy

@@ -1,0 +1,11 @@
+# pipemaster:emulated config.name pipeline/drone/ref/secrets.TOKEN
+# pipemaster:emulated config.name pipeline/drone/ref/vars.REGION
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: drone
+spec:
+  tasks:
+    - name: ci
+      taskRef:
+        name: drone-ci

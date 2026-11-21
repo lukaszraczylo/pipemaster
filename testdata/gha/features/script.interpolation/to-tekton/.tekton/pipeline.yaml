@@ -1,0 +1,20 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: interp
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-ref-name
+      default: ""
+  tasks:
+    - name: build
+      taskRef:
+        name: ci-build
+      params:
+        - name: ctx-sha
+          value: $(params.ctx-sha)
+        - name: ctx-ref-name
+          value: $(params.ctx-ref-name)

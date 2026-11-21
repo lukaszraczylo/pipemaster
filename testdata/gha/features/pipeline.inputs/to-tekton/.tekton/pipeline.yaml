@@ -1,0 +1,20 @@
+# pipemaster:emulated trigger.manual pipeline/ci/trigger/0
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: inputs
+  params:
+    - name: environment
+      type: choice
+      description: Where to deploy
+      default: staging
+    - name: dry-run
+      type: boolean
+      description: Skip the push
+      default: "false"
+  tasks:
+    - name: build
+      taskRef:
+        name: ci-build

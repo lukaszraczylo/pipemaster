@@ -1,0 +1,12 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+# pipemaster:lost job.if pipeline/ci/job/build: opaque(tekton): {"input":"pipemaster-disabled","operator":"in","values":["never"]}
+when:
+  - event: push
+    evaluate: "false"
+  - event: tag
+    evaluate: "false"
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - '# pipemaster:lost script.interpolation: echo {{ opaque(gha): env[github.job] }}'

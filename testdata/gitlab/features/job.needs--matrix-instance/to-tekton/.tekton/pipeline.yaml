@@ -1,0 +1,25 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  tasks:
+    - name: images
+      taskRef:
+        name: gitlab-ci-images
+      matrix:
+        params:
+          - name: TARGET
+            value:
+              - alpine
+              - ubuntu
+    - name: package
+      taskRef:
+        name: gitlab-ci-package
+      runAfter:
+        - images
+    - name: package-all
+      taskRef:
+        name: gitlab-ci-package-all
+      runAfter:
+        - images

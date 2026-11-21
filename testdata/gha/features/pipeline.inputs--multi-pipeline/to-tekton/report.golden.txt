@@ -1,0 +1,11 @@
+Loss report: gha -> tekton
+[lost] pipeline/ci/job/test job.runner (Tekton schedules pods, not runner labels)
+[lost] pipeline/deploy pipeline.inputs (input target: a Tekton param with a default is optional, so required is lost)
+[lost] pipeline/deploy/job/deploy job.runner (Tekton schedules pods, not runner labels)
+[lost] pipeline/deploy/trigger/0 ext.passthrough (Ext of provider gha (inputs) is not written to the Tekton file; it is kept in round-trip metadata)
+[external] pipeline/ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[external] pipeline/ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[external] pipeline/deploy/trigger/0 trigger.manual: tkn pipeline start deploy (a person starts the run with `tkn pipeline start deploy`)
+[emulated] pipeline/ci/job/test/step/test-step-1 step.image: default image (the step names no image and Tekton requires one; alpine:3.22 runs it)
+[emulated] pipeline/deploy project.multi_pipeline: one Pipeline document per IR pipeline (each pipeline gets its own trigger)
+[emulated] pipeline/deploy/job/deploy/step/deploy-step-1 step.image: default image (the step names no image and Tekton requires one; alpine:3.22 runs it)

@@ -1,0 +1,13 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+when:
+  - event: push
+  - event: tag
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo "$$GREETING"
+    environment:
+      GREETING: hello ${CI_COMMIT_AUTHOR}
+      KEY:
+        from_secret: KEY

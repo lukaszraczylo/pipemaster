@@ -1,0 +1,24 @@
+# pipemaster:emulated step.image pipeline/ci/job/check/step/meta
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated step.image pipeline/ci/job/check/step/check-step-2
+# pipemaster:arg {"image":"alpine:3.22"}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-check
+spec:
+  params:
+    - name: ctx-event
+  steps:
+    - name: meta
+      image: alpine:3.22
+      script: echo "version=1" >> "$GITHUB_OUTPUT"
+    - name: check-step-2
+      displayName: Inspect
+      image: alpine:3.22
+      script: '# pipemaster:lost script.interpolation: docker inspect {{ steps.meta.outputs.version }}'
+      when:
+        - input: $(params.ctx-event)
+          operator: notin
+          values:
+            - pull_request

@@ -1,0 +1,12 @@
+build:
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - echo cleanup
+    # pipemaster:step build-step-2
+    # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
+    # pipemaster:arg "event == 'push'"
+    - |
+      if [ "$CI_PIPELINE_SOURCE" = "push" ]; then
+      echo push
+      fi

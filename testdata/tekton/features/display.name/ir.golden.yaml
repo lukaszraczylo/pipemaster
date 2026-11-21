@@ -1,0 +1,26 @@
+origin:
+    provider: tekton
+    dialect: tekton
+    files:
+        - .tekton/kustomization.yaml
+        - .tekton/pipeline.yaml
+        - .tekton/rbac/triggers.yaml
+        - .tekton/tasks/ci-build.yaml
+        - .tekton/triggers/eventlistener.yaml
+        - .tekton/triggers/triggerbinding.yaml
+        - .tekton/triggers/triggertemplate.yaml
+pipelines:
+    - id: ci
+      name: Build and test
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - id: build
+          name: Build the binary
+          steps:
+            - id: build-step-1
+              name: Compile
+              kind: script
+              script:
+                - go build ./...

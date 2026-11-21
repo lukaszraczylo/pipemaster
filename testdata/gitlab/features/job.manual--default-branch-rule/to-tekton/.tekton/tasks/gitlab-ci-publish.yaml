@@ -1,0 +1,13 @@
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/publish/step/script
+# pipemaster:arg {"image":"alpine:3.22"}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-publish
+spec:
+  params:
+    - name: ctx-branch
+  steps:
+    - name: script
+      image: alpine:3.22
+      script: make publish

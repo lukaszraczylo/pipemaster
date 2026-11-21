@@ -1,0 +1,17 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/build
+name: stepenv
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - id: build-step-1
+        run: echo "$GREETING"
+        env:
+          GREETING: hello ${{ github.actor }}
+          KEY: ${{ secrets.KEY }}

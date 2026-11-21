@@ -1,0 +1,11 @@
+# pipemaster:emulated pipeline.env pipeline/drone
+# pipemaster:arg {"env":"- name: CGO_ENABLED\n  value:\n    lit: \"0\"\n"}
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: drone
+spec:
+  tasks:
+    - name: ci
+      taskRef:
+        name: drone-ci

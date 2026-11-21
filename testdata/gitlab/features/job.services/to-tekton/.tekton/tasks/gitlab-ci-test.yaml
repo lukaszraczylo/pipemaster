@@ -1,0 +1,16 @@
+# pipemaster:emulated job.services pipeline/gitlab-ci/job/test
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-test
+spec:
+  stepTemplate:
+    image: golang:1.22
+  steps:
+    - name: script
+      script: make test
+  sidecars:
+    - name: postgres
+      image: postgres:15
+    - name: cache
+      image: redis:7

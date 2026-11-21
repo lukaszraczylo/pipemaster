@@ -1,0 +1,19 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: woodpecker
+spec:
+  params:
+    - name: ctx-branch
+      default: ""
+    - name: ctx-sha
+      default: ""
+  tasks:
+    - name: ci
+      taskRef:
+        name: woodpecker-ci
+      params:
+        - name: ctx-sha
+          value: $(params.ctx-sha)
+        - name: ctx-branch
+          value: $(params.ctx-branch)

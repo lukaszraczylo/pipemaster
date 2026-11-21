@@ -1,0 +1,17 @@
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/lint/step/script
+# pipemaster:arg {"image":"alpine:3.22"}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-lint
+spec:
+  stepTemplate:
+    env:
+      - name: GOCACHE
+        value: $CI_PROJECT_DIR/.cache/go-build
+      - name: GOMODCACHE
+        value: $CI_PROJECT_DIR/.cache/go-mod
+  steps:
+    - name: script
+      image: alpine:3.22
+      script: make lint

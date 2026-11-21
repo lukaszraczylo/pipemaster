@@ -1,0 +1,6 @@
+build:
+  image: golang:1.24
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - go version

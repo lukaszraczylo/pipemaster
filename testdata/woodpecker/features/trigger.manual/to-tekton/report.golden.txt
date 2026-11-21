@@ -1,0 +1,2 @@
+Loss report: woodpecker -> tekton
+[external] pipeline/woodpecker/trigger/0 trigger.manual: tkn pipeline start woodpecker (a person starts the run with `tkn pipeline start woodpecker`)

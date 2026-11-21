@@ -1,0 +1,8 @@
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: pipemaster
+spec:
+  serviceAccountName: pipemaster-triggers
+  triggers: []

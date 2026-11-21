@@ -1,0 +1,10 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-build
+spec:
+  stepTemplate:
+    image: golang:1.24
+  steps:
+    - name: build-step-1
+      script: go version

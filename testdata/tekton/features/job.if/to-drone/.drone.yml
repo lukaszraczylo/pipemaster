@@ -1,0 +1,17 @@
+# pipemaster:emulated job.if pipeline/ci/job/deploy
+# pipemaster:arg {"if":"(ref == 'refs/heads/main') \u0026\u0026 (event == 'push')","back":"(event == 'push') \u0026\u0026 (ref == 'refs/heads/main')","triggers":"- kind: push\n- kind: tag\n"}
+# pipemaster:emulated job.container pipeline/ci/job/deploy
+kind: pipeline
+type: docker
+name: deploy
+trigger:
+  event:
+    - push
+    - tag
+  ref:
+    - refs/heads/main
+steps:
+  - name: deploy-step-1
+    image: ubuntu:latest
+    commands:
+      - echo deploy

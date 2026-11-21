@@ -1,0 +1,19 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: needs
+  tasks:
+    - name: lint
+      taskRef:
+        name: ci-lint
+    - name: ship
+      taskRef:
+        name: ci-ship
+      runAfter:
+        - lint
+        - test
+    - name: test
+      taskRef:
+        name: ci-test

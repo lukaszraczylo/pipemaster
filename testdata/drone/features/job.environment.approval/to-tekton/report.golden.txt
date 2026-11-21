@@ -1,0 +1,4 @@
+Loss report: drone -> tekton
+[lost] pipeline/drone/job/deploy job.environment (Tekton has no environment name or URL)
+[lost] pipeline/drone/job/deploy job.environment.approval (Tekton has no approval gate)
+[external] pipeline/drone/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)

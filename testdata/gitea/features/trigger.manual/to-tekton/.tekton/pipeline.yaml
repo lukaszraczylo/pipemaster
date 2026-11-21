@@ -1,0 +1,11 @@
+# pipemaster:emulated trigger.manual pipeline/ci/trigger/0
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: manual
+  tasks:
+    - name: build
+      taskRef:
+        name: ci-build

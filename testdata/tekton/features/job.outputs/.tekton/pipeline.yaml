@@ -1,0 +1,18 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: outputs
+  tasks:
+    - name: use
+      taskRef:
+        name: ci-use
+      params:
+        - name: needs-version-tag
+          value: $(tasks.version.results.tag)
+      runAfter:
+        - version
+    - name: version
+      taskRef:
+        name: ci-version

@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - cron/gitlab-ci-schedule-0.yaml
+  - pipeline.yaml
+  - rbac/triggers.yaml
+  - tasks/gitlab-ci-nightly.yaml
+  - triggers/eventlistener.yaml
+  - triggers/triggerbinding.yaml
+  - triggers/triggertemplate.yaml

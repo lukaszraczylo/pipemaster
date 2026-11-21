@@ -1,0 +1,14 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  tasks:
+    - name: build
+      taskRef:
+        name: gitlab-ci-build
+      when:
+        - input: pipemaster-disabled
+          operator: in
+          values:
+            - never

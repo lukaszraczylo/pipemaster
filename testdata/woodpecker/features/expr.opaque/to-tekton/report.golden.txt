@@ -1,0 +1,4 @@
+Loss report: woodpecker -> tekton
+[lost] pipeline/woodpecker/job/ci/step/release expr.opaque (opaque expression opaque(woodpecker): when.branch glob "release/*" has no Tekton form: the condition has no Tekton when form and no shell guard)
+[lost] pipeline/woodpecker/job/ci/step/release step.if (the condition has no Tekton when form and no shell guard; the step never runs)
+[external] pipeline/woodpecker/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)

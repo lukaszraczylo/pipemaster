@@ -1,0 +1,13 @@
+# pipemaster:generated
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: woodpecker-github
+spec:
+  params:
+    - name: ctx-branch
+      value: $(extensions.ctx_branch)
+    - name: ctx-event
+      value: $(extensions.ctx_event)
+    - name: ctx-actor
+      value: $(extensions.ctx_actor)

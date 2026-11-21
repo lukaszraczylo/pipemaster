@@ -1,0 +1,3 @@
+Loss report: tekton -> gitea
+[emulated] pipeline/gitlab-ci/job/build job.retry: step-level retry loop via shell (Retry.Attempts is the total number of runs, so GitLab retry: N is Attempts N+1)
+[emulated] pipeline/gitlab-ci/job/build job.runner: default runner label ubuntu-latest (the pipeline named no runner)

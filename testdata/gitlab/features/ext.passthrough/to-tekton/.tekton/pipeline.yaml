@@ -1,0 +1,23 @@
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci
+# pipemaster:arg {"env":"- name: SHARED\n  value:\n    lit: \"1\"\n"}
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  tasks:
+    - name: build
+      taskRef:
+        name: gitlab-ci-build
+      retries: 1
+    - name: common
+      taskRef:
+        name: gitlab-ci-common
+      retries: 1
+    - name: prod
+      taskRef:
+        name: gitlab-ci-prod
+      runAfter:
+        - build
+        - common
+      retries: 1

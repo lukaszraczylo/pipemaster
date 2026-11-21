@@ -1,0 +1,11 @@
+# pipemaster:emulated config.name pipeline/ci/ref/secrets.API_KEY
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: jobenv
+  tasks:
+    - name: build
+      taskRef:
+        name: ci-build

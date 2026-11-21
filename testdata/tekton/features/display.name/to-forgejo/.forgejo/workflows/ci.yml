@@ -1,0 +1,16 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/build
+name: Build and test
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    name: Build the binary
+    runs-on: ubuntu-latest
+    steps:
+      - id: build-step-1
+        name: Compile
+        run: go build ./...

@@ -1,0 +1,10 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-build
+spec:
+  stepTemplate:
+    image: golang:1.22
+  steps:
+    - name: script
+      script: make

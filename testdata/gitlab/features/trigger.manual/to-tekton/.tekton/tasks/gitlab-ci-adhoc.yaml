@@ -1,0 +1,11 @@
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/adhoc/step/script
+# pipemaster:arg {"image":"alpine:3.22"}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-adhoc
+spec:
+  steps:
+    - name: script
+      image: alpine:3.22
+      script: make adhoc

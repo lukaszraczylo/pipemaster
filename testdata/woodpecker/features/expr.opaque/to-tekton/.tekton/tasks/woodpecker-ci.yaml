@@ -1,0 +1,16 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: woodpecker-ci
+spec:
+  params:
+    - name: ctx-event
+  steps:
+    - name: release
+      image: alpine:3.20
+      script: ./release.sh
+      when:
+        - input: pipemaster-disabled
+          operator: in
+          values:
+            - never

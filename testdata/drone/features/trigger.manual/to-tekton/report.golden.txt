@@ -1,0 +1,2 @@
+Loss report: drone -> tekton
+[external] pipeline/drone/trigger/0 trigger.manual: tkn pipeline start drone (a person starts the run with `tkn pipeline start drone`)

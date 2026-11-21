@@ -1,0 +1,2 @@
+Loss report: woodpecker -> tekton
+[external] pipeline/woodpecker/trigger/0 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)

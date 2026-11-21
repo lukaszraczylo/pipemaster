@@ -1,0 +1,24 @@
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
+# pipemaster:arg {"image":"alpine:3.22"}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-build
+spec:
+  params:
+    - name: ctx-sha
+    - name: ctx-branch
+    - name: ctx-actor
+  steps:
+    - name: script
+      image: alpine:3.22
+      script: |-
+        echo "building ${PM_CTX_SHA} on ${PM_CTX_BRANCH} for ${PM_CTX_ACTOR}"
+        echo "keeps $HOME and ${UNMAPPED}"
+      env:
+        - name: PM_CTX_SHA
+          value: $(params.ctx-sha)
+        - name: PM_CTX_BRANCH
+          value: $(params.ctx-branch)
+        - name: PM_CTX_ACTOR
+          value: $(params.ctx-actor)

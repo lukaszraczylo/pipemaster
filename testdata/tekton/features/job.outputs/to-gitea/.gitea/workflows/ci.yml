@@ -1,0 +1,20 @@
+# pipemaster:emulated job.runner pipeline/ci/job/use
+# pipemaster:emulated job.runner pipeline/ci/job/version
+name: outputs
+on:
+  push:
+jobs:
+  use:
+    needs:
+      - version
+    runs-on: ubuntu-latest
+    steps:
+      - id: use-step-1
+        run: echo ${{ needs.version.outputs.tag }}
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - id: tag
+        run: echo "value=v1" >> "$GITHUB_OUTPUT"
+    outputs:
+      tag: ""

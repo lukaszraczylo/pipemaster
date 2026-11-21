@@ -1,0 +1,25 @@
+# pipemaster:generated
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: gitlab-ci-run
+spec:
+  params: []
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: gitlab-ci-run-
+      spec:
+        pipelineRef:
+          name: gitlab-ci
+        params: []
+        workspaces:
+          - name: pipemaster-workspace
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 1Gi

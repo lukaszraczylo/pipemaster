@@ -1,0 +1,36 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  tasks:
+    - name: test
+      taskRef:
+        name: gitlab-ci-test
+      matrix:
+        include:
+          - params:
+              - name: GO
+                value: "1.21"
+              - name: OS
+                value: linux
+          - params:
+              - name: GO
+                value: "1.21"
+              - name: OS
+                value: mac
+          - params:
+              - name: GO
+                value: "1.22"
+              - name: OS
+                value: linux
+          - params:
+              - name: GO
+                value: "1.22"
+              - name: OS
+                value: mac
+          - params:
+              - name: GO
+                value: "1.20"
+              - name: OS
+                value: linux

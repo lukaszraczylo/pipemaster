@@ -1,0 +1,13 @@
+# pipemaster:emulated job.runner pipeline/ci/job/build
+name: tags
+on:
+  push:
+    tags:
+      - v[0-9]+.[0-9]+.[0-9]+
+      - '!v*-rc*'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - id: build-step-1
+        run: echo ok

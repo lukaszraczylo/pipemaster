@@ -1,0 +1,5 @@
+build:
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - sleep 1

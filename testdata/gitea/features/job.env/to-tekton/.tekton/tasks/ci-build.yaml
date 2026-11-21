@@ -1,0 +1,20 @@
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"image":"alpine:3.22"}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-build
+spec:
+  stepTemplate:
+    env:
+      - name: GOFLAGS
+        value: -trimpath
+      - name: API
+        valueFrom:
+          secretKeyRef:
+            name: ci-secrets
+            key: API_KEY
+  steps:
+    - name: build-step-1
+      image: alpine:3.22
+      script: echo ok

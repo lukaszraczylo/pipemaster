@@ -1,0 +1,7 @@
+Loss report: forgejo -> tekton
+[lost] pipeline/ci/job/build job.runner (Tekton schedules pods, not runner labels)
+[lost] pipeline/ci/trigger/1 trigger.filter.branches (a glob has no exact CEL regex, so the filter is false and the trigger never fires; the globs stay in the marker)
+[external] pipeline/ci/trigger/0 trigger.pull_request: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[external] pipeline/ci/trigger/1 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[emulated] pipeline/ci/job/build/step/build-step-1 step.image: default image (the step names no image and Tekton requires one; alpine:3.22 runs it)
+[emulated] pipeline/ci/trigger/0 trigger.filter.branches: CEL interceptor filter on the ref (the EventListener serves GitHub webhooks only)

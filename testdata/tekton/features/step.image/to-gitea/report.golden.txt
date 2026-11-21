@@ -1,0 +1,4 @@
+Loss report: tekton -> gitea
+[emulated] pipeline/ci/job/build job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/ci/job/build/step/build-step-1 step.image: uses: docker://<image> with entrypoint and args
+[emulated] pipeline/ci/job/deploy job.runner: default runner label ubuntu-latest (the pipeline named no runner)

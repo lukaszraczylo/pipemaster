@@ -1,0 +1,3 @@
+Loss report: gitlab -> tekton
+[emulated] pipeline/gitlab-ci/job/nightly/step/script step.image: default image (the step names no image and Tekton requires one; alpine:3.22 runs it)
+[emulated] pipeline/gitlab-ci/trigger/0 trigger.schedule: CronJob posting to the EventListener (CronJob gitlab-ci-schedule-0 posts to el-pipemaster in namespace default; deploy both in that namespace, or edit the host. The run has an empty ctx-repo because the post carries no repository. The listener entry matches only the X-Pipemaster-Schedule header, so any caller in the cluster can start a run; restrict the listener with a NetworkPolicy or add a shared-secret header)

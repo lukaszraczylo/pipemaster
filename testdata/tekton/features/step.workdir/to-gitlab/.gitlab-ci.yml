@@ -1,0 +1,10 @@
+build:
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    # pipemaster:emulated step.workdir pipeline/ci/job/build/step/build-step-1
+    - |
+      (
+      cd "./cmd/app" || exit 1
+      ls
+      )

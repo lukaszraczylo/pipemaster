@@ -1,0 +1,19 @@
+# pipemaster:emulated trigger.schedule pipeline/woodpecker/trigger/0
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: pipemaster
+spec:
+  serviceAccountName: pipemaster-triggers
+  triggers:
+    - name: woodpecker-schedule-0
+      interceptors:
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: header.canonical('X-Pipemaster-Schedule') == 'woodpecker/0'
+      bindings:
+        - ref: woodpecker-github
+      template:
+        ref: woodpecker-run

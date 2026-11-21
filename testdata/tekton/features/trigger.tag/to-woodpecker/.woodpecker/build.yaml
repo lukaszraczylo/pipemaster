@@ -1,0 +1,10 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+# pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/0
+when:
+  - event: tag
+    ref: refs/tags/v*
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok

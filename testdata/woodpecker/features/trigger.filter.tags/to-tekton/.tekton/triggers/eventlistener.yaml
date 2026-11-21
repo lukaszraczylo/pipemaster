@@ -1,0 +1,31 @@
+# pipemaster:emulated trigger.tag pipeline/woodpecker/trigger/0
+# pipemaster:arg {"kind":"tag","name":"woodpecker-tag-0","branches":{"Include":null,"Exclude":null},"tags":{"Include":["v*"],"Exclude":null},"paths":{"Include":null,"Exclude":null}}
+# pipemaster:emulated trigger.filter.tags pipeline/woodpecker/trigger/0
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: pipemaster
+spec:
+  serviceAccountName: pipemaster-triggers
+  triggers:
+    - name: woodpecker-tag-0
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: eventTypes
+              value:
+                - push
+            - name: secretRef
+              value:
+                secretName: pipemaster-github-webhook
+                secretKey: token
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: body.ref.startsWith('refs/tags/') && (body.ref.replace('refs/tags/','',1).matches(r'^v[^/]*$'))
+      bindings:
+        - ref: woodpecker-github
+      template:
+        ref: woodpecker-run

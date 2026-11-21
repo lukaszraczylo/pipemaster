@@ -1,0 +1,12 @@
+# pipemaster:emulated job.runner pipeline/ci/job/build
+name: ext
+on:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - id: build-step-1
+        run: echo ok
+        shell: bash
+        working-directory: app

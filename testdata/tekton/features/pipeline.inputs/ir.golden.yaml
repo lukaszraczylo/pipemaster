@@ -1,0 +1,26 @@
+origin:
+    provider: tekton
+    dialect: tekton
+    files:
+        - .tekton/kustomization.yaml
+        - .tekton/pipeline.yaml
+        - .tekton/tasks/ci-build.yaml
+pipelines:
+    - id: ci
+      name: inputs
+      inputs:
+        - name: environment
+          type: choice
+          default: staging
+          description: Where to deploy
+        - name: dry-run
+          type: boolean
+          default: "false"
+          description: Skip the push
+      jobs:
+        - id: build
+          steps:
+            - id: build-step-1
+              kind: script
+              script:
+                - echo ok

@@ -1,0 +1,15 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: opaque
+  tasks:
+    - name: build
+      taskRef:
+        name: ci-build
+      when:
+        - input: pipemaster-disabled
+          operator: in
+          values:
+            - never

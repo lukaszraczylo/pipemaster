@@ -1,0 +1,15 @@
+# pipemaster:emulated pipeline.env pipeline/woodpecker/job/ci
+# pipemaster:arg {"names":["CGO_ENABLED"]}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: woodpecker-ci
+spec:
+  stepTemplate:
+    env:
+      - name: CGO_ENABLED
+        value: "0"
+  steps:
+    - name: build
+      image: golang:1.25
+      script: go build ./...

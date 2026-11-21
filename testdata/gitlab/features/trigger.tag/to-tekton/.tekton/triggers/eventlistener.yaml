@@ -1,0 +1,30 @@
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/0
+# pipemaster:arg {"kind":"tag","name":"gitlab-ci-tag-0","branches":{"Include":null,"Exclude":null},"tags":{"Include":null,"Exclude":null},"paths":{"Include":null,"Exclude":null}}
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: pipemaster
+spec:
+  serviceAccountName: pipemaster-triggers
+  triggers:
+    - name: gitlab-ci-tag-0
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: eventTypes
+              value:
+                - push
+            - name: secretRef
+              value:
+                secretName: pipemaster-github-webhook
+                secretKey: token
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: body.ref.startsWith('refs/tags/')
+      bindings:
+        - ref: gitlab-ci-github
+      template:
+        ref: gitlab-ci-run

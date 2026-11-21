@@ -1,0 +1,17 @@
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/test/step/script
+# pipemaster:arg {"image":"alpine:3.22"}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-test
+spec:
+  params:
+    - name: ctx-sha
+  stepTemplate:
+    env:
+      - name: IMAGE
+        value: $CI_REGISTRY_IMAGE/tmp:$(params.ctx-sha)
+  steps:
+    - name: script
+      image: alpine:3.22
+      script: make test

@@ -21,6 +21,8 @@ var noSourceForm = map[string]string{
 	provider.Woodpecker + "/" + string(caps.JobEnvironmentApproval): "approval rules live in repo settings and no parser sets Environment.Approval",
 	provider.Drone + "/" + string(caps.DisplayName):                 "a Drone pipeline or step name is its id, so no drone source holds a separate display name",
 	provider.Drone + "/" + string(caps.JobTimeout):                  "Drone limits a build with a repo setting, which no pipeline file holds",
+	provider.Tekton + "/" + string(caps.StepAction):                 "a Tekton StepAction ref has no IR action form, so no Tekton source yields an IR action",
+	provider.Tekton + "/" + string(caps.TriggerManual):              "a person starts a Tekton Pipeline with tkn, so no Tekton file holds a manual trigger",
 	provider.Woodpecker + "/" + string(caps.JobTimeout):             "Woodpecker limits the whole pipeline with a repo setting, which no workflow file holds",
 }
 

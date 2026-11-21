@@ -1,0 +1,3 @@
+Loss report: tekton -> gitlab
+[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
+[emulated] pipeline/ci/job/version job.outputs: dotenv artifact report

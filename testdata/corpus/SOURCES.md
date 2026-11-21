@@ -4,10 +4,10 @@ Real-world CI pipelines stored verbatim for `TestCorpus` (`internal/roundtrip/co
 The directory of an entry is `testdata/corpus/<#>-<gha, gitea, forgejo, gitlab, woodpecker or drone>-<slug>`.
 Every file is byte-identical to the file at the pinned commit; the test run does not edit them.
 
-- Fetch date: 2026-11-18 for entries 01 to 27, 2026-11-19 for entries 28 to 40 and 2026-11-20 for entries 41 to 50 and 2026-11-21 for entries 51 to 62.
+- Fetch date: 2026-11-18 for entries 01 to 27, 2026-11-19 for entries 28 to 40 and 2026-11-20 for entries 41 to 50 and 2026-11-21 for entries 51 to 71.
 - Each repository is public, and its licence was read before use: from the host API (GitHub `license.spdx_id`, GitLab `license.key`), or, for entries 28 to 40,
   from the `LICENSE` file of the repository at the pinned commit.
-  Every licence is MIT, Apache-2.0, BSD-3-Clause or, for entry 60 only, MPL-2.0.
+  Every licence is MIT, Apache-2.0, BSD-3-Clause or, for entry 60 only, MPL-2.0. Entries 63 to 71 are Apache-2.0.
 - No private repository and no repository of the operator is used. No file holds a secret.
 - Attribution: this file names the source repository, the commit, each path and the SPDX licence of every
   copied file, and the licence text sits at the repository root of that commit. This attribution satisfies the
@@ -82,6 +82,15 @@ Every file is byte-identical to the file at the pinned commit; the test run does
 | 60 | go-markdown2confluence | Drone | <https://github.com/justmiles/go-markdown2confluence> | `812f9ef8812f5552f31d5fb46b71cf7f7e582219` | MPL-2.0 | `.drone.yml` |
 | 61 | pinmonl | Drone | <https://github.com/pinmonl/pinmonl> | `2ca880f1079a8d554df0c9762c378e0f3ea947f1` | MIT | `.drone.yml` |
 | 62 | elasticsearch-test-data | Drone | <https://github.com/oliver006/elasticsearch-test-data> | `e37c5d5b26b98d4000d89da38a1cb118014cd098` | MIT | `.drone.yml` |
+| 63 | pipeline | Tekton | <https://github.com/tektoncd/pipeline> | `3fe337ff1878f5037e2a4d5be288080306d617a7` | Apache-2.0 | `examples/v1/pipelineruns/pipelinerun-with-final-tasks.yaml`<br>`examples/v1/pipelineruns/pipelinerun-with-when-expressions.yaml`<br>`examples/v1/pipelineruns/beta/pipelinerun-with-matrix-include.yaml`<br>`examples/v1/pipelineruns/alpha/pipelinerun-with-cel-when-expressions.yaml`<br>`examples/v1/pipelineruns/optional-workspaces.yaml`<br>`examples/v1/pipelineruns/no-ci/git-resolver.yaml` |
+| 64 | triggers | Tekton | <https://github.com/tektoncd/triggers> | `9e21fc4bdea9e6defe7027242d1618cb6abd7f6d` | Apache-2.0 | `examples/v1beta1/cron/cronjob.yaml`<br>`examples/v1beta1/cron/eventlistener.yaml`<br>`examples/v1beta1/github-add-changed-files-push-cel/02-github-eventlistener-interceptor.yaml` |
+| 65 | plumbing | Tekton | <https://github.com/tektoncd/plumbing> | `b24502d4f511ddeb6eb390689a21d0813bb17610` | Apache-2.0 | `tekton/catalog/pipelines/release.yaml`<br>`tekton/catalog/tasks/publish.yaml` |
+| 66 | results | Tekton | <https://github.com/tektoncd/results> | `9d8626118d5582ae95b28107afbdd5b6ba551c9c` | Apache-2.0 | `tekton/ci.yaml`<br>`tekton/results-release-pipeline.yaml` |
+| 67 | chains | Tekton | <https://github.com/tektoncd/chains> | `afaaeac09fa09245a2f77bab556f0f6370db60f7` | Apache-2.0 | `release/release-pipeline.yaml` |
+| 68 | build-definitions | Tekton | <https://github.com/konflux-ci/build-definitions> | `8fed8ffff0ff01a8bd8d5ca2049e538c642f2d05` | Apache-2.0 | `.tekton/tasks/buildah.yaml`<br>`pipelines/enterprise-contract.yaml` |
+| 69 | pipelines-tutorial | Tekton | <https://github.com/openshift/pipelines-tutorial> | `4ebfb3d6f4e195de106f0f59a2506f4edffdfcf7` | Apache-2.0 | `01_pipeline/04_pipeline.yaml`<br>`01_pipeline/01_apply_manifest_task.yaml`<br>`.tekton/pipelinerun.yaml` |
+| 70 | git-clone | Tekton | <https://github.com/tektoncd-catalog/git-clone> | `e1b1fafc3a0c1704a69beb894d65a8b3e090d5d8` | Apache-2.0 | `task/git-clone/git-clone.yaml`<br>`stepaction/git-clone/git-clone.yaml` |
+| 71 | catalog | Tekton | <https://github.com/tektoncd/catalog> | `112374ce1262b133a77300bd8133445722605e04` | Apache-2.0 | `task/git-clone/0.10/git-clone.yaml` |
 
 Woodpecker entries (41 to 50):
 
@@ -99,3 +108,12 @@ Drone entries (51 to 62):
 - Gap: drone/drone-kaniko is not stored. Its pipelines use `type: vm`, which is not a docker-runner shape.
 - Entries 54, 55 hold a `kind: signature` document. Its `hmac` value is a hash of the file, not a secret.
 - Entry 60 is MPL-2.0, per the GitHub API `license.spdx_id`.
+
+Tekton entries (63 to 71):
+
+- The files are the non-PaC rows of section 10 of `docs/superpowers/research/tekton.md`, copied byte for byte from the pinned commit. The raw URL is `https://raw.githubusercontent.com/<repository>/<commit>/<path>`.
+- Rows 14, 16, 17, 18 and 21 of that section are PaC `.tekton/` PipelineRuns, which belong to a later phase. They are not stored.
+- Entries 63 to 69 keep the file name of the source path, in `.tekton/`. Entry 70 keeps the subdirectory `task/` or `stepaction/` of its two sources.
+- Entry 71 stores the file as `.tekton/git-clone.yaml`.
+- Entries 64, 70 and 71 hold a second file, `.tekton/pipelinerun-with-matrix-include.yaml`, from `tektoncd/pipeline` at the commit of entry 63 (path `examples/v1/pipelineruns/beta/pipelinerun-with-matrix-include.yaml`). The entries hold no Pipeline of their own, so a Tekton project needs it to parse.
+- Entry 71 is a `tekton.dev/deprecated` catalog Task. Entry 63 holds `cel` when entries, which the parser keeps as opaque text.

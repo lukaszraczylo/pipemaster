@@ -1,0 +1,14 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: drone
+spec:
+  workspaces:
+    - name: pipemaster-workspace
+  tasks:
+    - name: ci
+      taskRef:
+        name: drone-ci
+      workspaces:
+        - name: pipemaster-workspace
+          workspace: pipemaster-workspace

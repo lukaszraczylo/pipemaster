@@ -40,7 +40,8 @@ func corpusEntries(t *testing.T) []fixture {
 		}
 		dir := filepath.Join(corpusRoot, e.Name())
 		id := corpusProvider(t, e.Name())
-		if !prov(t, id).Detect(os.DirFS(dir)) {
+		// A Tekton entry may hold only trigger resources, which carry no Pipeline for Detect to find.
+		if id != "tekton" && !prov(t, id).Detect(os.DirFS(dir)) {
 			t.Fatalf("%s: provider %s does not detect the entry", e.Name(), id)
 		}
 		out = append(out, fixture{id, e.Name(), dir, dir})
@@ -257,7 +258,7 @@ func TestCorpus(t *testing.T) {
 				checkEmitted(t, b.ID(), cross, crossKnown)
 
 				c := verdictCounts(r.src, r.toRep)
-				fmt.Fprintf(&summary, "%s %s->%s native=%d emulated=%d external=%d lost=%d\n", f.name, a.ID(), b.ID(),
+				fmt.Fprintf(&summary, "%s %s->%s native=%4d emulated=%4d external=%4d lost=%4d\n", f.name, a.ID(), b.ID(),
 					c[caps.Native], c[caps.Emulated], c[caps.External], c[caps.Lost])
 			})
 			healthy = healthy && ok

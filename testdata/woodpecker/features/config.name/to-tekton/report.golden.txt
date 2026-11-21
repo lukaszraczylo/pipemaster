@@ -1,0 +1,5 @@
+Loss report: woodpecker -> tekton
+[external] pipeline/woodpecker/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[emulated] pipeline/woodpecker/job/ci/step/build script.interpolation: shell variable (a secret or variable in the script is read as a shell variable from the step env)
+[emulated] pipeline/woodpecker/ref/secrets.TOKEN config.name: secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars (the Secret values and ConfigMap values are not written)
+[emulated] pipeline/woodpecker/ref/vars.REGION config.name: secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars (the Secret values and ConfigMap values are not written)

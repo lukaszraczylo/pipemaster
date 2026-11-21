@@ -1,0 +1,8 @@
+Loss report: tekton -> gitea
+[emulated] pipeline/gitlab-ci/job/compile job.artifacts: upload-artifact step at job end
+[emulated] pipeline/gitlab-ci/job/compile job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/gitlab-ci/job/docs job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/gitlab-ci/job/unit job.needs.artifacts: download-artifact step at job start
+[emulated] pipeline/gitlab-ci/job/unit job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[native] pipeline/gitlab-ci/job/compile/synth/upload step.action (resolves against DEFAULT_ACTIONS_URL; default github)
+[native] pipeline/gitlab-ci/job/unit/synth/download step.action (resolves against DEFAULT_ACTIONS_URL; default github)

@@ -1,0 +1,5 @@
+Loss report: tekton -> gha
+[lost] pipeline/ci ext.passthrough (Ext of provider tekton (resources) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider tekton (bindings, listener, name, serviceAccountName, serviceAccountScope, template) is not written to the GHA file; it is kept in round-trip metadata)
+[emulated] pipeline/ci/job/build job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/ci/trigger/0 trigger.api: repository_dispatch (the API trigger names no event; repository_dispatch is used)

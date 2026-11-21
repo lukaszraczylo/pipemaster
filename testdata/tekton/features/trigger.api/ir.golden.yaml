@@ -1,0 +1,54 @@
+origin:
+    provider: tekton
+    dialect: tekton
+    files:
+        - .tekton/kustomization.yaml
+        - .tekton/pipeline.yaml
+        - .tekton/tasks/ci-build.yaml
+        - .tekton/triggers/eventlistener.yaml
+        - .tekton/triggers/triggerbinding.yaml
+        - .tekton/triggers/triggertemplate.yaml
+pipelines:
+    - ext:
+        tekton:
+            resources:
+                - apiVersion: triggers.tekton.dev/v1beta1
+                  kind: TriggerBinding
+                  metadata:
+                    name: ci-github
+                  spec:
+                    params: []
+                - apiVersion: triggers.tekton.dev/v1beta1
+                  kind: TriggerTemplate
+                  metadata:
+                    name: ci-run
+                  spec:
+                    params: []
+                    resourcetemplates:
+                        - apiVersion: tekton.dev/v1
+                          kind: PipelineRun
+                          metadata:
+                            generateName: ci-run-
+                          spec:
+                            pipelineRef:
+                                name: ci
+      id: ci
+      name: push
+      triggers:
+        - ext:
+            tekton:
+                bindings:
+                    - ref: ci-github
+                listener: pipemaster
+                name: ci-api
+                serviceAccountName: pipemaster-triggers
+                serviceAccountScope: spec
+                template: ci-run
+          kind: api
+      jobs:
+        - id: build
+          steps:
+            - id: build-step-1
+              kind: script
+              script:
+                - echo ok

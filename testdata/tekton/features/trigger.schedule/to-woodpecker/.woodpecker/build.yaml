@@ -1,0 +1,9 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+when:
+  - event: cron
+  - event: cron
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok

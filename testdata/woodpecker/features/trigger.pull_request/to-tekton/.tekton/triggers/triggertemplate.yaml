@@ -1,0 +1,16 @@
+# pipemaster:generated
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: woodpecker-run
+spec:
+  params: []
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: woodpecker-run-
+      spec:
+        pipelineRef:
+          name: woodpecker
+        params: []

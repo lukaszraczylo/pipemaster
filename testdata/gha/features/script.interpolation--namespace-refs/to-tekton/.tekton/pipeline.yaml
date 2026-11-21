@@ -1,0 +1,26 @@
+# pipemaster:emulated pipeline.env pipeline/ci
+# pipemaster:arg {"env":"- name: REGION\n  value:\n    lit: eu\n"}
+# pipemaster:emulated config.name pipeline/ci/ref/vars.LEVEL
+# pipemaster:emulated trigger.manual pipeline/ci/trigger/0
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  params:
+    - name: target
+      description: Deploy target
+      default: staging
+  tasks:
+    - name: test
+      taskRef:
+        name: ci-test
+      params:
+        - name: target
+          value: $(params.target)
+      matrix:
+        params:
+          - name: os
+            value:
+              - ubuntu-latest
+              - macos-latest

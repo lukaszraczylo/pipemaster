@@ -1,0 +1,8 @@
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci
+# pipemaster:arg {"env":"- name: REGION\n  value:\n    lit: eu\n"}
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  tasks: []

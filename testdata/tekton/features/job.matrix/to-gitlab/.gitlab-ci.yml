@@ -1,0 +1,25 @@
+# pipemaster:emulated script.interpolation pipeline/ci
+# pipemaster:arg [{"k":"t","p":"job/test/step/test-step-1/script/0","g":"echo $go","s":"echo $\u007b{ matrix.go }}"}]
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"Axes":[{"Name":"os","Values":["ubuntu-latest","macos-latest"]},{"Name":"go","Values":["1.24","1.25"]}],"Include":[[{"Key":"experimental","Value":"true"},{"Key":"go","Value":"1.25"},{"Key":"os","Value":"ubuntu-latest"}]],"Exclude":[[{"Key":"go","Value":"1.24"},{"Key":"os","Value":"macos-latest"}]],"lines":["echo $go"]}
+test:
+  needs: []
+  script:
+    # pipemaster:step test-step-1
+    - echo $go
+  parallel:
+    matrix:
+      - go:
+          - "1.24"
+        os:
+          - ubuntu-latest
+      - experimental:
+          - "true"
+        go:
+          - "1.25"
+        os:
+          - ubuntu-latest
+      - go:
+          - "1.25"
+        os:
+          - macos-latest

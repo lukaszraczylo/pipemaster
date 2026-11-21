@@ -1,0 +1,11 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: timeout
+  tasks:
+    - name: build
+      taskRef:
+        name: ci-build
+      timeout: 15m0s

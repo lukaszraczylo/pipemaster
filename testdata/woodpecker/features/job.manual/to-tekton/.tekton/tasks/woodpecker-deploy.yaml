@@ -1,0 +1,9 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: woodpecker-deploy
+spec:
+  steps:
+    - name: deploy
+      image: alpine:3.20
+      script: ./deploy.sh

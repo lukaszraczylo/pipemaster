@@ -1,0 +1,14 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: woodpecker
+spec:
+  tasks:
+    - name: lint
+      taskRef:
+        name: woodpecker-lint
+    - name: ship
+      taskRef:
+        name: woodpecker-ship
+      runAfter:
+        - lint

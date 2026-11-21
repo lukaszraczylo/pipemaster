@@ -1,0 +1,29 @@
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated script.interpolation pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"refs":[{"ref":"vars.CI","name":"CI","at":[0],"of":1},{"ref":"vars.FORGEJO_REGION","name":"FORGEJO_REGION","at":[0],"of":1}]}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-build
+spec:
+  steps:
+    - name: build-step-1
+      image: alpine:3.22
+      script: echo "${FORGEJO_REGION} ${CI}"
+      env:
+        - name: KEY
+          valueFrom:
+            secretKeyRef:
+              name: ci-secrets
+              key: DEPLOY_KEY
+        - name: FORGEJO_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: ci-vars
+              key: FORGEJO_REGION
+        - name: CI
+          valueFrom:
+            configMapKeyRef:
+              name: ci-vars
+              key: CI

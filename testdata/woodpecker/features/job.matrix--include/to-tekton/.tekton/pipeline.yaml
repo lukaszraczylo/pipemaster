@@ -1,0 +1,21 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: woodpecker
+spec:
+  tasks:
+    - name: ci
+      taskRef:
+        name: woodpecker-ci
+      matrix:
+        include:
+          - params:
+              - name: GO_VERSION
+                value: "1.24"
+              - name: TAGS
+                value: nethttp
+          - params:
+              - name: GO_VERSION
+                value: "1.25"
+              - name: TAGS
+                value: netgo

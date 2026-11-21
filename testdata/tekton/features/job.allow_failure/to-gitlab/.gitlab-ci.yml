@@ -1,0 +1,6 @@
+flaky:
+  needs: []
+  script:
+    # pipemaster:step flaky-step-1
+    - echo ok
+  allow_failure: true

@@ -1,0 +1,23 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  params:
+    - name: ctx-branch
+      default: ""
+    - name: ctx-sha
+      default: ""
+    - name: ctx-actor
+      default: ""
+  tasks:
+    - name: build
+      taskRef:
+        name: gitlab-ci-build
+      params:
+        - name: ctx-sha
+          value: $(params.ctx-sha)
+        - name: ctx-branch
+          value: $(params.ctx-branch)
+        - name: ctx-actor
+          value: $(params.ctx-actor)

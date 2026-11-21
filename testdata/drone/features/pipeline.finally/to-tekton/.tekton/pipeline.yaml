@@ -1,0 +1,13 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: drone
+spec:
+  tasks:
+    - name: build
+      taskRef:
+        name: drone-build
+  finally:
+    - name: notify
+      taskRef:
+        name: drone-notify

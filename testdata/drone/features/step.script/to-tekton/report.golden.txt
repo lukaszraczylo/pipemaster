@@ -1,0 +1,2 @@
+Loss report: drone -> tekton
+[external] pipeline/drone/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)

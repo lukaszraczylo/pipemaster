@@ -1,0 +1,12 @@
+# pipemaster:emulated job.container pipeline/ci/job/ship
+when:
+  - event: push
+  - event: tag
+depends_on:
+  - lint
+  - test
+steps:
+  - name: ship-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ship

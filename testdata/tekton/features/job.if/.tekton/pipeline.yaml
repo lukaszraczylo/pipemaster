@@ -1,0 +1,24 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: cond
+  params:
+    - name: ctx-event
+      default: ""
+    - name: ctx-ref
+      default: ""
+  tasks:
+    - name: deploy
+      taskRef:
+        name: ci-deploy
+      when:
+        - input: $(params.ctx-ref)
+          operator: in
+          values:
+            - refs/heads/main
+        - input: $(params.ctx-event)
+          operator: in
+          values:
+            - push

@@ -1,0 +1,43 @@
+origin:
+    provider: tekton
+    dialect: tekton
+    files:
+        - .tekton/kustomization.yaml
+        - .tekton/pipeline.yaml
+        - .tekton/rbac/triggers.yaml
+        - .tekton/tasks/gitlab-ci-alert.yaml
+        - .tekton/tasks/gitlab-ci-build.yaml
+        - .tekton/tasks/gitlab-ci-report.yaml
+        - .tekton/triggers/eventlistener.yaml
+        - .tekton/triggers/triggerbinding.yaml
+        - .tekton/triggers/triggertemplate.yaml
+pipelines:
+    - id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - id: build
+          steps:
+            - id: script
+              kind: script
+              script:
+                - make build
+      finally:
+        - if: failure()
+          id: alert
+          needs:
+            - job: build
+          steps:
+            - id: script
+              kind: script
+              script:
+                - ./page.sh
+        - id: report
+          needs:
+            - job: build
+          steps:
+            - id: script
+              kind: script
+              script:
+                - ./notify.sh

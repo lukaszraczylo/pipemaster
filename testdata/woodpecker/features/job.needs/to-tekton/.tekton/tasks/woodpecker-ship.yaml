@@ -1,0 +1,9 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: woodpecker-ship
+spec:
+  steps:
+    - name: ship
+      image: alpine:3.20
+      script: ./ship.sh

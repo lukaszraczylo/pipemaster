@@ -1,0 +1,17 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+# pipemaster:emulated job.if pipeline/ci/job/deploy
+# pipemaster:arg {"src":"(ref == 'refs/heads/main') \u0026\u0026 (event == 'push')","from":"tekton"}
+# pipemaster:emulated job.runner pipeline/ci/job/deploy
+name: cond
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - id: deploy-step-1
+        run: echo deploy

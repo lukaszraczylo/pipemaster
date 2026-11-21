@@ -1,0 +1,4 @@
+Loss report: tekton -> drone
+[lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/0 trigger.filter.tags (pattern v[0-9]+.[0-9]+.[0-9]+ uses GHA syntax that doublestar reads literally; Drone matches no ref with it; the filter is still written as a ref filter on the tag event (ref filter refs/tags/<pattern>); also inexact: !v*-rc*)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

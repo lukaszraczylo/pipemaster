@@ -1,0 +1,14 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: drone-ci
+spec:
+  steps:
+    - name: release
+      image: alpine:3.20
+      script: ./release.sh
+      when:
+        - input: pipemaster-disabled
+          operator: in
+          values:
+            - never

@@ -1,0 +1,22 @@
+# pipemaster:emulated script.interpolation pipeline/woodpecker/job/ci/step/build
+# pipemaster:arg {"refs":[{"ref":"secrets.TOKEN","name":"TOKEN","at":[0],"of":1},{"ref":"vars.REGION","name":"REGION","at":[0],"of":1}]}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: woodpecker-ci
+spec:
+  steps:
+    - name: build
+      image: alpine:3.20
+      script: 'curl -H "Authorization: Bearer ${TOKEN}" "https://${REGION}.example.org"'
+      env:
+        - name: TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ci-secrets
+              key: TOKEN
+        - name: REGION
+          valueFrom:
+            configMapKeyRef:
+              name: ci-vars
+              key: REGION

@@ -1,0 +1,20 @@
+# pipemaster:emulated job.runner pipeline/ci/job/build
+name: inputs
+on:
+  # pipemaster:emulated pipeline.inputs pipeline/ci
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Where to deploy
+        default: staging
+        type: choice
+      dry-run:
+        description: Skip the push
+        default: false
+        type: boolean
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - id: build-step-1
+        run: echo ok

@@ -1,0 +1,27 @@
+# pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated job.services pipeline/ci/job/test/service/db
+# pipemaster:arg {"ports":["5432:5432"]}
+# pipemaster:emulated job.services pipeline/ci/job/test
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-test
+spec:
+  steps:
+    - name: test-step-1
+      image: alpine:3.22
+      script: echo ok
+  sidecars:
+    - name: db
+      image: postgres:16
+      env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ci-secrets
+              key: DB_PASSWORD
+      ports:
+        - containerPort: 5432
+    - name: cache
+      image: redis:7

@@ -1,0 +1,11 @@
+# pipemaster:emulated pipeline.env pipeline/woodpecker
+# pipemaster:arg {"env":"- name: CGO_ENABLED\n  value:\n    lit: \"0\"\n"}
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: woodpecker
+spec:
+  tasks:
+    - name: ci
+      taskRef:
+        name: woodpecker-ci

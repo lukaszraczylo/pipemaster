@@ -1,0 +1,8 @@
+Loss report: gitea -> tekton
+[lost] pipeline/ci/job/build job.runner (Tekton schedules pods, not runner labels)
+[lost] pipeline/ci/job/build/step/build-step-2 step.action (no Tekton mapping for action org/tool@v2)
+[lost] pipeline/ci/job/build/step/build-step-3 step.action (no Tekton mapping for action org/local-action@main)
+[lost] pipeline/ci/job/build/step/build-step-4 step.action (no Tekton mapping for action /checkout)
+[external] pipeline/ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[external] pipeline/ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[emulated] pipeline/ci/job/build/step/build-step-1 step.action: StepAction ref to the tektoncd-catalog git-clone through the git resolver (the ctx-repo and ctx-sha params carry the repository and the commit)

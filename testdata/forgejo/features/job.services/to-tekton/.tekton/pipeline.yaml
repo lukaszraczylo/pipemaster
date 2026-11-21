@@ -1,0 +1,11 @@
+# pipemaster:emulated config.name pipeline/ci/ref/secrets.DB_PASSWORD
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: services
+  tasks:
+    - name: test
+      taskRef:
+        name: ci-test

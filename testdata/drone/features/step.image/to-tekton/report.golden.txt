@@ -1,0 +1,4 @@
+Loss report: drone -> tekton
+[lost] pipeline/drone/job/ci/step/publish step.action (the step has no action reference and no Tekton ref)
+[lost] pipeline/drone/job/ci/step/publish step.image (the step is lost, so the setting is lost with it)
+[external] pipeline/drone/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)

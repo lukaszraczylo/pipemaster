@@ -1,0 +1,8 @@
+# pipemaster:lost expr.opaque pipeline/ci/job/build: opaque(tekton): {"input":"pipemaster-disabled","operator":"in","values":["never"]}
+build:
+  needs: []
+  rules:
+    - when: never
+  script:
+    # pipemaster:step build-step-1
+    - '# pipemaster:lost script.interpolation: echo {{ opaque(gha): env[github.job] }}'

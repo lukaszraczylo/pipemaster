@@ -1,0 +1,4 @@
+Loss report: tekton -> drone
+[lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
+[external] pipeline/ci/job/build job.timeout: repo setting timeout (set the repo timeout to 15m0s; Drone has no per-pipeline or per-step timeout)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

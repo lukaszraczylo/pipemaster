@@ -1,0 +1,12 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: woodpecker-ci
+spec:
+  params:
+    - name: GO_VERSION
+    - name: TAGS
+  steps:
+    - name: test
+      image: golang:$(params.GO_VERSION)
+      script: go test -tags $(params.TAGS) ./...

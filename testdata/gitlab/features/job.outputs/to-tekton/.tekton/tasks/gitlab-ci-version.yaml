@@ -1,0 +1,23 @@
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/version/step/version-step-1
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated job.outputs pipeline/gitlab-ci/job/version
+# pipemaster:arg {"image":"alpine:3.22","script":"printf '%s' \"${PM_OUT_0}\" \u003e '$(results.tag.path)'","outputs":[{"name":"tag","env":"PM_OUT_0"}]}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-version
+spec:
+  params:
+    - name: ctx-sha
+  steps:
+    - name: version-step-1
+      image: alpine:3.22
+      script: make version
+    - name: pipemaster-outputs
+      image: alpine:3.22
+      script: printf '%s' "${PM_OUT_0}" > '$(results.tag.path)'
+      env:
+        - name: PM_OUT_0
+          value: v1-$(params.ctx-sha)
+  results:
+    - name: tag

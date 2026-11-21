@@ -1,0 +1,21 @@
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci
+# pipemaster:arg {"env":"- name: TAG\n  value:\n    lit: $[[ inputs.image_tag ]]\n"}
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  params:
+    - name: dry_run
+      type: boolean
+      default: "false"
+    - name: env
+      default: staging
+    - name: image_tag
+      type: string
+      description: Image tag to deploy
+      default: latest
+  tasks:
+    - name: deploy
+      taskRef:
+        name: gitlab-ci-deploy

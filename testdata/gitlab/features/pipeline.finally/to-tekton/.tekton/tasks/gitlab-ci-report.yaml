@@ -1,0 +1,13 @@
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/report/step/script
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated job.needs pipeline/gitlab-ci/job/report
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}]}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-report
+spec:
+  steps:
+    - name: script
+      image: alpine:3.22
+      script: ./notify.sh

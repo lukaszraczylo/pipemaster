@@ -1,0 +1,37 @@
+origin:
+    provider: tekton
+    dialect: tekton
+    files:
+        - .tekton/kustomization.yaml
+        - .tekton/pipeline.yaml
+        - .tekton/rbac/triggers.yaml
+        - .tekton/tasks/ci-test.yaml
+        - .tekton/triggers/eventlistener.yaml
+        - .tekton/triggers/triggerbinding.yaml
+        - .tekton/triggers/triggertemplate.yaml
+pipelines:
+    - id: ci
+      name: services
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - id: test
+          services:
+            - name: db
+              image:
+                ref: postgres:16
+              env:
+                - name: POSTGRES_PASSWORD
+                  value:
+                    secret: DB_PASSWORD
+              ports:
+                - 5432:5432
+            - name: cache
+              image:
+                ref: redis:7
+          steps:
+            - id: test-step-1
+              kind: script
+              script:
+                - echo ok

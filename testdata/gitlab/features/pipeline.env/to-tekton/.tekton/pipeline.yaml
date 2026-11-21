@@ -1,0 +1,11 @@
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci
+# pipemaster:arg {"env":"- name: GOFLAGS\n  value:\n    lit: -mod=readonly\n- name: DEPLOY_ENV\n  value:\n    lit: staging\n"}
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  tasks:
+    - name: build
+      taskRef:
+        name: gitlab-ci-build

@@ -1,0 +1,19 @@
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci/job/build
+# pipemaster:arg {"names":["GOFLAGS","DEPLOY_ENV"]}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-build
+spec:
+  stepTemplate:
+    env:
+      - name: GOFLAGS
+        value: -mod=readonly
+      - name: DEPLOY_ENV
+        value: staging
+  steps:
+    - name: script
+      image: alpine:3.22
+      script: make build

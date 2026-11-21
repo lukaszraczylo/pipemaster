@@ -1,0 +1,3 @@
+Loss report: tekton -> gitea
+[emulated] pipeline/ci/job/use job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/ci/job/version job.runner: default runner label ubuntu-latest (the pipeline named no runner)

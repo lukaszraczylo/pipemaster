@@ -1,0 +1,25 @@
+# pipemaster:emulated job.runner pipeline/ci/job/lint
+# pipemaster:emulated job.runner pipeline/ci/job/ship
+# pipemaster:emulated job.runner pipeline/ci/job/test
+name: needs
+on:
+  push:
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - id: lint-step-1
+        run: echo lint
+  ship:
+    needs:
+      - lint
+      - test
+    runs-on: ubuntu-latest
+    steps:
+      - id: ship-step-1
+        run: echo ship
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - id: test-step-1
+        run: echo test

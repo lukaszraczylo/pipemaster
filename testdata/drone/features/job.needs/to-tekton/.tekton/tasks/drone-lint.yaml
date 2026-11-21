@@ -1,0 +1,9 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: drone-lint
+spec:
+  steps:
+    - name: lint
+      image: golangci/golangci-lint:v2
+      script: golangci-lint run

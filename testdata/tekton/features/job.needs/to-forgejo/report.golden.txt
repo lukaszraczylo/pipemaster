@@ -1,0 +1,5 @@
+Loss report: tekton -> forgejo
+[emulated] pipeline/ci pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)
+[emulated] pipeline/ci/job/lint job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/ci/job/ship job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/ci/job/test job.runner: default runner label ubuntu-latest (the pipeline named no runner)

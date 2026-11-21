@@ -1,0 +1,13 @@
+# pipemaster:emulated config.name pipeline/ci/ref/secrets.GITEA_DEPLOY
+# pipemaster:emulated config.name pipeline/ci/ref/secrets.GITHUB_TOKEN
+# pipemaster:emulated config.name pipeline/ci/ref/vars.CI_MODE
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: config
+  tasks:
+    - name: build
+      taskRef:
+        name: ci-build

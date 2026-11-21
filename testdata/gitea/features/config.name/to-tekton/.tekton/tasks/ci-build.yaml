@@ -1,0 +1,29 @@
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated script.interpolation pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"refs":[{"ref":"vars.CI_MODE","name":"CI_MODE","at":[0],"of":1}]}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-build
+spec:
+  steps:
+    - name: build-step-1
+      image: alpine:3.22
+      script: echo "${CI_MODE}"
+      env:
+        - name: KEY
+          valueFrom:
+            secretKeyRef:
+              name: ci-secrets
+              key: GITEA_DEPLOY
+        - name: TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ci-secrets
+              key: GITHUB_TOKEN
+        - name: CI_MODE
+          valueFrom:
+            configMapKeyRef:
+              name: ci-vars
+              key: CI_MODE

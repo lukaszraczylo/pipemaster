@@ -1,0 +1,32 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
+  workspaces:
+    - name: pipemaster-workspace
+  tasks:
+    - name: build
+      taskRef:
+        name: ci-build
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
+      workspaces:
+        - name: pipemaster-workspace
+          workspace: pipemaster-workspace
+    - name: test
+      taskRef:
+        name: ci-test
+      runAfter:
+        - build
+      workspaces:
+        - name: pipemaster-workspace
+          workspace: pipemaster-workspace

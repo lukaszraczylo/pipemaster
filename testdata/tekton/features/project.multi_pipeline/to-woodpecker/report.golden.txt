@@ -1,0 +1,7 @@
+Loss report: tekton -> woodpecker
+[lost] pipeline/.shared display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
+[lost] pipeline/.shared/job/run ext.passthrough (Ext of provider tekton (task_name) is not written to the Woodpecker file; it is kept in round-trip metadata)
+[lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
+[emulated] pipeline/.shared/job/run job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/ci project.multi_pipeline: each job of each pipeline is a workflow named <pipeline>-<job> (each workflow carries its pipeline's trigger condition)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

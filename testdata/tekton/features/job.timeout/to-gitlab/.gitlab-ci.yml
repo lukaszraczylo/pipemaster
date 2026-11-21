@@ -1,0 +1,6 @@
+build:
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - echo ok
+  timeout: 15 minutes

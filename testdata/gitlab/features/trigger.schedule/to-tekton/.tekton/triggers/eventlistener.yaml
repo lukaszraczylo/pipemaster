@@ -1,0 +1,19 @@
+# pipemaster:emulated trigger.schedule pipeline/gitlab-ci/trigger/0
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: pipemaster
+spec:
+  serviceAccountName: pipemaster-triggers
+  triggers:
+    - name: gitlab-ci-schedule-0
+      interceptors:
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: header.canonical('X-Pipemaster-Schedule') == 'gitlab-ci/0'
+      bindings:
+        - ref: gitlab-ci-github
+      template:
+        ref: gitlab-ci-run

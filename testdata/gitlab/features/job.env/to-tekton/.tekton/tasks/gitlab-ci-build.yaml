@@ -1,0 +1,19 @@
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
+# pipemaster:arg {"image":"alpine:3.22"}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-build
+spec:
+  params:
+    - name: ctx-tag
+  stepTemplate:
+    env:
+      - name: CGO_ENABLED
+        value: "0"
+      - name: TAG
+        value: $(params.ctx-tag)
+  steps:
+    - name: script
+      image: alpine:3.22
+      script: make

@@ -1,0 +1,25 @@
+# pipemaster:emulated job.runner pipeline/ci/job/test
+name: matrix
+on:
+  push:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+        go:
+          - "1.24"
+          - "1.25"
+        include:
+          - experimental: "true"
+            go: "1.25"
+            os: ubuntu-latest
+        exclude:
+          - go: "1.24"
+            os: macos-latest
+    steps:
+      - id: test-step-1
+        run: echo ${{ matrix.go }}

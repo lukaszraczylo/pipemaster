@@ -1,0 +1,28 @@
+# pipemaster:generated
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: woodpecker-run
+spec:
+  params:
+    - name: ctx-branch
+      default: ""
+    - name: ctx-event
+      default: ""
+    - name: ctx-actor
+      default: ""
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: woodpecker-run-
+      spec:
+        pipelineRef:
+          name: woodpecker
+        params:
+          - name: ctx-branch
+            value: $(tt.params.ctx-branch)
+          - name: ctx-event
+            value: $(tt.params.ctx-event)
+          - name: ctx-actor
+            value: $(tt.params.ctx-actor)

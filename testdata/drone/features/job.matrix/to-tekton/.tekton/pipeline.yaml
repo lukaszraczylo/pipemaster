@@ -1,0 +1,19 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: drone
+spec:
+  tasks:
+    - name: ci
+      taskRef:
+        name: drone-ci
+      matrix:
+        params:
+          - name: GO_VERSION
+            value:
+              - "1.24"
+              - "1.25"
+          - name: OS
+            value:
+              - linux
+              - darwin
