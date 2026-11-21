@@ -291,7 +291,7 @@ func TestEditedGeneratedDocumentIsKept(t *testing.T) {
 			if want := c.to[strings.LastIndex(c.to, " ")+1:]; !strings.Contains(kept, want) {
 				t.Fatalf("edited text %q is not kept:\n%s", want, kept)
 			}
-			if !hasEntry(rep, "marker ignored") && name != "cron" {
+			if !hasEntry(rep, "marker ignored") {
 				t.Fatalf("no marker ignored entry: %v", rep.Entries)
 			}
 		})

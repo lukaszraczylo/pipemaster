@@ -416,7 +416,11 @@ func (p *project) cronJobs(byName map[string]*ir.Pipeline) {
 					cj["metadata"] = plain(mr)
 				}
 				k.vals["cronjob"] = cj
-				k.note(caps.TriggerSchedule, "the CronJob that posts to the EventListener has no IR field beside the schedule; kept in Ext", d.line)
+				why := ""
+				if isGenerated(d) {
+					why = "marker ignored: the CronJob was edited after pipemaster wrote it; "
+				}
+				k.note(caps.TriggerSchedule, why+"the CronJob that posts to the EventListener has no IR field beside the schedule; kept in Ext", d.line)
 			}
 			pl.Triggers = append(pl.Triggers, ir.Trigger{Kind: ir.TriggerSchedule, Cron: sched, Ext: k.ext()})
 		}
