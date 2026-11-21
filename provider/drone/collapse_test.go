@@ -595,3 +595,33 @@ func TestEditedApprovalGateKeepsTheFile(t *testing.T) {
 		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
 	}
 }
+
+func TestContainerMarkerWithoutTakenStillRestores(t *testing.T) {
+	j := gjob("b", &ir.Step{ID: "x", Kind: ir.StepScript, Script: []string{"a"}})
+	j.Container = &ir.Image{Ref: "node:22"}
+	p, rep := back(t, gproject(ghaOrigin, j), func(s string) string { return regexp.MustCompile(`,"taken":\d+`).ReplaceAllString(s, "") })
+	got := jobOf(t, p, "b")
+	if got.Container == nil || got.Container.Ref != "node:22" || got.Steps[0].Image != nil || ignored(rep, caps.JobContainer) {
+		t.Errorf("container = %+v, step image = %+v, entries %+v", got.Container, got.Steps[0].Image, rep.Entries)
+	}
+}
+
+// TestContainerMarkerMissesAnEditBesideAnEqualOwnImage documents a limit: a step that names the container image
+// itself counts as a step that took it, so editing the other step is not detected.
+func TestContainerMarkerMissesAnEditBesideAnEqualOwnImage(t *testing.T) {
+	j := gjob("b",
+		&ir.Step{ID: "own", Kind: ir.StepScript, Script: []string{"a"}, Image: &ir.Image{Ref: "node:22"}},
+		&ir.Step{ID: "took", Kind: ir.StepScript, Script: []string{"b"}})
+	j.Container = &ir.Image{Ref: "node:22"}
+	p, rep := back(t, gproject(ghaOrigin, j), func(s string) string {
+		i := strings.LastIndex(s, "image: node:22")
+		return s[:i] + "image: node:99" + s[i+len("image: node:22"):]
+	})
+	got := jobOf(t, p, "b")
+	if got.Container == nil || ignored(rep, caps.JobContainer) {
+		t.Fatalf("the limit changed; update the report: container %+v entries %+v", got.Container, rep.Entries)
+	}
+	if st := got.Steps[1]; st.Image == nil || st.Image.Ref != "node:99" {
+		t.Errorf("the edited step image must stay: %+v", st.Image)
+	}
+}
