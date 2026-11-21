@@ -193,11 +193,21 @@ func (tc *taskCtx) pipelineTask(jc condition) (*wmap, error) {
 		pt.set("params", params)
 	}
 	tc.e.runAfter(tc.pp, tc.jp, pt, tc.needed)
+	if err := tc.pipelineTaskKeys(pt, jc); err != nil {
+		return nil, err
+	}
+	return pt, nil
+}
+
+// pipelineTaskKeys writes the keys of a PipelineTask that no reference or param decides: the condition, matrix,
+// retries, timeout, error policy, workspace bindings and the kept keys.
+func (tc *taskCtx) pipelineTaskKeys(pt *wmap, jc condition) error {
+	j := tc.jp.j
 	if len(jc.when) > 0 {
 		pt.set("when", whenNode(jc.when))
 	}
 	if err := tc.matrixNode(pt); err != nil {
-		return nil, err
+		return err
 	}
 	if j.Retry != nil {
 		if len(j.Retry.On) > 0 {
@@ -225,7 +235,7 @@ func (tc *taskCtx) pipelineTask(jc condition) (*wmap, error) {
 	for _, k := range sortedKeys(px) {
 		pt.set(k, tc.e.node(tc.jp.path, "key "+k, px[k]))
 	}
-	return pt, nil
+	return nil
 }
 
 func join(ss []string) string {

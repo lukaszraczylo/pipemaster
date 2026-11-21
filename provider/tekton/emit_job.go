@@ -129,10 +129,22 @@ func (e *emitter) remoteTask(pp *plan, jp *jobPlan) (*wmap, bool) {
 		return nil, false
 	}
 	pt.set("taskRef", n)
+	if j.Name != "" {
+		pt.setStr("displayName", j.Name)
+	}
 	if v, ok := extOf(j.Ext)["params"]; ok {
 		pt.set("params", e.node(jp.path, "params", v))
 	}
+	tc := e.newTaskCtx(pp, jp)
 	e.runAfter(pp, jp, pt, nil)
+	jc := tc.cond(jp.path, caps.JobIf, j.If, pipelineScope)
+	if jc.guard != nil {
+		e.lose(jp.path, caps.JobIf, "the condition has no when form and a referenced task has no script to guard; the task never runs")
+		jc = condition{disabled: true, when: exprtekton.DisabledWhen()}
+	}
+	if err := tc.pipelineTaskKeys(pt, jc); err != nil {
+		e.lose(jp.path, caps.JobMatrix, err.Error())
+	}
 	return pt, true
 }
 

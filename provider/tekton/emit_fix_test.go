@@ -360,3 +360,38 @@ func TestForeignAPITriggerIsReportedLost(t *testing.T) {
 	_, rep := emit(t, p)
 	wantEntry(t, rep, caps.TriggerAPI, caps.Lost, "API trigger")
 }
+
+func TestRemoteTaskKeepsItsPipelineTaskKeys(t *testing.T) {
+	src := `apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: p
+spec:
+  workspaces:
+    - name: ws
+  tasks:
+    - name: first
+      taskRef:
+        name: remote
+      displayName: First
+      timeout: 1h0m0s
+      retries: 2
+      onError: continue
+      when:
+        - input: $(params.x)
+          operator: in
+          values: [a]
+      workspaces:
+        - name: source
+          workspace: ws
+  params:
+    - name: x
+      default: a
+`
+	p, _ := parseFiles(t, map[string]string{"p.yaml": src})
+	files, _ := emit(t, p)
+	back, _ := reparse(t, files)
+	if ok, diff := ir.Equal(p, back); !ok {
+		t.Fatalf("PipelineTask keys changed:\n%s\n%s", diff, joinFiles(files))
+	}
+}
