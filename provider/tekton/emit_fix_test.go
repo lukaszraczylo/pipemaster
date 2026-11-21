@@ -239,3 +239,47 @@ func TestKeptResourcesAreNotReportedLost(t *testing.T) {
 		t.Fatalf("false entry: %v", e)
 	}
 }
+
+func scheduleProject() *ir.Project {
+	p := project(scriptJob("a", "true"))
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush}, {Kind: ir.TriggerSchedule, Cron: "0 1 * * *"}}
+	return p
+}
+
+func TestUneditedScheduleReparsesCleanAndReemitsIdentically(t *testing.T) {
+	files, _ := emit(t, scheduleProject())
+	p2, prep := reparse(t, files)
+	if e := entry(prep, caps.ExprOpaque, "marker ignored"); e != nil {
+		t.Fatalf("marker ignored on an unedited file: %v", e)
+	}
+	again, _ := emit(t, p2)
+	if joinFiles(again) != joinFiles(files) {
+		t.Fatalf("re-emit differs:\n%s\n---\n%s", joinFiles(files), joinFiles(again))
+	}
+}
+
+func TestEditedScheduleEntryKeepsEdits(t *testing.T) {
+	files, _ := emit(t, scheduleProject())
+	const el = ".tekton/triggers/eventlistener.yaml"
+	edited := strings.Replace(files[el], "    - name: ci-schedule-0\n      interceptors:\n", "    - name: ci-schedule-0\n      interceptors:\n        - ref: {name: slack}\n", 1)
+	if edited == files[el] {
+		t.Fatalf("edit did not apply:\n%s", files[el])
+	}
+	in := map[string]string{}
+	for n, b := range files {
+		in[n] = b
+	}
+	in[el] = edited
+	p2, prep, err := tekton.New().Parse(repo(in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entry(prep, caps.ExprOpaque, "marker ignored") == nil {
+		t.Fatalf("no marker-ignored entry: %v", prep.Entries)
+	}
+	out, _ := emit(t, p2)
+	got := out[el]
+	if strings.Count(got, "name: slack") != 1 || strings.Count(got, "name: ci-schedule-0") != 1 {
+		t.Fatalf("edit lost or entry written twice:\n%s", got)
+	}
+}

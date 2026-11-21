@@ -147,6 +147,14 @@ func (e *emitter) pipelineTriggers(pp *plan, crons *[]*outDoc) (binding, templat
 	tname, bname = fit(tname, tname, maxName), fit(bname, bname, maxName)
 	used := false
 	sched := 0
+	e.keptEntries = map[string]bool{}
+	for _, t := range pp.pl.Triggers {
+		if x := extOf(t.Ext); e.own && x["listener"] != nil {
+			if n, ok := x["name"].(string); ok {
+				e.keptEntries[n] = true
+			}
+		}
+	}
 	groups := map[string]*sourceGroup{}
 	var order []string
 	for i, t := range pp.pl.Triggers {

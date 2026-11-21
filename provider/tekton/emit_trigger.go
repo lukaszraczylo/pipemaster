@@ -433,6 +433,9 @@ func (e *emitter) scheduleTrigger(pp *plan, n int, path string, t ir.Trigger, ct
 	e.emulate(path, caps.TriggerSchedule, "CronJob posting to the EventListener",
 		"CronJob "+jname+" posts to el-"+kindEventListenerName+" in namespace "+listenerNamespace+"; deploy both in that namespace, or edit the host. The run has an empty ctx-repo because the post carries no repository. The listener entry matches only the X-Pipemaster-Schedule header, so any caller in the cluster can start a run; restrict the listener with a NetworkPolicy or add a shared-secret header")
 	e.mark(caps.TriggerSchedule, path)
+	if e.keptEntries[jname] {
+		return nil, cronJobDoc(jname, t.Cron, tag), nil
+	}
 	entry := e.triggerEntry(jname, ir.TriggerSchedule, filter, nil, ctxs, bname, tname)
 	return entry, cronJobDoc(jname, t.Cron, tag), nil
 }

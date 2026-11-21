@@ -92,7 +92,9 @@ type emitter struct {
 	// pendingEL holds the EventListeners that a Tekton file kept as resources, by name.
 	pendingEL map[string][]resourceDoc
 	origin    string
-	plans     []*plan
+	// keptEntries holds the names of EventListener entries that a Tekton file kept, so a generated one is not written twice.
+	keptEntries map[string]bool
+	plans       []*plan
 	// listeners are the EventListeners in order of first use.
 	listeners []*listener
 	// own is true when the project came from Tekton, so its Ext keys are ours to write back.

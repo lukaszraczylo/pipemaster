@@ -257,7 +257,12 @@ func (p *project) interceptors(lt listenerTrigger, k *sink, pipeline string) ([]
 	if cel != nil {
 		restored = p.celFilterOf(lt, k, *cel, kinds)
 	}
-	if restored != nil && restored.Kind != ir.TriggerSchedule && (extra || shape != "gc" || p.editedAround(k, restored.Name, pipeline)) {
+	want := "gc"
+	if restored != nil && restored.Kind == ir.TriggerSchedule {
+		want = "c"
+	}
+	name, _ := text(lt.m.vals["name"])
+	if restored != nil && (extra || shape != want || p.editedAround(k, name, pipeline)) {
 		filter, _ := text(cel.params[paramFilter])
 		p.keepFilter(lt, k, *cel, filter, "marker ignored: the trigger was edited after pipemaster wrote it; ")
 		restored = nil
