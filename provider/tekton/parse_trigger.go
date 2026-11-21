@@ -61,40 +61,64 @@ func readInterceptor(v any) (interceptor, bool) {
 
 // listenerTrigger is one trigger of an EventListener with the EventListener it came from.
 type listenerTrigger struct {
-	doc  *rawDoc
-	m    *omap
+	doc *rawDoc
+	m   *omap
+	// spec is the EventListener spec; meta is its metadata.
 	spec *omap
-	el   string
+	meta *omap
+	// ref and refDoc are the triggerRef name and the Trigger document it names.
+	refDoc *rawDoc
+	ref    string
+	el     string
 }
 
-// triggers maps each EventListener trigger to triggers of the pipeline that its template runs.
+// triggers maps each EventListener trigger to triggers of the pipeline that its template runs. A trigger that
+// maps to no parsed pipeline stays in Ext[resources] inside a copy of its EventListener.
 func (p *project) triggers(byName map[string]*ir.Pipeline) {
 	for _, d := range p.listeners {
 		meta, _ := asMap(d.top.vals["metadata"])
 		el, _ := text(valueOf(meta, "name"))
 		spec, _ := asMap(d.top.vals["spec"])
 		list, _ := valueOf(spec, "triggers").([]any)
-		mapped := false
+		var unmapped []any
 		for _, e := range list {
 			m, ok := asMap(e)
 			if !ok {
+				unmapped = append(unmapped, plain(e))
 				continue
 			}
-			if ref, ok := text(valueOf(m, "triggerRef")); ok {
+			lt := listenerTrigger{doc: d, m: m, spec: spec, meta: meta, el: el}
+			if ref, ok := text(m.vals["triggerRef"]); ok {
+				lt.ref = ref
 				if td, found := p.trigDocs[ref]; found {
-					p.trigUsed[ref] = true
 					if tm, ok := asMap(td.top.vals["spec"]); ok {
-						m = tm
+						lt.m, lt.refDoc = tm, td
 					}
 				}
 			}
-			lt := listenerTrigger{doc: d, m: m, spec: spec, el: el}
-			mapped = p.trigger(lt, byName) || mapped
+			if p.trigger(lt, byName) {
+				if lt.refDoc != nil {
+					p.trigUsed[lt.ref] = true
+				}
+			} else {
+				unmapped = append(unmapped, plain(e))
+			}
 		}
-		if !mapped {
-			p.resources = append(p.resources, d)
+		if len(unmapped) > 0 || len(list) == 0 {
+			p.resources = append(p.resources, listenerCopy(d, unmapped))
 		}
 	}
+}
+
+// listenerCopy is the EventListener with only the triggers that map to no pipeline.
+func listenerCopy(d *rawDoc, unmapped []any) *rawDoc {
+	view, _ := plain(d.top).(map[string]any)
+	if spec, ok := view["spec"].(map[string]any); ok {
+		spec["triggers"] = unmapped
+	}
+	cp := *d
+	cp.view = view
+	return &cp
 }
 
 // templateName reads the TriggerTemplate that a trigger names.
@@ -148,6 +172,15 @@ func (p *project) trigger(lt listenerTrigger, byName map[string]*ir.Pipeline) bo
 	}
 	if tpl != "" {
 		k.vals["template"] = tpl
+	}
+	if lt.ref != "" {
+		k.vals["triggerRef"] = lt.ref
+	}
+	if lt.refDoc != nil {
+		k.keepMeta("triggerMetadata", lt.refDoc.top, "Trigger", lt.refDoc.line)
+	}
+	if lt.meta != nil {
+		k.keepMeta("listenerMetadata", lt.doc.top, "EventListener", lt.doc.line)
 	}
 	if b := lt.m.vals["bindings"]; b != nil {
 		k.vals["bindings"] = plain(b)
@@ -253,12 +286,25 @@ func buildTriggers(kinds []ir.TriggerKind, k *sink) []ir.Trigger {
 	return out
 }
 
-func cloneMap(m map[string]any) map[string]any {
-	out := make(map[string]any, len(m))
-	for k, v := range m {
-		out[k] = v
+func cloneMap(m map[string]any) map[string]any { return deepCopy(m).(map[string]any) }
+
+// deepCopy copies the maps and lists of an Ext value, so triggers of one listener share no state.
+func deepCopy(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(t))
+		for k, e := range t {
+			out[k] = deepCopy(e)
+		}
+		return out
+	case []any:
+		out := make([]any, len(t))
+		for i, e := range t {
+			out[i] = deepCopy(e)
+		}
+		return out
 	}
-	return out
+	return v
 }
 
 // cronJobs maps a CronJob that posts to an EventListener service to schedule triggers of its pipelines.
@@ -282,10 +328,12 @@ func (p *project) cronJobs(byName map[string]*ir.Pipeline) {
 		}
 		for _, pl := range pls {
 			k := newSink(p.rep, d.file, "pipeline/"+pl.ID+"/trigger/"+name)
-			k.keep("cronjob", &omap{
-				vals: map[string]any{"name": scalOf(name), "spec": rest}, keys: []string{"name", "spec"},
-				lines: map[string]int{},
-			}, caps.TriggerSchedule, "the CronJob that posts to the EventListener has no IR field beside the schedule; kept in Ext", d.line)
+			cj := map[string]any{"name": name, "spec": plain(rest)}
+			if mr := metaRest(meta); len(mr.keys) > 0 {
+				cj["metadata"] = plain(mr)
+			}
+			k.vals["cronjob"] = cj
+			k.note(caps.TriggerSchedule, "the CronJob that posts to the EventListener has no IR field beside the schedule; kept in Ext", d.line)
 			pl.Triggers = append(pl.Triggers, ir.Trigger{Kind: ir.TriggerSchedule, Cron: sched, Ext: k.ext()})
 		}
 	}
@@ -340,4 +388,18 @@ func (p *project) pipelinesOf(els []string, byName map[string]*ir.Pipeline) []*i
 		}
 	}
 	return out
+}
+
+// metaRest is the metadata keys except the name.
+func metaRest(meta *omap) *omap {
+	rest := &omap{vals: map[string]any{}, lines: map[string]int{}}
+	if meta == nil {
+		return rest
+	}
+	for _, key := range meta.keys {
+		if key != "name" {
+			rest.set(key, meta.vals[key], meta.lines[key])
+		}
+	}
+	return rest
 }

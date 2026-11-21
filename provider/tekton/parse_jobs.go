@@ -155,7 +155,7 @@ func (b *jobBuilder) header(r *reader) error {
 	}
 	if v, ok := r.take("matrix"); ok {
 		if err := b.matrix(v, r.line("matrix")); err != nil {
-			return err
+			b.k.keep("matrix", v, caps.JobMatrix, "matrix has no IR form ("+err.Error()+"); kept in Ext", r.line("matrix"))
 		}
 	}
 	if v, ok := r.take("params"); ok {
@@ -204,10 +204,11 @@ func parseDuration(v any) (ir.Duration, bool) {
 func (b *jobBuilder) matrix(v any, line int) error {
 	mm, ok := asMap(v)
 	if !ok {
-		return fmt.Errorf("matrix must be a mapping")
+		return fmt.Errorf("matrix is not a mapping")
 	}
 	r := newReader(mm)
 	mx := &ir.Matrix{}
+	names := map[string]bool{}
 	if pv, ok := r.take("params"); ok {
 		list, _ := pv.([]any)
 		for _, e := range list {
@@ -218,7 +219,7 @@ func (b *jobBuilder) matrix(v any, line int) error {
 				return fmt.Errorf("matrix.params needs a name and a list of strings")
 			}
 			mx.Axes = append(mx.Axes, ir.Axis{Name: name, Values: vals})
-			b.tx.matrix[name] = true
+			names[name] = true
 		}
 	}
 	var incNames []any
@@ -240,16 +241,21 @@ func (b *jobBuilder) matrix(v any, line int) error {
 					return fmt.Errorf("matrix.include params need a name and a string value")
 				}
 				combo = append(combo, ir.KV{Key: k, Value: val})
-				b.tx.matrix[k] = true
+				names[k] = true
 			}
 			mx.Include = append(mx.Include, combo)
 		}
+	}
+	if len(r.rest()) > 0 {
+		return fmt.Errorf("matrix holds keys beside params and include")
+	}
+	for n := range names {
+		b.tx.matrix[n] = true
 	}
 	if named {
 		b.k.vals["matrix_include_names"] = incNames
 		b.k.note(caps.JobMatrix, "matrix.include names have no IR field; kept in Ext", line)
 	}
-	b.k.keepRest(r)
 	b.job.Matrix = mx
 	return nil
 }

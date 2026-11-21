@@ -72,9 +72,6 @@ func (b *jobBuilder) taskParams(v any, line int) error {
 			r.take("default")
 			b.tx.defaults[name] = d
 		}
-		if _, ok := r.take("description"); ok {
-			b.k.note(caps.ExtPassthrough, "Task param "+name+": description has no IR field", m.lines["description"])
-		}
 		if rest := r.rest(); len(rest) > 0 {
 			kept = append(kept, plain(m))
 			b.k.note(caps.ExtPassthrough, "Task param "+name+": key "+rest[0]+" has no IR form; kept in Ext", line)

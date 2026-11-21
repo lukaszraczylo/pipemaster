@@ -15,7 +15,9 @@ import (
 
 // rawDoc is one YAML document of a file.
 type rawDoc struct {
-	top  *omap
+	top *omap
+	// view, when set, is what Ext holds instead of top: a copy with the parts that the parser consumed removed.
+	view any
 	file string
 	kind string
 	api  string

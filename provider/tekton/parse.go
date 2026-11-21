@@ -114,6 +114,14 @@ func (p *project) classify(d *rawDoc) {
 		}
 		p.pipes = append(p.pipes, &pipeSrc{doc: d, meta: meta, name: name})
 	case apiIs(d, apiPipelines) && d.kind == kindTask && name != "":
+		if first, dup := p.tasks[name]; dup {
+			p.rep.Add(report.Entry{
+				IRPath: "pipeline/", Feature: caps.ExtPassthrough, Level: caps.Lost, Strategy: strategyExt,
+				Detail: "Task " + name + " is defined twice; the first (" + first.loc(0) + ") is used and the later document is kept in Ext", SourceLoc: d.loc(0),
+			})
+			p.resources = append(p.resources, d)
+			return
+		}
 		p.tasks[name] = d
 	case apiIs(d, apiPipelines) && d.kind == kindPipelineRun:
 		spec, _ := asMap(d.top.vals["spec"])
@@ -161,7 +169,7 @@ func (p *project) attachResources(pl *ir.Pipeline) {
 	})
 	var list []any
 	for _, d := range p.resources {
-		list = append(list, plain(d.top))
+		list = append(list, d.ext())
 		kind := d.kind
 		if kind == "" {
 			kind = "(none)"
@@ -175,4 +183,12 @@ func (p *project) attachResources(pl *ir.Pipeline) {
 		pl.Ext = ir.Ext{dialect: map[string]any{}}
 	}
 	pl.Ext[dialect].(map[string]any)[ExtResources] = list
+}
+
+// ext is the form of the document that Ext holds.
+func (d *rawDoc) ext() any {
+	if d.view != nil {
+		return d.view
+	}
+	return plain(d.top)
 }

@@ -327,7 +327,11 @@ func (b *jobBuilder) sidecars(v any) error {
 		r.take("name")
 		sv := ir.Service{Name: name}
 		if t, ok := textOf(r.take("image")); ok {
-			sv.Image.Ref = t
+			ref, err := b.tx.template(t)
+			if err != nil {
+				return err
+			}
+			sv.Image.Ref = ref
 		}
 		if ev, ok := r.take("env"); ok {
 			vars, from, err := b.envList(ev, nil)

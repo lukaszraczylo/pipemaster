@@ -1,6 +1,7 @@
 package tekton_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -99,3 +100,5 @@ func pipelineWith(spec string) string {
 
 // inlineTask is a PipelineTask with an inline taskSpec.
 const inlineTask = "  tasks:\n  - name: build\n    taskSpec:\n      steps:\n      - name: s\n        image: golang\n        script: go test ./...\n"
+
+func fmtAny(v any) string { return fmt.Sprint(v) }

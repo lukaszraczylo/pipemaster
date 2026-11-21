@@ -1,7 +1,6 @@
 package tekton_test
 
 import (
-	"crypto/sha256"
 	"reflect"
 	"strings"
 	"testing"
@@ -73,7 +72,6 @@ func TestSanitizeID(t *testing.T) {
 	if len(ga) > 63 || len(gb) > 63 || ga == gb || r.SanitizeID(a) != ga {
 		t.Fatalf("long names must truncate to 63, stay distinct and stable: %q %q", ga, gb)
 	}
-	_ = sha256.Size
 }
 
 // A Task named <pipeline>-<job> that exceeds 63 characters is truncated by the emitter. The parser reads the

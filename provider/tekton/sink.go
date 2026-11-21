@@ -65,3 +65,11 @@ func (k *sink) ext() ir.Ext {
 	}
 	return ir.Ext{dialect: k.vals}
 }
+
+// keepMeta keeps the metadata of a document except its name.
+func (k *sink) keepMeta(key string, top *omap, what string, line int) {
+	meta, _ := asMap(top.vals["metadata"])
+	if rest := metaRest(meta); len(rest.keys) > 0 {
+		k.keep(key, rest, caps.ExtPassthrough, what+" metadata has no IR field; kept in Ext", line)
+	}
+}
