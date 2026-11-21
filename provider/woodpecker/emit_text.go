@@ -83,6 +83,14 @@ func joinNew(prev, next string) string {
 }
 
 func (e *emitter) external(path string, f caps.Feature, strategy, detail string) {
+	u := use(path, f)
+	if prev, ok := e.said[u]; ok {
+		strategy, detail = joinNew(prev[0], strategy), joinNew(prev[1], detail)
+	}
+	if e.said == nil {
+		e.said = map[ir.FeatureUse][2]string{}
+	}
+	e.said[u] = [2]string{strategy, detail}
 	e.led.Note(use(path, f), caps.Support{Level: caps.External, Strategy: strategy}, detail)
 }
 
@@ -114,7 +122,7 @@ func esc(s string) string { return strings.ReplaceAll(s, dollar, dollarEsc) }
 
 // bindings are the references a step's text reads as run-time variables. The step must map each secret from a
 // secret; refs lists every converted reference as "<namespace>.<name>" so the parser can restore the text.
-type bindings struct{ secrets, refs []string }
+type bindings struct{ secrets, vars, inputs, refs []string }
 
 func (b *bindings) add(ns, name string) {
 	if b == nil {
@@ -123,9 +131,21 @@ func (b *bindings) add(ns, name string) {
 	if ref := ns + "." + name; !slices.Contains(b.refs, ref) {
 		b.refs = append(b.refs, ref)
 	}
-	if ns == expr.PrefixSecrets && !slices.Contains(b.secrets, name) {
-		b.secrets = append(b.secrets, name)
+	switch ns {
+	case expr.PrefixSecrets:
+		b.secrets = appendNew(b.secrets, name)
+	case expr.PrefixVars:
+		b.vars = appendNew(b.vars, name)
+	case expr.PrefixInputs:
+		b.inputs = appendNew(b.inputs, name)
 	}
+}
+
+func appendNew(l []string, name string) []string {
+	if slices.Contains(l, name) {
+		return l
+	}
+	return append(l, name)
 }
 
 // refText spells one canonical reference in Woodpecker text. ok is false when Woodpecker has no spelling.

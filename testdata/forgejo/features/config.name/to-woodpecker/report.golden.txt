@@ -1,4 +1,5 @@
 Loss report: forgejo -> woodpecker
 [lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
 [lost] pipeline/ci/job/build job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
+[external] pipeline/ci/job/build/step/build-step-1 script.interpolation: secret for variable (variable FORGEJO_REGION is bound to the secret FORGEJO_REGION; Woodpecker has no variables, so create the secret FORGEJO_REGION with the value of the variable; variable CI is bound to the secret CI; Woodpecker has no variables, so create the secret CI with the value of the variable)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

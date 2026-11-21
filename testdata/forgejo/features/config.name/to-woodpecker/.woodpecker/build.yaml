@@ -11,3 +11,7 @@ steps:
     environment:
       KEY:
         from_secret: DEPLOY_KEY
+      FORGEJO_REGION:
+        from_secret: FORGEJO_REGION
+      CI:
+        from_secret: CI

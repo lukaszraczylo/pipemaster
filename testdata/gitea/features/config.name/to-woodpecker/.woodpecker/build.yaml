@@ -13,3 +13,5 @@ steps:
         from_secret: GITEA_DEPLOY
       TOKEN:
         from_secret: GITHUB_TOKEN
+      CI_MODE:
+        from_secret: CI_MODE

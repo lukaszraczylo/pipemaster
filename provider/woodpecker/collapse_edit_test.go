@@ -141,3 +141,34 @@ func TestRuntimeVariablesInScriptsBecomeReferencesOrAreReported(t *testing.T) {
 		}
 	}
 }
+
+func TestVariableReferenceIsBoundAndReported(t *testing.T) {
+	p := parseProject(t, "gha", map[string]string{".github/workflows/ci.yml": "on: push\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ${{ vars.HOST }} ${{ inputs.mode }}\n"})
+	files, rep := emitFiles(t, p)
+	var body string
+	for _, b := range files {
+		body = b
+	}
+	if !strings.Contains(body, "HOST:\n        from_secret: HOST") {
+		t.Errorf("vars.HOST is not bound to a secret:\n%s", body)
+	}
+	var host, mode bool
+	for _, e := range rep.Entries {
+		if e.Feature != caps.ScriptInterpolation || e.Level != caps.External {
+			continue
+		}
+		host = host || strings.Contains(e.Detail, "create the secret HOST")
+		mode = mode || strings.Contains(e.Detail, "input mode")
+	}
+	if !host || !mode {
+		t.Errorf("host note %v, mode note %v: %+v", host, mode, rep.Entries)
+	}
+	raw := map[string]string{}
+	for n, b := range files {
+		raw[n] = b
+	}
+	back := parseProject(t, "woodpecker", raw).Pipelines[0].Jobs[0].Steps[0]
+	if len(back.Env) != 0 || back.Script[0] != "echo ${{ vars.HOST }} ${{ inputs.mode }}" {
+		t.Errorf("round trip lost the references: env %+v script %q", back.Env, back.Script)
+	}
+}

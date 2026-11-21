@@ -150,7 +150,7 @@ func collapseRefs(c *collapseCtx) bool {
 		for i, l := range st.Script {
 			st.Script[i] = strings.ReplaceAll(l, "${"+name+"}", "${{ "+ref+" }}")
 		}
-		if ns == expr.PrefixSecrets {
+		if ns == expr.PrefixSecrets || ns == expr.PrefixVars {
 			st.Env = slices.DeleteFunc(st.Env, func(v ir.Var) bool {
 				return v.Name == name && v.Value.Kind == ir.ValueSecret && v.Value.Secret == name
 			})

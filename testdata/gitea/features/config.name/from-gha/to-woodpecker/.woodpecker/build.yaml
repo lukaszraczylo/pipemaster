@@ -13,5 +13,7 @@ steps:
     environment:
       KEY:
         from_secret: DEPLOY_KEY
+      REGION:
+        from_secret: REGION
       API_TOKEN:
         from_secret: API_TOKEN

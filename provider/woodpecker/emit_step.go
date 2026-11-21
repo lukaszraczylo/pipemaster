@@ -249,6 +249,18 @@ func (e *emitter) stepEnv(c *wfCtx, sp string, st *ir.Step, b *bindings, ext map
 		env.set(name, s.n)
 		e.emulate(sp, caps.ScriptInterpolation, "environment from_secret", "secret "+name+" is bound to the variable "+name+", which the command text reads at run time")
 	}
+	for _, name := range b.vars {
+		if env.has(name) {
+			continue
+		}
+		s := newMap()
+		s.set(fromSecret, str(name))
+		env.set(name, s.n)
+		e.external(sp, caps.ScriptInterpolation, "secret for variable", "variable "+name+" is bound to the secret "+name+"; Woodpecker has no variables, so create the secret "+name+" with the value of the variable")
+	}
+	for _, name := range b.inputs {
+		e.external(sp, caps.ScriptInterpolation, "environment variable for input", "input "+name+" is read as the variable "+name+", which nothing sets; define it in the Woodpecker environment")
+	}
 	if len(b.refs) > 0 {
 		if err := e.markArg(caps.ScriptInterpolation, sp, posArg{Pos: c.pos, Refs: b.refs}); err != nil {
 			return nil, err
