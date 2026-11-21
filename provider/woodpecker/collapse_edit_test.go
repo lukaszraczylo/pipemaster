@@ -92,3 +92,52 @@ func TestEditedEnvKeepsTheParsedValue(t *testing.T) {
 		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
 	}
 }
+
+func parseWoodpecker(t *testing.T, body string) (*ir.Job, *report.Report) {
+	t.Helper()
+	src, err := provider.Get("woodpecker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, rep, err := src.Parse(repo(map[string]string{".woodpecker/ci.yaml": body}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p.Pipelines[0].Jobs[0], rep
+}
+
+func TestRuntimeVariablesInScriptsBecomeReferencesOrAreReported(t *testing.T) {
+	j, rep := parseWoodpecker(t, `steps:
+  - name: s
+    image: alpine
+    commands:
+      - gh pr merge "$CI_COMMIT_PULL_REQUEST" --repo "$CI_REPO"
+      - echo $$CI_COMMIT_SHA $${CI_COMMIT_BRANCH} $HOME
+      - echo $CI_PIPELINE_NUMBER $$CI_STEP_NAME $${CI_BUILD_STATUS}
+`)
+	got := j.Steps[0].Script
+	want := []string{
+		`gh pr merge "${{ pr.number }}" --repo "${{ repo }}"`,
+		`echo ${{ sha }} ${{ branch }} $HOME`,
+		`echo $CI_PIPELINE_NUMBER $CI_STEP_NAME ${CI_BUILD_STATUS}`,
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("line %d = %q, want %q", i, got[i], want[i])
+		}
+	}
+	for _, name := range []string{"CI_PIPELINE_NUMBER", "CI_STEP_NAME", "CI_BUILD_STATUS"} {
+		found := false
+		for _, e := range rep.Entries {
+			found = found || e.Feature == caps.ScriptInterpolation && e.Level == caps.Lost && strings.Contains(e.Detail, name)
+		}
+		if !found {
+			t.Errorf("no script.interpolation entry for %s: %+v", name, rep.Entries)
+		}
+	}
+	for _, e := range rep.Entries {
+		if strings.Contains(e.Detail, "HOME") || strings.Contains(e.Detail, "CI_REPO") {
+			t.Errorf("unexpected entry %+v", e)
+		}
+	}
+}

@@ -19,6 +19,8 @@ type texts struct {
 	axes map[string]bool
 	// kept lists the ${...} forms left as written.
 	kept []string
+	// lostVars lists the CI_ run-time variables that have no IR reference.
+	lostVars []string
 }
 
 // markAxes reads the names of the matrix an emitter replaced with plain variables, so text that names one reads
@@ -72,26 +74,42 @@ func (x *texts) ref(name string) (expr.Ref, bool) {
 	return r, ok
 }
 
-// escapedBuiltin reads {NAME} after "$$" as the built-in variable the shell reads at run time, which is how a
-// GitLab script writes the same reference.
-func (x *texts) escapedBuiltin(s string) (r expr.Ref, whole string, ok bool) {
-	end := strings.IndexByte(s, '}')
-	if !strings.HasPrefix(s, "{") || end < 0 {
-		return expr.Ref{}, "", false
+// shellName reads NAME or {NAME} at the start of s, the forms of a shell variable, and returns the name and the
+// length of the form.
+func shellName(s string) (name string, n int) {
+	if strings.HasPrefix(s, "{") {
+		end := strings.IndexByte(s, '}')
+		if end < 0 || !isIdent(s[1:end]) {
+			return "", 0
+		}
+		return s[1:end], end + 1
 	}
-	name := s[1:end]
+	n = 0
+	for n < len(s) && (s[n] == '_' || s[n] >= 'a' && s[n] <= 'z' || s[n] >= 'A' && s[n] <= 'Z' || n > 0 && s[n] >= '0' && s[n] <= '9') {
+		n++
+	}
+	return s[:n], n
+}
+
+// runtimeVar reads a shell variable that Woodpecker sets in the step environment. A built-in with a canonical
+// name becomes that reference. Any other CI_ name has no IR reference, so it is noted as lost.
+func (x *texts) runtimeVar(name string) (expr.Ref, bool) {
 	if !isIdent(name) || x.axes[name] {
-		return expr.Ref{}, "", false
+		return expr.Ref{}, false
 	}
 	e, err := wpexpr.Parse(name)
 	if err != nil {
-		return expr.Ref{}, "", false
+		return expr.Ref{}, false
 	}
-	r, ok = e.(expr.Ref)
-	if !ok || len(r.Path) == 0 || r.Path[0] == expr.PrefixEnv || r.Path[0] == wpexpr.Dialect {
-		return expr.Ref{}, "", false
+	r, ok := e.(expr.Ref)
+	switch {
+	case !ok || len(r.Path) == 0 || r.Path[0] == expr.PrefixEnv:
+	case r.Path[0] == wpexpr.Dialect:
+		x.lostVars = append(x.lostVars, name)
+	default:
+		return r, true
 	}
-	return r, s[:end+1], true
+	return expr.Ref{}, false
 }
 
 func (x *texts) parts(s string) []expr.Part {
@@ -106,11 +124,13 @@ func (x *texts) parts(s string) []expr.Part {
 	for i := 0; i < len(s); {
 		switch {
 		case strings.HasPrefix(s[i:], "$$"):
-			if r, whole, ok := x.escapedBuiltin(s[i+2:]); ok {
-				flush()
-				parts = append(parts, expr.Part{Expr: r})
-				i += 2 + len(whole)
-				break
+			if name, n := shellName(s[i+2:]); n > 0 {
+				if r, ok := x.runtimeVar(name); ok {
+					flush()
+					parts = append(parts, expr.Part{Expr: r})
+					i += 2 + n
+					break
+				}
 			}
 			lit.WriteString(dollar)
 			i += 2
@@ -130,6 +150,17 @@ func (x *texts) parts(s string) []expr.Part {
 				x.kept = append(x.kept, whole)
 			}
 			i += end + 1
+		case s[i] == '$':
+			if name, n := shellName(s[i+1:]); n > 0 {
+				if r, ok := x.runtimeVar(name); ok {
+					flush()
+					parts = append(parts, expr.Part{Expr: r})
+					i += 1 + n
+					break
+				}
+			}
+			lit.WriteByte(s[i])
+			i++
 		default:
 			lit.WriteByte(s[i])
 			i++

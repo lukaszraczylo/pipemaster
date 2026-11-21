@@ -82,6 +82,7 @@ func parseWorkflow(rep *report.Report, file string, data []byte) (*workflow, err
 	spec.configure(m)
 	pipeEnv := collapseJob(rep, j, m)
 	w.noteKept()
+	w.noteRuntimeVars()
 	j.Ext = w.ext.ext()
 	return &workflow{job: j, when: spec, pipeEnv: pipeEnv, marks: m, conc: conc}, nil
 }
@@ -256,6 +257,21 @@ func (w *wf) noteKept() {
 		w.rep.Add(report.Entry{
 			IRPath: w.jobPath(), Feature: caps.ScriptInterpolation, Level: caps.Lost, Strategy: "kept as written",
 			Detail: f + " is a Woodpecker substitution with no IR reference; it stays in the text as written", SourceLoc: w.file,
+		})
+	}
+}
+
+// noteRuntimeVars reports each Woodpecker run-time variable that the text reads and no IR reference stands for.
+func (w *wf) noteRuntimeVars() {
+	seen := map[string]bool{}
+	for _, n := range w.tx.lostVars {
+		if seen[n] {
+			continue
+		}
+		seen[n] = true
+		w.rep.Add(report.Entry{
+			IRPath: w.jobPath(), Feature: caps.ScriptInterpolation, Level: caps.Lost, Strategy: "kept as written",
+			Detail: "Woodpecker run-time variable " + n + " has no IR reference; the target does not set it", SourceLoc: w.file,
 		})
 	}
 }
