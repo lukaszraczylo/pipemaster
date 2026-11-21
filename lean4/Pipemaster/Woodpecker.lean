@@ -506,10 +506,18 @@ def tplOpen : List Char → Bool
   | _ :: t => tplOpen t
   | [] => false
 
+/-- A text that names the file of a Tekton result (`$(results.`). Outside Tekton the text is a command substitution
+that fails, so the emitter drops the line and reports job.outputs lost (emitkit result.go IsResultWrite). The model
+refuses the whole prefix, which is stricter than the matcher. -/
+def resultOpen : List Char → Bool
+  | '$' :: '(' :: 'r' :: 'e' :: 's' :: 'u' :: 'l' :: 't' :: 's' :: '.' :: _ => true
+  | _ :: t => resultOpen t
+  | [] => false
+
 /-- A script line the model keeps. A newline joins into one multi-line command that the parser splits again
 (emit_step.go:362, parse_step.go:127). An unterminated `${{` is an emit error (expr/template.go:37), and a closed
 one moves the step into a `step.action` marker. -/
-def LineOk (l : String) : Prop := '\n' ∉ l.toList ∧ tplOpen l.toList = false
+def LineOk (l : String) : Prop := '\n' ∉ l.toList ∧ tplOpen l.toList = false ∧ resultOpen l.toList = false
 
 /-- A variable value the codec keeps: a newline with a tab breaks the YAML scalar. -/
 def ValueOk (v : String) : Prop := '\n' ∉ v.toList

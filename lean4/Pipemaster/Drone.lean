@@ -333,11 +333,20 @@ def dollarSafe : List Char → Bool
 guardOpen). -/
 def guardStart : List Char := ['i', 'f', ' ', '!', ' ']
 
+/-- A text that names the file of a Tekton result (`$(results.`). Outside Tekton the text is a command substitution
+that fails, so the emitter drops the line and reports job.outputs lost (emitkit result.go IsResultWrite). The model
+refuses the whole prefix, which is stricter than the matcher. -/
+def resultOpen : List Char → Bool
+  | '$' :: '(' :: 'r' :: 'e' :: 's' :: 'u' :: 'l' :: 't' :: 's' :: '.' :: _ => true
+  | _ :: t => resultOpen t
+  | [] => false
+
 /-- A script line the model keeps. A newline joins into one multi-line command that the parser splits again
 (emit_step.go commandTexts, parse_step.go script). A blank line folds into the line before it (emit_step.go
 foldBlankLines). A line that opens like a guard is read as a condition (parse_step.go script). -/
 def LineOk (l : String) : Prop :=
-  '\n' ∉ l.toList ∧ l ≠ "" ∧ dollarSafe l.toList = true ∧ guardStart.isPrefixOf l.toList = false
+  '\n' ∉ l.toList ∧ l ≠ "" ∧ dollarSafe l.toList = true ∧ guardStart.isPrefixOf l.toList = false ∧
+    resultOpen l.toList = false
 
 /-- A variable value the codec keeps: a newline breaks the YAML scalar, and `$NAME` is a Drone substitution
 (text.go value). -/
