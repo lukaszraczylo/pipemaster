@@ -89,7 +89,7 @@ func (e *emitter) pipeline(pp *plan) error {
 		spec.set("finally", seqOf(finally...))
 	}
 	root.set("spec", spec.n)
-	e.loseUnknownExt(pp.path, x, map[string]bool{"metadata": true, "description": true, "workspaces": true, "results": true, "params": true, "pipelineRun": true})
+	e.loseUnknownExt(pp.path, x, map[string]bool{"metadata": true, "description": true, "workspaces": true, "results": true, "params": true, "pipelineRun": true, ExtResources: true})
 	return nil
 }
 

@@ -146,3 +146,96 @@ func TestRequiredInputWithoutDefaultIsReportedOnTrigger(t *testing.T) {
 	_, rep := emit(t, p)
 	wantEntry(t, rep, caps.TriggerPush, caps.External, "required input ver")
 }
+
+// A hardened emitted listener keeps its edits: the marker is ignored and the file content is restored.
+func TestEditedGeneratedTriggerKeepsEdits(t *testing.T) {
+	p := project(scriptJob("a", "true"))
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush}}
+	files, _ := emit(t, p)
+	src := files[".tekton/triggers/eventlistener.yaml"]
+	edited := strings.Replace(src, "secretName: pipemaster-github-webhook", "secretName: my-secret", 1)
+	edited = strings.Replace(edited, "\n      bindings:\n        - ref: ci-github", "\n        - ref: {name: slack}\n      bindings:\n        - ref: ci-github\n        - ref: extra-binding", 1)
+	if edited == src || !strings.Contains(edited, "extra-binding") {
+		t.Fatalf("edit did not apply:\n%s", src)
+	}
+	in := map[string]string{}
+	for n, b := range files {
+		in[n] = b
+	}
+	in[".tekton/triggers/eventlistener.yaml"] = edited
+	p2, prep, err := tekton.New().Parse(repo(in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entry(prep, caps.ExprOpaque, "marker ignored") == nil {
+		t.Fatalf("no marker-ignored entry: %v", prep.Entries)
+	}
+	out, _ := emit(t, p2)
+	got := out[".tekton/triggers/eventlistener.yaml"]
+	for _, want := range []string{"secretName: my-secret", "name: slack", "extra-binding"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("%q lost:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "pipemaster-github-webhook") {
+		t.Fatalf("custom secretRef replaced:\n%s", got)
+	}
+}
+
+const orderedListener = `apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata: {name: gh}
+spec:
+  triggers:
+  - name: on-push
+    interceptors:
+    - ref: {name: github}
+      params:
+      - {name: secretRef, value: {secretName: s, secretKey: k}}
+      - {name: eventTypes, value: [push]}
+      - {name: addChangedFiles, value: {enabled: true}}
+    - ref: {name: cel}
+      params:
+      - {name: filter, value: "extensions.changed_files.matches('a')"}
+    - ref: {name: slack}
+    template: {ref: run-ci}
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata: {name: run-ci}
+spec:
+  resourcetemplates:
+  - apiVersion: tekton.dev/v1
+    kind: PipelineRun
+    spec:
+      pipelineRef: {name: ci}
+`
+
+func TestSourceInterceptorOrderIsKept(t *testing.T) {
+	files, _ := identityOf(t, map[string]string{"pipeline.yaml": triggerFiles, "triggers.yaml": orderedListener})
+	var names []string
+	for _, d := range docs(t, files[".tekton/triggers/eventlistener.yaml"]) {
+		for _, tr := range list(get(d, "spec", "triggers")) {
+			for _, ic := range list(get(tr, "interceptors")) {
+				names = append(names, get(ic, "ref", "name").(string))
+			}
+		}
+	}
+	if strings.Join(names, ",") != "github,cel,slack" {
+		t.Fatalf("order = %v", names)
+	}
+}
+
+func TestScheduleEntryWarnsAboutOpenListener(t *testing.T) {
+	p := project(scriptJob("a", "true"))
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerSchedule, Cron: "0 1 * * *"}}
+	_, rep := emit(t, p)
+	wantEntry(t, rep, caps.TriggerSchedule, caps.Emulated, "NetworkPolicy")
+}
+
+func TestKeptResourcesAreNotReportedLost(t *testing.T) {
+	_, rep := identityOf(t, map[string]string{"pipeline.yaml": triggerFiles, "triggers.yaml": listener})
+	if e := entry(rep, caps.ExtPassthrough, "Ext key resources"); e != nil {
+		t.Fatalf("false entry: %v", e)
+	}
+}

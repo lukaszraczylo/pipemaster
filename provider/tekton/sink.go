@@ -11,7 +11,7 @@ import (
 const (
 	strategyExt = "kept in Ext[" + dialect + "]"
 
-	// ExtResources is the Ext key of the first pipeline that holds the documents no IR field models, in file order.
+	// ExtResources is the Ext key of the first pipeline that holds the documents no IR field models, sorted by kind and name.
 	ExtResources = "resources"
 	// ExtImplicitNeeds is the job Ext key that lists the needs that came only from a result or status reference.
 	// The emitter writes no runAfter for them, because the reference orders the tasks.

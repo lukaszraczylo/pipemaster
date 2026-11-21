@@ -210,7 +210,7 @@ func (p *project) trigger(lt listenerTrigger, byName map[string]*ir.Pipeline) bo
 			k.keep("listenerSpec", rest, caps.ExtPassthrough, "EventListener keys beside triggers have no IR field; kept in Ext", lt.doc.line)
 		}
 	}
-	events, restored := p.interceptors(lt, k)
+	events, restored := p.interceptors(lt, k, p.pipelineOf(tpl))
 	switch {
 	case restored != nil && restored.Kind == ir.TriggerSchedule:
 	case restored != nil:
@@ -226,48 +226,58 @@ func (p *project) trigger(lt listenerTrigger, byName map[string]*ir.Pipeline) bo
 
 // interceptors reads the interceptor list. It returns the IR kinds that the github interceptor names, and the
 // trigger that a filter marker restores. A CEL filter with no valid marker becomes opaque Tekton text in Ext.
-func (p *project) interceptors(lt listenerTrigger, k *sink) ([]ir.TriggerKind, *filterArg) {
+// A trigger that carries anything beyond what the emitter writes keeps the whole list, in order, and the marker
+// is ignored.
+func (p *project) interceptors(lt listenerTrigger, k *sink, pipeline string) ([]ir.TriggerKind, *filterArg) {
 	list, _ := lt.m.vals["interceptors"].([]any)
 	var kinds []ir.TriggerKind
-	var rest []any
+	var all []any
 	var cel *interceptor
-	var defaultSecret []any
+	extra := false
+	shape := ""
 	for _, e := range list {
+		all = append(all, plain(e))
 		in, ok := readInterceptor(e)
 		switch {
 		case ok && in.name == interceptorGitHub:
 			ks, whole := githubKinds(in)
 			kinds = append(kinds, ks...)
-			if !whole {
-				rest = append(rest, plain(e))
-			}
-			if _, ok := in.params[paramSecretRef]; ok {
-				if hasDefaultSecret(in) {
-					defaultSecret = append(defaultSecret, plain(e))
-				} else {
-					rest = append(rest, plain(e))
-				}
-			}
+			extra = extra || !whole || !hasDefaultSecret(in)
+			shape += "g"
 		case ok && in.name == interceptorCEL && cel == nil:
 			c := in
 			cel = &c
+			shape += "c"
 		default:
-			rest = append(rest, plain(e))
+			extra = true
+			shape += "o"
 		}
 	}
 	var restored *filterArg
 	if cel != nil {
 		restored = p.celFilterOf(lt, k, *cel, kinds)
 	}
-	if restored == nil {
-		// Only a marked trigger is one that pipemaster wrote; the default secret of any other is the author's.
-		rest = append(rest, defaultSecret...)
+	if restored != nil && restored.Kind != ir.TriggerSchedule && (extra || shape != "gc" || p.editedAround(k, restored.Name, pipeline)) {
+		filter, _ := text(cel.params[paramFilter])
+		p.keepFilter(lt, k, *cel, filter, "marker ignored: the trigger was edited after pipemaster wrote it; ")
+		restored = nil
 	}
-	if len(rest) > 0 {
-		k.vals["interceptors"] = dedupe(rest)
-		k.note(caps.ExtPassthrough, "interceptors other than the event types of github have no IR field; kept in Ext", lt.doc.line)
+	if restored == nil && len(all) > 0 {
+		k.vals["interceptors"] = all
+		k.note(caps.ExtPassthrough, "interceptors are kept in Ext in their order", lt.doc.line)
 	}
 	return kinds, restored
+}
+
+// editedAround reports whether the listener keys of a marked trigger differ from what the emitter writes.
+func (p *project) editedAround(k *sink, trigger, pipeline string) bool {
+	tmp := map[string]any{}
+	for key, v := range k.vals {
+		tmp[key] = v
+	}
+	pruneGenerated(tmp, trigger, pipeline)
+	delete(tmp, "interceptors")
+	return len(tmp) > 0
 }
 
 // keepFilter keeps a CEL filter as opaque Tekton text.

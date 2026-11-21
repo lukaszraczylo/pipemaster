@@ -343,50 +343,17 @@ func (e *emitter) sourceEntry(pp *plan, g *sourceGroup) error {
 func (e *emitter) fillSourceTrigger(pp *plan, g *sourceGroup, m *wmap, sa string) error {
 	x := g.x
 	var ics []*yaml.Node
-	kept, _ := x["interceptors"].([]any)
-	hasGH := false
-	for _, k := range kept {
-		hasGH = hasGH || isGitHubInterceptor(k)
-	}
-	if !hasGH {
-		var types []string
-		for _, k := range g.kinds {
-			switch k {
-			case ir.TriggerPush, ir.TriggerTag:
-				types = append(types, eventPush)
-			case ir.TriggerPR:
-				types = append(types, eventPullRequest)
+	if kept, ok := x["interceptors"].([]any); ok {
+		for _, k := range kept {
+			n, err := plainNode(k)
+			if err != nil {
+				e.lose(g.paths[0], caps.ExtPassthrough, "an interceptor of the Tekton file cannot be written: "+err.Error())
+				continue
 			}
+			ics = append(ics, n)
 		}
-		types = dedupeStrings(types)
-		if len(types) > 0 {
-			gh := newMap()
-			gh.set("ref", nameOnly(interceptorGitHub))
-			gh.set("params", seqOf(nameNode(paramEventTypes, strSeq(types))))
-			ics = append(ics, gh.n)
-		}
-	}
-	celAt := -1
-	if f, ok := x["filter"].(string); ok {
-		node, err := e.celInterceptor(pp, g, f, x[extOverlays])
-		if err != nil {
-			return err
-		}
-		if node != nil {
-			ics = append(ics, node)
-			celAt = len(ics) - 1
-		}
-	}
-	for i, k := range kept {
-		n, err := plainNode(k)
-		if err != nil {
-			e.lose(g.paths[0], caps.ExtPassthrough, "an interceptor of the Tekton file cannot be written: "+err.Error())
-			continue
-		}
-		ics = append(ics, n)
-		if celAt >= 0 && i == 0 && !isGitHubInterceptor(k) {
-			e.emulate(g.paths[0], caps.ExtPassthrough, "interceptor order", "the cel interceptor is written before the interceptors that the Tekton file listed besides github")
-		}
+	} else {
+		ics = e.generatedInterceptors(pp, g)
 	}
 	if len(ics) > 0 {
 		m.set("interceptors", seqOf(ics...))
@@ -448,4 +415,30 @@ func (e *emitter) celInterceptor(pp *plan, g *sourceGroup, filter string, overla
 	cel.set("params", ps)
 	_ = pp
 	return cel.n, nil
+}
+
+// generatedInterceptors writes the github and cel interceptors of a source trigger that kept no interceptor list.
+func (e *emitter) generatedInterceptors(pp *plan, g *sourceGroup) []*yaml.Node {
+	var ics []*yaml.Node
+	var types []string
+	for _, k := range g.kinds {
+		switch k {
+		case ir.TriggerPush, ir.TriggerTag:
+			types = append(types, eventPush)
+		case ir.TriggerPR:
+			types = append(types, eventPullRequest)
+		}
+	}
+	if types = dedupeStrings(types); len(types) > 0 {
+		gh := newMap()
+		gh.set("ref", nameOnly(interceptorGitHub))
+		gh.set("params", seqOf(nameNode(paramEventTypes, strSeq(types))))
+		ics = append(ics, gh.n)
+	}
+	if f, ok := g.x["filter"].(string); ok {
+		if node, err := e.celInterceptor(pp, g, f, g.x[extOverlays]); err == nil && node != nil {
+			ics = append(ics, node)
+		}
+	}
+	return ics
 }
