@@ -763,3 +763,24 @@ func TestEditedEnvValueWins(t *testing.T) {
 		}
 	}
 }
+
+func TestMatrixMarkerWithoutCellsOrWithBadPositionDoesNotPanic(t *testing.T) {
+	doc := func(arg string) string {
+		return "# pipemaster:emulated job.matrix pipeline/ci/job/test\n# pipemaster:arg " + arg + "\n" +
+			"kind: pipeline\ntype: docker\nname: test\nsteps:\n  - name: s\n    image: alpine\n    commands:\n      - echo hi\n"
+	}
+	for name, arg := range map[string]string{
+		"no cell, position past the steps": `{"matrix":{"Axes":[{"Name":"go","Values":[]}]},"job":"test","cell":[],"held":[{"script":["x"],"pos":99}],"index":0}`,
+		"no cell, negative position":       `{"matrix":{"Axes":[{"Name":"go","Values":[]}]},"job":"test","cell":[],"held":[{"script":["x"],"pos":-1}],"index":0}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			p, rep := parseYMLProject(t, doc(arg))
+			if got := jobOf(t, p, "test"); got.Matrix != nil {
+				t.Errorf("the marker restored a matrix over an impossible position")
+			}
+			if !ignored(rep, caps.JobMatrix) {
+				t.Errorf("no marker-ignored entry: %+v", rep.Entries)
+			}
+		})
+	}
+}

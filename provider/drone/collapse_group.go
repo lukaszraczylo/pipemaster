@@ -131,6 +131,8 @@ func foldCells(rep *report.Report, g []cellDoc) bool {
 		asEmitted = asEmitted && c.arg.Index == i && (len(combos) == 0 || sameCombo(combos[i], c.arg.Cell)) &&
 			len(c.d.written) == len(first.d.written)
 	}
+	// A marker edited by hand can name a step the document does not hold, and a matrix with no cell checks no text.
+	asEmitted = asEmitted && !slices.ContainsFunc(first.arg.Held, func(h heldText) bool { return h.Pos < 0 || h.Pos >= len(first.d.written) })
 	if asEmitted && len(combos) > 0 {
 		asEmitted = heldMatches(first.arg.Held, g, combos) && jobVarsAre(first.arg.Env, g, combos) &&
 			servicesAre(first.arg.Services, g, combos) && cellsAlike(first.arg, g)
