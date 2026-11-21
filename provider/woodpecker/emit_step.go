@@ -399,7 +399,12 @@ func (e *emitter) stepTail(c *wfCtx, sp string, st *ir.Step, b *bindings, m *wma
 	if err != nil {
 		return err
 	}
-	m.set(envKey, env)
+	if env != nil && m.has(settKey) {
+		// The Woodpecker linter rejects a step that sets both environment and settings.
+		e.lose(sp, caps.StepEnv, "Woodpecker takes either environment or settings on a plugin step; the environment is not written")
+	} else {
+		m.set(envKey, env)
+	}
 	if st.WorkDir != "" {
 		d, err := e.text(nil, sp, caps.StepWorkdir, valueText, st.WorkDir)
 		if err != nil {

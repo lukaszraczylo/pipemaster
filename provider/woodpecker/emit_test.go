@@ -1,6 +1,7 @@
 package woodpecker_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -790,5 +791,20 @@ func TestLostExpressionInServiceDropsOnlyTheService(t *testing.T) {
 	}
 	if !reportHas(rep, caps.JobServices, caps.Lost) {
 		t.Errorf("the dropped service must be reported: %+v", rep.Entries)
+	}
+}
+
+func TestPluginStepNeverHoldsEnvironmentAndSettings(t *testing.T) {
+	pl := &ir.Step{
+		ID: "p", Kind: ir.StepPlugin, Image: &ir.Image{Ref: "plugins/slack"},
+		With: map[string]ir.Value{"k": {Lit: "x"}}, Env: []ir.Var{{Name: "V", Value: ir.Value{Lit: "1"}}},
+	}
+	files, rep := emitFiles(t, wpProject("woodpecker", wpJob("ci", pl)))
+	body := files[dirPrefix+"ci.yaml"]
+	if strings.Contains(body, "environment:") || !strings.Contains(body, "settings:") {
+		t.Fatalf("the linter rejects both keys on one plugin step:\n%s", body)
+	}
+	if !slices.ContainsFunc(rep.Entries, func(e report.Entry) bool { return e.Feature == caps.StepEnv && e.Level == caps.Lost }) {
+		t.Errorf("the dropped environment must be reported: %+v", rep.Entries)
 	}
 }
