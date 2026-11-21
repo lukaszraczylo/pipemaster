@@ -120,3 +120,14 @@ func TestEditedActionStepIsKept(t *testing.T) {
 		t.Fatalf("action restored: %+v", st)
 	}
 }
+
+func TestEditedWorkDirIsKept(t *testing.T) {
+	j := &ir.Job{ID: "a", Steps: []*ir.Step{
+		{ID: "co", Kind: ir.StepAction, Action: &ir.ActionRef{Kind: ir.ActionRepo, Owner: "actions", Repo: "checkout", Ref: "v4"}},
+		{ID: "run", Kind: ir.StepScript, Script: []string{"ls"}, WorkDir: "src"},
+	}}
+	back := editedMarker(t, project(j), taskFile, "workingDir: /workspace/src", "workingDir: /workspace/lib")
+	if got := back.Pipelines[0].Jobs[0].Steps[1].WorkDir; got != "/workspace/lib" {
+		t.Fatalf("work dir = %q", got)
+	}
+}

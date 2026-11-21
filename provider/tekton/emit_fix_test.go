@@ -450,3 +450,19 @@ spec:
 		t.Fatalf("cel entry changed:\n%s", diff)
 	}
 }
+
+func TestRelativeWorkDirReturnsAsWritten(t *testing.T) {
+	for _, wd := range []string{"tokio", "./docs", "./${{ matrix.module }}"} {
+		j := &ir.Job{ID: "a", Steps: []*ir.Step{
+			{ID: "co", Kind: ir.StepAction, Action: &ir.ActionRef{Kind: ir.ActionRepo, Owner: "actions", Repo: "checkout", Ref: "v4"}},
+			{ID: "run", Kind: ir.StepScript, Script: []string{"ls"}, WorkDir: wd},
+		}}
+		p := project(j)
+		p.Pipelines[0].Jobs[0].Matrix = &ir.Matrix{Axes: []ir.Axis{{Name: "module", Values: []string{"a"}}}}
+		files, _ := emit(t, p)
+		back, _ := reparse(t, files)
+		if got := back.Pipelines[0].Jobs[0].Steps[len(back.Pipelines[0].Jobs[0].Steps)-1].WorkDir; got != wd {
+			t.Fatalf("work dir %q came back as %q", wd, got)
+		}
+	}
+}

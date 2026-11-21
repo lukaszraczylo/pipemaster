@@ -50,6 +50,12 @@ type copiedArg struct {
 	Names []string `json:"names"`
 }
 
+// workdirArg holds a relative working directory that the emitter wrote under the workspace.
+type workdirArg struct {
+	WorkDir string `json:"workdir"`
+	Wrote   string `json:"wrote"`
+}
+
 // guardArg holds a job condition that the emitter wrote as a guard line in every script step.
 type guardArg struct {
 	If   string `json:"if"`
@@ -98,6 +104,7 @@ func (b *jobBuilder) collapse() {
 	b.collapseNoop()
 	b.collapseImages()
 	b.collapseShell()
+	b.collapseWorkdirs()
 	b.collapseJobGuard()
 	b.collapseActions()
 	b.collapseOutputs()
@@ -520,4 +527,17 @@ func (b *jobBuilder) collapseJobGuard() {
 		st.If = nil
 	}
 	b.job.If = orig
+}
+
+// collapseWorkdirs gives a step the relative working directory that the marker holds, when the file still says what was written.
+func (b *jobBuilder) collapseWorkdirs() {
+	for path, lines := range b.marksAt(caps.StepWorkdir) {
+		var a workdirArg
+		st := b.stepAt(path)
+		if st == nil || json.Unmarshal([]byte(lines[0]), &a) != nil || st.WorkDir != a.Wrote {
+			b.ignored(path, caps.StepWorkdir, "the working directory")
+			continue
+		}
+		st.WorkDir = a.WorkDir
+	}
 }

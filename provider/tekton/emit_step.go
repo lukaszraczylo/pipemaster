@@ -112,6 +112,9 @@ func (tc *taskCtx) scriptStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 		}
 		if ok {
 			if tc.checkout && !path.IsAbs(wd) {
+				if err := tc.e.markArg(caps.StepWorkdir, sp, workdirArg{WorkDir: st.WorkDir, Wrote: path.Join(workspaceDir, st.WorkDir)}); err != nil {
+					return nil, err
+				}
 				wd = path.Join(workspaceDir, wd)
 			}
 			m.setStr("workingDir", wd)
