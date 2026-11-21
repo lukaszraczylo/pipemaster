@@ -45,7 +45,7 @@
 12-gha-tokio gha->forgejo native=841 emulated=1 external=0 lost=7
 12-gha-tokio gha->gitea native=842 emulated=0 external=0 lost=1
 12-gha-tokio gha->gitlab native=464 emulated=81 external=1 lost=481
-12-gha-tokio gha->woodpecker native=614 emulated=74 external=2 lost=410
+12-gha-tokio gha->woodpecker native=612 emulated=76 external=2 lost=410
 13-gha-traefik gha->forgejo native=116 emulated=4 external=0 lost=5
 13-gha-traefik gha->gitea native=116 emulated=0 external=0 lost=1
 13-gha-traefik gha->gitlab native=54 emulated=11 external=1 lost=74
