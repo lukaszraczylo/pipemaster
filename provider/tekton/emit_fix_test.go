@@ -510,3 +510,30 @@ func TestStepConditionOnANeedsOutputReturns(t *testing.T) {
 		t.Fatalf("step condition = %q, want %q\n%s", got, want, joinFiles(files))
 	}
 }
+
+func TestStepSecurityContextSurvivesTektonIdentity(t *testing.T) {
+	st := &ir.Step{ID: "run", Kind: ir.StepScript, Script: []string{"id"}, Image: &ir.Image{Ref: "alpine:3"},
+		Ext: ir.Ext{"tekton": map[string]any{"securityContext": map[string]any{"runAsUser": 0}}}}
+	p := project(&ir.Job{ID: "a", Steps: []*ir.Step{st}})
+	p.Origin = ir.Origin{Provider: "tekton", Dialect: "tekton"}
+	files, _ := emit(t, p)
+	back, _ := reparse(t, files)
+	got, _ := back.Pipelines[0].Jobs[0].Steps[0].Ext["tekton"].(map[string]any)
+	if got["securityContext"] == nil {
+		t.Fatalf("securityContext lost\n%s", joinFiles(files))
+	}
+}
+
+func TestFinallyNeedFromAResultIsNotDuplicated(t *testing.T) {
+	a := scriptJob("a", "true")
+	a.Outputs = []ir.Output{{Name: "sha", Value: "x"}}
+	done := scriptJob("done", "echo ${{ needs.a.outputs.sha }}")
+	done.Needs = []ir.Need{{JobID: "a"}}
+	p := project(a)
+	p.Pipelines[0].Finally = []*ir.Job{done}
+	files, _ := emit(t, p)
+	back, _ := reparse(t, files)
+	if got := back.Pipelines[0].Finally[0].Needs; len(got) != 1 {
+		t.Fatalf("needs = %v\n%s", got, joinFiles(files))
+	}
+}

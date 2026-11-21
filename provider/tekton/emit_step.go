@@ -122,7 +122,7 @@ func (tc *taskCtx) scriptStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 		}
 	}
 	tc.stepTail(m, st, cond)
-	return m, tc.stepExt(m, st, sp)
+	return m, tc.stepExt(m, st)
 }
 
 func envName(n *yaml.Node) string {
@@ -148,19 +148,21 @@ func (tc *taskCtx) stepTail(m *wmap, st *ir.Step, cond condition) {
 }
 
 // stepExt writes the Tekton Ext keys of a step that came from Tekton.
-func (tc *taskCtx) stepExt(m *wmap, st *ir.Step, sp string) error {
+func (tc *taskCtx) stepExt(m *wmap, st *ir.Step) error {
 	x := extOf(st.Ext)
 	if len(x) == 0 || !tc.e.own {
 		return nil
 	}
-	skip := map[string]bool{ExtCommand: true, ExtArgs: true, ExtScriptLine: true, "ref": true, "params": true, "taskRef": true}
+	skip := map[string]bool{ExtCommand: true, ExtArgs: true, ExtScriptLine: true, "ref": true, "params": true, "taskRef": true, "timeout": true, "onError": true}
 	for _, k := range sortedKeys(x) {
-		if k == "timeout" || k == "onError" {
+		if skip[k] || m.has(k) {
 			continue
 		}
-		if !skip[k] {
-			tc.e.lose(sp, caps.ExtPassthrough, "key "+k+" of the step has no Tekton place in the emitter")
+		n, err := plainNode(x[k])
+		if err != nil {
+			return err
 		}
+		m.set(k, n)
 	}
 	for _, k := range []string{"timeout", "onError"} {
 		if v, ok := x[k]; ok {
