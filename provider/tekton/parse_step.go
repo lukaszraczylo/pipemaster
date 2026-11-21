@@ -91,7 +91,10 @@ func (b *jobBuilder) step(m *omap, n int) (*ir.Step, error) {
 		if err != nil {
 			return nil, fmt.Errorf("step %s: %w", id, err)
 		}
-		st.If = andExpr(st.If, b.condition(entries, r.line("when"), false))
+		b.inTask = true
+		cond := b.condition(entries, r.line("when"), false)
+		b.inTask = false
+		st.If = andExpr(st.If, cond)
 	}
 	k.keepRest(r)
 	st.Ext = k.ext()

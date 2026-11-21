@@ -90,6 +90,7 @@ type jobBuilder struct {
 	containerRef string
 	path         string
 	finally      bool
+	inTask       bool
 }
 
 func (c *plCtx) job(m *omap, finally bool) (*ir.Job, error) {

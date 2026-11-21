@@ -75,9 +75,31 @@ func (b *jobBuilder) condition(entries []exprtekton.Entry, line int, finally boo
 	return out
 }
 
+// resolveParams replaces an inputs.<param> ref in a step condition with what the PipelineTask binds to the param.
+func (b *jobBuilder) resolveParams(e expr.Expr) expr.Expr {
+	switch v := e.(type) {
+	case expr.Ref:
+		if len(v.Path) == 2 && v.Path[0] == expr.PrefixInputs {
+			if parts, ok := b.tx.taskParam(v.Path[1]); ok && len(parts) == 1 && parts[0].Expr != nil {
+				if r, isRef := parts[0].Expr.(expr.Ref); isRef {
+					return r
+				}
+			}
+		}
+	case expr.Unary:
+		return expr.Unary{Op: v.Op, X: b.resolveParams(v.X)}
+	case expr.Binary:
+		return expr.Binary{Op: v.Op, L: b.resolveParams(v.L), R: b.resolveParams(v.R)}
+	}
+	return e
+}
+
 // entry reads one entry through the shared decoder and renames the tasks it points at to job IDs.
 func (b *jobBuilder) entry(en exprtekton.Entry, line int) expr.Expr {
 	e := exprtekton.FromWhen([]exprtekton.Entry{en})
+	if b.inTask {
+		e = b.resolveParams(e)
+	}
 	if o, isOpaque := e.(expr.Opaque); isOpaque {
 		what := "a when entry that is not one variable tested with in or notin"
 		if en.CEL != "" {

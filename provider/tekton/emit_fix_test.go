@@ -497,3 +497,16 @@ func TestJobGuardOnAPlaceholderStepReturns(t *testing.T) {
 		t.Fatalf("job condition = %q, steps = %d\n%s", cond(got.If), len(got.Steps), joinFiles(files))
 	}
 }
+
+func TestStepConditionOnANeedsOutputReturns(t *testing.T) {
+	a := scriptJob("a", "true")
+	a.Outputs = []ir.Output{{Name: "dry", Value: "x"}}
+	b := scriptJob("b", "true")
+	b.Needs = []ir.Need{{JobID: "a"}}
+	b.Steps[0].If = expr.Binary{Op: expr.OpNe, L: expr.Ref{Path: []string{"needs", "a", "outputs", "dry"}}, R: expr.Lit{Kind: expr.LitStr, Str: "true"}}
+	files, _ := emit(t, project(a, b))
+	back, _ := reparse(t, files)
+	if got, want := cond(back.Pipelines[0].Jobs[1].Steps[0].If), cond(b.Steps[0].If); got != want {
+		t.Fatalf("step condition = %q, want %q\n%s", got, want, joinFiles(files))
+	}
+}
