@@ -49,6 +49,11 @@ actions:
         with:
           fetch-depth: {to: depth, transform: depth}
         support: {level: native, strategy: the default clone step runs before the steps}
+      drone:
+        kind: implicit
+        with:
+          fetch-depth: {to: depth, transform: depth}
+        support: {level: native, strategy: the default clone step runs before the steps}
 
   - match: actions/cache
     targets:
@@ -65,6 +70,12 @@ actions:
           key: key
           path: {to: paths, transform: lines}
         support: {level: emulated, strategy: shared workspace of the steps in one workflow, caveat: nothing persists between runs}
+      drone:
+        kind: cache
+        with:
+          key: key
+          path: {to: paths, transform: lines}
+        support: {level: emulated, strategy: shared workspace of the steps in one document, caveat: nothing persists between runs}
 
   - match: actions/upload-artifact
     targets:
@@ -82,6 +93,12 @@ actions:
           name: name
           path: {to: path, transform: lines}
         support: {level: emulated, strategy: shared workspace of the steps in one workflow, caveat: other workflows cannot read the files}
+      drone:
+        kind: artifact_upload
+        with:
+          name: name
+          path: {to: path, transform: lines}
+        support: {level: emulated, strategy: shared workspace of the steps in one document, caveat: other documents cannot read the files}
 
   - match: actions/download-artifact
     targets:
@@ -94,6 +111,10 @@ actions:
         kind: artifact_download
         with: {name: name, path: path}
         support: {level: emulated, strategy: shared workspace of the steps in one workflow, caveat: only an upload in the same workflow is visible}
+      drone:
+        kind: artifact_download
+        with: {name: name, path: path}
+        support: {level: emulated, strategy: shared workspace of the steps in one document, caveat: only an upload in the same document is visible}
 
   - match: actions/setup-go
     targets:
@@ -103,6 +124,10 @@ actions:
         image: "golang:{{go-version}}"
         support: {level: emulated, strategy: image selection, caveat: job image replaced}
       woodpecker:
+        kind: image
+        image: "golang:{{go-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
+      drone:
         kind: image
         image: "golang:{{go-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
@@ -118,6 +143,10 @@ actions:
         kind: image
         image: "node:{{node-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
+      drone:
+        kind: image
+        image: "node:{{node-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
 
   - match: actions/setup-python
     targets:
@@ -130,6 +159,10 @@ actions:
         kind: image
         image: "python:{{python-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
+      drone:
+        kind: image
+        image: "python:{{python-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
 
   - match: actions/setup-java
     targets:
@@ -139,6 +172,10 @@ actions:
         image: "eclipse-temurin:{{java-version}}"
         support: {level: emulated, strategy: image selection, caveat: job image replaced}
       woodpecker:
+        kind: image
+        image: "eclipse-temurin:{{java-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
+      drone:
         kind: image
         image: "eclipse-temurin:{{java-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
