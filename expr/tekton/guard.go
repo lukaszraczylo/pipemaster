@@ -66,8 +66,11 @@ func upperUnder(s string) string { return strings.ToUpper(strings.ReplaceAll(s, 
 
 func lowerDash(s string) string { return strings.ToLower(strings.ReplaceAll(s, "_", "-")) }
 
+// noVariable refuses text that Tekton would rewrite: it substitutes $(...) in script text with no escape.
+func noVariable(lit string) bool { return !strings.Contains(lit, wordOpen) }
+
 func guardDialect() shguard.Dialect {
-	return shguard.Dialect{Sem: Semantics, Name: EnvName, Ref: EnvRef}
+	return shguard.Dialect{Sem: Semantics, Name: EnvName, Ref: EnvRef, Literal: noVariable}
 }
 
 // Guardable reports whether PrintGuard accepts e.

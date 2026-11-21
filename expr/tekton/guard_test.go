@@ -23,7 +23,7 @@ func TestPrintGuard(t *testing.T) {
 		{bin(expr.OpEq, ref("matrix", "os"), str("linux")), "matrix axis", `if ! [ "$PM_MATRIX_OS" = 'linux' ]; then exit 0; fi # pipemaster:guard`},
 		{bin(expr.OpEq, ref("needs", "build-img", "outputs", "ok"), str("yes")), "task result", `if ! [ "$PM_NEEDS_BUILD_IMG__OK" = 'yes' ]; then exit 0; fi # pipemaster:guard`},
 		{eq("branch", "it's"), "single quote", `if ! [ "$PM_CTX_BRANCH" = 'it'\''s' ]; then exit 0; fi # pipemaster:guard`},
-		{eq("branch", "$(id) `x` ${y} $HOME"), "substitution text", "if ! [ \"$PM_CTX_BRANCH\" = '$(id) `x` ${y} $HOME' ]; then exit 0; fi # pipemaster:guard"},
+		{eq("branch", "`x` ${y} $HOME"), "shell text", "if ! [ \"$PM_CTX_BRANCH\" = '`x` ${y} $HOME' ]; then exit 0; fi # pipemaster:guard"},
 		{eq("branch", `a "b" c`), "spaces and double quote", `if ! [ "$PM_CTX_BRANCH" = 'a "b" c' ]; then exit 0; fi # pipemaster:guard`},
 		{eq("branch", "-n"), "test operator as data", `if ! [ "$PM_CTX_BRANCH" = '-n' ]; then exit 0; fi # pipemaster:guard`},
 		{eq("branch", ""), "empty literal", `if ! [ "$PM_CTX_BRANCH" = '' ]; then exit 0; fi # pipemaster:guard`},
@@ -69,6 +69,41 @@ func TestNotGuardable(t *testing.T) {
 		if line, err := tekton.PrintGuard(e); !errors.Is(err, tekton.ErrNotGuardable) {
 			t.Errorf("%s: PrintGuard = %q, %v; want ErrNotGuardable", name, line, err)
 		}
+	}
+}
+
+// Tekton rewrites $(...) variables in script text before the shell runs, so a literal that holds one is refused.
+func TestGuardRefusesVariableSyntaxInLiteral(t *testing.T) {
+	for _, lit := range []string{
+		"x$(params.ctx-branch)", "$(params.x)", "$(tasks.a.results.b)", "$(context.pipelineRun.name)", "a$(b", "$(", "it's $(params.x)",
+	} {
+		e := eq("branch", lit)
+		if tekton.Guardable(e) {
+			t.Errorf("%q: Guardable = true", lit)
+		}
+		if line, err := tekton.PrintGuard(e); !errors.Is(err, tekton.ErrNotGuardable) {
+			t.Errorf("%q: PrintGuard = %q, %v; want ErrNotGuardable", lit, line, err)
+		}
+		if _, err := tekton.AddGuard([]string{"x"}, e); !errors.Is(err, tekton.ErrNotGuardable) {
+			t.Errorf("%q: AddGuard = %v", lit, err)
+		}
+	}
+	// A lone dollar or a brace form carries no Tekton variable and stays guardable.
+	for _, lit := range []string{"$HOME", "${x}", "a$", "$ (x)"} {
+		if !tekton.Guardable(eq("branch", lit)) {
+			t.Errorf("%q: Guardable = false", lit)
+		}
+	}
+}
+
+func TestMatrixGuardRoundTrips(t *testing.T) {
+	e := bin(expr.OpEq, ref("matrix", "os"), str("linux"))
+	line, err := tekton.PrintGuard(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back, ok := tekton.ParseGuard(line); !ok || !reflect.DeepEqual(back, e) {
+		t.Errorf("ParseGuard(%q) = %#v, %v", line, back, ok)
 	}
 }
 
@@ -153,7 +188,7 @@ func TestGuardRunsInShell(t *testing.T) {
 	if err != nil {
 		t.Skip("no sh")
 	}
-	for _, lit := range []string{"main", "it's", "$(touch /nonexistent/x)", "`id`", `a "b" c`, "$HOME", "-n", "", "a b"} {
+	for _, lit := range []string{"main", "it's", "${x}", "`id`", `a "b" c`, "$HOME", "-n", "", "a b"} {
 		line, err := tekton.PrintGuard(eq("branch", lit))
 		if err != nil {
 			t.Fatalf("%q: %v", lit, err)

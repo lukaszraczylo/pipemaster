@@ -35,6 +35,8 @@ type Dialect struct {
 	Prepare func(expr.Expr) expr.Expr
 	// Compare prints a == or != node itself. handled false leaves the node to the shared printer.
 	Compare func(expr.Binary) (text string, handled bool, err error)
+	// Literal reports whether a string literal can appear in the script text. Nil means always.
+	Literal func(lit string) bool
 	// Exact reports whether a literal reads the same under Sem and under the shell test. Nil means always.
 	Exact func(lit string) bool
 	// Canon rewrites a parsed comparison, for example to a canonical literal. Nil keeps it.
@@ -210,7 +212,7 @@ func (d Dialect) operand(e expr.Expr) (string, error) {
 		}
 		return `"$` + name + `"`, nil
 	case expr.Lit:
-		if v.Kind != expr.LitStr || strings.ContainsAny(v.Str, "\n\r\x00") {
+		if v.Kind != expr.LitStr || strings.ContainsAny(v.Str, "\n\r\x00") || d.Literal != nil && !d.Literal(v.Str) {
 			return "", fmt.Errorf("%w: literal %+v", ErrNotGuardable, v)
 		}
 		return Quote(v.Str), nil
