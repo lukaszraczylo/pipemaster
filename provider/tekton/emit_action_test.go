@@ -165,3 +165,19 @@ func TestDroppedStepReportsItsSettingsLost(t *testing.T) {
 	wantEntry(t, rep, caps.StepIf, caps.Lost, "setting is lost")
 	wantEntry(t, rep, caps.StepImage, caps.Lost, "setting is lost")
 }
+
+func TestDroppedStepsKeepTheirOrder(t *testing.T) {
+	mk := func(id string) *ir.Step {
+		return &ir.Step{ID: id, Kind: ir.StepPlugin, Image: &ir.Image{Ref: "plugins/docker"}, With: map[string]ir.Value{"repo": {Lit: id}}}
+	}
+	j := jobWith(&ir.Step{ID: "run", Kind: ir.StepScript, Script: []string{"true"}}, mk("test-image"), mk("release-image"))
+	files, _ := emit(t, project(j))
+	back, _ := reparse(t, files)
+	var ids []string
+	for _, st := range back.Pipelines[0].Jobs[0].Steps {
+		ids = append(ids, st.ID)
+	}
+	if got := strings.Join(ids, ","); got != "run,test-image,release-image" {
+		t.Fatalf("steps = %s", got)
+	}
+}

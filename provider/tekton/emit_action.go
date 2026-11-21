@@ -31,6 +31,8 @@ type actionArg struct {
 	// Wrote is the fingerprint of the step that the file holds for the action; empty when the action wrote none.
 	Wrote string `json:"wrote,omitempty"`
 	At    int    `json:"at"`
+	// Seq orders the steps that stand at the same place, counted from the first step that the file lacks.
+	Seq int `json:"seq,omitempty"`
 }
 
 // printNode fingerprints written YAML, so the parser can tell a step that is still as written from an edited one.
@@ -129,7 +131,9 @@ func (tc *taskCtx) markAction(b *stepBook, sp string, st *ir.Step, image string,
 	if written != nil {
 		wrote = printNode(written.n)
 	}
-	return tc.e.markArg(caps.StepAction, sp, actionArg{Step: body, At: len(b.nodes), Image: image, Wrote: wrote})
+	arg := actionArg{Step: body, At: len(b.nodes), Image: image, Wrote: wrote, Seq: b.seq}
+	b.seq++
+	return tc.e.markArg(caps.StepAction, sp, arg)
 }
 
 // actionStep maps an action step through the actions table. Every mapped action leaves a marker that holds the step.

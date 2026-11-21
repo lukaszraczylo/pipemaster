@@ -25,6 +25,7 @@ type stepBook struct {
 	guard expr.Expr
 	names map[string]bool
 	nodes []*yaml.Node
+	seq   int
 }
 
 func (tc *taskCtx) durationText(d *ir.Duration) string { return time.Duration(*d).String() }
