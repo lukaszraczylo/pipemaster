@@ -677,3 +677,26 @@ func TestImageStepsWithCollidingSanitisedIDsCollapse(t *testing.T) {
 		t.Errorf("each step must collapse to its own image: %+v %+v\n%s", got[0], got[1], text)
 	}
 }
+
+func TestPluginSettingsSharingAnEnvNameKeepTheFirstAndReportTheSecond(t *testing.T) {
+	p := imageProject(t)
+	st := job(p, "build").Steps[0]
+	st.Kind, st.Script, st.Image = ir.StepPlugin, nil, &ir.Image{Ref: "alpine:3.20"}
+	st.With = map[string]ir.Value{"foo-bar": {Lit: "dash"}, "foo_bar": {Lit: "under"}}
+	files, rep, err := gha.New(gha.GHA).Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(files[".github/workflows/ci.yml"])
+	if n := strings.Count(text, "PLUGIN_FOO_BAR:"); n != 1 {
+		t.Errorf("PLUGIN_FOO_BAR written %d times, want 1:\n%s", n, text)
+	}
+	if !strings.Contains(text, "dash") || strings.Contains(text, "under") {
+		t.Errorf("want the first setting (foo-bar, sorted order) kept and the second dropped:\n%s", text)
+	}
+	if !slices.ContainsFunc(rep.Entries, func(e report.Entry) bool {
+		return e.Level == caps.Lost && strings.Contains(e.Detail, "foo_bar") && strings.Contains(e.Detail, "PLUGIN_FOO_BAR")
+	}) {
+		t.Errorf("the dropped setting must be reported as lost: %+v", rep.Entries)
+	}
+}

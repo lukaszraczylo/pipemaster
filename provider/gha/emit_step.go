@@ -342,13 +342,20 @@ func pluginEnvName(setting string) string {
 // the settings it could write.
 func (e *emitter) pluginEnv(sp string, with map[string]ir.Value) (env *yaml.Node, names []string, err error) {
 	env = newMap().n
+	owner := map[string]string{}
 	for _, k := range slices.Sorted(maps.Keys(with)) {
 		n, err := e.value(sp, with[k])
 		if err != nil {
 			return nil, nil, err
 		}
 		if n != nil {
-			env.Content = append(env.Content, str(pluginEnvName(k)), n)
+			name := pluginEnvName(k)
+			if first, dup := owner[name]; dup {
+				e.lose(sp, caps.StepImage, "the setting "+k+" maps to "+name+", which the setting "+first+" already sets; "+k+" is dropped")
+				continue
+			}
+			owner[name] = k
+			env.Content = append(env.Content, str(name), n)
 			names = append(names, k)
 		}
 	}
