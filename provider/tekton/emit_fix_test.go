@@ -639,3 +639,17 @@ func TestTektonParamTypesAreKept(t *testing.T) {
 		t.Fatalf("native type reported: %+v", rep.Entries)
 	}
 }
+
+func TestFinallyTaskReadingAResultKeepsOneNeed(t *testing.T) {
+	main := scriptJob("main", "true")
+	main.Outputs = []ir.Output{{Name: "o"}}
+	f := scriptJob("f", "echo ${{ needs.main.outputs.o }}")
+	f.Needs = []ir.Need{{JobID: "main"}}
+	p := project(main)
+	p.Pipelines[0].Finally = []*ir.Job{f}
+	files, _ := emit(t, p)
+	back, _ := reparse(t, files)
+	if n := back.Pipelines[0].Finally[0].Needs; len(n) != 1 || n[0].JobID != "main" {
+		t.Fatalf("needs = %+v\n%s", n, joinFiles(files))
+	}
+}
