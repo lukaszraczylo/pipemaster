@@ -662,3 +662,25 @@ func TestEditInLaterMatrixCellKeepsTheCells(t *testing.T) {
 		})
 	}
 }
+
+func gatedProject() *ir.Project {
+	man := gjob("deploy", gstep("x", "./deploy"))
+	man.Manual = true
+	p := gproject(ghaOrigin, gjob("build", gstep("b", "make")), man)
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush, Branches: ir.Filter{Include: []string{"main"}}}}
+	return p
+}
+
+func TestEditedTriggerBesideManualGateKeepsTheFile(t *testing.T) {
+	p, rep := back(t, gatedProject(), func(s string) string {
+		i := strings.Index(s, "name: build")
+		return s[:i] + strings.Replace(s[i:], "- push", "- pull_request", 1)
+	})
+	tr := p.Pipelines[0].Triggers
+	if len(tr) != 1 || tr[0].Kind != ir.TriggerPR {
+		t.Errorf("the gate marker replaced the edited triggers: %+v", tr)
+	}
+	if !ignored(rep, caps.JobManual) {
+		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
+	}
+}

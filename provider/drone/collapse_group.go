@@ -732,7 +732,11 @@ func (g *group) placeTriggers(rep *report.Report) []ir.Trigger {
 			reportUncollapsed(rep, u, "its argument is not a list of triggers")
 			continue
 		}
-		list = representable(orig)
+		if want := representable(orig); len(sel) == 0 || reflect.DeepEqual(want, list) {
+			list = want
+		} else {
+			reportIgnored(rep, u, "the pipeline triggers")
+		}
 		break
 	}
 	for _, d := range g.docs {
