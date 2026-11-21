@@ -1,0 +1,2 @@
+Loss report: woodpecker -> drone
+[emulated] pipeline/woodpecker/job/deploy job.manual: trigger event custom (a person starts the build through the API or drone build create; the document no longer runs on its normal events)

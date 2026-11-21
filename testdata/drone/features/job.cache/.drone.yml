@@ -1,0 +1,14 @@
+# pipemaster:emulated job.cache pipeline/drone/job/ci
+# pipemaster:arg [{"Key":"go-mod","Policy":"pull-push","Paths":["~/go/pkg/mod"]}]
+kind: pipeline
+type: docker
+name: ci
+environment: {}
+trigger:
+  event:
+    - push
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

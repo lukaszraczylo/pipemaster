@@ -1,0 +1,31 @@
+# pipemaster:emulated job.container pipeline/ci/job/test
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"matrix":{"FailFast":null,"Axes":[{"Name":"go","Values":["1.21","1.22"]}],"Include":[[{"Key":"experimental","Value":"true"},{"Key":"go","Value":"1.22"}]],"Exclude":null,"MaxParallel":0},"job":"test","cell":[{"Key":"go","Value":"1.21"}],"held":[{"script":["go test $$\u007b{ matrix.go }}"],"pos":0}],"index":0}
+kind: pipeline
+type: docker
+name: test-1.21
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: test-step-1
+    image: ubuntu:latest
+    commands:
+      - go test 1.21
+---
+# pipemaster:emulated job.container pipeline/ci/job/test
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"job":"test","cell":[{"Key":"experimental","Value":"true"},{"Key":"go","Value":"1.22"}],"index":1}
+kind: pipeline
+type: docker
+name: test-true-1.22
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: test-step-1
+    image: ubuntu:latest
+    commands:
+      - go test 1.22

@@ -1,0 +1,2 @@
+Loss report: drone -> woodpecker
+[emulated] pipeline/drone/job/ci job.artifacts: shared workspace of the steps in one workflow (other workflows cannot read the files)

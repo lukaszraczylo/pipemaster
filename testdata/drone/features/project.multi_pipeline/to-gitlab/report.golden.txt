@@ -1,0 +1,4 @@
+Loss report: drone -> gitlab
+[lost] pipeline/ci/job/test/step/test step.image (GitLab sets the image per job, not per step)
+[lost] pipeline/deploy/job/ship/step/ship step.image (GitLab sets the image per job, not per step)
+[emulated] pipeline/deploy project.multi_pipeline: jobs of every pipeline in one file under <pipeline>:<job> keys (each job carries its pipeline's trigger condition and a marker; workflow:rules is the union of all triggers)

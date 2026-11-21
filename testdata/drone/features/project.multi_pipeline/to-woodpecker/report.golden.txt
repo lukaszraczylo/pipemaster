@@ -1,0 +1,2 @@
+Loss report: drone -> woodpecker
+[emulated] pipeline/deploy project.multi_pipeline: each job of each pipeline is a workflow named <pipeline>-<job> (each workflow carries its pipeline's trigger condition)

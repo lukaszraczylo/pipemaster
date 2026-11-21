@@ -1,0 +1,2 @@
+Loss report: drone -> woodpecker
+[emulated] pipeline/drone/trigger/0 trigger.filter.tags: ref filter refs/tags/<pattern> (the tag name filter is written as a ref filter on the tag event)

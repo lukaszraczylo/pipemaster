@@ -1,0 +1,3 @@
+Loss report: woodpecker -> drone
+[emulated] pipeline/deploy project.multi_pipeline: each pipeline is a document named <pipeline>-<job> (each document carries its pipeline's trigger condition)
+[emulated] pipeline/deploy/trigger/0 trigger.manual: trigger event custom (a person starts the build through the API or drone build create)

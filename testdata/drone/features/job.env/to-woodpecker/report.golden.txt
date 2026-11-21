@@ -1,0 +1,2 @@
+Loss report: drone -> woodpecker
+[emulated] pipeline/drone/job/ci job.env: copied into the environment of every step (a step variable of the same name wins)

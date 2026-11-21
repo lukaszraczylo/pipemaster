@@ -1,0 +1,17 @@
+origin:
+    provider: drone
+    dialect: drone
+    files:
+        - .drone.yml
+pipelines:
+    - id: drone
+      jobs:
+        - if: (event == 'push') && (actor == 'release-bot')
+          id: ci
+          steps:
+            - image:
+                ref: golang:1.25
+              id: build
+              kind: script
+              script:
+                - go build ./...

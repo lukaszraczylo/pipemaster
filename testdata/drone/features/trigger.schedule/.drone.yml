@@ -1,0 +1,14 @@
+kind: pipeline
+type: docker
+name: ci
+environment: {}
+trigger:
+  event:
+    - cron
+  cron:
+    - woodpecker-schedule-0
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

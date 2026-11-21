@@ -1,0 +1,19 @@
+origin:
+    provider: drone
+    dialect: drone
+    files:
+        - .drone.yml
+pipelines:
+    - id: drone
+      triggers:
+        - kind: push
+      jobs:
+        - id: ci
+          steps:
+            - if: ((event == 'tag') || (branch == 'main')) && (actor == 'release-bot')
+              image:
+                ref: alpine:3.20
+              id: deploy
+              kind: script
+              script:
+                - ./deploy.sh

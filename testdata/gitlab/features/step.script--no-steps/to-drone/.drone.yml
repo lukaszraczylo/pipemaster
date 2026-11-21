@@ -1,0 +1,30 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make build
+---
+# pipemaster:emulated step.script pipeline/gitlab-ci/job/downstream
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/downstream
+kind: pipeline
+type: docker
+name: downstream
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - build
+steps:
+  - name: noop
+    image: ubuntu:latest
+    commands:
+      - "true"

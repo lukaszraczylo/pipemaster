@@ -1,0 +1,17 @@
+# pipemaster:emulated job.container pipeline/ci/job/check
+# pipemaster:lost script.interpolation pipeline/ci/job/check/step/check-step-2: docker inspect {{ steps.meta.outputs.version }}
+# pipemaster:lost step.script pipeline/ci/job/check/step/check-step-2: the step has no command left
+# pipemaster:emulated step.action pipeline/ci/job/check/step/check-step-2
+# pipemaster:arg {"step":"ext:\n    gha:\n        _derived_id: true\nid: check-step-2\nname: Inspect\nkind: script\nscript:\n    - docker inspect $$\u007b{ steps.meta.outputs.version }}\n","at":1}
+kind: pipeline
+type: docker
+name: check
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: meta
+    image: ubuntu:latest
+    commands:
+      - echo "version=1" >> "$$GITHUB_OUTPUT"

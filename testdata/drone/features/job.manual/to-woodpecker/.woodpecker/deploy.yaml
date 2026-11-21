@@ -1,0 +1,9 @@
+# pipemaster:emulated job.manual pipeline/drone/job/deploy
+# pipemaster:arg "- kind: push\n"
+when:
+  - event: manual
+steps:
+  - name: deploy
+    image: alpine:3.20
+    commands:
+      - ./deploy.sh

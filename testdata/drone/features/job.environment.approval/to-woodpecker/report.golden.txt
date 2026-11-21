@@ -1,0 +1,3 @@
+Loss report: drone -> woodpecker
+[lost] pipeline/drone/job/deploy job.environment (Woodpecker has no environment name or URL in the workflow)
+[external] pipeline/drone/job/deploy job.environment.approval: repo setting Require approval for

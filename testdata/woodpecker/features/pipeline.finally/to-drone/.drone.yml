@@ -1,0 +1,30 @@
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...
+---
+# pipemaster:emulated pipeline.finally pipeline/woodpecker
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}],"noIf":true}
+kind: pipeline
+type: docker
+name: notify
+trigger:
+  event:
+    - push
+  status:
+    - success
+    - failure
+depends_on:
+  - build
+steps:
+  - name: notify
+    image: alpine:3.20
+    commands:
+      - ./notify.sh

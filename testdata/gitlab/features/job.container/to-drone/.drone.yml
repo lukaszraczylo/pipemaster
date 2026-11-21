@@ -1,0 +1,14 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+# pipemaster:arg {"Ref":"golang:1.22","Entrypoint":[""]}
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: golang:1.22
+    commands:
+      - make

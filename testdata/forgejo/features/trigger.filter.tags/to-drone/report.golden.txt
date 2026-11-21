@@ -1,0 +1,5 @@
+Loss report: forgejo -> drone
+[lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
+[lost] pipeline/ci/job/build job.runner (only the platform has a Drone form; other runner labels are lost)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/ci/trigger/0 trigger.filter.tags: doublestar glob; ref filter refs/tags/<pattern> (pattern v[0-9]+.[0-9]+.[0-9]+, !v*-rc* has a different meaning in doublestar than in the source; it is written as is; the tag name filter is written as a ref filter on the tag event)

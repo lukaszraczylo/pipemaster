@@ -1,0 +1,2 @@
+Loss report: woodpecker -> drone
+[lost] pipeline/woodpecker/job/ci/step/ci-step-1 display.name (a Drone step has one name, which carries the id; the display name is kept in round-trip metadata)

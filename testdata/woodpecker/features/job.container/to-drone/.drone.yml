@@ -1,0 +1,13 @@
+# pipemaster:emulated job.container pipeline/woodpecker/job/ci
+# pipemaster:arg {"Ref":"node:22","Entrypoint":null}
+kind: pipeline
+type: docker
+name: ci
+trigger:
+  event:
+    - push
+steps:
+  - name: test
+    image: node:22
+    commands:
+      - npm test

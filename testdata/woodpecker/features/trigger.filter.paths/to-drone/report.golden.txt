@@ -1,0 +1,2 @@
+Loss report: woodpecker -> drone
+[lost] pipeline/woodpecker/trigger/0 trigger.filter.paths (the Drone OSS server does not evaluate trigger.paths, so no path filter is written)

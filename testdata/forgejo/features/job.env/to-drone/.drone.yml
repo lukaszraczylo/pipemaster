@@ -1,0 +1,20 @@
+# pipemaster:emulated job.env pipeline/ci/job/build
+# pipemaster:arg "- name: GOFLAGS\n  value:\n    lit: -trimpath\n- name: API\n  value:\n    secret: API_KEY\n"
+# pipemaster:emulated job.container pipeline/ci/job/build
+kind: pipeline
+type: docker
+name: build
+environment:
+  GOFLAGS: -trimpath
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok
+    environment:
+      API:
+        from_secret: API_KEY

@@ -1,0 +1,4 @@
+Loss report: gitlab -> drone
+[lost] pipeline/gitlab-ci/job/triggered job.if (the triggers of the pipeline have no single Drone condition; the document never runs)
+[lost] pipeline/gitlab-ci/trigger/0 trigger.api (the document is disabled, so the trigger is not written)
+[emulated] pipeline/gitlab-ci/job/triggered job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

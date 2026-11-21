@@ -1,0 +1,15 @@
+# pipemaster:emulated job.container pipeline/ci/job/test
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"matrix":{"FailFast":null,"Axes":null,"Include":[[{"Key":"os","Value":"ubuntu-latest"}]],"Exclude":null,"MaxParallel":0},"job":"test","cell":[{"Key":"os","Value":"ubuntu-latest"}],"index":0}
+kind: pipeline
+type: docker
+name: test-ubuntu-latest
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: test-step-1
+    image: ubuntu:latest
+    commands:
+      - make test

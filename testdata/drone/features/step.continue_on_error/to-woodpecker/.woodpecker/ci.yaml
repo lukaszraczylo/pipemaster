@@ -1,0 +1,8 @@
+when:
+  - event: push
+steps:
+  - name: lint
+    image: golangci/golangci-lint:v2
+    commands:
+      - golangci-lint run
+    failure: ignore

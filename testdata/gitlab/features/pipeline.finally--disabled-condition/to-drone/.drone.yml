@@ -1,0 +1,32 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/compile
+kind: pipeline
+type: docker
+name: compile
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make build
+---
+# pipemaster:lost job.if pipeline/gitlab-ci/job/cleanup: opaque(gitlab): - if: $$PIPELINE_TYPE =~ /_MR_PIPELINE$$/\n
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/cleanup
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:arg {"needs":[{"JobID":"compile","Artifacts":false,"Optional":false}]}
+kind: pipeline
+type: docker
+name: cleanup
+trigger:
+  event:
+    exclude:
+      - '**'
+depends_on:
+  - compile
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make clean

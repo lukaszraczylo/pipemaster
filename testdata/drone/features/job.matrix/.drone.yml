@@ -1,0 +1,63 @@
+# pipemaster:emulated job.matrix pipeline/drone/job/ci
+# pipemaster:arg {"matrix":{"FailFast":null,"Axes":[{"Name":"GO_VERSION","Values":["1.24","1.25"]},{"Name":"OS","Values":["linux","darwin"]}],"Include":null,"Exclude":null,"MaxParallel":0},"job":"ci","cell":[{"Key":"GO_VERSION","Value":"1.24"},{"Key":"OS","Value":"linux"}],"held":[{"image":"golang:$$\u007b{ matrix.GO_VERSION }}","script":["go test ./...","echo $$\u007b{ matrix.OS }}"],"pos":0}],"index":0}
+kind: pipeline
+type: docker
+name: ci-1.24-linux
+environment: {}
+trigger:
+  event:
+    - push
+steps:
+  - name: test
+    image: golang:1.24
+    commands:
+      - go test ./...
+      - echo linux
+---
+# pipemaster:emulated job.matrix pipeline/drone/job/ci
+# pipemaster:arg {"job":"ci","cell":[{"Key":"GO_VERSION","Value":"1.24"},{"Key":"OS","Value":"darwin"}],"index":1}
+kind: pipeline
+type: docker
+name: ci-1.24-darwin
+environment: {}
+trigger:
+  event:
+    - push
+steps:
+  - name: test
+    image: golang:1.24
+    commands:
+      - go test ./...
+      - echo darwin
+---
+# pipemaster:emulated job.matrix pipeline/drone/job/ci
+# pipemaster:arg {"job":"ci","cell":[{"Key":"GO_VERSION","Value":"1.25"},{"Key":"OS","Value":"linux"}],"index":2}
+kind: pipeline
+type: docker
+name: ci-1.25-linux
+environment: {}
+trigger:
+  event:
+    - push
+steps:
+  - name: test
+    image: golang:1.25
+    commands:
+      - go test ./...
+      - echo linux
+---
+# pipemaster:emulated job.matrix pipeline/drone/job/ci
+# pipemaster:arg {"job":"ci","cell":[{"Key":"GO_VERSION","Value":"1.25"},{"Key":"OS","Value":"darwin"}],"index":3}
+kind: pipeline
+type: docker
+name: ci-1.25-darwin
+environment: {}
+trigger:
+  event:
+    - push
+steps:
+  - name: test
+    image: golang:1.25
+    commands:
+      - go test ./...
+      - echo darwin

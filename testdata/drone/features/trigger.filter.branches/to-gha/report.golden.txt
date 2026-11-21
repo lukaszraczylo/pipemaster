@@ -1,0 +1,4 @@
+Loss report: drone -> gha
+[emulated] pipeline/drone/job/ci job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/drone/job/ci/step/build step.image: uses: docker://<image> with entrypoint and args
+[emulated] pipeline/drone/trigger/0 trigger.filter.branches: exclusions written as ! entries (GHA cannot combine branches and branches-ignore on one event)

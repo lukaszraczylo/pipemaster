@@ -1,0 +1,47 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/compile
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
+# pipemaster:arg [{"Name":"","Expire":"","Paths":["bin/"]}]
+kind: pipeline
+type: docker
+name: compile
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/docs
+kind: pipeline
+type: docker
+name: docs
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - compile
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make docs
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/unit
+kind: pipeline
+type: docker
+name: unit
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - compile
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make test

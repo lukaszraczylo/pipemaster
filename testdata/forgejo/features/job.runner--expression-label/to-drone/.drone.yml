@@ -1,0 +1,31 @@
+# pipemaster:emulated job.container pipeline/ci/job/test
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"matrix":{"FailFast":null,"Axes":null,"Include":[[{"Key":"python","Value":"3.13"}],[{"Key":"os","Value":"macos-latest"},{"Key":"python","Value":"3.14"}]],"Exclude":null,"MaxParallel":0},"job":"test","cell":[{"Key":"python","Value":"3.13"}],"index":0}
+kind: pipeline
+type: docker
+name: test-3.13
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: test-step-1
+    image: ubuntu:latest
+    commands:
+      - echo test
+---
+# pipemaster:emulated job.container pipeline/ci/job/test
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"job":"test","cell":[{"Key":"os","Value":"macos-latest"},{"Key":"python","Value":"3.14"}],"index":1}
+kind: pipeline
+type: docker
+name: test-macos-latest-3.14
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: test-step-1
+    image: ubuntu:latest
+    commands:
+      - echo test

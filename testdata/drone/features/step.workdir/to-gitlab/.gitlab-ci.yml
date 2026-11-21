@@ -1,0 +1,13 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+ci:
+  needs: []
+  script:
+    # pipemaster:step build
+    # pipemaster:emulated step.workdir pipeline/drone/job/ci/step/build
+    - |
+      (
+      cd "cmd/app" || exit 1
+      go build ./...
+      )

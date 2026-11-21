@@ -1,0 +1,5 @@
+Loss report: forgejo -> drone
+[lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
+[lost] pipeline/ci pipeline.concurrency (Drone concurrency.limit is a count and the IR models a group and cancel-in-progress, not a limit)
+[lost] pipeline/ci/job/build job.runner (only the platform has a Drone form; other runner labels are lost)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

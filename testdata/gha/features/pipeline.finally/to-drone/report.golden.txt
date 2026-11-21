@@ -1,0 +1,5 @@
+Loss report: gha -> drone
+[emulated] pipeline/gitlab-ci pipeline.finally: a document that depends on every other document and runs on trigger status success and failure (the server skips a stage whose status filter does not match the build result)
+[emulated] pipeline/gitlab-ci/job/alert job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/report job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

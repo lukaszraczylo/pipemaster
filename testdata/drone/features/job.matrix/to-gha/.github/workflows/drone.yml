@@ -1,0 +1,22 @@
+# pipemaster:emulated trigger.push pipeline/drone/trigger/0
+# pipemaster:emulated job.runner pipeline/drone/job/ci
+on:
+  push:
+    branches:
+      - '**'
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        GO_VERSION:
+          - "1.24"
+          - "1.25"
+        OS:
+          - linux
+          - darwin
+    steps:
+      - id: test
+        run: |
+          go test ./...
+          echo ${{ matrix.OS }}

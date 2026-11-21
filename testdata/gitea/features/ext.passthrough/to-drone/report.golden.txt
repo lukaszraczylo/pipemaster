@@ -1,0 +1,6 @@
+Loss report: gitea -> drone
+[lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
+[lost] pipeline/ci ext.passthrough (Ext of provider gha (events, run-name) is not written to the Drone file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/build job.runner (only the platform has a Drone form; other runner labels are lost)
+[lost] pipeline/ci/job/build/step/build-step-1 step.shell (Drone compiles commands into its own script, not bash)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

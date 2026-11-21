@@ -1,0 +1,86 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/compile
+kind: pipeline
+type: docker
+name: compile
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make build
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/lint
+kind: pipeline
+type: docker
+name: lint
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make lint
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/summary
+kind: pipeline
+type: docker
+name: summary
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - compile
+  - lint
+  - unit
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make report
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/unit
+kind: pipeline
+type: docker
+name: unit
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - compile
+  - lint
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make test
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/cleanup
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:arg {"needs":[{"JobID":"compile","Artifacts":false,"Optional":false}],"noIf":true}
+kind: pipeline
+type: docker
+name: cleanup
+trigger:
+  event:
+    - push
+    - tag
+  status:
+    - success
+    - failure
+depends_on:
+  - compile
+  - lint
+  - summary
+  - unit
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make clean

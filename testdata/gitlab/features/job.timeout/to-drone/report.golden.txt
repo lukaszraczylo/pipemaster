@@ -1,0 +1,3 @@
+Loss report: gitlab -> drone
+[external] pipeline/gitlab-ci/job/build job.timeout: repo setting timeout (set the repo timeout to 1h30m0s; Drone has no per-pipeline or per-step timeout)
+[emulated] pipeline/gitlab-ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

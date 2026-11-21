@@ -1,0 +1,7 @@
+Loss report: gitea -> drone
+[lost] pipeline/ci/job/call/step/call-step-1 step.action (step kind pipeline_call has no Drone form)
+[lost] pipeline/ci/job/call/step/script step.script (the job has no steps; a no-op step keeps the document valid)
+[lost] pipeline/ci/job/plain job.runner (only the platform has a Drone form; other runner labels are lost)
+[emulated] pipeline/ci/job/call job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/ci/job/call step.script: no-op step (Drone needs a step; no step of the job has a Drone form, so a no-op step stands in)
+[emulated] pipeline/ci/job/plain job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

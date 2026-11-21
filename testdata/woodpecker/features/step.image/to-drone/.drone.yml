@@ -1,0 +1,16 @@
+kind: pipeline
+type: docker
+name: ci
+trigger:
+  event:
+    - push
+steps:
+  - name: build
+    image: rust:1.85
+    commands:
+      - cargo build --release
+  - name: publish
+    image: woodpeckerci/plugin-docker-buildx
+    settings:
+      repo: example/app
+      tags: latest

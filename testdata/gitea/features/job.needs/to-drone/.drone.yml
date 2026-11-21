@@ -1,0 +1,44 @@
+# pipemaster:emulated job.container pipeline/ci/job/lint
+kind: pipeline
+type: docker
+name: lint
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: lint-step-1
+    image: ubuntu:latest
+    commands:
+      - echo lint
+---
+# pipemaster:emulated job.container pipeline/ci/job/ship
+kind: pipeline
+type: docker
+name: ship
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - lint
+  - test
+steps:
+  - name: ship-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ship
+---
+# pipemaster:emulated job.container pipeline/ci/job/test
+kind: pipeline
+type: docker
+name: test
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: test-step-1
+    image: ubuntu:latest
+    commands:
+      - echo test

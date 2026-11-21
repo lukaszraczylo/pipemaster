@@ -1,0 +1,27 @@
+kind: pipeline
+type: docker
+name: lint
+environment: {}
+trigger:
+  event:
+    - push
+steps:
+  - name: lint
+    image: golangci/golangci-lint:v2
+    commands:
+      - golangci-lint run
+---
+kind: pipeline
+type: docker
+name: ship
+environment: {}
+trigger:
+  event:
+    - push
+depends_on:
+  - lint
+steps:
+  - name: ship
+    image: alpine:3.20
+    commands:
+      - ./ship.sh

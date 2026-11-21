@@ -1,0 +1,16 @@
+# pipemaster:emulated job.manual pipeline/gitlab-ci/job/publish
+# pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:lost job.if pipeline/gitlab-ci/job/publish: branch == gitlab.CI_DEFAULT_BRANCH
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/publish
+kind: pipeline
+type: docker
+name: publish
+trigger:
+  event:
+    exclude:
+      - '**'
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make publish

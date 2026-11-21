@@ -1,0 +1,2 @@
+Loss report: drone -> woodpecker
+[lost] pipeline/drone/job/ci/step/deploy step.if (condition not expressible in Woodpecker CI; the step disabled)

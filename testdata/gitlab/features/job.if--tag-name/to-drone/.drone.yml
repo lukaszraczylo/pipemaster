@@ -1,0 +1,14 @@
+# pipemaster:lost job.if pipeline/gitlab-ci/job/release: tag
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/release
+kind: pipeline
+type: docker
+name: release
+trigger:
+  event:
+    exclude:
+      - '**'
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make release

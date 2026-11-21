@@ -1,0 +1,16 @@
+# pipemaster:emulated job.manual pipeline/gitlab-ci/job/deploy
+# pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/deploy
+# pipemaster:emulated job.allow_failure pipeline/gitlab-ci/job/deploy
+kind: pipeline
+type: docker
+name: deploy
+trigger:
+  event:
+    - custom
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make deploy
+    failure: ignore

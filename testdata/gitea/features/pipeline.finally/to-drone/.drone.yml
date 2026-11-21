@@ -1,0 +1,56 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make build
+---
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/alert
+# pipemaster:arg {"if":"failure()","back":"(event == 'push') \u0026\u0026 failure()","triggers":"- kind: push\n- kind: tag\n"}
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/alert
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}]}
+kind: pipeline
+type: docker
+name: alert
+trigger:
+  event:
+    - push
+    - tag
+  status:
+    - failure
+depends_on:
+  - build
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - ./page.sh
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/report
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}],"noIf":true}
+kind: pipeline
+type: docker
+name: report
+trigger:
+  event:
+    - push
+    - tag
+  status:
+    - success
+    - failure
+depends_on:
+  - build
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - ./notify.sh

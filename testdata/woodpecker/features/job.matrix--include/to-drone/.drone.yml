@@ -1,0 +1,27 @@
+# pipemaster:emulated job.matrix pipeline/woodpecker/job/ci
+# pipemaster:arg {"matrix":{"FailFast":null,"Axes":null,"Include":[[{"Key":"GO_VERSION","Value":"1.24"},{"Key":"TAGS","Value":"nethttp"}],[{"Key":"GO_VERSION","Value":"1.25"},{"Key":"TAGS","Value":"netgo"}]],"Exclude":null,"MaxParallel":0},"job":"ci","cell":[{"Key":"GO_VERSION","Value":"1.24"},{"Key":"TAGS","Value":"nethttp"}],"held":[{"image":"golang:$$\u007b{ matrix.GO_VERSION }}","script":["go test -tags $$\u007b{ matrix.TAGS }} ./..."],"pos":0}],"index":0}
+kind: pipeline
+type: docker
+name: ci-1.24-nethttp
+trigger:
+  event:
+    - push
+steps:
+  - name: test
+    image: golang:1.24
+    commands:
+      - go test -tags nethttp ./...
+---
+# pipemaster:emulated job.matrix pipeline/woodpecker/job/ci
+# pipemaster:arg {"job":"ci","cell":[{"Key":"GO_VERSION","Value":"1.25"},{"Key":"TAGS","Value":"netgo"}],"index":1}
+kind: pipeline
+type: docker
+name: ci-1.25-netgo
+trigger:
+  event:
+    - push
+steps:
+  - name: test
+    image: golang:1.25
+    commands:
+      - go test -tags netgo ./...

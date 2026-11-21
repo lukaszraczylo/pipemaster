@@ -1,0 +1,2 @@
+Loss report: woodpecker -> drone
+[lost] pipeline/woodpecker/job/ci ext.passthrough (Ext of provider woodpecker (skip_clone) is not written to the Drone file; it is kept in round-trip metadata)

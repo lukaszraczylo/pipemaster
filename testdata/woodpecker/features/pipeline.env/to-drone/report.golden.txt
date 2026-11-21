@@ -1,0 +1,2 @@
+Loss report: woodpecker -> drone
+[emulated] pipeline/woodpecker pipeline.env: copied into the environment of every pipeline document (a step variable of the same name wins)

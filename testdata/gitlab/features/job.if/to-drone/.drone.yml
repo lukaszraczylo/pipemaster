@@ -1,0 +1,15 @@
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - 'if ! ( [ "$$DRONE_BRANCH" = ''main'' ] || ( [ "$$DRONE_BUILD_EVENT" = ''cron'' ] && ( ! [ "$$DRONE_BRANCH" = ''main'' ] ) ) ); then exit 0; fi # pipemaster:guard'
+      - make

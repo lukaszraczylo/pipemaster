@@ -19,6 +19,8 @@ var noSourceForm = map[string]string{
 	provider.GitLab + "/" + string(caps.JobEnvironmentApproval):     "approval rules live in project settings and no parser sets Environment.Approval",
 	provider.GitLab + "/" + string(caps.ConfigName):                 "GitLab variables parse as plain script text, so no gitlab source yields a secrets or vars reference",
 	provider.Woodpecker + "/" + string(caps.JobEnvironmentApproval): "approval rules live in repo settings and no parser sets Environment.Approval",
+	provider.Drone + "/" + string(caps.DisplayName):                 "a Drone pipeline or step name is its id, so no drone source holds a separate display name",
+	provider.Drone + "/" + string(caps.JobTimeout):                  "Drone limits a build with a repo setting, which no pipeline file holds",
 	provider.Woodpecker + "/" + string(caps.JobTimeout):             "Woodpecker limits the whole pipeline with a repo setting, which no workflow file holds",
 }
 

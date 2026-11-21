@@ -1,0 +1,2 @@
+Loss report: gitlab -> drone
+No losses: every feature converted natively.

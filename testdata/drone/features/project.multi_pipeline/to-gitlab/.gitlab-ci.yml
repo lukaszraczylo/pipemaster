@@ -1,0 +1,26 @@
+# pipemaster:emulated project.multi_pipeline pipeline/ci
+# pipemaster:arg {"triggers":[{"Resource":null,"Ext":null,"Kind":"push","Cron":"","Branches":{"Include":null,"Exclude":null},"Tags":{"Include":null,"Exclude":null},"Paths":{"Include":null,"Exclude":null}}]}
+# pipemaster:emulated project.multi_pipeline pipeline/deploy
+# pipemaster:arg {"triggers":[{"Resource":null,"Ext":null,"Kind":"manual","Cron":"","Branches":{"Include":null,"Exclude":null},"Tags":{"Include":null,"Exclude":null},"Paths":{"Include":null,"Exclude":null}}]}
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+# pipemaster:emulated project.multi_pipeline pipeline/ci/job/test
+# pipemaster:arg {}
+ci:test:
+  needs: []
+  rules:
+    - if: $CI_COMMIT_BRANCH
+  script:
+    # pipemaster:step test
+    - ./test.sh
+# pipemaster:emulated project.multi_pipeline pipeline/deploy/job/ship
+# pipemaster:arg {}
+deploy:ship:
+  needs: []
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+  script:
+    # pipemaster:step ship
+    - ./ship.sh

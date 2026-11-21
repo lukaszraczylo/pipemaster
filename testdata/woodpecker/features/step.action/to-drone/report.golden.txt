@@ -1,0 +1,3 @@
+Loss report: woodpecker -> drone
+[lost] pipeline/woodpecker/job/ci/step/checkout ext.passthrough (the action reference actions/checkout@v4 is not in the Drone file; it is kept in round-trip metadata)
+[emulated] pipeline/woodpecker/job/ci/step/checkout step.action: per actions.Lookup verdict; a plugin step with settings (unknown actions are lost)

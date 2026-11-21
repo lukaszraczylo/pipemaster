@@ -1,0 +1,2 @@
+Loss report: woodpecker -> drone
+[lost] pipeline/woodpecker pipeline.concurrency (Drone concurrency.limit is a count and the IR models a group and cancel-in-progress, not a limit)

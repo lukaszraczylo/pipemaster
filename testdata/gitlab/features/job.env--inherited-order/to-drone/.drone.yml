@@ -1,0 +1,16 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/lint
+kind: pipeline
+type: docker
+name: lint
+environment:
+  GOCACHE: $$CI_PROJECT_DIR/.cache/go-build
+  GOMODCACHE: $$CI_PROJECT_DIR/.cache/go-mod
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make lint

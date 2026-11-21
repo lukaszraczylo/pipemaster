@@ -1,0 +1,14 @@
+# pipemaster:lost trigger.* pipeline/gitlab-ci/job/triggered: the triggers of the pipeline have no single Drone condition
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/triggered
+kind: pipeline
+type: docker
+name: triggered
+trigger:
+  event:
+    exclude:
+      - '**'
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make triggered

@@ -1,0 +1,16 @@
+# pipemaster:emulated job.environment.approval pipeline/drone/job/deploy
+# pipemaster:arg "- kind: push\n"
+kind: pipeline
+type: docker
+name: deploy
+environment: {}
+trigger:
+  event:
+    - promote
+  target:
+    - production
+steps:
+  - name: deploy
+    image: alpine:3.20
+    commands:
+      - ./deploy.sh

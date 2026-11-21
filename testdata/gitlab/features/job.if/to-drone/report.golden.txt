@@ -1,0 +1,3 @@
+Loss report: gitlab -> drone
+[emulated] pipeline/gitlab-ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/build job.if: shell guard on the first script line of every step (the condition has no Drone filter; each step shows success instead of skipped)

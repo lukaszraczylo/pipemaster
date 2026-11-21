@@ -1,0 +1,2 @@
+Loss report: woodpecker -> drone
+[emulated] pipeline/woodpecker/job/ci job.if: shell guard on the first script line of every step (the condition has no Drone filter; each step shows success instead of skipped)

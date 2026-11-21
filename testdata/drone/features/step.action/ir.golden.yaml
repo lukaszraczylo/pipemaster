@@ -1,0 +1,26 @@
+origin:
+    provider: drone
+    dialect: drone
+    files:
+        - .drone.yml
+pipelines:
+    - id: drone
+      triggers:
+        - kind: push
+      jobs:
+        - id: ci
+          steps:
+            - action:
+                kind: repo
+                host: https://github.com
+                owner: actions
+                repo: checkout
+                ref: v4
+              id: checkout
+              kind: action
+            - image:
+                ref: golang:1.25
+              id: build
+              kind: script
+              script:
+                - go build ./...

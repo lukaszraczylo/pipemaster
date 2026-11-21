@@ -1,0 +1,23 @@
+# pipemaster:emulated trigger.push pipeline/drone/trigger/0
+# pipemaster:emulated job.runner pipeline/drone/job/ci
+# pipemaster:emulated step.image pipeline/drone/job/ci/step/test
+# pipemaster:arg {"kind":"script","image":{"Ref":"golang:1.25","Entrypoint":null},"script":["go test ./..."]}
+on:
+  push:
+    branches:
+      - '**'
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: example
+    steps:
+      # pipemaster:emulated step.image pipeline/drone/job/ci/step/test
+      - id: test
+        uses: docker://golang:1.25
+        with:
+          entrypoint: /bin/sh
+          args: -ec 'go test ./...'

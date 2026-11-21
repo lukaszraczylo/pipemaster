@@ -1,0 +1,15 @@
+# pipemaster:emulated pipeline.env pipeline/woodpecker
+# pipemaster:arg "- name: CGO_ENABLED\n  value:\n    lit: \"0\"\n"
+kind: pipeline
+type: docker
+name: ci
+environment:
+  CGO_ENABLED: "0"
+trigger:
+  event:
+    - push
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

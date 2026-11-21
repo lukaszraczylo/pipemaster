@@ -1,0 +1,19 @@
+# pipemaster:emulated script.interpolation pipeline/drone
+# pipemaster:arg [{"k":"t","p":"job/ci/step/test/script/1","g":"echo $OS","s":"echo $\u007b{ matrix.OS }}"},{"k":"t","p":"job/ci/step/test/image","g":"golang:$GO_VERSION","s":"golang:$\u007b{ matrix.GO_VERSION }}"}]
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+ci:
+  needs: []
+  script:
+    # pipemaster:step test
+    - go test ./...
+    - echo $OS
+  parallel:
+    matrix:
+      - GO_VERSION:
+          - "1.24"
+          - "1.25"
+        OS:
+          - linux
+          - darwin

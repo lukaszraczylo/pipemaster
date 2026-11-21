@@ -1,0 +1,14 @@
+# pipemaster:lost trigger.* pipeline/ci/job/build: the triggers of the pipeline have no single Drone condition
+# pipemaster:emulated job.container pipeline/ci/job/build
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    exclude:
+      - '**'
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok

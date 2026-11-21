@@ -1,0 +1,11 @@
+# pipemaster:emulated pipeline.env pipeline/drone
+# pipemaster:arg "- name: CGO_ENABLED\n  value:\n    lit: \"0\"\n"
+when:
+  - event: push
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...
+    environment:
+      CGO_ENABLED: "0"

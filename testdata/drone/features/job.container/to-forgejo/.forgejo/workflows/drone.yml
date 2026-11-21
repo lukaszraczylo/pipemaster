@@ -1,0 +1,17 @@
+# pipemaster:emulated trigger.push pipeline/drone/trigger/0
+# pipemaster:emulated pipeline.concurrency pipeline/drone
+# pipemaster:emulated job.runner pipeline/drone/job/ci
+on:
+  push:
+    branches:
+      - '**'
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    container: node:22
+    steps:
+      - id: test
+        run: npm test

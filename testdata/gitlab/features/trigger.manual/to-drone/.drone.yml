@@ -1,0 +1,13 @@
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/adhoc
+kind: pipeline
+type: docker
+name: adhoc
+trigger:
+  event:
+    - custom
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make adhoc

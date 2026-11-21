@@ -1,0 +1,18 @@
+origin:
+    provider: drone
+    dialect: drone
+    files:
+        - .drone.yml
+pipelines:
+    - id: drone
+      triggers:
+        - kind: push
+      jobs:
+        - container:
+            ref: node:22
+          id: ci
+          steps:
+            - id: test
+              kind: script
+              script:
+                - npm test

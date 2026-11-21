@@ -1,0 +1,14 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+ci:
+  needs: []
+  script:
+    # pipemaster:step release
+    # pipemaster:emulated step.if pipeline/drone/job/ci/step/release
+    # pipemaster:arg "false"
+    # pipemaster:lost expr.opaque pipeline/drone/job/ci/step/release: opaque(drone): {"event":["push"]}
+    - |
+      if false; then
+      ./release.sh
+      fi

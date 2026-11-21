@@ -1,0 +1,17 @@
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
+# pipemaster:arg {"branches":{"Include":["main","release-**"],"Exclude":null},"tags":{"Include":null,"Exclude":null}}
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+  branch:
+    - main
+    - release-**
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make build

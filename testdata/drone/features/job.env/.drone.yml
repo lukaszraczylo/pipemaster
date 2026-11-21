@@ -1,0 +1,18 @@
+# pipemaster:emulated job.env pipeline/drone/job/ci
+# pipemaster:arg "- name: GOFLAGS\n  value:\n    lit: -trimpath\n- name: TOKEN\n  value:\n    secret: deploy_token\n"
+kind: pipeline
+type: docker
+name: ci
+environment:
+  GOFLAGS: -trimpath
+trigger:
+  event:
+    - push
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...
+    environment:
+      TOKEN:
+        from_secret: deploy_token

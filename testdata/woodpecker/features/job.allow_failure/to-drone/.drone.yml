@@ -1,0 +1,13 @@
+# pipemaster:emulated job.allow_failure pipeline/woodpecker/job/ci
+kind: pipeline
+type: docker
+name: ci
+trigger:
+  event:
+    - push
+steps:
+  - name: flaky
+    image: alpine:3.20
+    commands:
+      - ./flaky.sh
+    failure: ignore

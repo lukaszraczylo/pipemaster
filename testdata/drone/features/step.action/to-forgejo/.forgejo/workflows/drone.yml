@@ -1,0 +1,24 @@
+# pipemaster:emulated trigger.push pipeline/drone/trigger/0
+# pipemaster:emulated pipeline.concurrency pipeline/drone
+# pipemaster:emulated job.runner pipeline/drone/job/ci
+# pipemaster:emulated step.image pipeline/drone/job/ci/step/build
+# pipemaster:arg {"kind":"script","image":{"Ref":"golang:1.25","Entrypoint":null},"script":["go build ./..."]}
+on:
+  push:
+    branches:
+      - '**'
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - id: checkout
+        uses: https://github.com/actions/checkout@v4
+      # pipemaster:emulated step.image pipeline/drone/job/ci/step/build
+      - id: build
+        uses: docker://golang:1.25
+        with:
+          entrypoint: /bin/sh
+          args: -ec 'go build ./...'

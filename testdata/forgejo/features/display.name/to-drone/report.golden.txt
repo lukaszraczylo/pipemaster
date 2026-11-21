@@ -1,0 +1,6 @@
+Loss report: forgejo -> drone
+[lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
+[lost] pipeline/ci/job/build display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
+[lost] pipeline/ci/job/build job.runner (only the platform has a Drone form; other runner labels are lost)
+[lost] pipeline/ci/job/build/step/build-step-1 display.name (a Drone step has one name, which carries the id; the display name is kept in round-trip metadata)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

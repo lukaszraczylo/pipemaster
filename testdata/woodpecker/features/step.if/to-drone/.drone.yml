@@ -1,0 +1,13 @@
+# pipemaster:emulated step.if pipeline/woodpecker/job/ci/step/deploy
+kind: pipeline
+type: docker
+name: ci
+trigger:
+  event:
+    - push
+steps:
+  - name: deploy
+    image: alpine:3.20
+    commands:
+      - 'if ! ( ( [ "$$DRONE_BUILD_EVENT" = ''tag'' ] || [ "$$DRONE_BRANCH" = ''main'' ] ) && [ "$$DRONE_COMMIT_AUTHOR" = ''release-bot'' ] ); then exit 0; fi # pipemaster:guard'
+      - ./deploy.sh

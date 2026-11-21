@@ -1,0 +1,3 @@
+Loss report: drone -> woodpecker
+[lost] pipeline/drone/job/ci/step/release expr.opaque (an opaque expression of another dialect has no Woodpecker form)
+[lost] pipeline/drone/job/ci/step/release step.if (condition not expressible in Woodpecker CI; the step disabled)

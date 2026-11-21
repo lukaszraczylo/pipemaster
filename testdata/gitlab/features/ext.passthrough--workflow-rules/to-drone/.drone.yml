@@ -1,0 +1,14 @@
+# pipemaster:lost job.if pipeline/gitlab-ci/job/build: opaque(gitlab): workflow:\n    name: $$PIPELINE_NAME\n    rules:\n        - if: $$CI_COMMIT_TAG\n          when: never\n        - if: $$CI_PIPELINE_SOURCE == "merge_request_event"\n          variables:\n            PIPELINE_NAME: MR pipeline\n        - if: $$CI_COMMIT_BRANCH == $$CI_DEFAULT_BRANCH\n          variables:\n            PIPELINE_NAME: Default branch pipeline\n
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    exclude:
+      - '**'
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make build

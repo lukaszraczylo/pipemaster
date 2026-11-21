@@ -1,0 +1,13 @@
+when:
+  - event: push
+    branch:
+      include:
+        - main
+        - develop
+      exclude:
+        - wip
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

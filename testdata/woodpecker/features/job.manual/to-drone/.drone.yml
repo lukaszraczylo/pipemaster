@@ -1,0 +1,13 @@
+# pipemaster:emulated job.manual pipeline/woodpecker/job/deploy
+# pipemaster:arg "- kind: push\n"
+kind: pipeline
+type: docker
+name: deploy
+trigger:
+  event:
+    - custom
+steps:
+  - name: deploy
+    image: alpine:3.20
+    commands:
+      - ./deploy.sh

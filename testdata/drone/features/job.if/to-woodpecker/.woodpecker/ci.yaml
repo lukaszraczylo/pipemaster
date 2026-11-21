@@ -1,0 +1,18 @@
+# pipemaster:lost job.if pipeline/drone/job/ci: (event == 'push') && (actor == 'release-bot')
+when:
+  - event:
+      - push
+      - pull_request
+      - pull_request_closed
+      - pull_request_metadata
+      - tag
+      - release
+      - deployment
+      - cron
+      - manual
+    evaluate: "false"
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

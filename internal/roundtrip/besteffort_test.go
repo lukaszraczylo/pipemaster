@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -175,6 +176,8 @@ func covered(d irDiff, reps ...*report.Report) bool {
 	return false
 }
 
+var pipelineRE = regexp.MustCompile(`^pipeline/[^/]+`)
+
 func TestRoundTripWithoutMetaBestEffort(t *testing.T) {
 	for _, f := range allFixtures(t) {
 		for _, to := range targets(f.provider) {
@@ -186,6 +189,9 @@ func TestRoundTripWithoutMetaBestEffort(t *testing.T) {
 				if len(r.src.Pipelines) == 1 && len(r.back.Pipelines) == 1 {
 					// The pipeline id is the file stem on GHA and a fixed name on GitLab, so it is no loss.
 					r.back.Pipelines[0].ID = r.src.Pipelines[0].ID
+					for i := range r.backRep.Entries {
+						r.backRep.Entries[i].IRPath = pipelineRE.ReplaceAllLiteralString(r.backRep.Entries[i].IRPath, "pipeline/"+r.src.Pipelines[0].ID)
+					}
 				}
 				for _, d := range diffNodes(r.src, r.back) {
 					if !covered(d, r.srcRep, r.toRep, r.backRep) {

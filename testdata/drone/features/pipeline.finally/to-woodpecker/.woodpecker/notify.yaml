@@ -1,0 +1,15 @@
+# pipemaster:emulated pipeline.finally pipeline/drone
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}],"noIf":true}
+when:
+  - event: push
+    status:
+      - success
+      - failure
+depends_on:
+  - name: build
+    optional: true
+steps:
+  - name: notify
+    image: alpine:3.20
+    commands:
+      - ./notify.sh

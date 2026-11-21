@@ -1,0 +1,4 @@
+Loss report: gitlab -> drone
+[lost] pipeline/gitlab-ci/job/version job.outputs (Drone steps cannot pass values to other pipelines)
+[lost] pipeline/gitlab-ci/job/version job.runner (only the platform has a Drone form; other runner labels are lost)
+[emulated] pipeline/gitlab-ci/job/version job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

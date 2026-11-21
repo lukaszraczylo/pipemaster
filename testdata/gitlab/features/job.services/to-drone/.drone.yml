@@ -1,0 +1,19 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/test
+# pipemaster:arg {"Ref":"golang:1.22","Entrypoint":null}
+kind: pipeline
+type: docker
+name: test
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: golang:1.22
+    commands:
+      - make test
+services:
+  - name: postgres
+    image: postgres:15
+  - name: cache
+    image: redis:7

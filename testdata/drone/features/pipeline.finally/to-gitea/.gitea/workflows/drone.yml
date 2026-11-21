@@ -1,0 +1,36 @@
+# pipemaster:emulated trigger.push pipeline/drone/trigger/0
+# pipemaster:emulated job.runner pipeline/drone/job/build
+# pipemaster:emulated step.image pipeline/drone/job/build/step/build
+# pipemaster:arg {"kind":"script","image":{"Ref":"golang:1.25","Entrypoint":null},"script":["go build ./..."]}
+# pipemaster:emulated job.runner pipeline/drone/job/notify
+# pipemaster:emulated step.image pipeline/drone/job/notify/step/notify
+# pipemaster:arg {"kind":"script","image":{"Ref":"alpine:3.20","Entrypoint":null},"script":["./notify.sh"]}
+# pipemaster:emulated pipeline.finally pipeline/drone/job/notify
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}]}
+on:
+  push:
+    branches:
+      - '**'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # pipemaster:emulated step.image pipeline/drone/job/build/step/build
+      - id: build
+        uses: docker://golang:1.25
+        with:
+          entrypoint: /bin/sh
+          args: -ec 'go build ./...'
+  # pipemaster:emulated pipeline.finally pipeline/drone
+  notify:
+    needs:
+      - build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      # pipemaster:emulated step.image pipeline/drone/job/notify/step/notify
+      - id: notify
+        uses: docker://alpine:3.20
+        with:
+          entrypoint: /bin/sh
+          args: -ec ./notify.sh

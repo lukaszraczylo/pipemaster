@@ -1,0 +1,28 @@
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: build-step-1
+    image: alpine:3.20
+    commands:
+      - make build
+---
+# pipemaster:emulated job.container pipeline/ci/job/deploy
+kind: pipeline
+type: docker
+name: deploy
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - build
+steps:
+  - name: deploy-step-1
+    image: ubuntu:latest
+    commands:
+      - make deploy

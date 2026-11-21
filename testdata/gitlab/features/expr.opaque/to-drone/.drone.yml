@@ -1,0 +1,14 @@
+# pipemaster:lost job.if pipeline/gitlab-ci/job/build: opaque(gitlab): - changes:\n    - src/**/*\n  if: $$CI_COMMIT_BRANCH == "main"\n
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    exclude:
+      - '**'
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make

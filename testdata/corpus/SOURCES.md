@@ -1,13 +1,13 @@
 # Corpus sources
 
 Real-world CI pipelines stored verbatim for `TestCorpus` (`internal/roundtrip/corpus_test.go`).
-The directory of an entry is `testdata/corpus/<#>-<gha, gitea, forgejo, gitlab or woodpecker>-<slug>`.
+The directory of an entry is `testdata/corpus/<#>-<gha, gitea, forgejo, gitlab, woodpecker or drone>-<slug>`.
 Every file is byte-identical to the file at the pinned commit; the test run does not edit them.
 
-- Fetch date: 2026-11-18 for entries 01 to 27, 2026-11-19 for entries 28 to 40 and 2026-11-20 for entries 41 to 50.
+- Fetch date: 2026-11-18 for entries 01 to 27, 2026-11-19 for entries 28 to 40 and 2026-11-20 for entries 41 to 50 and 2026-11-21 for entries 51 to 62.
 - Each repository is public, and its licence was read before use: from the host API (GitHub `license.spdx_id`, GitLab `license.key`), or, for entries 28 to 40,
   from the `LICENSE` file of the repository at the pinned commit.
-  Every licence is MIT, Apache-2.0 or BSD-3-Clause.
+  Every licence is MIT, Apache-2.0, BSD-3-Clause or, for entry 60 only, MPL-2.0.
 - No private repository and no repository of the operator is used. No file holds a secret.
 - Attribution: this file names the source repository, the commit, each path and the SPDX licence of every
   copied file, and the licence text sits at the repository root of that commit. This attribution satisfies the
@@ -71,12 +71,31 @@ Every file is byte-identical to the file at the pinned commit; the test run does
 | 48 | aiocoap | Woodpecker | <https://github.com/chrysn/aiocoap> | `f867dc482ec4bfd7246924a7f4babf30b0193e79` | MIT | `.woodpecker/all.yaml` |
 | 49 | contributions-web | Woodpecker | <https://github.com/jordanopensource/contributions-web> | `5c4d44955d335d309777234d10097f31db583f5c` | Apache-2.0 | `.woodpecker/build-latest-image.yaml` |
 | 50 | rust-confirm-email | Woodpecker | <https://github.com/FrostWalk/rust-confirm-email> | `8dccde4410b4339c47ca92c590f5a2019d2fce96` | MIT | `.woodpecker/pr.yaml` |
+| 51 | Parsr | Drone | <https://github.com/axa-group/Parsr> | `4462467727409c4f2f4d186edc8ae4844c354ee8` | Apache-2.0 | `.drone.yml` |
+| 52 | distribution | Drone | <https://github.com/sighupio/distribution> | `a147b22ce87b2cbff469d199039b774001cf93ef` | BSD-3-Clause | `.drone.yml` |
+| 53 | dictutil | Drone | <https://github.com/pgaskin/dictutil> | `84f28bca4bdb452b86f01d5adf753d583d9dcd70` | MIT | `.drone.yml` |
+| 54 | go-away | Drone | <https://github.com/WeebDataHoarder/go-away> | `bddbe80d62ce12d099a800a344a27cdb04bbffdb` | MIT | `.drone.yml` |
+| 55 | geodns | Drone | <https://github.com/abh/geodns> | `ed37e52b329a37fc5f7fa1ff3a28adf32b3b42be` | Apache-2.0 | `.drone.yml` |
+| 56 | mysql-operator | Drone | <https://github.com/bitpoke/mysql-operator> | `37c64109855691ab227130cf2d011effdd48690b` | Apache-2.0 | `.drone.yml` |
+| 58 | go-admin | Drone | <https://github.com/GoAdminGroup/go-admin> | `c47763c7bb630a742edf33c01aa7010f7a37a33d` | Apache-2.0 | `.drone.yml` |
+| 59 | casper-node | Drone | <https://github.com/casper-network/casper-node> | `02925627bc2ac5ab477c3e5c31d7b20906198adc` | Apache-2.0 | `.drone.yml` |
+| 60 | go-markdown2confluence | Drone | <https://github.com/justmiles/go-markdown2confluence> | `812f9ef8812f5552f31d5fb46b71cf7f7e582219` | MPL-2.0 | `.drone.yml` |
+| 61 | pinmonl | Drone | <https://github.com/pinmonl/pinmonl> | `2ca880f1079a8d554df0c9762c378e0f3ea947f1` | MIT | `.drone.yml` |
+| 62 | elasticsearch-test-data | Drone | <https://github.com/oliver006/elasticsearch-test-data> | `e37c5d5b26b98d4000d89da38a1cb118014cd098` | MIT | `.drone.yml` |
 
 Woodpecker entries (41 to 50):
 
 - The `.woodpecker/` files of the research list (section 10.1) are copied byte for byte. The linter runs with
-  `--plugins-privileged woodpeckerci/plugin-docker-buildx`, which entries 41, 42 and 49 need.
+  `--plugins-privileged woodpeckerci/plugin-docker-buildx` and `--plugins-privileged plugins/docker`. Entries 41, 42 and 49 need the first; the converted Drone entries (51 to 62) need the second.
 - Gap: `.woodpecker/default.yaml` of ntppool/monitor (entry 44) is not stored. It holds a database connection string
   that trufflehog reports as a Postgres credential at line 43.
 - Gap: entry 45 (abh/ntppool, `.woodpecker/e2e.yaml`) is not stored for the same reason, at line 67.
 - Entry 48 is MIT per its `SPDX-License-Identifier` header and `LICENSES/MIT.txt`.
+
+Drone entries (51 to 62):
+
+- The `.drone.yml` files of the research list (section 10.1) are copied byte for byte from the pinned commit. The raw URL names the commit, not the branch.
+- Gap: entry 57 (webkom/lego-webapp) is not stored. Its `.drone.yml` holds a Sentry URL with a user name and password at line 92, which trufflehog flags.
+- Gap: drone/drone-kaniko is not stored. Its pipelines use `type: vm`, which is not a docker-runner shape.
+- Entries 54, 55 hold a `kind: signature` document. Its `hmac` value is a hash of the file, not a secret.
+- Entry 60 is MPL-2.0, per the GitHub API `license.spdx_id`.

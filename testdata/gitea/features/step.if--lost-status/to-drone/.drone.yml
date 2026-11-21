@@ -1,0 +1,33 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+# pipemaster:lost step.if pipeline/ci/job/build/step/build-step-4: steps.config.outputs.configured == 'true'
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo build
+  - name: build-step-2
+    image: ubuntu:latest
+    commands:
+      - echo cleanup
+    when:
+      status:
+        - failure
+  - name: config
+    image: ubuntu:latest
+    commands:
+      - echo "configured=true" >> "$$GITHUB_OUTPUT"
+  - name: build-step-4
+    image: ubuntu:latest
+    commands:
+      - echo configured
+    when:
+      event:
+        exclude:
+          - '**'

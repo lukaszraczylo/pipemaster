@@ -1,0 +1,2 @@
+Loss report: woodpecker -> drone
+[emulated] pipeline/woodpecker pipeline.finally: a document that depends on every other document and runs on trigger status success and failure (the server skips a stage whose status filter does not match the build result)

@@ -1,0 +1,5 @@
+Loss report: gha -> drone
+[lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
+[lost] pipeline/ci/job/test ext.passthrough (Ext of provider gha (services) is not written to the Drone file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/test job.runner (only the platform has a Drone form; other runner labels are lost)
+[emulated] pipeline/ci/job/test job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

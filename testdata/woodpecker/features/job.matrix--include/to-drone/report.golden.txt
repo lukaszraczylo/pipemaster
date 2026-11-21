@@ -1,0 +1,2 @@
+Loss report: woodpecker -> drone
+[emulated] pipeline/woodpecker/job/ci job.matrix: one pipeline document per cell (fail-fast and max-parallel are lost; a failed sibling stops the others without order)

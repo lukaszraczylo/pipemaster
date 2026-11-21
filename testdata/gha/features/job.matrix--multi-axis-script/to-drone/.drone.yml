@@ -1,0 +1,82 @@
+# pipemaster:emulated job.container pipeline/ci/job/prod
+kind: pipeline
+type: docker
+name: prod
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: prod-step-1
+    image: ubuntu:latest
+    commands:
+      - make
+---
+# pipemaster:lost script.interpolation pipeline/ci/job/test/step/test-step-1: echo {{ matrix.os }} {{ matrix.go }} {{ needs.prod.outputs.ver }}
+# pipemaster:lost step.script pipeline/ci/job/test/step/test-step-1: the step has no command left
+# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1
+# pipemaster:arg {"step":"ext:\n    gha:\n        _derived_id: true\nid: test-step-1\nkind: script\nscript:\n    - echo $$\u007b{ matrix.os }} $$\u007b{ matrix.go }} $$\u007b{ needs.prod.outputs.ver }}\n","at":0}
+# pipemaster:emulated step.script pipeline/ci/job/test
+# pipemaster:emulated job.container pipeline/ci/job/test
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"matrix":{"FailFast":null,"Axes":[{"Name":"os","Values":["linux","mac"]},{"Name":"go","Values":["1.24","1.25"]}],"Include":null,"Exclude":[[{"Key":"go","Value":"1.24"},{"Key":"os","Value":"mac"}]],"MaxParallel":0},"job":"test","cell":[{"Key":"go","Value":"1.24"},{"Key":"os","Value":"linux"}],"index":0}
+kind: pipeline
+type: docker
+name: test-1.24-linux
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - prod
+steps:
+  - name: noop
+    image: ubuntu:latest
+    commands:
+      - "true"
+---
+# pipemaster:lost script.interpolation pipeline/ci/job/test/step/test-step-1: echo {{ matrix.os }} {{ matrix.go }} {{ needs.prod.outputs.ver }}
+# pipemaster:lost step.script pipeline/ci/job/test/step/test-step-1: the step has no command left
+# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1
+# pipemaster:arg {"step":"ext:\n    gha:\n        _derived_id: true\nid: test-step-1\nkind: script\nscript:\n    - echo $$\u007b{ matrix.os }} $$\u007b{ matrix.go }} $$\u007b{ needs.prod.outputs.ver }}\n","at":0}
+# pipemaster:emulated step.script pipeline/ci/job/test
+# pipemaster:emulated job.container pipeline/ci/job/test
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"job":"test","cell":[{"Key":"go","Value":"1.25"},{"Key":"os","Value":"linux"}],"index":1}
+kind: pipeline
+type: docker
+name: test-1.25-linux
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - prod
+steps:
+  - name: noop
+    image: ubuntu:latest
+    commands:
+      - "true"
+---
+# pipemaster:lost script.interpolation pipeline/ci/job/test/step/test-step-1: echo {{ matrix.os }} {{ matrix.go }} {{ needs.prod.outputs.ver }}
+# pipemaster:lost step.script pipeline/ci/job/test/step/test-step-1: the step has no command left
+# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1
+# pipemaster:arg {"step":"ext:\n    gha:\n        _derived_id: true\nid: test-step-1\nkind: script\nscript:\n    - echo $$\u007b{ matrix.os }} $$\u007b{ matrix.go }} $$\u007b{ needs.prod.outputs.ver }}\n","at":0}
+# pipemaster:emulated step.script pipeline/ci/job/test
+# pipemaster:emulated job.container pipeline/ci/job/test
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"job":"test","cell":[{"Key":"go","Value":"1.25"},{"Key":"os","Value":"mac"}],"index":2}
+kind: pipeline
+type: docker
+name: test-1.25-mac
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - prod
+steps:
+  - name: noop
+    image: ubuntu:latest
+    commands:
+      - "true"

@@ -1,0 +1,14 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - echo "building $${DRONE_COMMIT_SHA} on $${DRONE_BRANCH} for $${DRONE_COMMIT_AUTHOR}"
+      - echo "keeps $$HOME and $${UNMAPPED}"

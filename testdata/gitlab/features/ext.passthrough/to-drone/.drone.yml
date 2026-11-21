@@ -1,0 +1,59 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+# pipemaster:arg {"Ref":"alpine:3","Entrypoint":null}
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci
+# pipemaster:arg "- name: SHARED\n  value:\n    lit: \"1\"\n"
+kind: pipeline
+type: docker
+name: build
+environment:
+  SHARED: "1"
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: alpine:3
+    commands:
+      - make
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/common
+# pipemaster:arg {"Ref":"alpine:3","Entrypoint":null}
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci
+# pipemaster:arg "- name: SHARED\n  value:\n    lit: \"1\"\n"
+kind: pipeline
+type: docker
+name: common
+environment:
+  SHARED: "1"
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: alpine:3
+    commands:
+      - echo common
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/prod
+# pipemaster:arg {"Ref":"alpine:3","Entrypoint":null}
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci
+# pipemaster:arg "- name: SHARED\n  value:\n    lit: \"1\"\n"
+kind: pipeline
+type: docker
+name: prod
+environment:
+  SHARED: "1"
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - build
+  - common
+steps:
+  - name: script
+    image: alpine:3
+    commands:
+      - ./deploy.sh

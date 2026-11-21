@@ -1,0 +1,16 @@
+# pipemaster:emulated trigger.filter.tags pipeline/gitlab-ci/trigger/0
+# pipemaster:arg {"branches":{"Include":null,"Exclude":null},"tags":{"Include":["v**"],"Exclude":null}}
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/release
+kind: pipeline
+type: docker
+name: release
+trigger:
+  event:
+    - tag
+  ref:
+    - refs/tags/v**
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make release

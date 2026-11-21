@@ -49,6 +49,12 @@ var providerChecks = map[string]providerCheck{
 		schemaLag:  []string{"15-gitlab-charts-gitlab", "16-gitlab-cli", "20-gitlab-gitlab-runner", "24-gitlab-release-cli"},
 		noGHAExpr:  true,
 	},
+	provider.Drone: {
+		schemaLag: []string{
+			"51-drone-parsr", "53-drone-dictutil", "54-drone-go-away", "55-drone-geodns",
+			"56-drone-mysql-operator", "59-drone-casper-node", "60-drone-go-markdown2confluence",
+		},
+	},
 	provider.Woodpecker: {requireLinter: requireWoodpeckerCLI, lintFile: lintWoodpecker, lintFindings: woodpeckerFindings, lintFrom: provider.GHA, noGHAExpr: true},
 }
 

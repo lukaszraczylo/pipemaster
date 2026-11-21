@@ -1,0 +1,10 @@
+# pipemaster:lost step.if pipeline/drone/job/ci/step/deploy: ((event == 'tag') || (branch == 'main')) && (actor == 'release-bot')
+when:
+  - event: push
+steps:
+  - name: deploy
+    image: alpine:3.20
+    commands:
+      - ./deploy.sh
+    when:
+      - evaluate: "false"

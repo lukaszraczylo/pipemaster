@@ -1,0 +1,29 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok
+---
+# pipemaster:emulated job.container pipeline/ci/job/grouped
+kind: pipeline
+type: docker
+name: grouped
+node:
+  group: big-runners
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: grouped-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok

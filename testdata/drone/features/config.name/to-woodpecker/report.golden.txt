@@ -1,0 +1,2 @@
+Loss report: drone -> woodpecker
+[external] pipeline/drone/job/ci/step/build script.interpolation: environment from_secret; secret for variable (secret TOKEN is bound to the variable TOKEN, which the command text reads at run time; variable REGION is bound to the secret REGION; Woodpecker has no variables, so create the secret REGION with the value of the variable)

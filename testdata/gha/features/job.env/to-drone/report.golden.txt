@@ -1,0 +1,5 @@
+Loss report: gha -> drone
+[lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
+[lost] pipeline/ci/job/build job.runner (only the platform has a Drone form; other runner labels are lost)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/ci/job/build job.env: environment of every step (a document environment holds strings only, so a secret variable is set on each step)

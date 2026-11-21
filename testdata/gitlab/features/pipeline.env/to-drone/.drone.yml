@@ -1,0 +1,18 @@
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci
+# pipemaster:arg "- name: GOFLAGS\n  value:\n    lit: -mod=readonly\n- name: DEPLOY_ENV\n  value:\n    lit: staging\n"
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+kind: pipeline
+type: docker
+name: build
+environment:
+  GOFLAGS: -mod=readonly
+  DEPLOY_ENV: staging
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make build

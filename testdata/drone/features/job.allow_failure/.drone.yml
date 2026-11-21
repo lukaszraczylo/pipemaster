@@ -1,0 +1,14 @@
+# pipemaster:emulated job.allow_failure pipeline/drone/job/ci
+kind: pipeline
+type: docker
+name: ci
+environment: {}
+trigger:
+  event:
+    - push
+steps:
+  - name: flaky
+    image: alpine:3.20
+    commands:
+      - ./flaky.sh
+    failure: ignore

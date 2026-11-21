@@ -1,0 +1,10 @@
+# pipemaster:emulated job.if pipeline/woodpecker/job/ci
+kind: pipeline
+type: docker
+name: ci
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - 'if ! ( ( [ "$$DRONE_BUILD_EVENT" = ''push'' ] || [ "$$DRONE_BUILD_EVENT" = ''tag'' ] ) && [ "$$DRONE_COMMIT_AUTHOR" = ''release-bot'' ] ); then exit 0; fi # pipemaster:guard'
+      - go build ./...

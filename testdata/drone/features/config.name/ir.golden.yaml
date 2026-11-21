@@ -1,0 +1,18 @@
+origin:
+    provider: drone
+    dialect: drone
+    files:
+        - .drone.yml
+pipelines:
+    - id: drone
+      triggers:
+        - kind: push
+      jobs:
+        - id: ci
+          steps:
+            - image:
+                ref: alpine:3.20
+              id: build
+              kind: script
+              script:
+                - 'curl -H "Authorization: Bearer ${{ secrets.TOKEN }}" "https://${{ vars.REGION }}.example.org"'

@@ -14,6 +14,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
+	_ "github.com/lukaszraczylo/pipemaster/provider/drone"
 	"github.com/lukaszraczylo/pipemaster/provider/gha"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gitlab"
 	_ "github.com/lukaszraczylo/pipemaster/provider/woodpecker"

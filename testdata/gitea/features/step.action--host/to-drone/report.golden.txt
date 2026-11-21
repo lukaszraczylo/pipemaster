@@ -1,0 +1,10 @@
+Loss report: gitea -> drone
+[lost] pipeline/ci/job/build job.runner (only the platform has a Drone form; other runner labels are lost)
+[lost] pipeline/ci/job/build/step/build-step-1 ext.passthrough (the action reference actions/checkout@v4 is not in the Drone file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/build/step/build-step-2 step.action (no Drone mapping for action org/tool@v2)
+[lost] pipeline/ci/job/build/step/build-step-3 step.action (no Drone mapping for action org/local-action@main)
+[lost] pipeline/ci/job/build/step/build-step-4 step.action (no Drone mapping for action /checkout)
+[lost] pipeline/ci/job/build/step/script step.script (the job has no steps; a no-op step keeps the document valid)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/ci/job/build step.script: no-op step (Drone needs a step; no step of the job has a Drone form, so a no-op step stands in)
+[emulated] pipeline/ci/job/build/step/build-step-1 step.action: per actions.Lookup verdict; a plugin step with settings (unknown actions are lost)

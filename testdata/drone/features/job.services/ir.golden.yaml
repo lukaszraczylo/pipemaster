@@ -1,0 +1,26 @@
+origin:
+    provider: drone
+    dialect: drone
+    files:
+        - .drone.yml
+pipelines:
+    - id: drone
+      triggers:
+        - kind: push
+      jobs:
+        - id: ci
+          services:
+            - name: db
+              image:
+                ref: postgres:17
+              env:
+                - name: POSTGRES_PASSWORD
+                  value:
+                    lit: example
+          steps:
+            - image:
+                ref: golang:1.25
+              id: test
+              kind: script
+              script:
+                - go test ./...

@@ -1,0 +1,10 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+ci:
+  needs: []
+  script:
+    # pipemaster:step build
+    - cargo build --release
+    # pipemaster:step publish
+    # pipemaster:lost step publish kind plugin

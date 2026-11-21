@@ -1,0 +1,14 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - pull_request
+  branch:
+    - main
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok

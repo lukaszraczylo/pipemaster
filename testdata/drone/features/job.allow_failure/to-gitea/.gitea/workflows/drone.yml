@@ -1,0 +1,19 @@
+# pipemaster:emulated trigger.push pipeline/drone/trigger/0
+# pipemaster:emulated job.runner pipeline/drone/job/ci
+# pipemaster:emulated step.image pipeline/drone/job/ci/step/flaky
+# pipemaster:arg {"kind":"script","image":{"Ref":"alpine:3.20","Entrypoint":null},"script":["./flaky.sh"]}
+on:
+  push:
+    branches:
+      - '**'
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      # pipemaster:emulated step.image pipeline/drone/job/ci/step/flaky
+      - id: flaky
+        uses: docker://alpine:3.20
+        with:
+          entrypoint: /bin/sh
+          args: -ec ./flaky.sh

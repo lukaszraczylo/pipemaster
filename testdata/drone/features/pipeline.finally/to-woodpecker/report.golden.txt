@@ -1,0 +1,2 @@
+Loss report: drone -> woodpecker
+[emulated] pipeline/drone pipeline.finally: a workflow that depends on every other workflow and runs on status success or failure (a skipped dependency is optional, so the workflow still runs)

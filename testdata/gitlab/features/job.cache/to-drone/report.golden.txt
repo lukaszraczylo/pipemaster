@@ -1,0 +1,4 @@
+Loss report: gitlab -> drone
+[lost] pipeline/gitlab-ci/job/build ext.passthrough (Ext of provider gitlab (cache) is not written to the Drone file; it is kept in round-trip metadata)
+[emulated] pipeline/gitlab-ci/job/build job.cache: shared workspace of the steps in one document (nothing persists between runs)
+[emulated] pipeline/gitlab-ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

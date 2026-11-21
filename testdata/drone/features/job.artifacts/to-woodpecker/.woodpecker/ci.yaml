@@ -1,0 +1,9 @@
+# pipemaster:emulated job.artifacts pipeline/drone/job/ci
+# pipemaster:arg [{"Name":"dist","Expire":"7d","Paths":["dist/"]}]
+when:
+  - event: push
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

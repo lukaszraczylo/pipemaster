@@ -1,0 +1,4 @@
+Loss report: drone -> gitlab
+[lost] pipeline/drone ext.passthrough (the pipeline has no trigger GitLab can express; workflow:rules never starts it)
+[lost] pipeline/drone/job/ci job.if (condition not expressible in GitLab CI; job disabled)
+[lost] pipeline/drone/job/ci/step/build step.image (GitLab sets the image per job, not per step)

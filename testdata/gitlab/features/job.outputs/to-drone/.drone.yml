@@ -1,0 +1,12 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/version
+kind: pipeline
+type: docker
+name: version
+trigger:
+  event:
+    - push
+steps:
+  - name: version-step-1
+    image: ubuntu:latest
+    commands:
+      - make version

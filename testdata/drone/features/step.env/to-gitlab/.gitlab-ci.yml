@@ -1,0 +1,14 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+ci:
+  needs: []
+  script:
+    # pipemaster:step build
+    # pipemaster:emulated step.env pipeline/drone/job/ci/step/build
+    - |
+      (
+      export GOFLAGS="-trimpath"
+      export TOKEN="$deploy_token"
+      go build ./...
+      )

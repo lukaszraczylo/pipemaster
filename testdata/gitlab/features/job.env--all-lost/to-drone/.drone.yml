@@ -1,0 +1,15 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/test
+kind: pipeline
+type: docker
+name: test
+environment:
+  IMAGE: $$CI_REGISTRY_IMAGE/tmp:${DRONE_COMMIT_SHA}
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make test

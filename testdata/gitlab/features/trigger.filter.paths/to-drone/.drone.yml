@@ -1,0 +1,13 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+    - pull_request
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok

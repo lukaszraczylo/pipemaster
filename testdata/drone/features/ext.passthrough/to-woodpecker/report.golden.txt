@@ -1,0 +1,2 @@
+Loss report: drone -> woodpecker
+[lost] pipeline/drone/job/ci ext.passthrough (Ext of provider drone (workspace) is not written to the Woodpecker file; it is kept in round-trip metadata)

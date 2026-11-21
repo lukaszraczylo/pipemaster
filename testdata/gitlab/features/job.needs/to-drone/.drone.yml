@@ -1,0 +1,61 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/compile
+kind: pipeline
+type: docker
+name: compile
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/lint
+kind: pipeline
+type: docker
+name: lint
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make lint
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/ship
+kind: pipeline
+type: docker
+name: ship
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - compile
+  - lint
+  - unit
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make ship
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/unit
+kind: pipeline
+type: docker
+name: unit
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - compile
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make test

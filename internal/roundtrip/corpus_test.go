@@ -88,10 +88,25 @@ type findings map[string]bool
 
 func (f findings) add(lines string) {
 	for _, l := range strings.Split(lines, "\n") {
-		if l = strings.TrimSpace(findingRE.ReplaceAllString(l, "")); l != "" && !strings.HasPrefix(l, "|") && !strings.Contains(l, " | ") {
+		l = sortProps(strings.TrimSpace(findingRE.ReplaceAllString(l, "")))
+		if l != "" && !strings.HasPrefix(l, "|") && !strings.Contains(l, " | ") {
 			f[l] = true
 		}
 	}
+}
+
+// propsRE matches the property list of a schema "additional properties" complaint, whose order the validator
+// takes from map iteration.
+var propsRE = regexp.MustCompile(`additional properties ('[^']*'(?:, '[^']*')*) not allowed`)
+
+// sortProps puts the property names of a complaint in order, so the same complaint compares equal.
+func sortProps(l string) string {
+	return propsRE.ReplaceAllStringFunc(l, func(m string) string {
+		list := propsRE.FindStringSubmatch(m)[1]
+		names := strings.Split(list, ", ")
+		slices.Sort(names)
+		return "additional properties " + strings.Join(names, ", ") + " not allowed"
+	})
 }
 
 // dialectCtxRE matches the context aliases of Gitea and Forgejo.

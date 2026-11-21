@@ -1,0 +1,2 @@
+Loss report: woodpecker -> drone
+[emulated] pipeline/woodpecker/job/ci job.allow_failure: failure ignore on every step (later steps still run after a failed step)

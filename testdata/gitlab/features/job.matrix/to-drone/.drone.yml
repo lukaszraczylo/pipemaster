@@ -1,0 +1,79 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/test
+# pipemaster:emulated job.matrix pipeline/gitlab-ci/job/test
+# pipemaster:arg {"matrix":{"FailFast":null,"Axes":null,"Include":[[{"Key":"GO","Value":"1.21"},{"Key":"OS","Value":"linux"}],[{"Key":"GO","Value":"1.21"},{"Key":"OS","Value":"mac"}],[{"Key":"GO","Value":"1.22"},{"Key":"OS","Value":"linux"}],[{"Key":"GO","Value":"1.22"},{"Key":"OS","Value":"mac"}],[{"Key":"GO","Value":"1.20"},{"Key":"OS","Value":"linux"}]],"Exclude":null,"MaxParallel":0},"job":"test","cell":[{"Key":"GO","Value":"1.21"},{"Key":"OS","Value":"linux"}],"index":0}
+kind: pipeline
+type: docker
+name: test-1.21-linux
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make test
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/test
+# pipemaster:emulated job.matrix pipeline/gitlab-ci/job/test
+# pipemaster:arg {"job":"test","cell":[{"Key":"GO","Value":"1.21"},{"Key":"OS","Value":"mac"}],"index":1}
+kind: pipeline
+type: docker
+name: test-1.21-mac
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make test
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/test
+# pipemaster:emulated job.matrix pipeline/gitlab-ci/job/test
+# pipemaster:arg {"job":"test","cell":[{"Key":"GO","Value":"1.22"},{"Key":"OS","Value":"linux"}],"index":2}
+kind: pipeline
+type: docker
+name: test-1.22-linux
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make test
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/test
+# pipemaster:emulated job.matrix pipeline/gitlab-ci/job/test
+# pipemaster:arg {"job":"test","cell":[{"Key":"GO","Value":"1.22"},{"Key":"OS","Value":"mac"}],"index":3}
+kind: pipeline
+type: docker
+name: test-1.22-mac
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make test
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/test
+# pipemaster:emulated job.matrix pipeline/gitlab-ci/job/test
+# pipemaster:arg {"job":"test","cell":[{"Key":"GO","Value":"1.20"},{"Key":"OS","Value":"linux"}],"index":4}
+kind: pipeline
+type: docker
+name: test-1.20-linux
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make test

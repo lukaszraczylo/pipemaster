@@ -1,0 +1,65 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/images
+# pipemaster:emulated job.matrix pipeline/gitlab-ci/job/images
+# pipemaster:arg {"matrix":{"FailFast":null,"Axes":[{"Name":"TARGET","Values":["alpine","ubuntu"]}],"Include":null,"Exclude":null,"MaxParallel":0},"job":"images","cell":[{"Key":"TARGET","Value":"alpine"}],"index":0}
+kind: pipeline
+type: docker
+name: images-alpine
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make images
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/images
+# pipemaster:emulated job.matrix pipeline/gitlab-ci/job/images
+# pipemaster:arg {"job":"images","cell":[{"Key":"TARGET","Value":"ubuntu"}],"index":1}
+kind: pipeline
+type: docker
+name: images-ubuntu
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make images
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/package
+kind: pipeline
+type: docker
+name: package
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - images-alpine
+  - images-ubuntu
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make package
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/package-all
+kind: pipeline
+type: docker
+name: package-all
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - images-alpine
+  - images-ubuntu
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make package-all

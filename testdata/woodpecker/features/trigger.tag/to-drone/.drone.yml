@@ -1,0 +1,11 @@
+kind: pipeline
+type: docker
+name: ci
+trigger:
+  event:
+    - tag
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

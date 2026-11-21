@@ -1,0 +1,16 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+kind: pipeline
+type: docker
+name: build
+environment:
+  CGO_ENABLED: "0"
+  TAG: ${DRONE_TAG}
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make

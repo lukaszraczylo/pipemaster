@@ -1,0 +1,14 @@
+# pipemaster:emulated job.artifacts pipeline/drone/job/ci
+# pipemaster:arg [{"Name":"dist","Expire":"7d","Paths":["dist/"]}]
+kind: pipeline
+type: docker
+name: ci
+environment: {}
+trigger:
+  event:
+    - push
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

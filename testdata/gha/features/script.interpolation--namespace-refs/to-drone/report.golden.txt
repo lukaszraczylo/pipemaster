@@ -1,0 +1,8 @@
+Loss report: gha -> drone
+[lost] pipeline/ci pipeline.inputs (Drone has no typed pipeline inputs)
+[lost] pipeline/ci/job/test job.runner (only the platform has a Drone form; other runner labels are lost)
+[external] pipeline/ci/job/test/step/test-step-1 script.interpolation: secret for variable; environment variable for input (variable LEVEL is bound to the secret LEVEL; Drone has no variables, so create the secret LEVEL with the value of the variable; input target is read as the variable target, which nothing sets; define it in the Drone environment)
+[emulated] pipeline/ci pipeline.env: copied into the environment of every pipeline document (a step variable of the same name wins)
+[emulated] pipeline/ci/job/test job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/ci/job/test job.matrix: one pipeline document per cell (fail-fast and max-parallel are lost; a failed sibling stops the others without order)
+[emulated] pipeline/ci/trigger/0 trigger.manual: trigger event custom (a person starts the build through the API or drone build create)

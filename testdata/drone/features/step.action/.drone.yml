@@ -1,0 +1,14 @@
+# pipemaster:emulated step.action pipeline/drone/job/ci/step/checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v4\nid: checkout\nkind: action\n","at":0}
+kind: pipeline
+type: docker
+name: ci
+environment: {}
+trigger:
+  event:
+    - push
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

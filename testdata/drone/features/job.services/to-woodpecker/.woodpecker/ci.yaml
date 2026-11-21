@@ -1,0 +1,12 @@
+when:
+  - event: push
+steps:
+  - name: test
+    image: golang:1.25
+    commands:
+      - go test ./...
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: example

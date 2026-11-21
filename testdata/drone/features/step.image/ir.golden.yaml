@@ -1,0 +1,27 @@
+origin:
+    provider: drone
+    dialect: drone
+    files:
+        - .drone.yml
+pipelines:
+    - id: drone
+      triggers:
+        - kind: push
+      jobs:
+        - id: ci
+          steps:
+            - image:
+                ref: rust:1.85
+              id: build
+              kind: script
+              script:
+                - cargo build --release
+            - image:
+                ref: woodpeckerci/plugin-docker-buildx
+              with:
+                repo:
+                    lit: example/app
+                tags:
+                    lit: latest
+              id: publish
+              kind: plugin

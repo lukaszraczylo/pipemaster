@@ -1,0 +1,13 @@
+# pipemaster:emulated trigger.manual pipeline/drone/trigger/0
+kind: pipeline
+type: docker
+name: ci
+environment: {}
+trigger:
+  event:
+    - custom
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

@@ -1,0 +1,7 @@
+Loss report: gitlab -> drone
+[lost] pipeline/gitlab-ci/job/package ext.passthrough (Ext of provider gitlab (needs_extra) is not written to the Drone file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/job/package-all ext.passthrough (Ext of provider gitlab (needs_extra) is not written to the Drone file; it is kept in round-trip metadata)
+[emulated] pipeline/gitlab-ci/job/images job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/images job.matrix: one pipeline document per cell (fail-fast and max-parallel are lost; a failed sibling stops the others without order)
+[emulated] pipeline/gitlab-ci/job/package job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/package-all job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

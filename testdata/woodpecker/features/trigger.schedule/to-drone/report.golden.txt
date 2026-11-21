@@ -1,0 +1,2 @@
+Loss report: woodpecker -> drone
+[external] pipeline/woodpecker/trigger/0 trigger.schedule: trigger event cron with the cron job name (Drone keeps the schedule in the repo settings: run drone cron add <repo> woodpecker-schedule-0 "")

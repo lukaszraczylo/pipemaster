@@ -1,0 +1,28 @@
+# pipemaster:emulated project.multi_pipeline pipeline/ci
+# pipemaster:arg {"pipeline":"ci","job":"test","p":0,"j":0}
+kind: pipeline
+type: docker
+name: ci-test
+trigger:
+  event:
+    - push
+steps:
+  - name: test
+    image: alpine:3.20
+    commands:
+      - ./test.sh
+---
+# pipemaster:emulated project.multi_pipeline pipeline/deploy
+# pipemaster:arg {"pipeline":"deploy","job":"ship","p":1,"j":0}
+# pipemaster:emulated trigger.manual pipeline/deploy/trigger/0
+kind: pipeline
+type: docker
+name: deploy-ship
+trigger:
+  event:
+    - custom
+steps:
+  - name: ship
+    image: alpine:3.20
+    commands:
+      - ./ship.sh

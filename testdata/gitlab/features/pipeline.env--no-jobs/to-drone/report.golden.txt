@@ -1,0 +1,6 @@
+Loss report: gitlab -> drone
+[lost] pipeline/gitlab-ci ext.passthrough (Ext of provider gitlab (hidden) is not written to the Drone file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/job/empty/step/script step.script (the job has no steps; a no-op step keeps the document valid)
+[emulated] pipeline/gitlab-ci pipeline.env: copied into the environment of every pipeline document (a step variable of the same name wins)
+[emulated] pipeline/gitlab-ci/job/empty job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/empty step.script: no-op step (Drone needs a step; no step of the job has a Drone form, so a no-op step stands in)
