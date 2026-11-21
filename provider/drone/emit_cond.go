@@ -360,7 +360,11 @@ func irGlobs(f ir.Filter, prefix string) (out dexpr.Filter, inexact []string) {
 	}
 	for _, p := range f.Exclude {
 		out.Exclude = append(out.Exclude, prefix+p)
-		if !exactGlob(p) {
+		switch {
+		case strings.Contains(p, "+"):
+			// An excluded plus pattern is as inert as a negated one, so it reads the same way.
+			inexact = append(inexact, negation+p)
+		case !exactGlob(p):
 			inexact = append(inexact, p)
 		}
 	}
@@ -472,15 +476,33 @@ func sameFilters(fs []ir.Filter) bool {
 func anyFilter(fs []ir.Filter) bool { return slices.ContainsFunc(fs, hasFilter) }
 
 // noteGlobs reports the patterns that doublestar reads differently from the IR. A pattern with the GHA "+"
-// quantifier matches no ref in Drone, so it is lost; the other patterns are emulated.
+// quantifier matches nothing in Drone, so an include pattern keeps the job from every ref and an exclude pattern
+// excludes no ref. Both are lost; the other patterns are emulated. The ledger keeps one detail per feature and
+// path at the worst level, so a lost entry also names the other inexact patterns and the written form.
 func (e *emitter) noteGlobs(tp string, f caps.Feature, inexact []string) {
-	var other []string
+	var lost, other []string
 	for _, p := range inexact {
-		if !strings.HasPrefix(p, negation) && strings.Contains(p, "+") {
-			e.lose(tp, f, "pattern "+p+" uses GHA syntax that doublestar reads literally; Drone matches no ref with it")
-			continue
+		switch {
+		case strings.HasPrefix(p, negation) && strings.Contains(p, "+"):
+			lost = append(lost, "exclude pattern "+strings.TrimPrefix(p, negation)+" uses GHA syntax that doublestar reads literally; Drone excludes no ref with it, so the job also runs on refs the source excluded")
+		case strings.Contains(p, "+") && !strings.HasPrefix(p, negation):
+			lost = append(lost, "pattern "+p+" uses GHA syntax that doublestar reads literally; Drone matches no ref with it")
+		default:
+			other = append(other, p)
 		}
-		other = append(other, p)
+	}
+	if len(lost) > 0 {
+		detail := strings.Join(lost, "; ")
+		if f == caps.TriggerFilterTags {
+			detail += "; the filter is still written as a ref filter on the tag event (ref filter refs/tags/<pattern>)"
+		} else {
+			detail += "; the filter is still written as is"
+		}
+		if len(other) > 0 {
+			detail += "; also inexact: " + strings.Join(other, ", ")
+		}
+		e.lose(tp, f, detail)
+		return
 	}
 	if len(other) > 0 {
 		e.emulate(tp, f, "doublestar glob", "pattern "+strings.Join(other, ", ")+" has a different meaning in doublestar than in the source; it is written as is")

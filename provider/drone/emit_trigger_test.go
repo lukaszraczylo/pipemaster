@@ -229,3 +229,42 @@ func TestPlusGlobIsLostAndOtherInexactGlobsAreEmulated(t *testing.T) {
 		})
 	}
 }
+
+func tagEntries(t *testing.T, f ir.Filter) []report.Entry {
+	t.Helper()
+	p := gproject(ghaOrigin, gjob("b", gstep("x", "a")))
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerTag, Tags: f}}
+	_, rep := emitText(t, p)
+	return slices.DeleteFunc(slices.Clone(rep.Entries), func(e report.Entry) bool { return e.Feature != caps.TriggerFilterTags })
+}
+
+func TestLostGlobDetailKeepsTheOtherInexactPatterns(t *testing.T) {
+	es := tagEntries(t, ir.Filter{Include: []string{"v[0-9]+.[0-9]+", "rel/**", "!v*-rc*"}})
+	if len(es) != 1 || es[0].Level != caps.Lost {
+		t.Fatalf("entries = %+v", es)
+	}
+	for _, want := range []string{
+		"pattern v[0-9]+.[0-9]+ uses GHA syntax", "written as a ref filter on the tag event", "ref filter refs/tags/<pattern>",
+		"also inexact: rel/**, !v*-rc*",
+	} {
+		if !strings.Contains(es[0].Detail, want) {
+			t.Errorf("detail lacks %q: %s", want, es[0].Detail)
+		}
+	}
+}
+
+func TestNegatedPlusGlobIsLost(t *testing.T) {
+	const want = "exclude pattern v[0-9]+ uses GHA syntax that doublestar reads literally; Drone excludes no ref with it, so the job also runs on refs the source excluded"
+	cases := map[string]ir.Filter{
+		"negated include": {Include: []string{"v*", "!v[0-9]+"}},
+		"exclude list":    {Include: []string{"v*"}, Exclude: []string{"v[0-9]+"}},
+	}
+	for name, f := range cases {
+		t.Run(name, func(t *testing.T) {
+			es := tagEntries(t, f)
+			if len(es) != 1 || es[0].Level != caps.Lost || !strings.Contains(es[0].Detail, want) {
+				t.Errorf("entries = %+v", es)
+			}
+		})
+	}
+}
