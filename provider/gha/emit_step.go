@@ -180,6 +180,9 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 		err = e.withKey(m, sp, st.With, nil)
 	case st.Kind == ir.StepScript && st.Image == nil:
 		m.set("run", str(noopScript))
+	case st.Kind == ir.StepAction && st.Action == nil:
+		e.lose(sp, caps.StepAction, "the step names no action GHA can run; the step runs "+noopScript)
+		m.set("run", str(noopScript))
 	case st.Kind == ir.StepTask:
 		e.lose(sp, caps.StepAction, "a task reference has no GHA form; the step runs "+noopScript)
 		m.set("run", str(noopScript))
