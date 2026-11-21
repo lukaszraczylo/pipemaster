@@ -829,3 +829,11 @@ func TestJobConditionBesideAScheduleReturns(t *testing.T) {
 		t.Fatalf("job condition = %v\n%v", got, files)
 	}
 }
+
+func TestResultWriteLineIsNotWritten(t *testing.T) {
+	j := wpJob("ci", wpStep("s", "echo v > $(results.tag.path)", "make"))
+	body, rep := one(t, wpProject("tekton", j))
+	if strings.Contains(body, "results.") || !reportHas(rep, caps.JobOutputs, caps.Lost) {
+		t.Fatalf("result write:\n%s\n%+v", body, rep.Entries)
+	}
+}

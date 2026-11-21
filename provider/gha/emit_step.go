@@ -199,13 +199,26 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 	return m.n, wrapped, nil
 }
 
+// withoutResultWrites drops the lines that write a Tekton result file, which no shell outside Tekton can run.
+func (e *emitter) withoutResultWrites(sp string, lines []string) []string {
+	var out []string
+	for _, l := range lines {
+		if emitkit.IsResultWrite(l) {
+			emitkit.LoseResultWrite(e.lose, sp)
+			continue
+		}
+		out = append(out, l)
+	}
+	return out
+}
+
 // remoteRefPrefix starts a script line that stands for a GitLab !reference into a remote include.
 const remoteRefPrefix = "!reference ["
 
 // withoutRemoteRefs drops the lines that only a GitLab remote include could fill; the metadata keeps them.
 func (e *emitter) withoutRemoteRefs(sp string, lines []string) []string {
 	var out []string
-	for _, l := range lines {
+	for _, l := range e.withoutResultWrites(sp, lines) {
 		if strings.HasPrefix(l, remoteRefPrefix) {
 			e.lose(sp, caps.StepScript, "the line "+l+" depends on a remote GitLab include and has no GHA form")
 			continue
@@ -286,7 +299,7 @@ func (e *emitter) imageParts(sp string, st *ir.Step) (ref, entrypoint, args stri
 	if ref, err = e.template(sp, st.Image.Ref); err != nil {
 		return
 	}
-	ts, err := e.templates(sp, st.Script)
+	ts, err := e.templates(sp, e.withoutResultWrites(sp, st.Script))
 	if err != nil {
 		return
 	}

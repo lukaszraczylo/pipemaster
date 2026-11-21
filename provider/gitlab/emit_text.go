@@ -201,6 +201,11 @@ func (e *emitter) field(path string, f caps.Feature, s string) (string, error) {
 // scriptLine converts one script entry. An entry with an expression GitLab cannot spell is commented out whole,
 // because dropping the part could change what the command does.
 func (e *emitter) scriptLine(path, s string) (out string, keep bool, err error) {
+	if emitkit.IsResultWrite(s) {
+		emitkit.LoseResultWrite(e.lose, path)
+		e.comment("step.script " + path + ": " + s)
+		return "", false, nil
+	}
 	if !strings.Contains(s, "${{") {
 		return s, true, nil
 	}
@@ -413,6 +418,9 @@ func (e *emitter) cancelLost(pp string, c *ir.Concurrency) {
 func (e *emitter) outputText(o ir.Output) (text string, ok bool, why string, err error) {
 	if !isIdent(o.Name) {
 		return "", false, "output name " + o.Name + " is not a dotenv variable name", nil
+	}
+	if o.Value == "" {
+		return "", false, "output " + o.Name + " has no value expression", nil
 	}
 	text, lost, err := convert(o.Value)
 	if err != nil {

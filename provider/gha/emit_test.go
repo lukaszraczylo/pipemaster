@@ -457,3 +457,44 @@ func TestActionStepWithNoActionEmitsAPlaceholderAndReportsLoss(t *testing.T) {
 		t.Fatalf("no lost entry: %v", rep.Entries)
 	}
 }
+
+func TestResultWriteLineIsNotWritten(t *testing.T) {
+	p := baseProject(t)
+	job(p, "build").Steps[0].Script = []string{"echo v > $(results.tag.path)", "make build"}
+	job(p, "build").Outputs = []ir.Output{{Name: "tag"}}
+	text, rep := emitText(t, gha.GHA, p)
+	if strings.Contains(text, "results.") {
+		t.Fatalf("the result write reached the file:\n%s", text)
+	}
+	if e := entry(rep, caps.JobOutputs); e == nil || e.Level != caps.Lost {
+		t.Fatalf("job.outputs not reported lost: %+v", rep.Entries)
+	}
+}
+
+func TestOutputWithoutValueIsLost(t *testing.T) {
+	p := baseProject(t)
+	job(p, "build").Outputs = []ir.Output{{Name: "tag"}}
+	text, rep := emitText(t, gha.GHA, p)
+	if strings.Contains(text, "tag:") {
+		t.Fatalf("an output with no value was written:\n%s", text)
+	}
+	if e := entry(rep, caps.JobOutputs); e == nil || e.Level != caps.Lost {
+		t.Fatalf("job.outputs not reported lost: %+v", rep.Entries)
+	}
+}
+
+func TestResultWriteLineIsNotWrittenInAnImageStep(t *testing.T) {
+	p := baseProject(t)
+	st := job(p, "build").Steps[0]
+	st.Image = &ir.Image{Ref: "alpine:3"}
+	st.Script = []string{"printf '%s' v > $(results.tag.path)"}
+	text, rep := emitText(t, gha.GHA, p)
+	for _, l := range strings.Split(text, "\n") {
+		if strings.Contains(l, "$(results.") && !strings.HasPrefix(strings.TrimSpace(l), "#") {
+			t.Fatalf("the result write reached the file:\n%s", text)
+		}
+	}
+	if e := entry(rep, caps.JobOutputs); e == nil || e.Level != caps.Lost {
+		t.Fatalf("job.outputs not reported lost: %+v", rep.Entries)
+	}
+}

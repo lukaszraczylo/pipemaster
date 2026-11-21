@@ -1,0 +1,21 @@
+# pipemaster:emulated script.interpolation pipeline/ci
+# pipemaster:arg [{"k":"t","p":"job/use/step/use-step-1/script/0","g":"echo $tag","s":"echo $\u007b{ needs.version.outputs.tag }}"}]
+stages:
+  - stage-0
+  - stage-1
+use:
+  stage: stage-1
+  needs:
+    - version
+  script:
+    # pipemaster:lost script.interpolation pipeline/ci/job/use/step/use-step-1: echo {{ needs.version.outputs.tag }}
+    - "true"
+    # pipemaster:step use-step-1
+# pipemaster:lost job.outputs pipeline/ci/job/version: output tag is not written
+version:
+  stage: stage-0
+  needs: []
+  script:
+    # pipemaster:lost step.script pipeline/ci/job/version/step/tag: printf '%s' v1 > $(results.tag.path)
+    - "true"
+    # pipemaster:step tag

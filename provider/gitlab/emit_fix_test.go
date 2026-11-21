@@ -541,3 +541,26 @@ func TestCapsDeclareDisplayNameLost(t *testing.T) {
 		t.Errorf("a reported job name must be lost, got %+v", got)
 	}
 }
+
+func TestResultWriteLineIsNotWritten(t *testing.T) {
+	j := glJob("a", glStep("echo v > $(results.tag.path)", "make"))
+	j.Outputs = []ir.Output{{Name: "tag"}}
+	files, rep := emitFiles(t, glProject("tekton", j))
+	for _, l := range strings.Split(string(files[rootFile]), "\n") {
+		if strings.Contains(l, "results.") && !strings.HasPrefix(strings.TrimSpace(l), "#") {
+			t.Fatalf("the result write reached the script:\n%s", files[rootFile])
+		}
+	}
+	if lvl, ok := levelAt(rep, caps.JobOutputs, "pipeline/gitlab-ci/job/a"); !ok || lvl != caps.Lost {
+		t.Fatalf("job.outputs level %v found %v: %+v", lvl, ok, rep.Entries)
+	}
+}
+
+func TestOutputWithoutValueIsLost(t *testing.T) {
+	j := glJob("a", glStep("make"))
+	j.Outputs = []ir.Output{{Name: "tag"}}
+	doc := emitDoc(t, glProject("tekton", j))
+	if strings.Contains(doc, `"tag="`) || strings.Contains(doc, "outputs.env") {
+		t.Fatalf("an output with no value was written:\n%s", doc)
+	}
+}

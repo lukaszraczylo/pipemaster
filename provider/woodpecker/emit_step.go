@@ -9,6 +9,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -324,6 +325,10 @@ func (e *emitter) scriptStep(c *wfCtx, sp string, st *ir.Step) (*wmap, error) {
 	b := &bindings{}
 	var lines []*yaml.Node
 	for _, l := range commandTexts(st) {
+		if emitkit.IsResultWrite(l) {
+			emitkit.LoseResultWrite(e.lose, sp)
+			continue
+		}
 		out, keep, err := e.command(b, sp, l)
 		if err != nil {
 			return nil, err

@@ -1,0 +1,11 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-version
+spec:
+  steps:
+    - name: tag
+      image: alpine:3.22
+      script: printf '%s' v1 > $(results.tag.path)
+  results:
+    - name: tag

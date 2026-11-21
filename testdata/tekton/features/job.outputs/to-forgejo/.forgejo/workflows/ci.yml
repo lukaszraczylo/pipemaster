@@ -20,5 +20,3 @@ jobs:
     steps:
       - id: tag
         run: echo "value=v1" >> "$GITHUB_OUTPUT"
-    outputs:
-      tag: ""

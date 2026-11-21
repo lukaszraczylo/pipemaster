@@ -8,17 +8,13 @@ use:
   needs:
     - version
   script:
+    # pipemaster:lost script.interpolation pipeline/ci/job/use/step/use-step-1: echo {{ needs.version.outputs.tag }}
+    - "true"
     # pipemaster:step use-step-1
-    - echo $tag
+# pipemaster:lost job.outputs pipeline/ci/job/version: output tag is not written
 version:
   stage: stage-0
   needs: []
   script:
     # pipemaster:step tag
     - echo "value=v1" >> "$GITHUB_OUTPUT"
-    # pipemaster:emulated job.outputs pipeline/ci/job/version
-    # pipemaster:arg {"lines":["echo $tag"]}
-    - echo "tag=" >> outputs.env
-  artifacts:
-    reports:
-      dotenv: outputs.env
