@@ -172,6 +172,7 @@ func (tc *taskCtx) actionStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 
 func (tc *taskCtx) dropAction(st *ir.Step, sp, why string) {
 	tc.e.lose(sp, caps.StepAction, why)
+	tc.unappliedFields(st, sp)
 	ref := string(st.Kind)
 	if st.Action != nil {
 		ref = actionRef(st.Action)
@@ -185,6 +186,7 @@ func (tc *taskCtx) extAction(st *ir.Step, sp, name string) *wmap {
 	ref, ok := x["ref"]
 	if !ok || !tc.e.own {
 		tc.e.lose(sp, caps.StepAction, "the step has no action reference and no Tekton ref")
+		tc.unappliedFields(st, sp)
 		return nil
 	}
 	m := newMap()
@@ -339,3 +341,20 @@ func (tc *taskCtx) copyStep(st *ir.Step, sp, name string, lines []string) *wmap 
 }
 
 var _ = exprtekton.OpIn
+
+// unappliedFields reports the settings of a step that the emitter drops, because the settings have no step to sit on.
+func (tc *taskCtx) unappliedFields(st *ir.Step, sp string) {
+	const why = "the step is lost, so the setting is lost with it"
+	for _, f := range []struct {
+		what caps.Feature
+		set  bool
+	}{
+		{caps.StepIf, st.If != nil}, {caps.StepEnv, len(st.Env) > 0}, {caps.StepWorkdir, st.WorkDir != ""},
+		{caps.StepContinueOnError, st.ContinueOnError}, {caps.StepTimeout, st.Timeout != nil},
+		{caps.StepImage, st.Image != nil}, {caps.StepShell, st.Shell != ""},
+	} {
+		if f.set {
+			tc.e.lose(sp, f.what, why)
+		}
+	}
+}

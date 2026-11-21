@@ -158,3 +158,10 @@ func TestEditedWorkspaceIsNotRestored(t *testing.T) {
 		})
 	}
 }
+
+func TestDroppedStepReportsItsSettingsLost(t *testing.T) {
+	st := &ir.Step{ID: "p", Kind: ir.StepPlugin, Image: &ir.Image{Ref: "plugins/docker"}, With: map[string]ir.Value{"repo": {Lit: "x"}}, If: eqStr([]string{"event"}, "push")}
+	_, rep := emit(t, project(jobWith(st)))
+	wantEntry(t, rep, caps.StepIf, caps.Lost, "setting is lost")
+	wantEntry(t, rep, caps.StepImage, caps.Lost, "setting is lost")
+}
