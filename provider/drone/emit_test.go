@@ -664,3 +664,41 @@ func TestExtKeysWithUnderscoreAreWritten(t *testing.T) {
 		t.Fatal("the step grouping record is not a file key")
 	}
 }
+
+func TestNoPosixGuardOnWindows(t *testing.T) {
+	cond := or(eq(ref(expr.CtxEvent), "pull_request"), eq(ref(expr.CtxBranch), "1.0"))
+	for name, mk := range map[string]func() *ir.Project{
+		"job guard": func() *ir.Project {
+			j := gjob("b", gstep("x", "1"))
+			j.If = cond
+			j.Runner = ir.Runner{Platform: "windows/amd64"}
+			return gproject("drone", j)
+		},
+		"step guard": func() *ir.Project {
+			s := gstep("x", "1")
+			s.If = cond
+			j := gjob("b", s)
+			j.Runner = ir.Runner{Platform: "windows/amd64"}
+			return gproject("drone", j)
+		},
+		"platform in Ext": func() *ir.Project {
+			s := gstep("x", "1")
+			s.If = cond
+			j := gjob("b", s)
+			j.Ext = ir.Ext{"drone": map[string]any{"platform": map[string]any{"os": "windows"}}}
+			return gproject("drone", j)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, rep := emitText(t, mk())
+			if strings.Contains(out, "pipemaster:guard") {
+				t.Errorf("a POSIX guard line on a Windows document:\n%s", out)
+			}
+			if !slices.ContainsFunc(rep.Entries, func(e report.Entry) bool {
+				return (e.Feature == caps.JobIf || e.Feature == caps.StepIf) && e.Level == caps.Lost
+			}) {
+				t.Errorf("no lost entry for the disabled condition: %+v", rep.Entries)
+			}
+		})
+	}
+}

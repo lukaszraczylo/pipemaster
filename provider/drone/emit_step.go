@@ -336,7 +336,7 @@ func (e *emitter) finishStep(c *docCtx, sp string, st *ir.Step, name string, bod
 		}
 		m.set(keyWhen, n)
 	} else {
-		n, _, err := e.stepWhen(sp, st, len(st.Script) > 0 && body.has(keyCommands))
+		n, _, err := e.stepWhen(sp, st, len(st.Script) > 0 && body.has(keyCommands) && !windowsJob(c.j))
 		if err != nil {
 			return stepDone{}, err
 		}
@@ -484,7 +484,7 @@ func (e *emitter) scriptStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
 // guards returns the guard lines of a script step: the job guard first, then the step guard.
 func (e *emitter) guards(c *docCtx, st *ir.Step) ([]*yaml.Node, error) {
 	var out []*yaml.Node
-	if st.If != nil {
+	if st.If != nil && !windowsJob(c.j) {
 		if _, filter := e.exprSet(st.If); !filter {
 			if ok, _ := e.guardable(st.If); ok {
 				line, err := e.printGuard(st.If)

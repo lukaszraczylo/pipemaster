@@ -719,7 +719,7 @@ func (e *emitter) jobSet(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (j
 				return jobCond{set: disabledSet(), has: true}, nil
 			}
 			out.set, out.has, filtered = merged, true, true
-		case guardableSteps(j.Steps) && gok:
+		case guardableSteps(j.Steps) && gok && !windowsJob(j):
 			e.emulate(jp, caps.JobIf, "shell guard on the first script line of every step", "the condition has no Drone filter; each step shows success instead of skipped")
 			if gfolded {
 				e.noteFold(jp, caps.JobIf)
@@ -768,6 +768,19 @@ func triggerFeature(t *ir.Trigger) caps.Feature {
 }
 
 // guardableSteps reports whether every step that Drone runs has a script, the only step a guard line can open.
+// windowsJob is true when the document runs on Windows, where the docker runner reads commands as PowerShell and
+// a POSIX guard line is a syntax error.
+func windowsJob(j *ir.Job) bool {
+	for _, l := range append([]string{j.Runner.Platform}, j.Runner.Labels...) {
+		if strings.HasPrefix(l, "windows/") {
+			return true
+		}
+	}
+	pf, _ := extOf(j.Ext)[keyPlatform].(map[string]any)
+	os, _ := pf[platformOS].(string)
+	return os == "windows"
+}
+
 func guardableSteps(steps []*ir.Step) bool {
 	for _, st := range steps {
 		if st == nil || st.Action != nil || st.Kind == ir.StepAction || st.Kind == ir.StepPipelineCall {
