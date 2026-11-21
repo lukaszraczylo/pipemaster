@@ -242,7 +242,8 @@ func varsAre(h heldText, st *ir.Step, cell map[string]string) bool {
 		}
 	}
 	for k, v := range with {
-		if got, has := st.With[k]; has && !valueIs(v, got, cell) {
+		got, has := st.With[k]
+		if has && !valueIs(v, got, cell) || !has && st.Kind == ir.StepPlugin {
 			return false
 		}
 	}
@@ -256,6 +257,9 @@ func restoreVars(h heldText, st *ir.Step) {
 		if i := slices.IndexFunc(st.Env, func(w ir.Var) bool { return w.Name == v.Name }); i >= 0 {
 			st.Env[i] = v
 		}
+	}
+	if len(with) > 0 && st.With == nil {
+		st.With = map[string]ir.Value{}
 	}
 	maps.Copy(st.With, with)
 }

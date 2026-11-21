@@ -459,3 +459,49 @@ func TestNeverRunningJobKeepsThePipelineTriggers(t *testing.T) {
 		t.Errorf("triggers = %+v", got.Pipelines[0].Triggers)
 	}
 }
+
+func matrixPluginJob() *ir.Job {
+	pl := &ir.Step{
+		ID: "notify", Kind: ir.StepPlugin, Image: &ir.Image{Ref: "plugins/slack"},
+		With: map[string]ir.Value{"k": {Kind: ir.ValueExpr, Expr: ref("matrix", "go")}},
+	}
+	j := gjob("test", pl)
+	j.Matrix = &ir.Matrix{Axes: []ir.Axis{{Name: "go", Values: []string{"1.21", "1.22"}}}}
+	return j
+}
+
+func TestEditedPluginCellsWithoutSettingsKeepTheDocuments(t *testing.T) {
+	cut := func(s string) string {
+		var out []string
+		skip := false
+		for _, l := range strings.Split(s, "\n") {
+			switch {
+			case strings.HasPrefix(l, "    settings:"):
+				skip = true
+			case skip && strings.HasPrefix(l, "      "):
+			default:
+				skip = false
+				out = append(out, l)
+			}
+		}
+		return strings.Join(out, "\n")
+	}
+	p, rep := back(t, gproject(ghaOrigin, matrixPluginJob()), cut)
+	if p.Pipelines[0].Jobs[0].Matrix != nil {
+		t.Errorf("the marker restored the matrix over the edit")
+	}
+	if !ignored(rep, caps.JobMatrix) {
+		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
+	}
+}
+
+func TestScriptStepHoldingSettingsFoldsWithoutPanic(t *testing.T) {
+	st := gstep("run", "go test")
+	st.With = map[string]ir.Value{"k": {Kind: ir.ValueExpr, Expr: ref("matrix", "go")}}
+	j := gjob("test", st)
+	j.Matrix = &ir.Matrix{Axes: []ir.Axis{{Name: "go", Values: []string{"1.21", "1.22"}}}}
+	p, _ := back(t, gproject(ghaOrigin, j), nil)
+	if got := jobOf(t, p, "test"); got.Matrix == nil || len(got.Steps[0].With) != 1 {
+		t.Errorf("job = %+v", got)
+	}
+}
