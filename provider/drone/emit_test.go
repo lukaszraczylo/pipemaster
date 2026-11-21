@@ -586,3 +586,25 @@ func TestDroneOriginComparisonStaysExact(t *testing.T) {
 		t.Fatalf("a Drone-origin condition must not carry the fold caveat: %v", rep.Entries)
 	}
 }
+
+func TestRenamedJobIDIsReported(t *testing.T) {
+	out, rep := emitText(t, gproject("drone", gjob("Ci Main", gstep("x", "1")), gjob("ok", gstep("x", "1"))))
+	if !strings.Contains(out, "name: Ci-Main") {
+		t.Fatalf("the document is not named Ci-Main:\n%s", out)
+	}
+	var found bool
+	for _, e := range rep.Entries {
+		if e.Feature == caps.ExtPassthrough && strings.Contains(e.IRPath, "job/Ci Main") {
+			found = true
+			if e.Level != caps.Emulated || !strings.Contains(e.Detail, "Ci Main") || !strings.Contains(e.Detail, "Ci-Main") {
+				t.Fatalf("entry = %+v", e)
+			}
+		}
+		if strings.Contains(e.IRPath, "job/ok") && e.Feature == caps.ExtPassthrough {
+			t.Fatalf("a valid job id must not be reported: %+v", e)
+		}
+	}
+	if !found {
+		t.Fatalf("the rename has no report entry: %v", rep.Entries)
+	}
+}

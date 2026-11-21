@@ -160,6 +160,21 @@ func newPlanSet(pls []*ir.Pipeline, own bool) *planSet {
 	return s
 }
 
+// noteRename reports a document name that differs from its job id. A matrix cell name always does, so it is skipped.
+func (e *emitter) noteRename(pln *docPlan, prefixed bool) {
+	if pln.j.Matrix != nil {
+		return
+	}
+	want := pln.j.ID
+	if prefixed {
+		want = pln.pl.ID + "-" + want
+	}
+	if pln.name != want {
+		e.emulate("pipeline/"+pln.pl.ID+"/job/"+pln.j.ID, caps.ExtPassthrough, "job id renamed",
+			"job id "+pln.j.ID+" is not a valid Drone document name; written as "+pln.name)
+	}
+}
+
 func (e *emitter) project(s *planSet, pls []*ir.Pipeline) ([]byte, error) {
 	var roots []*yaml.Node
 	var heads [][]string
@@ -177,6 +192,7 @@ func (e *emitter) project(s *planSet, pls []*ir.Pipeline) ([]byte, error) {
 	for _, pln := range s.plans {
 		c := &docCtx{pl: pln.pl, j: pln.j, plan: pln, uploads: map[string]bool{}, name: pln.name, jp: "pipeline/" + pln.pl.ID + "/job/" + pln.j.ID}
 		e.head = nil
+		e.noteRename(pln, len(pls) > 1)
 		if len(pls) > 1 && pln.first {
 			ji := jobIdx[pln.pl]
 			jobIdx[pln.pl]++
