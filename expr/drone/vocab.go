@@ -72,7 +72,7 @@ func droneEvents(canon string, fold bool) ([]string, bool) {
 }
 
 // canonEvent inverts droneEvents for one DRONE_BUILD_EVENT value, except push, which alone has no canonical
-// form: it is push without tag (see canonEventList).
+// form: it is push without tag (see pushOnly).
 func canonEvent(native string) (string, bool) {
 	for c, v := range Events {
 		if v == native {

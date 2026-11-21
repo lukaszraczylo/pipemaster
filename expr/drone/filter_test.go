@@ -2,6 +2,7 @@ package drone_test
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -277,8 +278,8 @@ func genFilter(t *rapid.T, label string) drone.Filter {
 }
 
 func genEventFilter(t *rapid.T) drone.Filter {
-	// "push+tag" stands for the pair that reads back as canonical push; each alone has no canonical form here.
-	val := rapid.SampledFrom([]string{"pull_request", "cron", "custom", "promote", "rollback", "p*", "**", "push+tag"})
+	// "push+tag" stands for the pair that reads back as canonical push; "push" alone is a push of a branch.
+	val := rapid.SampledFrom([]string{"pull_request", "cron", "custom", "promote", "rollback", "p*", "**", "push+tag", "push"})
 	expand := func(vs []string) []string {
 		var out []string
 		for _, v := range vs {
@@ -288,7 +289,13 @@ func genEventFilter(t *rapid.T) drone.Filter {
 				out = append(out, v)
 			}
 		}
-		return out
+		// A repeated push would read back as the pair, so the generator keeps the first of each.
+		seen := map[string]bool{}
+		return slices.DeleteFunc(out, func(v string) bool {
+			dup := seen[v] && (v == "push" || v == "tag")
+			seen[v] = true
+			return dup
+		})
 	}
 	f := drone.Filter{Include: expand(rapid.SliceOfN(val, 0, 3).Draw(t, "eventinc")), Exclude: expand(rapid.SliceOfN(val, 0, 3).Draw(t, "eventexc"))}
 	if len(f.Include) == 0 {
@@ -391,7 +398,7 @@ func TestEventsWithoutDroneLiteral(t *testing.T) {
 		}
 	}
 	// Native names with no canonical meaning cannot stand in the canonical AST.
-	for _, v := range []string{"push", "schedule", "workflow_dispatch", "foo"} { // push alone is push without tag
+	for _, v := range []string{"schedule", "workflow_dispatch", "foo"} {
 		if e, err := drone.ToExpr(drone.Conditions{Event: drone.Filter{Include: []string{v}}}); err == nil {
 			t.Errorf("ToExpr(event %s) = %#v; want an error", v, e)
 		}
@@ -443,9 +450,22 @@ func TestPushIsPushAndTag(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(e, bin(expr.OpOr, eq(event, "push"), eq(event, "schedule"))) {
 		t.Errorf("FilterExpr(push, cron, tag) = %#v, %v", e, err)
 	}
-	for _, f := range []drone.Filter{{Include: []string{"push"}}, {Exclude: []string{"push"}}, {Include: []string{"push", "cron"}}} {
-		if e, err := drone.FilterExpr("event", f); err == nil {
-			t.Errorf("FilterExpr(%v) = %#v; push without tag has no canonical form, want an error", f, e)
+	typed := bin(expr.OpAnd, eq(event, "push"), eq(r("ref_type"), "branch"))
+	for name, c := range map[string]struct {
+		want expr.Expr
+		f    drone.Filter
+	}{
+		"include":         {typed, drone.Filter{Include: []string{"push"}}},
+		"exclude":         {not(typed), drone.Filter{Exclude: []string{"push"}}},
+		"beside an event": {bin(expr.OpOr, typed, eq(event, "schedule")), drone.Filter{Include: []string{"push", "cron"}}},
+	} {
+		e, err := drone.FilterExpr("event", c.f)
+		if err != nil || !reflect.DeepEqual(e, c.want) {
+			t.Errorf("%s: FilterExpr(%v) = %#v, %v; want push of a branch %#v", name, c.f, e, err, c.want)
+		}
+		back, ok := drone.FromExpr(e, exact)
+		if !ok || !reflect.DeepEqual(back.Event, c.f) {
+			t.Errorf("%s: FromExpr(%#v) = %#v, %v; want %v", name, e, back.Event, ok, c.f)
 		}
 	}
 	got, ok := drone.FromExpr(eq(event, "push"), exact)

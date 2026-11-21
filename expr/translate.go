@@ -759,6 +759,14 @@ func approxCmp(b Binary, from Dialect, cav *caveats) (Expr, bool) {
 	case CtxBranch, CtxTag:
 		addAll(cav, litCaveats(lit))
 		cmp = guardE(n, Binary{Op: OpEq, L: ctxRef(CtxRefName), R: Lit{Kind: LitStr, Str: lit}})
+	case CtxRef, CtxRepo:
+		addAll(cav, litCaveats(lit))
+		return Binary{Op: b.Op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: lit}}, true
+	case CtxRefType:
+		if lit != refTypeBranch && lit != refTypeTag {
+			return nil, false
+		}
+		return Binary{Op: b.Op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: lit}}, true
 	default:
 		return nil, false
 	}

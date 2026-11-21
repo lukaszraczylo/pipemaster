@@ -8,6 +8,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
+	dexpr "github.com/lukaszraczylo/pipemaster/expr/drone"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -69,6 +70,9 @@ func (a adapter) emit(p *ir.Project) (map[string][]byte, *report.Report, map[str
 	e := &emitter{led: emitkit.NewLedger("ir", dialect, a.Caps()), stepIDs: map[string]string{}}
 	if lang, ok := expr.LangOf(origin); ok && origin != dialect {
 		e.sem = lang.Sem
+		if from := expr.SourceFor(origin, dexpr.Lang); from != nil && from.Class == dexpr.Lang.Class {
+			e.from = from
+		}
 	}
 	uses := ir.Features(p)
 	for _, u := range uses {

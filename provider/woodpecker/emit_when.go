@@ -213,6 +213,21 @@ func (e *emitter) disable(path string, f caps.Feature, x expr.Expr, what string)
 	e.comment(string(f) + " " + path + ": " + expr.String(x))
 }
 
+// markSource records a condition in its source dialect when the translation changed its text, so a return
+// conversion restores it.
+func (e *emitter) markSource(path string, f caps.Feature, x expr.Expr) {
+	if e.from == nil || hasStatusCall(x) {
+		return
+	}
+	t, ok := expr.Translate(x, *e.from, wpexpr.Lang)
+	if !ok || expr.String(t) == expr.String(x) {
+		return
+	}
+	if err := e.markArg(f, path, srcArg{Src: expr.String(x), From: e.from.ID}); err != nil {
+		e.comment("expression source not carried: " + err.Error())
+	}
+}
+
 // stepWhen renders a step condition as a when list; nil means no restriction.
 func (e *emitter) stepWhen(path string, x expr.Expr) *yaml.Node {
 	if x == nil {
@@ -222,6 +237,7 @@ func (e *emitter) stepWhen(path string, x expr.Expr) *yaml.Node {
 	if !ok {
 		return whenNode(neverEntries(nil))
 	}
+	e.markSource(path, caps.StepIf, x)
 	entries := make([]whenEntry, 0, len(items))
 	for _, it := range items {
 		entries = append(entries, whenEntry{Item: it, status: status})

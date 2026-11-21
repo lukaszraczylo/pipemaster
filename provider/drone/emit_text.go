@@ -41,7 +41,9 @@ type emitter struct {
 	// declared lists the matrix names of the job being written.
 	declared map[string]bool
 	// sem is the equality semantics of the dialect that wrote the IR conditions.
-	sem  expr.Semantics
+	sem expr.Semantics
+	// from is the source dialect of a condition that shares the Drone class, so its event names map to Drone's.
+	from *expr.Dialect
 	head []string
 	// cut is set when an image or workdir lost an expression; the step or service being written owns it.
 	cut bool

@@ -24,11 +24,10 @@ func TestStepWhenBecomesIf(t *testing.T) {
 	}
 }
 
-func TestEventPushAloneStaysOpaque(t *testing.T) {
+func TestEventPushAloneIsPushOnBranch(t *testing.T) {
 	s, _ := whenOf(t, "    event: push\n")
-	o, ok := s.If.(expr.Opaque)
-	if !ok || o.Dialect != "drone" || o.Text != `{"event":"push"}` {
-		t.Fatalf("if = %#v", s.If)
+	if got := condText(s.If); got != "(event == 'push') && (ref_type == 'branch')" {
+		t.Fatalf("if = %q", got)
 	}
 }
 
@@ -148,14 +147,10 @@ func TestTriggerExtraKeysStayInJobExt(t *testing.T) {
 	}
 }
 
-func TestTriggerOpaqueOnPushAloneWithBranchGoesToIf(t *testing.T) {
-	pl, rep := parseYML(t, trigYML("  event: push\n  ref: refs/heads/main\n"))
-	o, ok := pl.Jobs[0].If.(expr.Opaque)
-	if !ok || o.Dialect != "drone" || len(pl.Triggers) != 0 {
-		t.Fatalf("if = %#v triggers=%v", pl.Jobs[0].If, pl.Triggers)
-	}
-	if !hasEntry(rep, "kept as opaque Drone text") {
-		t.Fatal("no entry")
+func TestTriggerPushAloneWithRefGoesToIf(t *testing.T) {
+	pl, _ := parseYML(t, trigYML("  event: push\n  ref: refs/heads/main\n"))
+	if got := condText(pl.Jobs[0].If); got != "(event == 'push') && (ref_type == 'branch') && (ref == 'refs/heads/main')" || len(pl.Triggers) != 0 {
+		t.Fatalf("if = %q triggers=%v", got, pl.Triggers)
 	}
 }
 
@@ -205,8 +200,8 @@ func TestTriggersThatDifferGoToJobIf(t *testing.T) {
 	if condText(pl.Jobs[1].If) != "event == 'pull_request'" {
 		t.Fatalf("job b if = %q", condText(pl.Jobs[1].If))
 	}
-	if _, ok := pl.Jobs[0].If.(expr.Opaque); !ok {
-		t.Fatalf("job a if = %#v, want the opaque push-only condition", pl.Jobs[0].If)
+	if got := condText(pl.Jobs[0].If); got != "(event == 'push') && (ref_type == 'branch')" {
+		t.Fatalf("job a if = %q, want the push-only condition", got)
 	}
 }
 

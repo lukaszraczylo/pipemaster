@@ -1,4 +1,4 @@
-# pipemaster:lost step.if pipeline/drone/job/ci/step/release: opaque(drone): {"event":["push"]}
+# pipemaster:lost step.if pipeline/drone/job/ci/step/release: opaque(drone): when.ref glob "refs/tags/v*"
 when:
   - event: push
 steps:

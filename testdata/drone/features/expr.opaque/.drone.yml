@@ -11,4 +11,4 @@ steps:
     commands:
       - ./release.sh
     when:
-      event: [push]
+      ref: [refs/tags/v*]

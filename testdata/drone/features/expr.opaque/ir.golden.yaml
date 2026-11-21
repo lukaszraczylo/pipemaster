@@ -10,7 +10,7 @@ pipelines:
       jobs:
         - id: ci
           steps:
-            - if: 'opaque(drone): {"event":["push"]}'
+            - if: 'opaque(drone): when.ref glob "refs/tags/v*"'
               image:
                 ref: alpine:3.20
               id: release

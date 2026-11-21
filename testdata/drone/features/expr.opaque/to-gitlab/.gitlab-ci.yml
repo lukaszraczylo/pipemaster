@@ -7,7 +7,7 @@ ci:
     # pipemaster:step release
     # pipemaster:emulated step.if pipeline/drone/job/ci/step/release
     # pipemaster:arg "false"
-    # pipemaster:lost expr.opaque pipeline/drone/job/ci/step/release: opaque(drone): {"event":["push"]}
+    # pipemaster:lost expr.opaque pipeline/drone/job/ci/step/release: opaque(drone): when.ref glob "refs/tags/v*"
     - |
       if false; then
       ./release.sh

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -69,6 +70,10 @@ var keyRefs = map[string]expr.Ref{
 
 var tagRef = expr.Ref{Path: []string{expr.CtxTag}}
 
+var refTypeRef = expr.Ref{Path: []string{expr.CtxRefType}}
+
+const refTypeBranch = "branch"
+
 func (c *Conditions) filter(key string) *Filter {
 	switch key {
 	case KeyEvent:
@@ -123,44 +128,55 @@ func valueExpr(key, v string) (expr.Expr, error) {
 	return expr.Binary{Op: expr.OpEq, L: keyRefs[key], R: strLit(v)}, nil
 }
 
-// canonEventList maps Drone event values to canonical names. The pair push and tag is the canonical push, and
-// the tag entries then drop out. Push without tag is Drone's push-only event; the AST has no exact node for it
-// (it would need a ref test that the filter reader cannot invert), so it is an error and the caller keeps the
-// filter native. A glob stays as written.
-func canonEventList(vs []string) ([]string, error) {
-	hasPush, hasTag := slices.Contains(vs, "push"), slices.Contains(vs, "tag")
-	if hasPush && !hasTag {
-		return nil, errors.New("drone when: event push without tag has no canonical form")
+// pushOnly is the canonical form of Drone's push event: a push of a branch. The canonical push also stands for
+// a tag push, so the branch restriction is a test of the ref type.
+func pushOnly() expr.Expr {
+	return expr.Binary{Op: expr.OpAnd,
+		L: expr.Binary{Op: expr.OpEq, L: keyRefs[KeyEvent], R: strLit(eventPush)},
+		R: expr.Binary{Op: expr.OpEq, L: refTypeRef, R: strLit(refTypeBranch)}}
+}
+
+// isPushOnly reports whether e is the node pushOnly builds.
+func isPushOnly(e expr.Expr) bool {
+	b, ok := e.(expr.Binary)
+	if !ok || b.Op != expr.OpAnd {
+		return false
 	}
-	var out []string
-	for _, v := range vs {
-		switch {
-		case !IsLiteral(v):
-			out = append(out, v)
-		case v == "tag" && hasPush:
-		case v == "push":
-			out = append(out, eventPush)
-		default:
-			c, ok := canonEvent(v)
-			if !ok {
-				return nil, fmt.Errorf("drone when: event %q has no canonical name", v)
-			}
-			out = append(out, c)
-		}
+	return reflect.DeepEqual(b, pushOnly())
+}
+
+// eventExpr maps one event value to its canonical node. The pair push and tag is the canonical push, so the tag
+// entry drops out (nil). A push without tag is a push of a branch. A glob stays as written, and a value with no
+// canonical name is an error.
+func eventExpr(v string, hasPush, hasTag bool) (expr.Expr, error) {
+	switch {
+	case !IsLiteral(v):
+		return GlobOpaque(KeyEvent, v), nil
+	case v == "tag" && hasPush && hasTag:
+		return nil, nil
+	case v == eventPush && !hasTag:
+		return pushOnly(), nil
+	case v == eventPush:
+		return expr.Binary{Op: expr.OpEq, L: keyRefs[KeyEvent], R: strLit(eventPush)}, nil
 	}
-	return out, nil
+	c, ok := canonEvent(v)
+	if !ok {
+		return nil, fmt.Errorf("drone when: event %q has no canonical name", v)
+	}
+	return expr.Binary{Op: expr.OpEq, L: keyRefs[KeyEvent], R: strLit(c)}, nil
 }
 
 func orChain(key string, vs []string) (expr.Expr, error) {
-	if key == KeyEvent {
-		var err error
-		if vs, err = canonEventList(vs); err != nil {
-			return nil, err
-		}
-	}
+	hasPush, hasTag := slices.Contains(vs, "push"), slices.Contains(vs, "tag")
 	var out expr.Expr
 	for _, v := range vs {
-		e, err := valueExpr(key, v)
+		var e expr.Expr
+		var err error
+		if key == KeyEvent {
+			e, err = eventExpr(v, hasPush, hasTag)
+		} else {
+			e, err = valueExpr(key, v)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -279,7 +295,7 @@ func statusList(c expr.Call) ([]string, bool) {
 // flattenAnd splits only the left spine: ToExpr nests a key's include-AND-NOT-exclude on the right, and that
 // pair must stay one conjunct.
 func flattenAnd(e expr.Expr) []expr.Expr {
-	if b, ok := e.(expr.Binary); ok && b.Op == expr.OpAnd {
+	if b, ok := e.(expr.Binary); ok && b.Op == expr.OpAnd && !isPushOnly(e) {
 		return append(flattenAnd(b.L), b.R)
 	}
 	return []expr.Expr{e}
@@ -306,6 +322,9 @@ func (rd reader) valueOf(e expr.Expr) (key string, vs []string, ok bool) {
 		k, p, ok := ParseGlob(x)
 		return k, []string{p}, ok
 	case expr.Binary:
+		if isPushOnly(x) {
+			return KeyEvent, []string{eventPush}, true
+		}
 		lit, isLit := x.R.(expr.Lit)
 		r, isRef := x.L.(expr.Ref)
 		if x.Op != expr.OpEq || !isLit || !isRef || lit.Kind != expr.LitStr || !IsLiteral(lit.Str) {
@@ -345,7 +364,7 @@ func (rd reader) valuesOf(e expr.Expr) (string, []string, bool) {
 
 // filterOf reads include, NOT exclude, or both ANDed.
 func (rd reader) filterOf(e expr.Expr) (string, Filter, bool) {
-	if b, ok := e.(expr.Binary); ok && b.Op == expr.OpAnd {
+	if b, ok := e.(expr.Binary); ok && b.Op == expr.OpAnd && !isPushOnly(e) {
 		n, isNot := b.R.(expr.Unary)
 		if !isNot || n.Op != expr.OpNot {
 			return "", Filter{}, false

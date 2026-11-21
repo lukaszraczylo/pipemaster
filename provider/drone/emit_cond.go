@@ -97,6 +97,25 @@ func literalFilter(f dexpr.Filter) bool {
 	return len(f.Exclude) == 0 && !slices.ContainsFunc(f.Include, func(s string) bool { return !dexpr.IsLiteral(s) })
 }
 
+// onlyInclude reports whether f lists exact names to match and nothing to exclude.
+func onlyInclude(f dexpr.Filter) bool { return literalFilter(f) && len(f.Include) > 0 }
+
+// onlyExclude reports whether f lists exact names to exclude and nothing to match.
+func onlyExclude(f dexpr.Filter) bool {
+	return len(f.Include) == 0 && len(f.Exclude) > 0 && !slices.ContainsFunc(f.Exclude, func(s string) bool { return !dexpr.IsLiteral(s) })
+}
+
+// without is the names of inc that exc does not exclude. It fails when none remain, as then no run matches.
+func without(inc, exc dexpr.Filter) (dexpr.Filter, bool) {
+	var out dexpr.Filter
+	for _, v := range inc.Include {
+		if !slices.Contains(exc.Exclude, v) {
+			out.Include = append(out.Include, v)
+		}
+	}
+	return out, len(out.Include) > 0
+}
+
 func mergeFilter(a, b dexpr.Filter) (dexpr.Filter, bool) {
 	switch {
 	case empty(a):
@@ -111,6 +130,10 @@ func mergeFilter(a, b dexpr.Filter) (dexpr.Filter, bool) {
 			}
 		}
 		return out, len(out.Include) > 0
+	case onlyInclude(a) && onlyExclude(b):
+		return without(a, b)
+	case onlyInclude(b) && onlyExclude(a):
+		return without(b, a)
 	}
 	return dexpr.Filter{}, false
 }
@@ -225,13 +248,15 @@ func filterValue(f dexpr.Filter) any {
 
 // exprSet turns a canonical condition into Drone conditions. ok is false when Drone has no filter for it.
 func (e *emitter) exprSet(x expr.Expr) (condSet, bool) {
+	orig := x
+	x = e.toDrone(x)
 	if c, ok := dexpr.FromExpr(x, e.sem); ok {
 		return condSet{c: c}, true
 	}
 	if c, ok := dexpr.FromExpr(x, e.sem, dexpr.AllowFold); ok {
 		return condSet{c: c, folded: true}, true
 	}
-	o, isOpaque := x.(expr.Opaque)
+	o, isOpaque := orig.(expr.Opaque)
 	if !isOpaque || o.Dialect != dexpr.Dialect {
 		return condSet{}, false
 	}
@@ -252,6 +277,18 @@ func (e *emitter) noteBranch(path string, f caps.Feature, strategy string, cs co
 	}
 }
 
+// toDrone reads a condition of a dialect in the Drone class with the Drone event names. A condition that does
+// not translate stays as written, and the filter and guard readers then refuse it.
+func (e *emitter) toDrone(x expr.Expr) expr.Expr {
+	if e.from == nil {
+		return x
+	}
+	if t, ok := expr.Translate(x, *e.from, dexpr.Lang); ok {
+		return t
+	}
+	return x
+}
+
 // noteFold reports a filter or guard that reads a folded comparison case-sensitively.
 func (e *emitter) noteFold(path string, f caps.Feature) {
 	e.emulate(path, f, "case-sensitive comparison", foldCaveat)
@@ -259,6 +296,7 @@ func (e *emitter) noteFold(path string, f caps.Feature) {
 
 // guardable reports whether x has a shell guard, and whether that guard reads a folded comparison.
 func (e *emitter) guardable(x expr.Expr) (ok, folded bool) {
+	x = e.toDrone(x)
 	if dexpr.Guardable(x, e.sem) {
 		return true, false
 	}
@@ -326,6 +364,7 @@ type condArg struct {
 // markGuard writes the marker of a shell guard. It holds the condition when the guard reads back as another
 // expression, which happens when a folded comparison is printed case-sensitively.
 func (e *emitter) markGuard(f caps.Feature, path string, orig expr.Expr) error {
+	orig = e.toDrone(orig)
 	line, err := e.printGuard(orig)
 	if err != nil {
 		return err
@@ -344,6 +383,7 @@ func (e *emitter) markCond(f caps.Feature, path string, orig expr.Expr, cs condS
 	if _, own := orig.(expr.Opaque); own {
 		return nil
 	}
+	orig = e.toDrone(orig)
 	back, err := dexpr.ToExpr(cs.c)
 	if err != nil {
 		// The parser keeps a condition with no expression form as Drone text.

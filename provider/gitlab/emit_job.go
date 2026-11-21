@@ -238,7 +238,7 @@ func (e *emitter) jobNode(c *pipeCtx, p *jobPrep) (*yaml.Node, []string, error) 
 	if err := e.artifactsKey(m, p, ext, skip); err != nil {
 		return nil, nil, err
 	}
-	var marks []string
+	marks := slices.Clone(t.marks)
 	if err := e.limitKeys(m, p, t, ext, skip, &marks); err != nil {
 		return nil, nil, err
 	}

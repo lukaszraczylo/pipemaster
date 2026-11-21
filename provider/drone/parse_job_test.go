@@ -145,7 +145,7 @@ func TestBadShapesAreErrors(t *testing.T) {
 }
 
 func TestOpaqueUsesDroneDialect(t *testing.T) {
-	j, _ := parseJob(t, "kind: pipeline\nname: p\nsteps:\n- name: s\n  image: x\n  when:\n    event: push\n")
+	j, _ := parseJob(t, "kind: pipeline\nname: p\nsteps:\n- name: s\n  image: x\n  when:\n    branch:\n      include: main\n")
 	o, ok := step(t, j, "s").If.(expr.Opaque)
 	if !ok || o.Dialect != "drone" {
 		t.Fatalf("if = %#v", step(t, j, "s").If)

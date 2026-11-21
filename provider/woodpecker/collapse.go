@@ -12,6 +12,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
+	wpexpr "github.com/lukaszraczylo/pipemaster/expr/woodpecker"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -72,6 +73,7 @@ var jobCollapsers = []struct {
 	{collapseAllowFailure, caps.JobAllowFailure},
 	{collapseNoop, caps.StepScript},
 	{collapseLostEnv, caps.ExprOpaque},
+	{collapseStepIf, caps.StepIf},
 }
 
 // collapseJob undoes the emulations marked in one workflow file. A marker it cannot restore is reported, so the
@@ -670,4 +672,29 @@ func (g *group) rename(rep *report.Report, pl *ir.Pipeline) {
 			j.ID = id
 		}
 	}
+}
+
+// collapseStepIf restores a step condition in its source dialect when the parsed one is still its translation.
+func collapseStepIf(c *collapseCtx) bool {
+	var a srcArg
+	_, id, found := strings.Cut(c.use.IRPath, stepSep)
+	if !found || !decodeArg(c.args, &a) {
+		return false
+	}
+	from, ok := expr.LangOf(a.From)
+	src, err := expr.ParseCanonical(a.Src)
+	if !ok || err != nil {
+		return false
+	}
+	t, ok := expr.Translate(src, *from, wpexpr.Lang)
+	if !ok {
+		return false
+	}
+	for _, st := range c.j.Steps {
+		if st.ID == id && st.If != nil && expr.String(st.If) == expr.String(t) {
+			st.If = src
+			return true
+		}
+	}
+	return false
 }

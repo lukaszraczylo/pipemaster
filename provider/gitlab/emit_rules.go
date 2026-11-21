@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
@@ -15,6 +16,7 @@ const whenRuleKey = "when"
 type jobTiming struct {
 	rules *yaml.Node
 	when  string
+	marks []string
 }
 
 // timing turns Job.If, the status functions and Manual into when and rules. An inexpressible condition
@@ -24,6 +26,7 @@ func (e *emitter) timing(jp string, j *ir.Job, finally bool) (jobTiming, error) 
 	disabled := false
 	var cond expr.Expr
 	status := ""
+	var srcIf, translated expr.Expr
 	if ifx := withoutNative(j.If); ifx != nil {
 		rest, st, ok := splitStatus(ifx)
 		status = st
@@ -34,6 +37,9 @@ func (e *emitter) timing(jp string, j *ir.Job, finally bool) (jobTiming, error) 
 		case rest != nil:
 			c, ok := e.condition(jp, caps.JobIf, rest, "job")
 			cond, disabled = c, !ok
+			if ok && e.from != nil && st == "" {
+				srcIf, translated = rest, c
+			}
 		}
 	}
 	base := ""
@@ -103,6 +109,11 @@ func (e *emitter) timing(jp string, j *ir.Job, finally bool) (jobTiming, error) 
 		if err != nil {
 			return t, err
 		}
+		if srcIf != nil && expr.String(cond) == expr.String(translated) && expr.String(srcIf) != expr.String(translated) {
+			if t.marks, err = e.srcMarks(jp, srcIf); err != nil {
+				return t, err
+			}
+		}
 		r := newMap()
 		r.set("if", str(text))
 		if base != "" {
@@ -149,4 +160,13 @@ func foldRules(parts []foldPart, cond expr.Expr, base string) (*yaml.Node, error
 		rules.Content = append(rules.Content, r.n)
 	}
 	return rules, nil
+}
+
+// srcMarks records the job condition in the source dialect, which the translated rule only approximates.
+func (e *emitter) srcMarks(jp string, src expr.Expr) ([]string, error) {
+	a, err := markerArg(srcArg{Src: expr.String(src), From: e.from.ID})
+	if err != nil {
+		return nil, err
+	}
+	return []string{emitkit.Marker(caps.JobIf, jp), a}, nil
 }

@@ -33,6 +33,7 @@ type collapser func(c *collapseCtx) bool
 
 var collapsers = map[caps.Feature]collapser{
 	caps.JobOutputs:          collapseOutputs,
+	caps.JobIf:               collapseJobIf,
 	caps.JobMatrix:           collapseMatrix,
 	caps.PipelineConcurrency: collapseConcurrency,
 	caps.PipelineInputs:      collapseInputs,

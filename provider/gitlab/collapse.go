@@ -11,6 +11,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
+	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -637,4 +638,27 @@ func triggersDerive(pid string, marked, parsed []ir.Trigger) bool {
 		got = defaultTriggers()
 	}
 	return sameTriggers(got, parsed)
+}
+
+// collapseJobIf restores the job condition in its source dialect when the parsed rule is still the translation of it.
+func collapseJobIf(c *collapseCtx) bool {
+	j := findJobAt(c.pl, c.path)
+	if j == nil || j.If == nil || len(c.args) != 1 {
+		return false
+	}
+	var arg srcArg
+	if json.Unmarshal([]byte(c.args[0]), &arg) != nil {
+		return false
+	}
+	from, ok := expr.LangOf(arg.From)
+	src, err := expr.ParseCanonical(arg.Src)
+	if !ok || err != nil {
+		return false
+	}
+	t, ok := expr.Translate(src, *from, exprgitlab.Lang)
+	if !ok || expr.String(t) != expr.String(j.If) {
+		return false
+	}
+	j.If = src
+	return true
 }

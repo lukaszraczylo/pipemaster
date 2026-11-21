@@ -513,6 +513,7 @@ func (e *emitter) guards(c *docCtx, st *ir.Step) ([]*yaml.Node, error) {
 
 // printGuard writes the guard line of x, reading a folded comparison case-sensitively when it must.
 func (e *emitter) printGuard(x expr.Expr) (string, error) {
+	x = e.toDrone(x)
 	if dexpr.Guardable(x, e.sem) {
 		return dexpr.PrintGuard(x, e.sem)
 	}

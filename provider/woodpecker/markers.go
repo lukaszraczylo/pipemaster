@@ -25,6 +25,12 @@ type posArg struct {
 	Pos   int      `json:"pos"`
 }
 
+// srcArg carries a condition in the dialect it came from, which the translated when entries only approximate.
+type srcArg struct {
+	Src  string `json:"src"`
+	From string `json:"from"`
+}
+
 // axesArg names matrix variables that a file reads and does not declare, because the matrix has no Woodpecker form.
 type axesArg struct {
 	Axes []string `json:"axes"`

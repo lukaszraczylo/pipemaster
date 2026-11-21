@@ -193,7 +193,8 @@ type movedArg struct {
 
 // srcArg carries the condition as the source dialect wrote it, which the emitted guard only approximates.
 type srcArg struct {
-	Src string `json:"src"`
+	Src  string `json:"src"`
+	From string `json:"from,omitempty"`
 }
 
 // disabledGuard is the shell condition of a step whose own condition GitLab cannot state.
