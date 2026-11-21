@@ -473,3 +473,16 @@ func TestOptionalNeedIsReportedLost(t *testing.T) {
 	_, rep := emit(t, project(a, b))
 	wantEntry(t, rep, caps.JobNeeds, caps.Lost, "optional")
 }
+
+func TestJobGuardBesideStepConditionsReturns(t *testing.T) {
+	j := scriptJob("a", "make")
+	j.If = expr.Binary{Op: expr.OpOr, L: eqStr([]string{"branch"}, "main"), R: eqStr([]string{"event"}, "schedule")}
+	j.Steps = append(j.Steps, &ir.Step{ID: "tail", Kind: ir.StepScript, Script: []string{"done"}, If: expr.Unary{Op: expr.OpNot, X: eqStr([]string{"event"}, "pull_request")}})
+	p := project(j)
+	files, _ := emit(t, p)
+	back, _ := reparse(t, files)
+	got, want := back.Pipelines[0].Jobs[0], j
+	if cond(got.If) != cond(want.If) || got.Steps[0].If != nil || cond(got.Steps[1].If) != cond(want.Steps[1].If) {
+		t.Fatalf("conditions changed: job %q, steps %q %q\n%s", cond(got.If), cond(got.Steps[0].If), cond(got.Steps[1].If), joinFiles(files))
+	}
+}

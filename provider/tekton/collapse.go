@@ -502,7 +502,8 @@ func (b *jobBuilder) shellAsWritten(st *ir.Step, a shellArg) bool {
 	return true
 }
 
-// collapseJobGuard takes the job condition back from the steps that all hold it as their condition.
+// collapseJobGuard takes the job condition back from the steps that all hold it as their condition. A step that
+// has a condition of its own holds the job condition and its own, joined by and.
 func (b *jobBuilder) collapseJobGuard() {
 	var a guardArg
 	if !b.marks.arg(caps.JobIf, b.path, &a) {
@@ -515,18 +516,39 @@ func (b *jobBuilder) collapseJobGuard() {
 		}
 	}
 	orig, err := expr.ParseCanonical(a.If)
+	rest := make([]expr.Expr, len(steps))
 	ok := err == nil && len(steps) > 0
-	for _, st := range steps {
-		ok = ok && st.If != nil && expr.String(st.If) == a.Back
+	for i, st := range steps {
+		if ok {
+			rest[i], ok = withoutGuard(st.If, a.Back)
+		}
 	}
 	if !ok {
 		b.ignored(b.path, caps.JobIf, "the job guard")
 		return
 	}
-	for _, st := range steps {
-		st.If = nil
+	for i, st := range steps {
+		st.If = rest[i]
 	}
 	b.job.If = orig
+}
+
+// withoutGuard removes the job condition (as back) from a step condition. ok is false when the condition does not hold it.
+func withoutGuard(cond expr.Expr, back string) (rest expr.Expr, ok bool) {
+	if cond == nil {
+		return nil, false
+	}
+	if expr.String(cond) == back {
+		return nil, true
+	}
+	and, isAnd := cond.(expr.Binary)
+	if !isAnd || and.Op != expr.OpAnd {
+		return nil, false
+	}
+	if expr.String(and.L) == back {
+		return and.R, true
+	}
+	return nil, false
 }
 
 // collapseWorkdirs gives a step the relative working directory that the marker holds, when the file still says what was written.
