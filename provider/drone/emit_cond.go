@@ -245,6 +245,13 @@ func (e *emitter) exprSet(x expr.Expr) (condSet, bool) {
 	return condSet{raw: escAny(m).(map[string]any)}, true
 }
 
+// noteBranch adds the pull request caveat to a condition that is written as a branch filter.
+func (e *emitter) noteBranch(path string, f caps.Feature, strategy string, cs condSet) {
+	if len(cs.c.Branch.Include)+len(cs.c.Branch.Exclude) > 0 {
+		e.note(path, f, caps.Native, strategy, branchCaveat)
+	}
+}
+
 // noteFold reports a filter or guard that reads a folded comparison case-sensitively.
 func (e *emitter) noteFold(path string, f caps.Feature) {
 	e.emulate(path, f, "case-sensitive comparison", foldCaveat)
@@ -280,6 +287,7 @@ func (e *emitter) stepWhen(sp string, st *ir.Step, script bool) (n *yaml.Node, g
 		if cs.folded {
 			e.noteFold(sp, caps.StepIf)
 		}
+		e.noteBranch(sp, caps.StepIf, "step when", cs)
 		if err := e.markCond(caps.StepIf, sp, st.If, cs, nil); err != nil {
 			return nil, false, err
 		}
@@ -301,6 +309,8 @@ func (e *emitter) stepWhen(sp string, st *ir.Step, script bool) (n *yaml.Node, g
 	n, err = condNode(disabledSet(), nil)
 	return n, false, err
 }
+
+const branchCaveat = "on a pull request Drone matches the branch filter against the target branch, so the condition also holds on a pull request that targets the branch; the source may not"
 
 // condArg carries a condition that the file reads back as another expression: the IR condition, and what the
 // parser reads from the file, so the parser can tell an unedited file. Triggers holds the pipeline triggers that
@@ -713,6 +723,7 @@ func (e *emitter) jobSet(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (j
 			if cs.folded {
 				e.noteFold(jp, caps.JobIf)
 			}
+			e.noteBranch(jp, caps.JobIf, "pipeline trigger conditions", cs)
 			merged, mok := mergeSets(out.set, cs)
 			if !mok {
 				e.disable(jp, caps.JobIf, j.If, "the document, whose trigger filters cannot join the condition,")

@@ -1,2 +1,3 @@
 Loss report: gitlab -> drone
 [emulated] pipeline/gitlab-ci/job/deploy job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[native] pipeline/gitlab-ci/job/deploy job.if: pipeline trigger conditions (on a pull request Drone matches the branch filter against the target branch, so the condition also holds on a pull request that targets the branch; the source may not)

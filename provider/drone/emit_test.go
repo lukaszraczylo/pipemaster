@@ -714,3 +714,31 @@ func TestDependencyOnAnUnwrittenStepIsReported(t *testing.T) {
 		t.Errorf("no lost entry for the dropped depends_on: %+v", rep.Entries)
 	}
 }
+
+func TestBranchFilterCarriesThePullRequestCaveat(t *testing.T) {
+	cond := eq(ref(expr.CtxBranch), "main")
+	for name, tc := range map[string]struct {
+		mk func() *ir.Project
+		f  caps.Feature
+	}{
+		"step": {func() *ir.Project {
+			s := gstep("x", "1")
+			s.If = cond
+			return gproject("drone", gjob("b", s))
+		}, caps.StepIf},
+		"job": {func() *ir.Project {
+			j := gjob("b", gstep("x", "1"))
+			j.If = cond
+			return gproject("drone", j)
+		}, caps.JobIf},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, rep := emitText(t, tc.mk())
+			if !slices.ContainsFunc(rep.Entries, func(e report.Entry) bool {
+				return e.Feature == tc.f && strings.Contains(e.Detail, "target branch")
+			}) {
+				t.Errorf("no pull request caveat on %s: %+v", tc.f, rep.Entries)
+			}
+		})
+	}
+}

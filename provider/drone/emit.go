@@ -80,7 +80,7 @@ func (a adapter) emit(p *ir.Project) (map[string][]byte, *report.Report, map[str
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("%s: %w", dialect, err)
 	}
-	rep, err := e.led.Finish(uses)
+	rep, err := e.led.FinishNoted(uses)
 	if err != nil {
 		return nil, rep, nil, fmt.Errorf("%s: %w", dialect, err)
 	}
