@@ -103,11 +103,10 @@ func renameClass(e Expr, from, to Dialect) (Expr, bool) {
 	if !ok {
 		return nil, false
 	}
-	t = native(t, to)
 	if to.Supports != nil && !to.Supports(t) {
 		return nil, false
 	}
-	return t, true
+	return native(t, to), true
 }
 
 // mapEvents rewrites each event literal from one Events table to the other (lean4/Pipemaster/TranslateClass.lean:

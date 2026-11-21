@@ -67,13 +67,14 @@ func isRefCmp(b expr.Binary) bool {
 // for another dialect, and only the subset arrives from one. A bare ref in the IR stands for ref != "" (see ReadIf).
 func reads(e expr.Expr) bool { return isBareRef(e) || inSubset(e) }
 
-// supports also takes ref != "" as the whole condition, the translation of a GitLab bare ref. Under && or || a
-// GitLab operand tests for Ruby truthiness, where "" is true, so a bare ref stays out there.
+// supports also takes a bare ref as the whole condition, which native spells ref != "". A GitLab ref != "" is
+// not that: it holds for an unset ref, so it stays out. Under && or || a GitLab operand tests for Ruby
+// truthiness, where "" is true, so a bare ref stays out there too.
 func supports(e expr.Expr) bool {
-	if !isNonEmpty(e) && !inSubset(e) {
+	if !isBareRef(e) && !inSubset(e) {
 		return false
 	}
-	_, err := Print(e)
+	_, err := Print(native(e))
 	return err == nil
 }
 

@@ -262,10 +262,11 @@ func TestLangConfinesTranslationToTheSubset(t *testing.T) {
 			t.Errorf("%s: inside the subset but refused", name)
 		}
 	}
-	// The IR holds ref != "" as a bare ref, so the dialect reads the bare form and writes the comparison.
+	// The IR holds ref != "" as a bare ref, so the dialect reads and supports the bare form and writes the comparison.
+	// A ref != "" in the IR is the GitLab test, true for an unset ref, so it is neither read nor supported.
 	nonEmpty := bin(expr.OpNe, branch, str(""))
-	if woodpecker.Lang.Reads(nonEmpty) || !woodpecker.Lang.Supports(nonEmpty) || !woodpecker.Lang.Reads(branch) || woodpecker.Lang.Supports(branch) {
-		t.Error("a bare ref must be read and not supported, ref != \"\" supported and not read")
+	if woodpecker.Lang.Reads(nonEmpty) || woodpecker.Lang.Supports(nonEmpty) || !woodpecker.Lang.Reads(branch) || !woodpecker.Lang.Supports(branch) {
+		t.Error("a bare ref must be read and supported, ref != \"\" neither")
 	}
 	if got := woodpecker.ReadIf(nonEmpty); !reflect.DeepEqual(got, branch) {
 		t.Errorf("ReadIf(ref != \"\") = %#v, want the bare ref", got)

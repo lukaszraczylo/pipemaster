@@ -244,6 +244,9 @@ func TestWoodpeckerTranslateTable(t *testing.T) {
 		// Outside the subset: an unset name is null in GitLab and "" in Woodpecker (Woodpecker.lean: not_gitlab_class).
 		{"gitlab", "woodpecker", `$CI_COMMIT_TAG == ""`, ``},
 		{"gitlab", "woodpecker", `$CI_COMMIT_TAG == null`, ``},
+		// ref != "" holds for an unset ref in GitLab (null != "") and fails in Woodpecker, and it must not read back as the bare ref.
+		{"gitlab", "woodpecker", `$CI_COMMIT_SHA != ""`, ``},
+		{"gitlab", "woodpecker", `$CI_COMMIT_SHA != "" && $CI_COMMIT_BRANCH == "main"`, ``},
 		{"gitlab", "woodpecker", `$CI_COMMIT_TAG`, `CI_COMMIT_TAG != ""`},
 		{"gitlab", "woodpecker", `$CI_COMMIT_BRANCH == "main"`, `CI_COMMIT_BRANCH == "main"`},
 		{"gitlab", "woodpecker", `$CI_COMMIT_BRANCH != "main" && $CI_COMMIT_TAG =~ /^v/i`, `CI_COMMIT_BRANCH != "main" && CI_COMMIT_TAG matches "(?i)^v"`},

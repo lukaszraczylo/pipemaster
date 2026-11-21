@@ -14,7 +14,7 @@ type Dialect struct {
 	Reads func(Expr) bool
 	// Supports, when set, accepts the expressions the dialect can print and that stay inside its subset.
 	Supports func(Expr) bool
-	// Native, when set, rewrites a translation result into the dialect's own spelling before Supports sees it.
+	// Native, when set, rewrites an accepted translation result into the dialect's own spelling; Supports sees the result before it.
 	Native func(Expr) Expr
 	// Events maps canonical event values to this dialect's values.
 	Events map[string]string
@@ -265,8 +265,8 @@ func Translate(e Expr, from, to Dialect) (Expr, bool) {
 		t, ok = renameClass(e, from, to)
 	case from.Class == ClassGHA:
 		t, ok = toGitLab(e, from, to)
-		t = native(t, to)
 		ok = ok && from.names(e) && to.names(t) && supported(t, to)
+		t = native(t, to)
 	default:
 		t, ok = toGHA(e, from, to)
 		ok = ok && from.names(e) && to.names(t) && supported(t, to)
@@ -291,7 +291,6 @@ func Translatable(e Expr, from, to Dialect) bool {
 			return false
 		}
 		t, _ := toGitLab(e, from, to)
-		t = native(t, to)
 		return to.names(t) && supported(t, to)
 	}
 	if !okRev(e, from) || !from.names(e) {
