@@ -79,6 +79,16 @@ func Require(t testing.TB, name string) string {
 // Drone image plugin is the one that Drone files name.
 var privilegedPlugins = []string{"woodpeckerci/plugin-docker-buildx", "plugins/docker"}
 
+// lintArgs is the woodpecker-cli argument list that lints file with every privileged plugin allowed.
+func lintArgs(extra []string, file string) []string {
+	args := []string{"--disable-update-check", "lint", "--strict"}
+	for _, plug := range privilegedPlugins {
+		args = append(args, "--plugins-privileged", plug)
+	}
+	args = append(args, extra...)
+	return append(args, file)
+}
+
 // RequireWoodpecker is Require for woodpecker-cli.
 func RequireWoodpecker(t testing.TB) string { return Require(t, woodpeckerID) }
 
@@ -91,12 +101,7 @@ func WoodpeckerLint(t testing.TB, name string, data []byte, extra ...string) (st
 	if err := os.WriteFile(p, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	args := []string{"--disable-update-check", "lint", "--strict"}
-	for _, p := range privilegedPlugins {
-		args = append(args, "--plugins-privileged", p)
-	}
-	args = append(args, extra...)
-	out, err := exec.Command(bin, append(args, p)...).CombinedOutput() // #nosec G204 -- pinned local binary, temp path
+	out, err := exec.Command(bin, lintArgs(extra, p)...).CombinedOutput() // #nosec G204 -- pinned local binary, temp path
 	return string(out), err
 }
 
