@@ -423,3 +423,30 @@ spec:
 		t.Fatalf("keys reported lost but written: %v", e)
 	}
 }
+
+func TestOwnCELWhenEntryIsWrittenBack(t *testing.T) {
+	src := `apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: p
+spec:
+  params:
+    - name: run
+      default: "true"
+  tasks:
+    - name: a
+      when:
+        - cel: "'$(params.run)' == 'true'"
+      taskSpec:
+        steps: [{name: s, image: x, script: "true"}]
+`
+	p, _ := parseFiles(t, map[string]string{"p.yaml": src})
+	files, _ := emit(t, p)
+	if !strings.Contains(joinFiles(files), "cel:") {
+		t.Fatalf("cel entry dropped:\n%s", joinFiles(files))
+	}
+	back, _ := reparse(t, files)
+	if ok, diff := ir.Equal(p, back); !ok {
+		t.Fatalf("cel entry changed:\n%s", diff)
+	}
+}

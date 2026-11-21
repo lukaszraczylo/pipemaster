@@ -140,7 +140,8 @@ func (tc *taskCtx) whenEntries(e expr.Expr, sc scope) (out []exprtekton.Entry, o
 	for _, c := range conjuncts(e) {
 		if o, isOpaque := c.(expr.Opaque); isOpaque {
 			en, good := exprtekton.OpaqueEntry(o)
-			if !good || en.CEL != "" {
+			// A cel entry is alpha. The Tekton file that held it already relies on the gate, so only that file gets it back.
+			if !good || (en.CEL != "" && !tc.e.own) {
 				return nil, false
 			}
 			out = append(out, en)
@@ -241,11 +242,16 @@ func guardEnv(sc *stepScope, g expr.Expr) {
 	}
 }
 
-// whenNode renders `when` entries. A cel entry never reaches it: whenEntries refuses one.
+// whenNode renders `when` entries. whenEntries lets a cel entry through only for a project that came from Tekton.
 func whenNode(es []exprtekton.Entry) *yaml.Node {
 	out := seqOf()
 	for _, en := range es {
 		m := newMap()
+		if en.CEL != "" {
+			m.setStr("cel", en.CEL)
+			out.Content = append(out.Content, m.n)
+			continue
+		}
 		m.setStr("input", en.Input)
 		m.setStr("operator", en.Operator)
 		m.set("values", strSeq(en.Values))
