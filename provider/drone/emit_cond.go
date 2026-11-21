@@ -193,8 +193,6 @@ func condNode(s condSet, extra map[string]any) (*yaml.Node, error) {
 	return m.n, nil
 }
 
-// filterValue writes a filter as a list, or as an include/exclude mapping of lists: the SchemaStore schema reads
-// no scalar there, and Drone reads every form.
 // condFilters is the when mapping of c: every filter as a list, or an include and exclude map.
 func condFilters(c dexpr.Conditions) map[string]any {
 	all := map[string]any{}
@@ -212,6 +210,8 @@ func condFilters(c dexpr.Conditions) map[string]any {
 	return all
 }
 
+// filterValue writes a filter as a list, or as an include/exclude mapping of lists: the SchemaStore schema reads
+// no scalar there, and Drone reads every form.
 func filterValue(f dexpr.Filter) any {
 	if len(f.Exclude) == 0 {
 		return f.Include

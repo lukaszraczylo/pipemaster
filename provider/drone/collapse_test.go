@@ -184,7 +184,7 @@ func TestEditedEnvKeepsTheParsedValue(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			out, _ := emitText(t, envProject())
 			if edit(out) == out {
-				t.Skipf("edit does not apply to:\n%s", out)
+				t.Fatalf("edit does not apply to:\n%s", out)
 			}
 			_, rep := back(t, envProject(), edit)
 			if !ignored(rep, caps.JobEnv) {
