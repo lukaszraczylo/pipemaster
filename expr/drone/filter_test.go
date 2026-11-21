@@ -277,6 +277,18 @@ func genFilter(t *rapid.T, label string) drone.Filter {
 	return f
 }
 
+// pairAdjacent moves tag next to push: the expression holds the pair as one canonical push node, so it reads
+// back with tag right after push. A filter list is a set, and this is the order the reader writes.
+func pairAdjacent(vs []string) []string {
+	p, tg := slices.Index(vs, "push"), slices.Index(vs, "tag")
+	if p < 0 || tg < 0 {
+		return vs
+	}
+	out := slices.Delete(slices.Clone(vs), tg, tg+1)
+	p = slices.Index(out, "push")
+	return slices.Insert(out, p+1, "tag")
+}
+
 func genEventFilter(t *rapid.T) drone.Filter {
 	// "push+tag" stands for the pair that reads back as canonical push; "push" alone is a push of a branch.
 	val := rapid.SampledFrom([]string{"pull_request", "cron", "custom", "promote", "rollback", "p*", "**", "push+tag", "push"})
@@ -291,11 +303,12 @@ func genEventFilter(t *rapid.T) drone.Filter {
 		}
 		// A repeated push would read back as the pair, so the generator keeps the first of each.
 		seen := map[string]bool{}
-		return slices.DeleteFunc(out, func(v string) bool {
+		out = slices.DeleteFunc(out, func(v string) bool {
 			dup := seen[v] && (v == "push" || v == "tag")
 			seen[v] = true
 			return dup
 		})
+		return pairAdjacent(out)
 	}
 	f := drone.Filter{Include: expand(rapid.SliceOfN(val, 0, 3).Draw(t, "eventinc")), Exclude: expand(rapid.SliceOfN(val, 0, 3).Draw(t, "eventexc"))}
 	if len(f.Include) == 0 {
@@ -334,6 +347,23 @@ func TestConditionsRoundTrips(t *testing.T) {
 			t.Fatalf("expression round trip of %#v gave %#v, %v", c, got, ok)
 		}
 	})
+}
+
+// A when list is a set, so the expression holds push and tag as one canonical push node and reads it back
+// with tag right after push, wherever the list had tag. The read is the same on every run.
+func TestEventPairReadsBackAdjacent(t *testing.T) {
+	c := drone.Conditions{Event: drone.Filter{Exclude: []string{"push", "pull_request", "tag"}}}
+	want := drone.Conditions{Event: drone.Filter{Exclude: []string{"push", "tag", "pull_request"}}}
+	for i := 0; i < 50; i++ {
+		e, err := drone.ToExpr(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, ok := drone.FromExpr(e, exact)
+		if !ok || !reflect.DeepEqual(got, want) {
+			t.Fatalf("run %d: FromExpr = %#v, %v; want %#v", i, got, ok, want)
+		}
+	}
 }
 
 func FuzzParse(f *testing.F) {
