@@ -564,3 +564,16 @@ spec:
           value: $(tasks.first.results.sha)
 `})
 }
+
+func TestCommandFormSurvivesASplitScript(t *testing.T) {
+	st := &ir.Step{ID: "run", Kind: ir.StepScript, Image: &ir.Image{Ref: "alpine:3"},
+		Script: []string{"/bin/sh -c 'echo a", "echo b'"},
+		Ext: ir.Ext{"tekton": map[string]any{
+			"command": []any{"/bin/sh", "-c"}, "args": []any{"echo a\necho b"}, "script_line": "/bin/sh -c 'echo a\necho b'"}}}
+	p := project(&ir.Job{ID: "a", Steps: []*ir.Step{st}})
+	p.Origin = ir.Origin{Provider: "tekton", Dialect: "tekton"}
+	files, _ := emit(t, p)
+	if src := joinFiles(files); !strings.Contains(src, "command:") {
+		t.Fatalf("command form lost\n%s", src)
+	}
+}

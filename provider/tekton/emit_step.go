@@ -243,7 +243,7 @@ func (tc *taskCtx) commandForm(m *wmap, st *ir.Step, sp string, guard expr.Expr)
 		return false
 	}
 	line, _ := x[ExtScriptLine].(string)
-	if guard != nil || st.Shell != "" || len(st.Script) != 1 || st.Script[0] != line {
+	if guard != nil || st.Shell != "" || len(st.Script) == 0 || strings.Join(st.Script, "\n") != line {
 		tc.e.emulate(sp, caps.StepScript, "script step", "command and args are written as a script, so the image needs a shell")
 		return false
 	}
