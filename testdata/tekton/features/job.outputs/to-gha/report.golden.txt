@@ -1,4 +1,4 @@
 Loss report: tekton -> gha
-[lost] pipeline/ci/job/version job.outputs (output tag has no value expression; it is not written)
+[lost] pipeline/ci/job/version job.outputs (output tag has no value expression; it is written empty so that the jobs that read it stay valid)
 [emulated] pipeline/ci/job/use job.runner: default runner label ubuntu-latest (the pipeline named no runner)
 [emulated] pipeline/ci/job/version job.runner: default runner label ubuntu-latest (the pipeline named no runner)

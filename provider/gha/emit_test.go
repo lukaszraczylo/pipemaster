@@ -475,8 +475,8 @@ func TestOutputWithoutValueIsLost(t *testing.T) {
 	p := baseProject(t)
 	job(p, "build").Outputs = []ir.Output{{Name: "tag"}}
 	text, rep := emitText(t, gha.GHA, p)
-	if strings.Contains(text, "tag:") {
-		t.Fatalf("an output with no value was written:\n%s", text)
+	if !strings.Contains(text, `tag: ""`) {
+		t.Fatalf("a consumer needs the key:\n%s", text)
 	}
 	if e := entry(rep, caps.JobOutputs); e == nil || e.Level != caps.Lost {
 		t.Fatalf("job.outputs not reported lost: %+v", rep.Entries)

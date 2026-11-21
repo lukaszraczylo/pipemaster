@@ -463,8 +463,7 @@ func (e *emitter) outputsKey(m *omap, jp string, j *ir.Job) error {
 	om := newMap()
 	for _, o := range j.Outputs {
 		if o.Value == "" {
-			e.lose(jp, caps.JobOutputs, "output "+o.Name+" has no value expression; it is not written")
-			continue
+			e.lose(jp, caps.JobOutputs, "output "+o.Name+" has no value expression; it is written empty so that the jobs that read it stay valid")
 		}
 		v, err := e.template(jp, o.Value)
 		if err != nil {
@@ -472,9 +471,7 @@ func (e *emitter) outputsKey(m *omap, jp string, j *ir.Job) error {
 		}
 		om.set(o.Name, str(v))
 	}
-	if len(om.n.Content) > 0 {
-		m.set("outputs", om.n)
-	}
+	m.set("outputs", om.n)
 	return nil
 }
 
