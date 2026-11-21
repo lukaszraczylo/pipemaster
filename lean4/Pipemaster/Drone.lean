@@ -20,7 +20,8 @@ Not in the model, each on purpose:
   step carry no core field, and the vector test checks that they are the constants of the emitter.
 - Several pipelines in one file (multi-pipeline markers), `resources` documents, signature documents.
 - Matrices are in the section `Matrix`: the core subset has no matrix, so the section states the cell documents and
-  their collapse for one job.
+  their collapse for one job. Its lemmas prove cell counts and fold behaviour only. Matrix jobs are outside the
+  `drone_from_to` round-trip theorem.
 - Trigger combinations that need a `ref` list (several kinds with different filters) or that Drone cannot join into
   one condition (the document is then written disabled): `TrigOk`. -/
 

@@ -403,7 +403,7 @@ theorem chainFrag_adapters_iff (p : Pipe) :
     · exact h.2.1
     · exact h.2.2
 
-/-- The four adapters that are not Woodpecker. -/
+/-- The adapters without Woodpecker and Drone, which have their own hops. -/
 def crossAdapters : List Adapter := [gha, gitea, forgejo, gitlab]
 
 theorem crossAdapters_closed : Closed crossAdapters := by
