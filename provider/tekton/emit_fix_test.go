@@ -283,3 +283,14 @@ func TestEditedScheduleEntryKeepsEdits(t *testing.T) {
 		t.Fatalf("edit lost or entry written twice:\n%s", got)
 	}
 }
+
+func TestRequiredInputKeepsItsDefault(t *testing.T) {
+	p := project(scriptJob("a", "true"))
+	p.Pipelines[0].Inputs = []ir.Input{{Name: "env", Required: true, Default: "staging"}}
+	files, rep := emit(t, p)
+	params := list(get(pipelineDoc(t, files, "ci"), "spec", "params"))
+	if len(params) != 1 || get(params[0], "default") != "staging" {
+		t.Fatalf("default dropped: %v", params)
+	}
+	wantEntry(t, rep, caps.PipelineInputs, caps.Lost, "required")
+}
