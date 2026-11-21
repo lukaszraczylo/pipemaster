@@ -588,3 +588,12 @@ func TestJobWithNoStepReportsThePlaceholderAsLost(t *testing.T) {
 		t.Fatalf("no lost placeholder entry: %v", rep.Entries)
 	}
 }
+
+func TestCommentedScriptLineBindsNoEnv(t *testing.T) {
+	st := &ir.Step{ID: "run", Kind: ir.StepScript, Image: &ir.Image{Ref: "alpine:3"},
+		Script: []string{"echo ${{ inputs.target }} ${{ vars.LEVEL }}"}}
+	files, _ := emit(t, project(&ir.Job{ID: "a", Steps: []*ir.Step{st}}))
+	if src := joinFiles(files); strings.Contains(src, "LEVEL") && strings.Contains(src, "valueFrom") {
+		t.Fatalf("a commented line left its env binding\n%s", src)
+	}
+}

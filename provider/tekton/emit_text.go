@@ -1,6 +1,7 @@
 package tekton
 
 import (
+	"maps"
 	"regexp"
 	"strings"
 
@@ -51,6 +52,22 @@ func newScope() *stepScope { return &stepScope{names: map[string]bool{}, shell: 
 func (s *stepScope) shellVar(ref, name string) string {
 	s.shell[ref] = name
 	return shellMark + ref + shellMark
+}
+
+// scopeState is a copy of what convert adds to a stepScope.
+type scopeState struct {
+	names map[string]bool
+	shell map[string]string
+	env   int
+}
+
+// snapshot copies the scope, so a line that is commented out can leave no binding behind.
+func (s *stepScope) snapshot() scopeState {
+	return scopeState{names: maps.Clone(s.names), shell: maps.Clone(s.shell), env: len(s.env)}
+}
+
+func (s *stepScope) restore(h scopeState) {
+	s.names, s.shell, s.env = h.names, h.shell, s.env[:h.env]
 }
 
 func (s *stepScope) add(name string, n *yaml.Node) {
@@ -293,10 +310,12 @@ func (tc *taskCtx) scriptLine(sc *stepScope, path, s string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	held := sc.snapshot()
 	out, lost := tc.convert(sc, path, scriptText, parts)
 	if len(lost) == 0 {
 		return out, nil
 	}
+	sc.restore(held)
 	tc.e.lose(path, caps.ScriptInterpolation, "no Tekton spelling for expression "+strings.Join(lost, ", ")+"; the line is commented out")
 	return "# pipemaster:lost script.interpolation: " + commentSafe(s), nil
 }
