@@ -749,7 +749,7 @@ func (d *doc) placeCondition(list []ir.Trigger, restored bool) {
 		return
 	}
 	gate := d.gate()
-	if ev := map[caps.Feature]string{caps.JobManual: eventCustom, caps.JobEnvironmentApproval: eventPromote}[gate]; gate != "" && !t.hasEvent(ev) {
+	if ev := map[caps.Feature]string{caps.JobManual: eventCustom, caps.JobEnvironmentApproval: eventPromote}[gate]; gate != "" && !t.hasEvent(ev) && !t.c.IsDisabled() {
 		u, _ := d.marks.markedWith(gate, "")
 		reportIgnored(d.rep, u, "the job gate")
 		d.job.If = t.cond
