@@ -81,6 +81,8 @@ func TestToWhenRefusals(t *testing.T) {
 		"ref against ref":       bin(expr.OpEq, ref("branch"), ref("tag")),
 		"env ref":               bin(expr.OpEq, ref("env", "X"), str("y")),
 		"secret ref":            bin(expr.OpEq, ref("secrets", "X"), str("y")),
+		"matrix ref":            bin(expr.OpEq, ref("matrix", "os"), str("linux")),
+		"matrix ref in and":     and(eq("branch", "a"), bin(expr.OpNe, ref("matrix", "os"), str("linux"))),
 		"vars ref":              bin(expr.OpEq, ref("vars", "X"), str("y")),
 		"opaque":                expr.Opaque{Dialect: tekton.Dialect, Text: "x"},
 		"opaque inside and":     and(eq("branch", "a"), expr.Opaque{Dialect: "gha", Text: "x"}),

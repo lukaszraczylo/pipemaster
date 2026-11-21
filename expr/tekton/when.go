@@ -159,6 +159,10 @@ func compare(b expr.Binary) (input, value string, ok bool) {
 	if !isRef || !isLit || l.Kind != expr.LitStr {
 		return "", "", false
 	}
+	// A task-level when has no matrix param, and a matrix ref would read back as an input.
+	if len(ref.Path) > 0 && ref.Path[0] == expr.PrefixMatrix {
+		return "", "", false
+	}
 	word, ok := RefWord(ref)
 	return word, l.Str, ok
 }
