@@ -222,6 +222,9 @@ func (b *jobBuilder) matrix(v any, line int) error {
 			if name == "" || !ok {
 				return fmt.Errorf("matrix.params needs a name and a list of strings")
 			}
+			if len(vals) == 0 {
+				b.k.note(caps.JobMatrix, "matrix param "+name+" has no values, so the matrix runs no task", line)
+			}
 			mx.Axes = append(mx.Axes, ir.Axis{Name: name, Values: vals})
 			names[name] = true
 		}

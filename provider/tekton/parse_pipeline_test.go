@@ -260,3 +260,18 @@ func TestInvalidInput(t *testing.T) {
 	parseErr(t, "apiVersion: tekton.dev/v1\nkind: Pipeline\nmetadata: {name: ci}\nspec:\n  tasks:\n  - {name: a, runAfter: [ghost], taskSpec: {steps: [{name: s, image: x, script: x}]}}\n")
 	parseErr(t, "apiVersion: tekton.dev/v1\nkind: Pipeline\nmetadata: {name: ci}\nspec:\n  tasks: [\n")
 }
+
+func TestEmptyMatrixAxisIsReported(t *testing.T) {
+	_, rep := parseYAML(t, pipelineWith(`  tasks:
+  - name: a
+    matrix:
+      params:
+      - {name: os, value: []}
+    taskSpec:
+      params: [{name: os}]
+      steps: [{name: s, image: x, script: "true"}]
+`))
+	if !hasEntry(rep, "has no values") {
+		t.Fatalf("no entry for the empty axis: %v", rep.Entries)
+	}
+}
