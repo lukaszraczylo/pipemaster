@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
@@ -93,14 +92,19 @@ func TestEditedPipelineEnvIsKept(t *testing.T) {
 
 func TestEditedJobGuardIsKept(t *testing.T) {
 	j := scriptJob("a", "make")
-	j.If = expr.Binary{Op: expr.OpOr, L: eqStr([]string{"ctx", "branch"}, "main"), R: eqStr([]string{"ctx", "event"}, "schedule")}
+	j.Matrix = &ir.Matrix{Axes: []ir.Axis{{Name: "os", Values: []string{"l"}}}}
+	j.If = eqStr([]string{"matrix", "os"}, "l")
 	files, _ := emit(t, project(j))
 	if !strings.Contains(files[taskFile], "pipemaster:guard") {
-		t.Skip("condition has a when form")
+		t.Fatalf("no guard line in the task:\n%s", files[taskFile])
 	}
-	back := editedMarker(t, project(j), taskFile, "'main'", "'dev'")
-	if back.Pipelines[0].Jobs[0].If != nil {
-		t.Fatalf("job condition restored: %v", back.Pipelines[0].Jobs[0].If)
+	back := editedMarker(t, project(j), taskFile, "= 'l'", "= 'z'")
+	got := back.Pipelines[0].Jobs[0]
+	if got.If != nil {
+		t.Fatalf("job condition restored: %v", got.If)
+	}
+	if c := cond(got.Steps[0].If); !strings.Contains(c, "'z'") {
+		t.Fatalf("the edit is lost: step condition %q", c)
 	}
 }
 
