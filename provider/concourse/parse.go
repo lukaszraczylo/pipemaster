@@ -183,6 +183,7 @@ func (b *pipeBuilder) build(top *omap) (*ir.Pipeline, error) {
 	b.readResources(r)
 	b.readTypes(r)
 	list, _ := jobs.([]any)
+	rawList := list
 	if b.placeholder(list) {
 		list = nil
 	}
@@ -204,6 +205,7 @@ func (b *pipeBuilder) build(top *omap) (*ir.Pipeline, error) {
 	b.triggers(pl, built)
 	b.concurrency(pl, built)
 	b.applyJobNames(pl)
+	b.carryPipeline(top, rawList, pl)
 	b.keepResources(k)
 	for _, key := range knownTop {
 		if v, ok := r.Take(key); ok {

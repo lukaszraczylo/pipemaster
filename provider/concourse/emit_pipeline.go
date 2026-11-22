@@ -84,6 +84,7 @@ func (e *emitter) pipeline(pl *ir.Pipeline, first bool) {
 			top.Set(k, e.node(pp, "top-level key "+k, extra[k]))
 		}
 	}
+	pe.carryPipeline(top.N)
 	pe.doc.Root = top.N
 	e.files = append(e.files, &outFile{name: pe.file, doc: pe.doc})
 }

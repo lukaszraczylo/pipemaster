@@ -170,18 +170,20 @@ func (jb *jobBuilder) taskStep(m *omap) *ir.Step {
 	st.Ext = k.Ext()
 	st = jb.heldAction(m, written, st)
 	if st.Kind == ir.StepScript {
-		jb.applyMarkers(st, written)
+		jb.applyMarkers(m, st, written)
 	}
 	return st
 }
 
 // applyMarkers reads the markers of a task, which the emitter keyed by the written task name.
-func (jb *jobBuilder) applyMarkers(st *ir.Step, written string) {
+func (jb *jobBuilder) applyMarkers(m *omap, st *ir.Step, written string) {
 	st.ID = written
 	jb.guardLines(st)
 	jb.workdirMarker(st)
 	jb.secretMarker(st)
 	jb.nameMarker(st)
+	jb.matrixBack(st)
+	jb.carryStep(m, written, st)
 }
 
 // config reads an inline task config into the step. It returns the config params, which the step env reads.

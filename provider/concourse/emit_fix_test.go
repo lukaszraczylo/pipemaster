@@ -174,3 +174,114 @@ func TestEditedPlaceholderJobStaysAJob(t *testing.T) {
 		t.Fatalf("jobs=%v entries=%v", back.Pipelines[0].Jobs, rep.Entries)
 	}
 }
+
+func carryProject() *ir.Project {
+	build := scriptJob("build", "echo ${{ matrix.os }} ${{ env.MODE }}")
+	build.Runner = ir.Runner{Labels: []string{"ubuntu-latest"}}
+	build.Env = []ir.Var{{Name: "JOB_LEVEL", Value: ir.Value{Lit: "1"}}}
+	build.Container = &ir.Image{Ref: "golang:1.22"}
+	build.Retry = &ir.Retry{Attempts: 2, On: []string{"runner_system_failure"}}
+	build.Matrix = &ir.Matrix{Axes: []ir.Axis{{Name: "os", Values: []string{"a", "b"}}}}
+	build.Steps[0].Env = []ir.Var{{Name: "MODE", Value: ir.Value{Lit: "fast"}}}
+	build.Steps[0].Shell = "bash"
+	test := scriptJob("test", "make test")
+	test.Needs = []ir.Need{{JobID: "build", Artifacts: true}}
+	p := project(build, test)
+	p.Pipelines[0].Env = []ir.Var{{Name: "PIPE_LEVEL", Value: ir.Value{Lit: "x"}}}
+	p.Pipelines[0].Triggers = []ir.Trigger{pushOn("main", "dev"), {Kind: ir.TriggerManual}}
+	return p
+}
+
+func TestCarryRestoresTheFieldsTheFileCannotSay(t *testing.T) {
+	p := carryProject()
+	ir.Normalize(p)
+	files, _ := emit(t, p)
+	back, rep := reparse(t, files)
+	if hasFeatureEntry(rep, string(caps.ExtPassthrough), "marker ignored") {
+		t.Fatalf("an unedited carry was ignored: %v", rep.Entries)
+	}
+	pl, want := back.Pipelines[0], p.Pipelines[0]
+	if len(pl.Triggers) != len(want.Triggers) || len(pl.Env) != 1 || pl.Env[0].Name != "PIPE_LEVEL" {
+		t.Fatalf("pipeline came back with triggers=%v env=%v", pl.Triggers, pl.Env)
+	}
+	b := pl.Jobs[0]
+	if b.Runner.Labels[0] != "ubuntu-latest" || b.Container == nil || b.Container.Ref != "golang:1.22" || len(b.Env) != 1 ||
+		b.Retry == nil || len(b.Retry.On) != 1 || b.Matrix == nil {
+		t.Fatalf("job came back as %+v", b)
+	}
+	st := b.Steps[0]
+	if st.Script[0] != "echo ${{ matrix.os }} ${{ env.MODE }}" || len(st.Env) != 1 || st.Env[0].Name != "MODE" || st.Shell != "bash" {
+		t.Fatalf("step came back as %+v", st)
+	}
+	if !pl.Jobs[1].Needs[0].Artifacts {
+		t.Fatalf("needs came back as %+v", pl.Jobs[1].Needs)
+	}
+}
+
+func TestEditedTaskKeepsTheFileAndReportsTheCarry(t *testing.T) {
+	p := carryProject()
+	files, _ := emit(t, p)
+	src := files[".concourse/ci.yml"]
+	edited := strings.Replace(src, "make test", "make verify", 1)
+	if edited == src {
+		t.Fatalf("no script to edit:\n%s", src)
+	}
+	back, rep := parseFiles(t, map[string]string{"ci.yml": edited})
+	var test *ir.Job
+	for _, j := range back.Pipelines[0].Jobs {
+		if j.ID == "test" {
+			test = j
+		}
+	}
+	if test == nil || test.Steps[0].Script[0] != "make verify" || test.Needs[0].Artifacts {
+		t.Fatalf("edited job came back as %+v", test)
+	}
+	if !hasFeatureEntry(rep, string(caps.ExtPassthrough), "marker ignored") {
+		t.Fatalf("no marker-ignored entry: %v", rep.Entries)
+	}
+}
+
+func TestEmptyPipelineKeepsItsEnv(t *testing.T) {
+	p := project()
+	p.Pipelines[0].Env = []ir.Var{{Name: "KEEP", Value: ir.Value{Lit: "me"}}}
+	files, _ := emit(t, p)
+	back, _ := reparse(t, files)
+	if got := back.Pipelines[0]; len(got.Env) != 1 || got.Env[0].Name != "KEEP" || len(got.Jobs) != 0 {
+		t.Fatalf("pipeline came back as %+v", got)
+	}
+}
+
+func TestReferencesComeBackWithoutTheCarry(t *testing.T) {
+	j := scriptJob("build", "echo ${{ sha }} ${{ matrix.os }}")
+	j.Matrix = &ir.Matrix{Axes: []ir.Axis{{Name: "os", Values: []string{"a", "b"}}}}
+	j.Steps[0].Image = &ir.Image{Ref: "golang:1.22"}
+	files, _ := emit(t, project(j))
+	src := files[".concourse/ci.yml"]
+	edited := strings.Replace(src, "tag: \"1.22\"", "tag: \"1.23\"", 1)
+	if edited == src {
+		t.Fatalf("no image tag to edit:\n%s", src)
+	}
+	back, rep := parseFiles(t, map[string]string{"ci.yml": edited})
+	st := back.Pipelines[0].Jobs[0].Steps[0]
+	if st.Script[0] != "echo ${{ sha }} ${{ matrix.os }}" {
+		t.Fatalf("script = %q", st.Script)
+	}
+	if st.Image == nil || st.Image.Ref != "golang:1.23" || !hasFeatureEntry(rep, string(caps.ExtPassthrough), "marker ignored") {
+		t.Fatalf("step = %+v entries=%v", st, rep.Entries)
+	}
+}
+
+func TestPipelineCallStepIsAPlaceholderAndComesBack(t *testing.T) {
+	j := scriptJob("build", "make")
+	call := &ir.Step{ID: "call", Kind: ir.StepPipelineCall, Action: &ir.ActionRef{Kind: ir.ActionLocal, Path: "./.github/workflows/w.yml"}}
+	j.Steps = append(j.Steps, call)
+	files, rep := emit(t, project(j))
+	if !strings.Contains(files[".concourse/ci.yml"], "task: call") || !hasFeatureEntry(rep, string(caps.StepAction), "another pipeline") {
+		t.Fatalf("no placeholder:\n%s\n%v", files[".concourse/ci.yml"], rep.Entries)
+	}
+	back, _ := reparse(t, files)
+	got := back.Pipelines[0].Jobs[0].Steps
+	if len(got) != 2 || got[1].Kind != ir.StepPipelineCall || got[1].Action == nil || got[1].Action.Path != "./.github/workflows/w.yml" {
+		t.Fatalf("steps came back as %+v", got)
+	}
+}

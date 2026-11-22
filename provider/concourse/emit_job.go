@@ -139,6 +139,7 @@ func (pe *pipeEmitter) job(j *ir.Job) *yaml.Node {
 			e.lose(jx.path, caps.ExtPassthrough, "the Ext of the job cannot be written: "+err.Error())
 		}
 	}
+	jx.carryJob(m.N)
 	return m.N
 }
 

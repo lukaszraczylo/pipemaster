@@ -51,6 +51,9 @@ func (c *chain) step(st *ir.Step) []*yaml.Node {
 	switch st.Kind {
 	case ir.StepAction:
 		return c.action(st, path, at)
+	case ir.StepPipelineCall:
+		e.lose(path, caps.StepAction, "a call of another pipeline has no Concourse form; a placeholder task keeps its place")
+		return c.placeholder(st, path, actionArg{})
 	case ir.StepScript, "":
 		return []*yaml.Node{c.script(st, path)}
 	case ir.StepResource, ir.StepPlugin, ir.StepTask:
@@ -132,6 +135,7 @@ func (c *chain) script(st *ir.Step, path string) *yaml.Node {
 		}
 	}
 	jx.secretMarker(sc, name)
+	jx.carryStep(st, name, m.N, body)
 	if !st.ContinueOnError {
 		return m.N
 	}

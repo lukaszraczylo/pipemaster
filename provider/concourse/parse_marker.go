@@ -286,18 +286,8 @@ func (jb *jobBuilder) guardLines(st *ir.Step) {
 		jb.disabled(st)
 		return
 	}
-	var kept []string
-	for _, l := range pre {
-		v := preludeVar(l)
-		if cond != nil && !slices.ContainsFunc(body, func(b string) bool { return strings.Contains(b, v) }) {
-			continue
-		}
-		if cond == nil && !slices.ContainsFunc(body, func(b string) bool { return strings.Contains(b, v) }) {
-			continue
-		}
-		kept = append(kept, l)
-	}
-	st.Script = append(kept, body...)
+	body = refsBack(pre, body)
+	st.Script = body
 	if cond != nil {
 		st.If = cond
 	}
@@ -444,4 +434,148 @@ func (b *pipeBuilder) placeholder(list []any) bool {
 		return false
 	}
 	return true
+}
+
+// carryOf reads the carry marker at a path when the digest of the file text still matches.
+func (b *pipeBuilder) carryOf(path, digest string, into any) bool {
+	var a carryArg
+	if !b.arg(path+carrySuffix, caps.ExtPassthrough, &a) {
+		return false
+	}
+	if a.Digest != digest {
+		b.ignored(path+carrySuffix, caps.ExtPassthrough, "the text beside the carry of "+path+" was edited after pipemaster wrote it")
+		return false
+	}
+	if err := yaml.Unmarshal([]byte(a.Carry), into); err != nil {
+		b.ignored(path+carrySuffix, caps.ExtPassthrough, "the carry of "+path+" cannot be read")
+		return false
+	}
+	return true
+}
+
+// carryStep puts back the step fields that the task cannot say: the image, the shell, the env, the condition.
+func (jb *jobBuilder) carryStep(m *omap, written string, st *ir.Step) {
+	var c ir.Step
+	if !jb.b.carryOf(jb.path+"/step/"+written, digestOf(plainValue(m)), &c) {
+		return
+	}
+	script := st.Script
+	if len(c.Script) > 0 {
+		script = c.Script
+	}
+	c.Script, c.Ext = script, st.Ext
+	*st = c
+}
+
+// carryJob puts back the job fields that the plan cannot say.
+func (jb *jobBuilder) carryJob(m *omap) {
+	var c ir.Job
+	if !jb.b.carryOf(jb.path, digestOf(plainValue(m)), &c) {
+		return
+	}
+	j := jb.job
+	needs := j.Needs
+	if len(needs) == len(c.Needs) {
+		for i := range needs {
+			needs[i].Artifacts, needs[i].Optional = c.Needs[i].Artifacts, c.Needs[i].Optional
+		}
+	}
+	c.ID, c.Name, c.Steps, c.Ext, c.Needs = j.ID, j.Name, j.Steps, j.Ext, needs
+	*j = c
+}
+
+// carryPipeline puts back the pipeline fields that the resources and gets cannot say.
+func (b *pipeBuilder) carryPipeline(top *omap, list []any, pl *ir.Pipeline) {
+	var res any
+	if v := top.Vals["resources"]; v != nil {
+		res = plainValue(v)
+	}
+	var gets []any
+	for _, raw := range list {
+		m, ok := asMap(raw)
+		if !ok {
+			continue
+		}
+		steps, _ := m.Vals[keyPlan].([]any)
+		for _, s := range steps {
+			if sm, ok := asMap(s); ok && sm.Vals["get"] != nil {
+				gets = append(gets, plainValue(sm))
+			}
+		}
+	}
+	var c ir.Pipeline
+	if !b.carryOf(b.path(), digestOf([]any{res, gets}), &c) {
+		return
+	}
+	c.ID, c.Jobs, c.Ext = pl.ID, pl.Jobs, pl.Ext
+	*pl = c
+}
+
+// refsBack drops the context prelude lines and writes each ${PM_CTX_*} use in the body as the reference it stands for.
+func refsBack(pre, body []string) []string {
+	out := slices.Clone(body)
+	for _, l := range pre {
+		env := preludeVar(l)
+		ref, ok := exprconcourse.EnvRef(env)
+		if !ok {
+			continue
+		}
+		tmpl, err := expr.PrintScriptTemplate([]expr.Part{{Expr: ref}})
+		if err != nil {
+			continue
+		}
+		for i := range out {
+			out[i] = strings.ReplaceAll(out[i], "${"+env+"}", tmpl)
+		}
+	}
+	return out
+}
+
+// matrixBack writes each ${PM_MATRIX_*} use of a task as the matrix reference its param stands for, and drops the
+// param. It runs only for a job whose matrix came back from its marker.
+func (jb *jobBuilder) matrixBack(st *ir.Step) {
+	if jb.job.Matrix == nil {
+		return
+	}
+	cx, _ := st.Ext[dialect].(map[string]any)
+	params, _ := cx[ExtParams].(map[string]any)
+	for name, v := range params {
+		raw, _ := v.(string)
+		key, ok := matrixKey(raw)
+		if !ok || !strings.HasPrefix(name, "PM_MATRIX_") {
+			continue
+		}
+		ref := expr.Ref{Path: []string{expr.PrefixMatrix, key}}
+		tmpl, err := expr.PrintScriptTemplate([]expr.Part{{Expr: ref}})
+		if err != nil {
+			continue
+		}
+		for i := range st.Script {
+			st.Script[i] = strings.ReplaceAll(st.Script[i], "${"+name+"}", tmpl)
+		}
+		delete(params, name)
+	}
+	if len(params) == 0 && cx != nil {
+		delete(cx, ExtParams)
+		if len(cx) == 0 {
+			delete(st.Ext, dialect)
+			if len(st.Ext) == 0 {
+				st.Ext = nil
+			}
+		}
+	}
+}
+
+// matrixKey reads ((.:key)) and ((.:matrix.key)), the local var of a matrix cell.
+func matrixKey(v string) (string, bool) {
+	rest, ok := strings.CutPrefix(v, "((.:")
+	if !ok {
+		return "", false
+	}
+	rest, ok = strings.CutSuffix(rest, "))")
+	if !ok || rest == "" {
+		return "", false
+	}
+	rest = strings.TrimPrefix(rest, cellVar+".")
+	return rest, true
 }

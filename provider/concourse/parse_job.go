@@ -74,6 +74,7 @@ func (b *pipeBuilder) job(m *omap) *builtJob {
 	}
 	jb.k.KeepRest(r)
 	j.Ext = jb.k.Ext()
+	jb.carryJob(m)
 	return bj
 }
 
