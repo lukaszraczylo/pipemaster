@@ -67,3 +67,24 @@ func TestTryOnFileTasksAndResourceStepsIsKept(t *testing.T) {
 		t.Fatalf("no entry for the try wrappers: %v", rep.Entries)
 	}
 }
+
+func TestEnvironmentOnATriggeredJobComesBack(t *testing.T) {
+	for name, env := range map[string]*ir.Environment{
+		"plain":    {Name: "prod", URL: "https://example.com"},
+		"approval": {Name: "prod", Approval: true},
+	} {
+		j := scriptJob("deploy", "make deploy")
+		j.Environment = env
+		p := project(j)
+		p.Pipelines[0].Triggers = []ir.Trigger{pushOn("main")}
+		files, _ := emit(t, p)
+		back, rep := reparse(t, files)
+		got := back.Pipelines[0].Jobs[0]
+		if got.Environment == nil || *got.Environment != *env || got.Manual {
+			t.Fatalf("%s: job came back as manual=%v env=%+v", name, got.Manual, got.Environment)
+		}
+		if hasFeatureEntry(rep, string(caps.JobManual), "marker ignored") {
+			t.Fatalf("%s: an unedited marker was ignored: %v", name, rep.Entries)
+		}
+	}
+}
