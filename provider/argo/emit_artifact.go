@@ -53,13 +53,13 @@ func (sx *stepCtx) checkout(st *ir.Step, with map[string]string, t actions.Targe
 	tc.pp.ctx["ctx-repo"] = tc.pp.ctx["ctx-repo"] || useRepo
 	tc.pp.ctx["ctx-sha"] = tc.pp.ctx["ctx-sha"] || useSHA
 	g := newMap()
-	g.setStr("repo", repo)
+	g.SetStr("repo", repo)
 	if revision != "" {
-		g.setStr("revision", revision)
+		g.SetStr("revision", revision)
 	}
 	if d, ok := t.With["depth"].(string); ok && d != "0" {
 		if n, err := strconv.Atoi(d); err == nil && n > 0 {
-			g.set("depth", intNode(n))
+			g.Set("depth", intNode(n))
 		} else {
 			tc.e.lose(path, caps.StepAction, "the fetch depth "+d+" is no count; the clone is full")
 		}
@@ -72,10 +72,10 @@ func (sx *stepCtx) checkout(st *ir.Step, with map[string]string, t actions.Targe
 		}
 	}
 	a := newMap()
-	a.setStr("name", unique(sx.taken, gitArtifactName, maxName))
-	a.setStr("path", dir)
-	a.set("git", g.n)
-	sx.artIn = append(sx.artIn, a.n)
+	a.SetStr("name", unique(sx.taken, gitArtifactName, maxName))
+	a.SetStr("path", dir)
+	a.Set("git", g.N)
+	sx.artIn = append(sx.artIn, a.N)
 	tc.e.external(path, caps.StepAction, "input git artifact", "a private repository needs usernameSecret and passwordSecret, or sshPrivateKeySecret, on the git artifact; the file names none")
 }
 
@@ -118,9 +118,9 @@ func (sx *stepCtx) addOutputArtifacts(path, name string, paths []string, expire 
 			tc.e.lose(path, caps.JobArtifacts, "the path "+p+" holds a glob, which Argo does not expand")
 		}
 		a := newMap()
-		a.setStr("name", unique(sx.taken, n, maxName))
-		a.setStr("path", artifactPath(p))
-		sx.artOut = append(sx.artOut, a.n)
+		a.SetStr("name", unique(sx.taken, n, maxName))
+		a.SetStr("path", artifactPath(p))
+		sx.artOut = append(sx.artOut, a.N)
 	}
 	if expire != "" {
 		tc.e.lose(path, caps.JobArtifacts, "the expiry "+expire+" has no form; the artifact repository sets retention")
@@ -194,13 +194,13 @@ func (sx *stepCtx) inputArtifact(from *jobPlan, srcName, dst string) {
 	tc := sx.tc
 	name := unique(sx.taken, srcName, maxName)
 	a := newMap()
-	a.setStr("name", name)
-	a.setStr("path", dst)
-	sx.artIn = append(sx.artIn, a.n)
+	a.SetStr("name", name)
+	a.SetStr("path", dst)
+	sx.artIn = append(sx.artIn, a.N)
 	b := newMap()
-	b.setStr("name", name)
-	b.setStr("from", "{{tasks."+from.task+".outputs.artifacts."+srcName+"}}")
-	sx.argArts = append(sx.argArts, b.n)
+	b.SetStr("name", name)
+	b.SetStr("from", "{{tasks."+from.task+".outputs.artifacts."+srcName+"}}")
+	sx.argArts = append(sx.argArts, b.N)
 	tc.needed[from.j.ID] = true
 }
 

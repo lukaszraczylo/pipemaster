@@ -88,17 +88,17 @@ func (e *emitter) triggers() error {
 // listenerDoc fills the EventListener document of l.
 func (e *emitter) listenerDoc(l *listener) error {
 	el := newMap()
-	el.setStr("apiVersion", apiTriggersV1)
-	el.setStr("kind", kindEventListener)
+	el.SetStr("apiVersion", apiTriggersV1)
+	el.SetStr("kind", kindEventListener)
 	meta := newMap()
-	meta.setStr("name", l.name)
-	if err := meta.addExtra(l.meta, nil); err != nil {
+	meta.SetStr("name", l.name)
+	if err := meta.AddExtra(l.meta, nil); err != nil {
 		return err
 	}
-	el.set("metadata", meta.n)
+	el.Set("metadata", meta.N)
 	spec := newMap()
 	if l.sa != "" {
-		spec.setStr("serviceAccountName", l.sa)
+		spec.SetStr("serviceAccountName", l.sa)
 	}
 	entries := append([]*yaml.Node(nil), l.entries...)
 	for _, d := range e.pendingEL[l.name] {
@@ -115,12 +115,12 @@ func (e *emitter) listenerDoc(l *listener) error {
 		}
 	}
 	delete(e.pendingEL, l.name)
-	spec.set("triggers", seqOf(entries...))
-	if err := spec.addExtra(l.spec, map[string]bool{"triggers": true}); err != nil {
+	spec.Set("triggers", seqOf(entries...))
+	if err := spec.AddExtra(l.spec, map[string]bool{"triggers": true}); err != nil {
 		return err
 	}
-	el.set("spec", spec.n)
-	l.doc.root = el.n
+	el.Set("spec", spec.N)
+	l.doc.Root = el.N
 	e.add(triggersDir+"eventlistener.yaml", l.doc)
 	return nil
 }
@@ -268,23 +268,23 @@ func (e *emitter) sourceCron(pp *plan, path string, t ir.Trigger, x map[string]a
 	}
 	e.made["CronJob "+name] = true
 	meta := newMap()
-	meta.setStr("name", name)
+	meta.SetStr("name", name)
 	md, _ := cj["metadata"].(map[string]any)
-	_ = meta.addExtra(md, nil)
+	_ = meta.AddExtra(md, nil)
 	spec := newMap()
-	spec.setStr("schedule", t.Cron)
+	spec.SetStr("schedule", t.Cron)
 	sp, _ := cj["spec"].(map[string]any)
-	if err := spec.addExtra(sp, map[string]bool{"schedule": true}); err != nil {
+	if err := spec.AddExtra(sp, map[string]bool{"schedule": true}); err != nil {
 		e.lose(path, caps.ExtPassthrough, "the CronJob spec cannot be written: "+err.Error())
 		return
 	}
 	root := newMap()
-	root.setStr("apiVersion", apiBatchV1)
-	root.setStr("kind", kindCronJob)
-	root.set("metadata", meta.n)
-	root.set("spec", spec.n)
+	root.SetStr("apiVersion", apiBatchV1)
+	root.SetStr("kind", kindCronJob)
+	root.Set("metadata", meta.N)
+	root.Set("spec", spec.N)
 	e.emulate(path, caps.TriggerSchedule, "CronJob of the Tekton file", "the CronJob is written as the Tekton file had it, with the schedule of the trigger")
-	*crons = append(*crons, &outDoc{root: root.n})
+	*crons = append(*crons, &outDoc{Root: root.N})
 }
 
 // isGitHubInterceptor reads an interceptor kept in Ext.
@@ -317,7 +317,7 @@ func (e *emitter) sourceEntry(pp *plan, g *sourceGroup) error {
 	}
 	body := newMap()
 	if n, ok := x["name"].(string); ok {
-		body.setStr("name", n)
+		body.SetStr("name", n)
 	}
 	sa, _ := x["serviceAccountName"].(string)
 	if sa != "" && x[extSAScope] == saScopeSpec {
@@ -328,7 +328,7 @@ func (e *emitter) sourceEntry(pp *plan, g *sourceGroup) error {
 	ref, hasRef := x["triggerRef"].(string)
 	var trigDoc *wmap
 	if hasRef {
-		body.setStr("triggerRef", ref)
+		body.SetStr("triggerRef", ref)
 		target = newMap()
 		trigDoc = target
 	}
@@ -337,20 +337,20 @@ func (e *emitter) sourceEntry(pp *plan, g *sourceGroup) error {
 	}
 	if hasRef {
 		root := newMap()
-		root.setStr("apiVersion", apiTriggersV1)
-		root.setStr("kind", kindTrigger)
+		root.SetStr("apiVersion", apiTriggersV1)
+		root.SetStr("kind", kindTrigger)
 		meta := newMap()
-		meta.setStr("name", ref)
+		meta.SetStr("name", ref)
 		if md, ok := x["triggerMetadata"].(map[string]any); ok {
-			if err := meta.addExtra(md, nil); err != nil {
+			if err := meta.AddExtra(md, nil); err != nil {
 				return err
 			}
 		}
-		root.set("metadata", meta.n)
-		root.set("spec", trigDoc.n)
-		e.add(triggersDir+"trigger.yaml", &outDoc{root: root.n})
+		root.Set("metadata", meta.N)
+		root.Set("spec", trigDoc.N)
+		e.add(triggersDir+"trigger.yaml", &outDoc{Root: root.N})
 	}
-	l.entries = append(l.entries, body.n)
+	l.entries = append(l.entries, body.N)
 	return nil
 }
 
@@ -370,20 +370,20 @@ func (e *emitter) fillSourceTrigger(pp *plan, g *sourceGroup, m *wmap, sa string
 		ics = e.generatedInterceptors(pp, g)
 	}
 	if len(ics) > 0 {
-		m.set("interceptors", seqOf(ics...))
+		m.Set("interceptors", seqOf(ics...))
 	}
 	if b, ok := x["bindings"]; ok {
 		n, err := plainNode(b)
 		if err != nil {
 			return err
 		}
-		m.set("bindings", n)
+		m.Set("bindings", n)
 	}
 	if t, ok := x["template"].(string); ok {
-		m.set("template", nameOnlyRef(t))
+		m.Set("template", nameOnlyRef(t))
 	}
 	if sa != "" {
-		m.setStr("serviceAccountName", sa)
+		m.SetStr("serviceAccountName", sa)
 	}
 	return nil
 }
@@ -416,7 +416,7 @@ func (e *emitter) celInterceptor(pp *plan, g *sourceGroup, filter string, overla
 		return nil, nil
 	}
 	cel := newMap()
-	cel.set("ref", nameOnly(interceptorCEL))
+	cel.Set("ref", nameOnly(interceptorCEL))
 	ps := seqOf(nameValue(paramFilter, body.CEL))
 	if overlays != nil {
 		n, err := plainNode(overlays)
@@ -426,9 +426,9 @@ func (e *emitter) celInterceptor(pp *plan, g *sourceGroup, filter string, overla
 			ps.Content = append(ps.Content, nameNode(paramOverlays, n))
 		}
 	}
-	cel.set("params", ps)
+	cel.Set("params", ps)
 	_ = pp
-	return cel.n, nil
+	return cel.N, nil
 }
 
 // generatedInterceptors writes the github and cel interceptors of a source trigger that kept no interceptor list.
@@ -445,9 +445,9 @@ func (e *emitter) generatedInterceptors(pp *plan, g *sourceGroup) []*yaml.Node {
 	}
 	if types = dedupeStrings(types); len(types) > 0 {
 		gh := newMap()
-		gh.set("ref", nameOnly(interceptorGitHub))
-		gh.set("params", seqOf(nameNode(paramEventTypes, strSeq(types))))
-		ics = append(ics, gh.n)
+		gh.Set("ref", nameOnly(interceptorGitHub))
+		gh.Set("params", seqOf(nameNode(paramEventTypes, strSeq(types))))
+		ics = append(ics, gh.N)
 	}
 	if f, ok := g.x["filter"].(string); ok {
 		if node, err := e.celInterceptor(pp, g, f, g.x[extOverlays]); err == nil && node != nil {

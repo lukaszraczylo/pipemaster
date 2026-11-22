@@ -162,7 +162,7 @@ func (e *emitter) keep(path, kind string, doc map[string]any) {
 		return
 	}
 	file := resourcesDir + strings.ToLower(kind) + "-" + strings.Trim(dnsName(name), "-") + ".yaml"
-	e.add(file, &outDoc{root: n})
+	e.add(file, &outDoc{Root: n})
 }
 
 func dnsName(s string) string { return strings.ToLower(invalidParam.ReplaceAllString(s, "-")) }

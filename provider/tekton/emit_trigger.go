@@ -248,9 +248,9 @@ func ctxOverlay(kind ir.TriggerKind, ctx string) string {
 }
 
 func cronFile(d *outDoc) string {
-	for i := 0; i+1 < len(d.root.Content); i += 2 {
-		if d.root.Content[i].Value == "metadata" {
-			m := d.root.Content[i+1]
+	for i := 0; i+1 < len(d.Root.Content); i += 2 {
+		if d.Root.Content[i].Value == "metadata" {
+			m := d.Root.Content[i+1]
 			for j := 0; j+1 < len(m.Content); j += 2 {
 				if m.Content[j].Value == "name" {
 					return m.Content[j+1].Value + ".yaml"
@@ -287,13 +287,13 @@ func (e *emitter) eventTrigger(pp *plan, i int, path string, t ir.Trigger, ctxs 
 	gh[0] = nameNode("eventTypes", seqOf(types))
 	if len(t.Paths.Include)+len(t.Paths.Exclude) > 0 {
 		en := newMap()
-		en.set("enabled", boolNode(true))
-		gh = append(gh, nameNode("addChangedFiles", en.n))
+		en.Set("enabled", boolNode(true))
+		gh = append(gh, nameNode("addChangedFiles", en.N))
 	}
 	sec := newMap()
-	sec.setStr("secretName", githubSecretName)
-	sec.setStr("secretKey", githubSecretKey)
-	gh = append(gh, nameNode(paramSecretRef, sec.n))
+	sec.SetStr("secretName", githubSecretName)
+	sec.SetStr("secretKey", githubSecretKey)
+	gh = append(gh, nameNode(paramSecretRef, sec.N))
 	if t.Kind == ir.TriggerPR {
 		e.note(path, caps.TriggerPullRequest, caps.Emulated, "same-repository pull requests only",
 			"the filter admits only pull requests from this repository, because the code of a fork would run with every secret of the Task; GitHub Actions withholds secrets from fork runs. Remove the head.repo term of the filter to accept forks")
@@ -305,9 +305,9 @@ func (e *emitter) eventTrigger(pp *plan, i int, path string, t ir.Trigger, ctxs 
 
 func nameNode(name string, v *yaml.Node) *yaml.Node {
 	m := newMap()
-	m.setStr("name", name)
-	m.set("value", v)
-	return m.n
+	m.SetStr("name", name)
+	m.Set("value", v)
+	return m.N
 }
 
 func triggerName(pp *plan, k ir.TriggerKind, i int) string {
@@ -320,113 +320,113 @@ func (e *emitter) triggerEntry(name string, kind ir.TriggerKind, filter string, 
 	var ics []*yaml.Node
 	if github != nil {
 		g := newMap()
-		g.set("ref", nameOnly(interceptorGitHub))
-		g.set("params", seqOf(github...))
-		ics = append(ics, g.n)
+		g.Set("ref", nameOnly(interceptorGitHub))
+		g.Set("params", seqOf(github...))
+		ics = append(ics, g.N)
 	}
 	overlays := seqOf()
 	for _, c := range ctxs {
 		p, _ := ctxparam.Param(strings.Split(c, "."))
 		o := newMap()
-		o.setStr("key", overlayKey(p))
-		o.setStr("expression", ctxOverlay(kind, c))
-		overlays.Content = append(overlays.Content, o.n)
+		o.SetStr("key", overlayKey(p))
+		o.SetStr("expression", ctxOverlay(kind, c))
+		overlays.Content = append(overlays.Content, o.N)
 	}
 	cel := newMap()
-	cel.set("ref", nameOnly(interceptorCEL))
+	cel.Set("ref", nameOnly(interceptorCEL))
 	ps := seqOf(nameValue(paramFilter, filter))
 	if len(overlays.Content) > 0 {
 		ps.Content = append(ps.Content, nameNode("overlays", overlays))
 	}
-	cel.set("params", ps)
-	ics = append(ics, cel.n)
+	cel.Set("params", ps)
+	ics = append(ics, cel.N)
 	m := newMap()
-	m.setStr("name", name)
-	m.set("interceptors", seqOf(ics...))
-	m.set("bindings", seqOf(nameOnlyRef(bname)))
+	m.SetStr("name", name)
+	m.Set("interceptors", seqOf(ics...))
+	m.Set("bindings", seqOf(nameOnlyRef(bname)))
 	tpl := newMap()
-	tpl.setStr("ref", tname)
-	m.set("template", tpl.n)
-	return m.n
+	tpl.SetStr("ref", tname)
+	m.Set("template", tpl.N)
+	return m.N
 }
 
 func nameOnly(n string) *yaml.Node {
 	m := newMap()
-	m.setStr("name", n)
-	return m.n
+	m.SetStr("name", n)
+	return m.N
 }
 
 func nameOnlyRef(n string) *yaml.Node {
 	m := newMap()
-	m.setStr("ref", n)
-	return m.n
+	m.SetStr("ref", n)
+	return m.N
 }
 
 func (e *emitter) bindingDoc(name string, ctxs []string) *outDoc {
 	root := newMap()
-	root.setStr("apiVersion", apiTriggersV1)
-	root.setStr("kind", "TriggerBinding")
+	root.SetStr("apiVersion", apiTriggersV1)
+	root.SetStr("kind", "TriggerBinding")
 	meta := newMap()
-	meta.setStr("name", name)
-	root.set("metadata", meta.n)
+	meta.SetStr("name", name)
+	root.Set("metadata", meta.N)
 	ps := seqOf()
 	for _, c := range ctxs {
 		p, _ := ctxparam.Param(strings.Split(c, "."))
 		ps.Content = append(ps.Content, nameValue(p, "$(extensions."+overlayKey(p)+")"))
 	}
 	spec := newMap()
-	spec.set("params", ps)
-	root.set("spec", spec.n)
-	return &outDoc{root: root.n, head: []string{generatedMarker}}
+	spec.Set("params", ps)
+	root.Set("spec", spec.N)
+	return &outDoc{Root: root.N, Head: []string{generatedMarker}}
 }
 
 func (e *emitter) templateDoc(pp *plan, name string, ctxs []string) *outDoc {
 	root := newMap()
-	root.setStr("apiVersion", apiTriggersV1)
-	root.setStr("kind", kindTriggerTemplate)
+	root.SetStr("apiVersion", apiTriggersV1)
+	root.SetStr("kind", kindTriggerTemplate)
 	meta := newMap()
-	meta.setStr("name", name)
-	root.set("metadata", meta.n)
+	meta.SetStr("name", name)
+	root.Set("metadata", meta.N)
 	tps := seqOf()
 	rps := seqOf()
 	for _, c := range ctxs {
 		p, _ := ctxparam.Param(strings.Split(c, "."))
 		m := newMap()
-		m.setStr("name", p)
-		m.setStr("default", "")
-		tps.Content = append(tps.Content, m.n)
+		m.SetStr("name", p)
+		m.SetStr("default", "")
+		tps.Content = append(tps.Content, m.N)
 		rps.Content = append(rps.Content, nameValue(p, "$(tt.params."+p+")"))
 	}
 	run := newMap()
-	run.setStr("apiVersion", apiPipelinesV1)
-	run.setStr("kind", kindPipelineRun)
+	run.SetStr("apiVersion", apiPipelinesV1)
+	run.SetStr("kind", kindPipelineRun)
 	rm := newMap()
-	rm.setStr("generateName", pp.name+"-run-")
-	run.set("metadata", rm.n)
+	rm.SetStr("generateName", pp.name+"-run-")
+	run.Set("metadata", rm.N)
 	rs := newMap()
-	rs.set("pipelineRef", nameOnly(pp.name))
-	rs.set("params", rps)
+	rs.Set("pipelineRef", nameOnly(pp.name))
+	rs.Set("params", rps)
 	if pp.ws {
 		vc := newMap()
 		sp := newMap()
-		sp.set("accessModes", strSeq([]string{"ReadWriteOnce"}))
+		sp.Set("accessModes", strSeq([]string{"ReadWriteOnce"}))
 		req := newMap()
 		st := newMap()
-		st.setStr("storage", workspaceStorage)
-		req.set("requests", st.n)
-		sp.set("resources", req.n)
-		vc.set("spec", sp.n)
+		st.SetStr("storage", workspaceStorage)
+		req.Set("requests", st.N)
+		sp.Set("resources", req.N)
+		vc.Set("spec", sp.N)
 		w := newMap()
-		w.setStr("name", workspaceName)
-		w.set("volumeClaimTemplate", vc.n)
-		rs.set("workspaces", seqOf(w.n))
+		w.SetStr("name", workspaceName)
+		w.Set("volumeClaimTemplate", vc.N)
+		rs.Set("workspaces", seqOf(w.N))
 	}
-	run.set("spec", rs.n)
+	run.Set("spec", rs.N)
 	spec := newMap()
-	spec.set("params", tps)
-	spec.set("resourcetemplates", seqOf(run.n))
-	root.set("spec", spec.n)
-	return &outDoc{root: root.n, head: []string{generatedMarker}}
+	spec.Set("params", tps)
+	spec.Set("resourcetemplates", seqOf(run.N))
+	root.Set("spec", spec.N)
+	return &outDoc{Root: root.N, Head: []string{generatedMarker}}
 }
 
 // scheduleTrigger writes the CronJob that posts to the EventListener and the listener trigger that takes the post.
@@ -448,31 +448,31 @@ func (e *emitter) scheduleTrigger(pp *plan, n int, path string, t ir.Trigger, ct
 // cronJobDoc is the CronJob that posts the schedule tag to the EventListener.
 func cronJobDoc(jname, cron, tag string) *outDoc {
 	cj := newMap()
-	cj.setStr("apiVersion", apiBatchV1)
-	cj.setStr("kind", kindCronJob)
+	cj.SetStr("apiVersion", apiBatchV1)
+	cj.SetStr("kind", kindCronJob)
 	meta := newMap()
-	meta.setStr("name", jname)
-	cj.set("metadata", meta.n)
+	meta.SetStr("name", jname)
+	cj.Set("metadata", meta.N)
 	c := newMap()
-	c.setStr("name", cronContainerName)
-	c.setStr("image", curlImage)
+	c.SetStr("name", cronContainerName)
+	c.SetStr("image", curlImage)
 	url := "http://el-" + scheduleListenerName + "." + listenerNamespace + ".svc.cluster.local:" + listenerPort
-	c.set("args", strSeq([]string{"-sS", "--fail", "-X", "POST", "-H", "Content-Type: application/json", "-H", scheduleHeader + ": " + tag, "-d", "{}", url}))
+	c.Set("args", strSeq([]string{"-sS", "--fail", "-X", "POST", "-H", "Content-Type: application/json", "-H", scheduleHeader + ": " + tag, "-d", "{}", url}))
 	pod := newMap()
-	pod.setStr("restartPolicy", "Never")
-	pod.set("containers", seqOf(c.n))
+	pod.SetStr("restartPolicy", "Never")
+	pod.Set("containers", seqOf(c.N))
 	tpl := newMap()
-	tpl.set("spec", pod.n)
+	tpl.Set("spec", pod.N)
 	jspec := newMap()
-	jspec.set("template", tpl.n)
+	jspec.Set("template", tpl.N)
 	jt := newMap()
-	jt.set("spec", jspec.n)
+	jt.Set("spec", jspec.N)
 	spec := newMap()
-	spec.setStr("schedule", cron)
-	spec.setStr("timeZone", utcZone)
-	spec.set("jobTemplate", jt.n)
-	cj.set("spec", spec.n)
-	return &outDoc{root: cj.n, head: []string{generatedMarker}}
+	spec.SetStr("schedule", cron)
+	spec.SetStr("timeZone", utcZone)
+	spec.Set("jobTemplate", jt.N)
+	cj.Set("spec", spec.N)
+	return &outDoc{Root: cj.N, Head: []string{generatedMarker}}
 }
 
 // rbac writes the ServiceAccount and the roles that the EventListener needs.
@@ -486,53 +486,53 @@ func (e *emitter) rbac() {
 func rbacDocs() []*outDoc {
 	rule := func(groups, resources, verbs []string) *yaml.Node {
 		m := newMap()
-		m.set("apiGroups", strSeq(groups))
-		m.set("resources", strSeq(resources))
-		m.set("verbs", strSeq(verbs))
-		return m.n
+		m.Set("apiGroups", strSeq(groups))
+		m.Set("resources", strSeq(resources))
+		m.Set("verbs", strSeq(verbs))
+		return m.N
 	}
 	obj := func(api, kind, name string) *wmap {
 		m := newMap()
-		m.setStr("apiVersion", api)
-		m.setStr("kind", kind)
+		m.SetStr("apiVersion", api)
+		m.SetStr("kind", kind)
 		md := newMap()
-		md.setStr("name", name)
+		md.SetStr("name", name)
 		if kind == "ServiceAccount" || kind == "Role" || kind == "RoleBinding" {
-			md.setStr("namespace", listenerNamespace)
+			md.SetStr("namespace", listenerNamespace)
 		}
-		m.set("metadata", md.n)
+		m.Set("metadata", md.N)
 		return m
 	}
 	bind := func(api, kind, name, roleKind string) *outDoc {
 		m := obj(api, kind, name)
 		sub := newMap()
-		sub.setStr("kind", "ServiceAccount")
-		sub.setStr("name", triggersAccount)
-		sub.setStr("namespace", listenerNamespace)
-		m.set("subjects", seqOf(sub.n))
+		sub.SetStr("kind", "ServiceAccount")
+		sub.SetStr("name", triggersAccount)
+		sub.SetStr("namespace", listenerNamespace)
+		m.Set("subjects", seqOf(sub.N))
 		ref := newMap()
-		ref.setStr("apiGroup", "rbac.authorization.k8s.io")
-		ref.setStr("kind", roleKind)
-		ref.setStr("name", name)
-		m.set("roleRef", ref.n)
-		return &outDoc{root: m.n}
+		ref.SetStr("apiGroup", "rbac.authorization.k8s.io")
+		ref.SetStr("kind", roleKind)
+		ref.SetStr("name", name)
+		m.Set("roleRef", ref.N)
+		return &outDoc{Root: m.N}
 	}
 	read := []string{"get", "list", "watch"}
 	role := obj(apiRBAC, "Role", triggersAccount)
-	role.set("rules", seqOf(
+	role.Set("rules", seqOf(
 		rule([]string{"triggers.tekton.dev"}, []string{"eventlisteners", "triggerbindings", "triggertemplates", "triggers", "interceptors"}, read),
 		rule([]string{""}, []string{"configmaps", "secrets"}, read),
 		rule([]string{"tekton.dev"}, []string{"pipelineruns", "taskruns"}, []string{"create"}),
 	))
 	crole := obj(apiRBAC, "ClusterRole", triggersAccount)
-	crole.set("rules", seqOf(rule([]string{"triggers.tekton.dev"}, []string{"clustertriggerbindings", "clusterinterceptors", "interceptors"}, read)))
+	crole.Set("rules", seqOf(rule([]string{"triggers.tekton.dev"}, []string{"clustertriggerbindings", "clusterinterceptors", "interceptors"}, read)))
 	sa := obj("v1", "ServiceAccount", triggersAccount)
 	docs := []*outDoc{
-		{root: sa.n}, {root: role.n}, bind(apiRBAC, "RoleBinding", triggersAccount, "Role"),
-		{root: crole.n}, bind(apiRBAC, "ClusterRoleBinding", triggersAccount, "ClusterRole"),
+		{Root: sa.N}, {Root: role.N}, bind(apiRBAC, "RoleBinding", triggersAccount, "Role"),
+		{Root: crole.N}, bind(apiRBAC, "ClusterRoleBinding", triggersAccount, "ClusterRole"),
 	}
 	for _, d := range docs {
-		d.head = []string{generatedMarker}
+		d.Head = []string{generatedMarker}
 	}
 	return docs
 }

@@ -170,14 +170,14 @@ func param(name string) string { return paramPrefix + name + paramClose }
 // storeRef is an env entry that reads a Secret or ConfigMap key.
 func storeRef(name, kind, store, key string) *yaml.Node {
 	ref := newMap()
-	ref.setStr("name", store)
-	ref.setStr("key", key)
+	ref.SetStr("name", store)
+	ref.SetStr("key", key)
 	from := newMap()
-	from.set(kind, ref.n)
+	from.Set(kind, ref.N)
 	m := newMap()
-	m.setStr("name", name)
-	m.set("valueFrom", from.n)
-	return m.n
+	m.SetStr("name", name)
+	m.Set("valueFrom", from.N)
+	return m.N
 }
 
 const (

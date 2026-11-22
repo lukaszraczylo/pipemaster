@@ -50,11 +50,11 @@ func (e *emitter) pipelineDoc(pp *plan) error {
 	pp.doc = d
 	e.add(workflowsDir+pp.name+".yaml", d, pp.path)
 	root := newMap()
-	root.setStr("apiVersion", apiVersion)
-	root.setStr("kind", kindTemplate)
-	root.set("metadata", e.metadata(pp, px))
+	root.SetStr("apiVersion", apiVersion)
+	root.SetStr("kind", kindTemplate)
+	root.Set("metadata", e.metadata(pp, px))
 	spec := newMap()
-	spec.setStr("entrypoint", entryTemplate)
+	spec.SetStr("entrypoint", entryTemplate)
 	var tmpls []*yaml.Node
 	var tasks, exits []*yaml.Node
 	for _, jp := range pp.jobs {
@@ -69,25 +69,25 @@ func (e *emitter) pipelineDoc(pp *plan) error {
 		}
 		tmpls = append(tmpls, out.tmpls...)
 	}
-	spec.set("arguments", e.arguments(pp, px))
+	spec.Set("arguments", e.arguments(pp, px))
 	if pl.Concurrency != nil {
-		spec.set("synchronization", e.synchronization(pp, px))
+		spec.Set("synchronization", e.synchronization(pp, px))
 	}
 	if len(pp.claimOrder) > 0 {
-		spec.set("volumeClaimTemplates", e.claims(pp))
+		spec.Set("volumeClaimTemplates", e.claims(pp))
 	}
 	if len(exits) > 0 {
 		hook := newMap()
-		hook.setStr("template", exitTemplate)
+		hook.SetStr("template", exitTemplate)
 		if rest, ok := px["exitHook"].(map[string]any); ok {
-			_ = hook.addExtra(rest, map[string]bool{"template": true})
+			_ = hook.AddExtra(rest, map[string]bool{"template": true})
 		}
 		hooks := newMap()
-		hooks.set("exit", hook.n)
+		hooks.Set("exit", hook.N)
 		if rest, ok := px["hooks"].(map[string]any); ok {
-			_ = hooks.addExtra(rest, nil)
+			_ = hooks.AddExtra(rest, nil)
 		}
-		spec.set("hooks", hooks.n)
+		spec.Set("hooks", hooks.N)
 	}
 	all := []*yaml.Node{dagTemplate(px, entryTemplate, "entrypoint_", tasks, true)}
 	if len(exits) > 0 {
@@ -99,7 +99,7 @@ func (e *emitter) pipelineDoc(pp *plan) error {
 			all = append(all, e.node(pp.path, "templates", t))
 		}
 	}
-	spec.set("templates", seqOf(all...))
+	spec.Set("templates", seqOf(all...))
 	skip := map[string]bool{}
 	for k := range specSkip {
 		skip[k] = true
@@ -110,9 +110,9 @@ func (e *emitter) pipelineDoc(pp *plan) error {
 			rest[k] = v
 		}
 	}
-	_ = spec.addExtra(rest, nil)
-	root.set("spec", spec.n)
-	d.root = root.n
+	_ = spec.AddExtra(rest, nil)
+	root.Set("spec", spec.N)
+	d.Root = root.N
 	e.made[kindTemplate+" "+pp.name] = true
 	return nil
 }
@@ -120,9 +120,9 @@ func (e *emitter) pipelineDoc(pp *plan) error {
 // metadata writes the name, the id comment, the title annotation and the metadata keys that an Argo file kept.
 func (e *emitter) metadata(pp *plan, px map[string]any) *yaml.Node {
 	m := newMap()
-	m.setStr("name", pp.name)
+	m.SetStr("name", pp.name)
 	if pp.name != pp.pl.ID {
-		m.keyComment("name", idComment(pp.pl.ID))
+		m.KeyComment("name", idComment(pp.pl.ID))
 	}
 	rest, _ := px["metadata"].(map[string]any)
 	if pp.pl.Name != "" {
@@ -140,8 +140,8 @@ func (e *emitter) metadata(pp *plan, px map[string]any) *yaml.Node {
 		cp["annotations"] = ann
 		rest = cp
 	}
-	_ = m.addExtra(rest, nil)
-	return m.n
+	_ = m.AddExtra(rest, nil)
+	return m.N
 }
 
 // arguments writes the input parameters and the reserved context parameters.
@@ -154,26 +154,26 @@ func (e *emitter) arguments(pp *plan, px map[string]any) *yaml.Node {
 	for _, in := range pl.Inputs {
 		name := pp.inputs[in.Name]
 		m := newMap()
-		m.setStr("name", name)
+		m.SetStr("name", name)
 		if in.Default != "" || !in.Required {
 			if unsafe, safe := tagKinds(in.Default); len(unsafe)+len(safe) > 0 {
 				e.lose(pp.path, caps.PipelineInputs, "the default of input "+in.Name+" holds a tag, which Argo would substitute; the input has no default")
 			} else {
-				m.setStr("value", in.Default)
+				m.SetStr("value", in.Default)
 			}
 		}
 		if in.Description != "" {
-			m.setStr("description", in.Description)
+			m.SetStr("description", in.Description)
 		}
 		if rest, ok := extra[name].(map[string]any); ok {
-			_ = m.addExtra(rest, nil)
+			_ = m.AddExtra(rest, nil)
 		}
 		if in.Type != "" && in.Type != "string" {
 			arg.Types[name] = in.Type
 			e.emulate(pp.path, caps.PipelineInputs, "string parameter", "input "+in.Name+" has type "+in.Type+", which Argo parameters lack; it is a string parameter and the type stays in the marker")
 		}
-		params = append(params, m.n)
-		pp.args = append(pp.args, argSpec{name: name, value: in.Default, has: m.has("value")})
+		params = append(params, m.N)
+		pp.args = append(pp.args, argSpec{name: name, value: in.Default, has: m.Has("value")})
 	}
 	for _, p := range ctxParams() {
 		if pp.ctx[p] {
@@ -182,33 +182,33 @@ func (e *emitter) arguments(pp *plan, px map[string]any) *yaml.Node {
 		}
 	}
 	if len(params) > 0 {
-		args.set("parameters", seqOf(params...))
+		args.Set("parameters", seqOf(params...))
 	}
 	if rest, ok := px["arguments"].(map[string]any); ok {
-		_ = args.addExtra(rest, nil)
+		_ = args.AddExtra(rest, nil)
 	}
 	if len(arg.Names) > 0 || len(arg.Types) > 0 {
 		if err := e.markArg(caps.PipelineInputs, pp.path, arg); err != nil {
 			e.lose(pp.path, caps.PipelineInputs, "the input marker cannot be written: "+err.Error())
 		}
 	}
-	if args.empty() {
+	if args.Empty() {
 		return nil
 	}
-	return args.n
+	return args.N
 }
 
 func (e *emitter) synchronization(pp *plan, px map[string]any) *yaml.Node {
 	c := pp.pl.Concurrency
 	mx := newMap()
-	mx.setStr("name", c.Group)
+	mx.SetStr("name", c.Group)
 	s := newMap()
-	s.set("mutexes", seqOf(mx.n))
+	s.Set("mutexes", seqOf(mx.N))
 	if rest, ok := px["synchronization"].(map[string]any); ok {
-		_ = s.addExtra(rest, nil)
+		_ = s.AddExtra(rest, nil)
 	}
 	e.emulate(pp.path, caps.PipelineConcurrency, "synchronization mutex", "a second run waits for the mutex"+cancelDetail(c))
-	return s.n
+	return s.N
 }
 
 func cancelDetail(c *ir.Concurrency) string {
@@ -222,18 +222,18 @@ func (e *emitter) claims(pp *plan) *yaml.Node {
 	var out []*yaml.Node
 	for _, name := range pp.claimOrder {
 		meta := newMap()
-		meta.setStr("name", name)
+		meta.SetStr("name", name)
 		req := newMap()
-		req.setStr("storage", pp.claims[name].size)
+		req.SetStr("storage", pp.claims[name].size)
 		res := newMap()
-		res.set("requests", req.n)
+		res.Set("requests", req.N)
 		spec := newMap()
-		spec.set("accessModes", strSeq([]string{"ReadWriteOnce"}))
-		spec.set("resources", res.n)
+		spec.Set("accessModes", strSeq([]string{"ReadWriteOnce"}))
+		spec.Set("resources", res.N)
 		c := newMap()
-		c.set("metadata", meta.n)
-		c.set("spec", spec.n)
-		out = append(out, c.n)
+		c.Set("metadata", meta.N)
+		c.Set("spec", spec.N)
+		out = append(out, c.N)
 	}
 	return seqOf(out...)
 }
@@ -241,9 +241,9 @@ func (e *emitter) claims(pp *plan) *yaml.Node {
 // dagTemplate writes a dag template of tasks. The Ext keys of the entry template come back with the prefix.
 func dagTemplate(px map[string]any, name, prefix string, tasks []*yaml.Node, entry bool) *yaml.Node {
 	t := newMap()
-	t.setStr("name", name)
+	t.SetStr("name", name)
 	d := newMap()
-	d.set("tasks", seqOf(tasks...))
+	d.Set("tasks", seqOf(tasks...))
 	if entry {
 		dagRest := map[string]any{}
 		for k, v := range px {
@@ -251,17 +251,17 @@ func dagTemplate(px map[string]any, name, prefix string, tasks []*yaml.Node, ent
 				dagRest[strings.TrimPrefix(k, "dag_")] = v
 			}
 		}
-		_ = d.addExtra(dagRest, nil)
+		_ = d.AddExtra(dagRest, nil)
 	}
-	t.set("dag", d.n)
+	t.Set("dag", d.N)
 	rest := map[string]any{}
 	for k, v := range px {
 		if strings.HasPrefix(k, prefix) {
 			rest[strings.TrimPrefix(k, prefix)] = v
 		}
 	}
-	_ = t.addExtra(rest, nil)
-	return t.n
+	_ = t.AddExtra(rest, nil)
+	return t.N
 }
 
 var _ = ctxparam.Prefix

@@ -1,6 +1,7 @@
 package argo_test
 
 import (
+	"github.com/lukaszraczylo/pipemaster/internal/linttool"
 	"strings"
 	"testing"
 
@@ -67,5 +68,19 @@ func TestSecretEnvSurvivesTwoArgoTrips(t *testing.T) {
 	again, _ := emit(t, back)
 	if !strings.Contains(again[".argo/workflows/ci.yaml"], "secretKeyRef") {
 		t.Errorf("the second trip lost the secret env:\n%s", again[".argo/workflows/ci.yaml"])
+	}
+}
+
+func TestYAMLBooleanLookalikesLintClean(t *testing.T) {
+	linttool.RequireArgo(t)
+	j := scriptJob("build", "echo hi")
+	j.Steps[0].Env = []ir.Var{{Name: "GO111MODULE", Value: ir.Value{Lit: "on"}}, {Name: "FLAG", Value: ir.Value{Lit: "no"}}, {Name: "V", Value: ir.Value{Lit: "1:30"}}}
+	files, _ := emit(t, project(j))
+	path := ".argo/workflows/ci.yaml"
+	if out, err := linttool.ArgoLint(t, path, []byte(files[path])); err != nil {
+		t.Fatalf("argo lint: %v\n%s\n%s", err, out, files[path])
+	}
+	if !strings.Contains(files[path], `value: "on"`) {
+		t.Errorf("on is not quoted:\n%s", files[path])
 	}
 }

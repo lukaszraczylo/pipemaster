@@ -95,7 +95,7 @@ func hasLine(head, want string) bool {
 }
 
 func mustMarshal(n *yaml.Node) []byte {
-	b, err := marshalDocs([]*outDoc{{root: n}})
+	b, err := marshalDocs([]*outDoc{{Root: n}})
 	if err != nil {
 		return nil
 	}

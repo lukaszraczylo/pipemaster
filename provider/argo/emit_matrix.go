@@ -75,9 +75,9 @@ func (tc *jobCtx) matrixItems() (items *yaml.Node, ok, whole bool) {
 		}
 		cell := newMap()
 		for _, k := range keys {
-			cell.setStr(k, vals[k])
+			cell.SetStr(k, vals[k])
 		}
-		items.Content = append(items.Content, cell.n)
+		items.Content = append(items.Content, cell.N)
 	}
 	if dropped > 0 {
 		tc.e.lose(path, caps.JobMatrix, "a matrix value holds {{ or }}, which Argo reads as a tag after substitution; the task drops "+itoa(dropped)+" cell(s) that hold one")

@@ -1,6 +1,7 @@
 package argo
 
 import (
+	"github.com/lukaszraczylo/pipemaster/provider/internal/ymap"
 	"regexp"
 	"slices"
 	"strings"
@@ -119,7 +120,7 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (jobOut, error) {
 	sx.needArtifacts()
 	conts, taskStep := sx.containers(jx)
 	tm := newMap()
-	tm.setStr("name", jp.tmpl)
+	tm.SetStr("name", jp.tmpl)
 	ref := false
 	switch {
 	case taskStep != nil && extOf(taskStep.Ext)[ExtTemplate] == nil:
@@ -134,9 +135,9 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (jobOut, error) {
 	var gate string
 	gate, d = e.gateTasks(tc, d, jx, &out)
 	task := e.dagTask(tc, sx, cond, d, gate, items, whole, jx, ref)
-	out.tasks = append(out.tasks, task.n)
+	out.tasks = append(out.tasks, task.N)
 	if !ref {
-		out.tmpls = append(out.tmpls, tm.n)
+		out.tmpls = append(out.tmpls, tm.N)
 	}
 	tc.reportSafeTags()
 	if len(tc.vars) > 0 {
@@ -219,7 +220,7 @@ func (sx *stepCtx) containers(jx map[string]any) (conts []*container, taskStep *
 // taskTemplate writes the template of a task step that kept a whole Argo template.
 func (e *emitter) taskTemplate(tc *jobCtx, tm *wmap, st *ir.Step) {
 	if body, ok := extOf(st.Ext)[ExtTemplate].(map[string]any); ok {
-		if err := tm.addExtra(body, nil); err != nil {
+		if err := tm.AddExtra(body, nil); err != nil {
 			e.lose(tc.jp.path, caps.ExtPassthrough, "the template of the task step cannot be written: "+err.Error())
 		}
 	}
@@ -230,11 +231,11 @@ func (e *emitter) containerTemplate(tc *jobCtx, tm *wmap, conts []*container, jx
 	path := tc.jp.path
 	if len(conts) == 0 {
 		c := &container{name: mainStep, m: newMap(), image: defaultImage}
-		c.m.setStr("name", mainStep)
-		c.m.setStr("image", tc.jobImage())
-		c.m.set("command", strSeq([]string{shellCommand, shellFlags}))
-		c.m.set("args", seqOf(str("true")))
-		c.m.setStr("workingDir", workspaceMount)
+		c.m.SetStr("name", mainStep)
+		c.m.SetStr("image", tc.jobImage())
+		c.m.Set("command", strSeq([]string{shellCommand, shellFlags}))
+		c.m.Set("args", seqOf(str("true")))
+		c.m.SetStr("workingDir", workspaceMount)
 		conts = []*container{c}
 		e.emulate(path, caps.StepScript, "no-op container", "the job runs no script, so a container named main carries its inputs and outputs")
 	}
@@ -242,11 +243,11 @@ func (e *emitter) containerTemplate(tc *jobCtx, tm *wmap, conts []*container, jx
 	var nodes []*yaml.Node
 	for i, c := range conts {
 		if len(deps[i]) > 0 {
-			c.m.set("dependencies", strSeq(deps[i]))
+			c.m.Set("dependencies", strSeq(deps[i]))
 		}
-		nodes = append(nodes, c.m.n)
+		nodes = append(nodes, c.m.N)
 	}
-	tm.set("containerSet", e.containerSet(tc, nodes, jx))
+	tm.Set("containerSet", e.containerSet(tc, nodes, jx))
 }
 
 // jobImage is the image of a container that no step names.
@@ -294,10 +295,10 @@ func chainDeps(conts []*container) [][]string {
 // containerSet builds the containerSet map with the workspace mount and the cache mounts.
 func (e *emitter) containerSet(tc *jobCtx, containers []*yaml.Node, jx map[string]any) *yaml.Node {
 	cs := newMap()
-	cs.set("containers", seqOf(containers...))
+	cs.Set("containers", seqOf(containers...))
 	ext, _ := jx["containerSet"].(map[string]any)
 	if mounts, ok := ext["volumeMounts"].([]any); ok && hasNamed(mounts, workspaceName) {
-		cs.set("volumeMounts", e.node(tc.jp.path, "volumeMounts", mounts))
+		cs.Set("volumeMounts", e.node(tc.jp.path, "volumeMounts", mounts))
 	} else {
 		var ms []*yaml.Node
 		ms = append(ms, mountNode(workspaceName, workspaceMount, ""))
@@ -307,12 +308,12 @@ func (e *emitter) containerSet(tc *jobCtx, containers []*yaml.Node, jx map[strin
 				ms = append(ms, e.node(tc.jp.path, "volumeMounts", m))
 			}
 		}
-		cs.set("volumeMounts", seqOf(ms...))
+		cs.Set("volumeMounts", seqOf(ms...))
 	}
-	if err := cs.addExtra(ext, map[string]bool{"volumeMounts": true}); err != nil {
+	if err := cs.AddExtra(ext, map[string]bool{"volumeMounts": true}); err != nil {
 		e.lose(tc.jp.path, caps.ExtPassthrough, "the containerSet keys of the Argo file cannot be written: "+err.Error())
 	}
-	return cs.n
+	return cs.N
 }
 
 func hasNamed(list []any, name string) bool {
@@ -326,12 +327,12 @@ func hasNamed(list []any, name string) bool {
 
 func mountNode(name, path, sub string) *yaml.Node {
 	m := newMap()
-	m.setStr("name", name)
-	m.setStr("mountPath", path)
+	m.SetStr("name", name)
+	m.SetStr("mountPath", path)
 	if sub != "" {
-		m.setStr("subPath", sub)
+		m.SetStr("subPath", sub)
 	}
-	return m.n
+	return m.N
 }
 
 // cacheMounts mounts the claim of each job cache.
@@ -359,9 +360,9 @@ func (e *emitter) templateKeys(tc *jobCtx, tm *wmap, sx *stepCtx, jx map[string]
 	e.inputsKey(tc, tm, sx, jx)
 	e.outputsKey(tc, tm, sx, jx)
 	if j.Timeout != nil {
-		tm.setStr("timeout", time.Duration(*j.Timeout).String())
+		tm.SetStr("timeout", time.Duration(*j.Timeout).String())
 	} else if v, ok := jx["timeout"]; ok {
-		tm.set("timeout", e.node(path, "timeout", v))
+		tm.Set("timeout", e.node(path, "timeout", v))
 	}
 	if j.Retry != nil || jx["retryStrategy"] != nil {
 		rs := newMap()
@@ -369,16 +370,16 @@ func (e *emitter) templateKeys(tc *jobCtx, tm *wmap, sx *stepCtx, jx map[string]
 		if j.Retry != nil && j.Retry.Attempts > 1 {
 			limit = itoa(j.Retry.Attempts - 1)
 		}
-		rs.setStr("limit", limit)
+		rs.SetStr("limit", limit)
 		if x, ok := jx["retryStrategy"].(map[string]any); ok {
-			_ = rs.addExtra(x, nil)
+			_ = rs.AddExtra(x, nil)
 		}
-		if j.Retry != nil || len(rs.n.Content) > 2 {
-			tm.set("retryStrategy", rs.n)
+		if j.Retry != nil || len(rs.N.Content) > 2 {
+			tm.Set("retryStrategy", rs.N)
 		}
 	}
 	if sc := e.sidecars(tc, jx); sc != nil {
-		tm.set(keySidecars, sc)
+		tm.Set(keySidecars, sc)
 	}
 	if !whole {
 		vols := []any{map[string]any{"name": workspaceName, "emptyDir": map[string]any{}}}
@@ -388,7 +389,7 @@ func (e *emitter) templateKeys(tc *jobCtx, tm *wmap, sx *stepCtx, jx map[string]
 			}
 			vols = append(vols, ext...)
 		}
-		tm.set("volumes", e.node(path, "volumes", vols))
+		tm.Set("volumes", e.node(path, "volumes", vols))
 	}
 	skip := map[string]bool{}
 	for k := range jobSkip {
@@ -403,7 +404,7 @@ func (e *emitter) templateKeys(tc *jobCtx, tm *wmap, sx *stepCtx, jx map[string]
 	if ns, ok := jx["nodeSelector"]; ok {
 		rest["nodeSelector"] = ns
 	}
-	if err := tm.addExtra(rest, nil); err != nil {
+	if err := tm.AddExtra(rest, nil); err != nil {
 		e.lose(path, caps.ExtPassthrough, "the template keys of the Argo file cannot be written: "+err.Error())
 	}
 }
@@ -416,8 +417,8 @@ func (e *emitter) inputsKey(tc *jobCtx, tm *wmap, sx *stepCtx, jx map[string]any
 	for _, p := range tc.params {
 		seen[p.name] = true
 		m := newMap()
-		m.setStr("name", p.name)
-		params = append(params, m.n)
+		m.SetStr("name", p.name)
+		params = append(params, m.N)
 	}
 	if l, ok := ext["parameters"].([]any); ok {
 		for _, p := range l {
@@ -427,7 +428,7 @@ func (e *emitter) inputsKey(tc *jobCtx, tm *wmap, sx *stepCtx, jx map[string]any
 		}
 	}
 	if len(params) > 0 {
-		in.set("parameters", seqOf(params...))
+		in.Set("parameters", seqOf(params...))
 	}
 	arts := append([]*yaml.Node{}, sx.artIn...)
 	if l, ok := ext["artifacts"].([]any); ok {
@@ -436,7 +437,7 @@ func (e *emitter) inputsKey(tc *jobCtx, tm *wmap, sx *stepCtx, jx map[string]any
 		}
 	}
 	if len(arts) > 0 {
-		in.set("artifacts", seqOf(arts...))
+		in.Set("artifacts", seqOf(arts...))
 	}
 	rest := map[string]any{}
 	for k, v := range ext {
@@ -444,9 +445,9 @@ func (e *emitter) inputsKey(tc *jobCtx, tm *wmap, sx *stepCtx, jx map[string]any
 			rest[k] = v
 		}
 	}
-	_ = in.addExtra(rest, nil)
-	if !in.empty() {
-		tm.set(keyInputsOut, in.n)
+	_ = in.AddExtra(rest, nil)
+	if !in.Empty() {
+		tm.Set(keyInputsOut, in.N)
 	}
 }
 
@@ -467,19 +468,19 @@ func (e *emitter) outputsKey(tc *jobCtx, tm *wmap, sx *stepCtx, jx map[string]an
 			continue
 		}
 		m := newMap()
-		m.setStr("name", o.Name)
+		m.SetStr("name", o.Name)
 		if rest, ok := extParams[o.Name].(map[string]any); ok {
-			_ = m.addExtra(rest, nil)
+			_ = m.AddExtra(rest, nil)
 		} else {
 			vf := newMap()
-			vf.setStr("path", outputFile(o.Name))
-			vf.setStr("default", "")
-			m.set("valueFrom", vf.n)
+			vf.SetStr("path", outputFile(o.Name))
+			vf.SetStr("default", "")
+			m.Set("valueFrom", vf.N)
 		}
-		params = append(params, m.n)
+		params = append(params, m.N)
 	}
 	if len(params) > 0 {
-		out.set("parameters", seqOf(params...))
+		out.Set("parameters", seqOf(params...))
 	}
 	for _, a := range j.Artifacts {
 		sx.addOutputArtifacts(path, safeName(a.Name), a.Paths, a.Expire)
@@ -488,11 +489,11 @@ func (e *emitter) outputsKey(tc *jobCtx, tm *wmap, sx *stepCtx, jx map[string]an
 	if len(sx.artOut) > 0 {
 		for _, a := range sx.artOut {
 			if rest, ok := extArts[a.Content[1].Value].(map[string]any); ok {
-				mm := &wmap{n: a, keys: map[string]bool{"name": true, "path": true}}
-				_ = mm.addExtra(rest, nil)
+				mm := ymap.Of(a, "name", "path")
+				_ = mm.AddExtra(rest, nil)
 			}
 		}
-		out.set("artifacts", seqOf(sx.artOut...))
+		out.Set("artifacts", seqOf(sx.artOut...))
 	}
 	rest := map[string]any{}
 	for k, v := range ext {
@@ -500,9 +501,9 @@ func (e *emitter) outputsKey(tc *jobCtx, tm *wmap, sx *stepCtx, jx map[string]an
 			rest[k] = v
 		}
 	}
-	_ = out.addExtra(rest, nil)
-	if !out.empty() {
-		tm.set(keyOutputs, out.n)
+	_ = out.AddExtra(rest, nil)
+	if !out.Empty() {
+		tm.Set(keyOutputs, out.N)
 	}
 }
 
@@ -516,14 +517,14 @@ func (e *emitter) sidecars(tc *jobCtx, jx map[string]any) *yaml.Node {
 	var out []*yaml.Node
 	for _, sv := range j.Services {
 		m := newMap()
-		m.setStr("name", sv.Name)
+		m.SetStr("name", sv.Name)
 		if sv.Image.Ref != "" {
 			if img, ok := tc.textOrLose(path, caps.JobServices, "the image of service "+sv.Name, sv.Image.Ref); ok {
-				m.setStr("image", img)
+				m.SetStr("image", img)
 			}
 		}
 		if env := tc.envList(newScope(), path, sv.Env); len(env) > 0 {
-			m.set("env", seqOf(env...))
+			m.Set("env", seqOf(env...))
 		}
 		var ports []*yaml.Node
 		for _, p := range sv.Ports {
@@ -533,16 +534,16 @@ func (e *emitter) sidecars(tc *jobCtx, jx map[string]any) *yaml.Node {
 				e.lose(path, caps.JobServices, "the port "+p+" of service "+sv.Name+" "+err)
 				continue
 			}
-			port.set("containerPort", intNode(n))
-			ports = append(ports, port.n)
+			port.Set("containerPort", intNode(n))
+			ports = append(ports, port.N)
 		}
 		if len(ports) > 0 {
-			m.set("ports", seqOf(ports...))
+			m.Set("ports", seqOf(ports...))
 		}
 		if rest, ok := ext[sv.Name].(map[string]any); ok {
-			_ = m.addExtra(rest, nil)
+			_ = m.AddExtra(rest, nil)
 		}
-		out = append(out, m.n)
+		out = append(out, m.N)
 		e.emulate(path, caps.JobServices, "template sidecar", "service "+sv.Name+" is reachable at localhost, not at its name")
 	}
 	return seqOf(out...)

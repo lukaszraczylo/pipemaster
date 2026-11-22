@@ -103,24 +103,24 @@ func (e *emitter) gateTasks(tc *jobCtx, d deps, jx map[string]any, out *jobOut) 
 	deps := d
 	for i, g := range gates {
 		t := newMap()
-		t.setStr("name", g.task)
-		t.setStr("template", g.tmpl)
+		t.SetStr("name", g.task)
+		t.SetStr("template", g.tmpl)
 		next := deps.names
 		if i+1 < len(gates) {
 			next = []string{gates[i+1].task}
 		}
 		if len(next) > 0 {
-			t.set("dependencies", strSeq(next))
+			t.Set("dependencies", strSeq(next))
 		}
-		out.tasks = append(out.tasks, t.n)
+		out.tasks = append(out.tasks, t.N)
 		tmpl := newMap()
 		if body, ok := g.body.(map[string]any); ok {
-			_ = tmpl.addExtra(body, nil)
+			_ = tmpl.AddExtra(body, nil)
 		} else {
-			tmpl.setStr("name", g.tmpl)
-			tmpl.set("suspend", newMap().n)
+			tmpl.SetStr("name", g.tmpl)
+			tmpl.Set("suspend", newMap().N)
 		}
-		out.tmpls = append(out.tmpls, tmpl.n)
+		out.tmpls = append(out.tmpls, tmpl.N)
 	}
 	return gates[0].task, deps
 }
@@ -129,7 +129,7 @@ func (e *emitter) gateTasks(tc *jobCtx, d deps, jx map[string]any, out *jobOut) 
 func (e *emitter) dagTask(tc *jobCtx, sx *stepCtx, cond taskCond, d deps, gate string, items *yaml.Node, whole bool, jx map[string]any, ref bool) *wmap {
 	j, jp, path := tc.jp.j, tc.jp, tc.jp.path
 	t := newMap()
-	t.setStr("name", jp.task)
+	t.SetStr("name", jp.task)
 	comments := []string{}
 	if jp.task != j.ID {
 		comments = append(comments, idComment(j.ID))
@@ -138,42 +138,42 @@ func (e *emitter) dagTask(tc *jobCtx, sx *stepCtx, cond taskCond, d deps, gate s
 		comments = append(comments, "# "+commentSafe(j.Name))
 	}
 	if len(comments) > 0 {
-		t.keyComment("name", strings.Join(comments, "\n"))
+		t.KeyComment("name", strings.Join(comments, "\n"))
 	}
 	if ref {
-		t.set("templateRef", e.node(path, "templateRef", jx["templateRef"]))
+		t.Set("templateRef", e.node(path, "templateRef", jx["templateRef"]))
 	} else {
-		t.setStr("template", jp.tmpl)
+		t.SetStr("template", jp.tmpl)
 	}
 	switch {
 	case gate != "" && d.depends == "":
-		t.set("dependencies", strSeq([]string{gate}))
+		t.Set("dependencies", strSeq([]string{gate}))
 	case d.depends != "":
-		t.setStr("depends", d.depends)
+		t.SetStr("depends", d.depends)
 	case len(d.names) > 0:
-		t.set("dependencies", strSeq(d.names))
+		t.Set("dependencies", strSeq(d.names))
 	}
 	switch {
 	case cond.disabled:
-		t.setStr("when", disabledWhen())
+		t.SetStr("when", disabledWhen())
 	case cond.when != "":
-		t.setStr("when", cond.when)
+		t.SetStr("when", cond.when)
 	}
 	if j.AllowFailure || jx["continueOn"] != nil {
 		co := newMap()
 		if j.AllowFailure {
-			co.set("failed", boolNode(true))
+			co.Set("failed", boolNode(true))
 		}
 		if x, ok := jx["continueOn"].(map[string]any); ok {
-			_ = co.addExtra(x, nil)
+			_ = co.AddExtra(x, nil)
 		}
-		if !co.empty() {
-			t.set("continueOn", co.n)
+		if !co.Empty() {
+			t.Set("continueOn", co.N)
 		}
 	}
 	switch {
 	case items != nil && !cond.disabled:
-		t.set("withItems", items)
+		t.Set("withItems", items)
 		if whole {
 			if err := e.markArg(caps.JobMatrix, path, argOf(j.Matrix)); err != nil {
 				e.lose(path, caps.JobMatrix, "the matrix marker cannot be written: "+err.Error())
@@ -182,14 +182,13 @@ func (e *emitter) dagTask(tc *jobCtx, sx *stepCtx, cond taskCond, d deps, gate s
 	default:
 		for _, k := range []string{"withItems", "withParam", "withSequence"} {
 			if v, ok := jx[k]; ok && j.Matrix == nil {
-				t.set(k, e.node(path, k, v))
+				t.Set(k, e.node(path, k, v))
 			}
 		}
 	}
-	t.set("arguments", e.taskArguments(tc, sx, jx))
-	if t.has("arguments") && t.n.Content[len(t.n.Content)-1].Kind == yaml.MappingNode && len(t.n.Content[len(t.n.Content)-1].Content) == 0 {
-		t.n.Content = t.n.Content[:len(t.n.Content)-2]
-		delete(t.keys, "arguments")
+	t.Set("arguments", e.taskArguments(tc, sx, jx))
+	if t.Has("arguments") && t.N.Content[len(t.N.Content)-1].Kind == yaml.MappingNode && len(t.N.Content[len(t.N.Content)-1].Content) == 0 {
+		t.Drop("arguments")
 	}
 	rest := map[string]any{}
 	for k := range taskKeys {
@@ -197,7 +196,7 @@ func (e *emitter) dagTask(tc *jobCtx, sx *stepCtx, cond taskCond, d deps, gate s
 			rest[k] = v
 		}
 	}
-	_ = t.addExtra(rest, nil)
+	_ = t.AddExtra(rest, nil)
 	return t
 }
 
@@ -225,7 +224,7 @@ func (e *emitter) taskArguments(tc *jobCtx, sx *stepCtx, jx map[string]any) *yam
 		}
 	}
 	if len(params) > 0 {
-		args.set("parameters", seqOf(params...))
+		args.Set("parameters", seqOf(params...))
 	}
 	arts := append([]*yaml.Node{}, sx.argArts...)
 	if l, ok := jx["argument_artifacts"].([]any); ok {
@@ -234,7 +233,7 @@ func (e *emitter) taskArguments(tc *jobCtx, sx *stepCtx, jx map[string]any) *yam
 		}
 	}
 	if len(arts) > 0 {
-		args.set("artifacts", seqOf(arts...))
+		args.Set("artifacts", seqOf(arts...))
 	}
 	rest := map[string]any{}
 	for k, v := range jx {
@@ -242,6 +241,6 @@ func (e *emitter) taskArguments(tc *jobCtx, sx *stepCtx, jx map[string]any) *yam
 			rest[strings.TrimPrefix(k, "arguments_")] = v
 		}
 	}
-	_ = args.addExtra(rest, nil)
-	return args.n
+	_ = args.AddExtra(rest, nil)
+	return args.N
 }

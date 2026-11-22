@@ -374,7 +374,7 @@ func (e *emitter) flushEvents() {
 		spec["schedules"] = sched
 		delete(spec, "schedule")
 		if n := e.node(c.path, "CronWorkflow "+name, map[string]any(c.doc)); n != nil {
-			e.add(cronDir+name+".yaml", &outDoc{root: n}, c.path)
+			e.add(cronDir+name+".yaml", &outDoc{Root: n}, c.path)
 			e.made[kindCron+" "+name] = true
 		}
 	}
@@ -392,7 +392,7 @@ func (e *emitter) writeGroup(file, kind string, order []string, docs map[string]
 		if n == nil {
 			continue
 		}
-		out := &outDoc{root: n}
+		out := &outDoc{Root: n}
 		e.files[file] = append(e.files[file], out)
 		e.made[kind+" "+name] = true
 	}
@@ -406,7 +406,7 @@ func (e *emitter) writeRBAC() {
 		for _, o := range f.objects() {
 			n := e.node("pipeline/", "RBAC", map[string]any(o))
 			if n != nil {
-				e.files[rbacDir+f.file] = append(e.files[rbacDir+f.file], &outDoc{root: n, head: []string{rbacMarker}})
+				e.files[rbacDir+f.file] = append(e.files[rbacDir+f.file], &outDoc{Root: n, Head: []string{rbacMarker}})
 			}
 		}
 	}

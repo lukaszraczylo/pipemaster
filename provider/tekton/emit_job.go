@@ -72,7 +72,7 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 			return nil, err
 		}
 		if m != nil {
-			b.nodes = append(b.nodes, m.n)
+			b.nodes = append(b.nodes, m.N)
 			if tc.checkout && clone == 0 {
 				clone = len(b.nodes)
 			}
@@ -92,8 +92,8 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 			return nil, err
 		}
 		m := newMap()
-		m.setStr("name", noopStepName)
-		m.setStr("image", image)
+		m.SetStr("name", noopStepName)
+		m.SetStr("image", image)
 		lines, sc := []string{noopScript}, newScope()
 		if b.guard != nil {
 			var err error
@@ -103,20 +103,20 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 			guardEnv(sc, b.guard)
 		}
 		if len(lines) == 1 {
-			m.setStr("script", lines[0])
+			m.SetStr("script", lines[0])
 		} else {
-			m.set("script", block(strings.Join(lines, "\n")))
+			m.Set("script", block(strings.Join(lines, "\n")))
 		}
 		if len(sc.env) > 0 {
-			m.set("env", seqOf(sc.env...))
+			m.Set("env", seqOf(sc.env...))
 		}
-		b.nodes = append(b.nodes, m.n)
+		b.nodes = append(b.nodes, m.N)
 	}
 	task, err := tc.taskDoc(b)
 	if err != nil {
 		return nil, err
 	}
-	tc.doc.root = task.root
+	tc.doc.Root = task.Root
 	e.add(tasksDir+jp.kname+".yaml", tc.doc)
 	return tc.pipelineTask(jc)
 }
@@ -141,17 +141,17 @@ func (e *emitter) remoteTask(pp *plan, jp *jobPlan) (*wmap, bool) {
 		return nil, false
 	}
 	pt := newMap()
-	pt.setStr("name", jp.tname)
+	pt.SetStr("name", jp.tname)
 	n := e.node(jp.path, "taskRef", ref)
 	if n == nil {
 		return nil, false
 	}
-	pt.set("taskRef", n)
+	pt.Set("taskRef", n)
 	if j.Name != "" {
-		pt.setStr("displayName", j.Name)
+		pt.SetStr("displayName", j.Name)
 	}
 	if v, ok := extOf(j.Ext)["params"]; ok {
-		pt.set("params", e.node(jp.path, "params", v))
+		pt.Set("params", e.node(jp.path, "params", v))
 	}
 	tc := e.newTaskCtx(pp, jp)
 	e.runAfter(pp, jp, pt, nil)
@@ -242,10 +242,10 @@ func insertAt(l []*yaml.Node, i int, n *yaml.Node) []*yaml.Node {
 func (tc *taskCtx) workspaceStep(name string, lines []string) (*yaml.Node, string) {
 	script := strings.Join(append([]string{"set -e"}, lines...), "\n")
 	m := newMap()
-	m.setStr("name", name)
-	m.setStr("image", firstNonEmpty(tc.containerRef, tc.image, defaultImage))
-	m.set("script", block(script))
-	return m.n, script
+	m.SetStr("name", name)
+	m.SetStr("image", firstNonEmpty(tc.containerRef, tc.image, defaultImage))
+	m.Set("script", block(script))
+	return m.N, script
 }
 
 // outputStep writes the values of the job outputs to the result files, in one step after the others.
@@ -275,15 +275,15 @@ func (tc *taskCtx) outputStep(b *stepBook) error {
 	}
 	tc.e.emulate(tc.jp.path, caps.JobOutputs, "result step", "an output with a value is written to its result file by the step "+outputsStep)
 	m := newMap()
-	m.setStr("name", outputsStep)
+	m.SetStr("name", outputsStep)
 	image := firstNonEmpty(tc.containerRef, tc.image, defaultImage)
 	script := strings.Join(lines, "\n")
-	m.setStr("image", image)
-	m.set("script", block(script))
+	m.SetStr("image", image)
+	m.Set("script", block(script))
 	if len(sc.env) > 0 {
-		m.set("env", seqOf(sc.env...))
+		m.Set("env", seqOf(sc.env...))
 	}
-	b.nodes = append(b.nodes, m.n)
+	b.nodes = append(b.nodes, m.N)
 	return tc.e.markArg(caps.JobOutputs, tc.jp.path, outputsArg{Image: image, Script: script, Outputs: held})
 }
 
@@ -291,16 +291,16 @@ func (tc *taskCtx) outputStep(b *stepBook) error {
 func (tc *taskCtx) taskDoc(b *stepBook) (*outDoc, error) {
 	j := tc.jp.j
 	root := newMap()
-	root.setStr("apiVersion", apiPipelinesV1)
-	root.setStr("kind", "Task")
+	root.SetStr("apiVersion", apiPipelinesV1)
+	root.SetStr("kind", "Task")
 	meta := newMap()
-	meta.setStr("name", tc.jp.kname)
+	meta.SetStr("name", tc.jp.kname)
 	if x := extOf(j.Ext); tc.e.own {
 		if md, ok := x["task_metadata"].(map[string]any); ok {
-			_ = meta.addExtra(md, nil)
+			_ = meta.AddExtra(md, nil)
 		}
 	}
-	root.set("metadata", meta.n)
+	root.Set("metadata", meta.N)
 	spec := newMap()
 	x := map[string]any{}
 	if tc.e.own {
@@ -315,28 +315,28 @@ func (tc *taskCtx) taskDoc(b *stepBook) (*outDoc, error) {
 		return nil, err
 	}
 	if v, ok := x["task_description"]; ok {
-		spec.set("description", tc.e.node(tc.jp.path, "task description", v))
+		spec.Set("description", tc.e.node(tc.jp.path, "task description", v))
 	}
 	_, body := tc.jobExt()
-	spec.set("params", tc.paramNodes(x))
-	spec.set("stepTemplate", tpl)
-	spec.set("steps", seqOf(b.nodes...))
-	spec.set("sidecars", sidecars)
-	spec.set("results", tc.resultNodes(x))
-	spec.set("workspaces", tc.workspaceNodes(x))
+	spec.Set("params", tc.paramNodes(x))
+	spec.Set("stepTemplate", tpl)
+	spec.Set("steps", seqOf(b.nodes...))
+	spec.Set("sidecars", sidecars)
+	spec.Set("results", tc.resultNodes(x))
+	spec.Set("workspaces", tc.workspaceNodes(x))
 	for _, k := range sortedKeys(body) {
-		spec.set(k, tc.e.node(tc.jp.path, "Task key "+k, body[k]))
+		spec.Set(k, tc.e.node(tc.jp.path, "Task key "+k, body[k]))
 	}
-	root.set("spec", spec.n)
-	return &outDoc{root: root.n}, nil
+	root.Set("spec", spec.N)
+	return &outDoc{Root: root.N}, nil
 }
 
 func (tc *taskCtx) paramNodes(x map[string]any) *yaml.Node {
 	out := seqOf()
 	for _, p := range tc.params {
 		m := newMap()
-		m.setStr("name", p)
-		out.Content = append(out.Content, m.n)
+		m.SetStr("name", p)
+		out.Content = append(out.Content, m.N)
 	}
 	if kept, ok := x["task_params"].([]any); ok {
 		for _, k := range kept {
@@ -364,8 +364,8 @@ func (tc *taskCtx) resultNodes(x map[string]any) *yaml.Node {
 	out := seqOf()
 	for _, o := range j.Outputs {
 		m := newMap()
-		m.setStr("name", o.Name)
-		out.Content = append(out.Content, m.n)
+		m.SetStr("name", o.Name)
+		out.Content = append(out.Content, m.N)
 	}
 	return out
 }
@@ -381,9 +381,9 @@ func (tc *taskCtx) workspaceNodes(x map[string]any) *yaml.Node {
 	}
 	if tc.ws {
 		m := newMap()
-		m.setStr("name", workspaceName)
-		m.setStr("mountPath", workspaceMount)
-		out.Content = append(out.Content, m.n)
+		m.SetStr("name", workspaceName)
+		m.SetStr("mountPath", workspaceMount)
+		out.Content = append(out.Content, m.N)
 	}
 	if len(out.Content) == 0 {
 		return nil
@@ -396,7 +396,7 @@ func (tc *taskCtx) stepTemplate(x map[string]any) (*yaml.Node, error) {
 	j := tc.jp.j
 	m := newMap()
 	if tc.containerRef != "" {
-		m.setStr("image", tc.containerRef)
+		m.SetStr("image", tc.containerRef)
 	}
 	sc := newScope()
 	jobEnv, err := tc.envList(sc, tc.jp.path, j.Env)
@@ -426,20 +426,20 @@ func (tc *taskCtx) stepTemplate(x map[string]any) (*yaml.Node, error) {
 	}
 	env = append(env, jobEnv...)
 	if len(env) > 0 {
-		m.set("env", seqOf(env...))
+		m.Set("env", seqOf(env...))
 	}
 	if tc.checkout {
-		m.setStr("workingDir", workspaceDir)
+		m.SetStr("workingDir", workspaceDir)
 	}
 	if extra, ok := x["stepTemplate"].(map[string]any); ok {
-		if err := m.addExtra(extra, nil); err != nil {
+		if err := m.AddExtra(extra, nil); err != nil {
 			return nil, err
 		}
 	}
-	if m.empty() {
+	if m.Empty() {
 		return nil, nil
 	}
-	return m.n, nil
+	return m.N, nil
 }
 
 // sidecars writes the services as sidecars; a service reaches its ports at localhost.
@@ -460,19 +460,19 @@ func (tc *taskCtx) sidecars() (*yaml.Node, error) {
 			continue
 		}
 		m := newMap()
-		m.setStr("name", sv.Name)
-		m.setStr("image", img)
+		m.SetStr("name", sv.Name)
+		m.SetStr("image", img)
 		env, err := tc.envList(sc, sp, sv.Env)
 		if err != nil {
 			return nil, err
 		}
 		if len(env) > 0 {
-			m.set("env", seqOf(env...))
+			m.Set("env", seqOf(env...))
 		}
 		if ports := tc.ports(sp, sv.Ports); len(ports.Content) > 0 {
-			m.set("ports", ports)
+			m.Set("ports", ports)
 		}
-		out.Content = append(out.Content, m.n)
+		out.Content = append(out.Content, m.N)
 	}
 	if len(out.Content) == 0 {
 		return nil, nil
@@ -496,8 +496,8 @@ func (tc *taskCtx) ports(sp string, ps []string) *yaml.Node {
 			continue
 		}
 		m := newMap()
-		m.set("containerPort", intNode(n))
-		out.Content = append(out.Content, m.n)
+		m.Set("containerPort", intNode(n))
+		out.Content = append(out.Content, m.N)
 	}
 	if mapped {
 		if err := tc.e.markArg(caps.JobServices, sp, portsArg{Ports: ps}); err != nil {
@@ -549,9 +549,9 @@ func (tc *taskCtx) extraParams(params *yaml.Node) {
 	for _, name := range sortedKeys(arrays) {
 		if n := tc.e.node(tc.jp.path, "param "+name, arrays[name]); n != nil && !have[name] {
 			m := newMap()
-			m.setStr("name", name)
-			m.set("value", n)
-			params.Content = append(params.Content, m.n)
+			m.SetStr("name", name)
+			m.Set("value", n)
+			params.Content = append(params.Content, m.N)
 		}
 	}
 	unused, _ := x["unused_params"].(map[string]any)
@@ -574,9 +574,9 @@ func (tc *taskCtx) pipelineWorkspaceBindings(x map[string]any) *yaml.Node {
 	}
 	if tc.ws {
 		w := newMap()
-		w.setStr("name", workspaceName)
-		w.setStr("workspace", workspaceName)
-		out.Content = append(out.Content, w.n)
+		w.SetStr("name", workspaceName)
+		w.SetStr("workspace", workspaceName)
+		out.Content = append(out.Content, w.N)
 	}
 	if len(out.Content) == 0 {
 		return nil

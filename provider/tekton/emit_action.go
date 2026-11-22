@@ -128,7 +128,7 @@ func (tc *taskCtx) markAction(b *stepBook, sp string, st *ir.Step, image string,
 	}
 	var wrote string
 	if written != nil {
-		wrote = printNode(written.n)
+		wrote = printNode(written.N)
 	}
 	arg := actionArg{Step: body, At: len(b.nodes), Image: image, Wrote: wrote, Seq: b.seq}
 	b.seq++
@@ -193,7 +193,7 @@ func (tc *taskCtx) extAction(st *ir.Step, sp, name string) *wmap {
 		return nil
 	}
 	m := newMap()
-	m.setStr("name", name)
+	m.SetStr("name", name)
 	for _, k := range []string{"ref", "params"} {
 		if v, ok := x[k]; ok {
 			n, err := plainNode(v)
@@ -201,7 +201,7 @@ func (tc *taskCtx) extAction(st *ir.Step, sp, name string) *wmap {
 				tc.e.lose(sp, caps.StepAction, err.Error())
 				return nil
 			}
-			m.set(k, n)
+			m.Set(k, n)
 		}
 	}
 	_ = ref
@@ -277,8 +277,8 @@ func (tc *taskCtx) cloneStep(st *ir.Step, sp, name string, t actions.Target) *wm
 	repoParam := tc.ctxParam("ctx-repo")
 	shaParam := tc.ctxParam("ctx-sha")
 	ref := newMap()
-	ref.setStr("resolver", "git")
-	ref.set("params", seqOf(
+	ref.SetStr("resolver", "git")
+	ref.Set("params", seqOf(
 		nameValue("url", gitCloneURL), nameValue("revision", gitCloneRevision), nameValue("pathInRepo", gitClonePath)))
 	params := seqOf(
 		nameValue("url", cloneHost+param(repoParam)+".git"),
@@ -289,9 +289,9 @@ func (tc *taskCtx) cloneStep(st *ir.Step, sp, name string, t actions.Target) *wm
 		params.Content = append(params.Content, nameValue("depth", d))
 	}
 	m := newMap()
-	m.setStr("name", name)
-	m.set("ref", ref.n)
-	m.set("params", params)
+	m.SetStr("name", name)
+	m.Set("ref", ref.N)
+	m.Set("params", params)
 	tc.unapplied(st, sp, "the clone step takes no env or working directory")
 	tc.stepTail(m, st, tc.cond(sp, caps.StepIf, st.If, taskScope))
 	return m
@@ -333,12 +333,12 @@ func (tc *taskCtx) copyStep(st *ir.Step, sp, name string, lines []string) *wmap 
 	tc.useWorkspace()
 	sc := newScope()
 	m := newMap()
-	m.setStr("name", name)
+	m.SetStr("name", name)
 	img, _ := tc.stepImage(sc, &ir.Step{}, sp)
 	if img != "" {
-		m.setStr("image", img)
+		m.SetStr("image", img)
 	}
-	m.set("script", block(strings.Join(append([]string{"set -e"}, lines...), "\n")))
+	m.Set("script", block(strings.Join(append([]string{"set -e"}, lines...), "\n")))
 	tc.stepTail(m, st, tc.cond(sp, caps.StepIf, st.If, taskScope))
 	return m
 }

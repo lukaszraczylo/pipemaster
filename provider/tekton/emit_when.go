@@ -252,14 +252,14 @@ func whenNode(es []exprtekton.Entry) *yaml.Node {
 	for _, en := range es {
 		m := newMap()
 		if en.CEL != "" {
-			m.setStr("cel", en.CEL)
-			out.Content = append(out.Content, m.n)
+			m.SetStr("cel", en.CEL)
+			out.Content = append(out.Content, m.N)
 			continue
 		}
-		m.setStr("input", en.Input)
-		m.setStr("operator", en.Operator)
-		m.set("values", strSeq(en.Values))
-		out.Content = append(out.Content, m.n)
+		m.SetStr("input", en.Input)
+		m.SetStr("operator", en.Operator)
+		m.Set("values", strSeq(en.Values))
+		out.Content = append(out.Content, m.N)
 	}
 	return out
 }

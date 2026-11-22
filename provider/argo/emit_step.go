@@ -104,12 +104,12 @@ func (sx *stepCtx) containerFor(st *ir.Step, name string, last bool, jx map[stri
 	if !e.own {
 		sx0 = nil
 	}
-	c.m.setStr("name", name)
+	c.m.SetStr("name", name)
 	if name != st.ID {
-		c.m.keyComment("name", idComment(st.ID))
+		c.m.KeyComment("name", idComment(st.ID))
 	}
 	c.image = sx.imageOf(st, path)
-	c.m.setStr("image", c.image)
+	c.m.SetStr("image", c.image)
 	script := tc.stepScripts(sc, path, st)
 	script = sx.guarded(sc, path, st, script)
 	if st.ContinueOnError {
@@ -123,24 +123,24 @@ func (sx *stepCtx) containerFor(st *ir.Step, name string, last bool, jx map[stri
 		c.own = true
 		for _, k := range []string{ExtCommand, ExtArgs} {
 			if v := sx0[k]; v != nil {
-				c.m.set(strings.ToLower(k), e.node(path, k, v))
+				c.m.Set(strings.ToLower(k), e.node(path, k, v))
 			}
 		}
 	} else {
-		c.m.set("command", strSeq([]string{shellCommand, shellFlags}))
-		c.m.set("args", seqOf(block(strings.Join(script, "\n"))))
+		c.m.Set("command", strSeq([]string{shellCommand, shellFlags}))
+		c.m.Set("args", seqOf(block(strings.Join(script, "\n"))))
 	}
 	workdir := workspaceMount
 	if st.WorkDir != "" {
 		workdir = tc.workdir(sc, path, st.WorkDir)
 	}
-	c.m.setStr("workingDir", workdir)
+	c.m.SetStr("workingDir", workdir)
 	env := tc.envList(sc, path, st.Env)
 	if merged := tc.mergeEnv(sc, env, sx0); len(merged) > 0 {
-		c.m.set("env", seqOf(merged...))
+		c.m.Set("env", seqOf(merged...))
 	}
 	if sx0 != nil {
-		if err := c.m.addExtra(sx0, containerSkip); err != nil {
+		if err := c.m.AddExtra(sx0, containerSkip); err != nil {
 			e.lose(path, caps.ExtPassthrough, "the Ext of the step cannot be written: "+err.Error())
 		}
 	}
@@ -252,9 +252,9 @@ func (tc *jobCtx) mergeEnv(sc *stepScope, step []*yaml.Node, ext map[string]any)
 	if vf, ok := ext["valueFrom"].(map[string]any); ok {
 		for _, name := range sortedKeys(vf) {
 			m := newMap()
-			m.setStr("name", name)
-			m.set("valueFrom", tc.e.node(path, "valueFrom", vf[name]))
-			all = append(all, m.n)
+			m.SetStr("name", name)
+			m.Set("valueFrom", tc.e.node(path, "valueFrom", vf[name]))
+			all = append(all, m.N)
 		}
 	}
 	last := map[string]int{}

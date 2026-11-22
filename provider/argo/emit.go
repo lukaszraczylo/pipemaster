@@ -169,7 +169,7 @@ func (e *emitter) ownerOf(path string) *outDoc {
 // mark writes the marker line of an emulated construct into the head of the document that owns the path.
 func (e *emitter) mark(f caps.Feature, path string) {
 	if d := e.ownerOf(path); d != nil {
-		d.head = append(d.head, emitkit.Marker(f, path))
+		d.Head = append(d.Head, emitkit.Marker(f, path))
 		e.marked[use(path, f)] = true
 	}
 }
@@ -182,7 +182,7 @@ func (e *emitter) markArg(f caps.Feature, path string, v any) error {
 	}
 	e.mark(f, path)
 	if d := e.ownerOf(path); d != nil {
-		d.head = append(d.head, line)
+		d.Head = append(d.Head, line)
 	}
 	return nil
 }
@@ -190,7 +190,7 @@ func (e *emitter) markArg(f caps.Feature, path string, v any) error {
 // comment queues a lost-text line for the document that owns the path.
 func (e *emitter) comment(path, s string) {
 	if d := e.ownerOf(path); d != nil {
-		d.head = append(d.head, "# pipemaster:lost "+commentSafe(s))
+		d.Head = append(d.Head, "# pipemaster:lost "+commentSafe(s))
 	}
 }
 

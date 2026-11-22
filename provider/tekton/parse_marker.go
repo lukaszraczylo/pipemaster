@@ -301,7 +301,7 @@ func regenerate(d *rawDoc) *outDoc {
 		return cronJobDoc(name, sched, scheduleTagOf(spec))
 	}
 	for _, g := range rbacDocs() {
-		gm, _ := asMap(plain2(g.root))
+		gm, _ := asMap(plain2(g.Root))
 		if kind, _ := text(valueOf(gm, "kind")); gm != nil && kind == d.Kind {
 			if gmeta, _ := asMap(valueOf(gm, "metadata")); gmeta != nil {
 				if n, _ := text(valueOf(gmeta, "name")); n == name {
@@ -315,7 +315,7 @@ func regenerate(d *rawDoc) *outDoc {
 
 // plain2 reads a node that the emitter built as the maps that the parser reads.
 func plain2(n *yaml.Node) any {
-	b, err := marshalDocs([]*outDoc{{root: n}})
+	b, err := marshalDocs([]*outDoc{{Root: n}})
 	if err != nil {
 		return nil
 	}
@@ -332,7 +332,7 @@ func unchanged(d *rawDoc) bool {
 	if gen == nil {
 		return false
 	}
-	want, err1 := json.Marshal(plain(plain2(gen.root)))
+	want, err1 := json.Marshal(plain(plain2(gen.Root)))
 	got, err2 := json.Marshal(plain(d.Top))
 	return err1 == nil && err2 == nil && string(got) == string(want)
 }

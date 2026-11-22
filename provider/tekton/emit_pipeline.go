@@ -36,29 +36,29 @@ func (e *emitter) pipeline(pp *plan) error {
 	pl := pp.pl
 	e.foreignExt(pp.path, pl.Ext)
 	root := newMap()
-	root.setStr("apiVersion", apiPipelinesV1)
+	root.SetStr("apiVersion", apiPipelinesV1)
 	x := map[string]any{}
 	if e.own {
 		x = extOf(pl.Ext)
 	}
 	// A pipeline that came from a PipelineRun with an embedded spec goes back into one, with the run keys.
 	run, isRun := x["pipelineRun"].(map[string]any)
-	root.setStr("kind", map[bool]string{false: pipelineKey, true: kindPipelineRun}[isRun])
+	root.SetStr("kind", map[bool]string{false: pipelineKey, true: kindPipelineRun}[isRun])
 	meta := newMap()
 	md, hasMeta := x["metadata"].(map[string]any)
 	if _, generated := md["generateName"]; !isRun || !generated {
-		meta.setStr("name", pp.name)
+		meta.SetStr("name", pp.name)
 	}
 	if hasMeta {
-		if err := meta.addExtra(md, nil); err != nil {
+		if err := meta.AddExtra(md, nil); err != nil {
 			return err
 		}
 	}
-	if pp.name != pl.ID && meta.has("name") {
-		meta.keyComment("name", idComment(pl.ID))
+	if pp.name != pl.ID && meta.Has("name") {
+		meta.KeyComment("name", idComment(pl.ID))
 	}
-	root.set("metadata", meta.n)
-	d := &outDoc{root: root.n}
+	root.Set("metadata", meta.N)
+	d := &outDoc{Root: root.N}
 	pp.doc = d
 	e.add(pipelineFile, d, pp.path)
 	if pl.Concurrency != nil || pl.Permissions != nil {
@@ -87,38 +87,38 @@ func (e *emitter) pipeline(pp *plan) error {
 			return err
 		}
 		if jp.finally {
-			finally = append(finally, pt.n)
+			finally = append(finally, pt.N)
 		} else {
-			tasks = append(tasks, pt.n)
+			tasks = append(tasks, pt.N)
 		}
 	}
 	spec := newMap()
 	if v, ok := x["description"]; ok {
-		spec.set("description", e.node(pp.path, "description", v))
+		spec.Set("description", e.node(pp.path, "description", v))
 	}
 	if pl.Name != "" {
-		spec.setStr("displayName", pl.Name)
+		spec.SetStr("displayName", pl.Name)
 	}
-	spec.set("params", e.pipelineParams(pp, x))
+	spec.Set("params", e.pipelineParams(pp, x))
 	if pp.ws || x["workspaces"] != nil {
-		spec.set("workspaces", e.pipelineWorkspaces(pp, x))
+		spec.Set("workspaces", e.pipelineWorkspaces(pp, x))
 	}
 	if v, ok := x["results"]; ok {
-		spec.set("results", e.node(pp.path, "results", v))
+		spec.Set("results", e.node(pp.path, "results", v))
 	}
-	spec.set("tasks", seqOf(tasks...))
+	spec.Set("tasks", seqOf(tasks...))
 	if len(finally) > 0 {
-		spec.set("finally", seqOf(finally...))
+		spec.Set("finally", seqOf(finally...))
 	}
 	if isRun {
 		runSpec := newMap()
-		runSpec.set("pipelineSpec", spec.n)
-		if err := runSpec.addExtra(run, nil); err != nil {
+		runSpec.Set("pipelineSpec", spec.N)
+		if err := runSpec.AddExtra(run, nil); err != nil {
 			return err
 		}
 		spec = runSpec
 	}
-	root.set("spec", spec.n)
+	root.Set("spec", spec.N)
 	e.loseUnknownExt(pp.path, x, map[string]bool{"metadata": true, "description": true, "workspaces": true, "results": true, "params": true, "pipelineRun": true, ExtResources: true})
 	return nil
 }
@@ -154,39 +154,39 @@ func (e *emitter) pipelineParams(pp *plan, x map[string]any) *yaml.Node {
 	out := seqOf()
 	for _, in := range pp.pl.Inputs {
 		m := newMap()
-		m.setStr("name", pp.inputs[in.Name])
+		m.SetStr("name", pp.inputs[in.Name])
 		if in.Type != "" {
-			m.setStr("type", e.paramType(pp.path, in))
+			m.SetStr("type", e.paramType(pp.path, in))
 		}
 		if in.Description != "" {
-			m.setStr("description", in.Description)
+			m.SetStr("description", in.Description)
 		}
 		sub, kept := extra[in.Name].(map[string]any)
 		// A default that Ext holds keeps the type it had in the Tekton file.
 		if _, structured := sub["default"]; !structured && (!in.Required || in.Default != "") {
 			switch in.Type {
 			case "array":
-				m.set("default", seqOf())
+				m.Set("default", seqOf())
 			case "object":
-				m.set("default", newMap().n)
+				m.Set("default", newMap().N)
 			default:
-				m.setStr("default", in.Default)
+				m.SetStr("default", in.Default)
 			}
 		}
 		if in.Required && in.Default != "" {
 			e.lose(pp.path, caps.PipelineInputs, "input "+in.Name+": a Tekton param with a default is optional, so required is lost")
 		}
 		if kept {
-			_ = m.addExtra(sub, nil)
+			_ = m.AddExtra(sub, nil)
 		}
-		out.Content = append(out.Content, m.n)
+		out.Content = append(out.Content, m.N)
 	}
 	for _, p := range ctxParams() {
 		if pp.ctx[p] {
 			m := newMap()
-			m.setStr("name", p)
-			m.setStr("default", "")
-			out.Content = append(out.Content, m.n)
+			m.SetStr("name", p)
+			m.SetStr("default", "")
+			out.Content = append(out.Content, m.N)
 		}
 	}
 	if len(out.Content) == 0 {
@@ -207,8 +207,8 @@ func (e *emitter) pipelineWorkspaces(pp *plan, x map[string]any) *yaml.Node {
 	}
 	if pp.ws {
 		m := newMap()
-		m.setStr("name", workspaceName)
-		out.Content = append(out.Content, m.n)
+		m.SetStr("name", workspaceName)
+		out.Content = append(out.Content, m.N)
 	}
 	return out
 }
@@ -217,16 +217,16 @@ func (e *emitter) pipelineWorkspaces(pp *plan, x map[string]any) *yaml.Node {
 func (tc *taskCtx) pipelineTask(jc condition) (*wmap, error) {
 	j := tc.jp.j
 	pt := newMap()
-	pt.setStr("name", tc.jp.tname)
+	pt.SetStr("name", tc.jp.tname)
 	if tc.jp.tname != j.ID {
-		pt.keyComment("name", idComment(j.ID))
+		pt.KeyComment("name", idComment(j.ID))
 	}
 	if j.Name != "" {
-		pt.setStr("displayName", j.Name)
+		pt.SetStr("displayName", j.Name)
 	}
 	ref := newMap()
-	ref.setStr("name", tc.jp.kname)
-	pt.set("taskRef", ref.n)
+	ref.SetStr("name", tc.jp.kname)
+	pt.Set("taskRef", ref.N)
 	params := seqOf()
 	for _, p := range tc.params {
 		if v, ok := tc.value[p]; ok {
@@ -235,7 +235,7 @@ func (tc *taskCtx) pipelineTask(jc condition) (*wmap, error) {
 	}
 	tc.extraParams(params)
 	if len(params.Content) > 0 {
-		pt.set("params", params)
+		pt.Set("params", params)
 	}
 	tc.e.runAfter(tc.pp, tc.jp, pt, tc.needed)
 	if err := tc.pipelineTaskKeys(pt, jc); err != nil {
@@ -249,7 +249,7 @@ func (tc *taskCtx) pipelineTask(jc condition) (*wmap, error) {
 func (tc *taskCtx) pipelineTaskKeys(pt *wmap, jc condition) error {
 	j := tc.jp.j
 	if len(jc.when) > 0 {
-		pt.set("when", whenNode(jc.when))
+		pt.Set("when", whenNode(jc.when))
 	}
 	if err := tc.matrixNode(pt); err != nil {
 		return err
@@ -259,26 +259,26 @@ func (tc *taskCtx) pipelineTaskKeys(pt *wmap, jc condition) error {
 			tc.e.lose(tc.jp.path, caps.JobRetry, "retry conditions "+join(j.Retry.On)+" have no Tekton form; every failure retries")
 		}
 		if j.Retry.Attempts > 1 {
-			pt.set("retries", intNode(j.Retry.Attempts-1))
+			pt.Set("retries", intNode(j.Retry.Attempts-1))
 		}
 	}
 	if j.Timeout != nil {
-		pt.setStr("timeout", time.Duration(*j.Timeout).String())
+		pt.SetStr("timeout", time.Duration(*j.Timeout).String())
 	}
 	if j.AllowFailure {
-		pt.setStr("onError", onErrorContinue)
+		pt.SetStr("onError", onErrorContinue)
 	}
 	px, _ := tc.jobExt()
 	x := extOf(j.Ext)
 	if !tc.e.own {
 		x = nil
 	}
-	pt.set("workspaces", tc.pipelineWorkspaceBindings(x))
+	pt.Set("workspaces", tc.pipelineWorkspaceBindings(x))
 	if v, ok := x["description"]; ok {
-		pt.set("description", tc.e.node(tc.jp.path, "description", v))
+		pt.Set("description", tc.e.node(tc.jp.path, "description", v))
 	}
 	for _, k := range sortedKeys(px) {
-		pt.set(k, tc.e.node(tc.jp.path, "key "+k, px[k]))
+		pt.Set(k, tc.e.node(tc.jp.path, "key "+k, px[k]))
 	}
 	return nil
 }
@@ -311,7 +311,7 @@ func (e *emitter) runAfter(pp *plan, jp *jobPlan, pt *wmap, needed map[string]bo
 	}
 	written := ""
 	if len(implicit) > 0 {
-		if b, err := yaml.Marshal(pt.n); err == nil {
+		if b, err := yaml.Marshal(pt.N); err == nil {
 			written = string(b)
 		}
 	}
@@ -335,7 +335,7 @@ func (e *emitter) runAfter(pp *plan, jp *jobPlan, pt *wmap, needed map[string]bo
 		}
 	}
 	if len(after) > 0 {
-		pt.set("runAfter", strSeq(after))
+		pt.Set("runAfter", strSeq(after))
 	}
 	if len(held) > 0 {
 		e.emulate(jp.path, caps.JobNeeds, "implied by finally", "a finally task runs after every other task, so the needs are not written; the marker holds them")
@@ -371,11 +371,11 @@ func (tc *taskCtx) matrixNode(pt *wmap) error {
 		ps := seqOf()
 		for _, a := range mx.Axes {
 			p := newMap()
-			p.setStr("name", a.Name)
-			p.set("value", strSeq(a.Values))
-			ps.Content = append(ps.Content, p.n)
+			p.SetStr("name", a.Name)
+			p.Set("value", strSeq(a.Values))
+			ps.Content = append(ps.Content, p.N)
 		}
-		m.set("params", ps)
+		m.Set("params", ps)
 	}
 	for i, c := range mx.Include {
 		name := ""
@@ -385,23 +385,23 @@ func (tc *taskCtx) matrixNode(pt *wmap) error {
 		include = append(include, includeNode(name, c))
 	}
 	if len(include) > 0 {
-		m.set("include", seqOf(include...))
+		m.Set("include", seqOf(include...))
 	}
-	pt.set("matrix", m.n)
+	pt.Set("matrix", m.N)
 	return nil
 }
 
 func includeNode(name string, c ir.Combo) *yaml.Node {
 	m := newMap()
 	if name != "" {
-		m.setStr("name", name)
+		m.SetStr("name", name)
 	}
 	ps := seqOf()
 	for _, kv := range c {
 		ps.Content = append(ps.Content, nameValue(kv.Key, kv.Value))
 	}
-	m.set("params", ps)
-	return m.n
+	m.Set("params", ps)
+	return m.N
 }
 
 // expandAxes lists the combinations of the axes in order.
@@ -486,7 +486,7 @@ func (e *emitter) writeResource(d resourceDoc) {
 	}
 	file := resourcesDir + sanitizeFile(d.kind+"-"+d.name) + ".yaml"
 	e.made[d.kind+" "+d.name] = true
-	e.add(file, &outDoc{root: n}, d.path+"#resource/"+d.kind+"/"+d.name)
+	e.add(file, &outDoc{Root: n}, d.path+"#resource/"+d.kind+"/"+d.name)
 }
 
 type resourceDoc struct {

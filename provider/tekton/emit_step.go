@@ -56,7 +56,7 @@ func (tc *taskCtx) step(b *stepBook, st *ir.Step, sp string) (*wmap, error) {
 		err = tc.markAction(b, sp, st, "", nil)
 	}
 	if m != nil && comment != "" {
-		m.n.HeadComment = comment
+		m.N.HeadComment = comment
 	}
 	return m, err
 }
@@ -65,9 +65,9 @@ func (tc *taskCtx) step(b *stepBook, st *ir.Step, sp string) (*wmap, error) {
 func (tc *taskCtx) scriptStep(b *stepBook, st *ir.Step, sp, name string) (*wmap, error) {
 	sc := newScope()
 	m := newMap()
-	m.setStr("name", name)
+	m.SetStr("name", name)
 	if st.Name != "" {
-		m.setStr("displayName", st.Name)
+		m.SetStr("displayName", st.Name)
 	}
 	userEnv, err := tc.envList(sc, sp, st.Env)
 	if err != nil {
@@ -81,7 +81,7 @@ func (tc *taskCtx) scriptStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 		return nil, err
 	}
 	if image != "" {
-		m.setStr("image", image)
+		m.SetStr("image", image)
 	}
 	cond := tc.cond(sp, caps.StepIf, st.If, taskScope)
 	guard := andGuard(b.guard, cond.guard)
@@ -102,10 +102,10 @@ func (tc *taskCtx) scriptStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 		lines = append([]string{shebang + st.Shell}, lines...)
 	}
 	if len(lines) > 0 && !tc.commandForm(m, st, sp, guard) {
-		m.set("script", block(strings.Join(lines, "\n")))
+		m.Set("script", block(strings.Join(lines, "\n")))
 	}
 	if len(userEnv)+len(sc.env) > 0 {
-		m.set("env", seqOf(append(userEnv, sc.env...)...))
+		m.Set("env", seqOf(append(userEnv, sc.env...)...))
 	}
 	if st.WorkDir != "" {
 		wd, ok, err := tc.text(sc, sp, caps.StepWorkdir, valueText, st.WorkDir)
@@ -119,7 +119,7 @@ func (tc *taskCtx) scriptStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 				}
 				wd = path.Join(workspaceDir, wd)
 			}
-			m.setStr("workingDir", wd)
+			m.SetStr("workingDir", wd)
 		}
 	}
 	tc.stepTail(m, st, cond)
@@ -138,13 +138,13 @@ func envName(n *yaml.Node) string {
 // stepTail writes the keys every step kind shares: timeout, onError and when.
 func (tc *taskCtx) stepTail(m *wmap, st *ir.Step, cond condition) {
 	if st.Timeout != nil {
-		m.setStr("timeout", tc.durationText(st.Timeout))
+		m.SetStr("timeout", tc.durationText(st.Timeout))
 	}
 	if st.ContinueOnError {
-		m.setStr("onError", onErrorContinue)
+		m.SetStr("onError", onErrorContinue)
 	}
 	if len(cond.when) > 0 {
-		m.set("when", whenNode(cond.when))
+		m.Set("when", whenNode(cond.when))
 	}
 }
 
@@ -156,14 +156,14 @@ func (tc *taskCtx) stepExt(m *wmap, st *ir.Step) error {
 	}
 	skip := map[string]bool{ExtCommand: true, ExtArgs: true, ExtScriptLine: true, "ref": true, "params": true, "taskRef": true, "timeout": true, "onError": true}
 	for _, k := range sortedKeys(x) {
-		if skip[k] || m.has(k) {
+		if skip[k] || m.Has(k) {
 			continue
 		}
 		n, err := plainNode(x[k])
 		if err != nil {
 			return err
 		}
-		m.set(k, n)
+		m.Set(k, n)
 	}
 	for _, k := range []string{"timeout", "onError"} {
 		if v, ok := x[k]; ok {
@@ -171,7 +171,7 @@ func (tc *taskCtx) stepExt(m *wmap, st *ir.Step) error {
 			if err != nil {
 				return err
 			}
-			m.set(k, n)
+			m.Set(k, n)
 		}
 	}
 	return nil
@@ -264,7 +264,7 @@ func (tc *taskCtx) commandForm(m *wmap, st *ir.Step, sp string, guard expr.Expr)
 	for _, k := range []string{ExtCommand, ExtArgs} {
 		if v, ok := x[k]; ok {
 			if n := tc.e.node(sp, k, v); n != nil {
-				m.set(k, n)
+				m.Set(k, n)
 			}
 		}
 	}
