@@ -17,33 +17,25 @@ var artifactFrom = regexp.MustCompile(`^\{\{\s*tasks\.([A-Za-z0-9_-]+)\.outputs\
 
 // jobBuilder reads one task and the template that it runs.
 type jobBuilder struct {
-	c         *plCtx
-	cl        *call
-	job       *ir.Job
-	k         *sink
-	ids       map[string]string
-	px        *texts
-	tx        *texts
-	explicit  map[string]bool
-	whenNeeds map[string]bool
-	// args maps each bound argument name to its value, to find those that no text reads.
-	args map[string]any
-	// argLines holds the source line of each argument.
-	argLines map[string]int
-	// artifactNeeds names the tasks that an input artifact comes from.
+	whenNeeds     map[string]bool
+	argLines      map[string]int
+	job           *ir.Job
+	args          map[string]any
+	ids           map[string]string
+	px            *texts
+	tx            *texts
+	explicit      map[string]bool
+	cl            *call
+	c             *plCtx
+	k             *sink
 	artifactNeeds map[string]bool
-	// gitArts maps each step that a git input artifact made to the canonical text of that artifact.
-	gitArts map[*ir.Step]string
-	// cacheMounts is true when the volumeMounts are the ones that the emitter writes for the caches.
-	cacheMounts bool
-	// fileOutputs names the outputs that the file holds as the emitter writes them.
-	fileOutputs []string
-	// outArts maps each output artifact name to the canonical text of its entry in the file.
-	outArts map[string]string
-	// holds maps each container ID to the canonical text of its container, without the dependencies.
-	holds   map[string]string
-	path    string
-	finally bool
+	gitArts       map[*ir.Step]string
+	holds         map[string]string
+	outArts       map[string]string
+	path          string
+	fileOutputs   []string
+	finally       bool
+	cacheMounts   bool
 }
 
 func (c *plCtx) newJob(cl *call, ids map[string]string, finally bool) *jobBuilder {

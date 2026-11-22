@@ -209,3 +209,85 @@ func (e *emitter) markContainer(j *ir.Job, path, written string, replaced bool) 
 		e.lose(path, caps.JobContainer, "the image marker cannot be written: "+err.Error())
 	}
 }
+
+// imagesArg holds where the IR put the images when that is not where a reader of the file puts them. A file
+// whose containers share one image reads as a job image, and one with several reads as step images.
+type imagesArg struct {
+	// Steps holds the step image of each step as IR YAML.
+	Steps map[string]string `json:"steps,omitempty"`
+	// Wrote holds the image reference that each script step got in the file.
+	Wrote map[string]string `json:"wrote"`
+	// Job is the job image as IR YAML, or empty.
+	Job string `json:"job,omitempty"`
+}
+
+// readImage is the image that a reader of the file gives a container that runs ref: the default image is no image.
+func readImage(ref string) string {
+	if ref == defaultImage {
+		return ""
+	}
+	return ref
+}
+
+// imageLayoutMatches is true when a reader of the file puts the images where the IR has them.
+func imageLayoutMatches(j *ir.Job, conts []*container) bool {
+	refs := map[string]bool{}
+	for _, c := range conts {
+		refs[c.image] = true
+	}
+	for _, c := range conts {
+		st := c.st
+		if st == nil || st.Kind == ir.StepAction {
+			continue
+		}
+		var want string
+		if st.Image != nil {
+			want = st.Image.Ref
+		}
+		if len(refs) == 1 && want != "" || len(refs) > 1 && want != readImage(c.image) {
+			return false
+		}
+	}
+	var job string
+	if j.Container != nil {
+		job = j.Container.Ref
+	}
+	if len(refs) == 1 {
+		for ref := range refs {
+			return job == readImage(ref)
+		}
+	}
+	return job == ""
+}
+
+// markImages writes the image layout of a job whose file would read back with the images elsewhere.
+func (e *emitter) markImages(j *ir.Job, path string, conts []*container) {
+	if len(conts) == 0 || imageLayoutMatches(j, conts) {
+		return
+	}
+	arg := imagesArg{Steps: map[string]string{}, Wrote: map[string]string{}}
+	var err error
+	if j.Container != nil {
+		if arg.Job, err = carryYAML(j.Container); err != nil {
+			e.lose(path, caps.StepImage, "the image marker cannot be written: "+err.Error())
+			return
+		}
+	}
+	for _, c := range conts {
+		st := c.st
+		if st == nil || st.Kind == ir.StepAction {
+			continue
+		}
+		arg.Wrote[st.ID] = c.image
+		if st.Image == nil {
+			continue
+		}
+		if arg.Steps[st.ID], err = carryYAML(st.Image); err != nil {
+			e.lose(path, caps.StepImage, "the image marker cannot be written: "+err.Error())
+			return
+		}
+	}
+	if err := e.markArg(caps.StepImage, path, arg); err != nil {
+		e.lose(path, caps.StepImage, "the image marker cannot be written: "+err.Error())
+	}
+}

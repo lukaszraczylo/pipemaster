@@ -156,6 +156,9 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (jobOut, error) {
 		written = conts[0].image
 	}
 	e.markContainer(j, jp.path, written, sx.image != "")
+	if sx.image == "" {
+		e.markImages(j, jp.path, conts)
+	}
 	e.markArtifacts(j, jp.path)
 	if len(tc.vars) > 0 {
 		if err := e.markArg(caps.ScriptInterpolation, jp.path, varsArg{Vars: tc.vars}); err != nil {
@@ -613,10 +616,10 @@ var _ = slices.Contains[[]string]
 
 // serviceArg holds what the sidecar of a service cannot carry: the host ports and the image entrypoint.
 type serviceArg struct {
+	// Image is the image reference that the sidecar was written with.
+	Image      string   `json:"image,omitempty"`
 	Ports      []string `json:"ports,omitempty"`
 	Entrypoint []string `json:"entrypoint,omitempty"`
-	// Image is the image reference that the sidecar was written with.
-	Image string `json:"image,omitempty"`
 }
 
 func (e *emitter) markService(path string, sv ir.Service) {

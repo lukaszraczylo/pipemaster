@@ -29,6 +29,7 @@ func (b *jobBuilder) collapseActions() {
 	b.collapseCache()
 	b.collapseHeld()
 	b.collapseContainer()
+	b.collapseImages()
 	b.collapseArtifacts()
 }
 
@@ -371,4 +372,55 @@ func (b *jobBuilder) takeJobImage(ref string) bool {
 		}
 	}
 	return found
+}
+
+// collapseImages puts the job image and the step images where the IR had them, when every script step still runs
+// the image that the emitter wrote for it.
+func (b *jobBuilder) collapseImages() {
+	var a imagesArg
+	if !markerArg(b.c.src.doc.Head, b.path, caps.StepImage, &a) {
+		return
+	}
+	byID := map[string]*ir.Step{}
+	for _, st := range b.job.Steps {
+		byID[st.ID] = st
+	}
+	steps := map[string]*ir.Image{}
+	for id, ref := range a.Wrote {
+		st := byID[id]
+		got := "\x00"
+		switch {
+		case st == nil:
+		case st.Image != nil:
+			got = st.Image.Ref
+		case b.job.Container != nil:
+			got = b.job.Container.Ref
+		default:
+			got = ""
+		}
+		if got != readImage(ref) {
+			b.c.ignored(b.path, caps.StepImage, "the image of the step "+id+" was edited or removed after pipemaster wrote the file; the file content is kept")
+			return
+		}
+		if y, ok := a.Steps[id]; ok {
+			img := &ir.Image{}
+			if yaml.Unmarshal([]byte(y), img) != nil {
+				b.c.ignored(b.path, caps.StepImage, "the image marker cannot be read")
+				return
+			}
+			steps[id] = img
+		}
+	}
+	var job *ir.Image
+	if a.Job != "" {
+		job = &ir.Image{}
+		if yaml.Unmarshal([]byte(a.Job), job) != nil {
+			b.c.ignored(b.path, caps.StepImage, "the image marker cannot be read")
+			return
+		}
+	}
+	b.job.Container = job
+	for id := range a.Wrote {
+		byID[id].Image = steps[id]
+	}
 }
