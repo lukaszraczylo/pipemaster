@@ -121,6 +121,7 @@ func (sx *stepCtx) containerFor(st *ir.Step, name string, last bool, jx map[stri
 	if name != st.ID {
 		c.m.KeyComment("name", idComment(st.ID))
 	}
+	e.markName(path, st.Name)
 	c.image = sx.imageOf(st, path)
 	c.m.SetStr("image", c.image)
 	script := tc.stepScripts(sc, path, st)

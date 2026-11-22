@@ -189,6 +189,7 @@ func (e *emitter) dagTask(tc *jobCtx, sx *stepCtx, cond taskCond, d deps, gate s
 	}
 	if j.Name != "" {
 		comments = append(comments, "# "+commentSafe(j.Name))
+		e.markName(path, j.Name)
 	}
 	if len(comments) > 0 {
 		t.KeyComment("name", strings.Join(comments, "\n"))

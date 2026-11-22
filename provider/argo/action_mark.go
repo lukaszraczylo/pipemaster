@@ -293,3 +293,17 @@ func (e *emitter) markImages(j *ir.Job, path string, conts []*container) {
 		e.lose(path, caps.StepImage, "the image marker cannot be written: "+err.Error())
 	}
 }
+
+// nameArg holds the display name of a job or a step, which Argo has no field for.
+type nameArg struct {
+	Name string `json:"name"`
+}
+
+func (e *emitter) markName(path, name string) {
+	if name == "" {
+		return
+	}
+	if err := e.markArg(caps.DisplayName, path, nameArg{Name: name}); err != nil {
+		e.lose(path, caps.DisplayName, "the name marker cannot be written: "+err.Error())
+	}
+}

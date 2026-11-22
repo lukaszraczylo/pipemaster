@@ -30,6 +30,7 @@ func (b *jobBuilder) collapseActions() {
 	b.collapseHeld()
 	b.collapseContainer()
 	b.collapseImages()
+	b.collapseNames()
 	b.collapseArtifacts()
 }
 
@@ -427,5 +428,36 @@ func (b *jobBuilder) collapseImages() {
 	b.job.Container = job
 	for id := range a.Wrote {
 		byID[id].Image = steps[id]
+	}
+}
+
+// collapseNames gives the job and its script steps the display names that the markers hold.
+func (b *jobBuilder) collapseNames() {
+	var a nameArg
+	if markerArg(b.c.src.doc.Head, b.path, caps.DisplayName, &a) {
+		b.job.Name = a.Name
+	}
+	for _, st := range b.job.Steps {
+		var s nameArg
+		if st.Kind == ir.StepScript && markerArg(b.c.src.doc.Head, b.path+"/step/"+st.ID, caps.DisplayName, &s) {
+			st.Name = s.Name
+		}
+	}
+}
+
+// staleNames reports a name marker whose job or step the file no longer holds.
+func (c *plCtx) staleNames(pl *ir.Pipeline) {
+	have := map[string]bool{}
+	for _, j := range append(slices.Clone(pl.Jobs), pl.Finally...) {
+		jp := "pipeline/" + c.plID + "/job/" + j.ID
+		have[jp] = true
+		for _, st := range j.Steps {
+			have[jp+"/step/"+st.ID] = true
+		}
+	}
+	for u := range emitkit.ParseArgs([]byte(c.src.doc.Head)) {
+		if u.Feature == caps.DisplayName && !have[u.IRPath] {
+			c.ignored(u.IRPath, caps.DisplayName, "the job or step was removed or renamed after pipemaster wrote the file; the name is not restored")
+		}
 	}
 }

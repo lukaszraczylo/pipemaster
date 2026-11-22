@@ -66,10 +66,11 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 		}
 	}
 	k.KeepRest(r)
-	c.metadata()
+	c.metadata(pl)
 	c.unreached()
 	pl.Ext = k.Ext()
 	c.placeholderMarker(pl)
+	c.staleNames(pl)
 	c.pipelineEnvMarker(pl)
 	c.staleGates(append(slices.Clone(pl.Jobs), pl.Finally...))
 	return pl, nil
@@ -83,12 +84,35 @@ func markOf(m *omap, key string) string {
 	return m.Marks[key]
 }
 
-// metadata keeps the metadata keys with no IR field.
-func (c *plCtx) metadata() {
+// metadata reads the title annotation as the pipeline name and keeps the other metadata keys, which have no IR field.
+func (c *plCtx) metadata(pl *ir.Pipeline) {
 	if c.src.meta == nil {
 		return
 	}
-	if rest := metaRest(c.src.meta); len(rest.Order) > 0 {
+	rest := metaRest(c.src.meta)
+	if ann, ok := asMap(rest.Vals["annotations"]); ok {
+		if title, has := text(ann.Vals[annotationTitle]); has {
+			pl.Name = title
+			var keep []string
+			for _, k := range ann.Order {
+				if k != annotationTitle {
+					keep = append(keep, k)
+				}
+			}
+			var keys []string
+			for _, k := range rest.Order {
+				if k != "annotations" || len(keep) > 0 {
+					keys = append(keys, k)
+				}
+			}
+			out := rest.Subset(keys)
+			if len(keep) > 0 {
+				out.Vals["annotations"] = ann.Subset(keep)
+			}
+			rest = out
+		}
+	}
+	if len(rest.Order) > 0 {
 		c.k.Keep("metadata", rest, caps.ExtPassthrough, "metadata has no IR field; kept in Ext", c.src.meta.Lines[rest.Order[0]])
 	}
 }
