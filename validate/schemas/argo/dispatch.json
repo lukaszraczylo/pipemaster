@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pipemaster.invalid/schemas/argo/dispatch.json",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "argoproj.io/v1alpha1"
+          },
+          "kind": {
+            "const": "ClusterWorkflowTemplate"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/argo/clusterworkflowtemplate_v1alpha1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "argoproj.io/v1alpha1"
+          },
+          "kind": {
+            "const": "CronWorkflow"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/argo/cronworkflow_v1alpha1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "argoproj.io/v1alpha1"
+          },
+          "kind": {
+            "const": "EventSource"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/argo/eventsource_v1alpha1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "argoproj.io/v1alpha1"
+          },
+          "kind": {
+            "const": "Sensor"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/argo/sensor_v1alpha1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "argoproj.io/v1alpha1"
+          },
+          "kind": {
+            "const": "Workflow"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/argo/workflow_v1alpha1.json"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "apiVersion": {
+            "const": "argoproj.io/v1alpha1"
+          },
+          "kind": {
+            "const": "WorkflowTemplate"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind"
+        ]
+      },
+      "then": {
+        "$ref": "https://pipemaster.invalid/schemas/argo/workflowtemplate_v1alpha1.json"
+      }
+    }
+  ]
+}

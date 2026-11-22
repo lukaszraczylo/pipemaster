@@ -134,6 +134,55 @@ install_kubeconform() {
 	echo "installed kubeconform $tag in $dest"
 }
 
+# The argo CLI ships gzipped single binaries. The sha256 values come from argo-workflows-cli-checksums.txt of v4.1.6
+# and match the release asset digests.
+install_argo() {
+	local tag="v4.1.6"
+	local os arch asset want
+	os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+	arch="$(uname -m)"
+	case "$arch" in
+	x86_64) arch="amd64" ;;
+	aarch64) arch="arm64" ;;
+	esac
+	asset="argo-${os}-${arch}.gz"
+	case "$asset" in
+	argo-darwin-amd64.gz) want="ffdecc7c592d3e2878210c58fff7412e80b54d5ab1d0e25a156c19f6084b305a" ;;
+	argo-darwin-arm64.gz) want="0c95c53ac22e15f2465bbcdbadfe62e96f40eccf70cbd2b9346e2126678e29e4" ;;
+	argo-linux-amd64.gz) want="885f886a338d7e7c0fd4a681152770fb54df1847f8fc55eaed788d661c0304e0" ;;
+	argo-linux-arm64.gz) want="c11996a95329288ebcc51e5830ad34d61ed684d5280251828596305599f92bf5" ;;
+	*)
+		echo "no pinned argo $tag release for $os/$arch" >&2
+		return 1
+		;;
+	esac
+	local stamp="$dest/.argo-$tag-$want"
+
+	if [[ -x "$dest/argo" && -f "$stamp" ]]; then
+		echo "argo $tag is already installed in $dest"
+		return 0
+	fi
+
+	local tmp got
+	tmp="$(mktemp -d "${TMPDIR:-/tmp}/install-linters.XXXXXX")"
+	trap "rm -rf '$tmp'" EXIT
+	curl -fsSL -o "$tmp/$asset" "https://github.com/argoproj/argo-workflows/releases/download/$tag/$asset"
+	got="$( (sha256sum "$tmp/$asset" 2>/dev/null || shasum -a 256 "$tmp/$asset") | cut -d' ' -f1)"
+	if [[ "$got" != "$want" ]]; then
+		rm -rf "$tmp"
+		echo "$asset has sha256 $got, expected $want" >&2
+		return 1
+	fi
+	gzip -dc "$tmp/$asset" >"$tmp/argo"
+	install -m 0755 "$tmp/argo" "$dest/argo"
+	rm -rf "$tmp"
+	trap - EXIT
+	rm -f "$dest"/.argo-*
+	touch "$stamp"
+	echo "installed argo $tag in $dest"
+}
+
 install_woodpecker
 install_drone
 install_kubeconform
+install_argo

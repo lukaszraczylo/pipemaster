@@ -29,3 +29,10 @@ func TestKubeconformArgsAreStrictAndOffline(t *testing.T) {
 		}
 	}
 }
+
+func TestArgoLintArgsAreOffline(t *testing.T) {
+	args := argoLintArgs("f.yaml")
+	if !slices.Contains(args, "--offline") || args[len(args)-1] != "f.yaml" {
+		t.Errorf("want --offline and the file last: %v", args)
+	}
+}

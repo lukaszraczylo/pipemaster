@@ -59,3 +59,29 @@ func TestFindRejectsAnotherDroneVersionOnPath(t *testing.T) {
 		t.Fatalf("Find returned the PATH binary of another version: %s", p)
 	}
 }
+
+func fakeArgo(t *testing.T, version string) string {
+	t.Helper()
+	dir := t.TempDir()
+	script := "#!/bin/sh\necho 'argo: " + version + "'\n"
+	if err := os.WriteFile(filepath.Join(dir, "argo"), []byte(script), 0o700); err != nil { // #nosec G306 -- test stub must be executable
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	return dir
+}
+
+func TestFindAcceptsThePinnedArgoVersion(t *testing.T) {
+	dir := fakeArgo(t, "v4.1.6")
+	p, ok := linttool.Find("argo")
+	if !ok || p != filepath.Join(dir, "argo") {
+		t.Fatalf("Find = %q, %v; want the PATH binary", p, ok)
+	}
+}
+
+func TestFindRejectsAnotherArgoVersionOnPath(t *testing.T) {
+	dir := fakeArgo(t, "v3.6.2")
+	if p, _ := linttool.Find("argo"); p == filepath.Join(dir, "argo") {
+		t.Fatalf("Find returned the PATH binary of another version: %s", p)
+	}
+}

@@ -20,10 +20,11 @@ const (
 	woodpeckerID  = "woodpecker-cli"
 	droneID       = "drone"
 	kubeconformID = "kubeconform"
+	argoID        = "argo"
 )
 
 // pinned maps a linter to the version its --version output must end with; scripts/install-linters.sh builds it.
-var pinned = map[string]string{woodpeckerID: "3.20.1", droneID: "1.9.0", kubeconformID: "0.8.0"}
+var pinned = map[string]string{woodpeckerID: "3.20.1", droneID: "1.9.0", kubeconformID: "0.8.0", argoID: "4.1.6"}
 
 // versionOK reports whether the binary at path is the pinned version. A linter without a pin always passes.
 func versionOK(name, path string) bool {
@@ -31,11 +32,14 @@ func versionOK(name, path string) bool {
 	if !ok {
 		return true
 	}
-	flag := "--version"
-	if name == kubeconformID {
-		flag = "-v"
+	args := []string{"--version"}
+	switch name {
+	case kubeconformID:
+		args = []string{"-v"}
+	case argoID:
+		args = []string{"version", "--short"}
 	}
-	out, err := exec.Command(path, flag).Output() // #nosec G204 -- path of a local linter binary
+	out, err := exec.Command(path, args...).Output() // #nosec G204 -- path of a local linter binary
 	return err == nil && strings.HasSuffix(strings.TrimSpace(string(out)), want)
 }
 
@@ -172,5 +176,27 @@ func KubeconformLint(t testing.TB, name string, data []byte) (string, error) {
 		t.Fatal(err)
 	}
 	out, err := exec.Command(bin, kubeconformArgs(schemaDir, p)...).CombinedOutput() // #nosec G204 -- pinned local binary, temp paths
+	return string(out), err
+}
+
+// RequireArgo is Require for argo.
+func RequireArgo(t testing.TB) string { return Require(t, argoID) }
+
+// argoLintArgs is the argo argument list that lints file without a cluster. It covers the four workflow kinds;
+// the linter does not read Sensors or EventSources.
+func argoLintArgs(file string) []string {
+	return []string{"lint", "--offline", "--no-color", "-o", "simple", file}
+}
+
+// ArgoLint runs `argo lint --offline` on one file and returns its output. The error is non-nil when the linter
+// reports a problem.
+func ArgoLint(t testing.TB, name string, data []byte) (string, error) {
+	t.Helper()
+	bin := RequireArgo(t)
+	p := filepath.Join(t.TempDir(), filepath.Base(name))
+	if err := os.WriteFile(p, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := exec.Command(bin, argoLintArgs(p)...).CombinedOutput() // #nosec G204 -- pinned local binary, temp path
 	return string(out), err
 }

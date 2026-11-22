@@ -33,3 +33,9 @@ var KubernetesDefinitions []byte
 //
 //go:embed tekton/*.json
 var Tekton embed.FS
+
+// Argo holds the Argo Workflows and Argo Events CRD schemas and dispatch.json, which routes a document to its
+// schema by apiVersion and kind.
+//
+//go:embed argo/*.json
+var Argo embed.FS

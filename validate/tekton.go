@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	tektonDir      = "tekton"
-	tektonBase     = "https://pipemaster.invalid/schemas/tekton/"
-	tektonDispatch = "dispatch.json"
+	tektonDir    = "tekton"
+	tektonBase   = "https://pipemaster.invalid/schemas/tekton/"
+	dispatchFile = "dispatch.json"
 )
 
 // kinds holds, per provider with per-document dispatch, the "apiVersion kind" pairs that have a schema.
@@ -50,27 +50,32 @@ type dispatchRule struct {
 // RegisterTekton pins the embedded Tekton schemas for provider id. File validates each document by apiVersion
 // and kind and skips a kind without a schema; it returns ErrNoSchema when no document of a file has one.
 func RegisterTekton(id string, patternList []string) {
-	entries, err := fs.ReadDir(schemas.Tekton, tektonDir)
+	registerDispatched(id, schemas.Tekton, tektonDir, tektonBase, patternList)
+}
+
+// registerDispatched pins the schema files in dir of fsys, and dispatch.json among them, for provider id.
+func registerDispatched(id string, fsys fs.FS, dir, base string, patternList []string) {
+	entries, err := fs.ReadDir(fsys, dir)
 	if err != nil {
 		panic("validate: " + err.Error())
 	}
 	var dispatch []byte
 	for _, e := range entries {
-		data, err := fs.ReadFile(schemas.Tekton, tektonDir+"/"+e.Name())
+		data, err := fs.ReadFile(fsys, dir+"/"+e.Name())
 		if err != nil {
 			panic("validate: " + err.Error())
 		}
-		if e.Name() == tektonDispatch {
+		if e.Name() == dispatchFile {
 			dispatch = data
 			continue
 		}
-		RegisterResource(tektonBase+e.Name(), data)
+		RegisterResource(base+e.Name(), data)
 	}
 	var head struct {
 		AllOf []dispatchRule `json:"allOf"`
 	}
 	if err := json.Unmarshal(dispatch, &head); err != nil || len(head.AllOf) == 0 {
-		panic(fmt.Sprintf("validate: unreadable %s: %v", tektonDispatch, err))
+		panic(fmt.Sprintf("validate: unreadable %s in %s: %v", dispatchFile, dir, err))
 	}
 	set := make(map[string]bool, len(head.AllOf))
 	for _, r := range head.AllOf {
