@@ -373,6 +373,7 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool) *container {
 		sx.checkout(st, with, t)
 		if len(sx.artIn) > nIn {
 			sx.act.Wrote = checkoutWrote
+			sx.act.Art = nodeCanon(sx.artIn[nIn])
 		}
 	case actions.KindUpload:
 		sx.upload(path, t)

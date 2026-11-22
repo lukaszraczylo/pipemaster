@@ -32,8 +32,10 @@ type jobBuilder struct {
 	argLines map[string]int
 	// artifactNeeds names the tasks that an input artifact comes from.
 	artifactNeeds map[string]bool
-	path          string
-	finally       bool
+	// gitArts maps each step that a git input artifact made to the canonical text of that artifact.
+	gitArts map[*ir.Step]string
+	path    string
+	finally bool
 }
 
 func (c *plCtx) newJob(cl *call, ids map[string]string, finally bool) *jobBuilder {

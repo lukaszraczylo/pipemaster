@@ -52,44 +52,82 @@ func (b *jobBuilder) collapseHeld() {
 		return
 	}
 	slices.SortFunc(held, func(x, y heldAction) int { return cmp.Or(x.arg.Seq-y.arg.Seq, strings.Compare(x.path, y.path)) })
-	checkouts := 0
-	for _, h := range held {
-		if h.arg.Wrote == checkoutWrote {
-			checkouts++
+	var front, rest []*ir.Step
+	for _, st := range b.job.Steps {
+		if _, ok := b.gitArts[st]; ok {
+			front = append(front, st)
+		} else {
+			rest = append(rest, st)
 		}
 	}
-	if checkouts > len(b.job.Steps) {
-		b.c.ignored(b.path, caps.StepAction, "the git artifacts were removed after pipemaster wrote the file")
-		return
-	}
-	front, rest := b.job.Steps[:checkouts], b.job.Steps[checkouts:]
-	var out []*ir.Step
-	ci, fi := 0, 0
+	used := map[*ir.Step]bool{}
+	var body []*ir.Step
+	var restored []heldAction
+	ci := 0
 	for _, h := range held {
 		st := *h.step
-		out = append(out, rest[ci:min(max(ci, h.arg.At), len(rest))]...)
+		body = append(body, rest[ci:min(max(ci, h.arg.At), len(rest))]...)
 		ci = max(ci, min(h.arg.At, len(rest)))
-		switch {
-		case h.arg.Wrote == checkoutWrote:
-			if fi < len(front) {
-				fi++
-			}
-		case h.arg.Ran:
-			if ci >= len(rest) || rest[ci].ID != st.ID {
-				b.c.ignored(h.path, caps.StepAction, "the container that stands in for the step was edited or removed after pipemaster wrote the file; the file content is kept")
-				continue
-			}
+		if why := b.heldEdit(h, front, used, rest, ci); why != "" {
+			b.c.ignored(h.path, caps.StepAction, why+"; the file content is kept")
+			continue
+		}
+		if h.arg.Ran {
 			ci++
 		}
-		out = append(out, &st)
+		body = append(body, &st)
 		b.c.restored[&st] = true
+		restored = append(restored, h)
 	}
+	var out []*ir.Step
+	for _, st := range front {
+		if !used[st] {
+			out = append(out, st)
+		}
+	}
+	out = append(out, body...)
 	out = append(out, rest[ci:]...)
 	b.job.Steps = out
-	for _, h := range held {
+	for _, h := range restored {
 		b.dropImage(h.arg.Image)
 		b.dropArtifacts(h.arg.Arts)
 	}
+}
+
+// heldEdit compares what the file holds for a step with what the emitter wrote. It returns why the marker cannot
+// stand in for the step, or an empty text when it can. It marks the artifact step that a checkout replaces.
+func (b *jobBuilder) heldEdit(h heldAction, front []*ir.Step, used map[*ir.Step]bool, rest []*ir.Step, ci int) string {
+	switch {
+	case h.arg.Wrote == checkoutWrote:
+		i := slices.IndexFunc(front, func(s *ir.Step) bool { return !used[s] && h.arg.Art != "" && b.gitArts[s] == h.arg.Art })
+		if i < 0 {
+			return "the git artifact was edited or removed after pipemaster wrote the file"
+		}
+		used[front[i]] = true
+	case h.arg.Ran:
+		if ci >= len(rest) || rest[ci].ID != h.step.ID {
+			return "the container that stands in for the step was edited or removed after pipemaster wrote the file"
+		}
+	case h.arg.Image != "":
+		if !b.hasImage(h.arg.Image) {
+			return "the image that the setup action gave was edited after pipemaster wrote the file"
+		}
+	case len(h.arg.Arts) > 0:
+		for _, n := range h.arg.Arts {
+			if !slices.ContainsFunc(b.job.Artifacts, func(a ir.Artifact) bool { return a.Name == n }) {
+				return "the output artifact of the upload was edited or removed after pipemaster wrote the file"
+			}
+		}
+	}
+	return ""
+}
+
+// hasImage is true when the job container or a step runs the image.
+func (b *jobBuilder) hasImage(ref string) bool {
+	if c := b.job.Container; c != nil && c.Ref == ref {
+		return true
+	}
+	return slices.ContainsFunc(b.job.Steps, func(st *ir.Step) bool { return st.Image != nil && st.Image.Ref == ref })
 }
 
 // dropImage clears the image that a setup action gave to the containers after it.

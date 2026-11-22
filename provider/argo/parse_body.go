@@ -144,6 +144,10 @@ func (b *jobBuilder) gitArtifact(e any) bool {
 		return false
 	}
 	st := &ir.Step{ID: checkoutStep}
+	if b.gitArts == nil {
+		b.gitArts = map[*ir.Step]string{}
+	}
+	b.gitArts[st] = canonJSON(plain(e))
 	k := newSink(b.c.p.rep, b.c.file, b.path+"/step/"+st.ID)
 	repoURL, _ := text(gm.Vals["repo"])
 	m := githubRepo.FindStringSubmatch(repoURL)

@@ -1,6 +1,8 @@
 package argo
 
 import (
+	"encoding/json"
+
 	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
@@ -22,6 +24,8 @@ type actionArg struct {
 	Image string `json:"image,omitempty"`
 	// Kind is the registry kind of the action.
 	Kind string `json:"kind,omitempty"`
+	// Art is the git artifact that the emitter wrote for a checkout, as canonical JSON.
+	Art string `json:"art,omitempty"`
 	// Arts names the output artifacts that an upload wrote.
 	Arts []string `json:"arts,omitempty"`
 	// At is the number of containers that the job held before the step.
@@ -158,6 +162,23 @@ func (e *emitter) markDisabled(j *ir.Job, path string) {
 // containerArg holds the job image with the entrypoint that the file cannot carry.
 type containerArg struct {
 	Image string `json:"image"`
+}
+
+// canonJSON is the one-line text that two equal values share, whatever the key order.
+func canonJSON(v any) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+func nodeCanon(n *yaml.Node) string {
+	var v any
+	if n.Decode(&v) != nil {
+		return ""
+	}
+	return canonJSON(v)
 }
 
 func (e *emitter) markContainer(j *ir.Job, path string) {
