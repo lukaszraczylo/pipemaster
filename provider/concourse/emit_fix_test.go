@@ -29,3 +29,41 @@ func TestJobConditionWithAnUnspellableRefIsAFailSafe(t *testing.T) {
 		t.Fatalf("no JobIf entry: %v", rep.Entries)
 	}
 }
+
+const tryPipeline = `resources:
+  - name: repo
+    type: git
+    source: {uri: https://example.com/r.git, branch: main}
+  - name: chat
+    type: registry-image
+    source: {repository: acme/notify}
+jobs:
+  - name: build
+    plan:
+      - get: repo
+        trigger: true
+      - try:
+          task: lint
+          file: repo/ci/lint.yml
+      - try:
+          put: chat
+          params: {text: done}
+`
+
+func TestTryOnFileTasksAndResourceStepsIsKept(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"ci.yml": tryPipeline})
+	files, rep := emit(t, p)
+	plan := list(jobDoc(t, pipelineDoc(t, files), "build")["plan"])
+	var tries int
+	for _, s := range plan {
+		if dict(s)["try"] != nil {
+			tries++
+		}
+	}
+	if tries != 2 {
+		t.Fatalf("%d try steps in the plan, want 2:\n%s", tries, files[".concourse/ci.yml"])
+	}
+	if !hasFeatureEntry(rep, string(caps.StepContinueOnError), "") {
+		t.Fatalf("no entry for the try wrappers: %v", rep.Entries)
+	}
+}

@@ -54,10 +54,17 @@ func (c *chain) step(st *ir.Step) []*yaml.Node {
 	case ir.StepScript, "":
 		return []*yaml.Node{c.script(st, path)}
 	case ir.StepResource, ir.StepPlugin, ir.StepTask:
-		if n := c.verbatim(st, path); n != nil {
-			return []*yaml.Node{n}
+		n := c.verbatim(st, path)
+		if n == nil {
+			return nil
 		}
-		return nil
+		if st.ContinueOnError && st.Kind != ir.StepPlugin {
+			e.emulate(path, caps.StepContinueOnError, "try around the step", "a failure of the step does not fail the job")
+			try := newMap()
+			try.Set("try", n)
+			n = try.N
+		}
+		return []*yaml.Node{n}
 	}
 	e.lose(path, caps.ExtPassthrough, "the step kind "+string(st.Kind)+" has no Concourse form; the step is not written")
 	return nil
