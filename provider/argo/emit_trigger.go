@@ -103,6 +103,7 @@ func (e *emitter) cron(pp *plan, i int, path string, tr ir.Trigger, x map[string
 			}
 		}
 		if _, ok := spec["workflowSpec"]; !ok {
+			e.emptyContext(pp, path, caps.TriggerSchedule, "the CronWorkflow "+name)
 			spec["workflowSpec"] = map[string]any{"workflowTemplateRef": map[string]any{"name": pp.name}, "serviceAccountName": workflowSA}
 			e.needsSA = true
 		}
@@ -139,6 +140,7 @@ func (e *emitter) apiTrigger(pp *plan, path string, x map[string]any) {
 
 // manual reports the command that starts the template, and writes back the Workflow that an Argo file held.
 func (e *emitter) manual(pp *plan, path string, x map[string]any) {
+	e.emptyContext(pp, path, caps.TriggerManual, "a manual run")
 	e.external(path, caps.TriggerManual, "argo submit --from workflowtemplate/"+pp.name, "start a run with: argo submit --from workflowtemplate/"+pp.name+"; the Workflow object needs a ServiceAccount with the rights in .argo/rbac/")
 	if w, ok := x["workflow"].(map[string]any); ok && e.own {
 		e.keep(path, "Workflow", w)
@@ -240,4 +242,19 @@ func (e *emitter) mergeSensor(name string, kept map[string]any) bool {
 		ds[key] = have
 	}
 	return true
+}
+
+// emptyContext reports the context parameters that a run with no event leaves empty. A Sensor fills them from the
+// event payload; a CronWorkflow and a manual run have none.
+func (e *emitter) emptyContext(pp *plan, path string, f caps.Feature, who string) {
+	var names []string
+	for _, n := range sortedKeys(pp.ctx) {
+		if pp.ctx[n] {
+			names = append(names, n)
+		}
+	}
+	if len(names) == 0 {
+		return
+	}
+	e.external(path, f, "empty context parameters", who+" starts the template with no value for "+strings.Join(names, ", ")+"; a checkout then clones "+cloneHost+".git. Pass the values with argo submit -p, or set them under spec.workflowSpec.arguments")
 }

@@ -1,6 +1,7 @@
 package argo_test
 
 import (
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/internal/linttool"
 	"strings"
@@ -282,5 +283,21 @@ func TestPipelineWithNoJobsEmitsAValidPlaceholder(t *testing.T) {
 	}
 	if len(entries(rep, "no job")) == 0 {
 		t.Errorf("no report entry for the empty pipeline: %v", rep.Entries)
+	}
+}
+
+func TestScheduleAndManualRunsReportEmptyContext(t *testing.T) {
+	j := &ir.Job{ID: "build", Steps: []*ir.Step{actionStep("co", "actions", "checkout", nil), {ID: "run", Kind: ir.StepScript, Script: []string{"ls"}}}}
+	p := project(j)
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerSchedule, Cron: "0 3 * * *"}, {Kind: ir.TriggerManual}}
+	_, rep := emit(t, p)
+	n := 0
+	for _, e := range entries(rep, "no value for ctx-repo, ctx-sha") {
+		if e.Level == caps.External {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Errorf("%d empty-context entries, want 2 (cron and manual): %v", n, rep.Entries)
 	}
 }
