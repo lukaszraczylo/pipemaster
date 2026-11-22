@@ -1,49 +1,10 @@
 package tekton
 
-import (
-	"crypto/sha256"
-	"encoding/hex"
-	"regexp"
-	"strings"
-)
+import "github.com/lukaszraczylo/pipemaster/provider/internal/dnsid"
 
-const (
-	// maxName is the longest Kubernetes object or Tekton task name: a DNS-1123 label.
-	maxName    = 63
-	fallbackID = "default"
-	// hashLen is the number of hex digits of the digest that keeps truncated names apart.
-	hashLen = 8
-)
+const maxName = dnsid.MaxName
 
-var dnsLabel = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
+var fit = dnsid.Fit
 
-// SanitizeID makes id a DNS-1123 label: lowercase letters, digits and dashes, at most 63 bytes. A name that
-// needs truncation ends in a dash and a digest of the whole id, so two long ids with one prefix stay apart.
-func (adapter) SanitizeID(id string) string {
-	if len(id) <= maxName && dnsLabel.MatchString(id) {
-		return id
-	}
-	var b strings.Builder
-	for _, r := range strings.ToLower(id) {
-		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
-			b.WriteRune(r)
-		} else {
-			b.WriteByte('-')
-		}
-	}
-	out := strings.Trim(b.String(), "-")
-	if out == "" {
-		return fallbackID
-	}
-	return fit(out, id, maxName)
-}
-
-// fit shortens name to at most limit bytes. A shortened name ends in a dash and a digest of id.
-func fit(name, id string, limit int) string {
-	if len(name) <= limit {
-		return name
-	}
-	sum := sha256.Sum256([]byte(id))
-	keep := limit - hashLen - 1
-	return strings.TrimRight(name[:keep], "-") + "-" + hex.EncodeToString(sum[:])[:hashLen]
-}
+// SanitizeID makes id a DNS-1123 label of at most 63 bytes; see dnsid.Sanitize.
+func (adapter) SanitizeID(id string) string { return dnsid.Sanitize(id) }

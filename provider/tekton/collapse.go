@@ -317,13 +317,13 @@ func (b *jobBuilder) collapseMatrix() {
 		b.ignored(b.path, caps.JobMatrix, "the matrix combinations")
 		return
 	}
-	if names, ok := b.k.vals["matrix_include_names"].([]any); ok {
+	if names, ok := b.k.Out["matrix_include_names"].([]any); ok {
 		// The names of the expanded combinations are the emitter's; only the include entries can carry one.
 		tail := slices.Clone(names[min(len(names), len(want)-len(a.Include)):])
 		if len(tail) == 0 || !slices.ContainsFunc(tail, func(n any) bool { return n != "" }) {
-			delete(b.k.vals, "matrix_include_names")
+			delete(b.k.Out, "matrix_include_names")
 		} else {
-			b.k.vals["matrix_include_names"] = tail
+			b.k.Out["matrix_include_names"] = tail
 		}
 	}
 	b.job.Matrix = &ir.Matrix{Axes: a.Axes, Include: a.Include, Exclude: a.Exclude}

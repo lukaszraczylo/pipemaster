@@ -55,8 +55,8 @@ func (p *project) celFilterOf(lt listenerTrigger, k *sink, in interceptor, kinds
 		p.keepFilter(lt, k, in, filter, "marker ignored: the overlays were edited after pipemaster wrote them; ")
 		return nil
 	}
-	name, _ := text(lt.m.vals["name"])
-	for _, a := range markedFilters(lt.doc.head) {
+	name, _ := text(lt.m.Vals["name"])
+	for _, a := range markedFilters(lt.doc.Head) {
 		if a.Name != name {
 			continue
 		}
@@ -77,7 +77,7 @@ func (p *project) celFilterOf(lt listenerTrigger, k *sink, in interceptor, kinds
 		return nil
 	}
 	why := ""
-	for _, a := range markedFilters(lt.doc.head) {
+	for _, a := range markedFilters(lt.doc.Head) {
 		if want, ok := celFilter(a); ok && want == filter {
 			why = "marker ignored: the trigger was renamed after pipemaster wrote it; "
 		}
@@ -120,15 +120,15 @@ func scheduleTagOf(spec *omap) string {
 	walk = func(v any) {
 		switch t := v.(type) {
 		case *omap:
-			for _, k := range t.keys {
-				walk(t.vals[k])
+			for _, k := range t.Order {
+				walk(t.Vals[k])
 			}
 		case []any:
 			for _, e := range t {
 				walk(e)
 			}
 		case scal:
-			if m := scheduleTag.FindStringSubmatch(t.text()); m != nil && found == "" {
+			if m := scheduleTag.FindStringSubmatch(t.Text()); m != nil && found == "" {
 				found = m[1]
 			}
 		}
@@ -146,11 +146,11 @@ func (p *project) workspaceOf(pt *omap, path string) *workspaceArg {
 	if !ok {
 		return nil
 	}
-	arg, found := markedWorkspace(doc.head)
+	arg, found := markedWorkspace(doc.Head)
 	if !found {
 		return nil
 	}
-	spec, _ := asMap(doc.top.vals["spec"])
+	spec, _ := asMap(doc.Top.Vals["spec"])
 	why := ""
 	switch {
 	case !isWorkspaceBinding(valueOf(pt, "workspaces")):
@@ -163,7 +163,7 @@ func (p *project) workspaceOf(pt *omap, path string) *workspaceArg {
 	if why != "" {
 		p.rep.Add(report.Entry{
 			IRPath: path, Feature: caps.JobArtifacts, Level: caps.Lost, Strategy: "marker ignored",
-			Detail: "marker ignored: " + why + " after pipemaster wrote it; the workspace and the copy steps are kept as written", SourceLoc: doc.loc(0),
+			Detail: "marker ignored: " + why + " after pipemaster wrote it; the workspace and the copy steps are kept as written", SourceLoc: doc.Loc(0),
 		})
 		return nil
 	}
@@ -186,11 +186,11 @@ func markedWorkspace(head string) (workspaceArg, bool) {
 // onlyKeys reports whether the mapping holds exactly the given keys with the given text values.
 func onlyKeys(v any, want map[string]string) bool {
 	m, ok := asMap(v)
-	if !ok || len(m.keys) != len(want) {
+	if !ok || len(m.Order) != len(want) {
 		return false
 	}
 	for k, w := range want {
-		if got, ok := text(m.vals[k]); !ok || got != w {
+		if got, ok := text(m.Vals[k]); !ok || got != w {
 			return false
 		}
 	}
@@ -215,7 +215,7 @@ func copyStepsMatch(v any, a workspaceArg) bool {
 		m, ok := asMap(e)
 		name, _ := text(valueOf(m, "name"))
 		if ok && (name == saveStep || name == restoreStep) {
-			seen[name], _ = text(m.vals["script"])
+			seen[name], _ = text(m.Vals["script"])
 		}
 	}
 	for name, want := range map[string]string{saveStep: a.Save, restoreStep: a.Restore} {
@@ -279,11 +279,11 @@ func ctxNamesOf(v any) []string {
 
 // regenerate writes again the document that the emitter wrote, from the facts the document itself states.
 func regenerate(d *rawDoc) *outDoc {
-	meta, _ := asMap(d.top.vals["metadata"])
+	meta, _ := asMap(d.Top.Vals["metadata"])
 	name, _ := text(valueOf(meta, "name"))
-	spec, _ := asMap(d.top.vals["spec"])
+	spec, _ := asMap(d.Top.Vals["spec"])
 	e := &emitter{}
-	switch d.kind {
+	switch d.Kind {
 	case "TriggerBinding":
 		return e.bindingDoc(name, ctxNamesOf(valueOf(spec, "params")))
 	case kindTriggerTemplate:
@@ -302,7 +302,7 @@ func regenerate(d *rawDoc) *outDoc {
 	}
 	for _, g := range rbacDocs() {
 		gm, _ := asMap(plain2(g.root))
-		if kind, _ := text(valueOf(gm, "kind")); gm != nil && kind == d.kind {
+		if kind, _ := text(valueOf(gm, "kind")); gm != nil && kind == d.Kind {
 			if gmeta, _ := asMap(valueOf(gm, "metadata")); gmeta != nil {
 				if n, _ := text(valueOf(gmeta, "name")); n == name {
 					return g
@@ -323,7 +323,7 @@ func plain2(n *yaml.Node) any {
 	if err != nil || len(docs) == 0 {
 		return nil
 	}
-	return docs[0].top
+	return docs[0].Top
 }
 
 // unchanged reports whether a document that carries the generated marker is still what the emitter writes.
@@ -333,12 +333,12 @@ func unchanged(d *rawDoc) bool {
 		return false
 	}
 	want, err1 := json.Marshal(plain(plain2(gen.root)))
-	got, err2 := json.Marshal(plain(d.top))
+	got, err2 := json.Marshal(plain(d.Top))
 	return err1 == nil && err2 == nil && string(got) == string(want)
 }
 
 func isGenerated(d *rawDoc) bool {
-	return strings.Contains(d.head, strings.TrimPrefix(generatedMarker, "# "))
+	return strings.Contains(d.Head, strings.TrimPrefix(generatedMarker, "# "))
 }
 
 // dropGenerated removes the documents that the emitter wrote whole and nobody edited from the resources.
@@ -352,7 +352,7 @@ func (p *project) dropGenerated() {
 		default:
 			p.rep.Add(report.Entry{
 				IRPath: "pipeline/", Feature: caps.ExtPassthrough, Level: caps.Lost, Strategy: "marker ignored",
-				Detail: "marker ignored: the " + d.kind + " was edited after pipemaster wrote it; it is kept in Ext", SourceLoc: d.loc(0),
+				Detail: "marker ignored: the " + d.Kind + " was edited after pipemaster wrote it; it is kept in Ext", SourceLoc: d.Loc(0),
 			})
 			kept = append(kept, d)
 		}

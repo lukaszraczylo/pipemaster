@@ -10,6 +10,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
@@ -37,7 +38,7 @@ func (c *plCtx) taskID(name string) (string, bool) {
 
 func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 	if src.spec == nil {
-		return nil, fmt.Errorf("%s: Pipeline %q needs a spec", src.doc.loc(0), src.name)
+		return nil, fmt.Errorf("%s: Pipeline %q needs a spec", src.doc.Loc(0), src.name)
 	}
 	id := src.name
 	if m := valueOf2(src.meta, "name"); m != "" {
@@ -47,33 +48,33 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 		id = fallbackPipelineID
 	}
 	pl := &ir.Pipeline{ID: id}
-	k := newSink(p.rep, src.doc.file, "pipeline/"+id)
+	k := newSink(p.rep, src.doc.File, "pipeline/"+id)
 	r := newReader(src.spec)
-	c := &plCtx{p: p, k: k, ids: map[string]string{}, file: src.doc.file, plID: id}
-	if name, ok := textOf(r.take("displayName")); ok {
+	c := &plCtx{p: p, k: k, ids: map[string]string{}, file: src.doc.File, plID: id}
+	if name, ok := textOf(r.Take("displayName")); ok {
 		pl.Name = name
 	}
-	if v, ok := r.take("description"); ok {
-		k.vals["description"] = plain(v)
+	if v, ok := r.Take("description"); ok {
+		k.Out["description"] = plain(v)
 	}
 	p.metadata(src, k)
-	renames, err := p.params(pl, k, r, readInputNames(src.doc.head, id))
+	renames, err := p.params(pl, k, r, readInputNames(src.doc.Head, id))
 	if err != nil {
 		return nil, err
 	}
-	pipeWS, hasWS := r.take("workspaces")
-	if v, ok := r.take("results"); ok {
-		k.keep("results", v, caps.ExtPassthrough, "pipeline results have no IR field; kept in Ext", r.line("results"))
+	pipeWS, hasWS := r.Take("workspaces")
+	if v, ok := r.Take("results"); ok {
+		k.Keep("results", v, caps.ExtPassthrough, "pipeline results have no IR field; kept in Ext", r.Line("results"))
 	}
-	tasks, ok := r.take("tasks")
+	tasks, ok := r.Take("tasks")
 	if !ok {
-		return nil, fmt.Errorf("%s: Pipeline %q needs spec.tasks", src.doc.loc(0), id)
+		return nil, fmt.Errorf("%s: Pipeline %q needs spec.tasks", src.doc.Loc(0), id)
 	}
-	finally, _ := r.take("finally")
-	k.keepRest(r)
+	finally, _ := r.Take("finally")
+	k.KeepRest(r)
 	envVars := c.copiedEnv(src, id)
 	if err := c.jobs(pl, tasks, finally); err != nil {
-		return nil, fmt.Errorf("%s: %w", src.doc.file, err)
+		return nil, fmt.Errorf("%s: %w", src.doc.File, err)
 	}
 	emitkit.RewriteInputRefs(pl, renames)
 	if envVars != nil && !c.envBad {
@@ -84,10 +85,10 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 			pipeWS = withoutWorkspace(pipeWS)
 		}
 		if pipeWS != nil {
-			k.keep("workspaces", pipeWS, caps.ExtPassthrough, "pipeline workspaces have no IR field; kept in Ext", r.line("workspaces"))
+			k.Keep("workspaces", pipeWS, caps.ExtPassthrough, "pipeline workspaces have no IR field; kept in Ext", r.Line("workspaces"))
 		}
 	}
-	pl.Ext = k.ext()
+	pl.Ext = k.Ext()
 	return pl, nil
 }
 
@@ -96,42 +97,42 @@ func valueOf2(m *omap, key string) string {
 	if m == nil {
 		return ""
 	}
-	return m.marks[key]
+	return m.Marks[key]
 }
 
 // metadata keeps the metadata keys with no IR field, and the run that embeds a pipeline.
 func (p *project) metadata(src *pipeSrc, k *sink) {
 	if src.meta != nil {
-		rest := &omap{vals: map[string]any{}, lines: map[string]int{}}
-		for _, key := range src.meta.keys {
+		rest := ynode.NewMap()
+		for _, key := range src.meta.Order {
 			if key != "name" {
-				rest.set(key, src.meta.vals[key], src.meta.lines[key])
+				rest.Set(key, src.meta.Vals[key], src.meta.Lines[key])
 			}
 		}
-		if len(rest.keys) > 0 {
-			k.keep("metadata", rest, caps.ExtPassthrough, "metadata labels and annotations have no IR field; kept in Ext", src.meta.lines["labels"])
+		if len(rest.Order) > 0 {
+			k.Keep("metadata", rest, caps.ExtPassthrough, "metadata labels and annotations have no IR field; kept in Ext", src.meta.Lines["labels"])
 		}
-		if ann, ok := asMap(src.meta.vals["annotations"]); ok && src.run != nil {
-			for _, key := range ann.keys {
+		if ann, ok := asMap(src.meta.Vals["annotations"]); ok && src.run != nil {
+			for _, key := range ann.Order {
 				if strings.HasPrefix(key, pacPrefix) {
-					k.note(caps.TriggerPush, "Pipelines-as-Code annotation "+key+" has trigger semantics that the IR does not read; kept in Ext", ann.lines[key])
+					k.Note(caps.TriggerPush, "Pipelines-as-Code annotation "+key+" has trigger semantics that the IR does not read; kept in Ext", ann.Lines[key])
 					break
 				}
 			}
 		}
 	}
 	if src.run != nil {
-		spec, _ := asMap(src.run.top.vals["spec"])
-		run := &omap{vals: map[string]any{}, lines: map[string]int{}}
+		spec, _ := asMap(src.run.Top.Vals["spec"])
+		run := ynode.NewMap()
 		if spec != nil {
-			for _, key := range spec.keys {
+			for _, key := range spec.Order {
 				if key != "pipelineSpec" {
-					run.set(key, spec.vals[key], spec.lines[key])
+					run.Set(key, spec.Vals[key], spec.Lines[key])
 				}
 			}
 		}
-		if len(run.keys) > 0 {
-			k.keep("pipelineRun", run, caps.ExtPassthrough, "the PipelineRun spec beside pipelineSpec has no IR field; kept in Ext", src.run.line)
+		if len(run.Order) > 0 {
+			k.Keep("pipelineRun", run, caps.ExtPassthrough, "the PipelineRun spec beside pipelineSpec has no IR field; kept in Ext", src.run.Line)
 		}
 	}
 }
@@ -148,7 +149,7 @@ func readInputNames(head, id string) map[string]string {
 // params maps the pipeline params to inputs. A ctx-* param is the context vocabulary and maps to nothing.
 // names maps the params that the emitter renamed to their input names; the result holds the renames that apply.
 func (p *project) params(pl *ir.Pipeline, k *sink, r *reader, names map[string]string) (map[string]string, error) {
-	v, ok := r.take("params")
+	v, ok := r.Take("params")
 	if !ok {
 		p.staleInputNames(k, names, nil)
 		return nil, nil
@@ -157,11 +158,11 @@ func (p *project) params(pl *ir.Pipeline, k *sink, r *reader, names map[string]s
 	if !ok {
 		return nil, fmt.Errorf("spec.params must be a list")
 	}
-	extra := &omap{vals: map[string]any{}, lines: map[string]int{}}
+	extra := ynode.NewMap()
 	have := map[string]bool{}
 	for _, e := range list {
 		if m, ok := asMap(e); ok {
-			n, _ := text(m.vals["name"])
+			n, _ := text(m.Vals["name"])
 			have[n] = true
 		}
 	}
@@ -171,7 +172,7 @@ func (p *project) params(pl *ir.Pipeline, k *sink, r *reader, names map[string]s
 		if !ok {
 			return nil, fmt.Errorf("param %d must be a mapping", i+1)
 		}
-		name, _ := text(m.vals["name"])
+		name, _ := text(m.Vals["name"])
 		if name == "" {
 			return nil, fmt.Errorf("param %d needs a name", i+1)
 		}
@@ -184,29 +185,29 @@ func (p *project) params(pl *ir.Pipeline, k *sink, r *reader, names map[string]s
 			renames[name] = orig
 		}
 		pr := newReader(m)
-		pr.take("name")
-		if t, ok := textOf(pr.take("type")); ok {
+		pr.Take("name")
+		if t, ok := textOf(pr.Take("type")); ok {
 			in.Type = t
 		}
-		if t, ok := textOf(pr.take("description")); ok {
+		if t, ok := textOf(pr.Take("description")); ok {
 			in.Description = t
 		}
-		def, hasDef := pr.take("default")
+		def, hasDef := pr.Take("default")
 		if t, ok := text(def); ok {
 			in.Default = t
 		} else if hasDef {
-			pr.release("default")
+			pr.Release("default")
 		}
 		in.Required = !hasDef
-		if rest := pr.rest(); len(rest) > 0 {
-			sub := m.subset(rest)
-			extra.set(in.Name, sub, m.lines[name])
-			k.note(caps.PipelineInputs, "param "+name+": key "+strings.Join(rest, ", ")+" has no IR field; kept in Ext", m.lines[name])
+		if rest := pr.Rest(); len(rest) > 0 {
+			sub := m.Subset(rest)
+			extra.Set(in.Name, sub, m.Lines[name])
+			k.Note(caps.PipelineInputs, "param "+name+": key "+strings.Join(rest, ", ")+" has no IR field; kept in Ext", m.Lines[name])
 		}
 		pl.Inputs = append(pl.Inputs, in)
 	}
-	if len(extra.keys) > 0 {
-		k.vals["params"] = plain(extra)
+	if len(extra.Order) > 0 {
+		k.Out["params"] = plain(extra)
 	}
 	p.staleInputNames(k, names, renames)
 	return renames, nil
@@ -217,8 +218,8 @@ func (p *project) staleInputNames(k *sink, names, applied map[string]string) {
 	for _, param := range sortedKeys(names) {
 		if _, ok := applied[param]; !ok {
 			p.rep.Add(report.Entry{
-				IRPath: k.path, Feature: caps.PipelineInputs, Level: caps.Lost, Strategy: "marker ignored",
-				Detail: "marker ignored: the param " + param + " was edited after pipemaster wrote it; the file content is kept", SourceLoc: k.file,
+				IRPath: k.Path, Feature: caps.PipelineInputs, Level: caps.Lost, Strategy: "marker ignored",
+				Detail: "marker ignored: the param " + param + " was edited after pipemaster wrote it; the file content is kept", SourceLoc: k.File,
 			})
 		}
 	}
@@ -227,7 +228,7 @@ func (p *project) staleInputNames(k *sink, names, applied map[string]string) {
 // copiedEnv reads the pipeline env that the marker holds; the jobs check it against their stepTemplate.
 func (c *plCtx) copiedEnv(src *pipeSrc, id string) []ir.Var {
 	var a envArg
-	if !readMarks(src.doc.head).arg(caps.PipelineEnv, "pipeline/"+id, &a) {
+	if !readMarks(src.doc.Head).arg(caps.PipelineEnv, "pipeline/"+id, &a) {
 		return nil
 	}
 	var vars []ir.Var

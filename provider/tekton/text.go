@@ -3,7 +3,6 @@ package tekton
 import (
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/expr"
@@ -158,20 +157,7 @@ func (x *texts) parts(s string) []expr.Part {
 		i += end + 1
 	}
 	flush()
-	return mergeText(parts)
-}
-
-// mergeText joins adjacent text parts so a bound literal reads as one text.
-func mergeText(parts []expr.Part) []expr.Part {
-	var out []expr.Part
-	for _, p := range parts {
-		if n := len(out); n > 0 && p.Expr == nil && out[n-1].Expr == nil {
-			out[n-1].Text += p.Text
-			continue
-		}
-		out = append(out, p)
-	}
-	return out
+	return expr.MergeText(parts)
 }
 
 // template reads s as canonical script text.
@@ -188,71 +174,9 @@ func (x *texts) value(s string) ir.Value {
 	var lit strings.Builder
 	for _, p := range parts {
 		if p.Expr != nil {
-			return ir.Value{Kind: ir.ValueExpr, Expr: mixFormat(parts)}
+			return ir.Value{Kind: ir.ValueExpr, Expr: expr.JoinParts(parts)}
 		}
 		lit.WriteString(p.Text)
 	}
 	return ir.Value{Lit: lit.String()}
-}
-
-// mixFormat joins parts into one expression: a lone reference stays itself, and text around references
-// becomes format('..{0}..', args) with literal braces doubled.
-func mixFormat(parts []expr.Part) expr.Expr {
-	if len(parts) == 1 && parts[0].Expr != nil {
-		return parts[0].Expr
-	}
-	var pat strings.Builder
-	args := []expr.Expr{nil}
-	for _, p := range parts {
-		if p.Expr == nil {
-			pat.WriteString(strings.NewReplacer("{", "{{", "}", "}}").Replace(p.Text))
-			continue
-		}
-		pat.WriteString("{" + strconv.Itoa(len(args)-1) + "}")
-		args = append(args, p.Expr)
-	}
-	args[0] = expr.Lit{Kind: expr.LitStr, Str: pat.String()}
-	return expr.Call{Name: "format", Args: args}
-}
-
-// renameNeeds rewrites the job in every needs reference of e.
-func renameNeeds(e expr.Expr, rename func(string) string) expr.Expr {
-	switch v := e.(type) {
-	case expr.Ref:
-		if len(v.Path) > 1 && v.Path[0] == expr.PrefixNeeds {
-			p := append([]string(nil), v.Path...)
-			p[1] = rename(p[1])
-			return expr.Ref{Path: p}
-		}
-	case expr.Unary:
-		return expr.Unary{Op: v.Op, X: renameNeeds(v.X, rename)}
-	case expr.Binary:
-		return expr.Binary{Op: v.Op, L: renameNeeds(v.L, rename), R: renameNeeds(v.R, rename)}
-	case expr.Call:
-		args := make([]expr.Expr, len(v.Args))
-		for i, a := range v.Args {
-			args[i] = renameNeeds(a, rename)
-		}
-		return expr.Call{Name: v.Name, Args: args}
-	}
-	return e
-}
-
-// needRefs lists the jobs that e reads a result or status of.
-func needRefs(e expr.Expr, add func(string)) {
-	switch v := e.(type) {
-	case expr.Ref:
-		if len(v.Path) > 1 && v.Path[0] == expr.PrefixNeeds {
-			add(v.Path[1])
-		}
-	case expr.Unary:
-		needRefs(v.X, add)
-	case expr.Binary:
-		needRefs(v.L, add)
-		needRefs(v.R, add)
-	case expr.Call:
-		for _, a := range v.Args {
-			needRefs(a, add)
-		}
-	}
 }

@@ -15,38 +15,38 @@ func (b *jobBuilder) body(spec *omap, r *reader) error {
 	if r == nil {
 		r = newReader(spec)
 	}
-	if v, ok := r.take("params"); ok {
-		if err := b.taskParams(v, r.line("params")); err != nil {
+	if v, ok := r.Take("params"); ok {
+		if err := b.taskParams(v, r.Line("params")); err != nil {
 			return err
 		}
 	}
-	if v, ok := r.take("stepTemplate"); ok {
-		if err := b.stepTemplate(v, r.line("stepTemplate")); err != nil {
+	if v, ok := r.Take("stepTemplate"); ok {
+		if err := b.stepTemplate(v, r.Line("stepTemplate")); err != nil {
 			return err
 		}
 	}
-	sv, ok := r.take("steps")
+	sv, ok := r.Take("steps")
 	if !ok {
 		return fmt.Errorf("a Task needs steps")
 	}
 	if err := b.steps(sv); err != nil {
 		return err
 	}
-	if v, ok := r.take("sidecars"); ok {
+	if v, ok := r.Take("sidecars"); ok {
 		if err := b.sidecars(v); err != nil {
 			return err
 		}
 	}
-	if v, ok := r.take("results"); ok {
-		b.results(v, r.line("results"))
+	if v, ok := r.Take("results"); ok {
+		b.results(v, r.Line("results"))
 	}
-	if v, ok := r.take("workspaces"); ok && b.ws == nil {
-		b.k.keep("task_workspaces", v, caps.ExtPassthrough, "Task workspaces have no IR field; kept in Ext", r.line("workspaces"))
+	if v, ok := r.Take("workspaces"); ok && b.ws == nil {
+		b.k.Keep("task_workspaces", v, caps.ExtPassthrough, "Task workspaces have no IR field; kept in Ext", r.Line("workspaces"))
 	}
-	if v, ok := r.take("description"); ok {
-		b.k.vals["task_description"] = plain(v)
+	if v, ok := r.Take("description"); ok {
+		b.k.Out["task_description"] = plain(v)
 	}
-	b.k.keepRestAs(r, taskKeyPrefix)
+	b.k.KeepRestAs(r, taskKeyPrefix)
 	b.unused()
 	return nil
 }
@@ -66,24 +66,24 @@ func (b *jobBuilder) taskParams(v any, line int) error {
 			return fmt.Errorf("a Task param needs a name")
 		}
 		r := newReader(m)
-		r.take("name")
-		r.take("type")
-		if t, ok := text(m.vals["type"]); ok && t != "string" {
-			r.release("type")
+		r.Take("name")
+		r.Take("type")
+		if t, ok := text(m.Vals["type"]); ok && t != "string" {
+			r.Release("type")
 		}
-		if d, ok := text(r.m.vals["default"]); ok {
-			r.take("default")
+		if d, ok := text(r.M.Vals["default"]); ok {
+			r.Take("default")
 			b.tx.defaults[name] = d
 		}
-		if rest := r.rest(); len(rest) > 0 {
+		if rest := r.Rest(); len(rest) > 0 {
 			kept = append(kept, plain(m))
-			b.k.note(caps.ExtPassthrough, "Task param "+name+": key "+rest[0]+" has no IR form; kept in Ext", line)
+			b.k.Note(caps.ExtPassthrough, "Task param "+name+": key "+rest[0]+" has no IR form; kept in Ext", line)
 		} else if b.opaque[name] {
 			kept = append(kept, plain(m))
 		}
 	}
 	if len(kept) > 0 {
-		b.k.vals["task_params"] = kept
+		b.k.Out["task_params"] = kept
 	}
 	return nil
 }
@@ -97,7 +97,7 @@ func (b *jobBuilder) unused() {
 		}
 	}
 	if len(rest) > 0 {
-		b.k.vals["unused_params"] = rest
-		b.k.note(caps.ExtPassthrough, "params that the Task does not read are kept in Ext", 0)
+		b.k.Out["unused_params"] = rest
+		b.k.Note(caps.ExtPassthrough, "params that the Task does not read are kept in Ext", 0)
 	}
 }

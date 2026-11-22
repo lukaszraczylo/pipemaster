@@ -8,6 +8,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
@@ -44,9 +45,9 @@ func readInterceptor(v any) (interceptor, bool) {
 		return interceptor{}, false
 	}
 	in := interceptor{raw: m, params: map[string]any{}}
-	if ref, ok := asMap(m.vals["ref"]); ok {
-		in.name, _ = text(ref.vals["name"])
-		if ps, ok := m.vals["params"].([]any); ok {
+	if ref, ok := asMap(m.Vals["ref"]); ok {
+		in.name, _ = text(ref.Vals["name"])
+		if ps, ok := m.Vals["params"].([]any); ok {
 			for _, e := range ps {
 				pm, _ := asMap(e)
 				if n, ok := text(valueOf(pm, "name")); ok {
@@ -56,11 +57,11 @@ func readInterceptor(v any) (interceptor, bool) {
 		}
 		return in, in.name != ""
 	}
-	if len(m.keys) == 1 {
-		in.name = m.keys[0]
-		if body, ok := asMap(m.vals[in.name]); ok {
-			for _, k := range body.keys {
-				in.params[k] = body.vals[k]
+	if len(m.Order) == 1 {
+		in.name = m.Order[0]
+		if body, ok := asMap(m.Vals[in.name]); ok {
+			for _, k := range body.Order {
+				in.params[k] = body.Vals[k]
 			}
 		}
 		return in, true
@@ -85,9 +86,9 @@ type listenerTrigger struct {
 // maps to no parsed pipeline stays in Ext[resources] inside a copy of its EventListener.
 func (p *project) triggers(byName map[string]*ir.Pipeline) {
 	for _, d := range p.listeners {
-		meta, _ := asMap(d.top.vals["metadata"])
+		meta, _ := asMap(d.Top.Vals["metadata"])
 		el, _ := text(valueOf(meta, "name"))
-		spec, _ := asMap(d.top.vals["spec"])
+		spec, _ := asMap(d.Top.Vals["spec"])
 		list, _ := valueOf(spec, "triggers").([]any)
 		var unmapped []any
 		for _, e := range list {
@@ -97,10 +98,10 @@ func (p *project) triggers(byName map[string]*ir.Pipeline) {
 				continue
 			}
 			lt := listenerTrigger{doc: d, m: m, spec: spec, meta: meta, el: el}
-			if ref, ok := text(m.vals["triggerRef"]); ok {
+			if ref, ok := text(m.Vals["triggerRef"]); ok {
 				lt.ref = ref
 				if td, found := p.trigDocs[ref]; found {
-					if tm, ok := asMap(td.top.vals["spec"]); ok {
+					if tm, ok := asMap(td.Top.Vals["spec"]); ok {
 						lt.m, lt.refDoc = tm, td
 					}
 				}
@@ -121,25 +122,25 @@ func (p *project) triggers(byName map[string]*ir.Pipeline) {
 
 // listenerCopy is the EventListener with only the triggers that map to no pipeline.
 func listenerCopy(d *rawDoc, unmapped []any) *rawDoc {
-	view, _ := plain(d.top).(map[string]any)
+	view, _ := plain(d.Top).(map[string]any)
 	if spec, ok := view["spec"].(map[string]any); ok {
 		spec["triggers"] = unmapped
 	}
 	cp := *d
-	cp.view = view
+	cp.View = view
 	return &cp
 }
 
 // templateName reads the TriggerTemplate that a trigger names.
 func templateName(m *omap) string {
-	tm, ok := asMap(m.vals["template"])
+	tm, ok := asMap(m.Vals["template"])
 	if !ok {
 		return ""
 	}
-	if n, ok := text(tm.vals["ref"]); ok {
+	if n, ok := text(tm.Vals["ref"]); ok {
 		return n
 	}
-	n, _ := text(tm.vals["name"])
+	n, _ := text(tm.Vals["name"])
 	return n
 }
 
@@ -149,7 +150,7 @@ func (p *project) pipelineOf(tpl string) string {
 	if !ok {
 		return ""
 	}
-	spec, _ := asMap(d.top.vals["spec"])
+	spec, _ := asMap(d.Top.Vals["spec"])
 	rts, _ := valueOf(spec, "resourcetemplates").([]any)
 	for _, e := range rts {
 		rm, _ := asMap(e)
@@ -173,42 +174,42 @@ func (p *project) trigger(lt listenerTrigger, byName map[string]*ir.Pipeline) bo
 		return false
 	}
 	path := "pipeline/" + pl.ID + "/trigger/" + lt.el
-	k := newSink(p.rep, lt.doc.file, path)
-	k.vals["listener"] = lt.el
-	name, _ := text(lt.m.vals["name"])
+	k := newSink(p.rep, lt.doc.File, path)
+	k.Out["listener"] = lt.el
+	name, _ := text(lt.m.Vals["name"])
 	if name != "" {
-		k.vals["name"] = name
+		k.Out["name"] = name
 	}
 	if tpl != "" {
-		k.vals["template"] = tpl
+		k.Out["template"] = tpl
 	}
 	if lt.ref != "" {
-		k.vals["triggerRef"] = lt.ref
+		k.Out["triggerRef"] = lt.ref
 	}
 	if lt.refDoc != nil {
-		k.keepMeta("triggerMetadata", lt.refDoc.top, "Trigger", lt.refDoc.line)
+		k.KeepMeta("triggerMetadata", lt.refDoc.Top, "Trigger", lt.refDoc.Line)
 	}
 	if lt.meta != nil {
-		k.keepMeta("listenerMetadata", lt.doc.top, "EventListener", lt.doc.line)
+		k.KeepMeta("listenerMetadata", lt.doc.Top, "EventListener", lt.doc.Line)
 	}
-	if b := lt.m.vals["bindings"]; b != nil {
-		k.vals["bindings"] = plain(b)
+	if b := lt.m.Vals["bindings"]; b != nil {
+		k.Out["bindings"] = plain(b)
 	}
-	if sa, ok := text(lt.m.vals["serviceAccountName"]); ok {
-		k.vals["serviceAccountName"] = sa
+	if sa, ok := text(lt.m.Vals["serviceAccountName"]); ok {
+		k.Out["serviceAccountName"] = sa
 	} else if sa, ok := text(valueOf(lt.spec, "serviceAccountName")); ok {
-		k.vals["serviceAccountName"] = sa
-		k.vals[extSAScope] = saScopeSpec
+		k.Out["serviceAccountName"] = sa
+		k.Out[extSAScope] = saScopeSpec
 	}
 	if lt.spec != nil {
-		rest := &omap{vals: map[string]any{}, lines: map[string]int{}}
-		for _, key := range lt.spec.keys {
+		rest := ynode.NewMap()
+		for _, key := range lt.spec.Order {
 			if key != "triggers" && key != "serviceAccountName" {
-				rest.set(key, lt.spec.vals[key], lt.spec.lines[key])
+				rest.Set(key, lt.spec.Vals[key], lt.spec.Lines[key])
 			}
 		}
-		if len(rest.keys) > 0 {
-			k.keep("listenerSpec", rest, caps.ExtPassthrough, "EventListener keys beside triggers have no IR field; kept in Ext", lt.doc.line)
+		if len(rest.Order) > 0 {
+			k.Keep("listenerSpec", rest, caps.ExtPassthrough, "EventListener keys beside triggers have no IR field; kept in Ext", lt.doc.Line)
 		}
 	}
 	events, restored := p.interceptors(lt, k, p.pipelineOf(tpl))
@@ -221,9 +222,9 @@ func (p *project) trigger(lt listenerTrigger, byName map[string]*ir.Pipeline) bo
 	switch {
 	case restored != nil && restored.Kind == ir.TriggerSchedule:
 	case restored != nil:
-		pruneGenerated(k.vals, restored.Name, p.pipelineOf(tpl), generatedListenerName(restored.Kind))
+		pruneGenerated(k.Out, restored.Name, p.pipelineOf(tpl), generatedListenerName(restored.Kind))
 		pl.Triggers = append(pl.Triggers, ir.Trigger{
-			Kind: restored.Kind, Branches: restored.Branches, Tags: restored.Tags, Paths: restored.Paths, Ext: extFrom(k.vals),
+			Kind: restored.Kind, Branches: restored.Branches, Tags: restored.Tags, Paths: restored.Paths, Ext: extFrom(k.Out),
 		})
 	default:
 		pl.Triggers = append(pl.Triggers, buildTriggers(events, k)...)
@@ -236,7 +237,7 @@ func (p *project) trigger(lt listenerTrigger, byName map[string]*ir.Pipeline) bo
 // A trigger that carries anything beyond what the emitter writes keeps the whole list, in order, and the marker
 // is ignored.
 func (p *project) interceptors(lt listenerTrigger, k *sink, pipeline string) ([]ir.TriggerKind, *filterArg) {
-	list, _ := lt.m.vals["interceptors"].([]any)
+	list, _ := lt.m.Vals["interceptors"].([]any)
 	var kinds []ir.TriggerKind
 	var all []any
 	var cel *interceptor
@@ -268,7 +269,7 @@ func (p *project) interceptors(lt listenerTrigger, k *sink, pipeline string) ([]
 	if restored != nil && restored.Kind == ir.TriggerSchedule {
 		want = "c"
 	}
-	name, _ := text(lt.m.vals["name"])
+	name, _ := text(lt.m.Vals["name"])
 	if restored != nil && restored.Kind == ir.TriggerSchedule {
 		// The emitter names the entry after the CronJob; any other name is an edit.
 		name = scheduleEntryName(restored.Name, name)
@@ -279,15 +280,15 @@ func (p *project) interceptors(lt listenerTrigger, k *sink, pipeline string) ([]
 		restored = nil
 	}
 	if restored == nil && len(all) > 0 {
-		k.vals["interceptors"] = all
-		k.note(caps.ExtPassthrough, "interceptors are kept in Ext in their order", lt.doc.line)
+		k.Out["interceptors"] = all
+		k.Note(caps.ExtPassthrough, "interceptors are kept in Ext in their order", lt.doc.Line)
 	}
 	return kinds, restored
 }
 
 // hasCEL tells a trigger that has a CEL interceptor.
 func hasCEL(lt listenerTrigger) bool {
-	list, _ := lt.m.vals["interceptors"].([]any)
+	list, _ := lt.m.Vals["interceptors"].([]any)
 	for _, e := range list {
 		if in, ok := readInterceptor(e); ok && in.name == interceptorCEL {
 			return true
@@ -302,12 +303,12 @@ var triggerFeature = map[ir.TriggerKind]caps.Feature{
 
 // reportFilteredTrigger reports each event kind whose CEL filter has no IR form.
 func (p *project) reportFilteredTrigger(lt listenerTrigger, pl *ir.Pipeline, kinds []ir.TriggerKind) {
-	name, _ := text(lt.m.vals["name"])
+	name, _ := text(lt.m.Vals["name"])
 	for _, kind := range kinds {
 		p.rep.Add(report.Entry{
 			IRPath: "pipeline/" + pl.ID + "/trigger/" + lt.el, Feature: triggerFeature[kind], Level: caps.Lost, Strategy: strategyExt,
 			Detail:    "the trigger " + name + " has a CEL filter with no IR form, so the " + string(kind) + " trigger is not converted; it becomes an api trigger that other providers never start, and the entry is kept in Ext",
-			SourceLoc: lt.doc.loc(0),
+			SourceLoc: lt.doc.Loc(0),
 		})
 	}
 }
@@ -315,7 +316,7 @@ func (p *project) reportFilteredTrigger(lt listenerTrigger, pl *ir.Pipeline, kin
 // editedAround reports whether the listener keys of a marked trigger differ from what the emitter writes.
 func (p *project) editedAround(k *sink, trigger, pipeline, listener string) bool {
 	tmp := map[string]any{}
-	for key, v := range k.vals {
+	for key, v := range k.Out {
 		tmp[key] = v
 	}
 	pruneGenerated(tmp, trigger, pipeline, listener)
@@ -326,13 +327,13 @@ func (p *project) editedAround(k *sink, trigger, pipeline, listener string) bool
 // keepFilter keeps a CEL filter as opaque Tekton text.
 func (p *project) keepFilter(lt listenerTrigger, k *sink, in interceptor, filter, why string) {
 	raw, _ := json.Marshal(map[string]any{"cel": filter})
-	k.vals["filter"] = expr.String(expr.Opaque{Dialect: dialect, Text: string(raw)})
+	k.Out["filter"] = expr.String(expr.Opaque{Dialect: dialect, Text: string(raw)})
 	if ov, ok := in.params[paramOverlays]; ok {
-		k.vals[extOverlays] = plain(ov)
+		k.Out[extOverlays] = plain(ov)
 	}
 	p.rep.Add(report.Entry{
-		IRPath: k.path, Feature: caps.ExprOpaque, Level: caps.Lost, Strategy: "kept as opaque Tekton text",
-		Detail: why + "a CEL filter has no IR trigger condition; it is kept as opaque Tekton text in Ext: " + filter, SourceLoc: lt.doc.loc(0),
+		IRPath: k.Path, Feature: caps.ExprOpaque, Level: caps.Lost, Strategy: "kept as opaque Tekton text",
+		Detail: why + "a CEL filter has no IR trigger condition; it is kept as opaque Tekton text in Ext: " + filter, SourceLoc: lt.doc.Loc(0),
 	})
 }
 
@@ -355,8 +356,8 @@ func githubKinds(in interceptor) (kinds []ir.TriggerKind, whole bool) {
 	types, _ := textList(in.params[paramEventTypes])
 	n := 1
 	if v, ok := in.params[paramChangedFiles]; ok {
-		if m, isMap := asMap(v); isMap && len(m.keys) == 1 {
-			if on, _ := text(m.vals["enabled"]); on == "true" {
+		if m, isMap := asMap(v); isMap && len(m.Order) == 1 {
+			if on, _ := text(m.Vals["enabled"]); on == "true" {
 				n++
 			}
 		}
@@ -385,7 +386,7 @@ func buildTriggers(kinds []ir.TriggerKind, k *sink) []ir.Trigger {
 	}
 	var out []ir.Trigger
 	for _, kind := range kinds {
-		out = append(out, ir.Trigger{Kind: kind, Ext: extFrom(k.vals)})
+		out = append(out, ir.Trigger{Kind: kind, Ext: extFrom(k.Out)})
 	}
 	return out
 }
@@ -422,7 +423,7 @@ func deepCopy(v any) any {
 // cronJobs maps a CronJob that posts to an EventListener service to schedule triggers of its pipelines.
 func (p *project) cronJobs(byName map[string]*ir.Pipeline) {
 	for _, d := range p.crons {
-		spec, _ := asMap(d.top.vals["spec"])
+		spec, _ := asMap(d.Top.Vals["spec"])
 		sched, ok := text(valueOf(spec, "schedule"))
 		els := listenersIn(spec)
 		pls := p.pipelinesOf(els, byName)
@@ -433,29 +434,29 @@ func (p *project) cronJobs(byName map[string]*ir.Pipeline) {
 			p.resources = append(p.resources, d)
 			continue
 		}
-		meta, _ := asMap(d.top.vals["metadata"])
+		meta, _ := asMap(d.Top.Vals["metadata"])
 		name, _ := text(valueOf(meta, "name"))
-		rest := &omap{vals: map[string]any{}, lines: map[string]int{}}
-		for _, key := range spec.keys {
+		rest := ynode.NewMap()
+		for _, key := range spec.Order {
 			if key != "schedule" {
-				rest.set(key, spec.vals[key], spec.lines[key])
+				rest.Set(key, spec.Vals[key], spec.Lines[key])
 			}
 		}
 		for _, pl := range pls {
-			k := newSink(p.rep, d.file, "pipeline/"+pl.ID+"/trigger/"+name)
+			k := newSink(p.rep, d.File, "pipeline/"+pl.ID+"/trigger/"+name)
 			if !isGenerated(d) || !unchanged(d) {
 				cj := map[string]any{"name": name, "spec": plain(rest)}
-				if mr := metaRest(meta); len(mr.keys) > 0 {
+				if mr := metaRest(meta); len(mr.Order) > 0 {
 					cj["metadata"] = plain(mr)
 				}
-				k.vals["cronjob"] = cj
+				k.Out["cronjob"] = cj
 				why := ""
 				if isGenerated(d) {
 					why = "marker ignored: the CronJob was edited after pipemaster wrote it; "
 				}
-				k.note(caps.TriggerSchedule, why+"the CronJob that posts to the EventListener has no IR field beside the schedule; kept in Ext", d.line)
+				k.Note(caps.TriggerSchedule, why+"the CronJob that posts to the EventListener has no IR field beside the schedule; kept in Ext", d.Line)
 			}
-			pl.Triggers = append(pl.Triggers, ir.Trigger{Kind: ir.TriggerSchedule, Cron: sched, Ext: k.ext()})
+			pl.Triggers = append(pl.Triggers, ir.Trigger{Kind: ir.TriggerSchedule, Cron: sched, Ext: k.Ext()})
 		}
 	}
 }
@@ -467,15 +468,15 @@ func listenersIn(v any) []string {
 	walk = func(v any) {
 		switch t := v.(type) {
 		case *omap:
-			for _, k := range t.keys {
-				walk(t.vals[k])
+			for _, k := range t.Order {
+				walk(t.Vals[k])
 			}
 		case []any:
 			for _, e := range t {
 				walk(e)
 			}
 		case scal:
-			if m := listenerHost.FindStringSubmatch(" " + t.text()); m != nil {
+			if m := listenerHost.FindStringSubmatch(" " + t.Text()); m != nil {
 				out = append(out, m[1])
 			}
 		}
@@ -490,11 +491,11 @@ func (p *project) pipelinesOf(els []string, byName map[string]*ir.Pipeline) []*i
 	seen := map[*ir.Pipeline]bool{}
 	for _, el := range els {
 		for _, d := range p.listeners {
-			meta, _ := asMap(d.top.vals["metadata"])
+			meta, _ := asMap(d.Top.Vals["metadata"])
 			if n, _ := text(valueOf(meta, "name")); n != el {
 				continue
 			}
-			spec, _ := asMap(d.top.vals["spec"])
+			spec, _ := asMap(d.Top.Vals["spec"])
 			list, _ := valueOf(spec, "triggers").([]any)
 			for _, e := range list {
 				m, ok := asMap(e)
@@ -511,19 +512,7 @@ func (p *project) pipelinesOf(els []string, byName map[string]*ir.Pipeline) []*i
 	return out
 }
 
-// metaRest is the metadata keys except the name.
-func metaRest(meta *omap) *omap {
-	rest := &omap{vals: map[string]any{}, lines: map[string]int{}}
-	if meta == nil {
-		return rest
-	}
-	for _, key := range meta.keys {
-		if key != "name" {
-			rest.set(key, meta.vals[key], meta.lines[key])
-		}
-	}
-	return rest
-}
+var metaRest = ynode.MetaRest
 
 // scheduleEntryName gives the name that the emitter writes for the listener entry of a schedule tag
 // (pipeline/index), or actual when the tag has no index. The name differs from actual when the entry was renamed.

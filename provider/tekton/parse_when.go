@@ -49,10 +49,10 @@ func whenEntries(v any) ([]exprtekton.Entry, error) {
 			return nil, fmt.Errorf("a when entry must be a mapping")
 		}
 		var en exprtekton.Entry
-		en.Input, _ = text(m.vals["input"])
-		en.Operator, _ = text(m.vals["operator"])
-		en.CEL, _ = text(m.vals["cel"])
-		en.Values, _ = textList(m.vals["values"])
+		en.Input, _ = text(m.Vals["input"])
+		en.Operator, _ = text(m.Vals["operator"])
+		en.CEL, _ = text(m.Vals["cel"])
+		en.Values, _ = textList(m.Vals["values"])
 		out = append(out, en)
 	}
 	return out, nil
@@ -112,12 +112,12 @@ func (b *jobBuilder) entry(en exprtekton.Entry, line int) expr.Expr {
 		})
 		return o
 	}
-	needRefs(e, func(n string) {
+	expr.NeedRefs(e, func(n string) {
 		if _, ok := b.c.taskID(n); ok {
 			b.whenNeeds[n] = true
 		}
 	})
-	return renameNeeds(e, func(n string) string {
+	return expr.RenameNeeds(e, func(n string) string {
 		if id, ok := b.c.taskID(n); ok {
 			return id
 		}

@@ -101,31 +101,31 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	return proj, rep, nil
 }
 
-func apiIs(d *rawDoc, prefix string) bool { return strings.HasPrefix(d.api, prefix) }
+func apiIs(d *rawDoc, prefix string) bool { return strings.HasPrefix(d.API, prefix) }
 
 // classify sorts a document into the roles the parser uses; a document with no role stays in Ext.
 func (p *project) classify(d *rawDoc) {
-	meta, _ := asMap(d.top.vals["metadata"])
+	meta, _ := asMap(d.Top.Vals["metadata"])
 	name, _ := text(valueOf(meta, "name"))
 	switch {
-	case apiIs(d, apiPipelines) && d.kind == kindPipeline:
-		if spec, ok := asMap(d.top.vals["spec"]); ok {
+	case apiIs(d, apiPipelines) && d.Kind == kindPipeline:
+		if spec, ok := asMap(d.Top.Vals["spec"]); ok {
 			p.pipes = append(p.pipes, &pipeSrc{doc: d, meta: meta, spec: spec, name: name})
 			return
 		}
 		p.pipes = append(p.pipes, &pipeSrc{doc: d, meta: meta, name: name})
-	case apiIs(d, apiPipelines) && d.kind == kindTask && name != "":
+	case apiIs(d, apiPipelines) && d.Kind == kindTask && name != "":
 		if first, dup := p.tasks[name]; dup {
 			p.rep.Add(report.Entry{
 				IRPath: "pipeline/", Feature: caps.ExtPassthrough, Level: caps.Lost, Strategy: strategyExt,
-				Detail: "Task " + name + " is defined twice; the first (" + first.loc(0) + ") is used and the later document is kept in Ext", SourceLoc: d.loc(0),
+				Detail: "Task " + name + " is defined twice; the first (" + first.Loc(0) + ") is used and the later document is kept in Ext", SourceLoc: d.Loc(0),
 			})
 			p.resources = append(p.resources, d)
 			return
 		}
 		p.tasks[name] = d
-	case apiIs(d, apiPipelines) && d.kind == kindPipelineRun:
-		spec, _ := asMap(d.top.vals["spec"])
+	case apiIs(d, apiPipelines) && d.Kind == kindPipelineRun:
+		spec, _ := asMap(d.Top.Vals["spec"])
 		if ps, ok := asMap(valueOf(spec, "pipelineSpec")); ok {
 			if name == "" {
 				gen, _ := text(valueOf(meta, "generateName"))
@@ -135,19 +135,19 @@ func (p *project) classify(d *rawDoc) {
 			return
 		}
 		p.resources = append(p.resources, d)
-	case apiIs(d, apiTriggers) && d.kind == kindEventListener:
+	case apiIs(d, apiTriggers) && d.Kind == kindEventListener:
 		p.listeners = append(p.listeners, d)
-	case apiIs(d, apiTriggers) && d.kind == kindTrigger && name != "":
+	case apiIs(d, apiTriggers) && d.Kind == kindTrigger && name != "":
 		p.trigDocs[name] = d
-	case apiIs(d, apiTriggers) && d.kind == kindTriggerTemplate && name != "":
+	case apiIs(d, apiTriggers) && d.Kind == kindTriggerTemplate && name != "":
 		p.templates[name] = d
 		p.resources = append(p.resources, d)
-	case apiIs(d, apiBatch) && d.kind == kindCronJob:
+	case apiIs(d, apiBatch) && d.Kind == kindCronJob:
 		p.crons = append(p.crons, d)
-	case d.kind == kindKustomization && strings.HasPrefix(d.api, kustomizeAPI) && p.isIndex(d):
+	case d.Kind == kindKustomization && strings.HasPrefix(d.API, kustomizeAPI) && p.isIndex(d):
 		p.rep.Add(report.Entry{
 			IRPath: "pipeline/", Feature: caps.ExtPassthrough, Level: caps.Emulated, Strategy: "kustomization index ignored",
-			Detail: "the kustomization lists the files of the project and holds no pipeline data; it is written again on emit", SourceLoc: d.loc(0),
+			Detail: "the kustomization lists the files of the project and holds no pipeline data; it is written again on emit", SourceLoc: d.Loc(0),
 		})
 	default:
 		p.resources = append(p.resources, d)
@@ -156,22 +156,15 @@ func (p *project) classify(d *rawDoc) {
 
 // isIndex tells the kustomization that the emitter writes from a hand-made one: it has only apiVersion, kind and resources.
 func (p *project) isIndex(d *rawDoc) bool {
-	if d.file != dirName+"/kustomization.yaml" {
+	if d.File != dirName+"/kustomization.yaml" {
 		return false
 	}
-	for _, k := range d.top.keys {
+	for _, k := range d.Top.Order {
 		if k != "apiVersion" && k != "kind" && k != "resources" {
 			return false
 		}
 	}
 	return true
-}
-
-func valueOf(m *omap, key string) any {
-	if m == nil {
-		return nil
-	}
-	return m.vals[key]
 }
 
 // attachResources keeps the documents with no IR field in the Ext of the first pipeline, each with an entry.
@@ -181,46 +174,31 @@ func (p *project) attachResources(pl *ir.Pipeline) {
 	}
 	sort.SliceStable(p.resources, func(i, j int) bool {
 		a, b := p.resources[i], p.resources[j]
-		if a.kind != b.kind {
-			return a.kind < b.kind
+		if a.Kind != b.Kind {
+			return a.Kind < b.Kind
 		}
-		if an, bn := a.name(), b.name(); an != bn {
+		if an, bn := a.Name(), b.Name(); an != bn {
 			return an < bn
 		}
-		if a.file != b.file {
-			return a.file < b.file
+		if a.File != b.File {
+			return a.File < b.File
 		}
-		return a.line < b.line
+		return a.Line < b.Line
 	})
 	var list []any
 	for _, d := range p.resources {
-		list = append(list, d.ext())
-		kind := d.kind
+		list = append(list, d.Ext())
+		kind := d.Kind
 		if kind == "" {
 			kind = "(none)"
 		}
 		p.rep.Add(report.Entry{
 			IRPath: "pipeline/" + pl.ID, Feature: caps.ExtPassthrough, Level: caps.Lost, Strategy: strategyExt,
-			Detail: "kind: " + kind + " has no IR form; the document is kept in Ext", SourceLoc: d.loc(0),
+			Detail: "kind: " + kind + " has no IR form; the document is kept in Ext", SourceLoc: d.Loc(0),
 		})
 	}
 	if pl.Ext == nil {
 		pl.Ext = ir.Ext{dialect: map[string]any{}}
 	}
 	pl.Ext[dialect].(map[string]any)[ExtResources] = list
-}
-
-// ext is the form of the document that Ext holds.
-func (d *rawDoc) ext() any {
-	if d.view != nil {
-		return d.view
-	}
-	return plain(d.top)
-}
-
-// name is the metadata name of the document, empty when it has none.
-func (d *rawDoc) name() string {
-	md, _ := valueOf(d.top, "metadata").(*omap)
-	n, _ := text(valueOf(md, "name"))
-	return n
 }

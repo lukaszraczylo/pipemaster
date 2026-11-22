@@ -10,6 +10,8 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 )
 
 const (
@@ -46,14 +48,14 @@ func (b *jobBuilder) steps(v any) error {
 
 func (b *jobBuilder) step(m *omap, n int) (*ir.Step, error) {
 	r := newReader(m)
-	name, _ := textOf(r.take("name"))
-	id := firstOf(m.marks[""], m.marks["name"], name, fmt.Sprintf("%s-step-%d", b.job.ID, n))
+	name, _ := textOf(r.Take("name"))
+	id := firstOf(m.Marks[""], m.Marks["name"], name, fmt.Sprintf("%s-step-%d", b.job.ID, n))
 	k := newSink(b.c.p.rep, b.c.file, b.path+"/step/"+id)
 	st := &ir.Step{ID: id}
-	if t, ok := textOf(r.take("displayName")); ok {
+	if t, ok := textOf(r.Take("displayName")); ok {
 		st.Name = t
 	}
-	if t, ok := textOf(r.take("image")); ok {
+	if t, ok := textOf(r.Take("image")); ok {
 		if img, err := b.tx.template(t); err != nil {
 			return nil, err
 		} else if img != b.containerRef {
@@ -63,7 +65,7 @@ func (b *jobBuilder) step(m *omap, n int) (*ir.Step, error) {
 	if err := b.command(st, k, r); err != nil {
 		return nil, fmt.Errorf("step %s: %w", id, err)
 	}
-	if v, ok := r.take("workingDir"); ok {
+	if v, ok := r.Take("workingDir"); ok {
 		t, isText := text(v)
 		if !isText {
 			return nil, fmt.Errorf("step %s: workingDir must be a string", id)
@@ -73,32 +75,32 @@ func (b *jobBuilder) step(m *omap, n int) (*ir.Step, error) {
 			return nil, err
 		}
 	}
-	if v, ok := r.take("timeout"); ok {
+	if v, ok := r.Take("timeout"); ok {
 		if d, ok := parseDuration(v); ok {
 			st.Timeout = &d
 		} else {
-			k.keep("timeout", v, caps.StepTimeout, "timeout has no positive Go duration; kept in Ext", r.line("timeout"))
+			k.Keep("timeout", v, caps.StepTimeout, "timeout has no positive Go duration; kept in Ext", r.Line("timeout"))
 		}
 	}
-	if v, ok := r.take("onError"); ok {
+	if v, ok := r.Take("onError"); ok {
 		if t, _ := text(v); t == onErrContinue {
 			st.ContinueOnError = true
 		} else {
-			k.keep("onError", v, caps.StepContinueOnError, "onError other than continue has no IR form; kept in Ext", r.line("onError"))
+			k.Keep("onError", v, caps.StepContinueOnError, "onError other than continue has no IR form; kept in Ext", r.Line("onError"))
 		}
 	}
-	if v, ok := r.take("when"); ok {
+	if v, ok := r.Take("when"); ok {
 		entries, err := whenEntries(v)
 		if err != nil {
 			return nil, fmt.Errorf("step %s: %w", id, err)
 		}
 		b.inTask = true
-		cond := b.condition(entries, r.line("when"), false)
+		cond := b.condition(entries, r.Line("when"), false)
 		b.inTask = false
 		st.If = andExpr(st.If, cond)
 	}
-	k.keepRest(r)
-	st.Ext = k.ext()
+	k.KeepRest(r)
+	st.Ext = k.Ext()
 	return st, nil
 }
 
@@ -123,18 +125,18 @@ func andExpr(l, r expr.Expr) expr.Expr {
 
 // command reads script, command and args, or the StepAction ref.
 func (b *jobBuilder) command(st *ir.Step, k *sink, r *reader) error {
-	if v, ok := r.take("ref"); ok {
+	if v, ok := r.Take("ref"); ok {
 		st.Kind = ir.StepAction
-		k.keep("ref", v, caps.StepAction, "a StepAction ref has no IR form; kept in Ext", r.line("ref"))
-		if p, ok := r.take("params"); ok {
-			k.keep("params", p, caps.StepAction, "the params of a StepAction have no IR field; kept in Ext", r.line("params"))
+		k.Keep("ref", v, caps.StepAction, "a StepAction ref has no IR form; kept in Ext", r.Line("ref"))
+		if p, ok := r.Take("params"); ok {
+			k.Keep("params", p, caps.StepAction, "the params of a StepAction have no IR field; kept in Ext", r.Line("params"))
 		}
 		return b.env(st, k, r)
 	}
 	st.Kind = ir.StepScript
-	script, hasScript := r.take("script")
-	cmd, hasCmd := r.take("command")
-	args, hasArgs := r.take("args")
+	script, hasScript := r.Take("script")
+	cmd, hasCmd := r.Take("command")
+	args, hasArgs := r.Take("args")
 	if hasScript && (hasCmd || hasArgs) {
 		return fmt.Errorf("script cannot be combined with command or args")
 	}
@@ -146,7 +148,7 @@ func (b *jobBuilder) command(st *ir.Step, k *sink, r *reader) error {
 			return fmt.Errorf("script must be a string")
 		}
 		var err error
-		ctxEnv := ctxEnvOf(r.m.vals["env"])
+		ctxEnv := ctxEnvOf(r.M.Vals["env"])
 		if guardEnv, err = b.script(st, ctxEnv.restore(t)); err != nil {
 			return err
 		}
@@ -209,46 +211,18 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, cmd, args any) error {
 		}
 	}
 	st.Script = []string{strings.Join(words, " ")}
-	k.vals[ExtScriptLine] = st.Script[0]
-	k.vals[ExtCommand] = plain(cmd)
-	k.vals[ExtArgs] = plain(args)
-	k.note(caps.StepScript, "command and args are written as one script line; both lists are kept in Ext", 0)
+	k.Out[ExtScriptLine] = st.Script[0]
+	k.Out[ExtCommand] = plain(cmd)
+	k.Out[ExtArgs] = plain(args)
+	k.Note(caps.StepScript, "command and args are written as one script line; both lists are kept in Ext", 0)
 	return nil
 }
 
-const safeWord = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_@%+=:,./-"
-
-// quote writes one command word for a shell. A word that holds a reference is double quoted so its value
-// stays one word.
-func (b *jobBuilder) quote(w string) (string, error) {
-	parts := b.tx.parts(w)
-	if slices.ContainsFunc(parts, func(p expr.Part) bool { return p.Expr != nil }) {
-		for i, p := range parts {
-			if p.Expr == nil {
-				parts[i].Text = strings.NewReplacer(`\`, `\\`, `"`, `\"`, "`", "\\`", "$", `\$`).Replace(p.Text)
-			}
-		}
-		t, err := expr.PrintScriptTemplate(parts)
-		return `"` + t + `"`, err
-	}
-	var lit strings.Builder
-	for _, p := range parts {
-		lit.WriteString(p.Text)
-	}
-	s := lit.String()
-	if s != "" && strings.Trim(s, safeWord) == "" {
-		return b.escapeText(s)
-	}
-	return b.escapeText("'" + strings.ReplaceAll(s, "'", `'\''`) + "'")
-}
-
-func (b *jobBuilder) escapeText(s string) (string, error) {
-	return expr.PrintScriptTemplate([]expr.Part{{Text: s}})
-}
+func (b *jobBuilder) quote(w string) (string, error) { return emitkit.ShellWord(b.tx.parts(w)) }
 
 // envWithout reads the step env. An entry that only a guard reads is dropped; valueFrom entries stay in Ext.
 func (b *jobBuilder) envWithout(st *ir.Step, k *sink, r *reader, skip []exprtekton.EnvVar) error {
-	v, ok := r.take("env")
+	v, ok := r.Take("env")
 	if !ok {
 		return nil
 	}
@@ -258,7 +232,7 @@ func (b *jobBuilder) envWithout(st *ir.Step, k *sink, r *reader, skip []exprtekt
 	}
 	st.Env = vars
 	if len(from) > 0 {
-		k.keep("valueFrom", from, caps.StepEnv, "env entries with valueFrom have no Value form; kept in Ext", r.line("env"))
+		k.Keep("valueFrom", from, caps.StepEnv, "env entries with valueFrom have no Value form; kept in Ext", r.Line("env"))
 	}
 	return nil
 }
@@ -277,8 +251,8 @@ func (b *jobBuilder) envList(v any, skip []exprtekton.EnvVar) ([]ir.Var, map[str
 		if !ok || name == "" {
 			return nil, nil, fmt.Errorf("an env entry needs a name")
 		}
-		raw, hasValue := text(m.vals["value"])
-		if vf, ok := m.vals["valueFrom"]; ok {
+		raw, hasValue := text(m.Vals["value"])
+		if vf, ok := m.Vals["valueFrom"]; ok {
 			if v, held := storeValue(vf); held {
 				vars = append(vars, ir.Var{Name: name, Value: v})
 				continue
@@ -300,21 +274,21 @@ func (b *jobBuilder) envList(v any, skip []exprtekton.EnvVar) ([]ir.Var, map[str
 // storeValue reads the Secret or ConfigMap key that the emitter writes for a secret or a variable.
 func storeValue(vf any) (ir.Value, bool) {
 	m, ok := asMap(vf)
-	if !ok || len(m.keys) != 1 {
+	if !ok || len(m.Order) != 1 {
 		return ir.Value{}, false
 	}
 	store, key := secretStore, ""
-	switch m.keys[0] {
+	switch m.Order[0] {
 	case kindSecretRef:
 	case kindConfigRef:
 		store = configStore
 	default:
 		return ir.Value{}, false
 	}
-	ref, _ := asMap(m.vals[m.keys[0]])
+	ref, _ := asMap(m.Vals[m.Order[0]])
 	name, _ := text(valueOf(ref, "name"))
 	key, _ = text(valueOf(ref, "key"))
-	if ref == nil || len(ref.keys) != 2 || name != store || key == "" {
+	if ref == nil || len(ref.Order) != 2 || name != store || key == "" {
 		return ir.Value{}, false
 	}
 	if store == secretStore {
@@ -330,7 +304,7 @@ func (b *jobBuilder) stepTemplate(v any, line int) error {
 		return fmt.Errorf("stepTemplate must be a mapping")
 	}
 	r := newReader(m)
-	if t, ok := textOf(r.take("image")); ok {
+	if t, ok := textOf(r.Take("image")); ok {
 		ref, err := b.tx.template(t)
 		if err != nil {
 			return err
@@ -338,18 +312,18 @@ func (b *jobBuilder) stepTemplate(v any, line int) error {
 		b.job.Container = &ir.Image{Ref: ref}
 		b.containerRef = ref
 	}
-	if ev, ok := r.take("env"); ok {
+	if ev, ok := r.Take("env"); ok {
 		vars, from, err := b.envList(ev, nil)
 		if err != nil {
 			return err
 		}
 		b.job.Env = vars
 		if len(from) > 0 {
-			b.k.keep("valueFrom", from, caps.JobEnv, "stepTemplate env entries with valueFrom have no Value form; kept in Ext", r.line("env"))
+			b.k.Keep("valueFrom", from, caps.JobEnv, "stepTemplate env entries with valueFrom have no Value form; kept in Ext", r.Line("env"))
 		}
 	}
-	if rest := r.rest(); len(rest) > 0 {
-		b.k.keep("stepTemplate", m.subset(rest), caps.ExtPassthrough, "stepTemplate."+strings.Join(rest, ", stepTemplate.")+" has no IR field; kept in Ext", line)
+	if rest := r.Rest(); len(rest) > 0 {
+		b.k.Keep("stepTemplate", m.Subset(rest), caps.ExtPassthrough, "stepTemplate."+strings.Join(rest, ", stepTemplate.")+" has no IR field; kept in Ext", line)
 	}
 	return nil
 }
@@ -360,7 +334,7 @@ func (b *jobBuilder) sidecars(v any) error {
 	if !ok {
 		return fmt.Errorf("sidecars must be a list")
 	}
-	extra := &omap{vals: map[string]any{}, lines: map[string]int{}}
+	extra := ynode.NewMap()
 	for _, e := range list {
 		m, ok := asMap(e)
 		name, _ := text(valueOf(m, "name"))
@@ -368,62 +342,42 @@ func (b *jobBuilder) sidecars(v any) error {
 			return fmt.Errorf("a sidecar needs a name")
 		}
 		r := newReader(m)
-		r.take("name")
+		r.Take("name")
 		sv := ir.Service{Name: name}
-		if t, ok := textOf(r.take("image")); ok {
+		if t, ok := textOf(r.Take("image")); ok {
 			ref, err := b.tx.template(t)
 			if err != nil {
 				return err
 			}
 			sv.Image.Ref = ref
 		}
-		if ev, ok := r.take("env"); ok {
+		if ev, ok := r.Take("env"); ok {
 			vars, from, err := b.envList(ev, nil)
 			if err != nil {
 				return err
 			}
 			sv.Env = vars
 			if len(from) > 0 {
-				r.release("env")
+				r.Release("env")
 			}
 		}
-		if pv, ok := r.take("ports"); ok {
+		if pv, ok := r.Take("ports"); ok {
 			ports, whole := containerPorts(pv)
 			sv.Ports = b.servicePorts(name, ports)
 			if !whole {
-				r.release("ports")
+				r.Release("ports")
 			}
 		}
 		b.job.Services = append(b.job.Services, sv)
-		if rest := r.rest(); len(rest) > 0 {
-			extra.set(name, m.subset(rest), m.lines[name])
-			b.k.note(caps.JobServices, "sidecar "+name+": key "+rest[0]+" has no IR field; kept in Ext", m.lines[name])
+		if rest := r.Rest(); len(rest) > 0 {
+			extra.Set(name, m.Subset(rest), m.Lines[name])
+			b.k.Note(caps.JobServices, "sidecar "+name+": key "+rest[0]+" has no IR field; kept in Ext", m.Lines[name])
 		}
 	}
-	if len(extra.keys) > 0 {
-		b.k.vals["sidecars"] = plain(extra)
+	if len(extra.Order) > 0 {
+		b.k.Out["sidecars"] = plain(extra)
 	}
 	return nil
-}
-
-// containerPorts reads ports with only a containerPort; whole is false when another key would be lost.
-func containerPorts(v any) (ports []string, whole bool) {
-	list, ok := v.([]any)
-	if !ok {
-		return nil, false
-	}
-	for _, e := range list {
-		m, ok := asMap(e)
-		if !ok || len(m.keys) != 1 || m.keys[0] != "containerPort" {
-			return nil, false
-		}
-		t, ok := text(m.vals["containerPort"])
-		if !ok {
-			return nil, false
-		}
-		ports = append(ports, t)
-	}
-	return ports, true
 }
 
 // results maps the Task results to outputs. The other result keys stay in Ext.
@@ -438,10 +392,10 @@ func (b *jobBuilder) results(v any, line int) {
 			continue
 		}
 		b.job.Outputs = append(b.job.Outputs, ir.Output{Name: name})
-		whole = whole && len(m.keys) == 1
+		whole = whole && len(m.Order) == 1
 	}
 	if !whole {
-		b.k.keep("results", v, caps.JobOutputs, "result keys beside name have no IR field; kept in Ext", line)
+		b.k.Keep("results", v, caps.JobOutputs, "result keys beside name have no IR field; kept in Ext", line)
 	}
 }
 
@@ -462,7 +416,7 @@ func ctxEnvOf(v any) ctxEnvs {
 			continue
 		}
 		name, _ := text(valueOf(m, "name"))
-		val, isText := text(m.vals["value"])
+		val, isText := text(m.Vals["value"])
 		ref, ok := exprtekton.EnvRef(name)
 		if !ok || !isText {
 			continue

@@ -5,10 +5,10 @@ import (
 	"slices"
 	"sort"
 	"strconv"
-	"time"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
@@ -23,16 +23,16 @@ func (c *plCtx) jobs(pl *ir.Pipeline, tasks, finally any) error {
 		return err
 	}
 	for _, m := range append(append([]*omap{}, regular...), fin...) {
-		name, ok := text(m.vals["name"])
+		name, ok := text(m.Vals["name"])
 		if !ok || name == "" {
 			return fmt.Errorf("a task needs a name")
 		}
 		if _, dup := c.ids[name]; dup {
 			return fmt.Errorf("task %q is defined twice", name)
 		}
-		id := m.marks[""]
+		id := m.Marks[""]
 		if id == "" {
-			id = m.marks["name"]
+			id = m.Marks["name"]
 		}
 		if id == "" {
 			id = name
@@ -96,7 +96,7 @@ type jobBuilder struct {
 }
 
 func (c *plCtx) job(m *omap, finally bool) (*ir.Job, error) {
-	name, _ := text(m.vals["name"])
+	name, _ := text(m.Vals["name"])
 	id := c.ids[name]
 	b := &jobBuilder{
 		c: c, job: &ir.Job{ID: id}, finally: finally, explicit: map[string]bool{}, whenNeeds: map[string]bool{}, raw: map[string]string{}, opaque: map[string]bool{},
@@ -107,14 +107,14 @@ func (c *plCtx) job(m *omap, finally bool) (*ir.Job, error) {
 	b.ws = c.p.workspaceOf(m, b.path)
 	c.ws = c.ws || b.ws != nil
 	r := newReader(m)
-	r.take("name")
+	r.Take("name")
 	if err := b.header(r); err != nil {
 		return nil, fmt.Errorf("task %s: %w", name, err)
 	}
 	if err := b.taskBody(r); err != nil {
 		return nil, fmt.Errorf("task %s: %w", name, err)
 	}
-	b.k.keepRest(r)
+	b.k.KeepRest(r)
 	b.finish()
 	return b.job, nil
 }
@@ -122,13 +122,13 @@ func (c *plCtx) job(m *omap, finally bool) (*ir.Job, error) {
 // header reads the PipelineTask keys that map to job fields.
 func (b *jobBuilder) header(r *reader) error {
 	j := b.job
-	if t, ok := textOf(r.take("displayName")); ok {
+	if t, ok := textOf(r.Take("displayName")); ok {
 		j.Name = t
 	}
-	if v, ok := r.take("description"); ok {
-		b.k.vals["description"] = plain(v)
+	if v, ok := r.Take("description"); ok {
+		b.k.Out["description"] = plain(v)
 	}
-	if v, ok := r.take("runAfter"); ok {
+	if v, ok := r.Take("runAfter"); ok {
 		names, ok := textList(v)
 		if !ok {
 			return fmt.Errorf("runAfter must be a list of task names")
@@ -143,35 +143,35 @@ func (b *jobBuilder) header(r *reader) error {
 		}
 	}
 	b.retries(r)
-	if v, ok := r.take("timeout"); ok {
+	if v, ok := r.Take("timeout"); ok {
 		if d, ok := parseDuration(v); ok {
 			j.Timeout = &d
 		} else {
-			b.k.keep("timeout", v, caps.JobTimeout, "timeout has no positive Go duration; kept in Ext", r.line("timeout"))
+			b.k.Keep("timeout", v, caps.JobTimeout, "timeout has no positive Go duration; kept in Ext", r.Line("timeout"))
 		}
 	}
-	if v, ok := r.take("onError"); ok {
+	if v, ok := r.Take("onError"); ok {
 		if t, _ := text(v); t == "continue" {
 			j.AllowFailure = true
 		} else {
-			b.k.keep("onError", v, caps.JobAllowFailure, "onError other than continue has no IR form; kept in Ext", r.line("onError"))
+			b.k.Keep("onError", v, caps.JobAllowFailure, "onError other than continue has no IR form; kept in Ext", r.Line("onError"))
 		}
 	}
-	if v, ok := r.take("workspaces"); ok && b.ws == nil {
-		b.k.keep("workspaces", v, caps.ExtPassthrough, "task workspaces have no IR field; kept in Ext", r.line("workspaces"))
+	if v, ok := r.Take("workspaces"); ok && b.ws == nil {
+		b.k.Keep("workspaces", v, caps.ExtPassthrough, "task workspaces have no IR field; kept in Ext", r.Line("workspaces"))
 	}
-	if v, ok := r.take("matrix"); ok {
-		if err := b.matrix(v, r.line("matrix")); err != nil {
-			b.k.keep("matrix", v, caps.JobMatrix, "matrix has no IR form ("+err.Error()+"); kept in Ext", r.line("matrix"))
+	if v, ok := r.Take("matrix"); ok {
+		if err := b.matrix(v, r.Line("matrix")); err != nil {
+			b.k.Keep("matrix", v, caps.JobMatrix, "matrix has no IR form ("+err.Error()+"); kept in Ext", r.Line("matrix"))
 		}
 	}
-	if v, ok := r.take("params"); ok {
+	if v, ok := r.Take("params"); ok {
 		if err := b.bindings(v); err != nil {
 			return err
 		}
 	}
-	if v, ok := r.take("when"); ok {
-		cond, err := b.when(v, r.line("when"))
+	if v, ok := r.Take("when"); ok {
+		cond, err := b.when(v, r.Line("when"))
 		if err != nil {
 			return err
 		}
@@ -181,7 +181,7 @@ func (b *jobBuilder) header(r *reader) error {
 }
 
 func (b *jobBuilder) retries(r *reader) {
-	v, ok := r.take("retries")
+	v, ok := r.Take("retries")
 	if !ok {
 		return
 	}
@@ -189,22 +189,10 @@ func (b *jobBuilder) retries(r *reader) {
 	n, err := strconv.Atoi(t)
 	switch {
 	case err != nil || n < 0:
-		b.k.keep("retries", v, caps.JobRetry, "retries is not a count; kept in Ext", r.line("retries"))
+		b.k.Keep("retries", v, caps.JobRetry, "retries is not a count; kept in Ext", r.Line("retries"))
 	case n > 0:
 		b.job.Retry = &ir.Retry{Attempts: n + 1}
 	}
-}
-
-func parseDuration(v any) (ir.Duration, bool) {
-	t, ok := text(v)
-	if !ok {
-		return 0, false
-	}
-	d, err := time.ParseDuration(t)
-	if err != nil || d <= 0 {
-		return 0, false
-	}
-	return ir.Duration(d), true
 }
 
 // matrix maps matrix.params to axes and matrix.include to include combinations.
@@ -216,7 +204,7 @@ func (b *jobBuilder) matrix(v any, line int) error {
 	r := newReader(mm)
 	mx := &ir.Matrix{}
 	names := map[string]bool{}
-	if pv, ok := r.take("params"); ok {
+	if pv, ok := r.Take("params"); ok {
 		list, _ := pv.([]any)
 		for _, e := range list {
 			em, _ := asMap(e)
@@ -226,7 +214,7 @@ func (b *jobBuilder) matrix(v any, line int) error {
 				return fmt.Errorf("matrix.params needs a name and a list of strings")
 			}
 			if len(vals) == 0 {
-				b.k.note(caps.JobMatrix, "matrix param "+name+" has no values, so the matrix runs no task", line)
+				b.k.Note(caps.JobMatrix, "matrix param "+name+" has no values, so the matrix runs no task", line)
 			}
 			mx.Axes = append(mx.Axes, ir.Axis{Name: name, Values: vals})
 			names[name] = true
@@ -234,7 +222,7 @@ func (b *jobBuilder) matrix(v any, line int) error {
 	}
 	var incNames []any
 	named := false
-	if iv, ok := r.take("include"); ok {
+	if iv, ok := r.Take("include"); ok {
 		list, _ := iv.([]any)
 		for _, e := range list {
 			em, _ := asMap(e)
@@ -256,15 +244,15 @@ func (b *jobBuilder) matrix(v any, line int) error {
 			mx.Include = append(mx.Include, combo)
 		}
 	}
-	if len(r.rest()) > 0 {
+	if len(r.Rest()) > 0 {
 		return fmt.Errorf("matrix holds keys beside params and include")
 	}
 	for n := range names {
 		b.tx.matrix[n] = true
 	}
 	if named {
-		b.k.vals["matrix_include_names"] = incNames
-		b.k.note(caps.JobMatrix, "matrix.include names have no IR field; kept in Ext", line)
+		b.k.Out["matrix_include_names"] = incNames
+		b.k.Note(caps.JobMatrix, "matrix.include names have no IR field; kept in Ext", line)
 	}
 	b.job.Matrix = mx
 	return nil
@@ -277,19 +265,19 @@ func (b *jobBuilder) bindings(v any) error {
 	if !ok {
 		return fmt.Errorf("params must be a list")
 	}
-	other := &omap{vals: map[string]any{}, lines: map[string]int{}}
+	other := ynode.NewMap()
 	for _, e := range list {
 		m, ok := asMap(e)
 		name, _ := text(valueOf(m, "name"))
 		if !ok || name == "" {
 			return fmt.Errorf("a param needs a name")
 		}
-		val, isText := text(m.vals["value"])
+		val, isText := text(m.Vals["value"])
 		if isText && b.hasUnresolved(val) {
 			// The Task text keeps $(params.name), so the Task must keep its param and the PipelineTask its binding.
 			b.opaque[name] = true
-			other.set(name, m.vals["value"], m.lines["value"])
-			b.k.note(caps.ExtPassthrough, "param "+name+" binds "+val+", a Tekton variable with no IR form; the binding and the Task param are kept in Ext", m.lines["value"])
+			other.Set(name, m.Vals["value"], m.Lines["value"])
+			b.k.Note(caps.ExtPassthrough, "param "+name+" binds "+val+", a Tekton variable with no IR form; the binding and the Task param are kept in Ext", m.Lines["value"])
 			continue
 		}
 		if isText {
@@ -297,12 +285,12 @@ func (b *jobBuilder) bindings(v any) error {
 			b.raw[name] = val
 			continue
 		}
-		other.set(name, m.vals["value"], m.lines["value"])
-		b.k.note(caps.ExtPassthrough, "param "+name+" is not a string; kept in Ext", m.lines["value"])
+		other.Set(name, m.Vals["value"], m.Lines["value"])
+		b.k.Note(caps.ExtPassthrough, "param "+name+" is not a string; kept in Ext", m.Lines["value"])
 	}
 	b.rawParams = v
-	if len(other.keys) > 0 {
-		b.k.vals["array_params"] = plain(other)
+	if len(other.Order) > 0 {
+		b.k.Out["array_params"] = plain(other)
 	}
 	return nil
 }
@@ -344,7 +332,7 @@ func (b *jobBuilder) finish() {
 		list = append(list, id)
 	}
 	if len(list) > 0 {
-		b.k.vals[ExtImplicitNeeds] = list
+		b.k.Out[ExtImplicitNeeds] = list
 	}
 	seen := map[string]bool{}
 	for _, t := range []*texts{b.px, b.tx} {
@@ -362,13 +350,6 @@ func (b *jobBuilder) finish() {
 	if b.ws != nil {
 		b.restoreWorkspace()
 	}
-	b.job.Ext = b.k.ext()
+	b.job.Ext = b.k.Ext()
 }
 
-// stringList reads a YAML sequence of scalars. A bare scalar is no list: it may be a reference to an array param.
-func stringList(v any) ([]string, bool) {
-	if _, isSeq := v.([]any); !isSeq {
-		return nil, false
-	}
-	return textList(v)
-}
