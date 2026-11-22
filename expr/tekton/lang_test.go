@@ -54,3 +54,28 @@ func TestLangSubsetReadsTektonConditions(t *testing.T) {
 		t.Fatal("a notin entry is inside the subset")
 	}
 }
+
+// A Tekton condition on a pipeline param, a task result or a matrix axis has a GHA spelling, so the other
+// providers do not disable it.
+func TestTektonInputAndResultConditionsTranslateToGHA(t *testing.T) {
+	from := expr.SourceFor(tekton.Dialect, gha.Lang)
+	eq := func(path ...string) expr.Expr {
+		return expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: path}, R: expr.Lit{Kind: expr.LitStr, Str: "README.md"}}
+	}
+	for _, c := range []struct {
+		e    expr.Expr
+		want string
+	}{
+		{eq(expr.PrefixInputs, "path"), "inputs.path == 'README.md'"},
+		{eq(expr.PrefixNeeds, "check-file", "outputs", "exists"), "needs.check-file.outputs.exists == 'README.md'"},
+		{eq(expr.PrefixMatrix, "go"), "matrix.go == 'README.md'"},
+	} {
+		got, cav, ok := expr.TranslateApprox(c.e, *from, gha.Lang)
+		if !ok || len(cav) == 0 {
+			t.Fatalf("%s: TranslateApprox ok=%v caveats=%v", c.want, ok, cav)
+		}
+		if s := expr.String(got); s != c.want {
+			t.Errorf("translation = %q, want %q", s, c.want)
+		}
+	}
+}

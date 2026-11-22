@@ -652,7 +652,20 @@ const (
 	nullCaveat    = "GitHub treats an unset value as equal to '' (null == '' is true); GitLab does not"
 	numberCaveat  = "GitHub coerces a numeric-looking literal to a number, so equality is numeric (null == '0' is true)"
 	unicodeCaveat = "GitHub case folding of non-ASCII text may differ from GitLab"
+	inputCaveat   = "GitHub sets inputs only on workflow_dispatch and workflow_call runs; on other events the input reads as empty, not as its default"
 )
+
+// userRef reports a reference to an input, a matrix axis or a needed job's output: the families that carry a
+// user-defined tail, spelled the same in the GHA dialect.
+func userRef(r Ref) bool {
+	switch {
+	case len(r.Path) == 2 && (r.Path[0] == PrefixInputs || r.Path[0] == PrefixMatrix):
+		return true
+	case len(r.Path) == 4 && r.Path[0] == PrefixNeeds && r.Path[2] == "outputs":
+		return true
+	}
+	return false
+}
 
 // TranslateApprox translates what Translate rejects but a close equivalent exists for: a GitLab == or !=
 // between a ref and a string literal becomes the GHA == or != (the same test, except for the divergences
@@ -743,6 +756,13 @@ func approxCmp(b Binary, from Dialect, cav *caveats) (Expr, bool) {
 	ref, lit, ok := refSide(b.L, b.R)
 	if !ok {
 		return nil, false
+	}
+	if userRef(ref) {
+		addAll(cav, litCaveats(lit))
+		if ref.Path[0] == PrefixInputs {
+			cav.add(inputCaveat)
+		}
+		return Binary{Op: b.Op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: lit}}, true
 	}
 	var cmp Expr
 	switch n := pathName(ref); n {
