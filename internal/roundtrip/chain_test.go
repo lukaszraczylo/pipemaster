@@ -418,6 +418,22 @@ func chainsFrom(a string) [][2]string {
 	return out
 }
 
+// sampleChains keeps one chain per middle hop under -short: for the source at position src in the registry,
+// the middle hop's group yields its chain number (group+src) mod group size. Every provider is then a middle
+// hop of the sources that differ from it; TestChainSampleCoversEveryProvider checks all three roles.
+func sampleChains(src int, chains [][2]string) [][2]string {
+	var out [][2]string
+	for lo := 0; lo < len(chains); {
+		hi := lo
+		for hi < len(chains) && chains[hi][0] == chains[lo][0] {
+			hi++
+		}
+		out = append(out, chains[lo+(len(out)+src)%(hi-lo)])
+		lo = hi
+	}
+	return out
+}
+
 // chainInputs is every feature fixture and corpus entry written in provider a.
 func chainInputs(t *testing.T, a string) []fixture {
 	t.Helper()
@@ -515,8 +531,11 @@ func checkFinalSchema(t *testing.T, a, name, dir, stderr string) {
 
 func TestChainMatrix(t *testing.T) {
 	total := 0
-	for _, a := range provider.IDs() {
+	for i, a := range provider.IDs() {
 		chains := chainsFrom(a)
+		if testing.Short() {
+			chains = sampleChains(i, chains)
+		}
 		inputs := chainInputs(t, a)
 		for _, f := range inputs {
 			for _, ch := range chains {
@@ -552,6 +571,36 @@ func TestChainMatrix(t *testing.T) {
 	}
 	if total == 0 {
 		t.Fatal("no chains ran")
+	}
+}
+
+func TestChainSampleCoversEveryProvider(t *testing.T) {
+	roles := map[string][3]bool{}
+	for i, a := range provider.IDs() {
+		all := chainsFrom(a)
+		sample := sampleChains(i, all)
+		if len(sample) == 0 || len(sample) >= len(all) {
+			t.Fatalf("sample of %s has %d of %d chains, want a strict, non-empty subset", a, len(sample), len(all))
+		}
+		if !slices.Equal(sample, sampleChains(i, all)) {
+			t.Fatalf("sample of %s changes between calls", a)
+		}
+		r := roles[a]
+		r[0] = true
+		roles[a] = r
+		for _, ch := range sample {
+			if !slices.Contains(all, ch) {
+				t.Fatalf("sampled chain %v is not a chain from %s", ch, a)
+			}
+			rb, rc := roles[ch[0]], roles[ch[1]]
+			rb[1], rc[2] = true, true
+			roles[ch[0]], roles[ch[1]] = rb, rc
+		}
+	}
+	for _, id := range provider.IDs() {
+		if r := roles[id]; !r[0] || !r[1] || !r[2] {
+			t.Errorf("%s as source, middle, target = %v, want all three", id, r)
+		}
 	}
 }
 
