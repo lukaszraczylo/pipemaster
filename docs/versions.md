@@ -1,6 +1,6 @@
 # Pinned versions
 
-These versions were verified on 2026-11-19. The Tekton Pipelines, Tekton Triggers and kubeconform rows were verified on 2026-11-21. The Gitea, Forgejo, Woodpecker, Drone and Tekton dialects follow them.
+These versions were verified on 2026-11-19. The Tekton Pipelines, Tekton Triggers and kubeconform rows were verified on 2026-11-21. The Argo rows were verified on 2026-11-22. The Gitea, Forgejo, Woodpecker, Drone, Tekton and Argo dialects follow them.
 
 | Product | Version | Date |
 | --- | --- | --- |
@@ -15,6 +15,9 @@ These versions were verified on 2026-11-19. The Tekton Pipelines, Tekton Trigger
 | drone-cli | v1.9.0 | |
 | Tekton Pipelines | v1.18.0 | 2026-10-29 |
 | Tekton Triggers | v0.38.0 | 2026-11-09 |
+| Argo Workflows | v4.1.6 | 2026-10-22 |
+| Argo Events | v1.9.11 | 2026-07-13 |
+| argo CLI | v4.1.6 | 2026-10-22 |
 | kubeconform | v0.8.0 | 2026-06-04 |
 
 ## Sources
@@ -30,6 +33,9 @@ These versions were verified on 2026-11-19. The Tekton Pipelines, Tekton Trigger
 - <https://docs.drone.io/pipeline/docker/syntax/>
 - <https://github.com/tektoncd/pipeline/releases/tag/v1.18.0>
 - <https://github.com/tektoncd/triggers/releases/tag/v0.38.0>
+- <https://github.com/argoproj/argo-workflows/releases/tag/v4.1.6>
+- <https://github.com/argoproj/argo-events/releases/tag/v1.9.11>
+- <https://github.com/datreeio/CRDs-catalog/tree/784ec895547a36e548e6810b41f27baade3a0890/argoproj.io>
 - <https://github.com/yannh/kubeconform/releases/tag/v0.8.0>
 
 Drone is in maintenance mode. Harness ships occasional server releases from the `drone` branch, and no release has followed v2.28.2.
@@ -46,6 +52,7 @@ The emitter writes only the first directory of each list. The parser reads the f
 | `woodpecker` | `.woodpecker` (no subfolders), then `.woodpecker.yaml`, then `.woodpecker.yml` |
 | `drone` | `.drone.yml` |
 | `tekton` | `.tekton` (all YAML files, including subfolders) |
+| `argo` | `.argo` (all YAML files, including subfolders) |
 
 ## Default action hosts
 
