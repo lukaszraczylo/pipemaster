@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
@@ -77,6 +78,7 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	var pls []*ir.Pipeline
 	byName := map[string]*ir.Pipeline{}
 	byCron := map[*rawDoc]*ir.Pipeline{}
+	p.renameClashes()
 	var libs []*pipeSrc
 	for _, src := range p.pipes {
 		if isLibrary(src) {
@@ -256,5 +258,39 @@ func listOf(v any) []any {
 func (p *project) keepLibraries(libs []*pipeSrc) {
 	for _, src := range libs {
 		p.resources = append(p.resources, src.doc)
+	}
+}
+
+const clashSuffix = "-workflow"
+
+// renameClashes gives a Workflow, or a CronWorkflow with its own templates, a new pipeline ID when its name
+// matches a WorkflowTemplate or an earlier pipeline. Argo keeps one namespace per kind, so the names are valid.
+func (p *project) renameClashes() {
+	taken := map[string]bool{}
+	for _, src := range p.pipes {
+		if p.wts[src.name] == src {
+			taken[src.name] = true
+		}
+	}
+	for _, src := range p.pipes {
+		if p.wts[src.name] == src {
+			continue
+		}
+		id := src.name
+		for n := 1; taken[id]; n++ {
+			id = src.name + clashSuffix
+			if n > 1 {
+				id += "-" + strconv.Itoa(n)
+			}
+		}
+		taken[id] = true
+		if id == src.name {
+			continue
+		}
+		p.rep.Add(report.Entry{
+			IRPath: "pipeline/" + id, Feature: caps.ExtPassthrough, Level: caps.Lost, Strategy: "renamed",
+			Detail: src.doc.Kind + " " + src.name + " shares its name with another pipeline; its pipeline ID is " + id, SourceLoc: src.doc.Loc(0),
+		})
+		src.name = id
 	}
 }
