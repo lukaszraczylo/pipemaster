@@ -1,6 +1,7 @@
 package argo
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 
@@ -186,7 +187,7 @@ func (e *emitter) dagTask(tc *jobCtx, sx *stepCtx, cond taskCond, d deps, gate s
 			}
 		}
 	}
-	t.Set("arguments", e.taskArguments(tc, sx, jx))
+	t.Set("arguments", e.taskArguments(tc, sx, jx, cond.disabled))
 	if t.Has("arguments") && t.N.Content[len(t.N.Content)-1].Kind == yaml.MappingNode && len(t.N.Content[len(t.N.Content)-1].Content) == 0 {
 		t.Drop("arguments")
 	}
@@ -200,16 +201,23 @@ func (e *emitter) dagTask(tc *jobCtx, sx *stepCtx, cond taskCond, d deps, gate s
 	return t
 }
 
+// loopItem is a reference to the loop item. A task that never runs has no loop, and Argo rejects the reference.
+var loopItem = regexp.MustCompile(`\{\{item(\.[^}]*)?\}\}`)
+
 // taskArguments binds the template inputs: the loop item, the outputs of other tasks, the artifacts, and the
 // arguments that an Argo file kept.
-func (e *emitter) taskArguments(tc *jobCtx, sx *stepCtx, jx map[string]any) *yaml.Node {
+func (e *emitter) taskArguments(tc *jobCtx, sx *stepCtx, jx map[string]any, disabled bool) *yaml.Node {
 	path := tc.jp.path
 	args := newMap()
 	var params []*yaml.Node
 	bound := map[string]bool{}
 	for _, p := range tc.params {
 		bound[p.name] = true
-		params = append(params, nameValue(p.name, p.value))
+		v := p.value
+		if disabled {
+			v = loopItem.ReplaceAllString(v, "")
+		}
+		params = append(params, nameValue(p.name, v))
 	}
 	if kept, ok := jx[ExtArguments].(map[string]any); ok {
 		for _, name := range sortedKeys(kept) {

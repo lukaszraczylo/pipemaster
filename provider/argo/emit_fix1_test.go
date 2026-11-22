@@ -1,6 +1,7 @@
 package argo_test
 
 import (
+	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/internal/linttool"
 	"strings"
 	"testing"
@@ -82,5 +83,25 @@ func TestYAMLBooleanLookalikesLintClean(t *testing.T) {
 	}
 	if !strings.Contains(files[path], `value: "on"`) {
 		t.Errorf("on is not quoted:\n%s", files[path])
+	}
+}
+
+func matrixJob(id string) *ir.Job {
+	j := scriptJob(id, "echo ${{ matrix.v }}")
+	j.Matrix = &ir.Matrix{Axes: []ir.Axis{{Name: "v", Values: []string{"a", "b"}}}}
+	return j
+}
+
+func TestDisabledMatrixJobStaysLintValid(t *testing.T) {
+	linttool.RequireArgo(t)
+	j := matrixJob("test")
+	j.If = expr.Opaque{Dialect: "gha", Text: "github.event.foo == 'x'"}
+	files, _ := emit(t, project(j))
+	path := ".argo/workflows/ci.yaml"
+	if out, err := linttool.ArgoLint(t, path, []byte(files[path])); err != nil {
+		t.Fatalf("argo lint: %v\n%s\n%s", err, out, files[path])
+	}
+	if !strings.Contains(files[path], "{{= false }}") {
+		t.Errorf("the job is not disabled:\n%s", files[path])
 	}
 }
