@@ -145,7 +145,7 @@ func (tc *taskCtx) whenEntries(e expr.Expr, sc scope) (out []exprtekton.Entry, o
 				return nil, false
 			}
 			if en.CEL != "" {
-				tc.e.note(tc.jp.path, caps.ExprOpaque, caps.External, "cel when entry", "a cel when entry needs enable-api-fields: alpha in the feature-flags ConfigMap")
+				tc.e.note(tc.jp.path, caps.ExprOpaque, caps.External, "cel when entry", "a cel when entry needs enable-cel-in-whenexpression: \"true\" in the feature-flags ConfigMap")
 			}
 			out = append(out, en)
 			continue

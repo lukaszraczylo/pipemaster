@@ -404,7 +404,7 @@ The following table comes from `pipemaster caps --from gha --to tekton --format 
 | --- | --- | --- | --- |
 | config.name | native | emulated | secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars (the Secret values and ConfigMap values are not written) |
 | display.name | native | native |  |
-| expr.opaque | native | native | (only opaque expressions of the tekton dialect; a cel entry from a Tekton file is written back and needs enable-api-fields: alpha; others are lost) |
+| expr.opaque | native | native | (only opaque expressions of the tekton dialect; a cel entry from a Tekton file is written back and needs enable-cel-in-whenexpression; others are lost) |
 | ext.passthrough | native | native |  |
 | job.allow_failure | native | native |  |
 | job.artifacts | emulated | emulated | workspace on a PVC from volumeClaimTemplate (tasks on different nodes need ReadWriteMany or the affinity assistant) |

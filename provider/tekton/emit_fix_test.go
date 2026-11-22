@@ -445,7 +445,7 @@ spec:
 	if !strings.Contains(joinFiles(files), "cel:") {
 		t.Fatalf("cel entry dropped:\n%s", joinFiles(files))
 	}
-	wantEntry(t, rep, caps.ExprOpaque, caps.External, "enable-api-fields: alpha")
+	wantEntry(t, rep, caps.ExprOpaque, caps.External, "enable-cel-in-whenexpression")
 	back, _ := reparse(t, files)
 	if ok, diff := ir.Equal(p, back); !ok {
 		t.Fatalf("cel entry changed:\n%s", diff)
