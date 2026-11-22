@@ -195,3 +195,56 @@ func TestTwoCheckoutsGetDistinctStepIDs(t *testing.T) {
 		seen[st.ID] = true
 	}
 }
+
+func envProject() *ir.Project {
+	a := &ir.Job{ID: "a", Env: []ir.Var{{Name: "JOBVAR", Value: ir.Value{Lit: "j"}}}, Steps: []*ir.Step{
+		{ID: "one", Kind: ir.StepScript, Script: []string{"echo 1"}, Env: []ir.Var{{Name: "STEPVAR", Value: ir.Value{Lit: "s"}}}},
+		{ID: "two", Kind: ir.StepScript, Script: []string{"echo 2"}},
+	}}
+	b := scriptJob("b", "echo 3")
+	p := project(a, b)
+	p.Pipelines[0].Env = []ir.Var{{Name: "GO111MODULE", Value: ir.Value{Lit: "on"}}, {Name: "OTHER", Value: ir.Value{Lit: "x"}}}
+	return p
+}
+
+func TestPipelineAndJobEnvComeBackWhereTheyWere(t *testing.T) {
+	p := envProject()
+	files, _ := emit(t, p)
+	back := roundTrip(t, files)
+	stripExt(back)
+	ir.Normalize(p)
+	if ok, diff := ir.Equal(p, back); !ok {
+		t.Fatalf("the env moved:\n%s", diff)
+	}
+}
+
+func TestEditedEnvValueKeepsTheStepsAndReportsTheMarker(t *testing.T) {
+	files, _ := emit(t, envProject())
+	path := ".argo/workflows/ci.yaml"
+	files[path] = strings.Replace(files[path], "value: x", "value: edited", 1)
+	back, rep, err := parseRepo(files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries(rep, "marker ignored")) == 0 {
+		t.Error("no marker ignored entry")
+	}
+	edited := 0
+	for _, j := range back.Pipelines[0].Jobs {
+		for _, st := range j.Steps {
+			for _, v := range st.Env {
+				if v.Name == "OTHER" && v.Value.Lit == "edited" {
+					edited++
+				}
+			}
+		}
+	}
+	if edited != 1 {
+		t.Errorf("%d steps hold the edited value, want 1", edited)
+	}
+	for _, v := range back.Pipelines[0].Env {
+		if v.Name == "OTHER" {
+			t.Error("OTHER was lifted to the pipeline although the steps differ")
+		}
+	}
+}

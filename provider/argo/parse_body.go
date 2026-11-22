@@ -65,6 +65,7 @@ func (b *jobBuilder) body(t *omap) error {
 	b.k.KeepRest(r)
 	b.uniqueStepIDs()
 	b.collapseSteps()
+	b.jobEnvMarker()
 	return nil
 }
 

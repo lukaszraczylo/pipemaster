@@ -3,6 +3,7 @@ package argo
 import (
 	"encoding/json"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
@@ -129,5 +130,60 @@ func (c *plCtx) gateMarker(j *ir.Job) {
 			j.Manual, j.Environment = a.Manual, a.Environment
 			return
 		}
+	}
+}
+
+// sameEnv finds the variable name in every script step. ok is false when a step lacks it or two steps differ.
+func sameEnv(steps []*ir.Step, name string) (v ir.Var, ok bool) {
+	for _, st := range steps {
+		i := slices.IndexFunc(st.Env, func(o ir.Var) bool { return o.Name == name })
+		if i < 0 || (ok && !reflect.DeepEqual(v, st.Env[i])) {
+			return ir.Var{}, false
+		}
+		v, ok = st.Env[i], true
+	}
+	return v, ok
+}
+
+// liftEnv moves the marked variables out of every script step and returns them in marker order. A name that the
+// steps no longer share stays in the steps, and the report says so.
+func (c *plCtx) liftEnv(jobs []*ir.Job, path string, f caps.Feature, names []string) []ir.Var {
+	var steps []*ir.Step
+	for _, j := range jobs {
+		for _, st := range j.Steps {
+			if st.Kind == ir.StepScript {
+				steps = append(steps, st)
+			}
+		}
+	}
+	var lifted []ir.Var
+	for _, name := range names {
+		v, ok := sameEnv(steps, name)
+		if !ok {
+			c.ignored(path, f, "the variable "+name+" is no longer the same in every step; it stays in the steps")
+			continue
+		}
+		lifted = append(lifted, v)
+		for _, st := range steps {
+			st.Env = slices.DeleteFunc(st.Env, func(o ir.Var) bool { return o.Name == name })
+		}
+	}
+	return lifted
+}
+
+// jobEnvMarker puts the variables that the emitter copied from the job back into Job.Env.
+func (b *jobBuilder) jobEnvMarker() {
+	var a envArg
+	if markerArg(b.c.src.doc.Head, b.path, caps.JobEnv, &a) {
+		b.job.Env = append(b.job.Env, b.c.liftEnv([]*ir.Job{b.job}, b.path, caps.JobEnv, a.Names)...)
+	}
+}
+
+// pipelineEnvMarker puts the variables that the emitter copied from the pipeline back into Pipeline.Env.
+func (c *plCtx) pipelineEnvMarker(pl *ir.Pipeline) {
+	var a envArg
+	path := "pipeline/" + c.plID
+	if markerArg(c.src.doc.Head, path, caps.PipelineEnv, &a) {
+		pl.Env = append(pl.Env, c.liftEnv(append(slices.Clone(pl.Jobs), pl.Finally...), path, caps.PipelineEnv, a.Names)...)
 	}
 }

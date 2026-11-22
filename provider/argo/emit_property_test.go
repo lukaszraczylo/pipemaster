@@ -66,7 +66,8 @@ func nativize(t *rapid.T, p *ir.Project) {
 	p.Origin = ir.Origin{Provider: "argo", Dialect: "argo"}
 	p.Pipelines = p.Pipelines[:1]
 	pl := p.Pipelines[0]
-	pl.ID, pl.Name, pl.Ext, pl.Env, pl.Finally, pl.Inputs, pl.Concurrency, pl.Permissions = "argo", "", nil, nil, nil, nil, nil, nil
+	pl.ID, pl.Name, pl.Ext, pl.Finally, pl.Inputs, pl.Concurrency, pl.Permissions = "argo", "", nil, nil, nil, nil, nil
+	pl.Env = nativeVars(pl.Env)
 	pl.Triggers = nativeTriggers(t)
 	for _, j := range pl.Jobs {
 		nativizeJob(j)
@@ -103,7 +104,8 @@ func nativeTriggers(t *rapid.T) []ir.Trigger {
 
 func nativizeJob(j *ir.Job) {
 	j.Name, j.Ext, j.Container, j.Runner, j.If, j.Environment, j.Manual = "", nil, nil, ir.Runner{}, nil, nil, false
-	j.Cache, j.Artifacts, j.Env = nil, nil, nil
+	j.Cache, j.Artifacts = nil, nil
+	j.Env = nativeVars(j.Env)
 	if j.Timeout != nil {
 		d := ir.Duration(propTimeout)
 		j.Timeout = &d

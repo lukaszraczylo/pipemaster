@@ -69,6 +69,7 @@ func (e *emitter) pipelineDoc(pp *plan) error {
 		}
 		tmpls = append(tmpls, out.tmpls...)
 	}
+	e.markPipelineEnv(pl, pp.path)
 	spec.Set("arguments", e.arguments(pp, px))
 	if pl.Concurrency != nil {
 		spec.Set("synchronization", e.synchronization(pp, px))

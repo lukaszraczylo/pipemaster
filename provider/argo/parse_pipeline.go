@@ -65,6 +65,7 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 	c.metadata()
 	c.unreached()
 	pl.Ext = k.Ext()
+	c.pipelineEnvMarker(pl)
 	return pl, nil
 }
 

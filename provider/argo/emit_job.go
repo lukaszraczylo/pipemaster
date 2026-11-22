@@ -140,6 +140,9 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (jobOut, error) {
 		out.tmpls = append(out.tmpls, tm.N)
 	}
 	tc.reportSafeTags()
+	if len(conts) > 0 {
+		e.markJobEnv(j, jp.path)
+	}
 	if len(tc.vars) > 0 {
 		if err := e.markArg(caps.ScriptInterpolation, jp.path, varsArg{Vars: tc.vars}); err != nil {
 			e.lose(jp.path, caps.ScriptInterpolation, "the variable marker cannot be written: "+err.Error())
