@@ -259,7 +259,8 @@ func (sx *stepCtx) imageOf(st *ir.Step, path string) string {
 		}
 		sc := newScope()
 		out, lost, hazards := tc.convert(sc, valueText, parts)
-		if len(lost)+len(hazards) == 0 {
+		// Argo substitutes a tag of an image before any shell runs, so a tag that an Argo file held is no hazard here.
+		if len(lost) == 0 && (len(hazards) == 0 || tc.e.own) {
 			return out
 		}
 		tc.e.lose(path, caps.StepImage, "the image "+ref+" has no Argo spelling; the default image "+defaultImage+" runs")
