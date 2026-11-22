@@ -680,6 +680,23 @@ def tekDocJson (d : Tekton.TDoc) : Json :=
   Json.mkObj [("name", d.name), ("disp", d.disp), ("tasks", Json.arr (d.tasks.map tekPTaskJson).toArray),
     ("finally", Json.arr (d.fin.map tekPTaskJson).toArray), ("trigs", Json.arr (d.trigs.map wpTrigJson).toArray)]
 
+/-- Jobs with several steps, and a real step named like the placeholder (`noop` running `true`), alone, beside a
+job with no step, and in a finally job. The parser must keep the real step and drop the placeholder. -/
+def tekStepPipes : List Core.Pipe :=
+  let real : Core.Step := cstep "noop" ["true"]
+  let three : List Core.Step :=
+    [cstep "s1" ["echo 1"], { cstep "s2" ["echo 2", "echo 3"] with name := "Two" }, cstep "s3" ["echo 4"]]
+  [pushAll [{ cj "a" with steps := three }] [],
+   pushAll [{ cj "a" with steps := three, env := [⟨"K", "v"⟩], retry := 2 }] [],
+   pushAll [cj "a"] [{ cj "f" with steps := three }],
+   pushAll [{ cj "a" with steps := [real] }] [],
+   pushAll [{ cj "a" with steps := [real] }, { cj "b" with steps := [] }] [],
+   pushAll [{ cj "a" with steps := [] }, { cj "b" with steps := [real] }] [],
+   pushAll [{ cj "a" with steps := [cstep "s1" ["echo 1"], real] }] [],
+   pushAll [{ cj "a" with steps := [real, cstep "s1" ["echo 1"]] }] [],
+   pushAll [cj "a"] [{ cj "f" with steps := [real] }],
+   pushAll [{ cj "a" with steps := [] }] [{ cj "f" with steps := [real], onFailure := true }]]
+
 /-- Pipelines with retry runs, which GitLab and Drone also take, and jobs with no step, which Tekton fills with a
 placeholder step. -/
 def tekExtraPipes : List Core.Pipe :=
@@ -689,7 +706,7 @@ def tekExtraPipes : List Core.Pipe :=
      { pushAll [{ cj "a" with retry := 3 }] [] with id := "my-ci", name := "My CI", pr := some ["main"] },
      { pushAll [{ cj "a" with retry := 2, timeout := 90 }] [] with tag := some ["v*"], push := none },
      { pushAll [{ cj "a" with name := "Build", retry := 4 }, { cj "b" with needs := needOn "a" false }] [] with
-         pr := some [] }]
+         pr := some [] }] ++ tekStepPipes
 
 def tektonPipes : List Core.Pipe :=
   (allPipes ++ wpExtraPipes ++ tekExtraPipes).filter fun p => decide (Wf p ∧ Tekton.TekOk p)
