@@ -223,7 +223,7 @@ func (sx *stepCtx) containers(jx map[string]any) (conts []*container, taskStep *
 			if e.runsContainer(st) {
 				sx.act, sx.disabled = actionArg{}, false
 				before := e.nlost
-				c := sx.containerFor(st, names[st], last, jx)
+				c := sx.containerFor(st, names[st], last)
 				conts = append(conts, c)
 				if sx.disabled || e.nlost != before {
 					sx.act.Hold = nodeCanon(c.m.N)

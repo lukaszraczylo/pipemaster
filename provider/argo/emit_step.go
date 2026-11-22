@@ -108,7 +108,7 @@ func (tc *jobCtx) stepScripts(sc *stepScope, path string, st *ir.Step) []string 
 }
 
 // containerFor writes one script step as a container.
-func (sx *stepCtx) containerFor(st *ir.Step, name string, last bool, jx map[string]any) *container {
+func (sx *stepCtx) containerFor(st *ir.Step, name string, last bool) *container {
 	tc, e := sx.tc, sx.tc.e
 	path := tc.jp.path + "/step/" + st.ID
 	c := &container{st: st, name: name, m: newMap()}
@@ -168,7 +168,6 @@ func (sx *stepCtx) containerFor(st *ir.Step, name string, last bool, jx map[stri
 			e.lose(path, caps.ExtPassthrough, "the Ext of the step cannot be written: "+err.Error())
 		}
 	}
-	_ = jx
 	return c
 }
 
@@ -391,7 +390,7 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool, at int) *cont
 	case actions.KindScript:
 		cp := *st
 		cp.Script, cp.Kind, cp.Action = t.Script, ir.StepScript, nil
-		c := sx.containerFor(&cp, name, last, nil)
+		c := sx.containerFor(&cp, name, last)
 		if c != nil {
 			sx.act.Hold = nodeCanon(c.m.N)
 		}
