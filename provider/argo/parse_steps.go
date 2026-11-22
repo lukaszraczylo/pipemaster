@@ -143,7 +143,8 @@ func (b *jobBuilder) outputValues() {
 		return
 	}
 	st := b.job.Steps[len(b.job.Steps)-1]
-	for i := range b.job.Outputs {
+	// The epilogue lines follow the order of the outputs, so the last output owns the last line.
+	for i := len(b.job.Outputs) - 1; i >= 0; i-- {
 		o := &b.job.Outputs[i]
 		line := outputEpilogue(o.Name)
 		n := len(st.Script)
