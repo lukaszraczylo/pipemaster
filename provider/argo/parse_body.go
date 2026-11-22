@@ -234,6 +234,10 @@ func (b *jobBuilder) outputs(r *reader) {
 			a.Paths = []string{p}
 		}
 		b.job.Artifacts = append(b.job.Artifacts, a)
+		if b.outArts == nil {
+			b.outArts = map[string]string{}
+		}
+		b.outArts[name] = canonJSON(plain(e))
 		if rest := restKeys(am, "name", "path"); len(rest) > 0 {
 			keptArts[name] = plain(am.Subset(rest))
 			b.k.Note(caps.JobArtifacts, "outputs.artifacts "+name+": key "+strings.Join(rest, ", ")+" has no IR field; kept in Ext", am.Lines["name"])

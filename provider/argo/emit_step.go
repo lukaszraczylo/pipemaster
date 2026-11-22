@@ -381,6 +381,7 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool, at int) *cont
 		sx.upload(path, t)
 		for _, a := range sx.artOut[nOut:] {
 			sx.act.Arts = append(sx.act.Arts, a.Content[1].Value)
+			sx.act.Outs = append(sx.act.Outs, nodeCanon(a))
 		}
 	case actions.KindDownload:
 		sx.download(path, t)

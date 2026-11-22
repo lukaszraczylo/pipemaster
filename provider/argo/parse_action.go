@@ -132,8 +132,8 @@ func (b *jobBuilder) heldAnchor(h heldAction, front []*ir.Step, used map[*ir.Ste
 			return -1, "the image that the setup action gave was edited after pipemaster wrote the file; the file content is kept"
 		}
 	case len(h.arg.Arts) > 0:
-		for _, n := range h.arg.Arts {
-			if !slices.ContainsFunc(b.job.Artifacts, func(a ir.Artifact) bool { return a.Name == n }) {
+		for i, n := range h.arg.Arts {
+			if i >= len(h.arg.Outs) || b.outArts[n] != h.arg.Outs[i] {
 				return -1, "the output artifact of the upload was edited or removed after pipemaster wrote the file; the file content is kept"
 			}
 		}

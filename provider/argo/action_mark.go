@@ -30,6 +30,8 @@ type actionArg struct {
 	Hold string `json:"hold,omitempty"`
 	// Arts names the output artifacts that an upload wrote.
 	Arts []string `json:"arts,omitempty"`
+	// Outs is the canonical JSON of each output artifact in Arts, in the same order.
+	Outs []string `json:"outs,omitempty"`
 	// Seq orders the steps that stand at the same place.
 	Seq int `json:"seq,omitempty"`
 }
