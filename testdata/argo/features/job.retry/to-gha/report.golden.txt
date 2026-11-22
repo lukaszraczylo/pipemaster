@@ -1,0 +1,5 @@
+Loss report: argo -> gha
+[lost] pipeline/gitlab-ci/trigger/0 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/trigger/1 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the GHA file; it is kept in round-trip metadata)
+[emulated] pipeline/gitlab-ci/job/build job.retry: step-level retry loop via shell (Retry.Attempts is the total number of runs, so GitLab retry: N is Attempts N+1)
+[emulated] pipeline/gitlab-ci/job/build job.runner: default runner label ubuntu-latest (the pipeline named no runner)

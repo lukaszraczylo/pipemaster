@@ -1,0 +1,38 @@
+# pipemaster:emulated step.image pipeline/drone/job/ci
+# pipemaster:arg {"steps":{"build":"ref: golang:1.25\n"},"wrote":{"build":"golang:1.25"}}
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: drone
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-event
+        value: ""
+      - name: ctx-actor
+        value: ""
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: ci
+            template: ci
+            when: '{{= (workflow.parameters[''ctx-event''] == ''push'') && (workflow.parameters[''ctx-actor''] == ''release-bot'') }}'
+    - name: ci
+      containerSet:
+        containers:
+          - name: build
+            image: golang:1.25
+            command:
+              - sh
+              - -ec
+            args:
+              - go build ./...
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

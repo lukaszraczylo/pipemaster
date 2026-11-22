@@ -1,0 +1,93 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: pipemaster
+spec:
+  dependencies:
+    - eventName: push
+      eventSourceName: pipemaster-github
+      name: gitlab-ci-push
+    - eventName: push
+      eventSourceName: pipemaster-github
+      filters:
+        data:
+          - path: body.ref
+            type: string
+            value:
+              - ^refs/tags/.*$
+      name: gitlab-ci-tag
+  template:
+    serviceAccountName: pipemaster-sensor
+  triggers:
+    - template:
+        conditions: gitlab-ci-push
+        k8s:
+          operation: create
+          parameters:
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dataTemplate: '{{ trimPrefix "refs/heads/" .Input.body.ref }}'
+                dependencyName: gitlab-ci-push
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dataKey: body.after
+                dependencyName: gitlab-ci-push
+            - dest: spec.arguments.parameters.2.value
+              src:
+                dataKey: body.sender.login
+                dependencyName: gitlab-ci-push
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: gitlab-ci-
+              spec:
+                arguments:
+                  parameters:
+                    - name: ctx-branch
+                      value: ""
+                    - name: ctx-sha
+                      value: ""
+                    - name: ctx-actor
+                      value: ""
+                serviceAccountName: pipemaster-workflow
+                workflowTemplateRef:
+                  name: gitlab-ci
+        name: gitlab-ci-push
+    - template:
+        conditions: gitlab-ci-tag
+        k8s:
+          operation: create
+          parameters:
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dataTemplate: '{{ trimPrefix "refs/tags/" .Input.body.ref }}'
+                dependencyName: gitlab-ci-tag
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dataKey: body.after
+                dependencyName: gitlab-ci-tag
+            - dest: spec.arguments.parameters.2.value
+              src:
+                dataKey: body.sender.login
+                dependencyName: gitlab-ci-tag
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: gitlab-ci-
+              spec:
+                arguments:
+                  parameters:
+                    - name: ctx-branch
+                      value: ""
+                    - name: ctx-sha
+                      value: ""
+                    - name: ctx-actor
+                      value: ""
+                serviceAccountName: pipemaster-workflow
+                workflowTemplateRef:
+                  name: gitlab-ci
+        name: gitlab-ci-tag

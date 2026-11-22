@@ -1,0 +1,4 @@
+Loss report: drone -> argo
+[external] pipeline/drone/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[emulated] pipeline/drone/job/ci/step/lint step.continue_on_error: trap on exit (the script ends with exit status 0, so a failure does not stop the containers that depend on it)
+[emulated] pipeline/drone/trigger/0 trigger.filter.branches

@@ -1,0 +1,10 @@
+Loss report: argo -> gitlab
+[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
+[lost] pipeline/ci/job/build/step/build-step-1 ext.passthrough (the action reference actions/checkout@v4 is not in the GitLab file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/build/step/build-step-1 step.action (input token has no GitLab equivalent)
+[lost] pipeline/ci/job/build/step/build-step-2 ext.passthrough (the action reference actions/setup-go@v5 is not in the GitLab file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/build/step/build-step-3 step.action (no GitLab mapping for action docker://alpine:3.20)
+[lost] pipeline/ci/job/build/step/local step.action (no GitLab mapping for action ./.github/actions/setup)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the GitLab file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the GitLab file; it is kept in round-trip metadata)
+[emulated] pipeline/ci/job/build/step/build-step-2 step.action: image selection (job image replaced)

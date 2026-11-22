@@ -1,0 +1,159 @@
+origin:
+    provider: argo
+    dialect: argo
+    files:
+        - .argo/events/eventsource.yaml
+        - .argo/events/sensor.yaml
+        - .argo/rbac/sensor.yaml
+        - .argo/rbac/workflow.yaml
+        - .argo/workflows/ci.yaml
+pipelines:
+    - id: ci
+      name: stepenv
+      triggers:
+        - ext:
+            argo:
+                dependency:
+                    eventName: push
+                    eventSourceName: pipemaster-github
+                    name: ci-push
+                eventSource:
+                    entry:
+                        active: true
+                        contentType: json
+                        events:
+                            - push
+                        repositories:
+                            - names:
+                                - REPO
+                              owner: OWNER
+                        webhook:
+                            endpoint: /push
+                            method: POST
+                            port: "12000"
+                            url: ""
+                        webhookSecret:
+                            key: token
+                            name: pipemaster-github-webhook
+                    event: push
+                    name: pipemaster-github
+                    spec:
+                        service:
+                            ports:
+                                - port: 12000
+                                  targetPort: 12000
+                    type: github
+                sensor:
+                    name: pipemaster
+                    spec:
+                        template:
+                            serviceAccountName: pipemaster-sensor
+                trigger:
+                    template:
+                        conditions: ci-push
+                        k8s:
+                            operation: create
+                            parameters:
+                                - dest: spec.arguments.parameters.0.value
+                                  src:
+                                    dataKey: body.sender.login
+                                    dependencyName: ci-push
+                            source:
+                                resource:
+                                    apiVersion: argoproj.io/v1alpha1
+                                    kind: Workflow
+                                    metadata:
+                                        generateName: ci-
+                                    spec:
+                                        arguments:
+                                            parameters:
+                                                - name: ctx-actor
+                                                  value: ""
+                                        serviceAccountName: pipemaster-workflow
+                                        workflowTemplateRef:
+                                            name: ci
+                        name: ci-push
+          kind: push
+        - ext:
+            argo:
+                dependency:
+                    eventName: push
+                    eventSourceName: pipemaster-github
+                    filters:
+                        data:
+                            - path: body.ref
+                              type: string
+                              value:
+                                - ^refs/tags/.*$
+                    name: ci-tag
+                eventSource:
+                    entry:
+                        active: true
+                        contentType: json
+                        events:
+                            - push
+                        repositories:
+                            - names:
+                                - REPO
+                              owner: OWNER
+                        webhook:
+                            endpoint: /push
+                            method: POST
+                            port: "12000"
+                            url: ""
+                        webhookSecret:
+                            key: token
+                            name: pipemaster-github-webhook
+                    event: push
+                    name: pipemaster-github
+                    spec:
+                        service:
+                            ports:
+                                - port: 12000
+                                  targetPort: 12000
+                    type: github
+                sensor:
+                    name: pipemaster
+                    spec:
+                        template:
+                            serviceAccountName: pipemaster-sensor
+                trigger:
+                    template:
+                        conditions: ci-tag
+                        k8s:
+                            operation: create
+                            parameters:
+                                - dest: spec.arguments.parameters.0.value
+                                  src:
+                                    dataKey: body.sender.login
+                                    dependencyName: ci-tag
+                            source:
+                                resource:
+                                    apiVersion: argoproj.io/v1alpha1
+                                    kind: Workflow
+                                    metadata:
+                                        generateName: ci-
+                                    spec:
+                                        arguments:
+                                            parameters:
+                                                - name: ctx-actor
+                                                  value: ""
+                                        serviceAccountName: pipemaster-workflow
+                                        workflowTemplateRef:
+                                            name: ci
+                        name: ci-tag
+          kind: tag
+      jobs:
+        - id: build
+          steps:
+            - id: build-step-1
+              kind: script
+              script:
+                - echo "$GREETING"
+              env:
+                - name: GREETING
+                  value:
+                    expr: format('hello {0}', actor)
+                - name: KEY
+                  value:
+                    secret: KEY

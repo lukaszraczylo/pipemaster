@@ -1,0 +1,24 @@
+# pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v4\nwith:\n    fetch-depth:\n        lit: \"0\"\n    token:\n        secret: PAT\nid: build-step-1\nkind: action\n","at":0}
+# pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: setup-go\n    ref: v5\nwith:\n    go-version:\n        lit: \"1.24\"\nid: build-step-2\nkind: action\n","image":"golang:1.24","at":1}
+# pipemaster:lost step pipeline/ci/job/build/step/build-step-3 uses docker://alpine:3.20
+# pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-3
+# pipemaster:arg {"step":"action:\n    kind: docker\n    image: alpine:3.20\nid: build-step-3\nkind: action\n","at":2}
+# pipemaster:lost step pipeline/ci/job/build/step/local uses ./.github/actions/setup
+# pipemaster:emulated step.action pipeline/ci/job/build/step/local
+# pipemaster:arg {"step":"action:\n    kind: local\n    path: ./.github/actions/setup\nid: local\nkind: action\n","at":3}
+# pipemaster:emulated step.script pipeline/ci/job/build
+when:
+  - event: push
+  - event: tag
+clone:
+  git:
+    image: docker.io/woodpeckerci/plugin-git:2.11.0
+    settings:
+      depth: 0
+steps:
+  - name: noop
+    image: golang:1.24
+    commands:
+      - "true"

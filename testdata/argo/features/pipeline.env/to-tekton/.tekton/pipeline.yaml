@@ -1,0 +1,14 @@
+# pipemaster:emulated pipeline.env pipeline/ci
+# pipemaster:arg {"env":"- name: CGO_ENABLED\n  value:\n    lit: \"0\"\n- name: VERSION\n  value:\n    lit: \"3.1\"\n- name: TOKEN\n  value:\n    secret: DEPLOY_TOKEN\n- name: LABEL\n  value:\n    expr: format('build-{0}', gha.github.run_number)\n"}
+# pipemaster:lost expr.opaque pipeline/ci: gha.github.run_number
+# pipemaster:emulated config.name pipeline/ci/ref/secrets.DEPLOY_TOKEN
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: env
+  tasks:
+    - name: build
+      taskRef:
+        name: ci-build

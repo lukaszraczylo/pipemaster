@@ -1,0 +1,4 @@
+Loss report: woodpecker -> argo
+[lost] pipeline/woodpecker/job/ci ext.passthrough (Ext of provider woodpecker (skip_clone) is not written to the Argo file; it is kept in round-trip metadata)
+[external] pipeline/woodpecker/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[emulated] pipeline/woodpecker/trigger/0 trigger.filter.branches

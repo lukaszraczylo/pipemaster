@@ -1,0 +1,33 @@
+# pipemaster:emulated ext.passthrough pipeline/.shared
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  # pipemaster:id .shared
+  name: shared
+  annotations:
+    workflows.argoproj.io/title: shared
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: run
+            template: run
+    - name: run
+      containerSet:
+        containers:
+          - name: run-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - echo run
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

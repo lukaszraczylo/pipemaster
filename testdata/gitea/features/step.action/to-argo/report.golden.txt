@@ -1,0 +1,13 @@
+Loss report: gitea -> argo
+[lost] pipeline/ci/job/build job.runner (Argo schedules pods; a runner label has no form)
+[lost] pipeline/ci/job/build/step/build-step-1 step.action (the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; the input token of the action has no Argo form)
+[lost] pipeline/ci/job/build/step/build-step-3 step.action (the action docker://alpine:3.20 has no Argo form; the step is dropped)
+[lost] pipeline/ci/job/build/step/local step.action (the action ./.github/actions/setup has no Argo form; the step is dropped)
+[external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[external] pipeline/ci/trigger/1 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[emulated] pipeline/ci/job/build step.script: no-op container (the job runs no script, so a container named main carries its inputs and outputs)
+[emulated] pipeline/ci/job/build/step/build-step-2 step.action: image selection; placeholder container (later steps without an image run in this image; Argo does not run the action; a container that runs true keeps its place)
+[emulated] pipeline/ci/ref/secrets.PAT config.name: secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars (the Secret values and ConfigMap values are not written)
+[emulated] pipeline/ci/trigger/0 trigger.filter.branches
+[emulated] pipeline/ci/trigger/1 trigger.filter.branches
+[emulated] pipeline/ci/trigger/1 trigger.tag: EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only)

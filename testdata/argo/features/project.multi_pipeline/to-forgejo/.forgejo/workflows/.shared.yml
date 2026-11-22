@@ -1,0 +1,11 @@
+# pipemaster:emulated job.runner pipeline/.shared/job/run
+name: shared
+on:
+  # pipemaster:emulated trigger.manual pipeline/.shared
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - id: run-step-1
+        run: echo run

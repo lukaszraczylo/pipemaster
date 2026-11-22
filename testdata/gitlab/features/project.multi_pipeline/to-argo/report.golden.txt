@@ -1,0 +1,9 @@
+Loss report: gitlab -> argo
+[lost] pipeline/.shared/job/run job.runner (Argo schedules pods; a runner label has no form)
+[lost] pipeline/.shared/trigger/0 ext.passthrough (Ext of provider gha (event) is not written to the Argo file; it is kept in round-trip metadata)
+[lost] pipeline/.shared/trigger/0 trigger.api (an api trigger that no Argo file held has no Argo form; no Sensor trigger is written)
+[lost] pipeline/ci/job/build job.runner (Argo schedules pods; a runner label has no form)
+[external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[emulated] pipeline/.shared ext.passthrough: pipeline id renamed (pipeline id .shared is not a DNS-1123 label; written as shared)
+[emulated] pipeline/ci project.multi_pipeline: one WorkflowTemplate per IR pipeline (each pipeline gets its own trigger)
+[emulated] pipeline/ci/trigger/0 trigger.filter.branches

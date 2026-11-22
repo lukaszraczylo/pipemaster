@@ -1,0 +1,2 @@
+Loss report: gha -> argo
+[lost] pipeline/ci/job/build job.runner (Argo schedules pods; a runner label has no form)

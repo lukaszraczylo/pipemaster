@@ -1,0 +1,11 @@
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: woodpecker-1
+spec:
+  schedules:
+    - ""
+  workflowSpec:
+    serviceAccountName: pipemaster-workflow
+    workflowTemplateRef:
+      name: woodpecker

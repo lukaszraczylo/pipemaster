@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: pipemaster-github
+spec:
+  github:
+    pull_request:
+      active: true
+      contentType: json
+      events:
+        - pull_request
+      repositories:
+        - names:
+            - REPO
+          owner: OWNER
+      webhook:
+        endpoint: /pull_request
+        method: POST
+        port: "12000"
+        url: ""
+      webhookSecret:
+        key: token
+        name: pipemaster-github-webhook
+  service:
+    ports:
+      - port: 12000
+        targetPort: 12000

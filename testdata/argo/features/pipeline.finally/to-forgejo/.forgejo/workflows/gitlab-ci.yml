@@ -1,0 +1,37 @@
+# pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/alert
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/alert
+# pipemaster:arg {}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/report
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/report
+# pipemaster:arg {}
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: make build
+  # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+  alert:
+    needs:
+      - build
+    if: always() && failure()
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: ./page.sh
+  # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+  report:
+    needs:
+      - build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - id: script
+        run: ./notify.sh

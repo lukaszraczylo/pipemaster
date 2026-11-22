@@ -1,0 +1,123 @@
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: gitlab-ci
+spec:
+  entrypoint: main
+  hooks:
+    exit:
+      template: exit-handler
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: compile
+            template: compile
+          - name: lint
+            template: lint
+          - name: summary
+            template: summary
+            dependencies:
+              - compile
+              - lint
+              - unit
+          - name: unit
+            template: unit
+            dependencies:
+              - compile
+              - lint
+    - name: exit-handler
+      dag:
+        tasks:
+          - name: cleanup
+            template: cleanup
+    - name: compile
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - make build
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: lint
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - make lint
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: summary
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - make report
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: unit
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - make test
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: cleanup
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - make clean
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

@@ -1,0 +1,86 @@
+origin:
+    provider: argo
+    dialect: argo
+    files:
+        - .argo/events/eventsource.yaml
+        - .argo/events/sensor.yaml
+        - .argo/rbac/sensor.yaml
+        - .argo/rbac/workflow.yaml
+        - .argo/workflows/drone.yaml
+pipelines:
+    - id: drone
+      triggers:
+        - ext:
+            argo:
+                dependency:
+                    eventName: push
+                    eventSourceName: pipemaster-github
+                    name: drone-push
+                eventSource:
+                    entry:
+                        active: true
+                        contentType: json
+                        events:
+                            - push
+                        repositories:
+                            - names:
+                                - REPO
+                              owner: OWNER
+                        webhook:
+                            endpoint: /push
+                            method: POST
+                            port: "12000"
+                            url: ""
+                        webhookSecret:
+                            key: token
+                            name: pipemaster-github-webhook
+                    event: push
+                    name: pipemaster-github
+                    spec:
+                        service:
+                            ports:
+                                - port: 12000
+                                  targetPort: 12000
+                    type: github
+                sensor:
+                    name: pipemaster
+                    spec:
+                        template:
+                            serviceAccountName: pipemaster-sensor
+                trigger:
+                    template:
+                        conditions: drone-push
+                        k8s:
+                            operation: create
+                            source:
+                                resource:
+                                    apiVersion: argoproj.io/v1alpha1
+                                    kind: Workflow
+                                    metadata:
+                                        generateName: drone-
+                                    spec:
+                                        serviceAccountName: pipemaster-workflow
+                                        workflowTemplateRef:
+                                            name: drone
+                        name: drone-push
+          kind: push
+      jobs:
+        - environment:
+            name: production
+            approval: true
+          ext:
+            argo:
+                gates:
+                    - body:
+                        name: deploy-gate
+                        suspend: {}
+                      task: deploy-gate
+                      template: deploy-gate
+          id: deploy
+          steps:
+            - image:
+                ref: alpine:3.20
+              id: deploy
+              kind: script
+              script:
+                - ./deploy.sh

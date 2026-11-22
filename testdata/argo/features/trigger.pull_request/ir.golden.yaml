@@ -1,0 +1,89 @@
+origin:
+    provider: argo
+    dialect: argo
+    files:
+        - .argo/events/eventsource.yaml
+        - .argo/events/sensor.yaml
+        - .argo/rbac/sensor.yaml
+        - .argo/rbac/workflow.yaml
+        - .argo/workflows/ci.yaml
+pipelines:
+    - id: ci
+      name: pr
+      triggers:
+        - ext:
+            argo:
+                dependency:
+                    eventName: pull_request
+                    eventSourceName: pipemaster-github
+                    filters:
+                        data:
+                            - path: body.action
+                              type: string
+                              value:
+                                - opened
+                                - reopened
+                                - synchronize
+                        exprs:
+                            - expr: head == base
+                              fields:
+                                - name: head
+                                  path: body.pull_request.head.repo.full_name
+                                - name: base
+                                  path: body.repository.full_name
+                    name: ci-pr
+                eventSource:
+                    entry:
+                        active: true
+                        contentType: json
+                        events:
+                            - pull_request
+                        repositories:
+                            - names:
+                                - REPO
+                              owner: OWNER
+                        webhook:
+                            endpoint: /pull_request
+                            method: POST
+                            port: "12000"
+                            url: ""
+                        webhookSecret:
+                            key: token
+                            name: pipemaster-github-webhook
+                    event: pull_request
+                    name: pipemaster-github
+                    spec:
+                        service:
+                            ports:
+                                - port: 12000
+                                  targetPort: 12000
+                    type: github
+                sensor:
+                    name: pipemaster
+                    spec:
+                        template:
+                            serviceAccountName: pipemaster-sensor
+                trigger:
+                    template:
+                        conditions: ci-pr
+                        k8s:
+                            operation: create
+                            source:
+                                resource:
+                                    apiVersion: argoproj.io/v1alpha1
+                                    kind: Workflow
+                                    metadata:
+                                        generateName: ci-
+                                    spec:
+                                        serviceAccountName: pipemaster-workflow
+                                        workflowTemplateRef:
+                                            name: ci
+                        name: ci-pr
+          kind: pr
+      jobs:
+        - id: build
+          steps:
+            - id: build-step-1
+              kind: script
+              script:
+                - echo ok

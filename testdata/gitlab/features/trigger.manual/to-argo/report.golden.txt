@@ -1,0 +1,2 @@
+Loss report: gitlab -> argo
+[external] pipeline/gitlab-ci/trigger/0 trigger.manual: argo submit --from workflowtemplate/gitlab-ci (start a run with: argo submit --from workflowtemplate/gitlab-ci; the Workflow object needs a ServiceAccount with the rights in .argo/rbac/)

@@ -1,0 +1,22 @@
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:arg {"kind":"push"}
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+# pipemaster:arg {"kind":"tag"}
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+build:
+  needs: []
+  script:
+    # pipemaster:step build-step-2
+    # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
+    # pipemaster:arg "event == 'push'"
+    - |
+      if [ "$CI_PIPELINE_SOURCE" = "push" ]; then
+      echo push
+      fi
+  after_script:
+    # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-1
+    # pipemaster:arg {"pos":0,"moved":"always","offset":0,"lines":1,"coe":false}
+    - echo cleanup

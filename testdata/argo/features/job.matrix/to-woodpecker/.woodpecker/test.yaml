@@ -1,0 +1,20 @@
+# pipemaster:emulated job.container pipeline/ci/job/test
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"FailFast":false,"Axes":[{"Name":"os","Values":["ubuntu-latest","macos-latest"]},{"Name":"go","Values":["1.24","1.25"]}],"Include":[[{"Key":"experimental","Value":"true"},{"Key":"go","Value":"1.25"},{"Key":"os","Value":"ubuntu-latest"}]],"Exclude":[[{"Key":"go","Value":"1.24"},{"Key":"os","Value":"macos-latest"}]],"MaxParallel":2}
+when:
+  - event: push
+  - event: tag
+matrix:
+  include:
+    - go: "1.24"
+      os: ubuntu-latest
+    - experimental: "true"
+      go: "1.25"
+      os: ubuntu-latest
+    - go: "1.25"
+      os: macos-latest
+steps:
+  - name: test-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ${go}

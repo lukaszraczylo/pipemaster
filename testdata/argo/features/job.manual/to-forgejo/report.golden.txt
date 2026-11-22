@@ -1,0 +1,7 @@
+Loss report: argo -> forgejo
+[lost] pipeline/gitlab-ci/job/deploy ext.passthrough (Ext of provider argo (gates) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/trigger/0 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/trigger/1 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the GHA file; it is kept in round-trip metadata)
+[emulated] pipeline/gitlab-ci pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)
+[emulated] pipeline/gitlab-ci/job/deploy job.manual: workflow_dispatch trigger
+[emulated] pipeline/gitlab-ci/job/deploy job.runner: default runner label ubuntu-latest (the pipeline named no runner)

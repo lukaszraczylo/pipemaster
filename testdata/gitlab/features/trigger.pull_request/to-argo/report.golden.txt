@@ -1,0 +1,4 @@
+Loss report: gitlab -> argo
+[external] pipeline/gitlab-ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[emulated] pipeline/gitlab-ci/trigger/0 trigger.filter.branches
+[emulated] pipeline/gitlab-ci/trigger/0 trigger.pull_request (the trigger accepts a pull request from the same repository only; a fork would run its code with every secret)

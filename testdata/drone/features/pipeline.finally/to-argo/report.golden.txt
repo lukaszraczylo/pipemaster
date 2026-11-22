@@ -1,0 +1,4 @@
+Loss report: drone -> argo
+[lost] pipeline/drone/job/notify job.needs (an exit handler task cannot wait for a task of the entry DAG (build); it starts after that DAG ends)
+[external] pipeline/drone/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[emulated] pipeline/drone/trigger/0 trigger.filter.branches

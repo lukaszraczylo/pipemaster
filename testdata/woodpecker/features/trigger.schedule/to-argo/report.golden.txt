@@ -1,0 +1,2 @@
+Loss report: woodpecker -> argo
+[lost] pipeline/woodpecker/trigger/0 trigger.schedule (the schedule has no cron expression, which a CronWorkflow needs; no CronWorkflow is written)

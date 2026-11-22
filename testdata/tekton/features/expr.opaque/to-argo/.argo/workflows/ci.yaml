@@ -1,0 +1,40 @@
+# pipemaster:emulated job.if pipeline/ci/job/build
+# pipemaster:arg {"job":"if: 'opaque(tekton): {\"input\":\"pipemaster-disabled\",\"operator\":\"in\",\"values\":[\"never\"]}'\nid: \"\"\n"}
+# pipemaster:emulated script.interpolation pipeline/ci/job/build
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
+# pipemaster:emulated trigger.push pipeline/ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+  annotations:
+    workflows.argoproj.io/title: opaque
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+            when: '{{= false }}'
+    - name: build
+      containerSet:
+        containers:
+          - name: build-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - '# pipemaster:lost script.interpolation: echo {{ opaque(gha): env[github.job] }}'
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

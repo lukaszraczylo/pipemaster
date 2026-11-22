@@ -1,0 +1,194 @@
+origin:
+    provider: argo
+    dialect: argo
+    files:
+        - .argo/events/eventsource.yaml
+        - .argo/events/sensor.yaml
+        - .argo/rbac/sensor.yaml
+        - .argo/rbac/workflow.yaml
+        - .argo/workflows/ci.yaml
+pipelines:
+    - id: ci
+      name: action
+      triggers:
+        - ext:
+            argo:
+                dependency:
+                    eventName: push
+                    eventSourceName: pipemaster-github
+                    name: ci-push
+                eventSource:
+                    entry:
+                        active: true
+                        contentType: json
+                        events:
+                            - push
+                        repositories:
+                            - names:
+                                - REPO
+                              owner: OWNER
+                        webhook:
+                            endpoint: /push
+                            method: POST
+                            port: "12000"
+                            url: ""
+                        webhookSecret:
+                            key: token
+                            name: pipemaster-github-webhook
+                    event: push
+                    name: pipemaster-github
+                    spec:
+                        service:
+                            ports:
+                                - port: 12000
+                                  targetPort: 12000
+                    type: github
+                sensor:
+                    name: pipemaster
+                    spec:
+                        template:
+                            serviceAccountName: pipemaster-sensor
+                trigger:
+                    template:
+                        conditions: ci-push
+                        k8s:
+                            operation: create
+                            parameters:
+                                - dest: spec.arguments.parameters.0.value
+                                  src:
+                                    dataKey: body.after
+                                    dependencyName: ci-push
+                                - dest: spec.arguments.parameters.1.value
+                                  src:
+                                    dataKey: body.repository.full_name
+                                    dependencyName: ci-push
+                            source:
+                                resource:
+                                    apiVersion: argoproj.io/v1alpha1
+                                    kind: Workflow
+                                    metadata:
+                                        generateName: ci-
+                                    spec:
+                                        arguments:
+                                            parameters:
+                                                - name: ctx-sha
+                                                  value: ""
+                                                - name: ctx-repo
+                                                  value: ""
+                                        serviceAccountName: pipemaster-workflow
+                                        workflowTemplateRef:
+                                            name: ci
+                        name: ci-push
+          kind: push
+        - ext:
+            argo:
+                dependency:
+                    eventName: push
+                    eventSourceName: pipemaster-github
+                    filters:
+                        data:
+                            - path: body.ref
+                              type: string
+                              value:
+                                - ^refs/tags/.*$
+                    name: ci-tag
+                eventSource:
+                    entry:
+                        active: true
+                        contentType: json
+                        events:
+                            - push
+                        repositories:
+                            - names:
+                                - REPO
+                              owner: OWNER
+                        webhook:
+                            endpoint: /push
+                            method: POST
+                            port: "12000"
+                            url: ""
+                        webhookSecret:
+                            key: token
+                            name: pipemaster-github-webhook
+                    event: push
+                    name: pipemaster-github
+                    spec:
+                        service:
+                            ports:
+                                - port: 12000
+                                  targetPort: 12000
+                    type: github
+                sensor:
+                    name: pipemaster
+                    spec:
+                        template:
+                            serviceAccountName: pipemaster-sensor
+                trigger:
+                    template:
+                        conditions: ci-tag
+                        k8s:
+                            operation: create
+                            parameters:
+                                - dest: spec.arguments.parameters.0.value
+                                  src:
+                                    dataKey: body.after
+                                    dependencyName: ci-tag
+                                - dest: spec.arguments.parameters.1.value
+                                  src:
+                                    dataKey: body.repository.full_name
+                                    dependencyName: ci-tag
+                            source:
+                                resource:
+                                    apiVersion: argoproj.io/v1alpha1
+                                    kind: Workflow
+                                    metadata:
+                                        generateName: ci-
+                                    spec:
+                                        arguments:
+                                            parameters:
+                                                - name: ctx-sha
+                                                  value: ""
+                                                - name: ctx-repo
+                                                  value: ""
+                                        serviceAccountName: pipemaster-workflow
+                                        workflowTemplateRef:
+                                            name: ci
+                        name: ci-tag
+          kind: tag
+      jobs:
+        - id: build
+          steps:
+            - action:
+                kind: repo
+                host: https://github.com
+                owner: actions
+                repo: checkout
+                ref: v4
+              with:
+                fetch-depth:
+                    lit: "0"
+                token:
+                    secret: PAT
+              id: build-step-1
+              kind: action
+            - action:
+                kind: repo
+                host: https://github.com
+                owner: actions
+                repo: setup-go
+                ref: v5
+              with:
+                go-version:
+                    lit: "1.24"
+              id: build-step-2
+              kind: action
+            - action:
+                kind: docker
+                image: alpine:3.20
+              id: build-step-3
+              kind: action
+            - action:
+                kind: local
+                path: ./.github/actions/setup
+              id: local
+              kind: action

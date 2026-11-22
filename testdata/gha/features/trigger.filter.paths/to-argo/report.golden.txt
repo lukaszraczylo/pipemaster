@@ -1,0 +1,13 @@
+Loss report: gha -> argo
+[lost] pipeline/ci/job/build job.runner (Argo schedules pods; a runner label has no form)
+[lost] pipeline/ci/trigger/0 trigger.filter.paths (a Sensor data filter cannot test the changed files; the trigger runs on every change)
+[lost] pipeline/ci/trigger/1 trigger.filter.paths (a Sensor data filter cannot test the changed files; the trigger runs on every change)
+[lost] pipeline/ci/trigger/2 trigger.filter.paths (a Sensor data filter cannot test the changed files; the trigger runs on every change)
+[external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[external] pipeline/ci/trigger/1 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[external] pipeline/ci/trigger/2 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[emulated] pipeline/ci/trigger/0 trigger.filter.branches
+[emulated] pipeline/ci/trigger/0 trigger.pull_request (the trigger accepts a pull request from the same repository only; a fork would run its code with every secret)
+[emulated] pipeline/ci/trigger/1 trigger.filter.branches
+[emulated] pipeline/ci/trigger/2 trigger.filter.branches
+[emulated] pipeline/ci/trigger/2 trigger.tag: EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only)

@@ -1,0 +1,35 @@
+# pipemaster:emulated step.action pipeline/drone/job/ci/step/release
+# pipemaster:arg {"step":"if: 'opaque(drone): when.ref glob \"refs/tags/v*\"'\nimage:\n    ref: alpine:3.20\nid: release\nkind: script\nscript:\n    - ./release.sh\n","hold":"{\"args\":[\"exit 0 # pipemaster:lost the step condition has no shell form\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.20\",\"name\":\"release\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:emulated step.image pipeline/drone/job/ci
+# pipemaster:arg {"steps":{"release":"ref: alpine:3.20\n"},"wrote":{"release":"alpine:3.20"}}
+# pipemaster:emulated trigger.filter.branches pipeline/drone/trigger/0
+# pipemaster:emulated trigger.push pipeline/drone/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: drone
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: ci
+            template: ci
+    - name: ci
+      containerSet:
+        containers:
+          - name: release
+            image: alpine:3.20
+            command:
+              - sh
+              - -ec
+            args:
+              - 'exit 0 # pipemaster:lost the step condition has no shell form'
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

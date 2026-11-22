@@ -1,13 +1,13 @@
 # Corpus sources
 
 Real-world CI pipelines stored verbatim for `TestCorpus` (`internal/roundtrip/corpus_test.go`).
-The directory of an entry is `testdata/corpus/<#>-<gha, gitea, forgejo, gitlab, woodpecker or drone>-<slug>`.
+The directory of an entry is `testdata/corpus/<#>-<gha, gitea, forgejo, gitlab, woodpecker, drone, tekton or argo>-<slug>`.
 Every file is byte-identical to the file at the pinned commit; the test run does not edit them.
 
-- Fetch date: 2026-11-18 for entries 01 to 27, 2026-11-19 for entries 28 to 40 and 2026-11-20 for entries 41 to 50 and 2026-11-21 for entries 51 to 71.
+- Fetch date: 2026-11-18 for entries 01 to 27, 2026-11-19 for entries 28 to 40 and 2026-11-20 for entries 41 to 50 and 2026-11-21 for entries 51 to 71 and 2026-11-22 for entries 72 to 75.
 - Each repository is public, and its licence was read before use: from the host API (GitHub `license.spdx_id`, GitLab `license.key`), or, for entries 28 to 40,
   from the `LICENSE` file of the repository at the pinned commit.
-  Every licence is MIT, Apache-2.0, BSD-3-Clause or, for entry 60 only, MPL-2.0. Entries 63 to 71 are Apache-2.0.
+  Every licence is MIT, Apache-2.0, BSD-3-Clause or, for entry 60 only, MPL-2.0. Entries 63 to 71 are Apache-2.0. Entry 72 is BSD-3-Clause, and entries 73 to 75 are Apache-2.0.
 - No private repository and no repository of the operator is used. No file holds a secret.
 - Attribution: this file names the source repository, the commit, each path and the SPDX licence of every
   copied file, and the licence text sits at the repository root of that commit. This attribution satisfies the
@@ -91,6 +91,10 @@ Every file is byte-identical to the file at the pinned commit; the test run does
 | 69 | pipelines-tutorial | Tekton | <https://github.com/openshift/pipelines-tutorial> | `4ebfb3d6f4e195de106f0f59a2506f4edffdfcf7` | Apache-2.0 | `01_pipeline/04_pipeline.yaml`<br>`01_pipeline/01_apply_manifest_task.yaml`<br>`.tekton/pipelinerun.yaml` |
 | 70 | git-clone | Tekton | <https://github.com/tektoncd-catalog/git-clone> | `e1b1fafc3a0c1704a69beb894d65a8b3e090d5d8` | Apache-2.0 | `task/git-clone/git-clone.yaml`<br>`stepaction/git-clone/git-clone.yaml` |
 | 71 | catalog | Tekton | <https://github.com/tektoncd/catalog> | `112374ce1262b133a77300bd8133445722605e04` | Apache-2.0 | `task/git-clone/0.10/git-clone.yaml` |
+| 72 | ci-example | Argo | <https://github.com/pipekit/argo-workflows-ci-example> | `4f0e92c4a90d788ba22ca617dae52a547d869b4b` | BSD-3-Clause | `bootstrap/workflow-templates/nfs/ci-workflow.yml` |
+| 73 | go-gin-rest-api | Argo | <https://github.com/linclin/go-gin-rest-api> | `8f326d8d6789fa8d5b486e7586ba8911b9da63a6` | Apache-2.0 | `wiki/ci/buildkit-argo-workflow-template.yaml` |
+| 74 | workflows-examples | Argo | <https://github.com/argoproj/argo-workflows> | `43021573c5a35cbafae009043c132dfcef43a112` | Apache-2.0 | `examples/ci.yaml`<br>`examples/conditionals.yaml`<br>`examples/dag-diamond.yaml`<br>`examples/dag-enhanced-depends.yaml`<br>`examples/exit-handler-dag-level.yaml` |
+| 75 | events-examples | Argo | <https://github.com/argoproj/argo-events> | `d13fde07d944c081c25574305911908c80faa98e` | Apache-2.0 | `examples/event-sources/github.yaml`<br>`examples/sensors/github.yaml`<br>`examples/dag-diamond.yaml` (from argo-workflows at the commit of entry 74) |
 
 Woodpecker entries (41 to 50):
 
@@ -117,3 +121,10 @@ Tekton entries (63 to 71):
 - Entry 71 stores the file as `.tekton/git-clone.yaml`.
 - Entries 64, 70 and 71 hold a second file, `.tekton/pipelinerun-with-matrix-include.yaml`, from `tektoncd/pipeline` at the commit of entry 63 (path `examples/v1/pipelineruns/beta/pipelinerun-with-matrix-include.yaml`). The entries hold no Pipeline of their own, so a Tekton project needs it to parse.
 - Entry 71 is a `tekton.dev/deprecated` catalog Task. Entry 63 holds `cel` when entries, which the parser keeps as opaque text.
+
+Argo entries (72 to 75):
+
+- The raw URL is `https://raw.githubusercontent.com/<repository>/<commit>/<path>`. Every file is byte-identical to the file at the pinned commit. Licences are the GitHub API `license.spdx_id` of each repository.
+- Entry 74 pins the tag v4.1.6 of argoproj/argo-workflows, which is the commit in the table. Entry 75 pins the tag v1.9.11 of argoproj/argo-events, an annotated tag that peels to the commit in the table.
+- Entries 72 to 74 keep the file name of the source path, in `.argo/`. Entry 75 keeps the subdirectories `event-sources/` and `sensors/`, and holds `.argo/dag-diamond.yaml` from entry 74, so that a Workflow exists for the Sensor to run.
+- Not stored, because the pinned file does not parse or does not round trip: `ci-workflow-s3.yml` of pipekit (a `parameters` key under `spec`, which the Argo schema rejects), `git-checkout-pr.yml` of pipekit (its tags read workflow parameters that no file declares), `cron-workflow.yaml` of argo-workflows (the schedule is every minute, which the GHA linter rejects), and the files of konstructio/gitops-template, yoonjk/argocd-handson, hortonew/kind-argo-lab and smiggiddy/argo. Those hold a template library with no entrypoint, a ClusterWorkflowTemplate whose entrypoint names no template, Helm template text, or a command list with an input tag. The entry numbers are not reused.

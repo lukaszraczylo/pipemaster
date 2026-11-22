@@ -1,0 +1,36 @@
+# pipemaster:emulated step.image pipeline/woodpecker/job/ci
+# pipemaster:arg {"steps":{"lint":"ref: golangci/golangci-lint:v2\n"},"wrote":{"lint":"golangci/golangci-lint:v2"}}
+# pipemaster:emulated step.continue_on_error pipeline/woodpecker/job/ci/step/lint
+# pipemaster:emulated trigger.filter.branches pipeline/woodpecker/trigger/0
+# pipemaster:emulated trigger.push pipeline/woodpecker/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: woodpecker
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: ci
+            template: ci
+    - name: ci
+      containerSet:
+        containers:
+          - name: lint
+            image: golangci/golangci-lint:v2
+            command:
+              - sh
+              - -ec
+            args:
+              - |-
+                trap 'exit 0' EXIT # pipemaster:continue-on-error
+                golangci-lint run
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

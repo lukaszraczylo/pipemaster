@@ -1,0 +1,12 @@
+Loss report: gha -> argo
+[lost] pipeline/ci/job/test job.runner (Argo schedules pods; a runner label has no form)
+[lost] pipeline/deploy/job/deploy job.runner (Argo schedules pods; a runner label has no form)
+[lost] pipeline/deploy/trigger/0 ext.passthrough (Ext of provider gha (inputs) is not written to the Argo file; it is kept in round-trip metadata)
+[external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[external] pipeline/ci/trigger/1 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[external] pipeline/deploy/trigger/0 trigger.manual: argo submit --from workflowtemplate/deploy (start a run with: argo submit --from workflowtemplate/deploy; the Workflow object needs a ServiceAccount with the rights in .argo/rbac/)
+[emulated] pipeline/ci/trigger/0 trigger.filter.branches
+[emulated] pipeline/ci/trigger/1 trigger.filter.branches
+[emulated] pipeline/ci/trigger/1 trigger.tag: EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only)
+[emulated] pipeline/deploy pipeline.inputs: string parameter (input target has type choice, which Argo parameters lack; it is a string parameter and the type stays in the marker)
+[emulated] pipeline/deploy project.multi_pipeline: one WorkflowTemplate per IR pipeline (each pipeline gets its own trigger)

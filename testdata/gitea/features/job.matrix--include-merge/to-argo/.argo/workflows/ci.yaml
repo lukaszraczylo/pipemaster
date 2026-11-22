@@ -1,0 +1,53 @@
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"axes":[{"Name":"go","Values":["1.21","1.22"]}],"include":[[{"Key":"experimental","Value":"true"},{"Key":"go","Value":"1.22"}]]}
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
+# pipemaster:emulated trigger.push pipeline/ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+  annotations:
+    workflows.argoproj.io/title: ci
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: test
+            template: test
+            withItems:
+              - go: "1.21"
+                experimental: ""
+              - go: "1.22"
+                experimental: "true"
+            arguments:
+              parameters:
+                - name: go
+                  value: '{{item.go}}'
+                - name: experimental
+                  value: '{{item.experimental}}'
+    - name: test
+      containerSet:
+        containers:
+          - name: test-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - go test {{inputs.parameters.go}}
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      inputs:
+        parameters:
+          - name: go
+          - name: experimental
+      volumes:
+        - emptyDir: {}
+          name: workspace

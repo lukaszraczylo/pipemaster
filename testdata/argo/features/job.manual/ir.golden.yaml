@@ -1,0 +1,143 @@
+origin:
+    provider: argo
+    dialect: argo
+    files:
+        - .argo/events/eventsource.yaml
+        - .argo/events/sensor.yaml
+        - .argo/rbac/sensor.yaml
+        - .argo/rbac/workflow.yaml
+        - .argo/workflows/gitlab-ci.yaml
+pipelines:
+    - id: gitlab-ci
+      triggers:
+        - ext:
+            argo:
+                dependency:
+                    eventName: push
+                    eventSourceName: pipemaster-github
+                    name: gitlab-ci-push
+                eventSource:
+                    entry:
+                        active: true
+                        contentType: json
+                        events:
+                            - push
+                        repositories:
+                            - names:
+                                - REPO
+                              owner: OWNER
+                        webhook:
+                            endpoint: /push
+                            method: POST
+                            port: "12000"
+                            url: ""
+                        webhookSecret:
+                            key: token
+                            name: pipemaster-github-webhook
+                    event: push
+                    name: pipemaster-github
+                    spec:
+                        service:
+                            ports:
+                                - port: 12000
+                                  targetPort: 12000
+                    type: github
+                sensor:
+                    name: pipemaster
+                    spec:
+                        template:
+                            serviceAccountName: pipemaster-sensor
+                trigger:
+                    template:
+                        conditions: gitlab-ci-push
+                        k8s:
+                            operation: create
+                            source:
+                                resource:
+                                    apiVersion: argoproj.io/v1alpha1
+                                    kind: Workflow
+                                    metadata:
+                                        generateName: gitlab-ci-
+                                    spec:
+                                        serviceAccountName: pipemaster-workflow
+                                        workflowTemplateRef:
+                                            name: gitlab-ci
+                        name: gitlab-ci-push
+          kind: push
+        - ext:
+            argo:
+                dependency:
+                    eventName: push
+                    eventSourceName: pipemaster-github
+                    filters:
+                        data:
+                            - path: body.ref
+                              type: string
+                              value:
+                                - ^refs/tags/.*$
+                    name: gitlab-ci-tag
+                eventSource:
+                    entry:
+                        active: true
+                        contentType: json
+                        events:
+                            - push
+                        repositories:
+                            - names:
+                                - REPO
+                              owner: OWNER
+                        webhook:
+                            endpoint: /push
+                            method: POST
+                            port: "12000"
+                            url: ""
+                        webhookSecret:
+                            key: token
+                            name: pipemaster-github-webhook
+                    event: push
+                    name: pipemaster-github
+                    spec:
+                        service:
+                            ports:
+                                - port: 12000
+                                  targetPort: 12000
+                    type: github
+                sensor:
+                    name: pipemaster
+                    spec:
+                        template:
+                            serviceAccountName: pipemaster-sensor
+                trigger:
+                    template:
+                        conditions: gitlab-ci-tag
+                        k8s:
+                            operation: create
+                            source:
+                                resource:
+                                    apiVersion: argoproj.io/v1alpha1
+                                    kind: Workflow
+                                    metadata:
+                                        generateName: gitlab-ci-
+                                    spec:
+                                        serviceAccountName: pipemaster-workflow
+                                        workflowTemplateRef:
+                                            name: gitlab-ci
+                        name: gitlab-ci-tag
+          kind: tag
+      jobs:
+        - ext:
+            argo:
+                gates:
+                    - body:
+                        name: deploy-gate
+                        suspend: {}
+                      task: deploy-gate
+                      template: deploy-gate
+          id: deploy
+          steps:
+            - id: script
+              kind: script
+              script:
+                - make deploy
+          allow_failure: true
+          manual: true

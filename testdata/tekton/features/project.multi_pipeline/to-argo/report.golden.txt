@@ -1,0 +1,6 @@
+Loss report: tekton -> argo
+[lost] pipeline/.shared/job/run ext.passthrough (Ext of provider tekton (task_name) is not written to the Argo file; it is kept in round-trip metadata)
+[external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[emulated] pipeline/.shared ext.passthrough: pipeline id renamed (pipeline id .shared is not a DNS-1123 label; written as shared)
+[emulated] pipeline/ci project.multi_pipeline: one WorkflowTemplate per IR pipeline (each pipeline gets its own trigger)
+[emulated] pipeline/ci/trigger/0 trigger.filter.branches

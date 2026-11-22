@@ -1,0 +1,7 @@
+when:
+  - event: push
+steps:
+  - name: deploy
+    image: alpine:3.20
+    commands:
+      - ./deploy.sh

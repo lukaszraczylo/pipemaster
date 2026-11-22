@@ -1,0 +1,5 @@
+Loss report: argo -> drone
+[lost] pipeline/drone/job/deploy ext.passthrough (Ext of provider argo (gates) is not written to the Drone file; it is kept in round-trip metadata)
+[lost] pipeline/drone/job/deploy job.environment (Drone has no environment name or URL in the pipeline file)
+[lost] pipeline/drone/trigger/0 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the Drone file; it is kept in round-trip metadata)
+[emulated] pipeline/drone/job/deploy job.environment.approval: trigger event promote with target (a person starts the build with drone build promote)

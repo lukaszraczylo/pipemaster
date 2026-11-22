@@ -1,0 +1,10 @@
+# pipemaster:emulated project.multi_pipeline pipeline/ci
+# pipemaster:arg {"pipeline":"ci","job":"build","p":1,"j":0}
+# pipemaster:emulated job.container pipeline/ci/job/build
+when:
+  - event: push
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo build

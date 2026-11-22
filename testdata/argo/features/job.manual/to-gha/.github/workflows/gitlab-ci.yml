@@ -1,0 +1,15 @@
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/deploy
+on:
+  push:
+  # pipemaster:emulated job.manual pipeline/gitlab-ci/job/deploy
+  workflow_dispatch:
+jobs:
+  # pipemaster:emulated job.manual pipeline/gitlab-ci/job/deploy
+  deploy:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - id: script
+        run: make deploy

@@ -1,0 +1,21 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  tasks:
+    - name: build
+      taskRef:
+        name: gitlab-ci-build
+  finally:
+    - name: alert
+      taskRef:
+        name: gitlab-ci-alert
+      when:
+        - input: $(tasks.status)
+          operator: in
+          values:
+            - Failed
+    - name: report
+      taskRef:
+        name: gitlab-ci-report

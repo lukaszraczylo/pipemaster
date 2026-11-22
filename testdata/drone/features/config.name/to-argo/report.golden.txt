@@ -1,0 +1,5 @@
+Loss report: drone -> argo
+[external] pipeline/drone/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[emulated] pipeline/drone/ref/secrets.TOKEN config.name: secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars (the Secret values and ConfigMap values are not written)
+[emulated] pipeline/drone/ref/vars.REGION config.name: secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars (the Secret values and ConfigMap values are not written)
+[emulated] pipeline/drone/trigger/0 trigger.filter.branches

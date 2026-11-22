@@ -1,0 +1,10 @@
+# pipemaster:emulated trigger.manual pipeline/ci/trigger/0
+# pipemaster:arg {"kind":"manual"}
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+build:
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - echo ok

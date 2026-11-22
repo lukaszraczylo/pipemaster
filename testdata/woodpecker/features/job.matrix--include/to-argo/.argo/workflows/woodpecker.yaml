@@ -1,0 +1,50 @@
+# pipemaster:emulated job.matrix pipeline/woodpecker/job/ci
+# pipemaster:arg {"include":[[{"Key":"GO_VERSION","Value":"1.24"},{"Key":"TAGS","Value":"nethttp"}],[{"Key":"GO_VERSION","Value":"1.25"},{"Key":"TAGS","Value":"netgo"}]]}
+# pipemaster:emulated step.image pipeline/woodpecker/job/ci
+# pipemaster:arg {"steps":{"test":"ref: golang:$\u007b{ matrix.GO_VERSION }}\n"},"wrote":{"test":"golang:$\u007b{ matrix.GO_VERSION }}"}}
+# pipemaster:emulated trigger.filter.branches pipeline/woodpecker/trigger/0
+# pipemaster:emulated trigger.push pipeline/woodpecker/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: woodpecker
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: ci
+            template: ci
+            withItems:
+              - GO_VERSION: "1.24"
+                TAGS: nethttp
+              - GO_VERSION: "1.25"
+                TAGS: netgo
+            arguments:
+              parameters:
+                - name: GO_VERSION
+                  value: '{{item.GO_VERSION}}'
+                - name: TAGS
+                  value: '{{item.TAGS}}'
+    - name: ci
+      containerSet:
+        containers:
+          - name: test
+            image: golang:{{inputs.parameters.GO_VERSION}}
+            command:
+              - sh
+              - -ec
+            args:
+              - go test -tags {{inputs.parameters.TAGS}} ./...
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      inputs:
+        parameters:
+          - name: GO_VERSION
+          - name: TAGS
+      volumes:
+        - emptyDir: {}
+          name: workspace

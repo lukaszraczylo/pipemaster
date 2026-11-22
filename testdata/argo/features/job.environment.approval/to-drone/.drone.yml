@@ -1,0 +1,15 @@
+# pipemaster:emulated job.environment.approval pipeline/drone/job/deploy
+# pipemaster:arg "- ext:\n    argo:\n        dependency:\n            eventName: push\n            eventSourceName: pipemaster-github\n            name: drone-push\n        eventSource:\n            entry:\n                active: true\n                contentType: json\n                events:\n                    - push\n                repositories:\n                    - names:\n                        - REPO\n                      owner: OWNER\n                webhook:\n                    endpoint: /push\n                    method: POST\n                    port: \"12000\"\n                    url: \"\"\n                webhookSecret:\n                    key: token\n                    name: pipemaster-github-webhook\n            event: push\n            name: pipemaster-github\n            spec:\n                service:\n                    ports:\n                        - port: 12000\n                          targetPort: 12000\n            type: github\n        sensor:\n            name: pipemaster\n            spec:\n                template:\n                    serviceAccountName: pipemaster-sensor\n        trigger:\n            template:\n                conditions: drone-push\n                k8s:\n                    operation: create\n                    source:\n                        resource:\n                            apiVersion: argoproj.io/v1alpha1\n                            kind: Workflow\n                            metadata:\n                                generateName: drone-\n                            spec:\n                                serviceAccountName: pipemaster-workflow\n                                workflowTemplateRef:\n                                    name: drone\n                name: drone-push\n  kind: push\n"
+kind: pipeline
+type: docker
+name: deploy
+trigger:
+  event:
+    - promote
+  target:
+    - production
+steps:
+  - name: deploy
+    image: alpine:3.20
+    commands:
+      - ./deploy.sh

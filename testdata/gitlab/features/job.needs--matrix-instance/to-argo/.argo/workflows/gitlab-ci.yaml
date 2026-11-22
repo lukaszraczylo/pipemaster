@@ -1,0 +1,88 @@
+# pipemaster:emulated job.matrix pipeline/gitlab-ci/job/images
+# pipemaster:arg {"axes":[{"Name":"TARGET","Values":["alpine","ubuntu"]}]}
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: gitlab-ci
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: images
+            template: images
+            withItems:
+              - TARGET: alpine
+              - TARGET: ubuntu
+            arguments:
+              parameters:
+                - name: TARGET
+                  value: '{{item.TARGET}}'
+          - name: package
+            template: package
+            dependencies:
+              - images
+          - name: package-all
+            template: package-all
+            dependencies:
+              - images
+    - name: images
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - make images
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      inputs:
+        parameters:
+          - name: TARGET
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: package
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - make package
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: package-all
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - make package-all
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

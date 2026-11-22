@@ -1,0 +1,35 @@
+# pipemaster:emulated step.image pipeline/drone/job/ci
+# pipemaster:arg {"steps":{"flaky":"ref: alpine:3.20\n"},"wrote":{"flaky":"alpine:3.20"}}
+# pipemaster:emulated trigger.filter.branches pipeline/drone/trigger/0
+# pipemaster:emulated trigger.push pipeline/drone/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: drone
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: ci
+            template: ci
+            continueOn:
+              failed: true
+    - name: ci
+      containerSet:
+        containers:
+          - name: flaky
+            image: alpine:3.20
+            command:
+              - sh
+              - -ec
+            args:
+              - ./flaky.sh
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

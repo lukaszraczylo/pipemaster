@@ -1,0 +1,6 @@
+Loss report: forgejo -> argo
+[lost] pipeline/ci/job/build job.runner (Argo schedules pods; a runner label has no form)
+[lost] pipeline/ci/trigger/0 trigger.filter.branches (the trigger is not written: the excluded name wip/** is a glob, which an equality test cannot state)
+[lost] pipeline/ci/trigger/1 trigger.filter.branches (the trigger is not written: a glob has no exact regex)
+[emulated] pipeline/ci/trigger/0 trigger.pull_request: EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only; the Sensor accepts pull requests from the same repository only, because a fork would run its code with every secret; the EventSource webhook needs Secret pipemaster-github-webhook with key token)
+[emulated] pipeline/ci/trigger/1 trigger.push: EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only; the Argo Events controller needs the EventBus and a ServiceAccount, and the EventSource Service needs an Ingress)

@@ -1,0 +1,4 @@
+Loss report: woodpecker -> argo
+[external] pipeline/woodpecker/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[emulated] pipeline/woodpecker/job/ci job.env: copied into the env of every container of the set (a step variable of the same name wins)
+[emulated] pipeline/woodpecker/trigger/0 trigger.filter.branches

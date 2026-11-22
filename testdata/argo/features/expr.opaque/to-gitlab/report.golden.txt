@@ -1,0 +1,6 @@
+Loss report: argo -> gitlab
+[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
+[lost] pipeline/ci/job/build expr.opaque (condition not expressible in GitLab CI; job disabled)
+[lost] pipeline/ci/job/build/step/build-step-1 script.interpolation (no GitLab variable for expression opaque(gha): env[github.job]; the line is commented out)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the GitLab file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the GitLab file; it is kept in round-trip metadata)

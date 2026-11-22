@@ -1,0 +1,51 @@
+# pipemaster:emulated script.interpolation pipeline/ci/job/build
+# pipemaster:arg {"vars":{"PM_CTX_REF_NAME":"ref_name","PM_CTX_SHA":"sha"}}
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
+# pipemaster:emulated trigger.push pipeline/ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+  annotations:
+    workflows.argoproj.io/title: interp
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-sha
+        value: ""
+      - name: ctx-ref-name
+        value: ""
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+    - name: build
+      containerSet:
+        containers:
+          - name: build-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - |-
+                echo "sha ${PM_CTX_SHA} on ${PM_CTX_REF_NAME}"
+                # pipemaster:lost script.interpolation: echo "{{ gha.github.workspace }}"
+            workingDir: /workspace
+            env:
+              - name: PM_CTX_SHA
+                value: '{{workflow.parameters.ctx-sha}}'
+              - name: PM_CTX_REF_NAME
+                value: '{{workflow.parameters.ctx-ref-name}}'
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

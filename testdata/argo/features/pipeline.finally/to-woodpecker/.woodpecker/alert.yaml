@@ -1,0 +1,18 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/alert
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:arg {}
+when:
+  - event: push
+    status:
+      - failure
+  - event: tag
+    status:
+      - failure
+depends_on:
+  - name: build
+    optional: true
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - ./page.sh

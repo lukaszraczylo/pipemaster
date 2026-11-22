@@ -1,0 +1,17 @@
+# pipemaster:emulated config.name pipeline/ci/ref/secrets.KEY
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: stepenv
+  params:
+    - name: ctx-actor
+      default: ""
+  tasks:
+    - name: build
+      taskRef:
+        name: ci-build
+      params:
+        - name: ctx-actor
+          value: $(params.ctx-actor)

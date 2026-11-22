@@ -22,6 +22,20 @@ var exprRE = regexp.MustCompile(`\$\{\{.*?\}\}`)
 // shellArgsRE matches the args of an `sh -ec` step that GHA writes for a container step.
 var shellArgsRE = regexp.MustCompile(`(?s)^-ec '(.*)'$`)
 
+// argoTagRE matches an Argo tag, which Argo resolves or leaves as written before the shell runs.
+var argoTagRE = regexp.MustCompile(`\{\{.*?\}\}`)
+
+// shellCommand is true for a container command that runs its args as a script: `sh -ec`, `bash -ec`.
+func shellCommand(v any) bool {
+	cmd, ok := v.([]any)
+	if !ok || len(cmd) != 2 {
+		return false
+	}
+	shell, _ := cmd[0].(string)
+	flag, _ := cmd[1].(string)
+	return flag == "-ec" && strings.HasSuffix(shell, "sh")
+}
+
 // scriptsOf lists the shell scripts of a pipeline file.
 func scriptsOf(data []byte) ([]string, error) {
 	var roots []any
@@ -56,6 +70,13 @@ func scriptsOf(data []byte) ([]string, error) {
 	walk = func(v any) {
 		switch t := v.(type) {
 		case map[string]any:
+			if shellCommand(t["command"]) {
+				if args, ok := t["args"].([]any); ok {
+					for _, a := range args {
+						collect(a)
+					}
+				}
+			}
 			for k, e := range t {
 				switch {
 				case scriptKeys[k]:
@@ -93,6 +114,9 @@ func checkShellSyntax(t *testing.T, id string, files map[string][]byte) {
 		for _, s := range scripts {
 			cmd := exec.Command("sh", "-n") // #nosec G204 -- fixed binary
 			s = exprRE.ReplaceAllString(s, "X")
+			if id == provider.Argo {
+				s = argoTagRE.ReplaceAllString(s, "X")
+			}
 			if id == provider.Woodpecker || id == provider.Drone {
 				s = strings.ReplaceAll(s, "$$", "$") // both engines write a literal dollar as $$
 			}

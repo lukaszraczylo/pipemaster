@@ -1,0 +1,77 @@
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: gitlab-ci
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: check
+            template: check
+            dependencies:
+              - compile
+              - package
+          - name: compile
+            template: compile
+          - name: package
+            template: package
+            dependencies:
+              - compile
+    - name: check
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - make check
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: compile
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - make compile
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: package
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - make package
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

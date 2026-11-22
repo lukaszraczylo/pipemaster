@@ -1,0 +1,56 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make build
+---
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/alert
+# pipemaster:arg {"if":"failure()","back":"(event == 'push') \u0026\u0026 failure()","triggers":"- ext:\n    argo:\n        dependency:\n            eventName: push\n            eventSourceName: pipemaster-github\n            name: gitlab-ci-push\n        eventSource:\n            entry:\n                active: true\n                contentType: json\n                events:\n                    - push\n                repositories:\n                    - names:\n                        - REPO\n                      owner: OWNER\n                webhook:\n                    endpoint: /push\n                    method: POST\n                    port: \"12000\"\n                    url: \"\"\n                webhookSecret:\n                    key: token\n                    name: pipemaster-github-webhook\n            event: push\n            name: pipemaster-github\n            spec:\n                service:\n                    ports:\n                        - port: 12000\n                          targetPort: 12000\n            type: github\n        sensor:\n            name: pipemaster\n            spec:\n                template:\n                    serviceAccountName: pipemaster-sensor\n        trigger:\n            template:\n                conditions: gitlab-ci-push\n                k8s:\n                    operation: create\n                    source:\n                        resource:\n                            apiVersion: argoproj.io/v1alpha1\n                            kind: Workflow\n                            metadata:\n                                generateName: gitlab-ci-\n                            spec:\n                                serviceAccountName: pipemaster-workflow\n                                workflowTemplateRef:\n                                    name: gitlab-ci\n                name: gitlab-ci-push\n  kind: push\n- ext:\n    argo:\n        dependency:\n            eventName: push\n            eventSourceName: pipemaster-github\n            filters:\n                data:\n                    - path: body.ref\n                      type: string\n                      value:\n                        - ^refs/tags/.*$$\n            name: gitlab-ci-tag\n        eventSource:\n            entry:\n                active: true\n                contentType: json\n                events:\n                    - push\n                repositories:\n                    - names:\n                        - REPO\n                      owner: OWNER\n                webhook:\n                    endpoint: /push\n                    method: POST\n                    port: \"12000\"\n                    url: \"\"\n                webhookSecret:\n                    key: token\n                    name: pipemaster-github-webhook\n            event: push\n            name: pipemaster-github\n            spec:\n                service:\n                    ports:\n                        - port: 12000\n                          targetPort: 12000\n            type: github\n        sensor:\n            name: pipemaster\n            spec:\n                template:\n                    serviceAccountName: pipemaster-sensor\n        trigger:\n            template:\n                conditions: gitlab-ci-tag\n                k8s:\n                    operation: create\n                    source:\n                        resource:\n                            apiVersion: argoproj.io/v1alpha1\n                            kind: Workflow\n                            metadata:\n                                generateName: gitlab-ci-\n                            spec:\n                                serviceAccountName: pipemaster-workflow\n                                workflowTemplateRef:\n                                    name: gitlab-ci\n                name: gitlab-ci-tag\n  kind: tag\n"}
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/alert
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:arg {}
+kind: pipeline
+type: docker
+name: alert
+trigger:
+  event:
+    - push
+    - tag
+  status:
+    - failure
+depends_on:
+  - build
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - ./page.sh
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/report
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:arg {"noIf":true}
+kind: pipeline
+type: docker
+name: report
+trigger:
+  event:
+    - push
+    - tag
+  status:
+    - success
+    - failure
+depends_on:
+  - build
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - ./notify.sh

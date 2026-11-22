@@ -1,0 +1,4 @@
+Loss report: woodpecker -> argo
+[lost] pipeline/woodpecker/trigger/0 trigger.filter.paths (a Sensor data filter cannot test the changed files; the trigger runs on every change)
+[external] pipeline/woodpecker/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[emulated] pipeline/woodpecker/trigger/0 trigger.filter.branches

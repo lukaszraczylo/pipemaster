@@ -1,0 +1,32 @@
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+  annotations:
+    workflows.argoproj.io/title: tags
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+    - name: build
+      containerSet:
+        containers:
+          - name: build-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - echo ok
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

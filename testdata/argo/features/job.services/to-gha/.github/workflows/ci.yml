@@ -1,0 +1,19 @@
+# pipemaster:emulated job.runner pipeline/ci/job/test
+name: services
+on:
+  push:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        ports:
+          - 5432:5432
+      cache:
+        image: redis:7
+    steps:
+      - id: test-step-1
+        run: echo ok

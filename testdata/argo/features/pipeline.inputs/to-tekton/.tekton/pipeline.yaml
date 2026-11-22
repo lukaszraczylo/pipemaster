@@ -1,0 +1,19 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: inputs
+  params:
+    - name: environment
+      type: string
+      description: Where to deploy
+      default: staging
+    - name: dry-run
+      type: string
+      description: Skip the push
+      default: "false"
+  tasks:
+    - name: build
+      taskRef:
+        name: ci-build

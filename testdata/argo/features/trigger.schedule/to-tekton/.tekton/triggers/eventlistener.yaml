@@ -1,0 +1,31 @@
+# pipemaster:emulated trigger.schedule pipeline/ci/trigger/0
+# pipemaster:emulated trigger.schedule pipeline/ci/trigger/1
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: pipemaster-schedule
+spec:
+  serviceAccountName: pipemaster-triggers
+  triggers:
+    - name: ci-schedule-0
+      interceptors:
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: header.canonical('X-Pipemaster-Schedule') == 'ci/0'
+      bindings:
+        - ref: ci-github
+      template:
+        ref: ci-run
+    - name: ci-schedule-1
+      interceptors:
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: header.canonical('X-Pipemaster-Schedule') == 'ci/1'
+      bindings:
+        - ref: ci-github
+      template:
+        ref: ci-run

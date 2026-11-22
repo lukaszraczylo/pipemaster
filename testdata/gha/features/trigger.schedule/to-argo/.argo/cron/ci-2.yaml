@@ -1,0 +1,11 @@
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: ci-2
+spec:
+  schedules:
+    - 30 5 * * 1-5
+  workflowSpec:
+    serviceAccountName: pipemaster-workflow
+    workflowTemplateRef:
+      name: ci

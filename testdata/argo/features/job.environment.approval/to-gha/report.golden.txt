@@ -1,0 +1,7 @@
+Loss report: argo -> gha
+[lost] pipeline/drone/job/deploy ext.passthrough (Ext of provider argo (gates) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/drone/trigger/0 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the GHA file; it is kept in round-trip metadata)
+[external] pipeline/drone/job/deploy job.environment.approval: configure required reviewers on the environment in repository settings
+[emulated] pipeline/drone/job/deploy job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/drone/job/deploy/step/deploy step.image: uses: docker://<image> with entrypoint and args
+[emulated] pipeline/drone/trigger/0 trigger.push: branches: '**' (GHA fires a push without filters for branches and tags; branches are named explicitly to leave tags out or beside a tag filter)

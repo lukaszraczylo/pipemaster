@@ -1,0 +1,40 @@
+# pipemaster:emulated pipeline.inputs pipeline/deploy
+# pipemaster:arg {"types":{"target":"choice"},"required":["target"]}
+# pipemaster:emulated project.multi_pipeline pipeline/deploy
+# pipemaster:emulated trigger.manual pipeline/deploy/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: deploy
+  annotations:
+    workflows.argoproj.io/title: Deploy
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: target
+        value: staging
+        description: Where to deploy
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: deploy
+            template: deploy
+    - name: deploy
+      containerSet:
+        containers:
+          - name: deploy-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - echo deploy
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

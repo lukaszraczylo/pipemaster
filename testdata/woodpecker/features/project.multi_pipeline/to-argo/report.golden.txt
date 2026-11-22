@@ -1,0 +1,5 @@
+Loss report: woodpecker -> argo
+[external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[external] pipeline/deploy/trigger/0 trigger.manual: argo submit --from workflowtemplate/deploy (start a run with: argo submit --from workflowtemplate/deploy; the Workflow object needs a ServiceAccount with the rights in .argo/rbac/)
+[emulated] pipeline/ci/trigger/0 trigger.filter.branches
+[emulated] pipeline/deploy project.multi_pipeline: one WorkflowTemplate per IR pipeline (each pipeline gets its own trigger)

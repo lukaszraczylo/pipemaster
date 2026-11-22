@@ -1,0 +1,42 @@
+# pipemaster:emulated pipeline.inputs pipeline/ci
+# pipemaster:arg {"types":{"dry-run":"boolean","environment":"choice"},"required":["environment"]}
+# pipemaster:emulated trigger.manual pipeline/ci/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+  annotations:
+    workflows.argoproj.io/title: inputs
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: environment
+        value: staging
+        description: Where to deploy
+      - name: dry-run
+        value: "false"
+        description: Skip the push
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+    - name: build
+      containerSet:
+        containers:
+          - name: build-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - echo ok
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

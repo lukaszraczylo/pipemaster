@@ -1,0 +1,12 @@
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: ci-paused
+spec:
+  schedules:
+    - "0 3 * * *"
+  suspend: true
+  workflowSpec:
+    workflowTemplateRef:
+      name: ci
+    serviceAccountName: pipemaster-workflow

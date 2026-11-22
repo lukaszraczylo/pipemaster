@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: pipemaster
+spec:
+  dependencies:
+    - eventName: push
+      eventSourceName: pipemaster-github
+      name: woodpecker-push
+  template:
+    serviceAccountName: pipemaster-sensor
+  triggers:
+    - template:
+        conditions: woodpecker-push
+        k8s:
+          operation: create
+          parameters:
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dataTemplate: '{{ trimPrefix "refs/heads/" .Input.body.ref }}'
+                dependencyName: woodpecker-push
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dataKey: body.after
+                dependencyName: woodpecker-push
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: woodpecker-
+              spec:
+                arguments:
+                  parameters:
+                    - name: ctx-branch
+                      value: ""
+                    - name: ctx-sha
+                      value: ""
+                serviceAccountName: pipemaster-workflow
+                workflowTemplateRef:
+                  name: woodpecker
+        name: woodpecker-push

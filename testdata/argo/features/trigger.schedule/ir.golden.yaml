@@ -1,0 +1,33 @@
+origin:
+    provider: argo
+    dialect: argo
+    files:
+        - .argo/cron/ci-1.yaml
+        - .argo/cron/ci-2.yaml
+        - .argo/rbac/workflow.yaml
+        - .argo/workflows/ci.yaml
+pipelines:
+    - id: ci
+      name: nightly
+      triggers:
+        - ext:
+            argo:
+                cronWorkflow:
+                    index: 0
+                    name: ci-1
+          kind: schedule
+          cron: 0 0 * * 0
+        - ext:
+            argo:
+                cronWorkflow:
+                    index: 0
+                    name: ci-2
+          kind: schedule
+          cron: 30 5 * * 1-5
+      jobs:
+        - id: build
+          steps:
+            - id: build-step-1
+              kind: script
+              script:
+                - echo ok

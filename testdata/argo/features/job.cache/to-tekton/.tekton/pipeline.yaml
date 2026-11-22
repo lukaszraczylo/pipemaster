@@ -1,0 +1,14 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  workspaces:
+    - name: pipemaster-workspace
+  tasks:
+    - name: build
+      taskRef:
+        name: gitlab-ci-build
+      workspaces:
+        - name: pipemaster-workspace
+          workspace: pipemaster-workspace

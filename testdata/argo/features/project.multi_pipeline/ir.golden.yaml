@@ -1,0 +1,84 @@
+origin:
+    provider: argo
+    dialect: argo
+    files:
+        - .argo/events/eventsource.yaml
+        - .argo/events/sensor.yaml
+        - .argo/rbac/sensor.yaml
+        - .argo/rbac/workflow.yaml
+        - .argo/workflows/ci.yaml
+        - .argo/workflows/shared.yaml
+pipelines:
+    - id: .shared
+      name: shared
+      jobs:
+        - id: run
+          steps:
+            - id: run-step-1
+              kind: script
+              script:
+                - echo run
+    - id: ci
+      name: CI
+      triggers:
+        - ext:
+            argo:
+                dependency:
+                    eventName: push
+                    eventSourceName: pipemaster-github
+                    name: ci-push
+                eventSource:
+                    entry:
+                        active: true
+                        contentType: json
+                        events:
+                            - push
+                        repositories:
+                            - names:
+                                - REPO
+                              owner: OWNER
+                        webhook:
+                            endpoint: /push
+                            method: POST
+                            port: "12000"
+                            url: ""
+                        webhookSecret:
+                            key: token
+                            name: pipemaster-github-webhook
+                    event: push
+                    name: pipemaster-github
+                    spec:
+                        service:
+                            ports:
+                                - port: 12000
+                                  targetPort: 12000
+                    type: github
+                sensor:
+                    name: pipemaster
+                    spec:
+                        template:
+                            serviceAccountName: pipemaster-sensor
+                trigger:
+                    template:
+                        conditions: ci-push
+                        k8s:
+                            operation: create
+                            source:
+                                resource:
+                                    apiVersion: argoproj.io/v1alpha1
+                                    kind: Workflow
+                                    metadata:
+                                        generateName: ci-
+                                    spec:
+                                        serviceAccountName: pipemaster-workflow
+                                        workflowTemplateRef:
+                                            name: ci
+                        name: ci-push
+          kind: push
+      jobs:
+        - id: build
+          steps:
+            - id: build-step-1
+              kind: script
+              script:
+                - echo build

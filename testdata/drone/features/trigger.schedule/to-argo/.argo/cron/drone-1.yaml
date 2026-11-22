@@ -1,0 +1,11 @@
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: drone-1
+spec:
+  schedules:
+    - ""
+  workflowSpec:
+    serviceAccountName: pipemaster-workflow
+    workflowTemplateRef:
+      name: drone

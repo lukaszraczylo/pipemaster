@@ -1,0 +1,59 @@
+# pipemaster:emulated display.name pipeline/ci/job/check/step/check-step-2
+# pipemaster:arg {"name":"Inspect"}
+# pipemaster:lost script pipeline/ci/job/check/step/check-step-2: docker inspect {{ steps.meta.outputs.version }}
+# pipemaster:emulated step.action pipeline/ci/job/check/step/check-step-2
+# pipemaster:arg {"step":"if: event != 'pull_request'\next:\n    gha:\n        _derived_id: true\nid: check-step-2\nname: Inspect\nkind: script\nscript:\n    - docker inspect $\u007b{ steps.meta.outputs.version }}\n","hold":"{\"args\":[\"if ! [ \\\"$PM_CTX_EVENT\\\" != 'pull_request' ]; then exit 0; fi # pipemaster:guard\"],\"command\":[\"sh\",\"-ec\"],\"env\":[{\"name\":\"PM_CTX_EVENT\",\"value\":\"{{workflow.parameters.ctx-event}}\"}],\"image\":\"alpine:3.22\",\"name\":\"check-step-2\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:emulated step.if pipeline/ci/job/check/step/check-step-2
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
+# pipemaster:emulated trigger.push pipeline/ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+  annotations:
+    workflows.argoproj.io/title: ci
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-event
+        value: ""
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: check
+            template: check
+    - name: check
+      containerSet:
+        containers:
+          - name: meta
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - echo "version=1" >> "$GITHUB_OUTPUT"
+            workingDir: /workspace
+          - name: check-step-2
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - 'if ! [ "$PM_CTX_EVENT" != ''pull_request'' ]; then exit 0; fi # pipemaster:guard'
+            workingDir: /workspace
+            env:
+              - name: PM_CTX_EVENT
+                value: '{{workflow.parameters.ctx-event}}'
+            dependencies:
+              - meta
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

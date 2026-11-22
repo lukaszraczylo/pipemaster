@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: pipemaster
+spec:
+  dependencies:
+    - eventName: push
+      eventSourceName: pipemaster-github
+      name: gitlab-ci-push
+  template:
+    serviceAccountName: pipemaster-sensor
+  triggers:
+    - template:
+        conditions: gitlab-ci-push
+        k8s:
+          operation: create
+          parameters:
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dependencyName: gitlab-ci-push
+                value: push
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: gitlab-ci-
+              spec:
+                arguments:
+                  parameters:
+                    - name: ctx-event
+                      value: ""
+                serviceAccountName: pipemaster-workflow
+                workflowTemplateRef:
+                  name: gitlab-ci
+        name: gitlab-ci-push

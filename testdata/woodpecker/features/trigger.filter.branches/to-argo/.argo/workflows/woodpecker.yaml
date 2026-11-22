@@ -1,0 +1,33 @@
+# pipemaster:emulated step.image pipeline/woodpecker/job/ci
+# pipemaster:arg {"steps":{"build":"ref: golang:1.25\n"},"wrote":{"build":"golang:1.25"}}
+# pipemaster:emulated trigger.filter.branches pipeline/woodpecker/trigger/0
+# pipemaster:emulated trigger.push pipeline/woodpecker/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: woodpecker
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: ci
+            template: ci
+    - name: ci
+      containerSet:
+        containers:
+          - name: build
+            image: golang:1.25
+            command:
+              - sh
+              - -ec
+            args:
+              - go build ./...
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

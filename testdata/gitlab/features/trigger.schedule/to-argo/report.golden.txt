@@ -1,0 +1,2 @@
+Loss report: gitlab -> argo
+[lost] pipeline/gitlab-ci/trigger/0 trigger.schedule (the schedule has no cron expression, which a CronWorkflow needs; no CronWorkflow is written)

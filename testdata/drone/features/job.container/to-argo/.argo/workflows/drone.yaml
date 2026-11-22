@@ -1,0 +1,31 @@
+# pipemaster:emulated trigger.filter.branches pipeline/drone/trigger/0
+# pipemaster:emulated trigger.push pipeline/drone/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: drone
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: ci
+            template: ci
+    - name: ci
+      containerSet:
+        containers:
+          - name: test
+            image: node:22
+            command:
+              - sh
+              - -ec
+            args:
+              - npm test
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

@@ -1,0 +1,37 @@
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:arg {"job":"if: |\n    opaque(gitlab): workflow:\n        name: $PIPELINE_NAME\n        rules:\n            - if: $CI_COMMIT_TAG\n              when: never\n            - if: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n              variables:\n                PIPELINE_NAME: MR pipeline\n            - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH\n              variables:\n                PIPELINE_NAME: Default branch pipeline\nid: \"\"\n"}
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: gitlab-ci
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+            when: '{{= false }}'
+    - name: build
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - make build
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

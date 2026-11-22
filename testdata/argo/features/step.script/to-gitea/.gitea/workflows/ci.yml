@@ -1,0 +1,13 @@
+# pipemaster:emulated job.runner pipeline/ci/job/build
+name: script
+on:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - id: build-step-1
+        name: Build
+        run: |
+          go build ./...
+          go test ./...

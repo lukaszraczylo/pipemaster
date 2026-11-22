@@ -1,0 +1,5 @@
+Loss report: argo -> drone
+[lost] pipeline/gitlab-ci/trigger/0 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the Drone file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/trigger/1 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the Drone file; it is kept in round-trip metadata)
+[emulated] pipeline/gitlab-ci/job/build job.artifacts: shared workspace of the steps in one document (other documents cannot read the files)
+[emulated] pipeline/gitlab-ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

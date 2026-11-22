@@ -1,0 +1,7 @@
+Loss report: argo -> drone
+[lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider argo (cronWorkflow) is not written to the Drone file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider argo (cronWorkflow) is not written to the Drone file; it is kept in round-trip metadata)
+[external] pipeline/ci/trigger/0 trigger.schedule: trigger event cron with the cron job name (Drone keeps the schedule in the repo settings: run drone cron add <repo> ci-schedule-0 "0 0 0 * * 0")
+[external] pipeline/ci/trigger/1 trigger.schedule: trigger event cron with the cron job name (Drone keeps the schedule in the repo settings: run drone cron add <repo> ci-schedule-1 "0 30 5 * * 1-5")
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

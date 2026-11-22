@@ -1,0 +1,102 @@
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/build-step-1
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: cache\n    ref: v4\nwith:\n    key:\n        lit: go-mod\n    path:\n        lit: ~/go/pkg/mod\nid: build-step-1\nkind: action\n","kind":"cache","hold":"{\"args\":[\"true\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-1\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/build-step-3
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\nid: build-step-3\nkind: action\n","kind":"artifact_upload","hold":"{\"args\":[\"true\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-3\",\"workingDir\":\"/workspace\"}","arts":["dist"],"outs":["{\"name\":\"dist\",\"path\":\"/workspace/dist/\"}"],"seq":1}
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/test/step/test-step-1
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\nid: test-step-1\nkind: action\n","kind":"artifact_download","hold":"{\"args\":[\"true\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"test-step-1\",\"workingDir\":\"/workspace\"}","needs":["build"]}
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: gitlab-ci
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+          - name: test
+            template: test
+            dependencies:
+              - build
+            arguments:
+              artifacts:
+                - name: dist
+                  from: '{{tasks.build.outputs.artifacts.dist}}'
+    - name: build
+      containerSet:
+        containers:
+          - name: build-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - "true"
+            workingDir: /workspace
+          - # pipemaster:id build-step-2
+            name: main
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - make build
+            workingDir: /workspace
+            dependencies:
+              - build-step-1
+          - name: build-step-3
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - "true"
+            workingDir: /workspace
+            dependencies:
+              - main
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      outputs:
+        artifacts:
+          - name: dist
+            path: /workspace/dist/
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: test
+      containerSet:
+        containers:
+          - name: test-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - "true"
+            workingDir: /workspace
+          - # pipemaster:id test-step-2
+            name: main
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - make test
+            workingDir: /workspace
+            dependencies:
+              - test-step-1
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      inputs:
+        artifacts:
+          - name: dist
+            path: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

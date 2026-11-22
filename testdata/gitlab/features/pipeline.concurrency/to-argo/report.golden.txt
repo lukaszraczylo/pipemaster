@@ -1,0 +1,5 @@
+Loss report: gitlab -> argo
+[lost] pipeline/gitlab-ci/job/build job.runner (Argo schedules pods; a runner label has no form)
+[external] pipeline/gitlab-ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[emulated] pipeline/gitlab-ci pipeline.concurrency: synchronization mutex (a second run waits for the mutex)
+[emulated] pipeline/gitlab-ci/trigger/0 trigger.filter.branches

@@ -1,0 +1,5 @@
+Loss report: gha -> argo
+[lost] pipeline/ci/job/build job.runner (Argo schedules pods; a runner label has no form)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider gha (types, workflows) is not written to the Argo file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/0 trigger.pipeline_done (Argo has no pipeline-completion trigger)
+[emulated] pipeline/ci/trigger/0 trigger.filter.branches: Sensor data filter on body.ref (the EventSource is github and serves GitHub webhooks only; a glob becomes a regex and a glob with no exact regex is lost)

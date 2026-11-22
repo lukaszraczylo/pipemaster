@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: pipemaster
+spec:
+  dependencies:
+    - eventName: pull_request
+      eventSourceName: pipemaster-github
+      filters:
+        data:
+          - path: body.action
+            type: string
+            value:
+              - opened
+              - reopened
+              - synchronize
+          - path: body.pull_request.base.ref
+            type: string
+            value:
+              - ^main$
+        exprs:
+          - expr: head == base
+            fields:
+              - name: head
+                path: body.pull_request.head.repo.full_name
+              - name: base
+                path: body.repository.full_name
+      name: ci-pr
+  template:
+    serviceAccountName: pipemaster-sensor
+  triggers:
+    - template:
+        conditions: ci-pr
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: ci-
+              spec:
+                serviceAccountName: pipemaster-workflow
+                workflowTemplateRef:
+                  name: ci
+        name: ci-pr

@@ -1,0 +1,40 @@
+# pipemaster:emulated step.image pipeline/woodpecker/job/ci
+# pipemaster:arg {"steps":{"build":"ref: golang:1.25\n"},"wrote":{"build":"golang:1.25"}}
+# pipemaster:emulated job.artifacts pipeline/woodpecker/job/ci
+# pipemaster:arg {"arts":"- name: dist\n  expire: 7d\n  paths:\n    - dist/\n","names":["dist"],"outs":["{\"name\":\"dist\",\"path\":\"/workspace/dist/\"}"]}
+# pipemaster:emulated trigger.filter.branches pipeline/woodpecker/trigger/0
+# pipemaster:emulated trigger.push pipeline/woodpecker/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: woodpecker
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: ci
+            template: ci
+    - name: ci
+      containerSet:
+        containers:
+          - # pipemaster:id build
+            name: main
+            image: golang:1.25
+            command:
+              - sh
+              - -ec
+            args:
+              - go build ./...
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      outputs:
+        artifacts:
+          - name: dist
+            path: /workspace/dist/
+      volumes:
+        - emptyDir: {}
+          name: workspace

@@ -1,0 +1,38 @@
+# pipemaster:emulated step.workdir pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"workdir":"./cmd/app","wrote":"/workspace/./cmd/app"}
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
+# pipemaster:emulated trigger.push pipeline/ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+  annotations:
+    workflows.argoproj.io/title: workdir
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+    - name: build
+      containerSet:
+        containers:
+          - name: build-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - ls
+            workingDir: /workspace/./cmd/app
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

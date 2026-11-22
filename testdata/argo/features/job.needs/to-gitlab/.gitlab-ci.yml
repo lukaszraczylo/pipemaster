@@ -1,0 +1,31 @@
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:arg {"kind":"push"}
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+# pipemaster:arg {"kind":"tag"}
+stages:
+  - stage-0
+  - stage-1
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+lint:
+  stage: stage-0
+  needs: []
+  script:
+    # pipemaster:step lint-step-1
+    - echo lint
+ship:
+  stage: stage-1
+  needs:
+    - lint
+    - test
+  script:
+    # pipemaster:step ship-step-1
+    - echo ship
+test:
+  stage: stage-0
+  needs: []
+  script:
+    # pipemaster:step test-step-1
+    - echo test

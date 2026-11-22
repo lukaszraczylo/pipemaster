@@ -41,7 +41,7 @@ func TestUntranslatableLineLeavesValidShell(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, target := range []string{provider.Woodpecker, provider.Drone, provider.GitLab} {
+	for _, target := range []string{provider.Woodpecker, provider.Drone, provider.GitLab, provider.Argo} {
 		t.Run(target, func(t *testing.T) {
 			files, _, err := prov(t, target).Emit(p)
 			if err != nil {
@@ -67,14 +67,14 @@ jobs:
           echo done
 `
 
-// An expression with no spelling in any target must leave valid shell, in Tekton too.
+// An expression with no spelling in any target must leave valid shell, in Tekton and Argo too.
 func TestUnspellableExpressionLeavesValidShell(t *testing.T) {
 	src := fstest.MapFS{".github/workflows/ci.yml": {Data: []byte(unspellableWorkflow)}}
 	p, _, err := prov(t, provider.GHA).Parse(src)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, target := range []string{provider.Woodpecker, provider.Drone, provider.GitLab, provider.Tekton} {
+	for _, target := range []string{provider.Woodpecker, provider.Drone, provider.GitLab, provider.Tekton, provider.Argo} {
 		t.Run(target, func(t *testing.T) {
 			files, rep, err := prov(t, target).Emit(p)
 			if err != nil {

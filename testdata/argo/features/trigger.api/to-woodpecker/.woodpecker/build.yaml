@@ -1,0 +1,19 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+# pipemaster:lost trigger.* pipeline/ci/job/build: no trigger of the pipeline has a Woodpecker event
+when:
+  - event:
+      - push
+      - pull_request
+      - pull_request_closed
+      - pull_request_metadata
+      - tag
+      - release
+      - deployment
+      - cron
+      - manual
+    evaluate: "false"
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok

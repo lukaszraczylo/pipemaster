@@ -1,0 +1,2 @@
+Loss report: woodpecker -> argo
+[external] pipeline/woodpecker/trigger/0 trigger.manual: argo submit --from workflowtemplate/woodpecker (start a run with: argo submit --from workflowtemplate/woodpecker; the Workflow object needs a ServiceAccount with the rights in .argo/rbac/)

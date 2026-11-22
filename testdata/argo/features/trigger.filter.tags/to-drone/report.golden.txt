@@ -1,0 +1,5 @@
+Loss report: argo -> drone
+[lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the Drone file; it is kept in round-trip metadata)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/ci/trigger/0 trigger.filter.tags: ref filter refs/tags/<pattern> (the tag name filter is written as a ref filter on the tag event)

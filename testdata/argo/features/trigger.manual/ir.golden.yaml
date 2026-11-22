@@ -1,0 +1,28 @@
+origin:
+    provider: argo
+    dialect: argo
+    files:
+        - .argo/workflows/ci.yaml
+        - .argo/workflows/run.yaml
+pipelines:
+    - id: ci
+      name: manual
+      triggers:
+        - ext:
+            argo:
+                workflow:
+                    apiVersion: argoproj.io/v1alpha1
+                    kind: Workflow
+                    metadata:
+                        generateName: ci-run-
+                    spec:
+                        workflowTemplateRef:
+                            name: ci
+          kind: manual
+      jobs:
+        - id: build
+          steps:
+            - id: build-step-1
+              kind: script
+              script:
+                - echo ok

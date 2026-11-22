@@ -1,0 +1,47 @@
+# pipemaster:emulated job.cache pipeline/drone/job/ci
+# pipemaster:arg {"caches":"- key: go-mod\n  policy: pull-push\n  paths:\n    - ~/go/pkg/mod\n"}
+# pipemaster:emulated step.image pipeline/drone/job/ci
+# pipemaster:arg {"steps":{"build":"ref: golang:1.25\n"},"wrote":{"build":"golang:1.25"}}
+# pipemaster:emulated trigger.filter.branches pipeline/drone/trigger/0
+# pipemaster:emulated trigger.push pipeline/drone/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: drone
+spec:
+  entrypoint: main
+  volumeClaimTemplates:
+    - metadata:
+        name: cache-ci-1
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: ci
+            template: ci
+    - name: ci
+      containerSet:
+        containers:
+          - name: build
+            image: golang:1.25
+            command:
+              - sh
+              - -ec
+            args:
+              - go build ./...
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+          - name: cache-ci-1
+            mountPath: /workspace/go/pkg/mod
+            subPath: p1
+      volumes:
+        - emptyDir: {}
+          name: workspace

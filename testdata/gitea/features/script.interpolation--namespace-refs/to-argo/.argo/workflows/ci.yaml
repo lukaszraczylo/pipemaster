@@ -1,0 +1,60 @@
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"axes":[{"Name":"os","Values":["ubuntu-latest","macos-latest"]}]}
+# pipemaster:emulated script.interpolation pipeline/ci/job/test
+# pipemaster:arg {"vars":{"LEVEL":"vars.LEVEL","REGION":"env.REGION"}}
+# pipemaster:emulated pipeline.env pipeline/ci
+# pipemaster:arg {"vars":"- name: REGION\n  value:\n    lit: eu\n","names":["REGION"]}
+# pipemaster:emulated config.name pipeline/ci/ref/vars.LEVEL
+# pipemaster:emulated trigger.manual pipeline/ci/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: target
+        value: staging
+        description: Deploy target
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: test
+            template: test
+            withItems:
+              - os: ubuntu-latest
+              - os: macos-latest
+            arguments:
+              parameters:
+                - name: os
+                  value: '{{item.os}}'
+    - name: test
+      containerSet:
+        containers:
+          - name: test-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - echo {{inputs.parameters.os}} {{workflow.parameters.target}} ${REGION} ${LEVEL}
+            workingDir: /workspace
+            env:
+              - name: REGION
+                value: eu
+              - name: LEVEL
+                valueFrom:
+                  configMapKeyRef:
+                    name: ci-vars
+                    key: LEVEL
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      inputs:
+        parameters:
+          - name: os
+      volumes:
+        - emptyDir: {}
+          name: workspace

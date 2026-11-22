@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: pipemaster
+spec:
+  dependencies:
+    - eventName: push
+      eventSourceName: pipemaster-github
+      filters:
+        data:
+          - path: body.ref
+            type: string
+            value:
+              - ^refs/tags/v.*$
+      name: drone-tag
+  template:
+    serviceAccountName: pipemaster-sensor
+  triggers:
+    - template:
+        conditions: drone-tag
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: drone-
+              spec:
+                serviceAccountName: pipemaster-workflow
+                workflowTemplateRef:
+                  name: drone
+        name: drone-tag

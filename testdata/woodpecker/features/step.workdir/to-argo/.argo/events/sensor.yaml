@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: pipemaster
+spec:
+  dependencies:
+    - eventName: push
+      eventSourceName: pipemaster-github
+      name: woodpecker-push
+  template:
+    serviceAccountName: pipemaster-sensor
+  triggers:
+    - template:
+        conditions: woodpecker-push
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: woodpecker-
+              spec:
+                serviceAccountName: pipemaster-workflow
+                workflowTemplateRef:
+                  name: woodpecker
+        name: woodpecker-push

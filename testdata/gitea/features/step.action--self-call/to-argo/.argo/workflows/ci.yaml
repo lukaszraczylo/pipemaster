@@ -1,0 +1,55 @@
+# pipemaster:emulated step.action pipeline/ci/job/call/step/call-step-1
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'self:'\n    owner: org\n    repo: shared\n    path: .gitea/workflows/build.yml\n    ref: main\next:\n    gha:\n        _derived_id: true\nid: call-step-1\nkind: pipeline_call\n","hold":"{\"args\":[\"true\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"call-step-1\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
+# pipemaster:emulated trigger.push pipeline/ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: call
+            template: call
+          - name: plain
+            template: plain
+    - name: call
+      containerSet:
+        containers:
+          - name: call-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - "true"
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: plain
+      containerSet:
+        containers:
+          - name: plain-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - echo ok
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

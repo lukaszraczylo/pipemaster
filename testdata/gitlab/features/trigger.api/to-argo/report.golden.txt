@@ -1,0 +1,2 @@
+Loss report: gitlab -> argo
+[lost] pipeline/gitlab-ci/trigger/0 trigger.api (an api trigger that no Argo file held has no Argo form; no Sensor trigger is written)

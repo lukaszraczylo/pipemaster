@@ -1,0 +1,5 @@
+Loss report: forgejo -> argo
+[lost] pipeline/ci/job/build job.runner (Argo schedules pods; a runner label has no form)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider gha (inputs) is not written to the Argo file; it is kept in round-trip metadata)
+[external] pipeline/ci/trigger/0 trigger.manual: argo submit --from workflowtemplate/ci (start a run with: argo submit --from workflowtemplate/ci; the Workflow object needs a ServiceAccount with the rights in .argo/rbac/)
+[emulated] pipeline/ci pipeline.inputs: string parameter (input environment has type choice, which Argo parameters lack; it is a string parameter and the type stays in the marker; input dry-run has type boolean, which Argo parameters lack; it is a string parameter and the type stays in the marker)

@@ -1,0 +1,20 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/report
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:arg {"noIf":true}
+when:
+  - event: push
+    status:
+      - success
+      - failure
+  - event: tag
+    status:
+      - success
+      - failure
+depends_on:
+  - name: build
+    optional: true
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - ./notify.sh

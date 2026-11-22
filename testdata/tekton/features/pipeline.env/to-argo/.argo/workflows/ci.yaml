@@ -1,0 +1,52 @@
+# pipemaster:lost expr.opaque pipeline/ci/job/build: gha.github.run_number
+# pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"step":"id: build-step-1\nkind: script\nscript:\n    - echo ok\n","hold":"{\"args\":[\"echo ok\"],\"command\":[\"sh\",\"-ec\"],\"env\":[{\"name\":\"CGO_ENABLED\",\"value\":\"0\"},{\"name\":\"VERSION\",\"value\":\"3.1\"},{\"name\":\"TOKEN\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"DEPLOY_TOKEN\",\"name\":\"ci-secrets\"}}}],\"image\":\"alpine:3.22\",\"name\":\"build-step-1\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:emulated pipeline.env pipeline/ci
+# pipemaster:arg {"vars":"- name: CGO_ENABLED\n  value:\n    lit: \"0\"\n- name: VERSION\n  value:\n    lit: \"3.1\"\n- name: TOKEN\n  value:\n    secret: DEPLOY_TOKEN\n- name: LABEL\n  value:\n    expr: format('build-{0}', gha.github.run_number)\n","names":["CGO_ENABLED","VERSION","TOKEN","LABEL"]}
+# pipemaster:emulated config.name pipeline/ci/ref/secrets.DEPLOY_TOKEN
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
+# pipemaster:emulated trigger.push pipeline/ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+  annotations:
+    workflows.argoproj.io/title: env
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+    - name: build
+      containerSet:
+        containers:
+          - name: build-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - echo ok
+            workingDir: /workspace
+            env:
+              - name: CGO_ENABLED
+                value: "0"
+              - name: VERSION
+                value: "3.1"
+              - name: TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: ci-secrets
+                    key: DEPLOY_TOKEN
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

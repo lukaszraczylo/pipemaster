@@ -1,0 +1,33 @@
+# pipemaster:emulated step.image pipeline/deploy/job/ship
+# pipemaster:arg {"steps":{"ship":"ref: alpine:3.20\n"},"wrote":{"ship":"alpine:3.20"}}
+# pipemaster:emulated project.multi_pipeline pipeline/deploy
+# pipemaster:emulated trigger.manual pipeline/deploy/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: deploy
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: ship
+            template: ship
+    - name: ship
+      containerSet:
+        containers:
+          - name: ship
+            image: alpine:3.20
+            command:
+              - sh
+              - -ec
+            args:
+              - ./ship.sh
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

@@ -1,0 +1,49 @@
+# pipemaster:emulated job.outputs pipeline/gitlab-ci/job/version
+# pipemaster:arg {"values":{"tag":"v1-$\u007b{ sha }}"}}
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: gitlab-ci
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-sha
+        value: ""
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: version
+            template: version
+    - name: version
+      containerSet:
+        containers:
+          - # pipemaster:id version-step-1
+            name: main
+            image: alpine:3.22
+            command:
+              - sh
+              - -ec
+            args:
+              - |-
+                make version
+                mkdir -p /workspace/.pipemaster/outputs && printf '%s' "${PM_OUT_TAG}" > /workspace/.pipemaster/outputs/tag
+            workingDir: /workspace
+            env:
+              - name: PM_OUT_TAG
+                value: v1-{{workflow.parameters.ctx-sha}}
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      outputs:
+        parameters:
+          - name: tag
+            valueFrom:
+              path: /workspace/.pipemaster/outputs/tag
+              default: ""
+      volumes:
+        - emptyDir: {}
+          name: workspace

@@ -1,0 +1,7 @@
+Loss report: argo -> woodpecker
+[lost] pipeline/gitlab-ci/job/deploy ext.passthrough (Ext of provider argo (gates) is not written to the Woodpecker file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/trigger/0 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the Woodpecker file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/trigger/1 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the Woodpecker file; it is kept in round-trip metadata)
+[emulated] pipeline/gitlab-ci/job/deploy job.allow_failure: failure ignore on every step (later steps still run after a failed step)
+[emulated] pipeline/gitlab-ci/job/deploy job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/deploy job.manual: when event manual (the workflow runs only when a person starts it from the UI or API)

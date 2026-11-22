@@ -1,0 +1,9 @@
+Loss report: argo -> woodpecker
+[lost] pipeline/gitlab-ci/job/unit ext.passthrough (Ext of provider argo (argument_artifacts, inputs) is not written to the Woodpecker file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/job/unit job.needs.artifacts (workflows do not share a workspace)
+[lost] pipeline/gitlab-ci/trigger/0 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the Woodpecker file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/trigger/1 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the Woodpecker file; it is kept in round-trip metadata)
+[emulated] pipeline/gitlab-ci/job/compile job.artifacts: shared workspace of the steps in one workflow (other workflows cannot read the files)
+[emulated] pipeline/gitlab-ci/job/compile job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/docs job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/unit job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

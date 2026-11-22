@@ -1,0 +1,92 @@
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci
+# pipemaster:arg {"vars":"- name: SHARED\n  value:\n    lit: \"1\"\n","names":["SHARED"]}
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: gitlab-ci
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+          - name: common
+            template: common
+          - name: prod
+            template: prod
+            dependencies:
+              - build
+              - common
+    - name: build
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3
+            command:
+              - sh
+              - -ec
+            args:
+              - make
+            workingDir: /workspace
+            env:
+              - name: SHARED
+                value: "1"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      retryStrategy:
+        limit: "1"
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: common
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3
+            command:
+              - sh
+              - -ec
+            args:
+              - echo common
+            workingDir: /workspace
+            env:
+              - name: SHARED
+                value: "1"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      retryStrategy:
+        limit: "1"
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: prod
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3
+            command:
+              - sh
+              - -ec
+            args:
+              - ./deploy.sh
+            workingDir: /workspace
+            env:
+              - name: SHARED
+                value: "1"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      retryStrategy:
+        limit: "1"
+      volumes:
+        - emptyDir: {}
+          name: workspace

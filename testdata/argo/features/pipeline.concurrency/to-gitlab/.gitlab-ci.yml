@@ -1,0 +1,16 @@
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:arg {"kind":"push"}
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+# pipemaster:arg {"kind":"tag"}
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+# pipemaster:lost script.interpolation pipeline/ci: {{ ref }}
+build:
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - echo ok
+  resource_group: ci-

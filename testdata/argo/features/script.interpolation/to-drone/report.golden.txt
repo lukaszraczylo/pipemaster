@@ -1,0 +1,9 @@
+Loss report: argo -> drone
+[lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
+[lost] pipeline/ci/job/build/step/build-step-1 script.interpolation (no Drone spelling for expression ref_name; the line is commented out; no Drone spelling for expression gha.github.workspace; the line is commented out)
+[lost] pipeline/ci/job/build/step/build-step-1 step.script (no command of the step has a Drone spelling; the step is not written)
+[lost] pipeline/ci/job/build/step/script step.script (the job has no steps; a no-op step keeps the document valid)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the Drone file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the Drone file; it is kept in round-trip metadata)
+[emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/ci/job/build step.script: no-op step (Drone needs a step; no step of the job has a Drone form, so a no-op step stands in)

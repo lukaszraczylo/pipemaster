@@ -1,0 +1,25 @@
+origin:
+    provider: argo
+    dialect: argo
+    files:
+        - .argo/cron/ci-paused.yaml
+        - .argo/workflows/ci.yaml
+pipelines:
+    - id: ci
+      name: api
+      triggers:
+        - ext:
+            argo:
+                cronWorkflow:
+                    cron: 0 3 * * *
+                    index: 0
+                    name: ci-paused
+                    suspend: true
+          kind: api
+      jobs:
+        - id: build
+          steps:
+            - id: build-step-1
+              kind: script
+              script:
+                - echo ok
