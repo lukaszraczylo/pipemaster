@@ -90,8 +90,9 @@ job, resource, resource type, group, display, task config (top level) and `acros
 decodes without a strict check (`config.run`, `inputs[]`, `outputs[]`, `caches[]`, `image_resource`, `container_limits`,
 an `in_parallel` object) take unknown keys. `source`, `params`, `config` of var sources and `user_data` are opaque.
 `source` is optional on a resource and resource type, `plan` on a job, and the var source `type` is any string
-(its set of types and the validity of its config are fly checks). A boolean or integer property can be null, as in
-fly. The schema is looser than fly for references between objects (an unused resource, an unknown `passed` job),
+(its set of types and the validity of its config are fly checks). Every optional property can be null (a key with
+no value), as fly decodes it to the zero value; the step-level `across`, `attempts` and hooks cannot, as in fly. A script
+added this null form to the hand-written schema; `validate/concourse_null_test.go` compares it with fly. The schema is looser than fly for references between objects (an unused resource, an unknown `passed` job),
 repeated step names, step names that break the identifier rule and a var source config. `task.privileged` is a
 boolean: fly 8.3.3 rejects `fuse-only`.
 
@@ -114,7 +115,7 @@ boolean: fly 8.3.3 rejects `fuse-only`.
 
 | File | Source | Bytes | SHA-256 | Licence |
 |---|---|---|---|---|
-| concourse.json | hand-written from the structs above, concourse/concourse `v8.3.3` | 16833 | 996543fcd79e4947e91bf0197de6173b19fe2f53be2ed6558779c987cff091a8 | Apache-2.0 (concourse/concourse structs); the file is written by this repo |
+| concourse.json | hand-written from the structs above, concourse/concourse `v8.3.3` | 25379 | 8f85e4c5a2574a5788f5665d2403ea908d0d49e66017af3f9e81363eeb627789 | Apache-2.0 (concourse/concourse structs); the file is written by this repo |
 
 ### fly v8.3.3 (scripts/install-linters.sh)
 

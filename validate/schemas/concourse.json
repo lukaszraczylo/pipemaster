@@ -16,44 +16,68 @@
       }
     },
     "resources": {
-      "type": "array",
+      "type": [
+        "array",
+        "null"
+      ],
       "items": {
         "$ref": "#/$defs/resource"
       }
     },
     "resource_types": {
-      "type": "array",
+      "type": [
+        "array",
+        "null"
+      ],
       "items": {
         "$ref": "#/$defs/resourceType"
       }
     },
     "prototypes": {
-      "type": "array",
+      "type": [
+        "array",
+        "null"
+      ],
       "items": {
         "$ref": "#/$defs/resourceType"
       }
     },
     "var_sources": {
-      "type": "array",
+      "type": [
+        "array",
+        "null"
+      ],
       "items": {
         "$ref": "#/$defs/varSource"
       }
     },
     "groups": {
-      "type": "array",
+      "type": [
+        "array",
+        "null"
+      ],
       "items": {
         "$ref": "#/$defs/group"
       }
     },
     "display": {
-      "type": "object",
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": false,
       "properties": {
         "background_image": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "background_filter": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
@@ -93,10 +117,24 @@
           "type": "string"
         },
         "jobs": {
-          "$ref": "#/$defs/stringList"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringList"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "resources": {
-          "$ref": "#/$defs/stringList"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringList"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
@@ -130,13 +168,23 @@
           "$ref": "#/$defs/identifier"
         },
         "old_name": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "type": {
           "type": "string"
         },
         "source": {
-          "$ref": "#/$defs/object"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/object"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "public": {
           "type": [
@@ -145,22 +193,52 @@
           ]
         },
         "webhook_token": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "check_every": {
-          "$ref": "#/$defs/checkEvery"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/checkEvery"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "check_timeout": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "tags": {
-          "$ref": "#/$defs/stringList"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringList"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "version": {
-          "$ref": "#/$defs/stringMap"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringMap"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "icon": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "expose_build_created_by": {
           "type": [
@@ -185,10 +263,24 @@
           "type": "string"
         },
         "source": {
-          "$ref": "#/$defs/object"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/object"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "defaults": {
-          "$ref": "#/$defs/object"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/object"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "privileged": {
           "type": [
@@ -197,13 +289,34 @@
           ]
         },
         "check_every": {
-          "$ref": "#/$defs/checkEvery"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/checkEvery"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "tags": {
-          "$ref": "#/$defs/stringList"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringList"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "params": {
-          "$ref": "#/$defs/object"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/object"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
@@ -218,7 +331,10 @@
           "$ref": "#/$defs/identifier"
         },
         "old_name": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "public": {
           "type": [
@@ -251,7 +367,14 @@
           ]
         },
         "serial_groups": {
-          "$ref": "#/$defs/stringList"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringList"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "max_in_flight": {
           "type": [
@@ -260,7 +383,14 @@
           ]
         },
         "tags": {
-          "$ref": "#/$defs/stringList"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringList"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "build_logs_to_retain": {
           "type": [
@@ -269,7 +399,10 @@
           ]
         },
         "build_log_retention": {
-          "type": "object",
+          "type": [
+            "object",
+            "null"
+          ],
           "additionalProperties": false,
           "properties": {
             "builds": {
@@ -293,22 +426,60 @@
           }
         },
         "on_success": {
-          "$ref": "#/$defs/step"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/step"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "on_failure": {
-          "$ref": "#/$defs/step"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/step"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "on_abort": {
-          "$ref": "#/$defs/step"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/step"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "on_error": {
-          "$ref": "#/$defs/step"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/step"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "ensure": {
-          "$ref": "#/$defs/step"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/step"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "plan": {
-          "type": "array",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "$ref": "#/$defs/step"
           }
@@ -319,12 +490,16 @@
       "type": "object",
       "properties": {
         "cpu": {
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "memory": {
           "type": [
             "number",
-            "string"
+            "string",
+            "null"
           ]
         }
       }
@@ -351,14 +526,14 @@
           ]
         },
         "attempts": {
-          "type": [
-            "integer",
-            "null"
-          ],
+          "type": "integer",
           "minimum": 1
         },
         "timeout": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "on_success": {
           "$ref": "#/$defs/step"
@@ -418,15 +593,22 @@
         },
         "values": {},
         "max_in_flight": {
-          "oneOf": [
+          "anyOf": [
             {
-              "type": [
-                "integer",
-                "null"
+              "oneOf": [
+                {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                {
+                  "const": "all"
+                }
               ]
             },
             {
-              "const": "all"
+              "type": "null"
             }
           ]
         }
@@ -441,26 +623,50 @@
           "type": "string"
         },
         "resource": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "version": {
-          "oneOf": [
+          "anyOf": [
             {
-              "enum": [
-                "latest",
-                "every"
+              "oneOf": [
+                {
+                  "enum": [
+                    "latest",
+                    "every"
+                  ]
+                },
+                {
+                  "$ref": "#/$defs/stringMap"
+                }
               ]
             },
             {
-              "$ref": "#/$defs/stringMap"
+              "type": "null"
             }
           ]
         },
         "params": {
-          "$ref": "#/$defs/object"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/object"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "passed": {
-          "$ref": "#/$defs/stringList"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringList"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "trigger": {
           "type": [
@@ -469,7 +675,14 @@
           ]
         },
         "tags": {
-          "$ref": "#/$defs/stringList"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringList"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
@@ -482,26 +695,57 @@
           "type": "string"
         },
         "resource": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "params": {
-          "$ref": "#/$defs/object"
-        },
-        "inputs": {
-          "oneOf": [
+          "anyOf": [
             {
-              "type": "string"
+              "$ref": "#/$defs/object"
             },
             {
-              "$ref": "#/$defs/stringList"
+              "type": "null"
+            }
+          ]
+        },
+        "inputs": {
+          "anyOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/$defs/stringList"
+                }
+              ]
+            },
+            {
+              "type": "null"
             }
           ]
         },
         "tags": {
-          "$ref": "#/$defs/stringList"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringList"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "get_params": {
-          "$ref": "#/$defs/object"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/object"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "no_get": {
           "type": [
@@ -519,12 +763,22 @@
         {
           "required": [
             "file"
-          ]
+          ],
+          "properties": {
+            "file": {
+              "type": "string"
+            }
+          }
         },
         {
           "required": [
             "config"
-          ]
+          ],
+          "properties": {
+            "config": {
+              "$ref": "#/$defs/taskConfig"
+            }
+          }
         }
       ],
       "properties": {
@@ -544,31 +798,86 @@
           ]
         },
         "file": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "container_limits": {
-          "$ref": "#/$defs/containerLimits"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/containerLimits"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "config": {
-          "$ref": "#/$defs/taskConfig"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/taskConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "params": {
-          "$ref": "#/$defs/object"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/object"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "vars": {
-          "$ref": "#/$defs/object"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/object"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "tags": {
-          "$ref": "#/$defs/stringList"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringList"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "input_mapping": {
-          "$ref": "#/$defs/stringMap"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringMap"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "output_mapping": {
-          "$ref": "#/$defs/stringMap"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringMap"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "image": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
@@ -583,56 +892,132 @@
           "type": "string"
         },
         "rootfs_uri": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "image_resource": {
-          "type": "object",
+          "type": [
+            "object",
+            "null"
+          ],
           "properties": {
             "name": {
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "type": {
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "source": {
-              "$ref": "#/$defs/object"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "version": {
-              "$ref": "#/$defs/stringMap"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/stringMap"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "params": {
-              "$ref": "#/$defs/object"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "tags": {
-              "$ref": "#/$defs/stringList"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/stringList"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           }
         },
         "container_limits": {
-          "$ref": "#/$defs/containerLimits"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/containerLimits"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "params": {
-          "$ref": "#/$defs/object"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/object"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "run": {
-          "type": "object",
+          "type": [
+            "object",
+            "null"
+          ],
           "properties": {
             "path": {
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "args": {
-              "$ref": "#/$defs/stringList"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/stringList"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "dir": {
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "user": {
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         },
         "inputs": {
-          "type": "array",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "object",
             "required": [
@@ -643,7 +1028,10 @@
                 "type": "string"
               },
               "path": {
-                "type": "string"
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "optional": {
                 "type": [
@@ -655,7 +1043,10 @@
           }
         },
         "outputs": {
-          "type": "array",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "object",
             "required": [
@@ -666,21 +1057,33 @@
                 "type": "string"
               },
               "path": {
-                "type": "string"
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             }
           }
         },
         "caches": {
-          "type": "array",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "object",
             "properties": {
               "path": {
-                "type": "string"
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "ttl": {
-                "type": "string"
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             }
           }
@@ -700,7 +1103,14 @@
           "type": "string"
         },
         "params": {
-          "$ref": "#/$defs/object"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/object"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "privileged": {
           "type": [
@@ -709,10 +1119,24 @@
           ]
         },
         "tags": {
-          "$ref": "#/$defs/stringList"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringList"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "container_limits": {
-          "$ref": "#/$defs/containerLimits"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/containerLimits"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
@@ -725,19 +1149,46 @@
           "type": "string"
         },
         "file": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "team": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "vars": {
-          "$ref": "#/$defs/object"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/object"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "var_files": {
-          "$ref": "#/$defs/stringList"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringList"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "instance_vars": {
-          "$ref": "#/$defs/object"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/object"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
@@ -750,15 +1201,25 @@
           "type": "string"
         },
         "file": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "format": {
-          "enum": [
-            "json",
-            "yaml",
-            "yml",
-            "trim",
-            "raw"
+          "anyOf": [
+            {
+              "enum": [
+                "json",
+                "yaml",
+                "yml",
+                "trim",
+                "raw"
+              ]
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "reveal": {
@@ -791,7 +1252,14 @@
           }
         },
         "tags": {
-          "$ref": "#/$defs/stringList"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringList"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
@@ -812,7 +1280,10 @@
               "type": "object",
               "properties": {
                 "steps": {
-                  "type": "array",
+                  "type": [
+                    "array",
+                    "null"
+                  ],
                   "items": {
                     "$ref": "#/$defs/step"
                   }
@@ -834,7 +1305,14 @@
           ]
         },
         "tags": {
-          "$ref": "#/$defs/stringList"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/stringList"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     }
