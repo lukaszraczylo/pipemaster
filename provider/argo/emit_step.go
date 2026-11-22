@@ -352,7 +352,7 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool) *container {
 	}
 	t, ok := actions.Lookup(*st.Action, dialect, with)
 	if !ok {
-		e.lose(path, caps.StepAction, "the action "+actionRef(st.Action)+" has no Argo mapping; the step is dropped and the reference stays here as a comment")
+		e.lose(path, caps.StepAction, "the action "+actionRef(st.Action)+" has no Argo mapping; Argo does not run the step, and the marker and a comment keep the reference")
 		e.comment(path, "uses: "+actionRef(st.Action))
 		return nil
 	}
