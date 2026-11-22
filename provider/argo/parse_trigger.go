@@ -228,18 +228,30 @@ type triggerWorkflow struct {
 	op string
 }
 
-// creates is true when the trigger starts a new run: only the k8s create operation does.
-func (w triggerWorkflow) creates() bool { return w.kind == triggerK8s && w.op == opCreate }
+// creates is true when the trigger starts a new run: the k8s create operation, or the argoWorkflow submit
+// operation. Argo Events v1.9.11 runs an argoWorkflow trigger with no operation as submit
+// (pkg/sensors/triggers/argo-workflow/argo-workflow.go:100-103).
+func (w triggerWorkflow) creates() bool {
+	switch w.kind {
+	case triggerK8s:
+		return w.op == opCreate
+	case triggerArgo:
+		return w.op == "" || w.op == opSubmit
+	}
+	return false
+}
 
 const (
-	triggerK8s = "k8s"
-	opCreate   = "create"
+	triggerK8s  = "k8s"
+	triggerArgo = "argoWorkflow"
+	opCreate    = "create"
+	opSubmit    = "submit"
 )
 
 // workflowOf finds the Workflow manifest that a trigger carries.
 func workflowOf(m *omap) (triggerWorkflow, bool) {
 	tm, _ := asMap(m.Vals["template"])
-	for _, key := range []string{triggerK8s, "argoWorkflow"} {
+	for _, key := range []string{triggerK8s, triggerArgo} {
 		body := asMapOr(valueOf(tm, key))
 		src, _ := asMap(valueOf(body, "source"))
 		res, ok := asMap(valueOf(src, "resource"))
@@ -288,7 +300,7 @@ func (p *project) sensorTrigger(t sensorTrigger, byName map[string]*ir.Pipeline)
 	if !wf.creates() {
 		p.rep.Add(report.Entry{
 			IRPath: "pipeline/" + pl.ID + "/trigger/" + t.name, Feature: caps.TriggerAPI, Level: caps.Lost, Strategy: "kept in Ext[" + dialect + "]", SourceLoc: t.doc.Loc(0),
-			Detail: "Sensor trigger " + tname + " has trigger type " + wf.kind + " and operation " + wf.op + ", which does not start a run; it maps to no trigger and stays in Ext",
+			Detail: "Sensor trigger " + tname + " has trigger type " + wf.kind + " and operation " + wf.op + ", which does not start a run, or has no Workflow to start; it maps to no trigger and stays in Ext",
 		})
 		return false
 	}

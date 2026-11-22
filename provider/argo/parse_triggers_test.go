@@ -259,11 +259,26 @@ func TestSensorWithNoMappedTriggerKeepsTheWholeDocuments(t *testing.T) {
 }
 
 func TestSensorTriggerThatIsNotACreateNeverStartsThePipeline(t *testing.T) {
-	for _, op := range []string{"delete", "patch", "update", "submit", "resubmit", "retry", "resume", "suspend", "terminate", "stop"} {
+	for _, op := range []string{"delete", "patch", "update", "resubmit", "retry", "resume", "suspend", "terminate", "stop"} {
 		t.Run(op, func(t *testing.T) {
 			run := strings.Replace(runCI, "operation: create", "operation: "+op, 1)
 			trs, entries := triggersOf(t, map[string]string{"es.yaml": eventSource, "s.yaml": sensor(dep("      - {path: headers.X-Github-Event, type: string, value: [\"push\"]}\n"), run)})
 			if len(trs) != 0 || !strings.Contains(entries, "operation "+op) {
+				t.Fatalf("triggers %+v entries %s", trs, entries)
+			}
+		})
+	}
+}
+
+// Argo Events v1.9.11 runs an argoWorkflow trigger with no operation as submit (pkg/sensors/triggers/argo-workflow/argo-workflow.go:100-103).
+func TestSensorArgoWorkflowSubmitStartsThePipeline(t *testing.T) {
+	for name, run := range map[string]string{
+		"submit":  strings.Replace(runCI, "k8s:\n        operation: create", "argoWorkflow:\n        operation: submit", 1),
+		"default": strings.Replace(runCI, "k8s:\n        operation: create", "argoWorkflow:", 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			trs, entries := triggersOf(t, map[string]string{"es.yaml": eventSource, "s.yaml": sensor(dep("      - {path: headers.X-Github-Event, type: string, value: [\"push\"]}\n"), run)})
+			if len(trs) != 1 || trs[0].Kind != ir.TriggerPush {
 				t.Fatalf("triggers %+v entries %s", trs, entries)
 			}
 		})
