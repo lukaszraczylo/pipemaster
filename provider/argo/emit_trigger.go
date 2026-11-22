@@ -1,6 +1,7 @@
 package argo
 
 import (
+	"cmp"
 	"strconv"
 	"strings"
 
@@ -81,6 +82,9 @@ func ownDoc(v any) docMap {
 	return out
 }
 
+// cronKey is the CronWorkflow Ext key that holds the cron expression of a suspended CronWorkflow.
+const cronKey = "cron"
+
 // cron adds a schedule to the CronWorkflow of the trigger. A suspended CronWorkflow that an Argo file held
 // arrives as an api trigger that keeps its cron; the CronWorkflow stays suspended.
 func (e *emitter) cron(pp *plan, i int, path string, tr ir.Trigger, x map[string]any) {
@@ -102,7 +106,7 @@ func (e *emitter) cron(pp *plan, i int, path string, tr ir.Trigger, x map[string
 	if c == nil {
 		spec := map[string]any{}
 		for k, v := range cw {
-			if k != "name" && k != "index" && k != "metadata" {
+			if k != "name" && k != "index" && k != "metadata" && k != cronKey {
 				spec[k] = v
 			}
 		}
@@ -121,8 +125,8 @@ func (e *emitter) cron(pp *plan, i int, path string, tr ir.Trigger, x map[string
 		ev.crons[name] = c
 		ev.cronOrder = append(ev.cronOrder, name)
 	}
-	if tr.Cron != "" {
-		c.schedules[idx] = tr.Cron
+	if cron, _ := cw[cronKey].(string); tr.Cron != "" || cron != "" {
+		c.schedules[idx] = cmp.Or(tr.Cron, cron)
 	}
 	if tr.Kind == ir.TriggerSchedule {
 		return

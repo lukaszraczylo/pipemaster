@@ -63,6 +63,10 @@ func (p *project) cronTriggers(byName map[string]*ir.Pipeline, byCron map[*rawDo
 			}
 			data := ynode.DeepCopy(cw).(map[string]any)
 			data["index"] = i
+			if suspended {
+				// Another provider's api trigger has no cron, so the expression travels in Ext.
+				data[cronKey] = cron
+			}
 			tr.Ext = ir.Ext{dialect: map[string]any{"cronWorkflow": data}}
 			pl.Triggers = append(pl.Triggers, tr)
 		}
