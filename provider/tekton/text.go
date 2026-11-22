@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/expr"
+	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
@@ -115,7 +116,7 @@ func (x *texts) taskParam(name string) ([]expr.Part, bool) {
 	if d, ok := x.defaults[name]; ok {
 		return []expr.Part{{Text: d}}, true
 	}
-	if path, ok := exprtekton.CtxRef(name); ok {
+	if path, ok := ctxparam.Ref(name); ok {
 		return []expr.Part{{Expr: expr.Ref{Path: path}}}, true
 	}
 	return nil, false

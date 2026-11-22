@@ -4,13 +4,14 @@ import (
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/expr"
+	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 )
 
 // langVocab names every canonical context ref by itself, because the AST that FromWhen builds already holds
 // canonical refs. The prefix families carry the user-defined tail.
 func langVocab() expr.Vocab {
 	v := expr.Vocab{ToCanon: map[string][]string{}, FromCanon: map[string][]string{}}
-	for _, n := range ctxNames {
+	for _, n := range ctxparam.Names() {
 		path := strings.Split(n, ".")
 		v.ToCanon[n], v.FromCanon[n] = path, path
 	}

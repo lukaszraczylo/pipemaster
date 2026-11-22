@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/expr"
+	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 )
 
 // Dialect is the Opaque dialect name.
@@ -16,19 +17,12 @@ const Dialect = "tekton"
 var Semantics = expr.Semantics{StrictTypes: true}
 
 const (
-	ctxPrefix   = "ctx-"
 	paramsHead  = "params."
 	tasksHead   = "tasks."
 	resultsPart = "results"
 	wordOpen    = "$("
 	wordClose   = ")"
 )
-
-// ctxNames are the canonical context names that a reserved param can carry.
-var ctxNames = []string{
-	expr.CtxBranch, expr.CtxTag, expr.CtxEvent, expr.CtxSHA, expr.CtxRepo, expr.CtxActor, expr.CtxPRNumber,
-	expr.CtxRefName, expr.CtxRefType, expr.CtxRef, expr.CtxPRHeadRef, expr.CtxPRBaseRef,
-}
 
 var (
 	paramName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
@@ -43,34 +37,10 @@ var (
 
 const maxLabel = 63
 
-var paramNamer = strings.NewReplacer(".", "-", "_", "-")
-
-// CtxParam gives the reserved pipeline param that carries a canonical context ref: branch is ctx-branch,
-// pr.number is ctx-pr-number and ref_name is ctx-ref-name.
-func CtxParam(path []string) (string, bool) {
-	name := strings.Join(path, ".")
-	for _, c := range ctxNames {
-		if c == name {
-			return ctxPrefix + paramNamer.Replace(name), true
-		}
-	}
-	return "", false
-}
-
-// CtxRef inverts CtxParam.
-func CtxRef(param string) ([]string, bool) {
-	for _, c := range ctxNames {
-		if ctxPrefix+paramNamer.Replace(c) == param {
-			return strings.Split(c, "."), true
-		}
-	}
-	return nil, false
-}
-
 // RefWord writes a canonical ref as the Tekton variable that holds it. A matrix axis is a param inside the
 // Task. env, secrets and vars have no word.
 func RefWord(r expr.Ref) (string, bool) {
-	if p, ok := CtxParam(r.Path); ok {
+	if p, ok := ctxparam.Param(r.Path); ok {
 		return wordOpen + paramsHead + p + wordClose, true
 	}
 	switch {
@@ -99,7 +69,7 @@ func FromWord(w string) (expr.Ref, bool) {
 		if !paramName.MatchString(name) {
 			return expr.Ref{}, false
 		}
-		if path, ok := CtxRef(name); ok {
+		if path, ok := ctxparam.Ref(name); ok {
 			return expr.Ref{Path: path}, true
 		}
 		return expr.Ref{Path: []string{expr.PrefixInputs, name}}, true

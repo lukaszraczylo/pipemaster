@@ -7,6 +7,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
+	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
@@ -466,7 +467,7 @@ func ctxEnvOf(v any) ctxEnvs {
 		if !ok || !isText {
 			continue
 		}
-		if _, ctx := exprtekton.CtxParam(ref.Path); !ctx {
+		if _, ctx := ctxparam.Param(ref.Path); !ctx {
 			continue
 		}
 		if word, ok := exprtekton.RefWord(ref); ok && word == val {

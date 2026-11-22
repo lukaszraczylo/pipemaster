@@ -5,6 +5,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
+	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
 )
 
@@ -44,7 +45,7 @@ func mapRefs(e expr.Expr, f func(expr.Ref) (expr.Expr, bool)) (expr.Expr, bool) 
 // rewrite maps the references of e to the references whose Tekton word is valid in scope sc.
 func (tc *taskCtx) rewrite(e expr.Expr, sc scope) (expr.Expr, bool) {
 	return mapRefs(e, func(r expr.Ref) (expr.Expr, bool) {
-		if p, ok := exprtekton.CtxParam(r.Path); ok {
+		if p, ok := ctxparam.Param(r.Path); ok {
 			tc.pp.ctx[p] = true
 			if sc == taskScope {
 				tc.ctxParam(p)

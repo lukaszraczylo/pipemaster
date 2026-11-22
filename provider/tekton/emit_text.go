@@ -9,6 +9,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
+	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
@@ -206,7 +207,7 @@ func isIdent(s string) bool { return identRE.MatchString(s) }
 
 // refText spells one canonical reference in Tekton text; ok is false when Tekton has no spelling.
 func (tc *taskCtx) refText(sc *stepScope, m textMode, r expr.Ref) (string, bool) {
-	if p, ok := exprtekton.CtxParam(r.Path); ok {
+	if p, ok := ctxparam.Param(r.Path); ok {
 		name := tc.ctxParam(p)
 		if m == valueText {
 			return param(name), true

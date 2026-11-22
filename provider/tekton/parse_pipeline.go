@@ -7,7 +7,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
-	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
+	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -175,7 +175,7 @@ func (p *project) params(pl *ir.Pipeline, k *sink, r *reader, names map[string]s
 		if name == "" {
 			return nil, fmt.Errorf("param %d needs a name", i+1)
 		}
-		if _, ctx := exprtekton.CtxRef(name); ctx {
+		if _, ctx := ctxparam.Ref(name); ctx {
 			continue
 		}
 		in := ir.Input{Name: name}

@@ -8,7 +8,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
-	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
+	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -96,7 +96,7 @@ func overlaysMatch(in interceptor, kind ir.TriggerKind) bool {
 		}
 		key, _ := text(valueOf(m, "key"))
 		ex, _ := text(valueOf(m, "expression"))
-		path, ok := exprtekton.CtxRef(strings.ReplaceAll(key, "_", "-"))
+		path, ok := ctxparam.Ref(strings.ReplaceAll(key, "_", "-"))
 		if !ok || ctxOverlay(kind, strings.Join(path, ".")) != ex {
 			return false
 		}
@@ -270,7 +270,7 @@ func ctxNamesOf(v any) []string {
 	var out []string
 	for _, e := range l {
 		n, _ := text(valueOf(func() *omap { m, _ := asMap(e); return m }(), "name"))
-		if path, ok := exprtekton.CtxRef(n); ok {
+		if path, ok := ctxparam.Ref(n); ok {
 			out = append(out, strings.Join(path, "."))
 		}
 	}

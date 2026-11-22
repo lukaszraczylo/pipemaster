@@ -9,7 +9,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
-	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
+	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
@@ -139,7 +139,7 @@ func (e *emitter) flushPendingListeners() {
 func (e *emitter) pipelineTriggers(pp *plan, crons *[]*outDoc) (binding, template *outDoc, err error) {
 	var ctxs []string
 	for _, c := range ctxOrder {
-		if p, _ := exprtekton.CtxParam(strings.Split(c, ".")); pp.ctx[p] {
+		if p, _ := ctxparam.Param(strings.Split(c, ".")); pp.ctx[p] {
 			ctxs = append(ctxs, c)
 		}
 	}

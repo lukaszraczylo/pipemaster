@@ -9,7 +9,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
-	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
+	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
@@ -326,7 +326,7 @@ func (e *emitter) triggerEntry(name string, kind ir.TriggerKind, filter string, 
 	}
 	overlays := seqOf()
 	for _, c := range ctxs {
-		p, _ := exprtekton.CtxParam(strings.Split(c, "."))
+		p, _ := ctxparam.Param(strings.Split(c, "."))
 		o := newMap()
 		o.setStr("key", overlayKey(p))
 		o.setStr("expression", ctxOverlay(kind, c))
@@ -371,7 +371,7 @@ func (e *emitter) bindingDoc(name string, ctxs []string) *outDoc {
 	root.set("metadata", meta.n)
 	ps := seqOf()
 	for _, c := range ctxs {
-		p, _ := exprtekton.CtxParam(strings.Split(c, "."))
+		p, _ := ctxparam.Param(strings.Split(c, "."))
 		ps.Content = append(ps.Content, nameValue(p, "$(extensions."+overlayKey(p)+")"))
 	}
 	spec := newMap()
@@ -390,7 +390,7 @@ func (e *emitter) templateDoc(pp *plan, name string, ctxs []string) *outDoc {
 	tps := seqOf()
 	rps := seqOf()
 	for _, c := range ctxs {
-		p, _ := exprtekton.CtxParam(strings.Split(c, "."))
+		p, _ := ctxparam.Param(strings.Split(c, "."))
 		m := newMap()
 		m.setStr("name", p)
 		m.setStr("default", "")

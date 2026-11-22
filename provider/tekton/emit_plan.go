@@ -5,16 +5,12 @@ import (
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
-	"github.com/lukaszraczylo/pipemaster/expr"
-	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
+	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
 // ctxOrder lists the canonical context names in the order the pipeline declares their params.
-var ctxOrder = []string{
-	expr.CtxBranch, expr.CtxTag, expr.CtxEvent, expr.CtxSHA, expr.CtxRepo, expr.CtxActor, expr.CtxPRNumber,
-	expr.CtxRefName, expr.CtxRefType, expr.CtxRef, expr.CtxPRHeadRef, expr.CtxPRBaseRef,
-}
+var ctxOrder = ctxparam.Names()
 
 var (
 	paramNameRE  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
@@ -53,7 +49,7 @@ type jobPlan struct {
 func ctxParams() []string {
 	var out []string
 	for _, c := range ctxOrder {
-		p, _ := exprtekton.CtxParam(strings.Split(c, "."))
+		p, _ := ctxparam.Param(strings.Split(c, "."))
 		out = append(out, p)
 	}
 	return out

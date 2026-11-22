@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/expr"
+	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/expr/internal/shguard"
 )
 
@@ -27,8 +28,8 @@ type EnvVar struct{ Name, Value string }
 // EnvName gives the step env name that holds a ref. The name inverts only for lowercase dash-separated
 // param names, so another name has no env name and no guard.
 func EnvName(r expr.Ref) (string, bool) {
-	if p, ok := CtxParam(r.Path); ok {
-		return envCtx + upperUnder(strings.TrimPrefix(p, ctxPrefix)), true
+	if p, ok := ctxparam.Param(r.Path); ok {
+		return envCtx + upperUnder(strings.TrimPrefix(p, ctxparam.Prefix)), true
 	}
 	switch {
 	case len(r.Path) == 2 && r.Path[0] == expr.PrefixInputs && dashName.MatchString(r.Path[1]):
@@ -45,7 +46,7 @@ func EnvName(r expr.Ref) (string, bool) {
 // EnvRef inverts EnvName.
 func EnvRef(name string) (expr.Ref, bool) {
 	if rest, ok := strings.CutPrefix(name, envCtx); ok && underName.MatchString(rest) {
-		path, ok := CtxRef(ctxPrefix + lowerDash(rest))
+		path, ok := ctxparam.Ref(ctxparam.Prefix + lowerDash(rest))
 		return expr.Ref{Path: path}, ok
 	}
 	for prefix, family := range map[string]string{envInput: expr.PrefixInputs, envMatrix: expr.PrefixMatrix} {

@@ -8,43 +8,6 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr/tekton"
 )
 
-func TestCtxParam(t *testing.T) {
-	for canon, want := range map[string]string{
-		"branch":      "ctx-branch",
-		"pr.number":   "ctx-pr-number",
-		"ref_name":    "ctx-ref-name",
-		"pr.head_ref": "ctx-pr-head-ref",
-	} {
-		path := splitCanon(canon)
-		got, ok := tekton.CtxParam(path)
-		if !ok || got != want {
-			t.Errorf("CtxParam(%v) = %q, %v; want %q", path, got, ok, want)
-		}
-		back, ok := tekton.CtxRef(got)
-		if !ok || !reflect.DeepEqual(back, path) {
-			t.Errorf("CtxRef(%q) = %v, %v; want %v", got, back, ok, path)
-		}
-	}
-	for _, bad := range [][]string{{"nope"}, {"inputs", "x"}, {"env", "A"}, nil} {
-		if p, ok := tekton.CtxParam(bad); ok {
-			t.Errorf("CtxParam(%v) = %q; want a refusal", bad, p)
-		}
-	}
-	if _, ok := tekton.CtxRef("ctx-nope"); ok {
-		t.Error("CtxRef accepted an unknown context param")
-	}
-}
-
-func splitCanon(s string) []string {
-	if s == "pr.number" {
-		return []string{"pr", "number"}
-	}
-	if s == "pr.head_ref" {
-		return []string{"pr", "head_ref"}
-	}
-	return []string{s}
-}
-
 func TestWordRoundTrip(t *testing.T) {
 	for _, c := range []struct {
 		want string
