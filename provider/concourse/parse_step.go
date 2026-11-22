@@ -201,6 +201,10 @@ func (jb *jobBuilder) noRun(k *sink, line int) {
 // run reads run.path, run.args and run.dir. A shell -c form gives the shell and the script lines; any other
 // command becomes one quoted script line with the command and args kept in Ext.
 func (jb *jobBuilder) run(st *ir.Step, k *sink, run *omap, line int) {
+	if runHasVar(run) {
+		k.Keep(ExtRun, run, caps.StepScript, "run holds a ((var)), which no script can carry; run is kept in Ext and the step runs nothing", line)
+		return
+	}
 	r := newReader(run)
 	if d, ok := textOf(r.Take("dir")); ok {
 		st.WorkDir = d
@@ -230,6 +234,21 @@ func (jb *jobBuilder) run(st *ir.Step, k *sink, run *omap, line int) {
 		}
 		k.Keep(ExtRun, kept, caps.ExtPassthrough, "run keys "+strings.Join(rest, ", ")+" have no IR field; kept in Ext", line)
 	}
+}
+
+// runHasVar reports a ((var)) in run.path, run.args or run.dir. Concourse resolves it at run time and another
+// provider would run the literal text, so the parser leaves it out of the script.
+func runHasVar(run *omap) bool {
+	for _, key := range []string{"path", "args", "dir"} {
+		if l, ok := textList(run.Vals[key]); ok {
+			for _, w := range l {
+				if strings.Contains(w, varOpen) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func (jb *jobBuilder) command(st *ir.Step, k *sink, cmd string, argv []string, line int) {

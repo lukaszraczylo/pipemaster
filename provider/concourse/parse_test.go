@@ -567,3 +567,26 @@ func TestParsesTheCorpusFixture(t *testing.T) {
 	}
 	t.Logf("%d jobs, %d triggers, %d entries", len(pl.Jobs), len(pl.Triggers), len(rep.Entries))
 }
+
+func TestVarInRunIsKeptNotScripted(t *testing.T) {
+	for name, run := range map[string]string{
+		"args": "{path: sh, args: [-ec, \"curl -H 'X: ((api_token))' u\"]}",
+		"path": "{path: ((tool)), args: [a]}",
+		"dir":  "{path: ls, dir: ((where))}",
+		"word": "{path: ./x.sh, args: [--token, ((api_token))]}",
+	} {
+		t.Run(name, func(t *testing.T) {
+			pl, rep := parseYAML(t, oneJob("  - task: t\n    config: {platform: linux, run: "+run+"}\n"))
+			s := step(t, job(t, pl, "build"), "t")
+			if len(s.Script) != 0 || s.WorkDir != "" || s.Shell != "" {
+				t.Fatalf("a var must not reach the script: %+v", s)
+			}
+			if kept, _ := ext(s.Ext)["run"].(map[string]any); kept["path"] == nil {
+				t.Errorf("run not kept whole: %v", s.Ext)
+			}
+			if !hasEntry(rep, "((") {
+				t.Error("no entry for the var in run")
+			}
+		})
+	}
+}
