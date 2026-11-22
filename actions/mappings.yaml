@@ -59,6 +59,11 @@ actions:
         with:
           fetch-depth: {to: depth, transform: depth}
         support: {level: emulated, strategy: StepAction ref to the tektoncd-catalog git-clone through the git resolver, caveat: the ctx-repo and ctx-sha params carry the repository and the commit}
+      argo:
+        kind: implicit
+        with:
+          fetch-depth: {to: depth, transform: depth}
+        support: {level: emulated, strategy: input git artifact at /workspace, caveat: "the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set"}
 
   - match: actions/cache
     targets:
@@ -87,6 +92,12 @@ actions:
           key: key
           path: {to: paths, transform: lines}
         support: {level: emulated, strategy: shared workspace on a PVC, caveat: nothing persists between runs and the paths are not copied}
+      argo:
+        kind: cache
+        with:
+          key: key
+          path: {to: paths, transform: lines}
+        support: {level: emulated, strategy: PVC from volumeClaimTemplates, caveat: nothing persists between runs and the paths are not copied}
 
   - match: actions/upload-artifact
     targets:
@@ -116,6 +127,12 @@ actions:
           name: name
           path: {to: path, transform: lines}
         support: {level: emulated, strategy: shared workspace on a PVC, caveat: tasks of the same run only}
+      argo:
+        kind: artifact_upload
+        with:
+          name: name
+          path: {to: path, transform: lines}
+        support: {level: emulated, strategy: output artifact of the main container, caveat: the artifact repository is external and a glob path is not expanded}
 
   - match: actions/download-artifact
     targets:
@@ -136,6 +153,10 @@ actions:
         kind: artifact_download
         with: {name: name, path: path}
         support: {level: emulated, strategy: shared workspace on a PVC, caveat: only an upload in the same run is visible}
+      argo:
+        kind: artifact_download
+        with: {name: name, path: path}
+        support: {level: emulated, strategy: input artifact from the task that uploads it, caveat: the artifact repository is external and the uploading job must be a need}
 
   - match: actions/setup-go
     targets:
@@ -153,6 +174,10 @@ actions:
         image: "golang:{{go-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
       tekton:
+        kind: image
+        image: "golang:{{go-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
+      argo:
         kind: image
         image: "golang:{{go-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
@@ -176,6 +201,10 @@ actions:
         kind: image
         image: "node:{{node-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
+      argo:
+        kind: image
+        image: "node:{{node-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
 
   - match: actions/setup-python
     targets:
@@ -196,6 +225,10 @@ actions:
         kind: image
         image: "python:{{python-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
+      argo:
+        kind: image
+        image: "python:{{python-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
 
   - match: actions/setup-java
     targets:
@@ -213,6 +246,10 @@ actions:
         image: "eclipse-temurin:{{java-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
       tekton:
+        kind: image
+        image: "eclipse-temurin:{{java-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
+      argo:
         kind: image
         image: "eclipse-temurin:{{java-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
