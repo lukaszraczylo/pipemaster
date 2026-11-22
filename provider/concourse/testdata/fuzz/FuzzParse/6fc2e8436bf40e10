@@ -1,0 +1,2 @@
+go test fuzz v1
+string("jobs:\n- name: 0\n  plan:\n  -")

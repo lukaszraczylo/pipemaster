@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	_ "github.com/lukaszraczylo/pipemaster/provider/argo"
+	_ "github.com/lukaszraczylo/pipemaster/provider/concourse"
 	_ "github.com/lukaszraczylo/pipemaster/provider/drone"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gha"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gitlab"
@@ -71,5 +72,19 @@ func TestDetectListsArgoAndTekton(t *testing.T) {
 	code, out, errs := run(t, "detect", dir)
 	if code != 0 || out != "argo\ntekton\n" {
 		t.Fatalf("code=%d out=%q stderr=%q", code, out, errs)
+	}
+}
+
+func TestDetectListsConcourseWithOthers(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, ".concourse/ci.yml", "jobs:\n- name: a\n  plan:\n  - task: t\n    config: {platform: linux, run: {path: ls}}\n")
+	write(t, dir, ".tekton/p.yaml", "apiVersion: tekton.dev/v1\nkind: Pipeline\nmetadata: {name: p}\nspec:\n  tasks:\n  - name: a\n    taskSpec:\n      steps:\n      - {name: s, image: x, script: echo}\n")
+	code, out, errs := run(t, "detect", dir)
+	if code != 0 || out != "concourse\ntekton\n" {
+		t.Fatalf("code=%d out=%q stderr=%q", code, out, errs)
+	}
+	code, _, errs = run(t, "convert", dir, "--to", "gitlab", "-o", t.TempDir())
+	if code != 2 || !strings.Contains(errs, "concourse, tekton") {
+		t.Errorf("code=%d stderr=%q", code, errs)
 	}
 }
