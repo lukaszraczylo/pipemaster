@@ -58,7 +58,7 @@ func TestLookupUnknown(t *testing.T) {
 			t.Errorf("%s: got %+v, %v", name, got, ok)
 		}
 	}
-	if _, ok := Lookup(repo("actions", "checkout", ""), provider.Concourse, nil); ok {
+	if _, ok := Lookup(repo("actions", "checkout", ""), "unregistered", nil); ok {
 		t.Error("unregistered target matched")
 	}
 }

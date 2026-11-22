@@ -64,6 +64,11 @@ actions:
         with:
           fetch-depth: {to: depth, transform: depth}
         support: {level: emulated, strategy: input git artifact at /workspace, caveat: "the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set"}
+      concourse:
+        kind: implicit
+        with:
+          fetch-depth: {to: depth, transform: depth}
+        support: {level: native, strategy: the source get of the job clones the repository before the tasks, caveat: submodules and other get params are not mapped}
 
   - match: actions/cache
     targets:
@@ -98,6 +103,12 @@ actions:
           key: key
           path: {to: paths, transform: lines}
         support: {level: emulated, strategy: PVC from volumeClaimTemplates, caveat: nothing persists between runs and the paths are not copied}
+      concourse:
+        kind: cache
+        with:
+          key: key
+          path: {to: paths, transform: lines}
+        support: {level: emulated, strategy: task caches, caveat: a cache lives on the worker that ran the task and the key is not used}
 
   - match: actions/upload-artifact
     targets:
@@ -133,6 +144,12 @@ actions:
           name: name
           path: {to: path, transform: lines}
         support: {level: emulated, strategy: output artifact of the main container, caveat: the artifact repository is external and a glob path is not expanded}
+      concourse:
+        kind: artifact_upload
+        with:
+          name: name
+          path: {to: path, transform: lines}
+        support: {level: emulated, strategy: the workspace output of the task, caveat: later tasks of the same job read the files and other jobs cannot}
 
   - match: actions/download-artifact
     targets:
@@ -157,6 +174,10 @@ actions:
         kind: artifact_download
         with: {name: name, path: path}
         support: {level: emulated, strategy: input artifact from the task that uploads it, caveat: the artifact repository is external and the uploading job must be a need}
+      concourse:
+        kind: artifact_download
+        with: {name: name, path: path}
+        support: {level: emulated, strategy: the workspace input of the task, caveat: only an upload in the same job is visible}
 
   - match: actions/setup-go
     targets:
@@ -181,6 +202,10 @@ actions:
         kind: image
         image: "golang:{{go-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
+      concourse:
+        kind: image
+        image: "golang:{{go-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later tasks without an image run in this image}
 
   - match: actions/setup-node
     targets:
@@ -205,6 +230,10 @@ actions:
         kind: image
         image: "node:{{node-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
+      concourse:
+        kind: image
+        image: "node:{{node-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later tasks without an image run in this image}
 
   - match: actions/setup-python
     targets:
@@ -229,6 +258,10 @@ actions:
         kind: image
         image: "python:{{python-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
+      concourse:
+        kind: image
+        image: "python:{{python-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later tasks without an image run in this image}
 
   - match: actions/setup-java
     targets:
@@ -253,6 +286,10 @@ actions:
         kind: image
         image: "eclipse-temurin:{{java-version}}"
         support: {level: emulated, strategy: image selection, caveat: later steps without an image run in this image}
+      concourse:
+        kind: image
+        image: "eclipse-temurin:{{java-version}}"
+        support: {level: emulated, strategy: image selection, caveat: later tasks without an image run in this image}
 
 # Versions checked 2026-11-18 via the GitHub releases API (latest release, major tag).
 reverse:
