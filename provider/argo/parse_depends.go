@@ -231,3 +231,18 @@ func boolLit(e expr.Expr) (value, ok bool) {
 	l, isLit := e.(expr.Lit)
 	return l.Bool, isLit && l.Kind == expr.LitBool
 }
+
+// renameDepends rewrites the task of every atom of a depends text, and leaves a name that rename does not know.
+func renameDepends(s string, rename func(string) (string, bool)) string {
+	return dependsAtom.ReplaceAllStringFunc(s, func(atom string) string {
+		name, status, _ := strings.Cut(atom, ".")
+		to, ok := rename(name)
+		if !ok {
+			return atom
+		}
+		if status != "" {
+			return to + "." + status
+		}
+		return to
+	})
+}
