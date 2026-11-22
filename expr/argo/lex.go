@@ -341,10 +341,10 @@ func (l *lexer) govWord() bool {
 		return true
 	}
 	j := 0
-	for j < len(r) && isBareWord(r[j]) {
+	for j < len(r) && isBareWord(r[j], j == 0) {
 		j++
 	}
-	if j == 0 {
+	if j == 0 || govKeywords[r[:j]] {
 		return false
 	}
 	l.toks = append(l.toks, token{kind: kStr, str: r[:j], bare: true})
@@ -352,8 +352,16 @@ func (l *lexer) govWord() bool {
 	return true
 }
 
-// isBareWord admits the characters of a branch, tag or path name. Any other character may be an operator to
-// govaluate, so a word that holds one is left as Opaque.
-func isBareWord(c byte) bool {
-	return isIdent(c) || c == '-' || c == '.' || c == '/' || c == ':' || c == '@'
+// govKeywords are the words that govaluate reads as a boolean or an operator, not as a variable.
+var govKeywords = map[string]bool{"true": true, "false": true, "in": true, "IN": true}
+
+// isBareWord admits the characters of a govaluate variable token: a letter, then letters, digits and `_`
+// (Knetic/govaluate 7625b7f8c03d parsing.go:142-144 and isVariableName at :455-461). Argo's shouldExecute
+// retypes that token to a string. Anything else reads as an operator, an accessor or a number there, so a
+// word that holds one is left as Opaque.
+func isBareWord(c byte, first bool) bool {
+	if first {
+		return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
+	}
+	return isIdent(c)
 }

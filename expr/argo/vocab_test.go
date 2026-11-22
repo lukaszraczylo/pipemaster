@@ -20,7 +20,7 @@ func TestRefExprAndTag(t *testing.T) {
 		{"dotted context", "workflow.parameters['ctx-pr-number']", "{{workflow.parameters.ctx-pr-number}}", []string{"pr", "number"}, argo.ScopeTask},
 		{"underscore context", "workflow.parameters['ctx-ref-name']", "{{workflow.parameters.ctx-ref-name}}", []string{"ref_name"}, argo.ScopeTask},
 		{"input", "workflow.parameters['tag']", "{{workflow.parameters.tag}}", []string{"inputs", "tag"}, argo.ScopeTask},
-		{"needs output", "tasks['build'].outputs.parameters['digest']", "{{tasks.build.outputs.parameters.digest}}", []string{"needs", "build", "outputs", "digest"}, argo.ScopeTask},
+		{"needs output", "(tasks['build'].outputs.parameters['digest'] ?? '')", "{{tasks.build.outputs.parameters.digest}}", []string{"needs", "build", "outputs", "digest"}, argo.ScopeTask},
 		{"matrix in a task", "item['os']", "{{item.os}}", []string{"matrix", "os"}, argo.ScopeTask},
 		{"matrix in the template", "inputs.parameters['os']", "{{inputs.parameters.os}}", []string{"matrix", "os"}, argo.ScopeTemplate},
 		{"context in the template", "workflow.parameters['ctx-branch']", "{{workflow.parameters.ctx-branch}}", []string{"branch"}, argo.ScopeTemplate},

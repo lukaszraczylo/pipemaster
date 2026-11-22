@@ -103,13 +103,18 @@ func fromSegments(seg []string, s Scope) (expr.Ref, bool) {
 }
 
 // RefExpr writes a canonical ref as an expr-lang member path with bracket indexing for every name, which a
-// hyphenated name needs: workflow.parameters['ctx-branch']. env, secrets and vars have no form.
+// hyphenated name needs: workflow.parameters['ctx-branch']. A needs output is wrapped as (ref ?? ”). env,
+// secrets and vars have no form.
 func RefExpr(r expr.Ref, s Scope) (string, bool) {
 	seg, ok := segments(r, s)
 	if !ok {
 		return "", false
 	}
 	var b strings.Builder
+	needs := seg[0].text == tasksHead
+	if needs {
+		b.WriteByte('(')
+	}
 	for i, p := range seg {
 		switch {
 		case p.name:
@@ -119,6 +124,10 @@ func RefExpr(r expr.Ref, s Scope) (string, bool) {
 		default:
 			b.WriteString(p.text)
 		}
+	}
+	if needs {
+		// An output of a skipped task is absent, and an unguarded reference fails the node.
+		b.WriteString(" ?? '')")
 	}
 	return b.String(), true
 }
