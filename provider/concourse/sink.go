@@ -29,6 +29,9 @@ const (
 	ExtGetsParallel = "gets_in_parallel"
 	// ExtResourcesRef is the trigger Ext key that lists the resource names the trigger came from.
 	ExtResourcesRef = "resources"
+	// ExtCron is the trigger Ext key of the cron the parser derived from a time resource; a trigger that still has it
+	// restores the resource source unchanged.
+	ExtCron = "cron"
 	// ExtUnreadable is the Ext key of an api trigger that says why the source trigger could not be read.
 	ExtUnreadable = "unreadable"
 	// ExtStep and ExtKind keep a step the IR cannot model: the verbatim step and its kind key.

@@ -293,6 +293,10 @@ func (pe *pipeEmitter) schedule(t *ir.Trigger, tp string) {
 		name = unique(pe.nameSet(), scheduleName)
 		def = map[string]any{keyName: name, keyType: typeTime, keySource: map[string]any{}}
 	}
+	if own := extOf(t.Ext)[ExtCron]; own == t.Cron && def != nil && pe.e.own && pe.extDef(name) != nil {
+		pe.add(&source{name: name, typ: typeTime, def: def, trigger: true})
+		return
+	}
 	src := srcOf(def)
 	for _, k := range strings.Fields(timeSourceKeys) {
 		delete(src, k)

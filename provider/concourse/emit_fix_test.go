@@ -88,3 +88,58 @@ func TestEnvironmentOnATriggeredJobComesBack(t *testing.T) {
 		}
 	}
 }
+
+const dailyPipeline = `resources:
+  - name: daily
+    type: time
+    source: {interval: 24h}
+  - name: repo
+    type: git
+    source: {uri: https://example.com/r.git, branch: main}
+jobs:
+  - name: scan
+    plan:
+      - get: daily
+        trigger: true
+      - get: repo
+      - task: scan
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          inputs: [{name: repo}]
+          run: {path: sh, args: [-ec, "echo scan"]}
+`
+
+func TestOwnTimeSourceIsRestoredVerbatim(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"ci.yml": dailyPipeline})
+	files, _ := emit(t, p)
+	src := resourceDoc(pipelineDoc(t, files), "daily")
+	if src == nil || dict(src["source"])["interval"] != "24h" {
+		t.Fatalf("time source = %v", src)
+	}
+}
+
+func TestMidnightCronIsNotAnEmptySource(t *testing.T) {
+	p := project(scriptJob("nightly", "make"))
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerSchedule, Cron: "0 0 * * *"}}
+	files, _ := emit(t, p)
+	var tm map[string]any
+	for _, r := range list(pipelineDoc(t, files)["resources"]) {
+		if dict(r)["type"] == "time" {
+			tm = dict(r)
+		}
+	}
+	if tm == nil || len(dict(tm["source"])) == 0 {
+		t.Fatalf("time resource = %v", tm)
+	}
+	back, _ := reparse(t, files)
+	var cron string
+	for _, tr := range back.Pipelines[0].Triggers {
+		if tr.Kind == ir.TriggerSchedule {
+			cron = tr.Cron
+		}
+	}
+	if cron != "0 0 * * *" {
+		t.Fatalf("cron came back as %q", cron)
+	}
+}

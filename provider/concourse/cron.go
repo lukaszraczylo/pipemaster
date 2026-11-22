@@ -49,9 +49,6 @@ func scheduleSource(cron string) (map[string]any, bool) {
 	if !mok || !hok {
 		return nil, false
 	}
-	if minute == 0 && hour == 0 {
-		return src, true
-	}
 	end := hour*minutesInHour + minute + windowMinutes
 	// The resource tests the weekday of the check time, not of the start, so a window past midnight loses its
 	// part on the next day; time-resource lord/time_lord.go daysMatch.

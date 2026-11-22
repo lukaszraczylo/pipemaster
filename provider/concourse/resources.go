@@ -334,7 +334,9 @@ func (b *pipeBuilder) timeTrigger(r *resource) sourceTrigger {
 	}
 	b.note(caps.TriggerSchedule, caps.Emulated, b.path(), "approximate cron",
 		fmt.Sprintf("time resource %s becomes the approximate cron %q; Concourse counts the interval from the last version, cron counts from the clock", r.name, cron), r.line)
-	return sourceTrigger{trig: ir.Trigger{Kind: ir.TriggerSchedule, Cron: cron, Ext: resourceExt(r.name)}}
+	ext := resourceExt(r.name)
+	ext[dialect].(map[string]any)[ExtCron] = cron
+	return sourceTrigger{trig: ir.Trigger{Kind: ir.TriggerSchedule, Cron: cron, Ext: ext}}
 }
 
 func timeCron(interval string, days []string) (string, bool) {
