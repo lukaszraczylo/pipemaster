@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/expr"
-	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/expr/internal/shguard"
 )
 
@@ -15,57 +14,39 @@ const GuardMarker = shguard.Marker
 var ErrNotGuardable = shguard.ErrNotGuardable
 
 const (
-	envCtx    = "PM_CTX_"
-	envInput  = "PM_INPUT_"
-	envMatrix = "PM_MATRIX_"
-	envNeeds  = "PM_NEEDS_"
-	envSplit  = "__"
+	envNeeds = "PM_NEEDS_"
+	envSplit = "__"
 )
 
 // EnvVar is a step env entry that a guard reads: the step sets Name to Value, a Tekton variable.
-type EnvVar struct{ Name, Value string }
+type EnvVar = shguard.EnvVar
 
 // EnvName gives the step env name that holds a ref. The name inverts only for lowercase dash-separated
 // param names, so another name has no env name and no guard.
 func EnvName(r expr.Ref) (string, bool) {
-	if p, ok := ctxparam.Param(r.Path); ok {
-		return envCtx + upperUnder(strings.TrimPrefix(p, ctxparam.Prefix)), true
+	if n, ok := shguard.BaseEnvName(r); ok {
+		return n, true
 	}
-	switch {
-	case len(r.Path) == 2 && r.Path[0] == expr.PrefixInputs && dashName.MatchString(r.Path[1]):
-		return envInput + upperUnder(r.Path[1]), true
-	case len(r.Path) == 2 && r.Path[0] == expr.PrefixMatrix && dashName.MatchString(r.Path[1]):
-		return envMatrix + upperUnder(r.Path[1]), true
-	case len(r.Path) == 4 && r.Path[0] == expr.PrefixNeeds && r.Path[2] == "outputs" &&
-		validTask(r.Path[1]) && dashJobName.MatchString(r.Path[1]) && dashName.MatchString(r.Path[3]):
-		return envNeeds + upperUnder(r.Path[1]) + envSplit + upperUnder(r.Path[3]), true
+	if len(r.Path) == 4 && r.Path[0] == expr.PrefixNeeds && r.Path[2] == "outputs" &&
+		validTask(r.Path[1]) && dashJobName.MatchString(r.Path[1]) && shguard.DashName.MatchString(r.Path[3]) {
+		return envNeeds + shguard.UpperUnder(r.Path[1]) + envSplit + shguard.UpperUnder(r.Path[3]), true
 	}
 	return "", false
 }
 
 // EnvRef inverts EnvName.
 func EnvRef(name string) (expr.Ref, bool) {
-	if rest, ok := strings.CutPrefix(name, envCtx); ok && underName.MatchString(rest) {
-		path, ok := ctxparam.Ref(ctxparam.Prefix + lowerDash(rest))
-		return expr.Ref{Path: path}, ok
-	}
-	for prefix, family := range map[string]string{envInput: expr.PrefixInputs, envMatrix: expr.PrefixMatrix} {
-		if rest, ok := strings.CutPrefix(name, prefix); ok && underName.MatchString(rest) {
-			return expr.Ref{Path: []string{family, lowerDash(rest)}}, true
-		}
+	if r, ok := shguard.BaseEnvRef(name); ok {
+		return r, true
 	}
 	if rest, ok := strings.CutPrefix(name, envNeeds); ok {
 		job, res, found := strings.Cut(rest, envSplit)
-		if found && underJob.MatchString(job) && underName.MatchString(res) {
-			return expr.Ref{Path: []string{expr.PrefixNeeds, lowerDash(job), "outputs", lowerDash(res)}}, true
+		if found && underJob.MatchString(job) && shguard.UnderName.MatchString(res) {
+			return expr.Ref{Path: []string{expr.PrefixNeeds, shguard.LowerDash(job), "outputs", shguard.LowerDash(res)}}, true
 		}
 	}
 	return expr.Ref{}, false
 }
-
-func upperUnder(s string) string { return strings.ToUpper(strings.ReplaceAll(s, "-", "_")) }
-
-func lowerDash(s string) string { return strings.ToLower(strings.ReplaceAll(s, "_", "-")) }
 
 // noVariable refuses text that Tekton would rewrite: it substitutes $(...) in script text with no escape.
 func noVariable(lit string) bool { return !strings.Contains(lit, wordOpen) }
@@ -93,34 +74,4 @@ func RemoveGuard(script []string) ([]string, expr.Expr, bool) { return guardDial
 
 // GuardEnv lists the step env entries that the guard for e reads, in order of first use. It fails when a ref
 // has no env name or e holds no ref.
-func GuardEnv(e expr.Expr) ([]EnvVar, bool) {
-	var out []EnvVar
-	seen := map[string]bool{}
-	ok := true
-	var walk func(expr.Expr)
-	walk = func(e expr.Expr) {
-		switch v := e.(type) {
-		case expr.Unary:
-			walk(v.X)
-		case expr.Binary:
-			walk(v.L)
-			walk(v.R)
-		case expr.Ref:
-			name, nok := EnvName(v)
-			word, wok := RefWord(v)
-			if !nok || !wok {
-				ok = false
-				return
-			}
-			if !seen[name] {
-				seen[name] = true
-				out = append(out, EnvVar{Name: name, Value: word})
-			}
-		}
-	}
-	walk(e)
-	if !ok || len(out) == 0 {
-		return nil, false
-	}
-	return out, true
-}
+func GuardEnv(e expr.Expr) ([]EnvVar, bool) { return shguard.EnvVars(e, EnvName, RefWord) }

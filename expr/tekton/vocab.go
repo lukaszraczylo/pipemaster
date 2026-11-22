@@ -27,11 +27,8 @@ const (
 var (
 	paramName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
 	// dnsLabel is a Kubernetes object or Tekton task name.
-	dnsLabel = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
-	// dashName is a lowercase name whose dash maps to an underscore and back without loss.
-	dashName    = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
+	dnsLabel    = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 	dashJobName = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
-	underName   = regexp.MustCompile(`^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$`)
 	underJob    = regexp.MustCompile(`^[A-Z0-9]+(_[A-Z0-9]+)*$`)
 )
 
