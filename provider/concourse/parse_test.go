@@ -1,6 +1,7 @@
 package concourse_test
 
 import (
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
@@ -588,5 +589,27 @@ func TestVarInRunIsKeptNotScripted(t *testing.T) {
 				t.Error("no entry for the var in run")
 			}
 		})
+	}
+}
+
+func TestSecretNameConvention(t *testing.T) {
+	secret := []string{"deploy-token", "DB_PASSWORD", "gh-pat", "ghPat", "aws_creds", "creds", "tls-cert", "oauth", "auth", "api_key",
+		"signing-key", "signing", "pwd", "db-pass", "pass", "private-thing", "my-credential", "client-secret", "passphrase", "sshKey"}
+	plainNames := []string{"region", "path", "patch", "author", "bypass", "passed", "environment", "cluster"}
+	body := ""
+	for i, n := range append(append([]string{}, secret...), plainNames...) {
+		body += fmt.Sprintf("      P%d: ((%s))\n", i, n)
+	}
+	pl, _ := parseYAML(t, oneJob("  - task: t\n    params:\n"+body+"    config: {platform: linux, run: {path: ls}}\n"))
+	s := step(t, job(t, pl, "build"), "t")
+	got := map[string]ir.Value{}
+	for _, v := range s.Env {
+		got[v.Name] = v.Value
+	}
+	for i, n := range append(append([]string{}, secret...), plainNames...) {
+		isSecret := got[fmt.Sprintf("P%d", i)].Kind == ir.ValueSecret
+		if want := i < len(secret); isSecret != want {
+			t.Errorf("%s: secret=%v, want %v", n, isSecret, want)
+		}
 	}
 }

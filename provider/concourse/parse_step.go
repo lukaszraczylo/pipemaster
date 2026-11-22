@@ -17,10 +17,14 @@ import (
 var kindKeys = []string{"get", "put", "task", "run", "set_pipeline", "load_var", "try", "do", "in_parallel"}
 
 var (
-	wholeVar    = regexp.MustCompile(`^\(\(([A-Za-z_][A-Za-z0-9_-]*)\)\)$`)
-	identVar    = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
-	secretWords = []string{"secret", "password", "passwd", "token", "key", "credential", "private"}
-	shells      = map[string]bool{"sh": true, "bash": true, "dash": true, "ash": true, "zsh": true}
+	wholeVar = regexp.MustCompile(`^\(\(([A-Za-z_][A-Za-z0-9_-]*)\)\)$`)
+	identVar = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	// secretWords mark a secret when they appear anywhere in a name; secretSegments only as a whole segment, so
+	// that "path" and "author" stay plain.
+	secretWords    = []string{"secret", "password", "passwd", "passphrase", "token", "key", "credential", "private", "signing"}
+	secretSegments = map[string]bool{"pat": true, "pwd": true, "pass": true, "auth": true, "oauth": true, "cert": true, "creds": true, "cred": true}
+	camelBoundary  = regexp.MustCompile(`([a-z0-9])([A-Z])`)
+	shells         = map[string]bool{"sh": true, "bash": true, "dash": true, "ash": true, "zsh": true}
 )
 
 // step reads one plan step. A step that the IR cannot model becomes one plugin step that keeps it verbatim.
@@ -440,6 +444,12 @@ func secretName(name string) bool {
 	l := strings.ToLower(name)
 	for _, w := range secretWords {
 		if strings.Contains(l, w) {
+			return true
+		}
+	}
+	split := camelBoundary.ReplaceAllString(name, "$1-$2")
+	for _, seg := range strings.FieldsFunc(strings.ToLower(split), func(r rune) bool { return r == '-' || r == '_' || r == '.' }) {
+		if secretSegments[seg] {
 			return true
 		}
 	}
