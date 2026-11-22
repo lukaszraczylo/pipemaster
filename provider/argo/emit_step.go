@@ -97,7 +97,7 @@ func (tc *jobCtx) stepScripts(sc *stepScope, path string, st *ir.Step) []string 
 		lines[i], why[i] = out, w
 	}
 	keep := emitkit.DropLost(st.Script, why, func(detail, text string) {
-		tc.e.lose(path, caps.StepScript, detail)
+		tc.e.lose(path, caps.ScriptInterpolation, detail)
 		tc.e.comment(path, "script "+path+": "+text)
 	})
 	var out []string
