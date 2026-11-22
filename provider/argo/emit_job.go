@@ -126,7 +126,7 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (jobOut, error) {
 	if cond.disabled {
 		e.markDisabled(j, path)
 	}
-	e.jobFeatures(tc, jx)
+	e.jobFeatures(tc)
 
 	sx := &stepCtx{tc: tc, taken: map[string]bool{}, takenIn: map[string]bool{}, dests: map[string]bool{}}
 	sx.needArtifacts()
@@ -174,7 +174,7 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (jobOut, error) {
 }
 
 // jobFeatures reports the job fields that Argo has no form for.
-func (e *emitter) jobFeatures(tc *jobCtx, jx map[string]any) {
+func (e *emitter) jobFeatures(tc *jobCtx) {
 	j, path := tc.jp.j, tc.jp.path
 	if j.Environment != nil && !j.Environment.Approval || (j.Environment != nil && (j.Environment.Name != "" || j.Environment.URL != "")) {
 		e.lose(path, caps.JobEnvironment, "Argo has no environment name or URL; they stay in a comment marker only")
