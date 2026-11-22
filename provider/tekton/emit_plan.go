@@ -29,6 +29,8 @@ type plan struct {
 	byID map[string]*jobPlan
 	// inputs maps an IR input name to its Pipeline param name.
 	inputs map[string]string
+	// renamed maps a Pipeline param that an input was renamed to back to the IR input name.
+	renamed map[string]string
 	// ctx names the reserved ctx-* params that some task reads.
 	ctx  map[string]bool
 	name string
@@ -106,6 +108,10 @@ func (e *emitter) planInputs(pp *plan) {
 		name := unique(taken, base, maxName)
 		pp.inputs[in.Name] = name
 		if name != in.Name {
+			if pp.renamed == nil {
+				pp.renamed = map[string]string{}
+			}
+			pp.renamed[name] = in.Name
 			e.emulate(pp.path, caps.PipelineInputs, "input renamed",
 				"input "+in.Name+" is written as param "+name+" because the name is reserved for context, invalid or taken")
 		}

@@ -9,6 +9,8 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 const pacPrefix = "pipelinesascode.tekton.dev/"
@@ -55,7 +57,8 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 		k.vals["description"] = plain(v)
 	}
 	p.metadata(src, k)
-	if err := p.params(pl, k, r); err != nil {
+	renames, err := p.params(pl, k, r, readInputNames(src.doc.head, id))
+	if err != nil {
 		return nil, err
 	}
 	pipeWS, hasWS := r.take("workspaces")
@@ -72,6 +75,7 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 	if err := c.jobs(pl, tasks, finally); err != nil {
 		return nil, fmt.Errorf("%s: %w", src.doc.file, err)
 	}
+	emitkit.RewriteInputRefs(pl, renames)
 	if envVars != nil && !c.envBad {
 		pl.Env = envVars
 	}
@@ -132,30 +136,53 @@ func (p *project) metadata(src *pipeSrc, k *sink) {
 	}
 }
 
+// readInputNames reads the names that the emitter gave to inputs it had to rename.
+func readInputNames(head, id string) map[string]string {
+	var a inputsArg
+	if !readMarks(head).arg(caps.PipelineInputs, "pipeline/"+id, &a) {
+		return nil
+	}
+	return a.Names
+}
+
 // params maps the pipeline params to inputs. A ctx-* param is the context vocabulary and maps to nothing.
-func (p *project) params(pl *ir.Pipeline, k *sink, r *reader) error {
+// names maps the params that the emitter renamed to their input names; the result holds the renames that apply.
+func (p *project) params(pl *ir.Pipeline, k *sink, r *reader, names map[string]string) (map[string]string, error) {
 	v, ok := r.take("params")
 	if !ok {
-		return nil
+		p.staleInputNames(k, names, nil)
+		return nil, nil
 	}
 	list, ok := v.([]any)
 	if !ok {
-		return fmt.Errorf("spec.params must be a list")
+		return nil, fmt.Errorf("spec.params must be a list")
 	}
 	extra := &omap{vals: map[string]any{}, lines: map[string]int{}}
+	have := map[string]bool{}
+	for _, e := range list {
+		if m, ok := asMap(e); ok {
+			n, _ := text(m.vals["name"])
+			have[n] = true
+		}
+	}
+	renames := map[string]string{}
 	for i, e := range list {
 		m, ok := asMap(e)
 		if !ok {
-			return fmt.Errorf("param %d must be a mapping", i+1)
+			return nil, fmt.Errorf("param %d must be a mapping", i+1)
 		}
 		name, _ := text(m.vals["name"])
 		if name == "" {
-			return fmt.Errorf("param %d needs a name", i+1)
+			return nil, fmt.Errorf("param %d needs a name", i+1)
 		}
 		if _, ctx := exprtekton.CtxRef(name); ctx {
 			continue
 		}
 		in := ir.Input{Name: name}
+		if orig, ok := names[name]; ok && !have[orig] {
+			in.Name = orig
+			renames[name] = orig
+		}
 		pr := newReader(m)
 		pr.take("name")
 		if t, ok := textOf(pr.take("type")); ok {
@@ -173,7 +200,7 @@ func (p *project) params(pl *ir.Pipeline, k *sink, r *reader) error {
 		in.Required = !hasDef
 		if rest := pr.rest(); len(rest) > 0 {
 			sub := m.subset(rest)
-			extra.set(name, sub, m.lines[name])
+			extra.set(in.Name, sub, m.lines[name])
 			k.note(caps.PipelineInputs, "param "+name+": key "+strings.Join(rest, ", ")+" has no IR field; kept in Ext", m.lines[name])
 		}
 		pl.Inputs = append(pl.Inputs, in)
@@ -181,7 +208,20 @@ func (p *project) params(pl *ir.Pipeline, k *sink, r *reader) error {
 	if len(extra.keys) > 0 {
 		k.vals["params"] = plain(extra)
 	}
-	return nil
+	p.staleInputNames(k, names, renames)
+	return renames, nil
+}
+
+// staleInputNames reports each renamed param that the file no longer holds as the marker says.
+func (p *project) staleInputNames(k *sink, names, applied map[string]string) {
+	for _, param := range sortedKeys(names) {
+		if _, ok := applied[param]; !ok {
+			p.rep.Add(report.Entry{
+				IRPath: k.path, Feature: caps.PipelineInputs, Level: caps.Lost, Strategy: "marker ignored",
+				Detail: "marker ignored: the param " + param + " was edited after pipemaster wrote it; the file content is kept", SourceLoc: k.file,
+			})
+		}
+	}
 }
 
 // copiedEnv reads the pipeline env that the marker holds; the jobs check it against their stepTemplate.

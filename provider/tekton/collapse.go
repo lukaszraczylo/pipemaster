@@ -45,6 +45,11 @@ type envArg struct {
 	Env string `json:"env"`
 }
 
+// inputsArg maps each Pipeline param that the emitter renamed to the name of the IR input.
+type inputsArg struct {
+	Names map[string]string `json:"names"`
+}
+
 // copiedArg names the pipeline variables that a Task holds in its stepTemplate env.
 type copiedArg struct {
 	Names []string `json:"names"`

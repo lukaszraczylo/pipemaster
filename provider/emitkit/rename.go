@@ -13,23 +13,29 @@ var plainName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
 
 // RewriteNeedsRefs renames the job ids that `needs.<id>` references name, in place, across every expression
 // reference and every ${{ }} part of a string under v. All renames apply at once, so swapped ids stay correct. v must be a pointer.
-func RewriteNeedsRefs(v any, renames map[string]string) {
+func RewriteNeedsRefs(v any, renames map[string]string) { rewriteRefs(v, expr.PrefixNeeds, renames) }
+
+// RewriteInputRefs renames the inputs that `inputs.<name>` references name, with the rules of RewriteNeedsRefs.
+func RewriteInputRefs(v any, renames map[string]string) { rewriteRefs(v, expr.PrefixInputs, renames) }
+
+func rewriteRefs(v any, prefix string, renames map[string]string) {
 	if len(renames) == 0 {
 		return
 	}
-	rw := &refRewriter{renames: renames}
+	rw := &refRewriter{renames: renames, prefix: prefix}
 	olds := make([]string, 0, len(renames))
 	for o := range renames {
 		olds = append(olds, regexp.QuoteMeta(o))
 	}
 	sort.Slice(olds, func(i, j int) bool { return len(olds[i]) > len(olds[j]) })
-	rw.re = regexp.MustCompile(`\bneeds(\.|\[['"])(` + strings.Join(olds, "|") + `)(['"]\]|[^A-Za-z0-9_'"-]|$)`)
+	rw.re = regexp.MustCompile(`\b`+prefix+`(\.|\[['"])(` + strings.Join(olds, "|") + `)(['"]\]|[^A-Za-z0-9_'"-]|$)`)
 	rw.walk(reflect.ValueOf(v))
 }
 
 type refRewriter struct {
 	re      *regexp.Regexp
 	renames map[string]string
+	prefix  string
 }
 
 var templateExpr = regexp.MustCompile(`\$\{\{.*?\}\}`)
@@ -50,7 +56,7 @@ func (r *refRewriter) expression(s string) string {
 			// An id that is not a name can only be written in bracket form.
 			open, tail = "['", "']"+tail
 		}
-		return "needs" + open + id + tail
+		return r.prefix + open + id + tail
 	})
 }
 
@@ -99,7 +105,7 @@ func (r *refRewriter) walk(v reflect.Value) {
 }
 
 func (r *refRewriter) ref(ref *expr.Ref) {
-	if len(ref.Path) > 1 && ref.Path[0] == expr.PrefixNeeds {
+	if len(ref.Path) > 1 && ref.Path[0] == r.prefix {
 		if n, ok := r.renames[ref.Path[1]]; ok {
 			p := append([]string(nil), ref.Path...)
 			p[1] = n

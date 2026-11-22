@@ -72,6 +72,11 @@ func (e *emitter) pipeline(pp *plan) error {
 			return err
 		}
 	}
+	if len(pp.renamed) > 0 {
+		if err := e.markArg(caps.PipelineInputs, pp.path, inputsArg{Names: pp.renamed}); err != nil {
+			return err
+		}
+	}
 	var tasks, finally []*yaml.Node
 	for _, jp := range pp.jobs {
 		pt, err := e.job(pp, jp)

@@ -269,3 +269,32 @@ func TestAdmissionCheckRunsOnCorpusLikeOutput(t *testing.T) {
 	files, _ := identityOf(t, map[string]string{"p.yaml": structuredParams})
 	admission(t, files)
 }
+
+// An input named like a reserved context param is written under another name and comes back under its own.
+func TestRenamedInputKeepsItsNameOnTheWayBack(t *testing.T) {
+	j := scriptJob("a", "echo ${{ inputs.ctx-branch }}")
+	p := project(j)
+	p.Pipelines[0].Inputs = []ir.Input{{Name: "ctx-branch", Default: "x"}, {Name: "bad name", Default: "y"}}
+	files, _ := emit(t, p)
+	if !strings.Contains(joinFiles(files), "input-ctx-branch") {
+		t.Fatalf("the input was not renamed:\n%s", joinFiles(files))
+	}
+	back, rep := reparse(t, files)
+	if same, diff := ir.Equal(p, back); !same {
+		t.Fatalf("round trip differs:\n%s", diff)
+	}
+	if hasEntry(rep, "marker ignored") {
+		t.Fatalf("unexpected: %v", rep.Entries)
+	}
+}
+
+func TestEditedRenamedInputIsKept(t *testing.T) {
+	p := project(scriptJob("a", "true"))
+	p.Pipelines[0].Inputs = []ir.Input{{Name: "ctx-branch", Default: "x"}}
+	files, _ := emit(t, p)
+	files[".tekton/pipeline.yaml"] = strings.Replace(files[".tekton/pipeline.yaml"], "name: input-ctx-branch", "name: mine", 1)
+	back, _ := reparse(t, files)
+	if got := back.Pipelines[0].Inputs[0].Name; got != "mine" {
+		t.Fatalf("input name = %q", got)
+	}
+}
