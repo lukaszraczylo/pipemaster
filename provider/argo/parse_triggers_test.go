@@ -257,3 +257,15 @@ func TestSensorWithNoMappedTriggerKeepsTheWholeDocuments(t *testing.T) {
 		t.Fatalf("resources %d triggers %v", len(res), p.Pipelines[0].Triggers)
 	}
 }
+
+func TestSensorTriggerThatIsNotACreateNeverStartsThePipeline(t *testing.T) {
+	for _, op := range []string{"delete", "patch", "update", "submit", "resubmit", "retry", "resume", "suspend", "terminate", "stop"} {
+		t.Run(op, func(t *testing.T) {
+			run := strings.Replace(runCI, "operation: create", "operation: "+op, 1)
+			trs, entries := triggersOf(t, map[string]string{"es.yaml": eventSource, "s.yaml": sensor(dep("      - {path: headers.X-Github-Event, type: string, value: [\"push\"]}\n"), run)})
+			if len(trs) != 0 || !strings.Contains(entries, "operation "+op) {
+				t.Fatalf("triggers %+v entries %s", trs, entries)
+			}
+		})
+	}
+}

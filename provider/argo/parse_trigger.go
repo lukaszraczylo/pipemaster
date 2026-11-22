@@ -219,17 +219,36 @@ func triggerCopy(d *rawDoc, unmapped []any) *rawDoc {
 	return &cp
 }
 
-// workflowOf finds the Workflow manifest that a trigger creates.
-func workflowOf(m *omap) *omap {
+// triggerWorkflow is the Workflow manifest that a Sensor trigger carries, with how the trigger acts on it.
+type triggerWorkflow struct {
+	res *omap
+	// kind is the trigger type: k8s or argoWorkflow.
+	kind string
+	// op is the operation of the trigger.
+	op string
+}
+
+// creates is true when the trigger starts a new run: only the k8s create operation does.
+func (w triggerWorkflow) creates() bool { return w.kind == triggerK8s && w.op == opCreate }
+
+const (
+	triggerK8s = "k8s"
+	opCreate   = "create"
+)
+
+// workflowOf finds the Workflow manifest that a trigger carries.
+func workflowOf(m *omap) (triggerWorkflow, bool) {
 	tm, _ := asMap(m.Vals["template"])
-	for _, key := range []string{"k8s", "argoWorkflow"} {
-		src, _ := asMap(valueOf(asMapOr(valueOf(tm, key)), "source"))
+	for _, key := range []string{triggerK8s, "argoWorkflow"} {
+		body := asMapOr(valueOf(tm, key))
+		src, _ := asMap(valueOf(body, "source"))
 		res, ok := asMap(valueOf(src, "resource"))
 		if k, _ := text(valueOf(res, "kind")); ok && k == kindWorkflow {
-			return res
+			op, _ := text(valueOf(body, "operation"))
+			return triggerWorkflow{res: res, kind: key, op: op}, true
 		}
 	}
-	return nil
+	return triggerWorkflow{}, false
 }
 
 func asMapOr(v any) *omap {
@@ -259,13 +278,20 @@ func (t sensorTrigger) depsOf() ([]string, bool) {
 
 // sensorTrigger adds the triggers of one Sensor trigger to its pipeline. It reports whether it found a pipeline.
 func (p *project) sensorTrigger(t sensorTrigger, byName map[string]*ir.Pipeline) bool {
-	wf := workflowOf(t.m)
-	wspec, _ := asMap(valueOf(wf, "spec"))
+	wf, found := workflowOf(t.m)
+	wspec, _ := asMap(valueOf(wf.res, "spec"))
 	pl := byName[refName(wspec)]
-	if pl == nil {
+	if !found || pl == nil {
 		return false
 	}
 	tname, _ := text(valueOf(asMapOr(t.m.Vals["template"]), "name"))
+	if !wf.creates() {
+		p.rep.Add(report.Entry{
+			IRPath: "pipeline/" + pl.ID + "/trigger/" + t.name, Feature: caps.TriggerAPI, Level: caps.Lost, Strategy: "kept in Ext[" + dialect + "]", SourceLoc: t.doc.Loc(0),
+			Detail: "Sensor trigger " + tname + " has trigger type " + wf.kind + " and operation " + wf.op + ", which does not start a run; it maps to no trigger and stays in Ext",
+		})
+		return false
+	}
 	k := newSink(p.rep, t.doc.File, "pipeline/"+pl.ID+"/trigger/"+t.name)
 	k.Keep("trigger", t.m, caps.ExtPassthrough, "Sensor trigger "+tname+" (parameters, policy, the Workflow manifest) has no IR field; kept in Ext", t.doc.Line)
 	sensor := map[string]any{"name": t.name}
