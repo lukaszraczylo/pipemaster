@@ -8,6 +8,7 @@ import (
 	exprargo "github.com/lukaszraczylo/pipemaster/expr/argo"
 	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 // varsArg lists the shell variables that the emitter read in place of an expression, with the reference of each.
@@ -153,12 +154,31 @@ func (b *jobBuilder) outputValues() {
 		}
 		env := outputEnv(o.Name)
 		for j, v := range st.Env {
-			if v.Name == env && v.Value.Kind == ir.ValueLit {
-				o.Value = v.Value.Lit
+			if text, ok := outputText(v.Value); v.Name == env && ok {
+				o.Value = text
 				st.Env = append(st.Env[:j], st.Env[j+1:]...)
 				st.Script = st.Script[:n-1]
 				break
 			}
 		}
 	}
+}
+
+// outputText is the text of an output value that the emitter wrote as an env value: a literal, or text around
+// references in the script template form.
+func outputText(v ir.Value) (string, bool) {
+	switch v.Kind {
+	case ir.ValueLit:
+		return v.Lit, true
+	case ir.ValueExpr:
+		parts := []expr.Part{{Expr: v.Expr}}
+		if c, ok := v.Expr.(expr.Call); ok {
+			if p, ok := emitkit.UnmixFormat(c); ok {
+				parts = p
+			}
+		}
+		text, err := expr.PrintScriptTemplate(parts)
+		return text, err == nil
+	}
+	return "", false
 }
