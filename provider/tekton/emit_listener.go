@@ -187,7 +187,7 @@ func (e *emitter) pipelineTriggers(pp *plan, crons *[]*outDoc) (binding, templat
 			}
 			continue
 		}
-		l := e.listenerFor(kindEventListenerName)
+		l := e.listenerFor(generatedListenerName(t.Kind))
 		l.sa = triggersAccount
 		e.generatedListener = true
 		e.owners[path] = l.doc
@@ -455,4 +455,12 @@ func (e *emitter) generatedInterceptors(pp *plan, g *sourceGroup) []*yaml.Node {
 		}
 	}
 	return ics
+}
+
+// generatedListenerName is the EventListener that the emitter writes the entry of a trigger kind to.
+func generatedListenerName(k ir.TriggerKind) string {
+	if k == ir.TriggerSchedule {
+		return scheduleListenerName
+	}
+	return kindEventListenerName
 }

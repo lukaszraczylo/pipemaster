@@ -24,6 +24,7 @@ const (
 	refHeads          = "refs/heads/"
 	refTags           = "refs/tags/"
 	prActionsExpr     = "body.action in ['opened','synchronize','reopened']"
+	prSameRepoExpr    = "body.pull_request.head.repo.full_name == body.repository.full_name"
 	changedFilesExpr  = "(extensions.changed_files.added + extensions.changed_files.modified + extensions.changed_files.removed)"
 	utcZone           = "Etc/UTC"
 	cronContainerName = "trigger"
@@ -110,7 +111,7 @@ func celFilter(a filterArg) (string, bool) {
 			return "", false
 		}
 	case ir.TriggerPR:
-		conds = append(conds, prActionsExpr)
+		conds = append(conds, prActionsExpr, prSameRepoExpr)
 		if !branch("body.pull_request.base.ref") {
 			return "", false
 		}
@@ -293,6 +294,10 @@ func (e *emitter) eventTrigger(pp *plan, i int, path string, t ir.Trigger, ctxs 
 	sec.setStr("secretName", githubSecretName)
 	sec.setStr("secretKey", githubSecretKey)
 	gh = append(gh, nameNode(paramSecretRef, sec.n))
+	if t.Kind == ir.TriggerPR {
+		e.note(path, caps.TriggerPullRequest, caps.Emulated, "same-repository pull requests only",
+			"the filter admits only pull requests from this repository, because the code of a fork would run with every secret of the Task; GitHub Actions withholds secrets from fork runs. Remove the head.repo term of the filter to accept forks")
+	}
 	e.note(path, kindFeature[t.Kind], caps.External, "Secret "+githubSecretName,
 		"create the Secret "+githubSecretName+" with key "+githubSecretKey+" holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign")
 	return e.triggerEntry(tn, t.Kind, filter, gh, ctxs, bname, tname), nil
@@ -431,7 +436,7 @@ func (e *emitter) scheduleTrigger(pp *plan, n int, path string, t ir.Trigger, ct
 	jname := pp.name + "-schedule-" + strconv.Itoa(n)
 	jname = fit(jname, jname, cronNameMax)
 	e.emulate(path, caps.TriggerSchedule, "CronJob posting to the EventListener",
-		"CronJob "+jname+" posts to el-"+kindEventListenerName+" in namespace "+listenerNamespace+"; deploy both in that namespace, or edit the host. The run has an empty ctx-repo because the post carries no repository. The listener entry matches only the X-Pipemaster-Schedule header, so any caller in the cluster can start a run; restrict the listener with a NetworkPolicy or add a shared-secret header")
+		"CronJob "+jname+" posts to el-"+scheduleListenerName+" in namespace "+listenerNamespace+"; deploy both in that namespace, or edit the host. The post has an empty body, so every ctx-* param is empty and a clone step has no repository. The entry matches only the "+scheduleHeader+" header, so any pod that reaches the service of listener "+scheduleListenerName+" can start a run. The listener has no Ingress, and the webhook listener "+kindEventListenerName+" does not take schedule entries. Do not expose "+scheduleListenerName+", and limit it with a NetworkPolicy that admits only the CronJob pods")
 	e.mark(caps.TriggerSchedule, path)
 	if e.keptEntries[jname] {
 		return nil, cronJobDoc(jname, t.Cron, tag), nil
@@ -451,7 +456,7 @@ func cronJobDoc(jname, cron, tag string) *outDoc {
 	c := newMap()
 	c.setStr("name", cronContainerName)
 	c.setStr("image", curlImage)
-	url := "http://el-" + kindEventListenerName + "." + listenerNamespace + ".svc.cluster.local:" + listenerPort
+	url := "http://el-" + scheduleListenerName + "." + listenerNamespace + ".svc.cluster.local:" + listenerPort
 	c.set("args", strSeq([]string{"-sS", "--fail", "-X", "POST", "-H", "Content-Type: application/json", "-H", scheduleHeader + ": " + tag, "-d", "{}", url}))
 	pod := newMap()
 	pod.setStr("restartPolicy", "Never")

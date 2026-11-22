@@ -1,6 +1,6 @@
 # Pinned versions
 
-These versions were verified on 2026-11-19. The Gitea, Forgejo, Woodpecker, Drone and Tekton dialects follow them.
+These versions were verified on 2026-11-19. The Tekton Pipelines, Tekton Triggers and kubeconform rows were verified on 2026-11-21. The Gitea, Forgejo, Woodpecker, Drone and Tekton dialects follow them.
 
 | Product | Version | Date |
 | --- | --- | --- |
@@ -13,9 +13,9 @@ These versions were verified on 2026-11-19. The Gitea, Forgejo, Woodpecker, Dron
 | Drone server | v2.28.2 | 2026-04-20 |
 | Drone docker runner | v1.8.5 | |
 | drone-cli | v1.9.0 | |
-| Tekton Pipelines | v1.18.0 | |
-| Tekton Triggers | v0.38.0 | |
-| kubeconform | v0.8.0 | |
+| Tekton Pipelines | v1.18.0 | 2026-10-29 |
+| Tekton Triggers | v0.38.0 | 2026-11-09 |
+| kubeconform | v0.8.0 | 2026-06-04 |
 
 ## Sources
 

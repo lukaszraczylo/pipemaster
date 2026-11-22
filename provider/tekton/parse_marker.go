@@ -361,7 +361,7 @@ func (p *project) dropGenerated() {
 }
 
 // pruneGenerated removes the Ext keys that equal what the emitter writes for a trigger it restored.
-func pruneGenerated(vals map[string]any, trigger, pipeline string) {
+func pruneGenerated(vals map[string]any, trigger, pipeline, listener string) {
 	same := func(key string, want any) {
 		if a, err := json.Marshal(vals[key]); err == nil {
 			if b, err := json.Marshal(want); err == nil && string(a) == string(b) {
@@ -369,7 +369,7 @@ func pruneGenerated(vals map[string]any, trigger, pipeline string) {
 			}
 		}
 	}
-	same("listener", kindEventListenerName)
+	same("listener", listener)
 	same("name", trigger)
 	same("template", fit(pipeline+templateNameSuffix, pipeline+templateNameSuffix, maxName))
 	same("bindings", []any{map[string]any{"ref": fit(pipeline+bindingNameSuffix, pipeline+bindingNameSuffix, maxName)}})

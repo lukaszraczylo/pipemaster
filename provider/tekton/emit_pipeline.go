@@ -13,7 +13,10 @@ import (
 
 const (
 	kindEventListenerName = "pipemaster"
-	pipelineKey           = "Pipeline"
+	// scheduleListenerName is the EventListener of the schedule entries. It has no GitHub signature check, so the
+	// webhook listener, which GitHub must reach from outside the cluster, does not hold them.
+	scheduleListenerName = kindEventListenerName + "-schedule"
+	pipelineKey          = "Pipeline"
 )
 
 // project writes every pipeline, then the triggers and the kept resources.

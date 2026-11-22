@@ -221,7 +221,7 @@ func (p *project) trigger(lt listenerTrigger, byName map[string]*ir.Pipeline) bo
 	switch {
 	case restored != nil && restored.Kind == ir.TriggerSchedule:
 	case restored != nil:
-		pruneGenerated(k.vals, restored.Name, p.pipelineOf(tpl))
+		pruneGenerated(k.vals, restored.Name, p.pipelineOf(tpl), generatedListenerName(restored.Kind))
 		pl.Triggers = append(pl.Triggers, ir.Trigger{
 			Kind: restored.Kind, Branches: restored.Branches, Tags: restored.Tags, Paths: restored.Paths, Ext: extFrom(k.vals),
 		})
@@ -273,7 +273,7 @@ func (p *project) interceptors(lt listenerTrigger, k *sink, pipeline string) ([]
 		// The emitter names the entry after the CronJob; any other name is an edit.
 		name = scheduleEntryName(restored.Name, name)
 	}
-	if restored != nil && (extra || shape != want || p.editedAround(k, name, pipeline)) {
+	if restored != nil && (extra || shape != want || p.editedAround(k, name, pipeline, generatedListenerName(restored.Kind))) {
 		filter, _ := text(cel.params[paramFilter])
 		p.keepFilter(lt, k, *cel, filter, "marker ignored: the trigger was edited after pipemaster wrote it; ")
 		restored = nil
@@ -313,12 +313,12 @@ func (p *project) reportFilteredTrigger(lt listenerTrigger, pl *ir.Pipeline, kin
 }
 
 // editedAround reports whether the listener keys of a marked trigger differ from what the emitter writes.
-func (p *project) editedAround(k *sink, trigger, pipeline string) bool {
+func (p *project) editedAround(k *sink, trigger, pipeline, listener string) bool {
 	tmp := map[string]any{}
 	for key, v := range k.vals {
 		tmp[key] = v
 	}
-	pruneGenerated(tmp, trigger, pipeline)
+	pruneGenerated(tmp, trigger, pipeline, listener)
 	delete(tmp, "interceptors")
 	return len(tmp) > 0
 }

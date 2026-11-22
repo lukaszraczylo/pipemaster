@@ -24,7 +24,7 @@ spec:
             name: cel
           params:
             - name: filter
-              value: body.action in ['opened','synchronize','reopened'] && (body.pull_request.base.ref.matches(r'^main$'))
+              value: body.action in ['opened','synchronize','reopened'] && body.pull_request.head.repo.full_name == body.repository.full_name && (body.pull_request.base.ref.matches(r'^main$'))
       bindings:
         - ref: ci-github
       template:

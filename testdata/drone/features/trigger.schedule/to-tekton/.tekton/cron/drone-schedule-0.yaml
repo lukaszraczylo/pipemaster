@@ -25,4 +25,4 @@ spec:
                 - 'X-Pipemaster-Schedule: drone/0'
                 - -d
                 - '{}'
-                - http://el-pipemaster.default.svc.cluster.local:8080
+                - http://el-pipemaster-schedule.default.svc.cluster.local:8080

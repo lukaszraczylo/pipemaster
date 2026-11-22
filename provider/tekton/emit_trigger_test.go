@@ -164,7 +164,7 @@ func TestScheduleBecomesCronJob(t *testing.T) {
 	for _, a := range args {
 		joined += a.(string) + "\n"
 	}
-	for _, s := range []string{"X-Pipemaster-Schedule: ci/0", "http://el-pipemaster.default.svc.cluster.local:8080"} {
+	for _, s := range []string{"X-Pipemaster-Schedule: ci/0", "http://el-pipemaster-schedule.default.svc.cluster.local:8080"} {
 		if !strings.Contains(joined, s) {
 			t.Fatalf("args lack %q: %v", s, args)
 		}
@@ -295,5 +295,60 @@ func TestEditedGeneratedDocumentIsKept(t *testing.T) {
 				t.Fatalf("no marker ignored entry: %v", rep.Entries)
 			}
 		})
+	}
+}
+
+func listenerNames(t *testing.T, files map[string]string) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	for _, d := range docs(t, files[listenerFile]) {
+		if d["kind"] != "EventListener" {
+			continue
+		}
+		var entries []string
+		for _, tr := range list(get(d, "spec", "triggers")) {
+			entries = append(entries, get(tr, "name").(string))
+		}
+		out[get(d, "metadata", "name").(string)] = strings.Join(entries, ",")
+	}
+	return out
+}
+
+// The schedule entry has no GitHub signature, so it sits on its own listener that the webhook Ingress does not reach.
+func TestScheduleEntryHasItsOwnListener(t *testing.T) {
+	files, rep := emit(t, withTriggers(ir.Trigger{Kind: ir.TriggerPush}, ir.Trigger{Kind: ir.TriggerSchedule, Cron: "0 3 * * *"}))
+	got := listenerNames(t, files)
+	if got["pipemaster"] != "ci-push-0" || got["pipemaster-schedule"] != "ci-schedule-0" || len(got) != 2 {
+		t.Fatalf("listeners = %v", got)
+	}
+	if cron := joinFiles(files); !strings.Contains(cron, "el-pipemaster-schedule.default.svc") || strings.Contains(cron, "el-pipemaster.default.svc") {
+		t.Fatalf("the CronJob must post to the schedule listener:\n%s", cron)
+	}
+	e := entry(rep, caps.TriggerSchedule, "pipemaster-schedule")
+	if e == nil || !strings.Contains(e.Detail, "every ctx-* param is empty") || strings.Contains(e.Detail, "any caller in the cluster") {
+		t.Fatalf("schedule caveat = %+v", e)
+	}
+	back, brep := reparse(t, files)
+	if hasEntry(brep, "marker ignored") {
+		t.Fatalf("unexpected marker ignored: %v", brep.Entries)
+	}
+	if same, diff := ir.Equal(withTriggers(ir.Trigger{Kind: ir.TriggerPush}, ir.Trigger{Kind: ir.TriggerSchedule, Cron: "0 3 * * *"}), back); !same {
+		t.Fatalf("round trip differs:\n%s", diff)
+	}
+}
+
+// A pull request from a fork would run its code with every secret of the Task, so the filter admits only the repository itself.
+func TestPullRequestFilterRejectsForks(t *testing.T) {
+	files, rep := emit(t, withTriggers(ir.Trigger{Kind: ir.TriggerPR}))
+	if !strings.Contains(files[listenerFile], "body.pull_request.head.repo.full_name == body.repository.full_name") {
+		t.Fatalf("no fork gate:\n%s", files[listenerFile])
+	}
+	e := entry(rep, caps.TriggerPullRequest, "fork")
+	if e == nil {
+		t.Fatalf("no fork entry: %v", rep.Entries)
+	}
+	back, brep := reparse(t, files)
+	if hasEntry(brep, "marker ignored") || len(back.Pipelines[0].Triggers) != 1 || back.Pipelines[0].Triggers[0].Kind != ir.TriggerPR {
+		t.Fatalf("the gated filter must read back: %+v %v", back.Pipelines[0].Triggers, brep.Entries)
 	}
 }

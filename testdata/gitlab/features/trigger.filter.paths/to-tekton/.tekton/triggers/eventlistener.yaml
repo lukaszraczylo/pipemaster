@@ -29,7 +29,7 @@ spec:
             name: cel
           params:
             - name: filter
-              value: body.action in ['opened','synchronize','reopened'] && (extensions.changed_files.added + extensions.changed_files.modified + extensions.changed_files.removed).exists(f, !(f.matches(r'^.*\.md$')))
+              value: body.action in ['opened','synchronize','reopened'] && body.pull_request.head.repo.full_name == body.repository.full_name && (extensions.changed_files.added + extensions.changed_files.modified + extensions.changed_files.removed).exists(f, !(f.matches(r'^.*\.md$')))
       bindings:
         - ref: gitlab-ci-github
       template:
