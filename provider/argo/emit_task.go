@@ -63,6 +63,18 @@ func (e *emitter) finalDeps(tc *jobCtx, cond taskCond, jx map[string]any) deps {
 	return d
 }
 
+// dependsAtom matches one task of a depends expression, with the optional status after a dot.
+var dependsAtom = regexp.MustCompile(`([A-Za-z0-9_-]+)(?:\.[A-Za-z]+)?`)
+
+// dependsTasks lists the task names that a depends expression reads. A name that ends another name is no match.
+func dependsTasks(depends string) []string {
+	var out []string
+	for _, m := range dependsAtom.FindAllStringSubmatch(depends, -1) {
+		out = append(out, m[1])
+	}
+	return out
+}
+
 // exitDeps limits the dependencies of an exit handler task to the tasks of the exit handler. Argo runs the
 // handler after the whole entry DAG, and a DAG cannot name a task of another DAG.
 func (e *emitter) exitDeps(tc *jobCtx, d deps) deps {
@@ -84,7 +96,7 @@ func (e *emitter) exitDeps(tc *jobCtx, d deps) deps {
 		dropped = append(dropped, n)
 		return true
 	})
-	if d.depends != "" && slices.ContainsFunc(main, func(n string) bool { return strings.Contains(d.depends, n+".") }) {
+	if tasks := dependsTasks(d.depends); slices.ContainsFunc(main, func(n string) bool { return slices.Contains(tasks, n) }) {
 		dropped = append(dropped, "the depends expression "+d.depends)
 		d.depends = ""
 		for _, jp := range tc.pp.jobs {
