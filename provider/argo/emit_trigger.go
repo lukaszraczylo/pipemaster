@@ -84,6 +84,10 @@ func ownDoc(v any) docMap {
 // cron adds a schedule to the CronWorkflow of the trigger. A suspended CronWorkflow that an Argo file held
 // arrives as an api trigger with no cron; its other schedules keep it suspended.
 func (e *emitter) cron(pp *plan, i int, path string, tr ir.Trigger, x map[string]any) {
+	if tr.Kind == ir.TriggerSchedule && tr.Cron == "" {
+		e.lose(path, caps.TriggerSchedule, "the schedule has no cron expression, which a CronWorkflow needs; no CronWorkflow is written")
+		return
+	}
 	ev := e.events
 	cw, _ := x["cronWorkflow"].(map[string]any)
 	name, _ := cw["name"].(string)
