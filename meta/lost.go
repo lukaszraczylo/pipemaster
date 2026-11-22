@@ -274,10 +274,10 @@ func restoreJob(dst, src, em *ir.Job, keepEdits bool) bool {
 	return copyNonZero(dst, src, em, keepEdits)
 }
 
-// restoreStep also drops the placeholder script of an action step the emitter wrote as a script; an edited
+// restoreStep also drops the placeholder script of an action or task step the emitter wrote as a script; an edited
 // file keeps its script unless it still reads as emitted.
 func restoreStep(dst, src, em *ir.Step, keepEdits bool) bool {
-	if src.Action != nil && (!keepEdits || (em != nil && reflect.DeepEqual(dst.Script, em.Script))) {
+	if (src.Action != nil || src.Kind == ir.StepTask) && (!keepEdits || (em != nil && reflect.DeepEqual(dst.Script, em.Script))) {
 		dst.Script = nil
 	}
 	return copyNonZero(dst, src, em, keepEdits)

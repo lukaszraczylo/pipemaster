@@ -199,3 +199,15 @@ func TestKeepingEditsKeepsConditionAddedToDisabledStep(t *testing.T) {
 		})
 	}
 }
+
+// A lost task step comes back with no script: the target wrote a placeholder script for it.
+func TestRestoreDropsThePlaceholderScriptOfALostTaskStep(t *testing.T) {
+	src := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "ci", Jobs: []*ir.Job{{ID: "b", Steps: []*ir.Step{{ID: "c", Kind: ir.StepTask}}}}}}}
+	lost, _ := meta.CollectLost(src, []report.Entry{{IRPath: "pipeline/ci/job/b/step/c", Feature: caps.StepAction, Level: caps.Lost}})
+	parsed := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "ci", Jobs: []*ir.Job{{ID: "b", Steps: []*ir.Step{
+		{ID: "c", Kind: ir.StepScript, Script: []string{"true"}}}}}}}}
+	meta.Reattach(parsed, &meta.Meta{Lost: lost})
+	if got := parsed.Pipelines[0].Jobs[0].Steps[0]; got.Kind != ir.StepTask || got.Script != nil {
+		t.Errorf("step = kind %q script %v, want a task with no script", got.Kind, got.Script)
+	}
+}
