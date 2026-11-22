@@ -329,9 +329,25 @@ func (b *jobBuilder) collapseContainer() {
 		return
 	}
 	var img ir.Image
-	if yaml.Unmarshal([]byte(a.Image), &img) != nil || b.job.Container == nil || b.job.Container.Ref != cmp.Or(a.Written, img.Ref) {
+	if yaml.Unmarshal([]byte(a.Image), &img) != nil || !b.takeJobImage(cmp.Or(a.Written, img.Ref)) {
 		b.c.ignored(b.path, caps.JobContainer, "the job image was edited after pipemaster wrote the file; the file content is kept")
 		return
 	}
 	b.job.Container = &img
+}
+
+// takeJobImage is true when the file still runs the image that the job container gave. A setup action leaves
+// the job image on the containers before it only, so the parser reads it as a step image then.
+func (b *jobBuilder) takeJobImage(ref string) bool {
+	if c := b.job.Container; c != nil {
+		return c.Ref == ref
+	}
+	found := false
+	for _, st := range b.job.Steps {
+		if st.Image != nil && st.Image.Ref == ref && len(st.Image.Entrypoint) == 0 {
+			st.Image = nil
+			found = true
+		}
+	}
+	return found
 }
