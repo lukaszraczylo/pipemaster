@@ -72,7 +72,7 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 			p.classify(d)
 		}
 	}
-	if len(p.pipes) == 0 {
+	if len(p.pipes) == 0 && len(p.runs) == 0 {
 		return nil, rep, fmt.Errorf("argo: no workflow definition with templates found under %s/", dirName)
 	}
 	var pls []*ir.Pipeline
@@ -97,7 +97,11 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		}
 	}
 	if len(pls) == 0 {
-		return nil, rep, fmt.Errorf("argo: no workflow with an entrypoint found under %s/", dirName)
+		pl := p.libraryPipeline(libs)
+		if pl == nil {
+			return nil, rep, fmt.Errorf("argo: no workflow with an entrypoint found under %s/", dirName)
+		}
+		pls = append(pls, pl)
 	}
 	p.keepLibraries(libs)
 	p.runBindings(byName)
@@ -258,6 +262,33 @@ func listOf(v any) []any {
 }
 
 // keepLibraries keeps each library WorkflowTemplate in Ext, so its metadata and spec keys are not lost.
+// libraryID is the ID of the pipeline that holds a project with templates or runs and no workflow of its own.
+const libraryID = "library"
+
+// libraryPipeline stands in for a project of library templates and run bindings only. The IR needs a pipeline to
+// hold Ext, so the pipeline has no job; its documents stay in Ext and other providers report them as lost.
+func (p *project) libraryPipeline(libs []*pipeSrc) *ir.Pipeline {
+	if len(libs) == 0 && len(p.runs) == 0 {
+		return nil
+	}
+	taken := map[string]bool{}
+	for _, src := range p.pipes {
+		taken[src.name] = true
+	}
+	for _, d := range p.runs {
+		taken[d.Name()] = true
+	}
+	id := libraryID
+	for n := 2; taken[id]; n++ {
+		id = libraryID + "-" + strconv.Itoa(n)
+	}
+	p.rep.Add(report.Entry{
+		IRPath: "pipeline/" + id, Feature: caps.ExtPassthrough, Level: caps.Lost, Strategy: "kept in Ext[" + dialect + "]",
+		Detail: "no workflow with an entrypoint exists; the templates and runs are kept in Ext of the pipeline " + id + ", which has no job",
+	})
+	return &ir.Pipeline{ID: id}
+}
+
 func (p *project) keepLibraries(libs []*pipeSrc) {
 	for _, src := range libs {
 		p.resources = append(p.resources, src.doc)
