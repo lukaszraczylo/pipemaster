@@ -131,7 +131,7 @@ func (e *emitter) cron(pp *plan, i int, path string, tr ir.Trigger, x map[string
 	if tr.Kind == ir.TriggerSchedule {
 		return
 	}
-	e.lose(path, caps.TriggerAPI, "the CronWorkflow "+name+" is suspended; no other provider starts it, and the file keeps it suspended")
+	e.emulate(path, caps.TriggerAPI, "suspended CronWorkflow", "the CronWorkflow "+name+" is suspended; no other provider starts it, and the file keeps it suspended")
 }
 
 // apiTrigger writes the Sensor trigger or the suspended CronWorkflow that an Argo file held. Any other API
