@@ -248,3 +248,26 @@ func TestEditedEnvValueKeepsTheStepsAndReportsTheMarker(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckoutPathIsStableAcrossArgoTrips(t *testing.T) {
+	j := &ir.Job{ID: "build", Steps: []*ir.Step{
+		actionStep("co", "actions", "checkout", map[string]string{"path": "."}),
+		{ID: "run", Kind: ir.StepScript, Script: []string{"ls"}},
+	}}
+	first, _ := emit(t, project(j))
+	back := roundTrip(t, first)
+	second, _ := emit(t, back)
+	path := ".argo/workflows/ci.yaml"
+	if strings.Contains(second[path], "/workspace/workspace") {
+		t.Errorf("the checkout path drifted:\n%s", second[path])
+	}
+	if !strings.Contains(first[path], "path: /workspace/.\n") {
+		t.Errorf("first trip changed:\n%s", first[path])
+	}
+	back2 := roundTrip(t, second)
+	stripExt(back)
+	stripExt(back2)
+	if ok, diff := ir.Equal(back, back2); !ok {
+		t.Errorf("the second trip changed the IR:\n%s", diff)
+	}
+}

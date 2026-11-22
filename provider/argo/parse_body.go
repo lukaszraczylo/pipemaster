@@ -172,7 +172,7 @@ func (b *jobBuilder) gitArtifact(e any) bool {
 		}
 	}
 	if t, ok := text(am.Vals["path"]); ok && t != workspaceMount {
-		st.With["path"] = ir.Value{Lit: t}
+		st.With["path"] = ir.Value{Lit: strings.TrimPrefix(t, workspaceMount+"/")}
 	}
 	if name, ok := text(am.Vals["name"]); ok && name != gitArtifactName {
 		k.Keep("artifact", map[string]any{"name": name}, caps.StepAction, "the name of git artifact "+name+" has no IR field; kept in Ext", am.Lines["name"])
