@@ -324,7 +324,7 @@ func (b *jobBuilder) sidecars(v any) error {
 				return err
 			}
 			sv.Env = vars
-			if len(from) > 0 {
+			if len(from.Order) > 0 {
 				r.Release("env")
 			}
 		}
@@ -349,13 +349,13 @@ func (b *jobBuilder) sidecars(v any) error {
 }
 
 // envList reads a Kubernetes env list; entries with valueFrom stay out of the list and are returned by name.
-func (b *jobBuilder) envList(v any) ([]ir.Var, map[string]any, error) {
+func (b *jobBuilder) envList(v any) ([]ir.Var, *omap, error) {
 	list, ok := v.([]any)
 	if !ok {
 		return nil, nil, fmt.Errorf("env must be a list")
 	}
 	var vars []ir.Var
-	from := map[string]any{}
+	from := ynode.NewMap()
 	for _, e := range list {
 		m, ok := asMap(e)
 		name, _ := text(valueOf(m, "name"))
@@ -363,7 +363,7 @@ func (b *jobBuilder) envList(v any) ([]ir.Var, map[string]any, error) {
 			return nil, nil, fmt.Errorf("an env entry needs a name")
 		}
 		if vf, has := m.Vals["valueFrom"]; has {
-			from[name] = plain(vf)
+			from.Set(name, vf, 0)
 			continue
 		}
 		raw, _ := text(m.Vals["value"])
@@ -425,7 +425,7 @@ func (b *jobBuilder) stepOf(id string, r *reader, script bool) (*ir.Step, string
 			return nil, "", err
 		}
 		st.Env = vars
-		if len(from) > 0 {
+		if len(from.Order) > 0 {
 			k.Keep("valueFrom", from, caps.StepEnv, "env entries with valueFrom have no Value form; kept in Ext", r.Line("env"))
 		}
 	}
