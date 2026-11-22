@@ -336,15 +336,23 @@ func orTrue(l string) string {
 }
 
 func (e *emitter) stepLines(sp string, st *ir.Step) ([]string, error) {
-	var out []string
-	for _, l := range st.Script {
-		t, keep, err := e.scriptLine(sp, l)
-		if err != nil {
+	texts := make([]string, len(st.Script))
+	outs := make([]string, len(st.Script))
+	why := make([]string, len(st.Script))
+	for i, l := range st.Script {
+		texts[i] = emitkit.NeutralizeResultWrite(e.lose, sp, l)
+		var err error
+		if outs[i], why[i], err = e.scriptLine(texts[i]); err != nil {
 			return nil, err
 		}
-		if keep {
-			out = append(out, t)
-		}
+	}
+	keep := emitkit.DropLost(texts, why, func(detail, text string) {
+		e.lose(sp, caps.ScriptInterpolation, detail)
+		e.comment("script.interpolation " + sp + ": " + text)
+	})
+	out := make([]string, 0, len(keep))
+	for _, i := range keep {
+		out = append(out, outs[i])
 	}
 	return out, nil
 }

@@ -2,6 +2,7 @@ package woodpecker
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -324,15 +325,22 @@ func (e *emitter) common(c *wfCtx, sp string, st *ir.Step, m *wmap) error {
 func (e *emitter) scriptStep(c *wfCtx, sp string, st *ir.Step) (*wmap, error) {
 	b := &bindings{}
 	var lines []*yaml.Node
-	for _, l := range commandTexts(st) {
-		l = emitkit.NeutralizeResultWrite(e.lose, sp, l)
-		out, keep, err := e.command(b, sp, l)
+	texts := slices.Clone(commandTexts(st))
+	why := make([]string, len(texts))
+	for i, l := range texts {
+		texts[i] = emitkit.NeutralizeResultWrite(e.lose, sp, l)
+		_, lost, err := e.command(&bindings{}, texts[i])
 		if err != nil {
 			return nil, err
 		}
-		if keep {
-			lines = append(lines, block(out))
+		why[i] = noSpelling(lost)
+	}
+	for _, i := range e.commentSpans(sp, texts, why) {
+		out, _, err := e.command(b, texts[i])
+		if err != nil {
+			return nil, err
 		}
+		lines = append(lines, block(out))
 	}
 	if len(lines) == 0 {
 		e.comment("step.script " + sp + ": the step has no command left")

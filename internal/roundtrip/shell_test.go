@@ -1,6 +1,9 @@
 package roundtrip_test
 
 import (
+	"bytes"
+	"errors"
+	"io"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -21,9 +24,18 @@ var shellArgsRE = regexp.MustCompile(`(?s)^-ec '(.*)'$`)
 
 // scriptsOf lists the shell scripts of a pipeline file.
 func scriptsOf(data []byte) []string {
-	var root any
-	if err := yaml.Unmarshal(data, &root); err != nil {
-		return nil
+	var roots []any
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	for {
+		var root any
+		err := dec.Decode(&root)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil
+		}
+		roots = append(roots, root)
 	}
 	var out []string
 	var walk func(v any)
@@ -63,21 +75,16 @@ func scriptsOf(data []byte) []string {
 			}
 		}
 	}
-	walk(root)
+	for _, root := range roots {
+		walk(root)
+	}
 	return out
 }
-
-// knownSyntaxGaps lists emitted files whose scripts sh -n rejects for a reason outside the Tekton result writes:
-// Woodpecker comments out the `if` line that reads a needs output and keeps the `fi` that closes it.
-var knownSyntaxGaps = map[string]bool{".woodpecker/clone-cleanup-workspace-check-git-commit.yaml": true}
 
 // checkShellSyntax fails on an emitted script that `sh -n` rejects.
 func checkShellSyntax(t *testing.T, id string, files map[string][]byte) {
 	t.Helper()
 	for _, name := range names(files) {
-		if knownSyntaxGaps[name] {
-			continue
-		}
 		for _, s := range scriptsOf(files[name]) {
 			cmd := exec.Command("sh", "-n") // #nosec G204 -- fixed binary
 			s = exprRE.ReplaceAllString(s, "X")

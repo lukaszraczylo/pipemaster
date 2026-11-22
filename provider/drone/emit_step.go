@@ -453,17 +453,24 @@ func (e *emitter) scriptStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
 	b := &bindings{}
 	var lines []*yaml.Node
 	seen := map[string]int{}
-	for _, l := range commandTexts(st) {
-		l = emitkit.NeutralizeResultWrite(e.lose, sp, l)
-		b.hits = nil
-		out, keep, err := e.command(b, sp, l)
+	texts := slices.Clone(commandTexts(st))
+	why := make([]string, len(texts))
+	for i, l := range texts {
+		texts[i] = emitkit.NeutralizeResultWrite(e.lose, sp, l)
+		_, lost, err := e.command(&bindings{}, texts[i])
 		if err != nil {
 			return nil, err
 		}
-		if keep {
-			lines = append(lines, block(out))
-			b.place(out, seen)
+		why[i] = noSpelling(lost)
+	}
+	for _, i := range e.commentSpans(sp, texts, why) {
+		b.hits = nil
+		out, _, err := e.command(b, texts[i])
+		if err != nil {
+			return nil, err
 		}
+		lines = append(lines, block(out))
+		b.place(out, seen)
 	}
 	b.total(seen)
 	if len(lines) == 0 {

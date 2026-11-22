@@ -198,31 +198,27 @@ func (e *emitter) field(path string, f caps.Feature, s string) (string, error) {
 	return out, nil
 }
 
-// scriptLine converts one script entry. An entry with an expression GitLab cannot spell is commented out whole,
-// because dropping the part could change what the command does.
-func (e *emitter) scriptLine(path, s string) (out string, keep bool, err error) {
-	s = emitkit.NeutralizeResultWrite(e.lose, path, s)
+// scriptLine converts one script entry. why is empty when the entry stays; otherwise it names the reason GitLab
+// cannot spell the entry, and the caller comments out the whole statement around it, because dropping the part
+// could change what the command does.
+func (e *emitter) scriptLine(s string) (out, why string, err error) {
 	if !strings.Contains(s, "${{") {
-		return s, true, nil
+		return s, "", nil
 	}
 	out, lost, err := convert(s)
 	if err != nil {
-		return "", false, err
+		return "", "", err
 	}
 	if dead := e.deadOutputRefs(s); len(dead) > 0 {
 		lost = append(lost, dead...)
 	}
 	if len(lost) == 0 && strings.Contains(out, rawExprOpen) {
-		e.lose(path, caps.ScriptInterpolation, "the text holds a literal "+rawExprOpen+" that GitLab never expands; the line is commented out")
-		e.comment("script.interpolation " + path + ": " + s)
-		return "", false, nil
+		return "", "the text holds a literal " + rawExprOpen + " that GitLab never expands", nil
 	}
 	if len(lost) == 0 {
-		return out, true, nil
+		return out, "", nil
 	}
-	e.lose(path, caps.ScriptInterpolation, "no GitLab variable for expression "+strings.Join(lost, ", ")+"; the line is commented out")
-	e.comment("script.interpolation " + path + ": " + s)
-	return "", false, nil
+	return "", "no GitLab variable for expression " + strings.Join(lost, ", "), nil
 }
 
 // value renders an env value; ok is false when it was lost and must be omitted.

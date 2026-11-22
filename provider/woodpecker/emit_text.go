@@ -226,20 +226,23 @@ func (e *emitter) text(b *bindings, path string, f caps.Feature, mode textMode, 
 	return out, nil
 }
 
-// command converts one script entry. An entry with an expression Woodpecker cannot spell is commented out
-// whole, because dropping the part could change what the command does.
-func (e *emitter) command(b *bindings, path, s string) (out string, keep bool, err error) {
+// command converts one script entry. lost names the expressions Woodpecker cannot spell; the caller comments
+// the entry out whole, because dropping the part could change what the command does.
+func (e *emitter) command(b *bindings, s string) (out string, lost []string, err error) {
 	parts, err := expr.ParseScriptTemplate(s)
 	if err != nil {
-		return "", false, err
+		return "", nil, err
 	}
-	out, lost := e.convertParts(b, commandText, parts)
-	if len(lost) == 0 {
-		return out, true, nil
-	}
-	e.lose(path, caps.ScriptInterpolation, "no Woodpecker spelling for expression "+strings.Join(lost, ", ")+"; the line is commented out")
-	e.comment("script.interpolation " + path + ": " + s)
-	return "", false, nil
+	out, lost = e.convertParts(b, commandText, parts)
+	return out, lost, nil
+}
+
+// commentSpans comments out every statement of texts that holds a lost entry and returns the entries that stay.
+func (e *emitter) commentSpans(path string, texts, why []string) []int {
+	return emitkit.DropLost(texts, why, func(detail, text string) {
+		e.lose(path, caps.ScriptInterpolation, detail)
+		e.comment("script.interpolation " + path + ": " + text)
+	})
 }
 
 // valueNode renders an environment or settings value; nil means the value was lost and must be omitted.
@@ -300,4 +303,11 @@ func (e *emitter) envNode(path string, vs []ir.Var, m *wmap) error {
 		m.set(v.Name, n)
 	}
 	return nil
+}
+
+func noSpelling(lost []string) string {
+	if len(lost) == 0 {
+		return ""
+	}
+	return "no Woodpecker spelling for expression " + strings.Join(lost, ", ")
 }
