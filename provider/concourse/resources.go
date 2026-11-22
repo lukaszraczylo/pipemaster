@@ -272,13 +272,11 @@ func (b *pipeBuilder) gitTrigger(r *resource) sourceTrigger {
 	t := ir.Trigger{Kind: ir.TriggerPush, Ext: resourceExt(r.name)}
 	t.Paths = ir.Filter{Include: paths, Exclude: ignore}
 	if tag != "" {
+		if branch != "" {
+			return b.failSafe(r, r.name, "tag_filter with branch: Concourse needs the tagged commit on the branch and the IR tag trigger has no branch filter")
+		}
 		t.Kind = ir.TriggerTag
 		t.Tags.Include = []string{tag}
-		if branch != "" {
-			t.Branches.Include = []string{branch}
-			b.note(caps.TriggerFilterTags, caps.Lost, b.path(), strategyExt,
-				fmt.Sprintf("resource %s has tag_filter and branch %s: Concourse needs the tagged commit on the branch; the tag trigger fires on any matching tag", r.name, branch), r.line)
-		}
 		return sourceTrigger{trig: t}
 	}
 	if branch == "" {

@@ -85,13 +85,17 @@ func TestGitTrigger(t *testing.T) {
 }
 
 func TestTagFilterTrigger(t *testing.T) {
-	pl, rep := parseYAML(t, "resources:\n- name: repo\n  type: git\n  source: {uri: u, branch: main, tag_filter: 'v*'}\njobs:\n- name: rel\n  plan:\n  - {get: repo, trigger: true}\n"+echoTask)
+	pl, _ := parseYAML(t, "resources:\n- name: repo\n  type: git\n  source: {uri: u, tag_filter: 'v*'}\njobs:\n- name: rel\n  plan:\n  - {get: repo, trigger: true}\n"+echoTask)
 	tr := pl.Triggers[0]
-	if tr.Kind != ir.TriggerTag || !reflect.DeepEqual(tr.Tags.Include, []string{"v*"}) {
+	if tr.Kind != ir.TriggerTag || !reflect.DeepEqual(tr.Tags.Include, []string{"v*"}) || len(tr.Branches.Include) != 0 {
 		t.Fatalf("trigger = %+v", tr)
 	}
-	if !hasEntry(rep, "tag_filter") {
-		t.Error("no report entry for the tag_filter and branch combination")
+}
+
+func TestTagFilterWithBranchFailsSafe(t *testing.T) {
+	pl, rep := parseYAML(t, "resources:\n- name: repo\n  type: git\n  source: {uri: u, branch: main, tag_filter: 'v*'}\njobs:\n- name: rel\n  plan:\n  - {get: repo, trigger: true}\n"+echoTask)
+	if len(pl.Triggers) != 1 || pl.Triggers[0].Kind != ir.TriggerAPI || !hasEntry(rep, "tag_filter") {
+		t.Fatalf("triggers = %+v", pl.Triggers)
 	}
 }
 
