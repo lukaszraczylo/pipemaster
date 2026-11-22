@@ -68,6 +68,27 @@ func envIs(st *ir.Step, name string, want expr.Ref) bool {
 	return false
 }
 
+// storeEnvIs is true when the step env entry name holds the secret or variable that the reference names, as
+// the emitter writes it for a script that reads the reference.
+func storeEnvIs(st *ir.Step, name string, ref []string) bool {
+	if len(ref) != 2 {
+		return false
+	}
+	for _, v := range st.Env {
+		if v.Name != name {
+			continue
+		}
+		switch ref[0] {
+		case expr.PrefixSecrets:
+			return v.Value.Kind == ir.ValueSecret && v.Value.Secret == ref[1]
+		case expr.PrefixVars:
+			r, isRef := v.Value.Expr.(expr.Ref)
+			return v.Value.Kind == ir.ValueExpr && isRef && len(r.Path) == 2 && r.Path[0] == expr.PrefixVars && r.Path[1] == ref[1]
+		}
+	}
+	return false
+}
+
 // removeEnv drops the named env entries, unless the script still reads them.
 func removeEnv(st *ir.Step, names []string) {
 	var keep []ir.Var
@@ -104,6 +125,9 @@ func (b *jobBuilder) scriptVars(st *ir.Step, vars map[string]string) []string {
 				b.c.ignored(b.path, caps.ScriptInterpolation, "the env entry "+name+" was edited or removed after pipemaster wrote it; the text "+tok+" stays")
 				continue
 			}
+			drop = append(drop, name)
+		}
+		if storeEnvIs(st, name, ref) {
 			drop = append(drop, name)
 		}
 		for i, l := range st.Script {

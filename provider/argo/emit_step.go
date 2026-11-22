@@ -54,6 +54,12 @@ type stepCtx struct {
 	artIn   []*yaml.Node
 	artOut  []*yaml.Node
 	argArts []*yaml.Node
+	// act is what the last action step wrote.
+	act actionArg
+	// seq counts the action markers of the job.
+	seq int
+	// disabled is true when the last container runs disabledScript for a condition with no guard form.
+	disabled bool
 }
 
 // stepName gives each step with a container its name. The last container is main when the job has outputs or
@@ -140,6 +146,15 @@ func (sx *stepCtx) containerFor(st *ir.Step, name string, last bool, jx map[stri
 		workdir = tc.workdir(sc, path, st.WorkDir)
 	}
 	c.m.SetStr("workingDir", workdir)
+	if st.WorkDir != "" && workdir != st.WorkDir {
+		wrote := workdir
+		if !strings.HasPrefix(st.WorkDir, "/") && workdir != workspaceMount {
+			wrote = workspaceMount + "/" + st.WorkDir
+		}
+		if err := e.markArg(caps.StepWorkdir, path, workdirArg{WorkDir: st.WorkDir, Wrote: wrote}); err != nil {
+			e.lose(path, caps.StepWorkdir, "the working directory marker cannot be written: "+err.Error())
+		}
+	}
 	env := tc.envList(sc, path, st.Env)
 	if merged := tc.mergeEnv(sc, env, sx0); len(merged) > 0 {
 		c.m.Set("env", seqOf(merged...))
@@ -182,16 +197,19 @@ func (sx *stepCtx) guarded(sc *stepScope, path string, st *ir.Step, script []str
 	tc := sx.tc
 	if !exprargo.Guardable(st.If) {
 		tc.e.lose(path, caps.StepIf, "the condition has no shell test form; the step is disabled")
+		sx.disabled = true
 		return []string{disabledScript}
 	}
 	env, ok := exprargo.GuardEnv(st.If)
 	if !ok {
 		tc.e.lose(path, caps.StepIf, "a reference of the condition has no container env spelling; the step is disabled")
+		sx.disabled = true
 		return []string{disabledScript}
 	}
 	for _, v := range env {
 		if ref, isRef := exprargo.EnvRef(v.Name); isRef && len(ref.Path) == 2 && ref.Path[0] == expr.PrefixMatrix && !tc.matrix[ref.Path[1]] {
 			tc.e.lose(path, caps.StepIf, "the condition reads matrix."+ref.Path[1]+", and the job has no matrix that Argo can expand; the step is disabled")
+			sx.disabled = true
 			return []string{disabledScript}
 		}
 	}
@@ -202,6 +220,7 @@ func (sx *stepCtx) guarded(sc *stepScope, path string, st *ir.Step, script []str
 	out, err := exprargo.AddGuard(script, st.If)
 	if err != nil {
 		tc.e.lose(path, caps.StepIf, "the condition cannot be written as a guard: "+err.Error()+"; the step is disabled")
+		sx.disabled = true
 		return []string{disabledScript}
 	}
 	return out
@@ -344,21 +363,50 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool) *container {
 	if t.Support.Level == caps.Lost {
 		return nil
 	}
+	sx.act.Kind = t.Kind
+	nIn, nOut := len(sx.artIn), len(sx.artOut)
 	switch t.Kind {
 	case actions.KindImage:
 		sx.image = t.Image
+		sx.act.Image = t.Image
 	case actions.KindImplicit:
 		sx.checkout(st, with, t)
+		if len(sx.artIn) > nIn {
+			sx.act.Wrote = checkoutWrote
+		}
 	case actions.KindUpload:
 		sx.upload(path, t)
+		for _, a := range sx.artOut[nOut:] {
+			sx.act.Arts = append(sx.act.Arts, a.Content[1].Value)
+		}
 	case actions.KindDownload:
 		sx.download(path, t)
 	case actions.KindScript:
 		cp := *st
 		cp.Script, cp.Kind, cp.Action = t.Script, ir.StepScript, nil
-		return sx.containerFor(&cp, name, last, nil)
+		c := sx.containerFor(&cp, name, last, nil)
+		sx.act.Ran = c != nil
+		return c
 	}
 	return nil
+}
+
+// markAction writes the marker that holds an action step. at is the number of containers before the step.
+func (sx *stepCtx) markAction(st *ir.Step, at int) {
+	e, path := sx.tc.e, sx.tc.jp.path+"/step/"+st.ID
+	held := *st
+	held.Ext = withoutBookkeeping(st.Ext)
+	body, err := carryYAML(&held)
+	if err != nil {
+		e.lose(path, caps.StepAction, "the action marker cannot be written: "+err.Error())
+		return
+	}
+	arg := sx.act
+	arg.Step, arg.At, arg.Seq = body, at, sx.seq
+	sx.seq++
+	if err := e.markArg(caps.StepAction, path, arg); err != nil {
+		e.lose(path, caps.StepAction, "the action marker cannot be written: "+err.Error())
+	}
 }
 
 // valueCanon renders a value as the canonical text the action registry reads.

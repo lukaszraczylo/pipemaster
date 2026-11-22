@@ -6,7 +6,10 @@ import (
 	"slices"
 	"strings"
 
+	"go.yaml.in/yaml/v3"
+
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -48,6 +51,15 @@ func (c *plCtx) inputsMarker(pl *ir.Pipeline) {
 			return
 		}
 	}
+	for _, name := range a.Required {
+		if _, ok := byName[name]; !ok {
+			c.ignored(path, caps.PipelineInputs, "the parameter "+name+" was removed or renamed after pipemaster wrote the file")
+			return
+		}
+	}
+	for _, name := range a.Required {
+		pl.Inputs[byName[name]].Required = true
+	}
 	c.inNames = a.Names
 	for name, typ := range a.Types {
 		pl.Inputs[byName[name]].Type = typ
@@ -69,6 +81,12 @@ func (b *jobBuilder) matrixMarker(v any) bool {
 		b.c.ignored(b.path, caps.JobMatrix, "the withItems cells were edited after pipemaster wrote them; the cells stay in Ext")
 		return false
 	}
+	b.setMatrix(m)
+	return true
+}
+
+// setMatrix gives the job the matrix and tells the text reader which names the cells carry.
+func (b *jobBuilder) setMatrix(m *ir.Matrix) {
 	b.job.Matrix = m
 	b.tx.matrix = map[string]bool{}
 	for _, ax := range m.Axes {
@@ -79,7 +97,6 @@ func (b *jobBuilder) matrixMarker(v any) bool {
 			b.tx.matrix[kv.Key] = true
 		}
 	}
-	return true
 }
 
 func cellMaps(cells []ir.Combo) []map[string]string {
@@ -149,34 +166,60 @@ func (c *plCtx) staleGates(jobs []*ir.Job) {
 	}
 }
 
-// sameEnv finds the variable name in every script step. ok is false when a step lacks it or two steps differ.
-func sameEnv(steps []*ir.Step, name string) (v ir.Var, ok bool) {
-	for _, st := range steps {
-		i := slices.IndexFunc(st.Env, func(o ir.Var) bool { return o.Name == name })
-		if i < 0 || (ok && !reflect.DeepEqual(v, st.Env[i])) {
-			return ir.Var{}, false
-		}
-		v, ok = st.Env[i], true
+// sameVar compares two variables. An expression is compared in its canonical text, because one side came through YAML.
+func sameVar(a, b ir.Var) bool {
+	if a.Name != b.Name || a.Value.Kind != b.Value.Kind {
+		return false
 	}
-	return v, ok
+	if a.Value.Kind == ir.ValueExpr {
+		return expr.String(a.Value.Expr) == expr.String(b.Value.Expr)
+	}
+	return a.Value.Lit == b.Value.Lit && a.Value.Secret == b.Value.Secret
+}
+
+// sameEnv checks that every script step still holds the variable as the marker wrote it. A step that has it
+// differently, or not at all, makes the lift unsafe.
+func sameEnv(steps []*ir.Step, want ir.Var) bool {
+	for _, st := range steps {
+		i := slices.IndexFunc(st.Env, func(o ir.Var) bool { return o.Name == want.Name })
+		if i < 0 || !sameVar(want, st.Env[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // liftEnv moves the marked variables out of every script step and returns them in marker order. A name that the
-// steps no longer share stays in the steps, and the report says so.
-func (c *plCtx) liftEnv(jobs []*ir.Job, path string, f caps.Feature, names []string) []ir.Var {
-	var steps []*ir.Step
-	for _, j := range jobs {
-		for _, st := range j.Steps {
-			if st.Kind == ir.StepScript {
-				steps = append(steps, st)
-			}
-		}
+// steps no longer share stays in the steps, and the report says so. The marker holds the values, so a job with
+// no script step gets its variables back too.
+func (c *plCtx) liftEnv(jobs []*ir.Job, path string, f caps.Feature, a envArg) []ir.Var {
+	var vars []ir.Var
+	if a.Vars != "" && yaml.Unmarshal([]byte(a.Vars), &vars) != nil {
+		c.ignored(path, f, "the env values of the marker cannot be read")
+		return nil
 	}
 	var lifted []ir.Var
-	for _, name := range names {
-		v, ok := sameEnv(steps, name)
-		if !ok {
-			c.ignored(path, f, "the variable "+name+" is no longer the same in every step; it stays in the steps")
+	for _, name := range a.Names {
+		var steps []*ir.Step
+		for _, j := range jobs {
+			jp := "pipeline/" + c.plID + "/job/" + j.ID
+			if slices.Contains(a.Own[name], jp) {
+				continue
+			}
+			for _, st := range j.Steps {
+				if st.Kind == ir.StepScript && !c.restored[st] && !slices.Contains(a.Own[name], jp+"/step/"+st.ID) {
+					steps = append(steps, st)
+				}
+			}
+		}
+		i := slices.IndexFunc(vars, func(o ir.Var) bool { return o.Name == name })
+		if i < 0 {
+			c.ignored(path, f, "the marker holds no value for the variable "+name)
+			continue
+		}
+		v := vars[i]
+		if !sameEnv(steps, v) {
+			c.ignored(path, f, "the variable "+name+" was edited or removed in a step after pipemaster wrote the file; it stays in the steps")
 			continue
 		}
 		lifted = append(lifted, v)
@@ -191,7 +234,7 @@ func (c *plCtx) liftEnv(jobs []*ir.Job, path string, f caps.Feature, names []str
 func (b *jobBuilder) jobEnvMarker() {
 	var a envArg
 	if markerArg(b.c.src.doc.Head, b.path, caps.JobEnv, &a) {
-		b.job.Env = append(b.job.Env, b.c.liftEnv([]*ir.Job{b.job}, b.path, caps.JobEnv, a.Names)...)
+		b.job.Env = append(b.job.Env, b.c.liftEnv([]*ir.Job{b.job}, b.path, caps.JobEnv, a)...)
 	}
 }
 
@@ -200,6 +243,20 @@ func (c *plCtx) pipelineEnvMarker(pl *ir.Pipeline) {
 	var a envArg
 	path := "pipeline/" + c.plID
 	if markerArg(c.src.doc.Head, path, caps.PipelineEnv, &a) {
-		pl.Env = append(pl.Env, c.liftEnv(append(slices.Clone(pl.Jobs), pl.Finally...), path, caps.PipelineEnv, a.Names)...)
+		pl.Env = append(pl.Env, c.liftEnv(append(slices.Clone(pl.Jobs), pl.Finally...), path, caps.PipelineEnv, a)...)
 	}
+}
+
+// concurrencyMarker puts back the cancel flag of the concurrency group.
+func (c *plCtx) concurrencyMarker(pl *ir.Pipeline) {
+	var a concurrencyArg
+	path := "pipeline/" + c.plID
+	if !markerArg(c.src.doc.Head, path, caps.PipelineConcurrency, &a) {
+		return
+	}
+	if pl.Concurrency == nil {
+		c.ignored(path, caps.PipelineConcurrency, "the mutex was removed after pipemaster wrote the file")
+		return
+	}
+	pl.Concurrency.CancelInProgress = a.Cancel
 }

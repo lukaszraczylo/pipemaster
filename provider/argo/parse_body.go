@@ -10,6 +10,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/actions"
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
@@ -66,6 +67,7 @@ func (b *jobBuilder) body(t *omap) error {
 	b.k.KeepRest(r)
 	b.uniqueStepIDs()
 	b.collapseSteps()
+	b.collapseActions()
 	b.jobEnvMarker()
 	return nil
 }
@@ -340,6 +342,7 @@ func (b *jobBuilder) sidecars(v any) error {
 				sv.Ports = nil
 			}
 		}
+		b.serviceMarker(&sv)
 		b.job.Services = append(b.job.Services, sv)
 		if rest := r.Rest(); len(rest) > 0 {
 			extra.Set(name, m.Subset(rest), m.Lines["name"])
@@ -367,6 +370,10 @@ func (b *jobBuilder) envList(v any) ([]ir.Var, *omap, error) {
 			return nil, nil, fmt.Errorf("an env entry needs a name")
 		}
 		if vf, has := m.Vals["valueFrom"]; has {
+			if v, ok := storeValue(vf); ok && len(m.Order) == 2 {
+				vars = append(vars, ir.Var{Name: name, Value: v})
+				continue
+			}
 			from.Set(name, vf, 0)
 			continue
 		}
@@ -374,6 +381,30 @@ func (b *jobBuilder) envList(v any) ([]ir.Var, *omap, error) {
 		vars = append(vars, ir.Var{Name: name, Value: b.tx.value(raw)})
 	}
 	return vars, from, nil
+}
+
+// storeValue reads a reference to the secret or variable store that the emitter writes as a secret or a vars value.
+func storeValue(vf any) (ir.Value, bool) {
+	m, ok := asMap(vf)
+	if !ok || len(m.Order) != 1 {
+		return ir.Value{}, false
+	}
+	kind := m.Order[0]
+	ref, ok := asMap(m.Vals[kind])
+	if !ok || len(ref.Order) != 2 {
+		return ir.Value{}, false
+	}
+	store, _ := text(ref.Vals["name"])
+	key, hasKey := text(ref.Vals["key"])
+	switch {
+	case !hasKey || key == "":
+		return ir.Value{}, false
+	case kind == kindSecretRef && store == secretStore:
+		return ir.Value{Kind: ir.ValueSecret, Secret: key}, true
+	case kind == kindConfigRef && store == configStore:
+		return ir.Value{Kind: ir.ValueExpr, Expr: expr.Ref{Path: []string{expr.PrefixVars, key}}}, true
+	}
+	return ir.Value{}, false
 }
 
 // container reads a container or script template into one step.

@@ -22,8 +22,10 @@ type plCtx struct {
 	src     *pipeSrc
 	k       *sink
 	inNames map[string]string
-	file    string
-	plID    string
+	// restored holds the steps that a marker put back whole; they carry no copied env.
+	restored map[*ir.Step]bool
+	file     string
+	plID     string
 }
 
 func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
@@ -36,7 +38,7 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 	}
 	pl := &ir.Pipeline{ID: id}
 	k := newSink(p.rep, src.doc.File, "pipeline/"+id)
-	c := &plCtx{p: p, src: src, k: k, file: src.doc.File, plID: id}
+	c := &plCtx{p: p, src: src, k: k, file: src.doc.File, plID: id, restored: map[*ir.Step]bool{}}
 	r := newReader(src.spec)
 	if err := p.params(pl, k, r); err != nil {
 		return nil, fmt.Errorf("%s: %w", src.doc.Loc(0), err)
@@ -44,6 +46,7 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 	c.inputsMarker(pl)
 	if v, ok := r.Take("synchronization"); ok {
 		c.synchronization(pl, v, r.Line("synchronization"))
+		c.concurrencyMarker(pl)
 	}
 	r.Take(keyTemplates)
 	entry, err := c.entrypoint(r)
@@ -66,6 +69,7 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 	c.metadata()
 	c.unreached()
 	pl.Ext = k.Ext()
+	c.placeholderMarker(pl)
 	c.pipelineEnvMarker(pl)
 	c.staleGates(append(slices.Clone(pl.Jobs), pl.Finally...))
 	return pl, nil

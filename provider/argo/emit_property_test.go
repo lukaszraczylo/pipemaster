@@ -70,7 +70,7 @@ func nativize(t *rapid.T, p *ir.Project) {
 	pl.Env = nativeVars(pl.Env)
 	pl.Triggers = nativeTriggers(t)
 	for _, j := range pl.Jobs {
-		nativizeJob(j)
+		nativizeJob(t, j)
 	}
 }
 
@@ -102,7 +102,7 @@ func nativeTriggers(t *rapid.T) []ir.Trigger {
 	return out
 }
 
-func nativizeJob(j *ir.Job) {
+func nativizeJob(t *rapid.T, j *ir.Job) {
 	j.Name, j.Ext, j.Container, j.Runner, j.If, j.Environment, j.Manual = "", nil, nil, ir.Runner{}, nil, nil, false
 	j.Cache, j.Artifacts = nil, nil
 	j.Env = nativeVars(j.Env)
@@ -145,7 +145,17 @@ func nativizeJob(j *ir.Job) {
 	for i, st := range j.Steps {
 		nativizeStep(st)
 		st.ID = "s" + strconv.Itoa(i)
+		if rapid.Bool().Draw(t, "action") {
+			unmappedAction(st)
+		}
 	}
+}
+
+// unmappedAction turns a step into an action that Argo cannot run. The file holds no container for it, so only
+// the marker brings it back, and the env that the other steps share must still lift.
+func unmappedAction(st *ir.Step) {
+	st.Kind, st.Script, st.Env = ir.StepAction, nil, nil
+	st.Action = &ir.ActionRef{Kind: ir.ActionRepo, Host: "https://github.com", Owner: "acme", Repo: "unmapped", Ref: "v1"}
 }
 
 func nativizeStep(st *ir.Step) {

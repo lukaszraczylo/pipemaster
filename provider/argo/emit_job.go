@@ -114,6 +114,9 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (jobOut, error) {
 	}
 	cond := tc.condition()
 	cond.disabled = cond.disabled || !matrixOK
+	if cond.disabled {
+		e.markDisabled(j, path)
+	}
 	e.jobFeatures(tc, jx)
 
 	sx := &stepCtx{tc: tc, taken: map[string]bool{}, takenIn: map[string]bool{}, dests: map[string]bool{}}
@@ -140,9 +143,11 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (jobOut, error) {
 		out.tmpls = append(out.tmpls, tm.N)
 	}
 	tc.reportSafeTags()
-	if len(conts) > 0 {
-		e.markJobEnv(j, jp.path)
-	}
+	e.markJobEnv(j, jp.path)
+	e.markOutputs(j, jp.path)
+	e.markCache(j, jp.path)
+	e.markContainer(j, jp.path)
+	e.markArtifacts(j, jp.path)
 	if len(tc.vars) > 0 {
 		if err := e.markArg(caps.ScriptInterpolation, jp.path, varsArg{Vars: tc.vars}); err != nil {
 			e.lose(jp.path, caps.ScriptInterpolation, "the variable marker cannot be written: "+err.Error())
@@ -198,14 +203,27 @@ func (sx *stepCtx) containers(jx map[string]any) (conts []*container, taskStep *
 			if !ok {
 				name = st.ID
 			}
+			sx.act, sx.disabled = actionArg{}, false
+			at := len(conts)
 			if c := sx.actionStep(st, name, last); c != nil {
 				conts = append(conts, c)
 			}
+			sx.markAction(st, at)
 		case ir.StepScript, "":
 			if e.runsContainer(st) {
+				sx.act, sx.disabled = actionArg{}, false
+				at, before := len(conts), e.nlost
 				conts = append(conts, sx.containerFor(st, names[st], last, jx))
-			} else if len(st.Script) == 0 {
-				e.lose(path, caps.StepScript, "the step has no script; no container runs it")
+				if sx.disabled || e.nlost != before {
+					sx.act.Ran = true
+					sx.markAction(st, at)
+				}
+			} else {
+				if len(st.Script) == 0 {
+					e.lose(path, caps.StepScript, "the step has no script; no container runs it")
+				}
+				sx.act, sx.disabled = actionArg{}, false
+				sx.markAction(st, len(conts))
 			}
 		case ir.StepTask:
 			if e.own && extOf(st.Ext)[ExtTemplate] != nil || jx["templateRef"] != nil {
@@ -213,8 +231,12 @@ func (sx *stepCtx) containers(jx map[string]any) (conts []*container, taskStep *
 				continue
 			}
 			e.lose(path, caps.StepAction, "a task step has no Argo form; the step is dropped")
+			sx.act, sx.disabled = actionArg{}, false
+			sx.markAction(st, len(conts))
 		default:
 			e.lose(path, caps.StepAction, "a "+string(st.Kind)+" step has no Argo form; the step is dropped")
+			sx.act, sx.disabled = actionArg{}, false
+			sx.markAction(st, len(conts))
 		}
 	}
 	return conts, taskStep
@@ -241,6 +263,9 @@ func (e *emitter) containerTemplate(tc *jobCtx, tm *wmap, conts []*container, jx
 		c.m.SetStr("workingDir", workspaceMount)
 		conts = []*container{c}
 		e.emulate(path, caps.StepScript, "no-op container", "the job runs no script, so a container named main carries its inputs and outputs")
+		if err := e.markArg(caps.StepScript, path, struct{}{}); err != nil {
+			e.lose(path, caps.StepScript, "the no-op marker cannot be written: "+err.Error())
+		}
 	}
 	deps := chainDeps(conts)
 	var nodes []*yaml.Node
@@ -543,6 +568,7 @@ func (e *emitter) sidecars(tc *jobCtx, jx map[string]any) *yaml.Node {
 		if len(ports) > 0 {
 			m.Set("ports", seqOf(ports...))
 		}
+		e.markService(path, sv)
 		if rest, ok := ext[sv.Name].(map[string]any); ok {
 			_ = m.AddExtra(rest, nil)
 		}
@@ -568,3 +594,26 @@ func portNumber(p string) (int, string) {
 }
 
 var _ = slices.Contains[[]string]
+
+// serviceArg holds what the sidecar of a service cannot carry: the host ports and the image entrypoint.
+type serviceArg struct {
+	Ports      []string `json:"ports,omitempty"`
+	Entrypoint []string `json:"entrypoint,omitempty"`
+}
+
+func (e *emitter) markService(path string, sv ir.Service) {
+	var a serviceArg
+	if slices.ContainsFunc(sv.Ports, func(p string) bool { return strings.Contains(p, ":") }) {
+		a.Ports = sv.Ports
+	}
+	if len(sv.Image.Entrypoint) > 0 {
+		a.Entrypoint = sv.Image.Entrypoint
+		e.lose(path, caps.JobServices, "the entrypoint of service "+sv.Name+" has no Argo form; the sidecar runs the image entrypoint")
+	}
+	if a.Ports == nil && a.Entrypoint == nil {
+		return
+	}
+	if err := e.markArg(caps.JobServices, path+"/service/"+sv.Name, a); err != nil {
+		e.lose(path, caps.JobServices, "the service marker cannot be written: "+err.Error())
+	}
+}

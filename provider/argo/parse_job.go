@@ -122,7 +122,9 @@ func (b *jobBuilder) header(r *reader) error {
 		if !isText {
 			return fmt.Errorf("when must be a string")
 		}
-		b.job.If = andExpr(b.job.If, b.when(w, r.Line("when")))
+		if w != disabledWhen() || !b.disabledMarker() {
+			b.job.If = andExpr(b.job.If, b.when(w, r.Line("when")))
+		}
 	}
 	if v, ok := r.Take("continueOn"); ok {
 		b.continueOn(v, r.Line("continueOn"))

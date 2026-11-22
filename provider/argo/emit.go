@@ -93,11 +93,14 @@ type emitter struct {
 	plans   []*plan
 	own     bool
 	needsSA bool
+	// nlost counts the Lost entries, so a caller can tell whether a step lost something.
+	nlost int
 }
 
 func use(path string, f caps.Feature) ir.FeatureUse { return ir.FeatureUse{IRPath: path, Feature: f} }
 
 func (e *emitter) lose(path string, f caps.Feature, detail string) {
+	e.nlost++
 	e.note(path, f, caps.Lost, "", detail)
 }
 

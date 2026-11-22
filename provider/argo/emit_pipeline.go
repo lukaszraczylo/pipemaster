@@ -22,6 +22,13 @@ var specSkip = map[string]bool{ExtResources: true, ExtTemplates: true, "params":
 type inputsArg struct {
 	Names map[string]string `json:"names,omitempty"`
 	Types map[string]string `json:"types,omitempty"`
+	// Required names the parameters of inputs with no default: a default of the parameter would hide it.
+	Required []string `json:"required,omitempty"`
+}
+
+// concurrencyArg holds the cancel flag that a mutex cannot carry.
+type concurrencyArg struct {
+	Cancel bool `json:"cancel"`
 }
 
 // project writes every pipeline, then the triggers and the documents that an Argo file kept.
@@ -172,8 +179,13 @@ func (e *emitter) arguments(pp *plan, px map[string]any) *yaml.Node {
 		if rest, ok := extra[name].(map[string]any); ok {
 			_ = m.AddExtra(rest, nil)
 		}
-		if in.Type != "" && in.Type != "string" {
+		if in.Required {
+			arg.Required = append(arg.Required, name)
+		}
+		if in.Type != "" {
 			arg.Types[name] = in.Type
+		}
+		if in.Type != "" && in.Type != "string" {
 			e.emulate(pp.path, caps.PipelineInputs, "string parameter", "input "+in.Name+" has type "+in.Type+", which Argo parameters lack; it is a string parameter and the type stays in the marker")
 		}
 		params = append(params, m.N)
@@ -191,7 +203,7 @@ func (e *emitter) arguments(pp *plan, px map[string]any) *yaml.Node {
 	if rest, ok := px["arguments"].(map[string]any); ok {
 		_ = args.AddExtra(rest, nil)
 	}
-	if len(arg.Names) > 0 || len(arg.Types) > 0 {
+	if len(arg.Names) > 0 || len(arg.Types) > 0 || len(arg.Required) > 0 {
 		if err := e.markArg(caps.PipelineInputs, pp.path, arg); err != nil {
 			e.lose(pp.path, caps.PipelineInputs, "the input marker cannot be written: "+err.Error())
 		}
@@ -210,6 +222,11 @@ func (e *emitter) synchronization(pp *plan, px map[string]any) *yaml.Node {
 	s.Set("mutexes", seqOf(mx.N))
 	if rest, ok := px["synchronization"].(map[string]any); ok {
 		_ = s.AddExtra(rest, nil)
+	}
+	if c.CancelInProgress {
+		if err := e.markArg(caps.PipelineConcurrency, pp.path, concurrencyArg{Cancel: true}); err != nil {
+			e.lose(pp.path, caps.PipelineConcurrency, "the cancel marker cannot be written: "+err.Error())
+		}
 	}
 	e.emulate(pp.path, caps.PipelineConcurrency, "synchronization mutex", "a second run waits for the mutex"+cancelDetail(c))
 	return s.N
@@ -270,10 +287,17 @@ func dagTemplate(px map[string]any, name, prefix string, tasks []*yaml.Node, ent
 
 var _ = ctxparam.Prefix
 
-// placeholder adds the one task that a DAG needs when the pipeline has no job that runs at entry.
+// placeholderArg names the task that stands in for a pipeline with no job.
+type placeholderArg struct {
+	Task string `json:"task"`
+}
+
 func (e *emitter) placeholder(pp *plan, tasks, tmpls []*yaml.Node) ([]*yaml.Node, []*yaml.Node) {
 	e.note(pp.path, caps.StepScript, caps.Emulated, "placeholder task", "the pipeline has no job and an Argo DAG needs one task; a task that runs "+placeholderScript+" stands in")
 	name := unique(pp.taskNames, placeholderTask, maxName)
+	if err := e.markArg(caps.StepScript, pp.path, placeholderArg{Task: name}); err != nil {
+		e.lose(pp.path, caps.StepScript, "the placeholder marker cannot be written: "+err.Error())
+	}
 	tmplName := unique(pp.tmpls, name, maxName)
 	t := newMap()
 	t.SetStr("name", name)
