@@ -127,6 +127,7 @@ func (b *jobBuilder) header(r *reader) error {
 			return err
 		}
 	}
+	restoredIf := false
 	if v, ok := r.Take("when"); ok {
 		w, isText := text(v)
 		if !isText {
@@ -134,6 +135,14 @@ func (b *jobBuilder) header(r *reader) error {
 		}
 		if w != disabledWhen() || !b.disabledMarker() {
 			b.job.If = andExpr(b.job.If, b.when(w, r.Line("when")))
+		} else {
+			restoredIf = true
+		}
+	}
+	if !restoredIf {
+		var held disabledArg
+		if markerArg(b.c.src.doc.Head, b.path, caps.JobIf, &held) {
+			b.c.ignored(b.path, caps.JobIf, "the task is no longer disabled by when false after pipemaster wrote the file; the file content is kept")
 		}
 	}
 	if v, ok := r.Take("continueOn"); ok {
