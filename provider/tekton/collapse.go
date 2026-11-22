@@ -134,13 +134,13 @@ func (b *jobBuilder) collapsePipelineEnv() {
 	b.job.Env = slices.Clone(b.job.Env[n:])
 }
 
-// sameValue compares env values; a written expression reads back in canonical form, so only its kind is compared.
+// sameValue compares env values. Both come from a parse, so an expression is compared in its canonical text.
 func sameValue(a, b ir.Value) bool {
 	if a.Kind != b.Kind {
 		return false
 	}
 	if a.Kind == ir.ValueExpr {
-		return true
+		return expr.String(a.Expr) == expr.String(b.Expr)
 	}
 	return a.Lit == b.Lit && a.Secret == b.Secret
 }

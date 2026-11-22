@@ -135,3 +135,19 @@ func TestEditedWorkDirIsKept(t *testing.T) {
 		t.Fatalf("work dir = %q", got)
 	}
 }
+
+func TestEditedPipelineEnvExpressionIsKept(t *testing.T) {
+	p := project(scriptJob("a", "true"))
+	p.Pipelines[0].Env = []ir.Var{{Name: "REF", Value: ir.Value{Kind: ir.ValueExpr, Expr: refExpr("branch")}}}
+	back := editedMarker(t, p, taskFile, "$(params.ctx-branch)", "$(params.ctx-sha)")
+	if len(back.Pipelines[0].Env) != 0 {
+		t.Fatalf("env restored: %+v", back.Pipelines[0].Env)
+	}
+	var kept bool
+	for _, st := range back.Pipelines[0].Jobs[0].Env {
+		kept = kept || st.Name == "REF"
+	}
+	if !kept {
+		t.Fatalf("the edited env must stay on the job: %+v", back.Pipelines[0].Jobs[0].Env)
+	}
+}
