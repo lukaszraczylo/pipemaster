@@ -495,7 +495,7 @@ The following table comes from `pipemaster caps --from gha --to argo --format md
 | pipeline.concurrency | native | emulated | synchronization mutex (cancel-in-progress is lost; a second run waits for the mutex) |
 | pipeline.env | native | emulated | copied into the env of every container (a step variable of the same name wins) |
 | pipeline.finally | emulated | native | exit handler (hooks.exit) that runs a second dag |
-| pipeline.inputs | native | native | spec arguments parameters (every input is a string parameter; a choice becomes enum) |
+| pipeline.inputs | native | native | spec arguments parameters (every input is a string parameter) |
 | pipeline.permissions | native | lost | (permissions come from the ServiceAccount of the Workflow) |
 | project.multi_pipeline | native | emulated | one WorkflowTemplate per IR pipeline (each pipeline gets its own trigger) |
 | script.interpolation | native | native |  |
