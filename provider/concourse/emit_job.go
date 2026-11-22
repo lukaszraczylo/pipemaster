@@ -9,6 +9,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
+	exprconcourse "github.com/lukaszraczylo/pipemaster/expr/concourse"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
@@ -192,7 +193,15 @@ func (jx *jobEmitter) condition() {
 		e.lose(jx.path, caps.JobIf, "the condition has no shell test form; the job has no triggering get, so a person starts it")
 		return
 	}
-	_ = refs
+	probe := jx.newScope("")
+	for _, r := range refs {
+		env, spelled := probe.refVar(r)
+		if want, named := exprconcourse.EnvName(r); !spelled || !named || env != want {
+			jx.manual = true
+			e.lose(jx.path, caps.JobIf, "the reference "+expr.String(r)+" has no spelling in a Concourse task; the job has no triggering get, so a person starts it")
+			return
+		}
+	}
 	jx.guard = j.If
 	e.emulate(jx.path, caps.JobIf, "shell guard on each script task", "every script task of the job starts with the guard of the condition")
 	e.markArg(caps.JobIf, jx.mpath, ifArg{If: expr.String(j.If)})
