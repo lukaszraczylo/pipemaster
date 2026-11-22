@@ -77,25 +77,40 @@ func (e *emitter) needsMain(j *ir.Job) bool {
 	return false
 }
 
+// actionTarget resolves the registry entry of a repo action step.
+func actionTarget(st *ir.Step) (actions.Target, bool) {
+	if st.Action == nil || st.Action.Kind != ir.ActionRepo {
+		return actions.Target{}, false
+	}
+	with := map[string]string{}
+	for k, v := range st.With {
+		if s, ok := valueCanon(v); ok {
+			with[k] = s
+		}
+	}
+	return actions.Lookup(*st.Action, dialect, with)
+}
+
 // runsContainer is true when the step becomes a container of the set.
 func (e *emitter) runsContainer(st *ir.Step) bool {
 	switch st.Kind {
 	case ir.StepScript, "":
 		return len(st.Script) > 0 || extOf(st.Ext)[ExtScriptLine] != nil
 	case ir.StepAction:
-		if st.Action == nil || st.Action.Kind != ir.ActionRepo {
-			return false
-		}
-		with := map[string]string{}
-		for k, v := range st.With {
-			if s, ok := valueCanon(v); ok {
-				with[k] = s
-			}
-		}
-		t, ok := actions.Lookup(*st.Action, dialect, with)
+		t, ok := actionTarget(st)
 		return ok && t.Kind == actions.KindScript && t.Support.Level != caps.Lost
 	}
 	return false
+}
+
+// holdsPlace is true when an action step that Argo does not run gets a placeholder container, so the file keeps
+// the place of the step.
+func holdsPlace(st *ir.Step) bool {
+	if st.Kind != ir.StepAction {
+		return false
+	}
+	t, ok := actionTarget(st)
+	return !ok || t.Support.Level == caps.Lost || t.Kind == actions.KindDownload
 }
 
 // job writes the DAG task and the template of one job.
@@ -193,7 +208,13 @@ func (sx *stepCtx) containers(jx map[string]any) (conts []*container, taskStep *
 			producing = append(producing, st)
 		}
 	}
-	names := stepNames(producing, e.needsMain(j), e, tc.jp.path)
+	var holders []*ir.Step
+	for _, st := range j.Steps {
+		if st != nil && holdsPlace(st) {
+			holders = append(holders, st)
+		}
+	}
+	names := stepNames(producing, holders, e.needsMain(j), e, tc.jp.path)
 	for i, st := range j.Steps {
 		if st == nil {
 			continue
@@ -203,10 +224,7 @@ func (sx *stepCtx) containers(jx map[string]any) (conts []*container, taskStep *
 		last := len(producing) > 0 && producing[len(producing)-1] == st
 		switch st.Kind {
 		case ir.StepAction:
-			name, ok := names[st]
-			if !ok {
-				name = st.ID
-			}
+			name := names[st]
 			sx.act, sx.disabled = actionArg{}, false
 			at := len(conts)
 			if c := sx.actionStep(st, name, last); c != nil {
@@ -258,14 +276,14 @@ func (e *emitter) taskTemplate(tc *jobCtx, tm *wmap, st *ir.Step) {
 // containerTemplate writes the containerSet of the job.
 func (e *emitter) containerTemplate(tc *jobCtx, tm *wmap, conts []*container, jx map[string]any) {
 	path := tc.jp.path
-	if len(conts) == 0 {
+	if len(conts) == 0 || (e.needsMain(tc.jp.j) && !slices.ContainsFunc(conts, func(c *container) bool { return c.name == mainStep })) {
 		c := &container{name: mainStep, m: newMap(), image: defaultImage}
 		c.m.SetStr("name", mainStep)
 		c.m.SetStr("image", tc.jobImage())
 		c.m.Set("command", strSeq([]string{shellCommand, shellFlags}))
 		c.m.Set("args", seqOf(str("true")))
 		c.m.SetStr("workingDir", workspaceMount)
-		conts = []*container{c}
+		conts = append(conts, c)
 		e.emulate(path, caps.StepScript, "no-op container", "the job runs no script, so a container named main carries its inputs and outputs")
 		if err := e.markArg(caps.StepScript, path, struct{}{}); err != nil {
 			e.lose(path, caps.StepScript, "the no-op marker cannot be written: "+err.Error())

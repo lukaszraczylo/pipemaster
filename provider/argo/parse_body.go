@@ -607,6 +607,10 @@ func (b *jobBuilder) containerSet(r *reader) error {
 		if n.st, n.image, err = b.stepOf(id, nr, false); err != nil {
 			return fmt.Errorf("container %s: %w", name, err)
 		}
+		if b.holds == nil {
+			b.holds = map[string]string{}
+		}
+		b.holds[id] = canonJSON(plain(cm.Subset(restKeys(cm, keyDeps))))
 		nodes = append(nodes, n)
 	}
 	order, err := sortNodes(nodes)

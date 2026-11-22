@@ -64,7 +64,7 @@ type stepCtx struct {
 
 // stepName gives each step with a container its name. The last container is main when the job has outputs or
 // artifacts, because Argo reads them from the container of that name only.
-func stepNames(steps []*ir.Step, wantMain bool, e *emitter, path string) map[*ir.Step]string {
+func stepNames(steps, holders []*ir.Step, wantMain bool, e *emitter, path string) map[*ir.Step]string {
 	names := map[*ir.Step]string{}
 	taken := map[string]bool{}
 	var last *ir.Step
@@ -77,6 +77,9 @@ func stepNames(steps []*ir.Step, wantMain bool, e *emitter, path string) map[*ir
 		if st == last {
 			continue
 		}
+		names[st] = e.dnsName(taken, path+"/step/"+st.ID, "step id", st.ID, maxName, true)
+	}
+	for _, st := range holders {
 		names[st] = e.dnsName(taken, path+"/step/"+st.ID, "step id", st.ID, maxName, true)
 	}
 	return names
@@ -339,7 +342,7 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool) *container {
 	if st.Action == nil || st.Action.Kind != ir.ActionRepo {
 		e.lose(path, caps.StepAction, "the action "+actionRef(st.Action)+" has no Argo form; the step is dropped")
 		e.comment(path, "uses: "+actionRef(st.Action))
-		return nil
+		return sx.placeholder(st, name)
 	}
 	with := map[string]string{}
 	for k, v := range st.With {
@@ -354,14 +357,14 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool) *container {
 	if !ok {
 		e.lose(path, caps.StepAction, "the action "+actionRef(st.Action)+" has no Argo mapping; Argo does not run the step, and the marker and a comment keep the reference")
 		e.comment(path, "uses: "+actionRef(st.Action))
-		return nil
+		return sx.placeholder(st, name)
 	}
 	e.note(path, caps.StepAction, t.Support.Level, t.Support.Strategy, t.Support.Caveat)
 	for _, k := range t.Unmapped {
 		e.lose(path, caps.StepAction, "the input "+k+" of the action has no Argo form")
 	}
 	if t.Support.Level == caps.Lost {
-		return nil
+		return sx.placeholder(st, name)
 	}
 	sx.act.Kind = t.Kind
 	nIn, nOut := len(sx.artIn), len(sx.artOut)
@@ -382,6 +385,7 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool) *container {
 		}
 	case actions.KindDownload:
 		sx.download(path, t)
+		return sx.placeholder(st, name)
 	case actions.KindScript:
 		cp := *st
 		cp.Script, cp.Kind, cp.Action = t.Script, ir.StepScript, nil
@@ -390,6 +394,26 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool) *container {
 		return c
 	}
 	return nil
+}
+
+// placeholder writes the container that keeps the place of an action that Argo does not run. The marker holds
+// the canonical text of the container, so the parser restores the action only when the file still has it.
+func (sx *stepCtx) placeholder(st *ir.Step, name string) *container {
+	tc := sx.tc
+	path := tc.jp.path + "/step/" + st.ID
+	c := &container{name: name, m: newMap()}
+	c.m.SetStr("name", name)
+	if name != st.ID {
+		c.m.KeyComment("name", idComment(st.ID))
+	}
+	c.image = sx.imageOf(st, path)
+	c.m.SetStr("image", c.image)
+	c.m.Set("command", strSeq([]string{shellCommand, shellFlags}))
+	c.m.Set("args", seqOf(block(placeholderScript)))
+	c.m.SetStr("workingDir", workspaceMount)
+	sx.act.Hold = nodeCanon(c.m.N)
+	tc.e.emulate(path, caps.StepAction, "placeholder container", "Argo does not run the action; a container that runs "+placeholderScript+" keeps its place")
+	return c
 }
 
 // markAction writes the marker that holds an action step. at is the number of containers before the step.

@@ -34,6 +34,8 @@ type jobBuilder struct {
 	artifactNeeds map[string]bool
 	// gitArts maps each step that a git input artifact made to the canonical text of that artifact.
 	gitArts map[*ir.Step]string
+	// holds maps each container ID to the canonical text of its container, without the dependencies.
+	holds   map[string]string
 	path    string
 	finally bool
 }

@@ -63,6 +63,14 @@ func (b *jobBuilder) collapseHeld() {
 	used := map[*ir.Step]bool{}
 	var body []*ir.Step
 	var restored []heldAction
+	var placed []heldAction
+	for _, h := range held {
+		if h.arg.Hold != "" && b.restorePlaceholder(h, rest) {
+			placed = append(placed, h)
+		}
+	}
+	held = slices.DeleteFunc(held, func(h heldAction) bool { return h.arg.Hold != "" })
+	restored = append(restored, placed...)
 	ci := 0
 	for _, h := range held {
 		st := *h.step
@@ -92,6 +100,24 @@ func (b *jobBuilder) collapseHeld() {
 		b.dropImage(h.arg.Image)
 		b.dropArtifacts(h.arg.Arts)
 	}
+}
+
+// restorePlaceholder puts a held action in the place of the container that stands in for it. The container must
+// be in the file, unedited. The action then stands where the file has the container.
+func (b *jobBuilder) restorePlaceholder(h heldAction, rest []*ir.Step) bool {
+	i := slices.IndexFunc(rest, func(s *ir.Step) bool { return s.ID == h.step.ID })
+	switch {
+	case i < 0:
+		b.c.ignored(h.path, caps.StepAction, "the placeholder container was removed after pipemaster wrote the file; the action is not restored")
+	case b.holds[h.step.ID] != h.arg.Hold:
+		b.c.ignored(h.path, caps.StepAction, "the placeholder container was edited after pipemaster wrote the file; the file content is kept")
+	default:
+		st := *h.step
+		rest[i] = &st
+		b.c.restored[&st] = true
+		return true
+	}
+	return false
 }
 
 // heldEdit compares what the file holds for a step with what the emitter wrote. It returns why the marker cannot
