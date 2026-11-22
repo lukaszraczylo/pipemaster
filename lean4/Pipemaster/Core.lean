@@ -2,6 +2,14 @@ import Mathlib.Data.List.Nodup
 import Pipemaster.Dag
 
 namespace Pipemaster
+
+/-- Decides a bounded quantifier by walking the list. Without it, `∀ c ∈ l, P c` over `Char` resolves to Batteries'
+instance for `∀ c : Char, P c`, which tests all 1.1 million code points (about 280 ms per quantifier in
+`gen-vectors`). -/
+instance (priority := high) boundedForall {α : Type} (l : List α) (p : α → Prop) [DecidablePred p] :
+    Decidable (∀ x, x ∈ l → p x) :=
+  List.decidableBAll p l
+
 namespace Core
 
 /-! The IR subset the GHA and GitLab adapter models cover (Mirrors ir.CoreOf (ir/core.go)): one pipeline of
@@ -276,6 +284,7 @@ def Wf (p : Pipe) : Prop :=
   (∀ j ∈ p.all, ∀ s ∈ j.steps, validId s.id ∧ (varNames s.env).Nodup) ∧
   (∀ j ∈ p.jobs, j.onFailure = false) ∧ (∀ j ∈ p.fin, j.manual = false)
 
+set_option synthInstance.maxSize 256 in
 instance (p : Pipe) : Decidable (Wf p) := by unfold Wf; exact inferInstance
 
 /-- What GHA needs beyond `Wf`: a job with no script gets a placeholder from the emitter (gha noopScript). A job
