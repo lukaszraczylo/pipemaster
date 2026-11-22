@@ -46,8 +46,8 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 	c.inputsMarker(pl)
 	if v, ok := r.Take("synchronization"); ok {
 		c.synchronization(pl, v, r.Line("synchronization"))
-		c.concurrencyMarker(pl)
 	}
+	c.concurrencyMarker(pl)
 	r.Take(keyTemplates)
 	entry, err := c.entrypoint(r)
 	if err != nil {
