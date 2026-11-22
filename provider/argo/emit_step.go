@@ -16,17 +16,19 @@ import (
 )
 
 const (
-	workspaceName   = "workspace"
-	workspaceMount  = "/workspace"
-	outputsDir      = workspaceMount + "/.pipemaster/outputs"
-	artifactsDir    = workspaceMount + "/artifacts"
-	shellCommand    = "sh"
-	shellFlags      = "-ec"
-	continueTrap    = "trap 'exit 0' EXIT # pipemaster:continue-on-error"
-	disabledScript  = "exit 0 # pipemaster:lost the step condition has no shell form"
-	cloneHost       = "https://github.com/"
-	gitArtifactName = "source"
-	outEnvPrefix    = "PM_OUT_"
+	workspaceName     = "workspace"
+	workspaceMount    = "/workspace"
+	outputsDir        = workspaceMount + "/.pipemaster/outputs"
+	artifactsDir      = workspaceMount + "/artifacts"
+	shellCommand      = "sh"
+	shellFlags        = "-ec"
+	continueTrap      = "trap 'exit 0' EXIT # pipemaster:continue-on-error"
+	placeholderScript = "true"
+	placeholderTask   = "noop"
+	disabledScript    = "exit 0 # pipemaster:lost the step condition has no shell form"
+	cloneHost         = "https://github.com/"
+	gitArtifactName   = "source"
+	outEnvPrefix      = "PM_OUT_"
 )
 
 var nonIdent = regexp.MustCompile(`[^A-Za-z0-9_]`)

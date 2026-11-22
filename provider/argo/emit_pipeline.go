@@ -70,6 +70,9 @@ func (e *emitter) pipelineDoc(pp *plan) error {
 		tmpls = append(tmpls, out.tmpls...)
 	}
 	e.markPipelineEnv(pl, pp.path)
+	if len(tasks) == 0 {
+		tasks, tmpls = e.placeholder(pp, tasks, tmpls)
+	}
 	spec.Set("arguments", e.arguments(pp, px))
 	if pl.Concurrency != nil {
 		spec.Set("synchronization", e.synchronization(pp, px))
@@ -266,3 +269,24 @@ func dagTemplate(px map[string]any, name, prefix string, tasks []*yaml.Node, ent
 }
 
 var _ = ctxparam.Prefix
+
+// placeholder adds the one task that a DAG needs when the pipeline has no job that runs at entry.
+func (e *emitter) placeholder(pp *plan, tasks, tmpls []*yaml.Node) ([]*yaml.Node, []*yaml.Node) {
+	e.note(pp.path, caps.StepScript, caps.Emulated, "placeholder task", "the pipeline has no job and an Argo DAG needs one task; a task that runs "+placeholderScript+" stands in")
+	name := unique(pp.taskNames, placeholderTask, maxName)
+	tmplName := unique(pp.tmpls, name, maxName)
+	t := newMap()
+	t.SetStr("name", name)
+	t.SetStr("template", tmplName)
+	c := newMap()
+	c.SetStr("name", mainStep)
+	c.SetStr("image", defaultImage)
+	c.Set("command", strSeq([]string{shellCommand, shellFlags}))
+	c.Set("args", seqOf(str(placeholderScript)))
+	cs := newMap()
+	cs.Set("containers", seqOf(c.N))
+	tm := newMap()
+	tm.SetStr("name", tmplName)
+	tm.Set("containerSet", cs.N)
+	return append(tasks, t.N), append(tmpls, tm.N)
+}

@@ -271,3 +271,16 @@ func TestCheckoutPathIsStableAcrossArgoTrips(t *testing.T) {
 		t.Errorf("the second trip changed the IR:\n%s", diff)
 	}
 }
+
+func TestPipelineWithNoJobsEmitsAValidPlaceholder(t *testing.T) {
+	linttool.RequireArgo(t)
+	p := project()
+	files, rep := emit(t, p)
+	path := ".argo/workflows/ci.yaml"
+	if out, err := linttool.ArgoLint(t, path, []byte(files[path])); err != nil {
+		t.Fatalf("argo lint: %v\n%s\n%s", err, out, files[path])
+	}
+	if len(entries(rep, "no job")) == 0 {
+		t.Errorf("no report entry for the empty pipeline: %v", rep.Entries)
+	}
+}
