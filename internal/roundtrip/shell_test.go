@@ -23,7 +23,7 @@ var exprRE = regexp.MustCompile(`\$\{\{.*?\}\}`)
 var shellArgsRE = regexp.MustCompile(`(?s)^-ec '(.*)'$`)
 
 // scriptsOf lists the shell scripts of a pipeline file.
-func scriptsOf(data []byte) []string {
+func scriptsOf(data []byte) ([]string, error) {
 	var roots []any
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	for {
@@ -33,7 +33,7 @@ func scriptsOf(data []byte) []string {
 			break
 		}
 		if err != nil {
-			return nil
+			return nil, err
 		}
 		roots = append(roots, root)
 	}
@@ -78,14 +78,19 @@ func scriptsOf(data []byte) []string {
 	for _, root := range roots {
 		walk(root)
 	}
-	return out
+	return out, nil
 }
 
 // checkShellSyntax fails on an emitted script that `sh -n` rejects.
 func checkShellSyntax(t *testing.T, id string, files map[string][]byte) {
 	t.Helper()
 	for _, name := range names(files) {
-		for _, s := range scriptsOf(files[name]) {
+		scripts, err := scriptsOf(files[name])
+		if err != nil {
+			t.Errorf("%s: cannot read the emitted file: %v", name, err)
+			continue
+		}
+		for _, s := range scripts {
 			cmd := exec.Command("sh", "-n") // #nosec G204 -- fixed binary
 			s = exprRE.ReplaceAllString(s, "X")
 			if id == provider.Woodpecker || id == provider.Drone {

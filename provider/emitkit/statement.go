@@ -53,10 +53,24 @@ type shScanner struct {
 	cmdPos  bool
 	cont    bool
 	opTrail bool
+	// needBody is set after a function name until its body starts; fnName after the `function` keyword; fnCand
+	// after a command word, which `()` turns into a function name.
+	needBody, fnName, fnCand bool
+}
+
+const arith = "))"
+
+func (s *shScanner) inArith() bool {
+	for _, c := range s.stack {
+		if c == arith {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *shScanner) clean() bool {
-	return len(s.stack) == 0 && s.quote == 0 && !s.cont && !s.opTrail && s.here == nil && len(s.pending) == 0
+	return len(s.stack) == 0 && s.quote == 0 && !s.cont && !s.opTrail && s.here == nil && len(s.pending) == 0 && !s.needBody && !s.fnName
 }
 
 func (s *shScanner) top() string {
@@ -111,8 +125,6 @@ func (s *shScanner) nextHere() {
 	}
 }
 
-const wordBreak = " \t;&|()<>'\"`\\"
-
 func (s *shScanner) scan(line string) {
 	var word strings.Builder
 	plain := true
@@ -147,6 +159,11 @@ func (s *shScanner) scan(line string) {
 			s.quote = c
 		case c == '#' && word.Len() == 0 && plain:
 			return
+		case c == '$' && strings.HasPrefix(line[i:], "$(("):
+			plain = false
+			s.push(arith)
+			s.cmdPos = false
+			i += 2
 		case c == '$' && i+1 < len(line) && line[i+1] == '(':
 			plain = false
 			s.push(")")
@@ -154,18 +171,10 @@ func (s *shScanner) scan(line string) {
 			i++
 		case c == '(':
 			flush()
-			if s.top() != "esac" {
-				s.push(")")
-			}
-			s.cmdPos = true
+			i = s.openParen(line, i)
 		case c == ')':
 			flush()
-			if s.top() == ")" {
-				s.pop(")")
-				s.cmdPos = false
-			} else {
-				s.cmdPos = s.top() == "esac"
-			}
+			i = s.closeParen(line, i)
 		case c == ';' || c == '&' || c == '|':
 			flush()
 			s.cmdPos = true
@@ -175,7 +184,7 @@ func (s *shScanner) scan(line string) {
 			} else if c == '|' {
 				s.opTrail = true
 			}
-		case c == '<' && strings.HasPrefix(line[i:], "<<") && !strings.HasPrefix(line[i:], "<<<"):
+		case c == '<' && !s.inArith() && strings.HasPrefix(line[i:], "<<") && !strings.HasPrefix(line[i:], "<<<"):
 			flush()
 			i = s.heredocOp(line, i+2)
 		default:
@@ -183,6 +192,44 @@ func (s *shScanner) scan(line string) {
 		}
 	}
 	flush()
+}
+
+// openParen handles a `(` and returns the index of the last byte it consumed. `f()` and `function f()` define a
+// function, so its body must follow; `((` at a command position opens arithmetic.
+func (s *shScanner) openParen(line string, i int) int {
+	rest := strings.TrimLeft(line[i+1:], " \t")
+	if strings.HasPrefix(rest, ")") && (s.fnCand || s.needBody) {
+		s.needBody, s.fnCand, s.cmdPos = true, false, true
+		return len(line) - len(rest)
+	}
+	s.needBody = false
+	switch {
+	case s.cmdPos && strings.HasPrefix(line[i:], "(("):
+		s.push(arith)
+		s.cmdPos = false
+		return i + 1
+	case s.top() != "esac":
+		s.push(")")
+	}
+	s.cmdPos = true
+	return i
+}
+
+func (s *shScanner) closeParen(line string, i int) int {
+	switch s.top() {
+	case arith:
+		if i+1 < len(line) && line[i+1] == ')' {
+			s.pop(arith)
+			i++
+		}
+		s.cmdPos = false
+	case ")":
+		s.pop(")")
+		s.cmdPos = false
+	default:
+		s.cmdPos = s.top() == "esac"
+	}
+	return i
 }
 
 // inQuote advances over quoted text from line[i] and returns the index of the last consumed byte.
@@ -229,6 +276,11 @@ func (s *shScanner) heredocOp(line string, i int) int {
 }
 
 func (s *shScanner) keyword(w string, plain bool) {
+	if s.fnName {
+		s.fnName, s.needBody, s.cmdPos = false, true, true
+		return
+	}
+	s.needBody = false
 	if !plain || !s.cmdPos {
 		s.cmdPos = false
 		return
@@ -249,9 +301,13 @@ func (s *shScanner) keyword(w string, plain bool) {
 	case "fi", "done", "esac", "}":
 		s.pop(w)
 		s.cmdPos = false
+	case "function":
+		s.fnName = true
+		s.cmdPos = false
 	case "then", "do", "else", "elif", "!", "time":
 	default:
 		s.cmdPos = false
+		s.fnCand = true
 	}
 }
 

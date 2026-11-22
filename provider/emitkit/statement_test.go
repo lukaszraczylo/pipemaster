@@ -45,6 +45,14 @@ func TestCommentSpans(t *testing.T) {
 		{"unclosed if runs to the end", []string{"echo a", "if x; then", "  echo X", "echo b"}, []int{2}, []emitkit.Span{{From: 1, To: 3, Open: true}}},
 		{"stray fi is ignored", []string{"fi", "echo X"}, []int{1}, []emitkit.Span{{From: 1, To: 1}}},
 		{"unterminated heredoc runs to the end", []string{"cat <<EOF", "X"}, []int{1}, []emitkit.Span{{From: 0, To: 1, Open: true}}},
+		{"function brace same line", []string{"f() {", "  echo X", "}", "echo b"}, []int{1}, []emitkit.Span{{From: 0, To: 2}}},
+		{"function keyword form", []string{"function f {", "  echo X", "}", "echo b"}, []int{1}, []emitkit.Span{{From: 0, To: 2}}},
+		{"function keyword with parens", []string{"function f() {", "  echo X", "}", "echo b"}, []int{1}, []emitkit.Span{{From: 0, To: 2}}},
+		{"function brace next line", []string{"f()", "{", "  echo X", "}", "echo b"}, []int{2}, []emitkit.Span{{From: 0, To: 3}}},
+		{"function subshell body", []string{"f() (", "  echo X", ")", "echo b"}, []int{1}, []emitkit.Span{{From: 0, To: 2}}},
+		{"function one-liner", []string{"f() { echo a; }", "echo X"}, []int{1}, []emitkit.Span{{From: 1, To: 1}}},
+		{"arithmetic shift is no here-doc", []string{"x=$((1<<2))", "echo X", "echo b"}, []int{1}, []emitkit.Span{{From: 1, To: 1}}},
+		{"arithmetic command shift", []string{"((x = 1<<2))", "echo X"}, []int{1}, []emitkit.Span{{From: 1, To: 1}}},
 		{"expression text is not shell", []string{"if [ \"${{ a.b }}\" = x ]; then", "fi"}, []int{0}, []emitkit.Span{{From: 0, To: 1}}},
 	}
 	for _, tt := range tests {

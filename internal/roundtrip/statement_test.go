@@ -93,3 +93,10 @@ func TestUnspellableExpressionLeavesValidShell(t *testing.T) {
 		})
 	}
 }
+
+// A file that does not decode must fail the shell check instead of being skipped.
+func TestScriptsOfReportsDecodeError(t *testing.T) {
+	if _, err := scriptsOf([]byte("a: [unclosed\n")); err == nil {
+		t.Fatal("want a decode error")
+	}
+}
