@@ -3,7 +3,6 @@ package argo
 
 import (
 	"bytes"
-	"errors"
 	"io/fs"
 	"path"
 	"regexp"
@@ -12,9 +11,8 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
-	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/validate"
 )
 
 const (
@@ -36,22 +34,17 @@ const (
 // Argo tags never start that way.
 var helmText = regexp.MustCompile(`\{\{-|\{\{\s*\.[A-Za-z]`)
 
-// ErrNoEmitter is returned by Emit until the Argo emitter exists.
-var ErrNoEmitter = errors.New("argo: the emitter is not available yet")
-
 type adapter struct{}
 
 // New returns the Argo provider.
 func New() provider.Provider { return adapter{} }
 
-func init() { provider.Register(New()) }
+func init() {
+	provider.Register(New())
+	validate.RegisterArgo(dialect, []string{dirName + "/*.yaml", dirName + "/*.yml", dirName + "/*/*.yaml", dirName + "/*/*.yml"})
+}
 
 func (adapter) ID() string { return dialect }
-
-// Emit is not available yet.
-func (adapter) Emit(*ir.Project) (map[string][]byte, *report.Report, error) {
-	return nil, nil, ErrNoEmitter
-}
 
 // SourceFiles lists the YAML files under .argo/ that Parse reads, in path order.
 func (adapter) SourceFiles(fsys fs.FS) ([]string, error) { return yamlFiles(fsys) }

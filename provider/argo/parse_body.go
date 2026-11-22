@@ -43,6 +43,9 @@ func (b *jobBuilder) body(t *omap) error {
 			return err
 		}
 	}
+	if v, ok := r.Take("volumes"); ok && !isWorkspaceVolumes(v) {
+		r.Release("volumes")
+	}
 	if v, ok := r.Take("nodeSelector"); ok {
 		b.nodeSelector(v, r.Line("nodeSelector"))
 	}
@@ -59,6 +62,7 @@ func (b *jobBuilder) body(t *omap) error {
 		return err
 	}
 	b.k.KeepRest(r)
+	b.collapseSteps()
 	return nil
 }
 
@@ -137,7 +141,8 @@ func (b *jobBuilder) gitArtifact(e any) bool {
 	k := newSink(b.c.p.rep, b.c.file, b.path+"/step/"+st.ID)
 	repoURL, _ := text(gm.Vals["repo"])
 	m := githubRepo.FindStringSubmatch(repoURL)
-	whole := m != nil && len(am.Order) <= 3
+	ctxRepo := repoURL == cloneHost+"{{workflow.parameters.ctx-repo}}.git"
+	whole := (m != nil || ctxRepo) && len(am.Order) <= 3
 	for _, key := range am.Order {
 		whole = whole && (key == "name" || key == "path" || key == "git")
 	}
@@ -154,16 +159,19 @@ func (b *jobBuilder) gitArtifact(e any) bool {
 	}
 	st.Kind = ir.StepAction
 	st.Action = &ref
-	st.With = map[string]ir.Value{"repository": {Lit: m[1] + "/" + m[2]}}
+	st.With = map[string]ir.Value{}
+	if !ctxRepo {
+		st.With["repository"] = ir.Value{Lit: m[1] + "/" + m[2]}
+	}
 	for _, kv := range [][2]string{{"revision", "ref"}, {"depth", "fetch-depth"}} {
-		if t, ok := text(gm.Vals[kv[0]]); ok {
+		if t, ok := text(gm.Vals[kv[0]]); ok && (!ctxRepo || t != "{{workflow.parameters.ctx-sha}}") {
 			st.With[kv[1]] = ir.Value{Lit: t}
 		}
 	}
-	if t, ok := text(am.Vals["path"]); ok {
+	if t, ok := text(am.Vals["path"]); ok && t != workspaceMount {
 		st.With["path"] = ir.Value{Lit: t}
 	}
-	if name, ok := text(am.Vals["name"]); ok {
+	if name, ok := text(am.Vals["name"]); ok && name != gitArtifactName {
 		k.Keep("artifact", map[string]any{"name": name}, caps.StepAction, "the name of git artifact "+name+" has no IR field; kept in Ext", am.Lines["name"])
 		st.Ext = k.Ext()
 	}
@@ -381,7 +389,7 @@ func (b *jobBuilder) container(r *reader, kind string) error {
 }
 
 func imageOf(ref string) *ir.Image {
-	if ref == "" {
+	if ref == "" || ref == defaultImage {
 		return nil
 	}
 	return &ir.Image{Ref: ref}
@@ -405,7 +413,7 @@ func (b *jobBuilder) stepOf(id string, r *reader, script bool) (*ir.Step, string
 	} else if err := b.commandLine(st, k, r); err != nil {
 		return nil, "", err
 	}
-	if t, ok := textOf(r.Take("workingDir")); ok {
+	if t, ok := textOf(r.Take("workingDir")); ok && t != workspaceMount {
 		var err error
 		if st.WorkDir, err = b.tx.template(t); err != nil {
 			return nil, "", err
@@ -457,6 +465,10 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, r *reader) error {
 	if !hasCmd && !hasArgs {
 		return nil
 	}
+	if lines, ok := b.shellScript(cmd, args); ok {
+		st.Script = lines
+		return nil
+	}
 	var words []string
 	for _, part := range []any{cmd, args} {
 		if part == nil {
@@ -480,6 +492,24 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, r *reader) error {
 	k.Out[ExtArgs] = plain(args)
 	k.Note(caps.StepScript, "command and args are written as one script line; both lists are kept in Ext", 0)
 	return nil
+}
+
+// shellScript reads command [sh, -ec] with one argument as the script lines that the emitter writes.
+func (b *jobBuilder) shellScript(cmd, args any) ([]string, bool) {
+	c, okC := textList(cmd)
+	a, okA := textList(args)
+	if !okC || !okA || len(c) != 2 || c[0] != shellCommand || c[1] != shellFlags || len(a) != 1 {
+		return nil, false
+	}
+	var lines []string
+	for _, l := range strings.Split(strings.TrimSuffix(a[0], "\n"), "\n") {
+		tl, err := b.tx.template(l)
+		if err != nil {
+			return nil, false
+		}
+		lines = append(lines, tl)
+	}
+	return lines, true
 }
 
 // node is one container of a containerSet.
@@ -517,7 +547,11 @@ func (b *jobBuilder) containerSet(r *reader) error {
 			}
 		}
 		var err error
-		if n.st, n.image, err = b.stepOf(name, nr, false); err != nil {
+		id := name
+		if mk := cm.Marks["name"]; mk != "" {
+			id = mk
+		}
+		if n.st, n.image, err = b.stepOf(id, nr, false); err != nil {
 			return fmt.Errorf("container %s: %w", name, err)
 		}
 		nodes = append(nodes, n)
@@ -527,7 +561,11 @@ func (b *jobBuilder) containerSet(r *reader) error {
 		return err
 	}
 	b.placeNodes(order)
-	if rest := restKeys(m, "containers"); len(rest) > 0 {
+	if mounts, ok := m.Vals["volumeMounts"]; ok && isWorkspaceMounts(mounts) {
+		cr.Take("volumeMounts")
+	}
+	if rest := restKeys(m, "containers", "volumeMounts"); len(rest) > 0 || (m.Vals["volumeMounts"] != nil && !isWorkspaceMounts(m.Vals["volumeMounts"])) {
+		rest = restKeys(m, "containers")
 		for _, key := range rest {
 			cr.Take(key)
 		}
@@ -628,4 +666,28 @@ func (b *jobBuilder) taskStep(r *reader, kind string) {
 	k := newSink(b.c.p.rep, b.c.file, b.path+"/step/"+mainStep)
 	k.Keep(ExtTemplate, sub, caps.StepAction, kind+" template has no IR form; it is kept in Ext as one task step", r.Line(kind))
 	b.job.Steps = append(b.job.Steps, &ir.Step{ID: mainStep, Kind: ir.StepTask, Ext: k.Ext()})
+}
+
+// isWorkspaceMounts is true for the one mount that the emitter writes on every containerSet.
+func isWorkspaceMounts(v any) bool {
+	l := listOf(v)
+	if len(l) != 1 {
+		return false
+	}
+	m, ok := asMap(l[0])
+	n, _ := text(valueOf(m, "name"))
+	p, _ := text(valueOf(m, "mountPath"))
+	return ok && len(m.Order) == 2 && n == workspaceName && p == workspaceMount
+}
+
+// isWorkspaceVolumes is true for the one emptyDir volume that the emitter writes on every template.
+func isWorkspaceVolumes(v any) bool {
+	l := listOf(v)
+	if len(l) != 1 {
+		return false
+	}
+	m, ok := asMap(l[0])
+	n, _ := text(valueOf(m, "name"))
+	e, isMap := asMap(valueOf(m, "emptyDir"))
+	return ok && len(m.Order) == 2 && n == workspaceName && isMap && len(e.Order) == 0
 }

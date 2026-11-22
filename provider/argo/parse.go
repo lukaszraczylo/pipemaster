@@ -145,6 +145,9 @@ func (p *project) classify(d *rawDoc) {
 	meta, _ := asMap(d.Top.Vals["metadata"])
 	spec, _ := asMap(d.Top.Vals["spec"])
 	name := nameOf(meta)
+	if p.isGeneratedRBAC(d) {
+		return
+	}
 	if !hasAPI(d) {
 		p.resources = append(p.resources, d)
 		return

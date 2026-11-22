@@ -43,7 +43,11 @@ type usedEvent struct{ source, entry string }
 type dataFilter struct {
 	path   string
 	values []string
+	// neq marks an exprs entry that excludes the value; gate marks the fork gate of a pull request.
+	neq, gate bool
 }
+
+var exprNotEqual = regexp.MustCompile(`^(\w+) != '([^']+)'$`)
 
 // dependency maps one dependency to triggers. why is empty when it succeeded; otherwise it says what has no IR form.
 func (p *project) dependency(dep *omap, k *sink) (out []ir.Trigger, used usedEvent, why string) {
@@ -133,8 +137,8 @@ func dataFilters(dep *omap) ([]dataFilter, string) {
 	var out []dataFilter
 	for _, key := range fm.Order {
 		switch key {
-		case "data":
-		case "dataLogicalOperator":
+		case "data", "exprs":
+		case "dataLogicalOperator", "exprLogicalOperator":
 			if op, _ := text(fm.Vals[key]); op != "" && op != logicalAnd {
 				return nil, "the data filters combine with " + op
 			}
@@ -159,6 +163,36 @@ func dataFilters(dep *omap) ([]dataFilter, string) {
 		}
 		seen[path] = true
 		out = append(out, dataFilter{path: path, values: vals})
+	}
+	extra, why := exprFilters(fm)
+	return append(out, extra...), why
+}
+
+// exprFilters reads the exprs entries that the emitter writes: an excluded ref and the fork gate.
+func exprFilters(fm *omap) ([]dataFilter, string) {
+	var out []dataFilter
+	for _, e := range listOf(fm.Vals["exprs"]) {
+		m, _ := asMap(e)
+		ex, _ := text(valueOf(m, "expr"))
+		fields := listOf(valueOf(m, "fields"))
+		if m == nil || len(m.Order) != 2 {
+			return nil, "an expression filter has keys beside expr and fields"
+		}
+		paths := map[string]string{}
+		for _, f := range fields {
+			fm, _ := asMap(f)
+			n, _ := text(valueOf(fm, "name"))
+			p, _ := text(valueOf(fm, "path"))
+			paths[n] = p
+		}
+		switch sub := exprNotEqual.FindStringSubmatch(ex); {
+		case ex == exprFork && len(paths) == 2 && paths[fieldHead] == pathHeadRepo && paths[exprBaseName] == pathRepo:
+			out = append(out, dataFilter{gate: true})
+		case sub != nil && len(paths) == 1 && (paths[sub[1]] == pathRef || paths[sub[1]] == pathBaseRef):
+			out = append(out, dataFilter{path: paths[sub[1]], values: []string{sub[2]}, neq: true})
+		default:
+			return nil, "the expression filter " + ex + " has no IR form"
+		}
 	}
 	return out, ""
 }
@@ -196,8 +230,30 @@ func (p *project) githubKinds(entry *omap, filters []dataFilter) (kinds []string
 // buildTriggers makes one trigger per event kind with the branch and tag filters that the data filters hold.
 func (p *project) buildTriggers(kinds []string, filters []dataFilter, k *sink) ([]ir.Trigger, string) {
 	var branches, tags, base []string
+	var excBranches, excTags, excBase []string
 	for _, f := range filters {
 		var err string
+		switch {
+		case f.gate:
+			if !slices.Contains(kinds, eventPR) || slices.Contains(kinds, eventPush) {
+				return nil, "the fork gate belongs to pull request events only"
+			}
+			continue
+		case f.neq && f.path == pathRef:
+			name := f.values[0]
+			switch {
+			case strings.HasPrefix(name, refHeads):
+				excBranches = append(excBranches, strings.TrimPrefix(name, refHeads))
+			case strings.HasPrefix(name, refTags):
+				excTags = append(excTags, strings.TrimPrefix(name, refTags))
+			default:
+				return nil, "the excluded ref " + name + " names neither a branch nor a tag"
+			}
+			continue
+		case f.neq:
+			excBase = append(excBase, f.values[0])
+			continue
+		}
 		switch f.path {
 		case pathEvent:
 		case pathRef:
@@ -226,7 +282,7 @@ func (p *project) buildTriggers(kinds []string, filters []dataFilter, k *sink) (
 		case kind == eventPR && len(branches)+len(tags) > 0:
 			return nil, "a body.ref filter does not apply to pull request events"
 		case kind == eventPR:
-			tr.Kind, tr.Branches = ir.TriggerPR, ir.Filter{Include: base}
+			tr.Kind, tr.Branches = ir.TriggerPR, ir.Filter{Include: base, Exclude: excBase}
 			if !slices.ContainsFunc(filters, func(f dataFilter) bool { return f.path == pathAction }) {
 				p.rep.Add(report.Entry{
 					IRPath: k.Path, Feature: caps.TriggerFilterBranch, Level: caps.Emulated, Strategy: "default actions", SourceLoc: k.File,
@@ -238,9 +294,12 @@ func (p *project) buildTriggers(kinds []string, filters []dataFilter, k *sink) (
 		case len(branches) > 0 && len(tags) > 0:
 			return nil, "the ref filter holds branches and tags"
 		case len(tags) > 0:
-			tr.Kind, tr.Tags = ir.TriggerTag, ir.Filter{Include: tags}
+			if slices.Equal(tags, []string{globStar}) {
+				tags = nil
+			}
+			tr.Kind, tr.Tags = ir.TriggerTag, ir.Filter{Include: tags, Exclude: excTags}
 		default:
-			tr.Branches = ir.Filter{Include: branches}
+			tr.Branches = ir.Filter{Include: branches, Exclude: excBranches}
 		}
 		out = append(out, tr)
 	}
@@ -313,6 +372,7 @@ func stripAnchors(v string) (string, bool) {
 
 // regexGlob reads a regex that is a plain name, or a name followed by .*, as a glob.
 func regexGlob(body string) (string, bool) {
+	body = strings.ReplaceAll(body, `\.`, ".")
 	prefix, star := strings.CutSuffix(body, globAnyTail)
 	if prefix != "" && !refChars.MatchString(prefix) || prefix == "" && !star {
 		return "", false

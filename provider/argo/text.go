@@ -1,6 +1,7 @@
 package argo
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 
@@ -19,20 +20,15 @@ const (
 // context parameter becomes a canonical reference; any other tag stays text as written. In a template scope,
 // {{inputs.parameters.x}} resolves through the argument that the task binds to x.
 type texts struct {
-	// bind holds the parts that the task binds to each template input.
-	bind map[string][]expr.Part
-	// defaults holds the default of each template input that has one.
+	bind     map[string][]expr.Part
 	defaults map[string]string
-	// used names the bound inputs that a text read.
-	used map[string]bool
-	// needs names the tasks that an output reference points at, by Argo name.
-	needs map[string]bool
-	// taskID maps an Argo task name to the job ID; ok is false for a name that is no task of the workflow.
-	taskID func(name string) (string, bool)
-	// kept lists the tags left as written.
-	kept []string
-	// tmpl is true in the text of a template, where an input name resolves through bind.
-	tmpl bool
+	used     map[string]bool
+	needs    map[string]bool
+	taskID   func(name string) (string, bool)
+	matrix   map[string]bool
+	inNames  map[string]string
+	kept     []string
+	tmpl     bool
 }
 
 func newTexts(taskID func(string) (string, bool), tmpl bool) *texts {
@@ -58,7 +54,7 @@ func (x *texts) scope() exprargo.Scope {
 // tag reads one whole tag as parts; ok is false when the tag stays text.
 func (x *texts) tag(tag, inner string) ([]expr.Part, bool) {
 	if strings.HasPrefix(inner, "=") {
-		return nil, false
+		return x.needsExpr(inner)
 	}
 	if x.tmpl {
 		if name, ok := strings.CutPrefix(inner, inputParamHead); ok {
@@ -68,6 +64,11 @@ func (x *texts) tag(tag, inner string) ([]expr.Part, bool) {
 	r, ok := exprargo.FromTag(tag, x.scope())
 	if !ok || len(r.Path) == 0 || r.Path[0] == expr.PrefixMatrix {
 		return nil, false
+	}
+	if len(r.Path) == 2 && r.Path[0] == expr.PrefixInputs {
+		if n, renamed := x.inNames[r.Path[1]]; renamed {
+			r = expr.Ref{Path: []string{expr.PrefixInputs, n}}
+		}
 	}
 	if len(r.Path) == 4 && r.Path[0] == expr.PrefixNeeds {
 		id, known := x.taskID(r.Path[1])
@@ -80,8 +81,28 @@ func (x *texts) tag(tag, inner string) ([]expr.Part, bool) {
 	return []expr.Part{{Expr: r}}, true
 }
 
+// needsRef is the expression that the emitter writes for the output of another task.
+var needsRef = regexp.MustCompile(`^=\s*\(tasks\['([^']+)'\]\.outputs\.parameters\['([^']+)'\] \?\? ''\)\s*$`)
+
+// needsExpr reads {{= (tasks['J'].outputs.parameters['O'] ?? ”) }} as a reference to the output of task J.
+func (x *texts) needsExpr(inner string) ([]expr.Part, bool) {
+	m := needsRef.FindStringSubmatch(inner)
+	if m == nil {
+		return nil, false
+	}
+	id, known := x.taskID(m[1])
+	if !known {
+		return nil, false
+	}
+	x.needs[m[1]] = true
+	return []expr.Part{{Expr: expr.Ref{Path: []string{expr.PrefixNeeds, id, "outputs", m[2]}}}}, true
+}
+
 // input resolves a template input: a bound argument, or its default.
 func (x *texts) input(name string) ([]expr.Part, bool) {
+	if x.matrix[name] {
+		return []expr.Part{{Expr: expr.Ref{Path: []string{expr.PrefixMatrix, name}}}}, true
+	}
 	if parts, ok := x.bind[name]; ok {
 		x.used[name] = true
 		return slices.Clone(parts), true

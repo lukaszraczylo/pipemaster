@@ -17,11 +17,12 @@ const (
 
 // plCtx is the workflow being read.
 type plCtx struct {
-	p    *project
-	src  *pipeSrc
-	k    *sink
-	file string
-	plID string
+	p       *project
+	src     *pipeSrc
+	k       *sink
+	inNames map[string]string
+	file    string
+	plID    string
 }
 
 func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
@@ -39,6 +40,7 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 	if err := p.params(pl, k, r); err != nil {
 		return nil, fmt.Errorf("%s: %w", src.doc.Loc(0), err)
 	}
+	c.inputsMarker(pl)
 	if v, ok := r.Take("synchronization"); ok {
 		c.synchronization(pl, v, r.Line("synchronization"))
 	}

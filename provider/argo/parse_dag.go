@@ -246,6 +246,9 @@ func (c *plCtx) foldGates(calls []*call, jobs []*ir.Job) []*ir.Job {
 			c.p.rep.Add(gateEntry(c, j, gates[n.JobID]))
 		}
 		j.Needs = needs
+		if j.Manual {
+			c.gateMarker(j)
+		}
 		if len(seen) > 0 {
 			if j.Ext == nil {
 				j.Ext = ir.Ext{dialect: map[string]any{}}

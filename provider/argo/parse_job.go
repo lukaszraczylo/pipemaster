@@ -43,6 +43,7 @@ func (c *plCtx) newJob(cl *call, ids map[string]string, finally bool) *jobBuilde
 		path: "pipeline/" + c.plID + "/job/" + cl.id,
 	}
 	b.px, b.tx = newTexts(b.taskID, false), newTexts(b.taskID, true)
+	b.px.inNames, b.tx.inNames = c.inNames, c.inNames
 	b.k = newSink(c.p.rep, c.file, b.path)
 	return b
 }
@@ -128,6 +129,9 @@ func (b *jobBuilder) header(r *reader) error {
 	}
 	for _, key := range []string{"withItems", "withParam", "withSequence"} {
 		if v, ok := r.Take(key); ok {
+			if key == "withItems" && b.matrixMarker(v) {
+				continue
+			}
 			b.k.Keep(key, v, caps.JobMatrix, "task "+b.cl.name+": "+key+" has no IR form; kept in Ext", r.Line(key))
 		}
 	}
@@ -218,7 +222,7 @@ func (b *jobBuilder) when(w string, line int) expr.Expr {
 	if st, ok := workflowStatus(w); ok && b.finally {
 		return st
 	}
-	e := exprargo.FromWhen(w, exprargo.ScopeTask)
+	e := renameInputRefs(exprargo.FromWhen(w, exprargo.ScopeTask), b.c.inNames)
 	if o, isOpaque := e.(expr.Opaque); isOpaque {
 		b.c.p.rep.Add(report.Entry{
 			IRPath: b.path, Feature: caps.ExprOpaque, Level: caps.Lost, Strategy: "kept as opaque Argo text", SourceLoc: b.c.k.Loc(line),
@@ -277,6 +281,9 @@ func (b *jobBuilder) arguments(v any) error {
 		}
 		b.argLines[name] = pm.Lines["name"]
 		val, isText := text(pm.Vals["value"])
+		if b.tx.matrix[name] && isText && val == "{{item."+name+"}}" && len(pm.Order) == 2 {
+			continue
+		}
 		if !isText || len(pm.Order) != 2 || unresolved(b.taskID, val) {
 			b.args[name] = plain(e)
 			b.k.Note(caps.ExtPassthrough, "argument "+name+" is not a plain string or holds a tag with no IR reference; it stays in Ext and the template keeps its input", pm.Lines["name"])
@@ -403,4 +410,30 @@ func (b *jobBuilder) templateRef(v any, line int) *omap {
 	b.k.Keep("templateRef", v, caps.StepAction, "templateRef "+wt+"/"+tn+" names a template that is not in the repo; the reference is kept in Ext", line)
 	b.job.Steps = append(b.job.Steps, &ir.Step{ID: mainStep, Kind: ir.StepTask})
 	return nil
+}
+
+// renameInputRefs puts the IR input name back in every input reference of e.
+func renameInputRefs(e expr.Expr, names map[string]string) expr.Expr {
+	if len(names) == 0 {
+		return e
+	}
+	switch v := e.(type) {
+	case expr.Ref:
+		if len(v.Path) == 2 && v.Path[0] == expr.PrefixInputs {
+			if n, ok := names[v.Path[1]]; ok {
+				return expr.Ref{Path: []string{expr.PrefixInputs, n}}
+			}
+		}
+	case expr.Unary:
+		return expr.Unary{Op: v.Op, X: renameInputRefs(v.X, names)}
+	case expr.Binary:
+		return expr.Binary{Op: v.Op, L: renameInputRefs(v.L, names), R: renameInputRefs(v.R, names)}
+	case expr.Call:
+		args := make([]expr.Expr, len(v.Args))
+		for i, a := range v.Args {
+			args[i] = renameInputRefs(a, names)
+		}
+		return expr.Call{Name: v.Name, Args: args}
+	}
+	return e
 }

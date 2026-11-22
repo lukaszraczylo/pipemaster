@@ -31,3 +31,5 @@ var (
 func newSink(rep *report.Report, file, path string) *sink {
 	return ynode.NewSink(dialect, rep, file, path)
 }
+
+const idPrefix = ynode.IDPrefix
