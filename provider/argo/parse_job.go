@@ -167,11 +167,11 @@ func (b *jobBuilder) continueOn(v any, line int) {
 
 // depends maps a depends expression to needs and a condition on the task results.
 func (b *jobBuilder) depends(v any, line int) error {
-	s, ok := text(v)
+	s0, ok := text(v)
 	if !ok {
 		return fmt.Errorf("depends must be a string")
 	}
-	d, err := parseDepends(s)
+	d, err := parseDepends(s0)
 	if err != nil {
 		return err
 	}
@@ -180,17 +180,26 @@ func (b *jobBuilder) depends(v any, line int) error {
 			return fmt.Errorf("depends %w", err)
 		}
 	}
-	switch {
-	case d.plain:
-	case d.unreadable:
-		b.k.Out[ExtDepends] = s
-		b.k.Note(caps.JobIf, "depends "+s+" holds an atom with no IR status (Errored, Omitted, Daemoned, AnySucceeded or AllFailed); the job waits for success of its tasks and the text is kept in Ext", line)
-	default:
-		b.job.If = andExpr(b.job.If, b.renameNeeds(d.cond))
-		if d.bare {
-			b.k.Out[ExtDepends] = s
-			b.k.Note(caps.JobIf, "depends "+s+" has a task with no result, which also passes when the task is Skipped or Daemoned; the condition holds Succeeded or Skipped, and the Daemoned case is kept in the text in Ext", line)
+	cond, constant := d.cond, false
+	if l, ok := cond.(expr.Lit); ok && l.Kind == expr.LitBool {
+		constant = true
+		if l.Bool {
+			cond = nil
 		}
+	}
+	switch {
+	case d.plain, constant && cond == nil:
+	case constant:
+		b.job.If = andExpr(b.job.If, cond)
+	default:
+		b.job.If = andExpr(b.job.If, b.renameNeeds(cond))
+	}
+	if d.unreadable {
+		b.k.Out[ExtDepends] = s0
+		b.k.Note(caps.JobIf, "depends "+s0+" holds an atom with no IR status (Errored, Omitted, Daemoned, AnySucceeded or AllFailed); the condition reads that atom as never true, so the job runs in fewer cases than in Argo or never, and the text is kept in Ext", line)
+	} else if d.bare {
+		b.k.Out[ExtDepends] = s0
+		b.k.Note(caps.JobIf, "depends "+s0+" has a task with no result, which also passes when the task is Skipped or Daemoned; the condition holds Succeeded or Skipped, and the Daemoned case is kept in the text in Ext", line)
 	}
 	return nil
 }

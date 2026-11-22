@@ -35,6 +35,8 @@ type dependsParser struct {
 	out  *depends
 	toks []string
 	pos  int
+	// neg counts the ! operators around the atom being read.
+	neg int
 	// onlySucceeded is false once the expression holds anything but && over .Succeeded atoms.
 	onlySucceeded bool
 }
@@ -53,7 +55,7 @@ func parseDepends(s string) (*depends, error) {
 	if p.pos != len(p.toks) {
 		return nil, fmt.Errorf("depends %q: unexpected %q", s, p.toks[p.pos])
 	}
-	p.out.cond = e
+	p.out.cond = foldBool(e)
 	p.out.plain = p.onlySucceeded && !p.out.bare && !p.out.unreadable
 	return p.out, nil
 }
@@ -125,7 +127,9 @@ func (p *dependsParser) unary() (expr.Expr, error) {
 	case "!":
 		p.pos++
 		p.onlySucceeded = false
+		p.neg++
 		x, err := p.unary()
+		p.neg--
 		return expr.Unary{Op: expr.OpNot, X: x}, err
 	case "(":
 		p.pos++
@@ -163,7 +167,8 @@ func (p *dependsParser) atom(tok string) expr.Expr {
 	case otherAtoms[atom]:
 		p.out.unreadable = true
 		p.onlySucceeded = false
-		return nil
+		// The atom reads as false, or as true under an odd number of !, so the whole condition only narrows.
+		return expr.Lit{Kind: expr.LitBool, Bool: p.neg%2 == 1}
 	}
 	p.onlySucceeded = p.onlySucceeded && atom == atomSucceeded
 	return resultIs(task, resultOf[atom])
@@ -183,4 +188,41 @@ func resultIs(task, status string) expr.Expr {
 	return expr.Binary{
 		Op: expr.OpEq, L: expr.Ref{Path: []string{expr.PrefixNeeds, task, "result"}}, R: expr.Lit{Kind: expr.LitStr, Str: status},
 	}
+}
+
+// foldBool removes the boolean literals that an atom with no IR status left in the condition.
+func foldBool(e expr.Expr) expr.Expr {
+	switch v := e.(type) {
+	case expr.Unary:
+		x := foldBool(v.X)
+		if l, ok := x.(expr.Lit); ok && l.Kind == expr.LitBool && v.Op == expr.OpNot {
+			return expr.Lit{Kind: expr.LitBool, Bool: !l.Bool}
+		}
+		return expr.Unary{Op: v.Op, X: x}
+	case expr.Binary:
+		l, r := foldBool(v.L), foldBool(v.R)
+		ll, lok := boolLit(l)
+		rl, rok := boolLit(r)
+		switch {
+		case v.Op == expr.OpAnd && (lok && !ll || rok && !rl):
+			return expr.Lit{Kind: expr.LitBool}
+		case v.Op == expr.OpOr && (lok && ll || rok && rl):
+			return expr.Lit{Kind: expr.LitBool, Bool: true}
+		case v.Op == expr.OpAnd && lok:
+			return r
+		case v.Op == expr.OpAnd && rok:
+			return l
+		case v.Op == expr.OpOr && lok:
+			return r
+		case v.Op == expr.OpOr && rok:
+			return l
+		}
+		return expr.Binary{Op: v.Op, L: l, R: r}
+	}
+	return e
+}
+
+func boolLit(e expr.Expr) (value, ok bool) {
+	l, isLit := e.(expr.Lit)
+	return l.Bool, isLit && l.Kind == expr.LitBool
 }

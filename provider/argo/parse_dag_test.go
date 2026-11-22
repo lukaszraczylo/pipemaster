@@ -108,16 +108,36 @@ func TestDependsStatusAtoms(t *testing.T) {
 	}
 }
 
-func TestDependsWithAnAtomTheIRCannotHoldKeepsTheTextAndStaysNarrow(t *testing.T) {
-	pl, rep := parseYAML(t, dagOf(`      - {name: a, template: echo}
-      - {name: c, template: echo, depends: "a.Daemoned"}
-`, echoTemplates))
-	c := job(t, pl, "c")
-	if !reflect.DeepEqual(needIDs(c), []string{"a"}) || ext(c.Ext)["depends"] != "a.Daemoned" || !hasEntry(rep, "a.Daemoned") {
-		t.Fatalf("c = %+v %v %+v", c, ext(c.Ext), rep.Entries)
+// An atom the IR cannot hold never widens or inverts the condition: it reads as false where it is positive.
+func TestDependsAtomsWithNoIRStatusFailSafe(t *testing.T) {
+	off := expr.Lit{Kind: expr.LitBool, Bool: false}
+	cases := map[string]expr.Expr{
+		"a.Daemoned":                off,
+		"a.Errored":                 off,
+		"a.Omitted":                 off,
+		"a.AnySucceeded":            off,
+		"a.AllFailed":               off,
+		"!a.Errored":                off,
+		"a.Succeeded && a.Errored":  off,
+		"a.Failed || a.Errored":     res("a", "failure"),
+		"a.Succeeded || a.Daemoned": res("a", "success"),
+		"a.Skipped || a.Omitted":    res("a", "skipped"),
+		"!(a.Failed || a.Errored)":  off,
 	}
-	if c.If != nil {
-		t.Fatalf("an unreadable depends made a condition: %v", c.If)
+	for depends, want := range cases {
+		t.Run(depends, func(t *testing.T) {
+			pl, rep := parseYAML(t, dagOf("      - {name: a, template: echo}\n      - {name: c, template: echo, depends: \""+depends+"\"}\n", echoTemplates))
+			c := job(t, pl, "c")
+			if !reflect.DeepEqual(needIDs(c), []string{"a"}) || ext(c.Ext)["depends"] != depends {
+				t.Fatalf("needs %v ext %v", needIDs(c), ext(c.Ext))
+			}
+			if c.If == nil || expr.String(c.If) != expr.String(want) {
+				t.Fatalf("If = %v, want %v", c.If, expr.String(want))
+			}
+			if !hasEntry(rep, depends) {
+				t.Fatalf("no entry: %+v", rep.Entries)
+			}
+		})
 	}
 }
 
