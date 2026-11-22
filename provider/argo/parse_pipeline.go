@@ -170,9 +170,9 @@ func impliedEntry(src *pipeSrc) (string, bool) {
 	return "", false
 }
 
-// isLibrary tells a WorkflowTemplate that names no entrypoint and has none to infer: other workflows call its templates.
+// isLibrary tells a WorkflowTemplate or ClusterWorkflowTemplate that names no entrypoint and has none to infer: other workflows call its templates.
 func isLibrary(src *pipeSrc) bool {
-	if src.cron != nil || src.doc.Kind != kindTemplate {
+	if src.cron != nil || (src.doc.Kind != kindTemplate && src.doc.Kind != kindClusterTmpl) {
 		return false
 	}
 	if _, ok := src.spec.Vals["entrypoint"]; ok {
