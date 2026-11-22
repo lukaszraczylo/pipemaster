@@ -145,3 +145,18 @@ func TestOutputArtifactKeepsItsNameBesideAnInput(t *testing.T) {
 		t.Errorf("the output of mid was renamed:\n%s", text)
 	}
 }
+
+func TestMatrixRefWithoutAMatrixIsLostAndLintValid(t *testing.T) {
+	linttool.RequireArgo(t)
+	j := scriptJob("compare", "echo ${{ matrix.mode }}")
+	j.Steps[0].If = eqStr([]string{"matrix", "mode"}, "x")
+	j.Env = []ir.Var{{Name: "M", Value: ir.Value{Kind: ir.ValueExpr, Expr: expr.Ref{Path: []string{"matrix", "mode"}}}}}
+	files, rep := emit(t, project(j))
+	path := ".argo/workflows/ci.yaml"
+	if out, err := linttool.ArgoLint(t, path, []byte(files[path])); err != nil {
+		t.Fatalf("argo lint: %v\n%s\n%s", err, out, files[path])
+	}
+	if len(entries(rep, "matrix")) == 0 {
+		t.Error("no report entry for the unbound matrix reference")
+	}
+}

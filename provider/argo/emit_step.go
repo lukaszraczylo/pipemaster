@@ -186,6 +186,12 @@ func (sx *stepCtx) guarded(sc *stepScope, path string, st *ir.Step, script []str
 		tc.e.lose(path, caps.StepIf, "a reference of the condition has no container env spelling; the step is disabled")
 		return []string{disabledScript}
 	}
+	for _, v := range env {
+		if ref, isRef := exprargo.EnvRef(v.Name); isRef && len(ref.Path) == 2 && ref.Path[0] == expr.PrefixMatrix && !tc.matrix[ref.Path[1]] {
+			tc.e.lose(path, caps.StepIf, "the condition reads matrix."+ref.Path[1]+", and the job has no matrix that Argo can expand; the step is disabled")
+			return []string{disabledScript}
+		}
+	}
 	// A reference to the output of another job needs the template input that carries it.
 	for _, v := range env {
 		sc.add(v.Name, nameValue(v.Name, tc.guardValue(v)))
