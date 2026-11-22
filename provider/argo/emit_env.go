@@ -4,7 +4,6 @@ import (
 	"slices"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
-	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
@@ -34,24 +33,12 @@ func (e *emitter) envMarker(f caps.Feature, path string, vars []ir.Var, names []
 	}
 }
 
-// readableEnv is true for a variable that the parser reads back from a container as a step variable. A secret or
-// vars reference becomes a valueFrom entry, which has no variable form.
-func readableEnv(v ir.Var) bool {
-	switch v.Value.Kind {
-	case ir.ValueSecret:
-		return false
-	case ir.ValueExpr:
-		r, ok := v.Value.Expr.(expr.Ref)
-		return !ok || len(r.Path) != 2 || (r.Path[0] != expr.PrefixSecrets && r.Path[0] != expr.PrefixVars)
-	}
-	return true
-}
-
-// copiedEnv lists the names of vars that every container carries: the ones that the parser reads back.
+// copiedEnv lists the names of vars that every container carries. A secret or vars reference is a valueFrom entry
+// that the parser reads back as a variable, so it counts too.
 func copiedEnv(vars []ir.Var) []string {
 	var out []string
 	for _, v := range vars {
-		if readableEnv(v) && !slices.Contains(out, v.Name) {
+		if !slices.Contains(out, v.Name) {
 			out = append(out, v.Name)
 		}
 	}
