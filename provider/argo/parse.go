@@ -238,7 +238,7 @@ func (p *project) attachResources(pl *ir.Pipeline) {
 		}
 		p.rep.Add(report.Entry{
 			IRPath: "pipeline/" + pl.ID, Feature: caps.ExtPassthrough, Level: caps.Lost, Strategy: "kept in Ext[" + dialect + "]",
-			Detail: "kind: " + kind + " has no IR form; the document is kept in Ext", SourceLoc: d.Loc(0),
+			Detail: "kind: " + kind + " has no IR form; the document " + d.Name() + " is kept in Ext", SourceLoc: d.Loc(0),
 		})
 	}
 	if pl.Ext == nil {
@@ -252,15 +252,9 @@ func listOf(v any) []any {
 	return l
 }
 
-// keepLibraries keeps a library WorkflowTemplate in Ext when a template of it is not called by a task, so no
-// template is lost.
+// keepLibraries keeps each library WorkflowTemplate in Ext, so its metadata and spec keys are not lost.
 func (p *project) keepLibraries(libs []*pipeSrc) {
 	for _, src := range libs {
-		for name := range src.tmpls {
-			if !src.used[name] {
-				p.resources = append(p.resources, src.doc)
-				break
-			}
-		}
+		p.resources = append(p.resources, src.doc)
 	}
 }

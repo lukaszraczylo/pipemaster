@@ -1,6 +1,7 @@
 package argo_test
 
 import (
+	"fmt"
 	"io/fs"
 	"reflect"
 	"strings"
@@ -283,5 +284,16 @@ func TestSourceFilesAndSanitizeID(t *testing.T) {
 	got := rules.SanitizeID(long)
 	if len(got) > 63 || got == rules.SanitizeID(long+"b") {
 		t.Errorf("long id %q", got)
+	}
+}
+
+// A library WorkflowTemplate whose templates are all called still has its other keys; they stay in Ext.
+func TestLibraryKeysSurviveWhenEveryTemplateIsCalled(t *testing.T) {
+	lib := "apiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata: {name: lib, labels: {team: a}}\nspec:\n  serviceAccountName: lib-sa\n  arguments: {parameters: [{name: p}]}\n  templates:\n  - {name: lint, container: {image: l, command: [lint]}}\n"
+	main := dagOf("      - {name: a, templateRef: {name: lib, template: lint}}\n", "")
+	p, rep := parseFiles(t, map[string]string{"lib.yaml": lib, "ci.yaml": main})
+	res, _ := ext(p.Pipelines[0].Ext)["resources"].([]any)
+	if len(res) != 1 || !strings.Contains(fmt.Sprint(res), "lib-sa") || !hasEntry(rep, "lib") {
+		t.Fatalf("library keys lost: %v %+v", res, rep.Entries)
 	}
 }
