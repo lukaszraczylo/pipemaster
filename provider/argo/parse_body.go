@@ -47,6 +47,7 @@ func (b *jobBuilder) body(t *omap) error {
 		}
 	}
 	if v, ok := r.Take("volumes"); ok && !isWorkspaceVolumes(v) {
+		r.M.Vals["volumes"] = withoutWorkspace(v)
 		r.Release("volumes")
 	}
 	if v, ok := r.Take("nodeSelector"); ok {
@@ -758,6 +759,15 @@ func isWorkspaceVolumes(v any) bool {
 	n, _ := text(valueOf(m, "name"))
 	e, isMap := asMap(valueOf(m, "emptyDir"))
 	return ok && len(m.Order) == 2 && n == workspaceName && isMap && len(e.Order) == 0
+}
+
+// withoutWorkspace drops the workspace volume that the emitter writes before the volumes of Ext.
+func withoutWorkspace(v any) any {
+	l := listOf(v)
+	if len(l) > 1 && isWorkspaceVolumes([]any{l[0]}) {
+		return l[1:]
+	}
+	return v
 }
 
 // uniqueStepIDs numbers a repeated step ID, such as a second checkout, because the IR needs one ID per step.
