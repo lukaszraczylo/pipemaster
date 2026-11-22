@@ -6,6 +6,8 @@ origin:
 pipelines:
     - id: ci
       name: inputs
+      triggers:
+        - kind: manual
       inputs:
         - name: environment
           type: choice
