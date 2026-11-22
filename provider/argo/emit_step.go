@@ -45,6 +45,8 @@ type container struct {
 type stepCtx struct {
 	tc      *jobCtx
 	taken   map[string]bool
+	takenIn map[string]bool
+	dests   map[string]bool
 	image   string
 	artIn   []*yaml.Node
 	artOut  []*yaml.Node

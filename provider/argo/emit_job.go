@@ -116,7 +116,7 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (jobOut, error) {
 	cond.disabled = cond.disabled || !matrixOK
 	e.jobFeatures(tc, jx)
 
-	sx := &stepCtx{tc: tc, taken: map[string]bool{}}
+	sx := &stepCtx{tc: tc, taken: map[string]bool{}, takenIn: map[string]bool{}, dests: map[string]bool{}}
 	sx.needArtifacts()
 	conts, taskStep := sx.containers(jx)
 	tm := newMap()

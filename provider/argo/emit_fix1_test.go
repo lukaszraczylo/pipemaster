@@ -105,3 +105,43 @@ func TestDisabledMatrixJobStaysLintValid(t *testing.T) {
 		t.Errorf("the job is not disabled:\n%s", files[path])
 	}
 }
+
+// artifactChain: two jobs upload a file named artifact; a third job needs both with artifacts.
+func artifactChain() *ir.Project {
+	up := func(id string) *ir.Job {
+		j := scriptJob(id, "echo hi")
+		j.Steps = append(j.Steps, actionStep(id+"-up", "actions", "upload-artifact", map[string]string{"name": "artifact", "path": id + "/out"}))
+		return j
+	}
+	sink := scriptJob("sink", "ls")
+	sink.Needs = []ir.Need{{JobID: "a", Artifacts: true}, {JobID: "b", Artifacts: true}}
+	return project(up("a"), up("b"), sink)
+}
+
+func TestArtifactNamesAndPathsDoNotCollide(t *testing.T) {
+	linttool.RequireArgo(t)
+	files, _ := emit(t, artifactChain())
+	path := ".argo/workflows/ci.yaml"
+	if out, err := linttool.ArgoLint(t, path, []byte(files[path])); err != nil {
+		t.Fatalf("argo lint: %v\n%s\n%s", err, out, files[path])
+	}
+	text := files[path]
+	if n := strings.Count(text, "path: /workspace/artifacts/artifact\n"); n != 1 {
+		t.Errorf("%d inputs write to /workspace/artifacts/artifact, want 1:\n%s", n, text)
+	}
+}
+
+func TestOutputArtifactKeepsItsNameBesideAnInput(t *testing.T) {
+	up := scriptJob("a", "echo")
+	up.Steps = append(up.Steps, actionStep("a-up", "actions", "upload-artifact", map[string]string{"name": "artifact", "path": "x"}))
+	mid := scriptJob("mid", "echo")
+	mid.Needs = []ir.Need{{JobID: "a", Artifacts: true}}
+	mid.Steps = append(mid.Steps, actionStep("m-up", "actions", "upload-artifact", map[string]string{"name": "artifact", "path": "y"}))
+	sink := scriptJob("sink", "echo")
+	sink.Needs = []ir.Need{{JobID: "mid", Artifacts: true}}
+	files, _ := emit(t, project(up, mid, sink))
+	text := files[".argo/workflows/ci.yaml"]
+	if !strings.Contains(text, "{{tasks.mid.outputs.artifacts.artifact}}") || strings.Contains(text, "artifact-3") {
+		t.Errorf("the output of mid was renamed:\n%s", text)
+	}
+}

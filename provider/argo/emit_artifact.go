@@ -72,7 +72,7 @@ func (sx *stepCtx) checkout(st *ir.Step, with map[string]string, t actions.Targe
 		}
 	}
 	a := newMap()
-	a.SetStr("name", unique(sx.taken, gitArtifactName, maxName))
+	a.SetStr("name", unique(sx.takenIn, gitArtifactName, maxName))
 	a.SetStr("path", dir)
 	a.Set("git", g.N)
 	sx.artIn = append(sx.artIn, a.N)
@@ -101,6 +101,23 @@ func artifactPath(p string) string {
 	return workspaceMount + "/" + strings.TrimPrefix(p, "./")
 }
 
+// outputNames lists the names of the output artifacts of one upload: the first path takes name, a later path a
+// numbered name. It records each in taken, which holds the output names of one template.
+func outputNames(taken map[string]bool, name string, paths []string) []string {
+	if len(paths) == 0 {
+		paths = []string{name}
+	}
+	var out []string
+	for i := range paths {
+		n := name
+		if i > 0 {
+			n = name + "-" + strconv.Itoa(i+1)
+		}
+		out = append(out, unique(taken, n, maxName))
+	}
+	return out
+}
+
 // addOutputArtifacts adds one output artifact per path of name. Argo saves one path per artifact, so a second
 // path gets a numbered name.
 func (sx *stepCtx) addOutputArtifacts(path, name string, paths []string, expire string) {
@@ -108,17 +125,16 @@ func (sx *stepCtx) addOutputArtifacts(path, name string, paths []string, expire 
 	if len(paths) == 0 {
 		paths = []string{name}
 	}
-	for i, p := range paths {
-		n := name
-		if i > 0 {
-			n = name + "-" + strconv.Itoa(i+1)
+	for i, n := range outputNames(sx.taken, name, paths) {
+		p := paths[i]
+		if n != name {
 			tc.e.emulate(path, caps.JobArtifacts, "one artifact per path", "Argo saves one path per output artifact; the path "+p+" is the artifact "+n)
 		}
 		if globChars.MatchString(p) {
 			tc.e.lose(path, caps.JobArtifacts, "the path "+p+" holds a glob, which Argo does not expand")
 		}
 		a := newMap()
-		a.SetStr("name", unique(sx.taken, n, maxName))
+		a.SetStr("name", n)
 		a.SetStr("path", artifactPath(p))
 		sx.artOut = append(sx.artOut, a.N)
 	}
@@ -144,12 +160,11 @@ func safeName(s string) string {
 	return out
 }
 
-// uploadsOf lists the artifact names that a job writes, from its artifacts and its upload steps.
+// uploadsOf lists the output artifact names that a job writes, in the order and with the numbering that the
+// emitter gives them: the upload steps first, then the job artifacts.
 func (e *emitter) uploadsOf(j *ir.Job) []string {
 	var out []string
-	for _, a := range j.Artifacts {
-		out = append(out, safeName(a.Name))
-	}
+	taken := map[string]bool{}
 	for _, st := range j.Steps {
 		if st.Action == nil || st.Action.Kind != ir.ActionRepo {
 			continue
@@ -165,8 +180,11 @@ func (e *emitter) uploadsOf(j *ir.Job) []string {
 			if n == "" {
 				n = "artifact"
 			}
-			out = append(out, safeName(n))
+			out = append(out, outputNames(taken, safeName(n), pathLines(t.With["path"]))...)
 		}
+	}
+	for _, a := range j.Artifacts {
+		out = append(out, outputNames(taken, safeName(a.Name), a.Paths)...)
 	}
 	return out
 }
@@ -192,7 +210,7 @@ func (pp *plan) ancestors(j *ir.Job) []*jobPlan {
 // inputArtifact adds an input artifact that loads from an output artifact of another task.
 func (sx *stepCtx) inputArtifact(from *jobPlan, srcName, dst string) {
 	tc := sx.tc
-	name := unique(sx.taken, srcName, maxName)
+	name := unique(sx.takenIn, srcName, maxName)
 	a := newMap()
 	a.SetStr("name", name)
 	a.SetStr("path", dst)
@@ -216,6 +234,7 @@ func (sx *stepCtx) download(path string, t actions.Target) {
 	for _, jp := range tc.pp.ancestors(tc.jp.j) {
 		for _, n := range tc.e.uploadsOf(jp.j) {
 			if n == name {
+				sx.dests[dst] = true
 				sx.inputArtifact(jp, name, dst)
 				return
 			}
@@ -236,7 +255,12 @@ func (sx *stepCtx) needArtifacts() {
 			continue
 		}
 		for _, name := range tc.e.uploadsOf(jp.j) {
-			sx.inputArtifact(jp, name, artifactsDir+"/"+name)
+			dst := artifactsDir + "/" + name
+			if sx.dests[dst] {
+				dst = artifactsDir + "/" + jp.task + "/" + name
+			}
+			sx.dests[dst] = true
+			sx.inputArtifact(jp, name, dst)
 		}
 	}
 }
