@@ -35,3 +35,31 @@ func Assert(t *testing.T, path string, got []byte) {
 		t.Errorf("golden mismatch for %s (-want +got):\n%s", path, diff)
 	}
 }
+
+// Orphans fails t for each file under dir that is not in keep (paths relative to dir); -update deletes it.
+func Orphans(t *testing.T, dir string, keep map[string]bool) {
+	t.Helper()
+	var stale []string
+	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, err := filepath.Rel(dir, p)
+		if err == nil && !keep[filepath.ToSlash(rel)] {
+			stale = append(stale, p)
+		}
+		return err
+	})
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatalf("golden: walk %s: %v", dir, err)
+	}
+	for _, p := range stale {
+		if !*update {
+			t.Errorf("golden %s is not written by the emitter; run with -update to delete it", p)
+			continue
+		}
+		if err := os.Remove(p); err != nil {
+			t.Fatalf("golden: remove %s: %v", p, err)
+		}
+	}
+}

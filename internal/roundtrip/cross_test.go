@@ -99,6 +99,11 @@ func TestCrossGolden(t *testing.T) {
 					t.Fatal(err)
 				}
 				golden.Assert(t, filepath.Join(out, reportGolden), buf.Bytes())
+				keep := map[string]bool{reportGolden: true}
+				for name := range files {
+					keep[name] = true
+				}
+				golden.Orphans(t, out, keep)
 			})
 		}
 	}
