@@ -229,12 +229,12 @@ type triggerWorkflow struct {
 }
 
 // creates is true when the trigger starts a new run: the k8s create operation, or the argoWorkflow submit
-// operation. Argo Events v1.9.11 runs an argoWorkflow trigger with no operation as submit
-// (pkg/sensors/triggers/argo-workflow/argo-workflow.go:100-103).
+// operation. Argo Events v1.9.11 runs a trigger with no operation as create (pkg/sensors/triggers/standard-k8s/
+// standard-k8s.go:145-148) or as submit (pkg/sensors/triggers/argo-workflow/argo-workflow.go:100-103).
 func (w triggerWorkflow) creates() bool {
 	switch w.kind {
 	case triggerK8s:
-		return w.op == opCreate
+		return w.op == "" || w.op == opCreate
 	case triggerArgo:
 		return w.op == "" || w.op == opSubmit
 	}

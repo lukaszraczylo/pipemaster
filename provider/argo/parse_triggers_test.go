@@ -284,3 +284,12 @@ func TestSensorArgoWorkflowSubmitStartsThePipeline(t *testing.T) {
 		})
 	}
 }
+
+// Argo Events v1.9.11 runs a k8s trigger with no operation as create (pkg/sensors/triggers/standard-k8s/standard-k8s.go:145-148).
+func TestSensorK8sDefaultOperationStartsThePipeline(t *testing.T) {
+	run := strings.Replace(runCI, "        operation: create\n", "", 1)
+	trs, entries := triggersOf(t, map[string]string{"es.yaml": eventSource, "s.yaml": sensor(dep("      - {path: headers.X-Github-Event, type: string, value: [\"push\"]}\n"), run)})
+	if len(trs) != 1 || trs[0].Kind != ir.TriggerPush {
+		t.Fatalf("triggers %+v entries %s", trs, entries)
+	}
+}
