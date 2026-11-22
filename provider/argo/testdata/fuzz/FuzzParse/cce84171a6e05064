@@ -1,0 +1,2 @@
+go test fuzz v1
+string("apiVersion: argoproj.io/\nkind: Workflow\nspec: \n  templates:\n  - {name: main}\n---\napiVersion: argoproj.io/\nkind: Sensor\nspec:\n  triggers:\n  - {}")

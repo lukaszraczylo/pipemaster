@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	_ "github.com/lukaszraczylo/pipemaster/provider/argo"
 	_ "github.com/lukaszraczylo/pipemaster/provider/drone"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gha"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gitlab"
@@ -60,5 +61,15 @@ func TestConvertToDroneKeepsWorkingDirectory(t *testing.T) {
 	}
 	if got := read(t, out, ".drone.yml"); !strings.Contains(got, "working_dir: sub") {
 		t.Fatalf("working_dir missing:\n%s", got)
+	}
+}
+
+func TestDetectListsArgoAndTekton(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, ".argo/wf.yaml", "apiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata: {name: ci}\nspec:\n  entrypoint: main\n  templates:\n  - {name: main, container: {image: x}}\n")
+	write(t, dir, ".tekton/p.yaml", "apiVersion: tekton.dev/v1\nkind: Pipeline\nmetadata: {name: p}\nspec:\n  tasks:\n  - name: a\n    taskSpec:\n      steps:\n      - {name: s, image: x, script: echo}\n")
+	code, out, errs := run(t, "detect", dir)
+	if code != 0 || out != "argo\ntekton\n" {
+		t.Fatalf("code=%d out=%q stderr=%q", code, out, errs)
 	}
 }

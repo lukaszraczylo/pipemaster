@@ -31,7 +31,7 @@ func langEvents() map[string]string {
 // Lang is the Argo dialect for expr.Translate. A `when` expression compares a parameter with exact strings
 // under ==, != and the logic operators, with no coercion and no case folding, and an unset parameter reads as
 // "" and equals no non-empty literal. That is the GitLab class, as for Tekton. ClassGHA does not fit because
-// it folds case and coerces numbers. Registration with expr.RegisterLang is the caller's step.
+// it folds case and coerces numbers.
 var Lang = expr.Dialect{
 	ID:       Dialect,
 	Class:    expr.ClassGitLab,
@@ -60,3 +60,5 @@ func inSubset(e expr.Expr) bool {
 	}
 	return false
 }
+
+func init() { expr.RegisterLang(&Lang) }

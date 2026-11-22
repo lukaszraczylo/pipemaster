@@ -181,7 +181,7 @@ def fromTekton (d : TDoc) (m : Meta) : Pipe := restore (rawTekton d) m
 /-! ### The fragment -/
 
 /-- A DNS-1123 label of lowercase letters, digits and dashes that starts and ends with a letter or digit
-(Mirrors tekton.dnsLabel (provider/tekton/ids.go)). `SanitizeID` returns such a label unchanged; any other ID is
+(Mirrors dnsid.label (provider/internal/dnsid/dnsid.go)). `SanitizeID` returns such a label unchanged; any other ID is
 renamed and keeps its ID in a comment, which the model does not cover. -/
 def DnsId (s : String) : Prop :=
   s.toList ≠ [] ∧ (∀ c ∈ s.toList, c.isLower ∨ c.isDigit ∨ c = '-') ∧ (∀ c ∈ s.toList.take 1, c ≠ '-') ∧

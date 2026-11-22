@@ -54,3 +54,22 @@ func ContainerPorts(v any) (ports []string, whole bool) {
 	}
 	return ports, true
 }
+
+// DeepCopy copies the maps and lists of an Ext value, so triggers of one source share no state.
+func DeepCopy(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(t))
+		for k, e := range t {
+			out[k] = DeepCopy(e)
+		}
+		return out
+	case []any:
+		out := make([]any, len(t))
+		for i, e := range t {
+			out[i] = DeepCopy(e)
+		}
+		return out
+	}
+	return v
+}

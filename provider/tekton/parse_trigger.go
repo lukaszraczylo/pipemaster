@@ -401,24 +401,7 @@ func extFrom(vals map[string]any) ir.Ext {
 
 func cloneMap(m map[string]any) map[string]any { return deepCopy(m).(map[string]any) }
 
-// deepCopy copies the maps and lists of an Ext value, so triggers of one listener share no state.
-func deepCopy(v any) any {
-	switch t := v.(type) {
-	case map[string]any:
-		out := make(map[string]any, len(t))
-		for k, e := range t {
-			out[k] = deepCopy(e)
-		}
-		return out
-	case []any:
-		out := make([]any, len(t))
-		for i, e := range t {
-			out[i] = deepCopy(e)
-		}
-		return out
-	}
-	return v
-}
+var deepCopy = ynode.DeepCopy
 
 // cronJobs maps a CronJob that posts to an EventListener service to schedule triggers of its pipelines.
 func (p *project) cronJobs(byName map[string]*ir.Pipeline) {
