@@ -78,6 +78,7 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	var pls []*ir.Pipeline
 	byName := map[string]*ir.Pipeline{}
 	byCron := map[*rawDoc]*ir.Pipeline{}
+	srcOf := map[*ir.Pipeline]*pipeSrc{}
 	p.renameClashes()
 	var libs []*pipeSrc
 	for _, src := range p.pipes {
@@ -90,6 +91,7 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 			return nil, nil, err
 		}
 		pls = append(pls, pl)
+		srcOf[pl] = src
 		if src.cron == nil {
 			byName[src.name] = pl
 		} else {
@@ -107,6 +109,7 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	p.runBindings(byName)
 	p.cronTriggers(byName, byCron)
 	p.sensorTriggers(byName)
+	p.manualMarkers(pls, srcOf)
 	sort.SliceStable(pls, func(i, j int) bool { return pls[i].ID < pls[j].ID })
 	p.attachResources(pls[0])
 	proj := &ir.Project{Origin: ir.Origin{Provider: dialect, Dialect: dialect, Files: files}, Pipelines: pls}

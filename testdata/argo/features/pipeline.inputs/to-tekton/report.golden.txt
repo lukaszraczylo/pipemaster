@@ -1,3 +1,4 @@
 Loss report: argo -> tekton
 [lost] pipeline/ci pipeline.inputs (input environment: type choice has no Tekton param type; it is written as string; input environment: a Tekton param with a default is optional, so required is lost; input dry-run: type boolean has no Tekton param type; it is written as string)
+[external] pipeline/ci/trigger/0 trigger.manual: tkn pipeline start ci (a person starts the run with `tkn pipeline start ci`)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.image: default image (the step names no image and Tekton requires one; alpine:3.22 runs it)

@@ -3,10 +3,12 @@ package argo
 import (
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -29,6 +31,33 @@ func (p *project) runBindings(byName map[string]*ir.Pipeline) {
 		k := newSink(p.rep, d.File, "pipeline/"+pl.ID+"/trigger/"+name)
 		k.Keep("workflow", d.Top, caps.TriggerManual, "Workflow "+name+" runs the template once; the manual trigger keeps the document in Ext", d.Line)
 		pl.Triggers = append(pl.Triggers, ir.Trigger{Kind: ir.TriggerManual, Ext: k.Ext()})
+	}
+}
+
+// manualMarkers puts back the manual trigger that the emitter marks on the template, at the index that it had in
+// the source, so the triggers after it keep the paths that stored metadata names. A Workflow that already gave the
+// pipeline a manual trigger wins. A marker for another pipeline is ignored, because the template was renamed.
+func (p *project) manualMarkers(pls []*ir.Pipeline, srcOf map[*ir.Pipeline]*pipeSrc) {
+	for _, pl := range pls {
+		src := srcOf[pl]
+		if src == nil || slices.ContainsFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerManual }) {
+			continue
+		}
+		prefix := "pipeline/" + pl.ID + "/trigger/"
+		for _, u := range emitkit.ParseMarkers([]byte(src.doc.Head)) {
+			if u.Feature != caps.TriggerManual {
+				continue
+			}
+			idx, err := strconv.Atoi(strings.TrimPrefix(u.IRPath, prefix))
+			if !strings.HasPrefix(u.IRPath, prefix) || err != nil || idx < 0 {
+				p.rep.Add(report.Entry{IRPath: u.IRPath, Feature: caps.TriggerManual, Level: caps.Lost, Strategy: "kept as written", SourceLoc: src.doc.File,
+					Detail: markerIgnored + "the marker names " + u.IRPath + ", which is not a trigger of the pipeline " + pl.ID})
+				continue
+			}
+			idx = min(idx, len(pl.Triggers))
+			pl.Triggers = slices.Insert(pl.Triggers, idx, ir.Trigger{Kind: ir.TriggerManual})
+			break
+		}
 	}
 }
 

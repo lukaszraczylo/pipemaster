@@ -1,3 +1,2 @@
 Loss report: argo -> gha
-[emulated] pipeline/ci pipeline.inputs: workflow_dispatch trigger (inputs need a workflow_dispatch trigger; the pipeline had none)
 [emulated] pipeline/ci/job/build job.runner: default runner label ubuntu-latest (the pipeline named no runner)

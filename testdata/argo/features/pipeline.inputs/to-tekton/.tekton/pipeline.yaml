@@ -1,3 +1,4 @@
+# pipemaster:emulated trigger.manual pipeline/ci/trigger/0
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:

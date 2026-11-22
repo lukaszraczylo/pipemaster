@@ -1,7 +1,6 @@
 # pipemaster:emulated job.runner pipeline/ci/job/build
 name: inputs
 on:
-  # pipemaster:emulated pipeline.inputs pipeline/ci
   workflow_dispatch:
     inputs:
       environment:
