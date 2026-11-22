@@ -212,6 +212,12 @@ func (p *project) trigger(lt listenerTrigger, byName map[string]*ir.Pipeline) bo
 		}
 	}
 	events, restored := p.interceptors(lt, k, p.pipelineOf(tpl))
+	if restored == nil && hasCEL(lt) {
+		// A trigger whose filter has no IR form becomes an api trigger, which every provider writes as a trigger
+		// that never fires. A push trigger with no branch filter would run on every branch.
+		p.reportFilteredTrigger(lt, pl, events)
+		events = nil
+	}
 	switch {
 	case restored != nil && restored.Kind == ir.TriggerSchedule:
 	case restored != nil:
@@ -277,6 +283,33 @@ func (p *project) interceptors(lt listenerTrigger, k *sink, pipeline string) ([]
 		k.note(caps.ExtPassthrough, "interceptors are kept in Ext in their order", lt.doc.line)
 	}
 	return kinds, restored
+}
+
+// hasCEL tells a trigger that has a CEL interceptor.
+func hasCEL(lt listenerTrigger) bool {
+	list, _ := lt.m.vals["interceptors"].([]any)
+	for _, e := range list {
+		if in, ok := readInterceptor(e); ok && in.name == interceptorCEL {
+			return true
+		}
+	}
+	return false
+}
+
+var triggerFeature = map[ir.TriggerKind]caps.Feature{
+	ir.TriggerPush: caps.TriggerPush, ir.TriggerTag: caps.TriggerTag, ir.TriggerPR: caps.TriggerPullRequest,
+}
+
+// reportFilteredTrigger reports each event kind whose CEL filter has no IR form.
+func (p *project) reportFilteredTrigger(lt listenerTrigger, pl *ir.Pipeline, kinds []ir.TriggerKind) {
+	name, _ := text(lt.m.vals["name"])
+	for _, kind := range kinds {
+		p.rep.Add(report.Entry{
+			IRPath: "pipeline/" + pl.ID + "/trigger/" + lt.el, Feature: triggerFeature[kind], Level: caps.Lost, Strategy: strategyExt,
+			Detail:    "the trigger " + name + " has a CEL filter with no IR form, so the " + string(kind) + " trigger is not converted; it becomes an api trigger that other providers never start, and the entry is kept in Ext",
+			SourceLoc: lt.doc.loc(0),
+		})
+	}
 }
 
 // editedAround reports whether the listener keys of a marked trigger differ from what the emitter writes.

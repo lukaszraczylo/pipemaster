@@ -216,7 +216,7 @@ func TestEditedFilterIsNotRestored(t *testing.T) {
 	files[listenerFile] = strings.Replace(files[listenerFile], "'^main$'", "'^develop$'", 1)
 	back, rep := reparse(t, files)
 	tr := back.Pipelines[0].Triggers[0]
-	if len(tr.Branches.Include) != 0 || ext(tr.Ext)["filter"] == nil {
+	if tr.Kind != ir.TriggerAPI || len(tr.Branches.Include) != 0 || ext(tr.Ext)["filter"] == nil {
 		t.Fatalf("edited filter was restored: %+v", tr)
 	}
 	if !hasEntry(rep, "marker ignored") {
