@@ -59,7 +59,7 @@ func (p *project) cronTriggers(byName map[string]*ir.Pipeline, byCron map[*rawDo
 		for i, cron := range crons {
 			tr := ir.Trigger{Kind: ir.TriggerSchedule, Cron: cron}
 			if suspended {
-				tr.Kind = ir.TriggerAPI
+				tr.Kind, tr.Cron = ir.TriggerAPI, ""
 			}
 			data := ynode.DeepCopy(cw).(map[string]any)
 			data["index"] = i

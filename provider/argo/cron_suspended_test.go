@@ -18,15 +18,11 @@ func TestSuspendedCronKeepsItsScheduleThroughARoundTrip(t *testing.T) {
 	}
 }
 
-func TestSuspendedCronWritesItsScheduleFromExtWhenTheTriggerHoldsNone(t *testing.T) {
+func TestSuspendedCronKeepsTheCronInExtAndNotOnTheTrigger(t *testing.T) {
 	p, _ := parseFiles(t, map[string]string{"t.yaml": ciTemplate, "c.yaml": cron("  schedules: [\"0 2 * * *\"]\n  suspend: true\n  workflowSpec: {workflowTemplateRef: {name: ci}}\n")})
-	p.Pipelines[0].Triggers[0].Cron = ""
-	files, _ := emit(t, p)
-	back, _, err := parseRepo(files)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if trs := back.Pipelines[0].Triggers; len(trs) != 1 || trs[0].Cron != "0 2 * * *" {
-		t.Errorf("triggers = %+v, want the schedule back", trs)
+	tr := p.Pipelines[0].Triggers[0]
+	cw, _ := ext(tr.Ext)["cronWorkflow"].(map[string]any)
+	if tr.Cron != "" || cw["cron"] != "0 2 * * *" {
+		t.Errorf("cron = %q, Ext = %v; want the expression in Ext only", tr.Cron, cw)
 	}
 }
