@@ -516,7 +516,7 @@ def resultOpen : List Char → Bool
   | [] => false
 
 /-- A script line the model keeps. A newline joins into one multi-line command that the parser splits again
-(emit_step.go:362, parse_step.go:127). An unterminated `${{` is an emit error (expr/template.go:37), and a closed
+(emit_step.go commandTexts, parse_step.go:127). An unterminated `${{` is an emit error (expr/template.go:37), and a closed
 one moves the step into a `step.action` marker. -/
 def LineOk (l : String) : Prop := '\n' ∉ l.toList ∧ tplOpen l.toList = false ∧ resultOpen l.toList = false
 

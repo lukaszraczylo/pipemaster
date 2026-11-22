@@ -10,7 +10,6 @@ import (
 	"github.com/lukaszraczylo/pipemaster/actions"
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
-	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
@@ -343,8 +342,6 @@ func (tc *taskCtx) copyStep(st *ir.Step, sp, name string, lines []string) *wmap 
 	tc.stepTail(m, st, tc.cond(sp, caps.StepIf, st.If, taskScope))
 	return m
 }
-
-var _ = exprtekton.OpIn
 
 // unappliedFields reports the settings of a step that the emitter drops, because the settings have no step to sit on.
 func (tc *taskCtx) unappliedFields(st *ir.Step, sp string) {
