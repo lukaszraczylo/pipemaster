@@ -314,7 +314,11 @@ func (b *jobBuilder) collapseArtifacts() {
 		names = append(names, art.Name)
 	}
 	var arts []ir.Artifact
-	if !slices.Equal(names, a.Names) || yaml.Unmarshal([]byte(a.Arts), &arts) != nil {
+	same := len(a.Outs) == len(a.Names)
+	for i, n := range a.Names {
+		same = same && i < len(a.Outs) && b.outArts[n] == a.Outs[i]
+	}
+	if !same || !slices.Equal(names, a.Names) || yaml.Unmarshal([]byte(a.Arts), &arts) != nil {
 		b.c.ignored(b.path, caps.JobArtifacts, "the output artifacts were edited after pipemaster wrote them; the file content is kept")
 		return
 	}

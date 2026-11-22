@@ -107,6 +107,8 @@ type cacheArg struct {
 type artifactsArg struct {
 	Arts  string   `json:"arts"`
 	Names []string `json:"names"`
+	// Outs is the canonical JSON of each output artifact in Names, in the same order.
+	Outs []string `json:"outs,omitempty"`
 }
 
 func (e *emitter) markCache(j *ir.Job, path string) {
@@ -131,15 +133,22 @@ func (e *emitter) markArtifacts(j *ir.Job, path string) {
 		e.lose(path, caps.JobArtifacts, "the artifact marker cannot be written: "+err.Error())
 		return
 	}
-	var names []string
+	var names, outs []string
 	taken := map[string]bool{}
 	for _, n := range e.uploadsOf(&ir.Job{Steps: j.Steps}) {
 		taken[n] = true
 	}
 	for _, a := range j.Artifacts {
-		names = append(names, outputNames(taken, safeName(a.Name), a.Paths)...)
+		paths := a.Paths
+		if len(paths) == 0 {
+			paths = []string{safeName(a.Name)}
+		}
+		for i, n := range outputNames(taken, safeName(a.Name), a.Paths) {
+			names = append(names, n)
+			outs = append(outs, canonJSON(map[string]any{"name": n, "path": artifactPath(paths[i])}))
+		}
 	}
-	if err := e.markArg(caps.JobArtifacts, path, artifactsArg{Arts: body, Names: names}); err != nil {
+	if err := e.markArg(caps.JobArtifacts, path, artifactsArg{Arts: body, Names: names, Outs: outs}); err != nil {
 		e.lose(path, caps.JobArtifacts, "the artifact marker cannot be written: "+err.Error())
 	}
 }
