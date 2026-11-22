@@ -71,7 +71,7 @@ func TestCapsCaveats(t *testing.T) {
 		caps.TriggerFilterBranch:    {"one exact branch", "glob is lost"},
 		caps.TriggerFilterPaths:     {"paths", "ignore_paths"},
 		caps.TriggerTag:             {"tag_filter"},
-		caps.TriggerSchedule:        {"time resource", "interval", "start", "days", "lost", "cron text"},
+		caps.TriggerSchedule:        {"time resource", "interval", "start", "days", "lost", "cron text", "no clock alignment", "first check emits a version at once", "check cadence", "within 5 minutes after the cron time", "passes midnight"},
 		caps.TriggerAPI:             {"no resource", "Ext", "lost"},
 		caps.TriggerPullRequest:     {"pull request resource type"},
 		caps.JobManual:              {"no triggering get", "trigger set", "Ext"},

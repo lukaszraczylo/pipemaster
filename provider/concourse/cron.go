@@ -12,14 +12,18 @@ const (
 	hoursPerDay   = 24
 	minutesInHour = 60
 	daysInWeek    = 7
+	// windowMinutes is the window width: the time resource checks at least every 5 minutes, so a narrower window
+	// can pass with no check inside it.
+	windowMinutes = 5
 )
 
 var dayNames = [daysInWeek]string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
 
 var dayAbbrev = map[string]int{"sun": 0, "mon": 1, "tue": 2, "wed": 3, "thu": 4, "fri": 5, "sat": 6}
 
-// scheduleSource maps a cron line to the source of a time resource when the two agree exactly: a step that divides
-// the hour or the day, a daily window, or a day list. Any other line has no form, so the caller keeps the cron text.
+// scheduleSource maps a cron line to the source of a time resource that approximates it: an interval for a step
+// that divides the hour or the day, a window of windowMinutes for a daily time, or a day list. Any other line has no
+// form, so the caller keeps the cron text.
 func scheduleSource(cron string) (map[string]any, bool) {
 	f := strings.Fields(cron)
 	if len(f) != cronFields || f[2] != "*" || f[3] != "*" {
@@ -48,7 +52,13 @@ func scheduleSource(cron string) (map[string]any, bool) {
 	if minute == 0 && hour == 0 {
 		return src, true
 	}
-	end := (hour*minutesInHour + minute + 1) % (hoursPerDay * minutesInHour)
+	end := hour*minutesInHour + minute + windowMinutes
+	// The resource tests the weekday of the check time, not of the start, so a window past midnight loses its
+	// part on the next day; time-resource lord/time_lord.go daysMatch.
+	if _, listed := src["days"]; listed && end > hoursPerDay*minutesInHour {
+		return nil, false
+	}
+	end %= hoursPerDay * minutesInHour
 	src["start"] = fmt.Sprintf("%02d:%02d", hour, minute)
 	src["stop"] = fmt.Sprintf("%02d:%02d", end/minutesInHour, end%minutesInHour)
 	return src, true
