@@ -108,7 +108,7 @@ func TestEditedImageOfAHeldSetupActionKeepsTheFile(t *testing.T) {
 	j, rep := editedParse(t, func(s string) string {
 		return strings.ReplaceAll(s, "image: golang:1.22", "image: golang:1.23")
 	})
-	if stepByID(j, "go") != nil {
+	if st := stepByID(j, "go"); st != nil && st.Kind == ir.StepAction {
 		t.Errorf("the setup action came back although the image was edited")
 	}
 	if !hasEntry(rep, "marker ignored") {
@@ -118,7 +118,7 @@ func TestEditedImageOfAHeldSetupActionKeepsTheFile(t *testing.T) {
 
 func TestRemovedOutputArtifactDoesNotRestoreTheUpload(t *testing.T) {
 	j, rep := editedParse(t, func(s string) string { return replaceOnce(t, s, outputsBlock, "") })
-	if stepByID(j, "up") != nil {
+	if st := stepByID(j, "up"); st != nil && st.Kind == ir.StepAction {
 		t.Errorf("the upload step came back although the artifact was removed")
 	}
 	if !hasEntry(rep, "marker ignored") {

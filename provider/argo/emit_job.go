@@ -103,16 +103,6 @@ func (e *emitter) runsContainer(st *ir.Step) bool {
 	return false
 }
 
-// holdsPlace is true when an action step that Argo does not run gets a placeholder container, so the file keeps
-// the place of the step.
-func holdsPlace(st *ir.Step) bool {
-	if st.Kind != ir.StepAction {
-		return false
-	}
-	t, ok := actionTarget(st)
-	return !ok || t.Support.Level == caps.Lost || t.Kind == actions.KindDownload
-}
-
 // job writes the DAG task and the template of one job.
 func (e *emitter) job(pp *plan, jp *jobPlan) (jobOut, error) {
 	j, path := jp.j, jp.path
@@ -208,13 +198,8 @@ func (sx *stepCtx) containers(jx map[string]any) (conts []*container, taskStep *
 			producing = append(producing, st)
 		}
 	}
-	var holders []*ir.Step
-	for _, st := range j.Steps {
-		if st != nil && holdsPlace(st) {
-			holders = append(holders, st)
-		}
-	}
-	names := stepNames(producing, holders, e.needsMain(j), e, tc.jp.path)
+	names, taken := stepNames(producing, e.needsMain(j), e, tc.jp.path)
+	sx.nameTaken = taken
 	for i, st := range j.Steps {
 		if st == nil {
 			continue
@@ -224,28 +209,28 @@ func (sx *stepCtx) containers(jx map[string]any) (conts []*container, taskStep *
 		last := len(producing) > 0 && producing[len(producing)-1] == st
 		switch st.Kind {
 		case ir.StepAction:
-			name := names[st]
 			sx.act, sx.disabled = actionArg{}, false
-			at := len(conts)
-			if c := sx.actionStep(st, name, last); c != nil {
+			if c := sx.actionStep(st, names[st], last, len(conts)); c != nil {
 				conts = append(conts, c)
 			}
-			sx.markAction(st, at)
+			sx.markAction(st)
 		case ir.StepScript, "":
 			if e.runsContainer(st) {
 				sx.act, sx.disabled = actionArg{}, false
-				at, before := len(conts), e.nlost
-				conts = append(conts, sx.containerFor(st, names[st], last, jx))
+				before := e.nlost
+				c := sx.containerFor(st, names[st], last, jx)
+				conts = append(conts, c)
 				if sx.disabled || e.nlost != before {
-					sx.act.Ran = true
-					sx.markAction(st, at)
+					sx.act.Hold = nodeCanon(c.m.N)
+					sx.markAction(st)
 				}
 			} else {
 				if len(st.Script) == 0 {
 					e.lose(path, caps.StepScript, "the step has no script; no container runs it")
 				}
 				sx.act, sx.disabled = actionArg{}, false
-				sx.markAction(st, len(conts))
+				conts = append(conts, sx.placeholder(st))
+				sx.markAction(st)
 			}
 		case ir.StepTask:
 			if e.own && extOf(st.Ext)[ExtTemplate] != nil || jx["templateRef"] != nil {
@@ -254,11 +239,13 @@ func (sx *stepCtx) containers(jx map[string]any) (conts []*container, taskStep *
 			}
 			e.lose(path, caps.StepAction, "a task step has no Argo form; the step is dropped")
 			sx.act, sx.disabled = actionArg{}, false
-			sx.markAction(st, len(conts))
+			conts = append(conts, sx.placeholder(st))
+			sx.markAction(st)
 		default:
 			e.lose(path, caps.StepAction, "a "+string(st.Kind)+" step has no Argo form; the step is dropped")
 			sx.act, sx.disabled = actionArg{}, false
-			sx.markAction(st, len(conts))
+			conts = append(conts, sx.placeholder(st))
+			sx.markAction(st)
 		}
 	}
 	return conts, taskStep

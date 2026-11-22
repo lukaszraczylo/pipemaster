@@ -164,8 +164,8 @@ func TestEditsAroundThePlaceholderLeaveTheActionNextToIt(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			ids, _, rep := frobParse(t, c.edit)
 			wantIDs(t, ids, c.want...)
-			if strings.Contains(rep, "marker ignored") {
-				t.Errorf("unexpected marker ignored entry:\n%s", rep)
+			if strings.Contains(rep, "marker ignored") || strings.Contains(rep, "repeats in the job") {
+				t.Errorf("unexpected entry:\n%s", rep)
 			}
 		})
 	}

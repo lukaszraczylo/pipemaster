@@ -54,6 +54,8 @@ type stepCtx struct {
 	artIn   []*yaml.Node
 	artOut  []*yaml.Node
 	argArts []*yaml.Node
+	// nameTaken holds the container names of the job, for the placeholders.
+	nameTaken map[string]bool
 	// act is what the last action step wrote.
 	act actionArg
 	// seq counts the action markers of the job.
@@ -64,7 +66,7 @@ type stepCtx struct {
 
 // stepName gives each step with a container its name. The last container is main when the job has outputs or
 // artifacts, because Argo reads them from the container of that name only.
-func stepNames(steps, holders []*ir.Step, wantMain bool, e *emitter, path string) map[*ir.Step]string {
+func stepNames(steps []*ir.Step, wantMain bool, e *emitter, path string) (map[*ir.Step]string, map[string]bool) {
 	names := map[*ir.Step]string{}
 	taken := map[string]bool{}
 	var last *ir.Step
@@ -79,10 +81,7 @@ func stepNames(steps, holders []*ir.Step, wantMain bool, e *emitter, path string
 		}
 		names[st] = e.dnsName(taken, path+"/step/"+st.ID, "step id", st.ID, maxName, true)
 	}
-	for _, st := range holders {
-		names[st] = e.dnsName(taken, path+"/step/"+st.ID, "step id", st.ID, maxName, true)
-	}
-	return names
+	return names, taken
 }
 
 // stepScripts converts the script lines of a step. A statement with no spelling is commented out whole.
@@ -336,13 +335,13 @@ func outputEpilogue(name string) string {
 }
 
 // actionStep writes a step that uses an action. It returns a container when the action runs as one.
-func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool) *container {
+func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool, at int) *container {
 	tc, e := sx.tc, sx.tc.e
 	path := tc.jp.path + "/step/" + st.ID
 	if st.Action == nil || st.Action.Kind != ir.ActionRepo {
 		e.lose(path, caps.StepAction, "the action "+actionRef(st.Action)+" has no Argo form; the step is dropped")
 		e.comment(path, "uses: "+actionRef(st.Action))
-		return sx.placeholder(st, name)
+		return sx.placeholder(st)
 	}
 	with := map[string]string{}
 	for k, v := range st.With {
@@ -357,14 +356,14 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool) *container {
 	if !ok {
 		e.lose(path, caps.StepAction, "the action "+actionRef(st.Action)+" has no Argo mapping; Argo does not run the step, and the marker and a comment keep the reference")
 		e.comment(path, "uses: "+actionRef(st.Action))
-		return sx.placeholder(st, name)
+		return sx.placeholder(st)
 	}
 	e.note(path, caps.StepAction, t.Support.Level, t.Support.Strategy, t.Support.Caveat)
 	for _, k := range t.Unmapped {
 		e.lose(path, caps.StepAction, "the input "+k+" of the action has no Argo form")
 	}
 	if t.Support.Level == caps.Lost {
-		return sx.placeholder(st, name)
+		return sx.placeholder(st)
 	}
 	sx.act.Kind = t.Kind
 	nIn, nOut := len(sx.artIn), len(sx.artOut)
@@ -385,22 +384,27 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool) *container {
 		}
 	case actions.KindDownload:
 		sx.download(path, t)
-		return sx.placeholder(st, name)
 	case actions.KindScript:
 		cp := *st
 		cp.Script, cp.Kind, cp.Action = t.Script, ir.StepScript, nil
 		c := sx.containerFor(&cp, name, last, nil)
-		sx.act.Ran = c != nil
+		if c != nil {
+			sx.act.Hold = nodeCanon(c.m.N)
+		}
 		return c
 	}
-	return nil
+	if sx.act.Wrote == checkoutWrote && at == 0 {
+		return nil
+	}
+	return sx.placeholder(st)
 }
 
 // placeholder writes the container that keeps the place of an action that Argo does not run. The marker holds
 // the canonical text of the container, so the parser restores the action only when the file still has it.
-func (sx *stepCtx) placeholder(st *ir.Step, name string) *container {
+func (sx *stepCtx) placeholder(st *ir.Step) *container {
 	tc := sx.tc
 	path := tc.jp.path + "/step/" + st.ID
+	name := tc.e.dnsName(sx.nameTaken, path, "step id", st.ID, maxName, true)
 	c := &container{name: name, m: newMap()}
 	c.m.SetStr("name", name)
 	if name != st.ID {
@@ -416,8 +420,8 @@ func (sx *stepCtx) placeholder(st *ir.Step, name string) *container {
 	return c
 }
 
-// markAction writes the marker that holds an action step. at is the number of containers before the step.
-func (sx *stepCtx) markAction(st *ir.Step, at int) {
+// markAction writes the marker that holds an action step.
+func (sx *stepCtx) markAction(st *ir.Step) {
 	e, path := sx.tc.e, sx.tc.jp.path+"/step/"+st.ID
 	held := *st
 	held.Ext = withoutBookkeeping(st.Ext)
@@ -427,7 +431,7 @@ func (sx *stepCtx) markAction(st *ir.Step, at int) {
 		return
 	}
 	arg := sx.act
-	arg.Step, arg.At, arg.Seq = body, at, sx.seq
+	arg.Step, arg.Seq = body, sx.seq
 	sx.seq++
 	if err := e.markArg(caps.StepAction, path, arg); err != nil {
 		e.lose(path, caps.StepAction, "the action marker cannot be written: "+err.Error())

@@ -26,16 +26,12 @@ type actionArg struct {
 	Kind string `json:"kind,omitempty"`
 	// Art is the git artifact that the emitter wrote for a checkout, as canonical JSON.
 	Art string `json:"art,omitempty"`
-	// Hold is the canonical JSON of the placeholder container that keeps the place of the step.
+	// Hold is the canonical JSON of the container that keeps the place of the step in the file.
 	Hold string `json:"hold,omitempty"`
 	// Arts names the output artifacts that an upload wrote.
 	Arts []string `json:"arts,omitempty"`
-	// At is the number of containers that the job held before the step.
-	At int `json:"at"`
 	// Seq orders the steps that stand at the same place.
 	Seq int `json:"seq,omitempty"`
-	// Ran is true when a container of the file stands in for the step.
-	Ran bool `json:"ran,omitempty"`
 }
 
 func carryYAML(v any) (string, error) {

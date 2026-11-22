@@ -32,7 +32,8 @@ func (b *jobBuilder) collapseActions() {
 	b.collapseArtifacts()
 }
 
-// collapseHeld puts back the steps that the markers hold.
+// collapseHeld puts back the steps that the markers hold. Each step stands where the file has the container or the
+// git artifact that the emitter wrote for it, and only when that anchor is still the one that was written.
 func (b *jobBuilder) collapseHeld() {
 	prefix := b.path + "/step/"
 	var held []heldAction
@@ -41,7 +42,7 @@ func (b *jobBuilder) collapseHeld() {
 			continue
 		}
 		h := heldAction{path: u.IRPath, step: &ir.Step{}}
-		if json.Unmarshal([]byte(lines[0]), &h.arg) != nil || yaml.Unmarshal([]byte(h.arg.Step), h.step) != nil || h.arg.At < 0 {
+		if json.Unmarshal([]byte(lines[0]), &h.arg) != nil || yaml.Unmarshal([]byte(h.arg.Step), h.step) != nil {
 			b.c.ignored(u.IRPath, caps.StepAction, "the action step marker cannot be read")
 			continue
 		}
@@ -61,29 +62,23 @@ func (b *jobBuilder) collapseHeld() {
 		}
 	}
 	used := map[*ir.Step]bool{}
-	var body []*ir.Step
 	var restored []heldAction
-	var placed []heldAction
-	for _, h := range held {
-		if h.arg.Hold != "" && b.restorePlaceholder(h, rest) {
-			placed = append(placed, h)
-		}
-	}
-	held = slices.DeleteFunc(held, func(h heldAction) bool { return h.arg.Hold != "" })
-	restored = append(restored, placed...)
-	ci := 0
 	for _, h := range held {
 		st := *h.step
-		body = append(body, rest[ci:min(max(ci, h.arg.At), len(rest))]...)
-		ci = max(ci, min(h.arg.At, len(rest)))
-		if why := b.heldEdit(h, front, used, rest, ci); why != "" {
-			b.c.ignored(h.path, caps.StepAction, why+"; the file content is kept")
+		fi, why := b.heldAnchor(h, front, used)
+		if why == "" {
+			why = b.restoreAt(h, &st, rest, fi)
+		}
+		if why != "" {
+			b.c.ignored(h.path, caps.StepAction, why)
 			continue
 		}
-		if h.arg.Ran {
-			ci++
+		if fi >= 0 {
+			used[front[fi]] = true
+			if h.arg.Hold == "" {
+				front[fi] = &st
+			}
 		}
-		body = append(body, &st)
 		b.c.restored[&st] = true
 		restored = append(restored, h)
 	}
@@ -93,8 +88,7 @@ func (b *jobBuilder) collapseHeld() {
 			out = append(out, st)
 		}
 	}
-	out = append(out, body...)
-	out = append(out, rest[ci:]...)
+	out = append(out, rest...)
 	b.job.Steps = out
 	for _, h := range restored {
 		b.dropImage(h.arg.Image)
@@ -102,50 +96,49 @@ func (b *jobBuilder) collapseHeld() {
 	}
 }
 
-// restorePlaceholder puts a held action in the place of the container that stands in for it. The container must
-// be in the file, unedited. The action then stands where the file has the container.
-func (b *jobBuilder) restorePlaceholder(h heldAction, rest []*ir.Step) bool {
+// restoreAt puts st in the place of the container of the held step, or of its git artifact when it has no container.
+// It returns why the step cannot be put back, or an empty text.
+func (b *jobBuilder) restoreAt(h heldAction, st *ir.Step, rest []*ir.Step, fi int) string {
+	if h.arg.Hold == "" {
+		if fi < 0 {
+			return "the step has no container or artifact that anchors it; the file content is kept"
+		}
+		return ""
+	}
 	i := slices.IndexFunc(rest, func(s *ir.Step) bool { return s.ID == h.step.ID })
 	switch {
 	case i < 0:
-		b.c.ignored(h.path, caps.StepAction, "the placeholder container was removed after pipemaster wrote the file; the action is not restored")
+		return "the placeholder container was removed after pipemaster wrote the file; the action is not restored"
 	case b.holds[h.step.ID] != h.arg.Hold:
-		b.c.ignored(h.path, caps.StepAction, "the placeholder container was edited after pipemaster wrote the file; the file content is kept")
-	default:
-		st := *h.step
-		rest[i] = &st
-		b.c.restored[&st] = true
-		return true
+		return "the placeholder container was edited after pipemaster wrote the file; the file content is kept"
 	}
-	return false
+	rest[i] = st
+	return ""
 }
 
-// heldEdit compares what the file holds for a step with what the emitter wrote. It returns why the marker cannot
-// stand in for the step, or an empty text when it can. It marks the artifact step that a checkout replaces.
-func (b *jobBuilder) heldEdit(h heldAction, front []*ir.Step, used map[*ir.Step]bool, rest []*ir.Step, ci int) string {
+// heldAnchor compares what the file holds for a step, apart from its container, with what the emitter wrote. It
+// returns the index of the git artifact step that the checkout replaces, or -1, and why the marker cannot stand
+// in for the step, or an empty text when it can.
+func (b *jobBuilder) heldAnchor(h heldAction, front []*ir.Step, used map[*ir.Step]bool) (int, string) {
 	switch {
 	case h.arg.Wrote == checkoutWrote:
 		i := slices.IndexFunc(front, func(s *ir.Step) bool { return !used[s] && h.arg.Art != "" && b.gitArts[s] == h.arg.Art })
 		if i < 0 {
-			return "the git artifact was edited or removed after pipemaster wrote the file"
+			return -1, "the git artifact was edited or removed after pipemaster wrote the file; the file content is kept"
 		}
-		used[front[i]] = true
-	case h.arg.Ran:
-		if ci >= len(rest) || rest[ci].ID != h.step.ID {
-			return "the container that stands in for the step was edited or removed after pipemaster wrote the file"
-		}
+		return i, ""
 	case h.arg.Image != "":
 		if !b.hasImage(h.arg.Image) {
-			return "the image that the setup action gave was edited after pipemaster wrote the file"
+			return -1, "the image that the setup action gave was edited after pipemaster wrote the file; the file content is kept"
 		}
 	case len(h.arg.Arts) > 0:
 		for _, n := range h.arg.Arts {
 			if !slices.ContainsFunc(b.job.Artifacts, func(a ir.Artifact) bool { return a.Name == n }) {
-				return "the output artifact of the upload was edited or removed after pipemaster wrote the file"
+				return -1, "the output artifact of the upload was edited or removed after pipemaster wrote the file; the file content is kept"
 			}
 		}
 	}
-	return ""
+	return -1, ""
 }
 
 // hasImage is true when the job container or a step runs the image.
