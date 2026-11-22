@@ -2,6 +2,7 @@ package argo
 
 import (
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ymap"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -143,6 +144,7 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (jobOut, error) {
 	}
 	e.templateKeys(tc, tm, sx, jx, taskStep != nil)
 	d := e.finalDeps(tc, cond, jx)
+	d.depends = e.keptDepends(path, jx, d.depends)
 	var gate string
 	gate, d = e.gateTasks(tc, d, jx, &out)
 	task := e.dagTask(tc, sx, cond, d, gate, items, whole, jx, ref)
@@ -174,9 +176,6 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (jobOut, error) {
 // jobFeatures reports the job fields that Argo has no form for.
 func (e *emitter) jobFeatures(tc *jobCtx, jx map[string]any) {
 	j, path := tc.jp.j, tc.jp.path
-	if _, ok := jx[ExtDepends].(string); ok {
-		e.lose(path, caps.JobIf, "the depends text kept in Ext is written again from the condition of the job; an atom with no IR status is lost")
-	}
 	if j.Environment != nil && !j.Environment.Approval || (j.Environment != nil && (j.Environment.Name != "" || j.Environment.URL != "")) {
 		e.lose(path, caps.JobEnvironment, "Argo has no environment name or URL; they stay in a comment marker only")
 	}
@@ -643,4 +642,24 @@ func (e *emitter) markService(path string, sv ir.Service) {
 	if err := e.markArg(caps.JobServices, path+"/service/"+sv.Name, a); err != nil {
 		e.lose(path, caps.JobServices, "the service marker cannot be written: "+err.Error())
 	}
+}
+
+// keptDepends gives the depends text that an Argo file held when it reads as the text that the IR writes. Any other
+// text is written again from the condition, and an atom with no IR status is lost.
+func (e *emitter) keptDepends(path string, jx map[string]any, written string) string {
+	kept, ok := jx[ExtDepends].(string)
+	if !ok {
+		return written
+	}
+	if sameDepends(kept, written) {
+		return kept
+	}
+	e.lose(path, caps.JobIf, "the depends text kept in Ext is written again from the condition of the job; an atom with no IR status is lost")
+	return written
+}
+
+func sameDepends(a, b string) bool {
+	da, errA := parseDepends(a)
+	db, errB := parseDepends(b)
+	return errA == nil && errB == nil && reflect.DeepEqual(da.cond, db.cond) && slices.Equal(da.tasks, db.tasks)
 }
