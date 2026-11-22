@@ -757,6 +757,8 @@ def argoExtraPipes : List Core.Pipe :=
    pushAll [cj "a", { cj "b" with needs := needOn "a" false }] [{ cj "f" with needs := needOn "a" false }],
    pushAll [cj "a", { cj "b" with needs := needOn "a" false }] [{ cj "f" with needs := needOn "b" false, onFailure := true }],
    pushAll [{ cj "a" with retry := 2, timeout := 90, allowFailure := true }] [],
+   pushAll [{ cj "a" with retry := 1 }] [],
+   pushAll [{ cj "a" with retry := 1, timeout := 5, steps := [] }] [{ cj "f" with retry := 1, onFailure := true }],
    pushAll [{ cj "a" with name := "Build" }] [{ cj "f" with name := "Notify", onFailure := true }]] ++ tekExtraPipes
 
 def argoPipes : List Core.Pipe :=

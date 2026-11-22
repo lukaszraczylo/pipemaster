@@ -195,7 +195,7 @@ def atask (fin : Bool) (j : Core.Job) : ATask where
   name := j.id
   disp := j.name
   wait := emitWait (if fin then [] else j.needs)
-  retries := if 1 < j.retry then some (j.retry - 1) else none
+  retries := if 0 < j.retry then some (j.retry - 1) else none
   timeout := j.timeout
   onError := j.allowFailure
   failedOnly := fin && j.onFailure
@@ -309,14 +309,14 @@ instance (s : String) : Decidable (ArgoPat s) := by unfold ArgoPat; exact inferI
 def trigPats (p : Pipe) : List String := Woodpecker.trigPats p
 
 /-- What one job needs beyond `Wf`. A manual job has no form here: it adds a suspend gate that the model leaves out
-(emit_task.go gateTasks). One run is written as `limit: "0"`, which reads back as no retry (parse_body.go retry). A need
+(emit_task.go gateTasks). A need
 that asks for artifacts goes through task arguments that the model leaves out. Task and container names are DNS labels
 that fit `maxName` (emit_plan.go planNames; emit.go dnsName), and a task is not named like the two fixed templates.
 Script lines and values pass through unchanged (`LineOk`, `ValueOk`). An env name is not empty (parse_body.go envList),
 and a step does not repeat a variable of its job, because the step variable would win (emit_step.go mergeEnv) and the
 `job.env` marker would then keep the copy in the step (parse_marker.go liftEnv). -/
 def ArgoJob (j : Core.Job) : Prop :=
-  (DnsId j.id ∧ j.id.length ≤ maxName ∧ j.id ∉ reservedTask) ∧ j.manual = false ∧ j.retry ≠ 1 ∧
+  (DnsId j.id ∧ j.id.length ≤ maxName ∧ j.id ∉ reservedTask) ∧ j.manual = false ∧
     (∀ n ∈ j.needs, n.artifacts = false) ∧ (∀ v ∈ j.env, ValueOk v.value ∧ v.name ≠ "") ∧
     ∀ s ∈ j.steps, (DnsId s.id ∧ s.id.length ≤ maxName) ∧ s.script ≠ [] ∧ (∀ l ∈ s.script, LineOk l) ∧
       ∀ v ∈ s.env, ValueOk v.value ∧ v.name ≠ "" ∧ v.name ∉ varNames j.env
@@ -386,25 +386,29 @@ theorem parseSteps_of (fin : Bool) (j : Core.Job)
       simpa using hmap
     · simpa using hmap
 
+theorem retry_rt (n : Nat) :
+    ((if 0 < n then some (n - 1) else none : Option Nat).map (· + 1)).getD 0 = n := by
+  by_cases h : 0 < n <;> simp [h] <;> omega
+
 theorem parse_main (j : Core.Job) (hj : ArgoJob j) (hon : j.onFailure = false) :
     parseJobA false (atask false j) = clr j := by
-  obtain ⟨_, hm, hr, hn, _, hst⟩ := hj
+  obtain ⟨_, hm, hn, _, hst⟩ := hj
   have hdisj : ∀ s ∈ j.steps, ∀ v ∈ s.env, v.name ∉ varNames j.env := fun s hs v hv => ((hst s hs).2.2.2 v hv).2.2
   have hw := (argo_depends_plain j.needs hn).2
   have hps := parseSteps_of false j hdisj
   unfold parseJobA
   rw [hps]
   unfold atask clr
-  simp only [Tekton.retry_rt j.retry hr, hw, hm, hon, Bool.false_and, Bool.false_eq_true, ite_false]
+  simp only [retry_rt j.retry, hw, hm, hon, Bool.false_and, Bool.false_eq_true, ite_false]
 
 theorem parse_fin (j : Core.Job) (hj : ArgoJob j) : parseJobA true (atask true j) = clrFin j := by
-  obtain ⟨_, hm, hr, _, _, hst⟩ := hj
+  obtain ⟨_, hm, _, _, hst⟩ := hj
   have hdisj : ∀ s ∈ j.steps, ∀ v ∈ s.env, v.name ∉ varNames j.env := fun s hs v hv => ((hst s hs).2.2.2 v hv).2.2
   have hps := parseSteps_of true j hdisj
   unfold parseJobA
   rw [hps]
   unfold atask clrFin
-  simp only [Tekton.retry_rt j.retry hr, hm, Bool.true_and, ite_true]
+  simp only [retry_rt j.retry, hm, Bool.true_and, ite_true]
   cases j; simp_all [emitWait, readWait]
 
 theorem rawArgo_toArgo (p : Pipe) (hw : Wf p) (ho : ArgoOk p) : rawArgo (toArgo p) = argClear p := by
@@ -588,8 +592,8 @@ theorem emptyFin_preserves (p : Pipe) (hd : FinDrop p) :
   · intro h
     obtain ⟨hid, hx, hne, hjo⟩ := h
     refine ⟨hid, hx, hne, allef p _ (fun j hj => ?_) hjo⟩
-    obtain ⟨a, b, c, _, e, f⟩ := hj
-    exact ⟨a, b, c, fun n hn => by simp [ef] at hn, e, f⟩
+    obtain ⟨a, b, _, e, f⟩ := hj
+    exact ⟨a, b, fun n hn => by simp [ef] at hn, e, f⟩
 
 theorem argoOk_clearP (q : Pipe) : ArgoOk q → ArgoOk (Tekton.clearP q) := by
   intro h
@@ -641,13 +645,9 @@ theorem argoOk_of_shape (p : Pipe) (pid : String) (hpid : DnsId pid) (hlen : pid
   refine ⟨⟨hpid, hlen⟩, hpat, by simpa using hne, ?_⟩
   intro x hx
   obtain ⟨j, hj, hk, ht⟩ := allm x hx
-  obtain ⟨⟨hid, hl, hres⟩, hman, hret, hart, henv, hst⟩ := hjob j hj
+  obtain ⟨⟨hid, hl, hres⟩, hman, hart, henv, hst⟩ := hjob j hj
   refine ⟨⟨by rw [hk.1]; exact hid, by rw [hk.1]; exact hl, by rw [hk.1]; exact hres⟩,
-    hk.2.2.2.2.1.trans hman, ?_, ht.2 hart, by rw [hk.2.2.1]; exact henv, ?_⟩
-  · intro h1
-    rcases ht.1 with h0 | h0
-    · omega
-    · exact hret (h0.symm.trans h1)
+    hk.2.2.2.2.1.trans hman, ht.2 hart, by rw [hk.2.2.1]; exact henv, ?_⟩
   · intro s hs
     rw [hk.2.2.2.1] at hs
     obtain ⟨s0, hs0, e1, e2, e3⟩ := Woodpecker.mem_stripName hs

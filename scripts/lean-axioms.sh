@@ -129,6 +129,7 @@ required=(
   Pipemaster.Chain.chainFrag_seven_iff
   Pipemaster.Chain.sevenAdapters_closed
   Pipemaster.Argo.rawArgo_toArgo
+  Pipemaster.Argo.retry_rt
   Pipemaster.Argo.argo_from_to
   Pipemaster.Argo.argo_depends_plain
   Pipemaster.Argo.depends_bare_not_plain

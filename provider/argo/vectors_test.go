@@ -334,7 +334,7 @@ func decodeTask(n *yaml.Node, tmpls map[string]vTmpl, used map[string]bool, fina
 	}
 	used[ref] = true
 	t.Steps, t.Timeout, t.Retries = tm.steps, tm.timeout, tm.retries
-	if t.Retries != nil && *t.Retries < 1 {
+	if t.Retries != nil && *t.Retries < 0 {
 		return t, fmt.Errorf("task %s: retry limit %d", t.Name, *t.Retries)
 	}
 	return t, nil

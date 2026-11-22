@@ -149,6 +149,15 @@ func TestRetryStrategy(t *testing.T) {
 			t.Fatalf("retryStrategy rest = %v", rs)
 		}
 	}
+	for _, limit := range []string{"0", `"0"`} {
+		j, _ := one(t, "      - {name: a, template: t}\n", "  - name: t\n    container: {image: x}\n    retryStrategy: {limit: "+limit+"}\n")
+		if j.Retry == nil || j.Retry.Attempts != 1 {
+			t.Fatalf("limit %s: Retry %+v, want one attempt", limit, j.Retry)
+		}
+	}
+	if j, _ := one(t, "      - {name: a, template: t}\n", "  - name: t\n    container: {image: x}\n"); j.Retry != nil {
+		t.Fatalf("no retryStrategy: Retry %+v, want nil", j.Retry)
+	}
 	j, rep := one(t, "      - {name: a, template: t}\n", "  - name: t\n    container: {image: x}\n    retryStrategy: {retryPolicy: Always}\n")
 	if j.Retry != nil || ext(j.Ext)["retryStrategy"] == nil || !hasEntry(rep, "retryStrategy") {
 		t.Fatalf("limitless strategy: %+v %v", j.Retry, ext(j.Ext))

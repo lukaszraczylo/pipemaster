@@ -637,3 +637,44 @@ func TestFullReturnSchemaFailureNeedsTheOriginToHaveFailed(t *testing.T) {
 		t.Fatalf("a different recorded failure: code = %d, want 1\n%s", code, msg)
 	}
 }
+
+// writeGitlab writes a one-file GitLab project and returns its directory.
+func writeGitlab(t *testing.T, src string) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".gitlab-ci.yml"), []byte(src), 0o600); err != nil { // #nosec G703 -- path under t.TempDir
+		t.Fatal(err)
+	}
+	return dir
+}
+
+const gitlabRetryOne = "build:\n  script: [echo hi]\n  retry:\n    max: 0\n"
+
+// A GitLab `retry: {max: 0}` is one attempt. Argo writes it as `limit: "0"`, so the return must keep it.
+func TestRetryOneThroughArgo(t *testing.T) {
+	t.Run("with metadata", func(t *testing.T) {
+		code, out, msg := runOut("roundtrip", writeGitlab(t, gitlabRetryOne), "--via", "argo")
+		if code != 0 || out != "no differences\n" {
+			t.Fatalf("code=%d out=%q\n%s", code, out, msg)
+		}
+	})
+	t.Run("without metadata", func(t *testing.T) {
+		src, mid, back := writeGitlab(t, gitlabRetryOne), t.TempDir(), t.TempDir()
+		if c, _, msg := runOut("convert", src, "--from", "gitlab", "--to", "argo", "-o", mid); c != 0 {
+			t.Fatalf("to argo = %d\n%s", c, msg)
+		}
+		if err := os.RemoveAll(filepath.Join(mid, ".pipemaster")); err != nil {
+			t.Fatal(err)
+		}
+		if c, _, msg := runOut("convert", mid, "--from", "argo", "--to", "gitlab", "-o", back); c != 0 {
+			t.Fatalf("to gitlab = %d\n%s", c, msg)
+		}
+		got, err := os.ReadFile(filepath.Join(back, ".gitlab-ci.yml")) // #nosec G304 -- temp dir
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(got), "max: 0") {
+			t.Fatalf("the one attempt is gone:\n%s", got)
+		}
+	})
+}

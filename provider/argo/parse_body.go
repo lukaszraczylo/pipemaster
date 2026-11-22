@@ -272,7 +272,8 @@ func isOutputFile(pm *omap, rest []string, name string) bool {
 	return hasPath && hasDefault && p == outputFile(name) && d == ""
 }
 
-// retry maps retryStrategy.limit to attempts; the other keys stay in Ext.
+// retry maps retryStrategy.limit to attempts, so an explicit limit of 0 is one attempt and an absent strategy is none;
+// the other keys stay in Ext.
 func (b *jobBuilder) retry(r *reader) {
 	v, ok := r.Take("retryStrategy")
 	if !ok {
@@ -285,9 +286,7 @@ func (b *jobBuilder) retry(r *reader) {
 		b.k.Keep("retryStrategy", v, caps.JobRetry, "retryStrategy has no limit that is a count; kept in Ext", r.Line("retryStrategy"))
 		return
 	}
-	if n > 0 {
-		b.job.Retry = &ir.Retry{Attempts: n + 1}
-	}
+	b.job.Retry = &ir.Retry{Attempts: n + 1}
 	if rest := restKeys(m, "limit"); len(rest) > 0 {
 		b.k.Keep("retryStrategy", m.Subset(rest), caps.JobRetry, "retryStrategy keys beside limit (retryPolicy, backoff, expression) have no IR field; kept in Ext", r.Line("retryStrategy"))
 	}
