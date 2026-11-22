@@ -26,7 +26,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.JobNeedsArtifacts:      {Level: caps.Native, Strategy: "DAG task arguments artifacts from the needed task", Caveat: artRepo + "; artifacts load only into a container named main"},
 		caps.JobEnvironmentApproval: {Level: caps.Native, Strategy: "suspend template as a gate task", Caveat: "Argo has no approver identity: anyone with RBAC to resume the Workflow can approve; the reviewer list is lost"},
 		caps.JobManual:              {Level: caps.Native, Strategy: "suspend template as a gate task", Caveat: "anyone with RBAC to resume the Workflow can start the job"},
-		caps.PipelineInputs:         {Level: caps.Native, Strategy: "spec arguments parameters", Caveat: "every input is a string parameter; a choice becomes enum"},
+		caps.PipelineInputs:         {Level: caps.Native, Strategy: "spec arguments parameters", Caveat: "every input is a string parameter"},
 		caps.PipelineFinally:        {Level: caps.Native, Strategy: "exit handler (hooks.exit) that runs a second dag"},
 		caps.StepScript:             {Level: caps.Native, Strategy: "container args"},
 		caps.StepImage:              {Level: caps.Native, Strategy: "container image"},

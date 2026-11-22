@@ -97,3 +97,10 @@ func TestCapsCaveats(t *testing.T) {
 		}
 	}
 }
+
+func TestCapsDoNotPromiseEnum(t *testing.T) {
+	s := argo.New().Caps()[caps.PipelineInputs]
+	if text := s.Strategy + " " + s.Caveat; strings.Contains(text, "enum") {
+		t.Errorf("the emitter writes no enum, but the text says: %q", text)
+	}
+}
