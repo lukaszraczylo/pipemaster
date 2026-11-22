@@ -85,6 +85,7 @@ type jobBuilder struct {
 	c            *plCtx
 	k            *sink
 	raw          map[string]string
+	opaque       map[string]bool
 	prints       map[string]string
 	ws           *workspaceArg
 	marks        *marks
@@ -98,7 +99,7 @@ func (c *plCtx) job(m *omap, finally bool) (*ir.Job, error) {
 	name, _ := text(m.vals["name"])
 	id := c.ids[name]
 	b := &jobBuilder{
-		c: c, job: &ir.Job{ID: id}, finally: finally, explicit: map[string]bool{}, whenNeeds: map[string]bool{}, raw: map[string]string{},
+		c: c, job: &ir.Job{ID: id}, finally: finally, explicit: map[string]bool{}, whenNeeds: map[string]bool{}, raw: map[string]string{}, opaque: map[string]bool{},
 		path: "pipeline/" + c.plID + "/job/" + id,
 		px:   newTexts(c.taskID, false), tx: newTexts(c.taskID, true),
 	}
@@ -284,6 +285,13 @@ func (b *jobBuilder) bindings(v any) error {
 			return fmt.Errorf("a param needs a name")
 		}
 		val, isText := text(m.vals["value"])
+		if isText && b.hasUnresolved(val) {
+			// The Task text keeps $(params.name), so the Task must keep its param and the PipelineTask its binding.
+			b.opaque[name] = true
+			other.set(name, m.vals["value"], m.lines["value"])
+			b.k.note(caps.ExtPassthrough, "param "+name+" binds "+val+", a Tekton variable with no IR form; the binding and the Task param are kept in Ext", m.lines["value"])
+			continue
+		}
 		if isText {
 			b.tx.bind[name] = b.px.parts(val)
 			b.raw[name] = val
@@ -297,6 +305,13 @@ func (b *jobBuilder) bindings(v any) error {
 		b.k.vals["array_params"] = plain(other)
 	}
 	return nil
+}
+
+// hasUnresolved tells a bound value that holds a Tekton variable which has no IR reference.
+func (b *jobBuilder) hasUnresolved(val string) bool {
+	probe := newTexts(b.c.taskID, false)
+	probe.parts(val)
+	return len(probe.kept) > 0
 }
 
 // finish adds the needs that references imply, the kept-variable entries and the Ext.

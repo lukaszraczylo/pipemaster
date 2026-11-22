@@ -230,3 +230,42 @@ func TestOptionalStructuredInputGetsATypedDefault(t *testing.T) {
 		t.Fatalf("object default = %#v", get(params[1], "default"))
 	}
 }
+
+const boundVariable = `apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata: {name: p}
+spec:
+  params:
+  - {name: cfg, type: object, properties: {url: {type: string}}, default: {url: "http://x"}}
+  tasks:
+  - name: a
+    params:
+    - {name: url, value: "$(params.cfg.url)"}
+    - {name: run, value: "$(context.pipelineRun.name)"}
+    - {name: lit, value: "hello world"}
+    taskSpec:
+      params: [{name: url}, {name: run}, {name: lit}]
+      steps:
+      - name: s
+        image: alpine
+        script: |
+          echo "$(params.url) $(params.run) $(params.lit)"
+`
+
+func TestBoundVariableWithoutIRFormKeepsTheTaskParam(t *testing.T) {
+	files, _ := identityOf(t, map[string]string{"p.yaml": boundVariable})
+	admission(t, files)
+	pt := list(get(pipelineDoc(t, files, "p"), "spec", "tasks"))[0]
+	bound := map[string]any{}
+	for _, p := range list(get(pt, "params")) {
+		bound[get(p, "name").(string)] = get(p, "value")
+	}
+	if bound["url"] != "$(params.cfg.url)" || bound["run"] != "$(context.pipelineRun.name)" {
+		t.Fatalf("bindings = %v", bound)
+	}
+}
+
+func TestAdmissionCheckRunsOnCorpusLikeOutput(t *testing.T) {
+	files, _ := identityOf(t, map[string]string{"p.yaml": structuredParams})
+	admission(t, files)
+}

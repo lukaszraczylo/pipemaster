@@ -78,6 +78,8 @@ func (b *jobBuilder) taskParams(v any, line int) error {
 		if rest := r.rest(); len(rest) > 0 {
 			kept = append(kept, plain(m))
 			b.k.note(caps.ExtPassthrough, "Task param "+name+": key "+rest[0]+" has no IR form; kept in Ext", line)
+		} else if b.opaque[name] {
+			kept = append(kept, plain(m))
 		}
 	}
 	if len(kept) > 0 {
