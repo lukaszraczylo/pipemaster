@@ -52,7 +52,8 @@ func (adapter) ID() string { return dialect }
 func (adapter) SourceFiles(fsys fs.FS) ([]string, error) { return yamlFiles(fsys) }
 
 // isHelm tells a file that holds Helm template text, which no YAML reader can parse until it is rendered. A file
-// that parses is no Helm template, even when a script in it holds Go template text such as {{.Host}}.
+// that parses is no Helm template, even when a script in it holds Go template text such as {{.Host}}. A parsed
+// file is one when a name or an image holds the text, because the pipeline id and the file name would carry it.
 func isHelm(data []byte) bool {
 	if !helmText.Match(data) {
 		return false
@@ -63,7 +64,34 @@ func isHelm(data []byte) bool {
 		if err := dec.Decode(&v); err != nil {
 			return !errors.Is(err, io.EOF)
 		}
+		if helmIdentity(v) {
+			return true
+		}
 	}
+}
+
+// helmKeys are the keys whose value names or selects something, so Helm text there cannot be script text.
+var helmKeys = map[string]bool{"name": true, "generateName": true, "image": true, "template": true}
+
+func helmIdentity(v any) bool {
+	switch t := v.(type) {
+	case map[string]any:
+		for k, e := range t {
+			if s, ok := e.(string); ok && helmKeys[k] && helmText.MatchString(s) {
+				return true
+			}
+			if helmIdentity(e) {
+				return true
+			}
+		}
+	case []any:
+		for _, e := range t {
+			if helmIdentity(e) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Detect reports whether a file under .argo/ holds a workflow kind of an argoproj.io API. A Helm template does not count.
