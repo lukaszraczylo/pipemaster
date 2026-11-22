@@ -83,11 +83,17 @@ https://pipemaster.invalid/schemas/argo/.
 Written by hand on 2026-11-22 from the Go structs of concourse/concourse tag `v8.3.3` (Apache-2.0; no Concourse code is
 imported or copied). Concourse publishes no schema. The tool reads the structs from
 `https://raw.githubusercontent.com/concourse/concourse/v8.3.3/atc/<file>`; the sha256 of each source file is below.
-Draft 2020-12, no external `$ref`. A step is a `oneOf` over the step kinds with `unevaluatedProperties: false`, so an
-unknown step key fails as it does in fly (`Step.UnknownFields`). The `source`, `params`, `config` of var sources and
-`user_data` maps are opaque. Unknown top-level, job, resource, resource type, task config and `across` keys fail, as in
-`fly validate-pipeline --strict`. References between objects (an unused resource, an unknown `passed` job) are checked
-by fly only. `task.privileged` is a boolean: fly 8.3.3 rejects `fuse-only`.
+Draft 2020-12, no external `$ref`. The schema accepts everything `fly validate-pipeline --strict` 8.3.3 accepts; the
+differential tests in `validate/concourse_test.go` compare the two. A step is a `oneOf` over the step kinds with
+`unevaluatedProperties: false`, so an unknown step key fails as it does in fly (`Step.UnknownFields`). Unknown top-level,
+job, resource, resource type, group, display, task config (top level) and `across` keys fail, as in fly. Maps that fly
+decodes without a strict check (`config.run`, `inputs[]`, `outputs[]`, `caches[]`, `image_resource`, `container_limits`,
+an `in_parallel` object) take unknown keys. `source`, `params`, `config` of var sources and `user_data` are opaque.
+`source` is optional on a resource and resource type, `plan` on a job, and the var source `type` is any string
+(its set of types and the validity of its config are fly checks). A boolean or integer property can be null, as in
+fly. The schema is looser than fly for references between objects (an unused resource, an unknown `passed` job),
+repeated step names, step names that break the identifier rule and a var source config. `task.privileged` is a
+boolean: fly 8.3.3 rejects `fuse-only`.
 
 | Schema part | Struct (file:type) |
 |---|---|
@@ -108,7 +114,7 @@ by fly only. `task.privileged` is a boolean: fly 8.3.3 rejects `fuse-only`.
 
 | File | Source | Bytes | SHA-256 | Licence |
 |---|---|---|---|---|
-| concourse.json | hand-written from the structs above, concourse/concourse `v8.3.3` | 11881 | 3e4e5a5751f9d4bce75ffde4454926d12e451d765426bcab0e60602729776ad7 | Apache-2.0 (concourse/concourse structs); the file is written by this repo |
+| concourse.json | hand-written from the structs above, concourse/concourse `v8.3.3` | 16833 | 996543fcd79e4947e91bf0197de6173b19fe2f53be2ed6558779c987cff091a8 | Apache-2.0 (concourse/concourse structs); the file is written by this repo |
 
 ### fly v8.3.3 (scripts/install-linters.sh)
 

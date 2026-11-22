@@ -61,10 +61,28 @@ func TestDecodeAcceptsMergeKeys(t *testing.T) {
 	}
 }
 
-func TestDecodeAcceptsRepeatedMergeKeyInOneMap(t *testing.T) {
+func TestDecodeRejectsRepeatedMergeKeyInOneMap(t *testing.T) {
+	// fly counts << like any key, even when the aliases do not overlap.
 	y := "a: &a {x: 1}\nb: &b {y: 2}\nd:\n  <<: *a\n  <<: *b\n"
-	if _, err := concourse.DecodeNode([]byte(y)); err != nil {
-		t.Fatalf("a merge key is not a duplicate: %v", err)
+	if _, err := concourse.DecodeNode([]byte(y)); err == nil || !strings.Contains(err.Error(), "already defined") {
+		t.Fatalf("got %v, want an already defined error", err)
+	}
+}
+
+func TestDecodeAcceptsMergeKeyList(t *testing.T) {
+	y := "a: &a {x: 1}\nb: &b {y: 2}\nd:\n  <<: [*a, *b]\n"
+	var got map[string]map[string]int
+	if err := concourse.Decode([]byte(y), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["d"]["x"] != 1 || got["d"]["y"] != 2 {
+		t.Fatalf("got %v", got["d"])
+	}
+}
+
+func TestDecodeRejectsRepeatedQuotedMergeKey(t *testing.T) {
+	if _, err := concourse.DecodeNode([]byte("d:\n  \"<<\": 1\n  \"<<\": 2\n")); err == nil {
+		t.Fatal("a quoted << is an ordinary key and must not repeat")
 	}
 }
 

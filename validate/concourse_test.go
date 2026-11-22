@@ -43,6 +43,12 @@ resources:
 - name: pull
   type: pr
   source: {repository: a/b}
+  old_name: pull-old
+  public: true
+  check_timeout: 10m
+  tags: [w]
+  version: {ref: abc}
+  expose_build_created_by: true
 jobs:
 - name: build
   serial: true
@@ -119,6 +125,15 @@ jobs:
       run: {path: sh, args: [-c, "true"], dir: src, user: nobody}
       container_limits: {cpu: 1}
 - name: other
+  old_name: other-old
+  public: true
+  serial_groups: [g]
+  interruptible: true
+  disable_manual_trigger: true
+  disable_reruns: true
+  tags: [w]
+  on_error: {get: repo-copy, resource: repo}
+  on_abort: {put: repo-out, resource: repo, params: {repository: x}}
   plan:
   - get: repo
   - get: nightly
@@ -230,7 +245,6 @@ func TestConcourseSchemaRejects(t *testing.T) {
 		"bad load_var format":         base("  - load_var: v\n    file: r/f\n    format: toml\n", ""),
 		"unknown hook key":            base("  - get: r\n    on_finish: {get: r}\n", ""),
 		"nested bad step":             base("  - do:\n    - get: r\n      nope: 1\n", ""),
-		"in_parallel bad key":         base("  - in_parallel: {steps: [], nope: 1}\n", ""),
 		"across without var":          base("  - get: r\n    across: [{values: [a]}]\n", ""),
 		"unknown top-level key":       base("  - get: r\n", "") + "bogus: 1\n",
 		"unknown job key":             "jobs:\n- name: j\n  bogus: 1\n  plan: []\n",
@@ -239,7 +253,6 @@ func TestConcourseSchemaRejects(t *testing.T) {
 		"upper-case job name":         "jobs:\n- name: Build\n  plan: []\n",
 		"upper-case resource name":    "resources:\n- {name: Repo, type: git, source: {}}\njobs:\n- {name: j, plan: []}\n",
 		"job name with a space":       "jobs:\n- name: a b\n  plan: []\n",
-		"var source type":             base("  - get: r\n", "") + "var_sources:\n- {name: v, type: nope, config: {}}\n",
 	}
 	for name, y := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -273,5 +286,77 @@ func TestConcourseFlyRejectsDuplicateKeyAndAcceptsAnchors(t *testing.T) {
 		"jobs:\n- name: j\n  plan:\n  - get: r1\n  - get: r2\n"
 	if out, err := linttool.FlyLint(t, "p.yml", []byte(anchors)); err != nil {
 		t.Fatalf("fly must accept a repeated anchor: %v\n%s", err, out)
+	}
+}
+
+// concourseDifferential holds pipelines where the schema verdict must equal the verdict of fly --strict. The want
+// column is not asserted: the run decides by fly, so the table cannot drift from the pinned linter.
+func concourseDifferential() map[string]string {
+	pipe := func(res, jobs string) string {
+		return "resources:\n- {name: r, type: git, source: {uri: u}}\n" + res + "jobs:\n" + jobs
+	}
+	job := func(step string) string { return pipe("", "- name: j\n  plan:\n  - get: r\n"+step) }
+	task := func(config string) string {
+		return job("  - task: t\n    config:\n      platform: linux\n      image_resource: {type: registry-image, source: {repository: b}}\n" + config)
+	}
+	return map[string]string{
+		"run unknown key":              task("      run: {path: x, bogus: 1}\n"),
+		"inputs item unknown key":      task("      inputs: [{name: a, bogus: 1}]\n      run: {path: x}\n"),
+		"outputs item unknown key":     task("      outputs: [{name: a, bogus: 1}]\n      run: {path: x}\n"),
+		"image_resource unknown key":   job("  - task: t\n    config:\n      platform: linux\n      image_resource: {type: registry-image, source: {repository: b}, bogus: 1}\n      run: {path: x}\n"),
+		"image_resource no source":     job("  - task: t\n    config:\n      platform: linux\n      image_resource: {type: registry-image}\n      run: {path: x}\n"),
+		"caches unknown key":           task("      caches: [{path: c, bogus: 1}]\n      run: {path: x}\n"),
+		"config container_limits key":  task("      container_limits: {bogus: 1}\n      run: {path: x}\n"),
+		"in_parallel extra key":        job("  - in_parallel: {steps: [], bogus: 1}\n"),
+		"cpu float":                    job("  - task: t\n    file: r/t.yml\n    container_limits: {cpu: 1.5}\n"),
+		"cpu negative":                 job("  - task: t\n    file: r/t.yml\n    container_limits: {cpu: -1}\n"),
+		"cpu string":                   job("  - task: t\n    file: r/t.yml\n    container_limits: {cpu: lots}\n"),
+		"limits unknown key":           job("  - task: t\n    file: r/t.yml\n    container_limits: {bogus: 1}\n"),
+		"resource without source":      "resources:\n- {name: r, type: git}\njobs:\n- {name: j, plan: [{get: r}]}\n",
+		"resource_type without source": pipe("resource_types:\n- {name: t, type: registry-image}\n", "- {name: j, plan: [{get: r}]}\n"),
+		"job without plan":             pipe("", "- {name: j, plan: [{get: r}]}\n- name: k\n"),
+		"job with empty plan":          pipe("", "- {name: j, plan: [{get: r}]}\n- {name: k, plan: []}\n"),
+		"var_source dummy":             job("") + "var_sources:\n- {name: k, type: dummy, config: {vars: {a: b}}}\n",
+		"version non-string value":     job("  - get: r\n    version: {ref: 1}\n"),
+		"put inputs bogus":             job("  - put: r\n    inputs: bogus\n"),
+		"serial null":                  pipe("", "- {name: j, serial: , plan: [{get: r}]}\n"),
+		"max_in_flight float":          pipe("", "- {name: j, max_in_flight: 1.5, plan: [{get: r}]}\n"),
+		"across max_in_flight bogus":   job("  - across: [{var: v, values: [a], max_in_flight: some}]\n    get: r\n"),
+		"trigger null":                 pipe("", "- {name: j, plan: [{get: r, trigger: null}]}\n"),
+		"fail_fast null":               pipe("", "- {name: j, plan: [{in_parallel: {steps: [{get: r}], fail_fast: null}}]}\n"),
+		"valid plain":                  job(""),
+	}
+}
+
+func TestConcourseSchemaMatchesFly(t *testing.T) {
+	for name, y := range concourseDifferential() {
+		t.Run(name, func(t *testing.T) {
+			schemaErr := validate.File(concourseTestID, "p.yml", []byte(y))
+			out, flyErr := linttool.FlyLint(t, "p.yml", []byte(y))
+			if (schemaErr == nil) != (flyErr == nil) {
+				t.Fatalf("schema accepts=%v, fly accepts=%v\nschema: %v\nfly: %s\n%s", schemaErr == nil, flyErr == nil, schemaErr, out, y)
+			}
+		})
+	}
+}
+
+// concourseFlyOnly holds pipelines that the schema accepts and fly rejects: fly checks references between objects
+// and the configuration of a var source, which a schema cannot.
+var concourseFlyOnly = map[string]string{
+	"var_source unknown type": "resources:\n- {name: r, type: git, source: {uri: u}}\njobs:\n- {name: j, plan: [{get: r}]}\nvar_sources:\n- {name: k, type: nope, config: {}}\n",
+	"var_source kubernetes":   "resources:\n- {name: r, type: git, source: {uri: u}}\njobs:\n- {name: j, plan: [{get: r}]}\nvar_sources:\n- {name: k, type: kubernetes, config: {}}\n",
+	"var_source conjur":       "resources:\n- {name: r, type: git, source: {uri: u}}\njobs:\n- {name: j, plan: [{get: r}]}\nvar_sources:\n- {name: k, type: conjur, config: {}}\n",
+}
+
+func TestConcourseSchemaIsLooserThanFlyOnlyWhereFlyChecksMore(t *testing.T) {
+	for name, y := range concourseFlyOnly {
+		t.Run(name, func(t *testing.T) {
+			if err := validate.File(concourseTestID, "p.yml", []byte(y)); err != nil {
+				t.Fatalf("schema: %v", err)
+			}
+			if out, err := linttool.FlyLint(t, "p.yml", []byte(y)); err == nil {
+				t.Fatalf("fly accepted:\n%s", out)
+			}
+		})
 	}
 }

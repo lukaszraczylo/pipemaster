@@ -10,14 +10,12 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-// mergeKey is the YAML merge key; it can repeat in one mapping.
-const mergeKey = "<<"
-
 // ErrNoDocument means the input holds no YAML document.
 var ErrNoDocument = errors.New("no yaml document")
 
 // DecodeNode parses the one document of data and returns its root node. Like fly 8.0+, it rejects a repeated
-// mapping key at any depth. A repeated anchor and a merge key are valid, as in fly.
+// mapping key at any depth, a repeated merge key included. A repeated anchor and the list form of a merge key
+// (<<: [*a, *b]) are valid, as in fly.
 func DecodeNode(data []byte) (*yaml.Node, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	var doc yaml.Node
@@ -59,7 +57,7 @@ func checkDuplicateKeys(n *yaml.Node) error {
 		seen := make(map[string]int, len(n.Content)/2)
 		for i := 0; i+1 < len(n.Content); i += 2 {
 			k := n.Content[i]
-			if k.Kind == yaml.ScalarNode && k.Value != mergeKey {
+			if k.Kind == yaml.ScalarNode {
 				if first, dup := seen[k.Value]; dup {
 					return fmt.Errorf("parse yaml: line %d: mapping key %q already defined at line %d", k.Line, k.Value, first)
 				}
