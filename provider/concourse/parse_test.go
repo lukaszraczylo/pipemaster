@@ -62,8 +62,8 @@ func TestSourceFilesAndIDRules(t *testing.T) {
 
 func TestEmitIsNotYetAvailable(t *testing.T) {
 	_, _, err := concourse.New().Emit(&ir.Project{})
-	if err == nil || len(concourse.New().Caps()) != 0 {
-		t.Fatalf("Emit err = %v, Caps = %v", err, concourse.New().Caps())
+	if err == nil {
+		t.Fatalf("Emit err = %v", err)
 	}
 }
 

@@ -8,7 +8,6 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -38,9 +37,6 @@ func init() {
 }
 
 func (adapter) ID() string { return dialect }
-
-// Caps is empty until the emitter exists.
-func (adapter) Caps() caps.Matrix { return caps.Matrix{} }
 
 // Emit is not available yet.
 func (adapter) Emit(*ir.Project) (map[string][]byte, *report.Report, error) {
