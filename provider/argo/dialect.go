@@ -3,6 +3,8 @@ package argo
 
 import (
 	"bytes"
+	"errors"
+	"io"
 	"io/fs"
 	"path"
 	"regexp"
@@ -49,8 +51,20 @@ func (adapter) ID() string { return dialect }
 // SourceFiles lists the YAML files under .argo/ that Parse reads, in path order.
 func (adapter) SourceFiles(fsys fs.FS) ([]string, error) { return yamlFiles(fsys) }
 
-// isHelm tells a file that holds Helm template text, which no YAML reader can parse until it is rendered.
-func isHelm(data []byte) bool { return helmText.Match(data) }
+// isHelm tells a file that holds Helm template text, which no YAML reader can parse until it is rendered. A file
+// that parses is no Helm template, even when a script in it holds Go template text such as {{.Host}}.
+func isHelm(data []byte) bool {
+	if !helmText.Match(data) {
+		return false
+	}
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	for {
+		var v any
+		if err := dec.Decode(&v); err != nil {
+			return !errors.Is(err, io.EOF)
+		}
+	}
+}
 
 // Detect reports whether a file under .argo/ holds a workflow kind of an argoproj.io API. A Helm template does not count.
 func (adapter) Detect(fsys fs.FS) bool {

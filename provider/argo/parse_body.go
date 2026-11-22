@@ -12,6 +12,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 const (
@@ -62,6 +63,7 @@ func (b *jobBuilder) body(t *omap) error {
 		return err
 	}
 	b.k.KeepRest(r)
+	b.uniqueStepIDs()
 	b.collapseSteps()
 	return nil
 }
@@ -690,4 +692,23 @@ func isWorkspaceVolumes(v any) bool {
 	n, _ := text(valueOf(m, "name"))
 	e, isMap := asMap(valueOf(m, "emptyDir"))
 	return ok && len(m.Order) == 2 && n == workspaceName && isMap && len(e.Order) == 0
+}
+
+// uniqueStepIDs numbers a repeated step ID, such as a second checkout, because the IR needs one ID per step.
+func (b *jobBuilder) uniqueStepIDs() {
+	seen := map[string]bool{}
+	for _, st := range b.job.Steps {
+		id := st.ID
+		for n := 2; seen[id]; n++ {
+			id = st.ID + "-" + strconv.Itoa(n)
+		}
+		if id != st.ID {
+			b.c.p.rep.Add(report.Entry{
+				IRPath: b.path + "/step/" + id, Feature: caps.ExtPassthrough, Level: caps.Lost, Strategy: "renamed",
+				SourceLoc: b.c.file, Detail: "the step ID " + st.ID + " repeats in the job; the step ID is " + id,
+			})
+			st.ID = id
+		}
+		seen[id] = true
+	}
 }

@@ -160,3 +160,38 @@ func TestMatrixRefWithoutAMatrixIsLostAndLintValid(t *testing.T) {
 		t.Error("no report entry for the unbound matrix reference")
 	}
 }
+
+func TestGoTemplateTextInAScriptReadsBack(t *testing.T) {
+	line := `docker inspect --format '{{.State.Status}}' x; echo '{{ .Values }}'`
+	files, _ := emit(t, project(scriptJob("build", line)))
+	back, rep, err := parseRepo(files)
+	if err != nil {
+		t.Fatalf("Parse: %v\n%s", err, joinFiles(files))
+	}
+	if len(back.Pipelines) != 1 || len(back.Pipelines[0].Jobs) != 1 {
+		t.Fatalf("the file was skipped as Helm text: %v\n%s", rep.Entries, joinFiles(files))
+	}
+	if got := strings.Join(back.Pipelines[0].Jobs[0].Steps[0].Script, "\n"); !strings.Contains(got, "{{.State.Status}}") {
+		t.Errorf("script = %q", got)
+	}
+}
+
+func TestTwoCheckoutsGetDistinctStepIDs(t *testing.T) {
+	j := &ir.Job{ID: "build", Steps: []*ir.Step{
+		actionStep("co1", "actions", "checkout", nil),
+		actionStep("co2", "actions", "checkout", map[string]string{"repository": "o/other", "path": "other"}),
+		{ID: "run", Kind: ir.StepScript, Script: []string{"ls"}},
+	}}
+	files, _ := emit(t, project(j))
+	back, _, err := parseRepo(files)
+	if err != nil {
+		t.Fatalf("Parse: %v\n%s", err, joinFiles(files))
+	}
+	seen := map[string]bool{}
+	for _, st := range back.Pipelines[0].Jobs[0].Steps {
+		if seen[st.ID] {
+			t.Errorf("duplicate step id %s", st.ID)
+		}
+		seen[st.ID] = true
+	}
+}
