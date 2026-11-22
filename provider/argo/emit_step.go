@@ -133,7 +133,7 @@ func (sx *stepCtx) containerFor(st *ir.Step, name string, last bool, jx map[stri
 	if last {
 		script = append(script, tc.outputWriters(sc, path)...)
 	}
-	if line, ok := sx0[ExtScriptLine].(string); ok && len(st.Script) == 1 && st.Script[0] == line && !st.ContinueOnError && st.If == nil && !strings.Contains(line, "${{") {
+	if line, ok := sx0[ExtScriptLine].(string); ok && strings.Join(st.Script, "\n") == line && !st.ContinueOnError && st.If == nil && !strings.Contains(line, "${{") {
 		c.own = true
 		for _, k := range []string{ExtCommand, ExtArgs} {
 			if v := sx0[k]; v != nil {

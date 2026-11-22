@@ -551,13 +551,14 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, r *reader) error {
 			words = append(words, q)
 		}
 	}
-	st.Script = []string{strings.Join(words, " ")}
+	line := strings.Join(words, " ")
+	st.Script = strings.Split(line, "\n")
 	if tagged {
 		// A tag reads an input or a parameter that the emitted template may not declare, so the lists cannot be written back.
 		k.Note(caps.StepScript, "command and args are written as one script line; the lists hold a tag and are not kept", 0)
 		return nil
 	}
-	k.Out[ExtScriptLine] = st.Script[0]
+	k.Out[ExtScriptLine] = line
 	k.Out[ExtCommand] = plain(cmd)
 	k.Out[ExtArgs] = plain(args)
 	k.Note(caps.StepScript, "command and args are written as one script line; both lists are kept in Ext", 0)
