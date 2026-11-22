@@ -295,6 +295,10 @@ func (b *jobBuilder) collapseCache() {
 		b.c.ignored(b.path, caps.JobCache, "the cache marker cannot be read")
 		return
 	}
+	if !b.cacheIntact(caches) {
+		b.c.ignored(b.path, caps.JobCache, "the cache mounts or claims were edited or removed after pipemaster wrote the file; the file content is kept")
+		return
+	}
 	b.job.Cache = caches
 }
 

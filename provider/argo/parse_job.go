@@ -34,6 +34,8 @@ type jobBuilder struct {
 	artifactNeeds map[string]bool
 	// gitArts maps each step that a git input artifact made to the canonical text of that artifact.
 	gitArts map[*ir.Step]string
+	// cacheMounts is true when the volumeMounts are the ones that the emitter writes for the caches.
+	cacheMounts bool
 	// fileOutputs names the outputs that the file holds as the emitter writes them.
 	fileOutputs []string
 	// outArts maps each output artifact name to the canonical text of its entry in the file.

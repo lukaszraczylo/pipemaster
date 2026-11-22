@@ -379,7 +379,7 @@ func (tc *jobCtx) cacheMounts() []*yaml.Node {
 	for i, c := range j.Cache {
 		claim := "cache-" + tc.jp.task + "-" + itoa(i+1)
 		if _, ok := pp.claims[claim]; !ok {
-			pp.claims[claim] = cacheClaim{name: claim, size: "1Gi"}
+			pp.claims[claim] = cacheClaim{name: claim, size: cacheClaimSize}
 			pp.claimOrder = append(pp.claimOrder, claim)
 		}
 		for k, p := range c.Paths {

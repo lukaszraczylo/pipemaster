@@ -627,7 +627,8 @@ func (b *jobBuilder) containerSet(r *reader) error {
 	}
 	b.placeNodes(order)
 	mounts, hasMounts := m.Vals["volumeMounts"]
-	ownMounts := hasMounts && (isWorkspaceMounts(mounts) || b.isCacheMounts(mounts))
+	b.cacheMounts = hasMounts && b.isCacheMounts(mounts)
+	ownMounts := hasMounts && (isWorkspaceMounts(mounts) || b.cacheMounts)
 	if ownMounts {
 		cr.Take("volumeMounts")
 	}
