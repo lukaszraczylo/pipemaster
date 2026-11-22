@@ -196,7 +196,7 @@ func (b *jobBuilder) depends(v any, line int) error {
 	}
 	if d.unreadable {
 		b.k.Out[ExtDepends] = s0
-		b.k.Note(caps.JobIf, "depends "+s0+" holds an atom with no IR status (Errored, Omitted, Daemoned, AnySucceeded or AllFailed); the condition reads that atom as never true, so the job runs in fewer cases than in Argo or never, and the text is kept in Ext", line)
+		b.k.Note(caps.JobIf, "depends "+s0+" holds an atom with no IR status (Errored, Omitted, Daemoned, AnySucceeded or AllFailed) or a negated task with no result; the condition reads that atom as never true, so the job runs in fewer cases than in Argo or never, and the text is kept in Ext", line)
 	} else if d.bare {
 		b.k.Out[ExtDepends] = s0
 		b.k.Note(caps.JobIf, "depends "+s0+" has a task with no result, which also passes when the task is Skipped or Daemoned; the condition holds Succeeded or Skipped, and the Daemoned case is kept in the text in Ext", line)

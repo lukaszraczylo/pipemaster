@@ -232,3 +232,21 @@ func TestGateReferencedByAConditionStaysAJob(t *testing.T) {
 		t.Fatal("gate removed although a status refers to it")
 	}
 }
+
+// A negated bare atom would be wider than Argo, which also passes a bare atom on Daemoned.
+func TestNegatedBareAtomFailsSafe(t *testing.T) {
+	off := expr.Lit{Kind: expr.LitBool, Bool: false}
+	for _, depends := range []string{"!a", "!(a)", "!a && b", "!(a || b)", "!!!a"} {
+		t.Run(depends, func(t *testing.T) {
+			pl, rep := parseYAML(t, dagOf("      - {name: a, template: echo}\n      - {name: b, template: echo}\n      - {name: c, template: echo, depends: \""+depends+"\"}\n", echoTemplates))
+			c := job(t, pl, "c")
+			if c.If == nil || expr.String(c.If) != expr.String(off) || ext(c.Ext)["depends"] != depends || !hasEntry(rep, depends) {
+				t.Fatalf("If = %v ext %v", c.If, ext(c.Ext))
+			}
+		})
+	}
+	pl, _ := parseYAML(t, dagOf("      - {name: a, template: echo}\n      - {name: c, template: echo, depends: \"!!a\"}\n", echoTemplates))
+	if got, want := cond(job(t, pl, "c").If), expr.String(not(not(or(res("a", "success"), res("a", "skipped"))))); got != want {
+		t.Fatalf("!!a If = %q, want %q", got, want)
+	}
+}

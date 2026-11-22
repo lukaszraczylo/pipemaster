@@ -163,6 +163,11 @@ func (p *dependsParser) atom(tok string) expr.Expr {
 	case atom == "":
 		p.out.bare = true
 		p.onlySucceeded = false
+		if p.neg%2 == 1 {
+			// Argo also passes a bare atom on Daemoned, so its negation is false there; the IR cannot say so.
+			p.out.unreadable = true
+			return expr.Lit{Kind: expr.LitBool, Bool: true}
+		}
 		return expr.Binary{Op: expr.OpOr, L: resultIs(task, "success"), R: resultIs(task, "skipped")}
 	case otherAtoms[atom]:
 		p.out.unreadable = true
