@@ -111,11 +111,12 @@ type sourceTrigger struct {
 	merge bool
 }
 
-// triggers builds the pipeline triggers from the resources that the jobs trigger on, and the job flags.
+// triggers builds the pipeline triggers from the resources that the jobs trigger on. The IR trigger is pipeline-wide,
+// so a job whose own triggers are fewer than the union becomes manual and keeps its own in Ext, never running on a
+// trigger it did not have.
 func (b *pipeBuilder) triggers(pl *ir.Pipeline, jobs []*builtJob) {
 	var order []string
 	seen := map[string]bool{}
-	sets := map[string][]string{}
 	for _, j := range jobs {
 		for _, n := range j.roots {
 			if !seen[n] {
@@ -123,23 +124,27 @@ func (b *pipeBuilder) triggers(pl *ir.Pipeline, jobs []*builtJob) {
 				order = append(order, n)
 			}
 		}
-		if len(j.roots) > 0 {
-			sets[strings.Join(j.roots, ",")] = append(sets[strings.Join(j.roots, ",")], j.job.ID)
-		}
 	}
 	var out []sourceTrigger
 	for _, n := range order {
 		out = append(out, b.sourceTrigger(n))
 	}
 	pl.Triggers = b.mergePushes(out)
-	if len(sets) > 1 {
-		var parts []string
-		for roots, ids := range sets {
-			parts = append(parts, fmt.Sprintf("jobs %s on %s", strings.Join(ids, ", "), roots))
+	for _, j := range jobs {
+		if len(j.roots) == 0 || len(j.roots) == len(order) {
+			continue
 		}
-		slices.Sort(parts)
-		b.note(caps.TriggerResource, caps.Lost, b.path(), strategyExt,
-			"a trigger is pipeline-wide in the IR but each Concourse job has its own: "+strings.Join(parts, "; "), 0)
+		j.job.Manual = true
+		refs := make([]any, len(j.roots))
+		for i, n := range j.roots {
+			refs[i] = n
+		}
+		if j.job.Ext == nil {
+			j.job.Ext = ir.Ext{dialect: map[string]any{}}
+		}
+		j.job.Ext[dialect].(map[string]any)[ExtTriggers] = refs
+		b.note(caps.TriggerResource, caps.Lost, b.path()+"/job/"+j.job.ID, strategyExt,
+			fmt.Sprintf("job %s triggers on %s only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext", j.job.ID, strings.Join(j.roots, ", ")), 0)
 	}
 }
 
