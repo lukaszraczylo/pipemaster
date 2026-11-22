@@ -4,10 +4,10 @@ Real-world CI pipelines stored verbatim for `TestCorpus` (`internal/roundtrip/co
 The directory of an entry is `testdata/corpus/<#>-<gha, gitea, forgejo, gitlab, woodpecker, drone, tekton or argo>-<slug>`.
 Every file is byte-identical to the file at the pinned commit; the test run does not edit them.
 
-- Fetch date: 2026-11-18 for entries 01 to 27, 2026-11-19 for entries 28 to 40 and 2026-11-20 for entries 41 to 50 and 2026-11-21 for entries 51 to 71 and 2026-11-22 for entries 72 to 75.
+- Fetch date: 2026-11-18 for entries 01 to 27, 2026-11-19 for entries 28 to 40 and 2026-11-20 for entries 41 to 50 and 2026-11-21 for entries 51 to 71 and 2026-11-22 for entries 72 to 79.
 - Each repository is public, and its licence was read before use: from the host API (GitHub `license.spdx_id`, GitLab `license.key`), or, for entries 28 to 40,
   from the `LICENSE` file of the repository at the pinned commit.
-  Every licence is MIT, Apache-2.0, BSD-3-Clause or, for entry 60 only, MPL-2.0. Entries 63 to 71 are Apache-2.0. Entry 72 is BSD-3-Clause, and entries 73 to 75 are Apache-2.0.
+  Every licence is MIT, Apache-2.0, BSD-3-Clause or, for entry 60 only, MPL-2.0. Entries 63 to 71 are Apache-2.0. Entry 72 is BSD-3-Clause, entry 73, 74 and 75 are Apache-2.0, entries 76 and 78 are MIT, entry 77 is Apache-2.0 and entry 79 is BSD-3-Clause.
 - No private repository and no repository of the operator is used. No file holds a secret.
 - Attribution: this file names the source repository, the commit, each path and the SPDX licence of every
   copied file, and the licence text sits at the repository root of that commit. This attribution satisfies the
@@ -95,6 +95,10 @@ Every file is byte-identical to the file at the pinned commit; the test run does
 | 73 | go-gin-rest-api | Argo | <https://github.com/linclin/go-gin-rest-api> | `8f326d8d6789fa8d5b486e7586ba8911b9da63a6` | Apache-2.0 | `wiki/ci/buildkit-argo-workflow-template.yaml` |
 | 74 | workflows-examples | Argo | <https://github.com/argoproj/argo-workflows> | `43021573c5a35cbafae009043c132dfcef43a112` | Apache-2.0 | `examples/ci.yaml`<br>`examples/conditionals.yaml`<br>`examples/dag-diamond.yaml`<br>`examples/dag-enhanced-depends.yaml`<br>`examples/exit-handler-dag-level.yaml` |
 | 75 | events-examples | Argo | <https://github.com/argoproj/argo-events> | `d13fde07d944c081c25574305911908c80faa98e` | Apache-2.0 | `examples/event-sources/github.yaml`<br>`examples/sensors/github.yaml`<br>`examples/dag-diamond.yaml` (from argo-workflows at the commit of entry 74) |
+| 76 | gitops-template | Argo | <https://github.com/konstructio/gitops-template> | `2418943af0047e6bc9ad1f99e5beb4e42e0a84d9` | MIT | `akamai-github/templates/mgmt/components/argo-workflows/cwfts/cwft-kaniko.yaml`<br>`akamai-github/templates/mgmt/components/argo-workflows/cwfts/cwft-git.yaml` |
+| 77 | argocd-handson | Argo | <https://github.com/yoonjk/argocd-handson> | `13be905bf5b102d4f0d9d6e0a9e8894cee7411af` | Apache-2.0 | `lab07/01/ci-workflowtemplate-buildah-commit.yaml`<br>`lab07/01/ci-sensor.yaml`<br>`lab05/02/sensor.yaml`<br>`lab05/02/eventsource.yaml` |
+| 78 | kind-argo-lab | Argo | <https://github.com/hortonew/kind-argo-lab> | `01b11d9c8a79c10f2e57ee78005fb8442608a9d1` | MIT | `charts/argo-workflows/templates/kaniko-build-workflowtemplate.yaml`<br>`charts/argo-events/templates/sensor-workflow-trigger.yaml`<br>`charts/argo-events/templates/eventsource-gitea.yaml` |
+| 79 | smiggiddy-argo | Argo | <https://github.com/smiggiddy/argo> | `86f4924023551cab7571943e74477873af7fd43c` | BSD-3-Clause | `argo-workflows/templates/buildkit.yaml`<br>`argo-workflows/build-excalidraw.yaml` |
 
 Woodpecker entries (41 to 50):
 
@@ -127,4 +131,5 @@ Argo entries (72 to 75):
 - The raw URL is `https://raw.githubusercontent.com/<repository>/<commit>/<path>`. Every file is byte-identical to the file at the pinned commit. Licences are the GitHub API `license.spdx_id` of each repository.
 - Entry 74 pins the tag v4.1.6 of argoproj/argo-workflows, which is the commit in the table. Entry 75 pins the tag v1.9.11 of argoproj/argo-events, an annotated tag that peels to the commit in the table.
 - Entries 72 to 74 keep the file name of the source path, in `.argo/`. Entry 75 keeps the subdirectories `event-sources/` and `sensors/`, and holds `.argo/dag-diamond.yaml` from entry 74, so that a Workflow exists for the Sensor to run.
-- Not stored, because the pinned file does not parse or does not round trip: `ci-workflow-s3.yml` of pipekit (a `parameters` key under `spec`, which the Argo schema rejects), `git-checkout-pr.yml` of pipekit (its tags read workflow parameters that no file declares), `cron-workflow.yaml` of argo-workflows (the schedule is every minute, which the GHA linter rejects), and the files of konstructio/gitops-template, yoonjk/argocd-handson, hortonew/kind-argo-lab and smiggiddy/argo. Those hold a template library with no entrypoint, a ClusterWorkflowTemplate whose entrypoint names no template, Helm template text, or a command list with an input tag. The entry numbers are not reused.
+- Entries 76 to 79 are rows 2, 4, 5 and 6 of section 8 of `docs/superpowers/research/argo.md`, copied byte for byte from the pinned commit into `.argo/` with the file name of the source path. Entry 76 holds two ClusterWorkflowTemplates and no workflow, entry 77 holds a template with no entrypoint, a Sensor and a webhook EventSource, and entry 79 holds a Workflow that only names a WorkflowTemplate. Those shapes parse into a pipeline with no job, with the documents kept in Ext.
+- Not stored, because the pinned file does not parse or does not round trip: `ci-workflow-s3.yml` of pipekit (a `parameters` key under `spec`, which the Argo schema rejects), `git-checkout-pr.yml` of pipekit (its tags read workflow parameters that no file declares), and `cron-workflow.yaml` of argo-workflows (the schedule is every minute, which the GHA linter rejects). The Helm-templated files of the research list are not stored. The entry numbers are not reused.
