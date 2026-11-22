@@ -115,7 +115,7 @@ func (tc *jobCtx) declareMatrix(name string) bool {
 // expression with a default, because the output of a skipped task is absent, and an absent value fails the node.
 func (tc *jobCtx) needParam(job, out string) (string, bool) {
 	jj, ok := tc.pp.byID[job]
-	if !ok || !paramNameRE.MatchString(out) || (!tc.jp.finally && jj.finally) {
+	if !ok || !paramNameRE.MatchString(out) || tc.jp.finally != jj.finally {
 		return "", false
 	}
 	ref, ok := exprargo.RefExpr(expr.Ref{Path: []string{expr.PrefixNeeds, jj.task, "outputs", out}}, exprargo.ScopeTask)

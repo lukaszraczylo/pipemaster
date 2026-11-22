@@ -232,6 +232,9 @@ func (sx *stepCtx) download(path string, t actions.Target) {
 		dst = artifactPath(p)
 	}
 	for _, jp := range tc.pp.ancestors(tc.jp.j) {
+		if tc.jp.finally && !jp.finally {
+			continue
+		}
 		for _, n := range tc.e.uploadsOf(jp.j) {
 			if n == name {
 				sx.dests[dst] = true
@@ -252,6 +255,10 @@ func (sx *stepCtx) needArtifacts() {
 		}
 		jp, ok := tc.pp.byID[n.JobID]
 		if !ok {
+			continue
+		}
+		if tc.jp.finally && !jp.finally {
+			tc.e.lose(tc.jp.path, caps.JobNeedsArtifacts, "an exit handler task cannot load an artifact of the entry DAG ("+jp.task+"); the artifacts of "+n.JobID+" are not loaded")
 			continue
 		}
 		for _, name := range tc.e.uploadsOf(jp.j) {

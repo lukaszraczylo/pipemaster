@@ -57,7 +57,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.JobEnvironment:         {Level: caps.Lost, Caveat: "Argo has no environment name or URL"},
 		caps.PipelinePermissions:    {Level: caps.Lost, Caveat: "permissions come from the ServiceAccount of the Workflow"},
 		caps.StepTimeout:            {Level: caps.Lost, Caveat: "containerSet has no timeout per container; the template timeout covers the whole job"},
-				caps.TriggerPipelineDone:    {Level: caps.Lost, Caveat: "Argo has no pipeline-completion trigger"},
+		caps.TriggerPipelineDone:    {Level: caps.Lost, Caveat: "Argo has no pipeline-completion trigger"},
 		caps.TriggerResource:        {Level: caps.Lost, Caveat: "Argo has no resource trigger"},
 	} {
 		m[f] = s

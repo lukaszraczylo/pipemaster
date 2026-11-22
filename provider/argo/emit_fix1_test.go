@@ -399,3 +399,21 @@ func TestResultWriteWordingNamesArgoOutputFiles(t *testing.T) {
 		t.Errorf("no entry names the Argo output directory: %v", rep.Entries)
 	}
 }
+
+func TestExitHandlerTaskDoesNotWaitForTheEntryDAG(t *testing.T) {
+	linttool.RequireArgo(t)
+	a := scriptJob("a", "echo")
+	a.Steps = append(a.Steps, actionStep("up", "actions", "upload-artifact", map[string]string{"name": "bin", "path": "x"}))
+	f := scriptJob("f", "echo")
+	f.Needs = []ir.Need{{JobID: "a", Artifacts: true}}
+	p := project(a)
+	p.Pipelines[0].Finally = []*ir.Job{f}
+	files, rep := emit(t, p)
+	path := ".argo/workflows/ci.yaml"
+	if out, err := linttool.ArgoLint(t, path, []byte(files[path])); err != nil {
+		t.Fatalf("argo lint: %v\n%s\n%s", err, out, files[path])
+	}
+	if len(entries(rep, "exit handler task cannot wait")) == 0 {
+		t.Errorf("no entry for the dropped dependency: %v", rep.Entries)
+	}
+}

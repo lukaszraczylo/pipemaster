@@ -8,6 +8,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
 // deps is how a task waits: dependencies, or a depends expression.
@@ -26,6 +27,9 @@ func (pp *plan) reaches(from *jobPlan, id string) bool {
 func (e *emitter) finalDeps(tc *jobCtx, cond taskCond, jx map[string]any) deps {
 	d := deps{depends: cond.depends, names: slices.Clone(cond.deps)}
 	pp, j := tc.pp, tc.jp.j
+	if tc.jp.finally {
+		d = e.exitDeps(tc, d)
+	}
 	needs := map[string]bool{}
 	for _, n := range j.Needs {
 		needs[n.JobID] = true
@@ -55,6 +59,42 @@ func (e *emitter) finalDeps(tc *jobCtx, cond taskCond, jx map[string]any) deps {
 		case !slices.Contains(d.names, jj.task):
 			d.names = append(d.names, jj.task)
 		}
+	}
+	return d
+}
+
+// exitDeps limits the dependencies of an exit handler task to the tasks of the exit handler. Argo runs the
+// handler after the whole entry DAG, and a DAG cannot name a task of another DAG.
+func (e *emitter) exitDeps(tc *jobCtx, d deps) deps {
+	path := tc.jp.path
+	exit := map[string]bool{}
+	var main []string
+	for _, jp := range tc.pp.jobs {
+		if jp.finally {
+			exit[jp.task] = true
+		} else {
+			main = append(main, jp.task)
+		}
+	}
+	var dropped []string
+	d.names = slices.DeleteFunc(d.names, func(n string) bool {
+		if exit[n] {
+			return false
+		}
+		dropped = append(dropped, n)
+		return true
+	})
+	if d.depends != "" && slices.ContainsFunc(main, func(n string) bool { return strings.Contains(d.depends, n+".") }) {
+		dropped = append(dropped, "the depends expression "+d.depends)
+		d.depends = ""
+		for _, jp := range tc.pp.jobs {
+			if jp.finally && jp.j != tc.jp.j && slices.ContainsFunc(tc.jp.j.Needs, func(n ir.Need) bool { return n.JobID == jp.j.ID }) {
+				d.names = append(d.names, jp.task)
+			}
+		}
+	}
+	if len(dropped) > 0 {
+		e.lose(path, caps.JobNeeds, "an exit handler task cannot wait for a task of the entry DAG ("+strings.Join(dropped, ", ")+"); it starts after that DAG ends")
 	}
 	return d
 }
