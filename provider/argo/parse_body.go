@@ -533,6 +533,7 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, r *reader) error {
 		return nil
 	}
 	var words []string
+	tagged := false
 	for _, part := range []any{cmd, args} {
 		if part == nil {
 			continue
@@ -542,6 +543,7 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, r *reader) error {
 			return fmt.Errorf("command and args must be lists of strings")
 		}
 		for _, w := range l {
+			tagged = tagged || strings.Contains(w, tagOpen)
 			q, err := emitkit.ShellWord(b.tx.parts(w))
 			if err != nil {
 				return err
@@ -550,9 +552,9 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, r *reader) error {
 		}
 	}
 	st.Script = []string{strings.Join(words, " ")}
-	if strings.Contains(st.Script[0], "${{") {
-		// The emitter writes a line with a reference as a shell script, so the lists have no use in Ext.
-		k.Note(caps.StepScript, "command and args are written as one script line; the lists hold a reference and are not kept", 0)
+	if tagged {
+		// A tag reads an input or a parameter that the emitted template may not declare, so the lists cannot be written back.
+		k.Note(caps.StepScript, "command and args are written as one script line; the lists hold a tag and are not kept", 0)
 		return nil
 	}
 	k.Out[ExtScriptLine] = st.Script[0]
