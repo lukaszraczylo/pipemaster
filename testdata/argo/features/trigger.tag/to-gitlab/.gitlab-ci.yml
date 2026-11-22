@@ -1,8 +1,8 @@
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/0
-# pipemaster:arg {"kind":"tag","tags":{"Include":["v*"],"Exclude":null}}
+# pipemaster:arg {"kind":"tag","tags":{"Include":["v**"],"Exclude":null}}
 workflow:
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v[^\/]*$/
+    - if: $CI_COMMIT_TAG =~ /^v.*$/
 build:
   needs: []
   script:

@@ -129,7 +129,7 @@ func TestSensorPushWithBranchFilter(t *testing.T) {
 	if len(trs) != 1 || trs[0].Kind != ir.TriggerPush {
 		t.Fatalf("triggers %+v", trs)
 	}
-	if !reflect.DeepEqual(trs[0].Branches.Include, []string{"main", "release-*"}) || len(trs[0].Tags.Include) != 0 {
+	if !reflect.DeepEqual(trs[0].Branches.Include, []string{"main", "release-**"}) || len(trs[0].Tags.Include) != 0 {
 		t.Fatalf("filters %+v", trs[0])
 	}
 	e := ext(trs[0].Ext)
@@ -147,7 +147,7 @@ func TestSensorTagAndPullRequest(t *testing.T) {
 	trs, _ := triggersOf(t, map[string]string{"es.yaml": eventSource, "s.yaml": sensor(dep(`      - {path: headers.X-Github-Event, type: string, value: ["push"]}
       - {path: body.ref, type: string, value: ["refs/tags/v.*"]}
 `), runCI)})
-	if len(trs) != 1 || trs[0].Kind != ir.TriggerTag || !reflect.DeepEqual(trs[0].Tags.Include, []string{"v*"}) {
+	if len(trs) != 1 || trs[0].Kind != ir.TriggerTag || !reflect.DeepEqual(trs[0].Tags.Include, []string{"v**"}) {
 		t.Fatalf("tag triggers %+v", trs)
 	}
 	trs, _ = triggersOf(t, map[string]string{"es.yaml": eventSource, "s.yaml": sensor(dep(`      - {path: headers.X-Github-Event, type: string, value: ["pull_request"]}

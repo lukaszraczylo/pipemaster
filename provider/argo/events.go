@@ -109,16 +109,30 @@ func withoutTypes(x ir.Ext) ir.Ext {
 	return out
 }
 
-// globRegex writes a branch or tag glob as an anchored-body regex; ok is false when the glob has no exact regex.
+// globRegex writes a branch or tag glob as an anchored-body regex with the IR meaning: `*` stays inside one path
+// segment, `**` crosses segments, `**/` is zero or more directories and `?` is one character. ok is false when the
+// glob has a character that has no exact regex.
 func globRegex(g string) (string, bool) {
-	prefix, star := strings.CutSuffix(g, globStar)
-	switch {
-	case !star && globLiteral.MatchString(g):
-		return regexp.QuoteMeta(g), true
-	case star && (prefix == "" || globLiteral.MatchString(prefix)) && !strings.Contains(prefix, globStar):
-		return regexp.QuoteMeta(prefix) + globAnyTail, true
+	var sb strings.Builder
+	for i := 0; i < len(g); i++ {
+		switch c := g[i]; {
+		case strings.HasPrefix(g[i:], globDeepDir):
+			sb.WriteString(reAnyDirs)
+			i += len(globDeepDir) - 1
+		case strings.HasPrefix(g[i:], globDeep):
+			sb.WriteString(globAnyTail)
+			i += len(globDeep) - 1
+		case c == '*':
+			sb.WriteString(reSegment)
+		case c == '?':
+			sb.WriteString(reOneChar)
+		case globLiteral.MatchString(string(c)):
+			sb.WriteString(regexp.QuoteMeta(string(c)))
+		default:
+			return "", false
+		}
 	}
-	return "", false
+	return sb.String(), g != ""
 }
 
 // literalName is true for an excluded name that an equality test can state.

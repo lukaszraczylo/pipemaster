@@ -11,7 +11,7 @@ spec:
           - path: body.ref
             type: string
             value:
-              - ^refs/tags/v.*$
+              - ^refs/tags/v[^/]*$
       name: ci-tag
   template:
     serviceAccountName: pipemaster-sensor

@@ -73,7 +73,7 @@ pipelines:
           kind: tag
           tags:
             include:
-                - v*
+                - v**
       jobs:
         - id: build
           steps:

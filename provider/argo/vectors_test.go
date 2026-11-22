@@ -80,6 +80,7 @@ const (
 	refHeads      = "^refs/heads/"
 	refTags       = "^refs/tags/"
 	anyTail       = ".*"
+	segmentStar   = "[^/]*"
 	forkGate      = "head == base"
 	pathRef       = "body.ref"
 	pathBase      = "body.pull_request.base.ref"
@@ -531,11 +532,12 @@ func decodeWorkflow(src []byte) (vDoc, error) {
 	return d, applyMarks(&d, src)
 }
 
-// globOf turns the body of an anchored regex into the glob it came from: `\.` is a dot, a trailing `.*` is a star.
+// globOf turns the body of an anchored regex into the glob it came from: `\.` is a dot, `[^/]*` is a star and a
+// trailing `.*` is a double star.
 func globOf(body string) string {
-	body = strings.ReplaceAll(body, `\.`, ".")
+	body = strings.ReplaceAll(strings.ReplaceAll(body, `\.`, "."), segmentStar, "*")
 	if p, ok := strings.CutSuffix(body, anyTail); ok {
-		return p + "*"
+		return p + "**"
 	}
 	return body
 }
@@ -626,7 +628,7 @@ func decodeData(tr *vTrig, des []vectors.Entry) error {
 	case path == pathRef && tr.Kind == kindPush:
 		tr.Include, err = anchoredValues(val, refHeads)
 	case path == pathRef && tr.Kind == kindTag:
-		if tr.Include, err = anchoredValues(val, refTags); err == nil && len(tr.Include) == 1 && tr.Include[0] == "*" {
+		if tr.Include, err = anchoredValues(val, refTags); err == nil && len(tr.Include) == 1 && tr.Include[0] == "**" {
 			tr.Include = []string{}
 		}
 	default:

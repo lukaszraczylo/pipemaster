@@ -27,6 +27,11 @@ const (
 	prStateOpen    = "open"
 	globAnyTail    = ".*"
 	globStar       = "*"
+	globDeep       = "**"
+	globDeepDir    = "**/"
+	reSegment      = "[^/]*"
+	reOneChar      = "[^/]"
+	reAnyDirs      = "(.*/)?"
 	regexAnchorBeg = "^"
 	regexAnchorEnd = "$"
 )
@@ -301,7 +306,7 @@ func (p *project) buildTriggers(kinds []string, filters []dataFilter, k *sink) (
 		case len(branches) > 0 && len(tags) > 0:
 			return nil, "the ref filter holds branches and tags"
 		case len(tags) > 0:
-			if slices.Equal(tags, []string{globStar}) {
+			if slices.Equal(tags, []string{globDeep}) {
 				tags = nil
 			}
 			tr.Kind, tr.Tags = ir.TriggerTag, ir.Filter{Include: tags, Exclude: excTags}
@@ -402,15 +407,37 @@ func stripAnchors(v string) (string, bool) {
 	return body, hasStart && hasEnd
 }
 
-// regexGlob reads a regex that is a plain name, or a name followed by .*, as a glob.
+// regexGlob reads the regex that globRegex writes back as the glob. A regex outside that form has no glob.
 func regexGlob(body string) (string, bool) {
-	body = strings.ReplaceAll(body, `\.`, ".")
-	prefix, star := strings.CutSuffix(body, globAnyTail)
-	if prefix != "" && !refChars.MatchString(prefix) || prefix == "" && !star {
-		return "", false
+	var sb strings.Builder
+	for i := 0; i < len(body); {
+		rest := body[i:]
+		switch {
+		case strings.HasPrefix(rest, reAnyDirs):
+			sb.WriteString(globDeepDir)
+			i += len(reAnyDirs)
+		case strings.HasPrefix(rest, reSegment):
+			sb.WriteString(globStar)
+			i += len(reSegment)
+		case strings.HasPrefix(rest, reOneChar):
+			sb.WriteString("?")
+			i += len(reOneChar)
+		case strings.HasPrefix(rest, globAnyTail):
+			// A `.*` before `/` is not what `**/` writes, so it has no glob.
+			if strings.HasPrefix(rest[len(globAnyTail):], "/") {
+				return "", false
+			}
+			sb.WriteString(globDeep)
+			i += len(globAnyTail)
+		case strings.HasPrefix(rest, `\.`):
+			sb.WriteByte('.')
+			i += 2
+		case refChars.MatchString(rest[:1]):
+			sb.WriteByte(rest[0])
+			i++
+		default:
+			return "", false
+		}
 	}
-	if star {
-		return prefix + globStar, true
-	}
-	return prefix, true
+	return sb.String(), body != ""
 }

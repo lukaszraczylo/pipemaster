@@ -1,5 +1,5 @@
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/0
-# pipemaster:arg {"kind":"tag","name":"ci-tag-0","branches":{"Include":null,"Exclude":null},"tags":{"Include":["v*"],"Exclude":null},"paths":{"Include":null,"Exclude":null}}
+# pipemaster:arg {"kind":"tag","name":"ci-tag-0","branches":{"Include":null,"Exclude":null},"tags":{"Include":["v**"],"Exclude":null},"paths":{"Include":null,"Exclude":null}}
 # pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/0
 apiVersion: triggers.tekton.dev/v1beta1
 kind: EventListener
@@ -24,7 +24,7 @@ spec:
             name: cel
           params:
             - name: filter
-              value: body.ref.startsWith('refs/tags/') && (body.ref.replace('refs/tags/','',1).matches(r'^v[^/]*$'))
+              value: body.ref.startsWith('refs/tags/') && (body.ref.replace('refs/tags/','',1).matches(r'^v.*$'))
       bindings:
         - ref: ci-github
       template:

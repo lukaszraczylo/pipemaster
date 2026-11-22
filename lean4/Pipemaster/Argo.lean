@@ -295,13 +295,11 @@ def litChar (c : Char) : Prop := c.isAlphanum = true ∨ c = '.' ∨ c = '_' ∨
 
 instance (c : Char) : Decidable (litChar c) := by unfold litChar; exact inferInstance
 
-/-- A glob without its trailing `*`. -/
-def globBody (l : List Char) : List Char := if l.getLast? = some '*' then l.dropLast else l
-
-/-- A trigger pattern for which the emitter writes an exact regex: a literal name, or a literal prefix and a trailing
-`*` (Mirrors argo.globRegex (provider/argo/events.go)). The parser reads those back (parse_sensor.go regexGlob). Any
-other glob is lost, and the trigger is not written (emit_sensor.go eventTrigger). -/
-def ArgoPat (s : String) : Prop := s ≠ "" ∧ ∀ c ∈ globBody s.toList, litChar c
+/-- A trigger pattern for which the emitter writes an exact regex: literal names and `*`, where `*` stays inside one
+path segment (`[^/]*`) and `**` crosses segments (`.*`), as the Tekton emitter reads a glob (Mirrors argo.globRegex
+(provider/argo/events.go)). The parser reads those back (parse_sensor.go regexGlob). `?` and `**/` also round trip in Go
+and the model leaves them out. Any other glob is lost, and the trigger is not written (emit_sensor.go eventTrigger). -/
+def ArgoPat (s : String) : Prop := s ≠ "" ∧ ∀ c ∈ s.toList, litChar c ∨ c = '*'
 
 instance (s : String) : Decidable (ArgoPat s) := by unfold ArgoPat; exact inferInstance
 
@@ -325,10 +323,10 @@ instance (j : Core.Job) : Decidable (ArgoJob j) := by unfold ArgoJob; exact infe
 
 /-- What Argo needs beyond `Wf`: a pipeline ID that is a short DNS label, trigger patterns that `globRegex` accepts, a
 main job (a pipeline with none gets a placeholder task, emit_pipeline.go placeholder), and `ArgoJob` for every job. A tag
-trigger with the one pattern `*` is written as the no-filter regex and read back as no filter (parse_sensor.go
+trigger with the one pattern `**` is written as the no-filter regex and read back as no filter (parse_sensor.go
 buildTriggers), so it is out. -/
 def ArgoOk (p : Pipe) : Prop :=
-  (DnsId p.id ∧ p.id.length ≤ maxPipeId) ∧ ((∀ x ∈ trigPats p, ArgoPat x) ∧ p.tag ≠ some ["*"]) ∧ p.jobs ≠ [] ∧
+  (DnsId p.id ∧ p.id.length ≤ maxPipeId) ∧ ((∀ x ∈ trigPats p, ArgoPat x) ∧ p.tag ≠ some ["**"]) ∧ p.jobs ≠ [] ∧
     ∀ j ∈ p.all, ArgoJob j
 
 instance (p : Pipe) : Decidable (ArgoOk p) := by unfold ArgoOk; exact inferInstance

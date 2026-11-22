@@ -1,8 +1,10 @@
 # pipemaster:emulated job.container pipeline/ci/job/build
 # pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/0
+# pipemaster:emulated trigger.filter.tags pipeline/ci
+# pipemaster:arg "- ext:\n    argo:\n        dependency:\n            eventName: push\n            eventSourceName: pipemaster-github\n            filters:\n                data:\n                    - path: body.ref\n                      type: string\n                      value:\n                        - ^refs/tags/v.*$$\n            name: ci-tag\n        eventSource:\n            entry:\n                active: true\n                contentType: json\n                events:\n                    - push\n                repositories:\n                    - names:\n                        - REPO\n                      owner: OWNER\n                webhook:\n                    endpoint: /push\n                    method: POST\n                    port: \"12000\"\n                    url: \"\"\n                webhookSecret:\n                    key: token\n                    name: pipemaster-github-webhook\n            event: push\n            name: pipemaster-github\n            spec:\n                service:\n                    ports:\n                        - port: 12000\n                          targetPort: 12000\n            type: github\n        sensor:\n            name: pipemaster\n            spec:\n                template:\n                    serviceAccountName: pipemaster-sensor\n        trigger:\n            template:\n                conditions: ci-tag\n                k8s:\n                    operation: create\n                    source:\n                        resource:\n                            apiVersion: argoproj.io/v1alpha1\n                            kind: Workflow\n                            metadata:\n                                generateName: ci-\n                            spec:\n                                serviceAccountName: pipemaster-workflow\n                                workflowTemplateRef:\n                                    name: ci\n                name: ci-tag\n  kind: tag\n  tags:\n    include:\n        - v**\n"
 when:
   - event: tag
-    ref: refs/tags/v*
+    ref: refs/tags/v**
 steps:
   - name: build-step-1
     image: ubuntu:latest
