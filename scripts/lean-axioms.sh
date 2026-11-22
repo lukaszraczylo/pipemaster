@@ -106,6 +106,26 @@ required=(
   Pipemaster.Chain.chain_gitlab_drone_woodpecker
   Pipemaster.Chain.cross_drone_gha
   Pipemaster.Chain.cross_drone_gitlab
+  Pipemaster.Tekton.rawTekton_toTekton
+  Pipemaster.Tekton.tekton_from_to
+  Pipemaster.Tekton.clearP_preserves
+  Pipemaster.Tekton.tekOk_of_shape
+  Pipemaster.Tekton.eval_in_fold
+  Pipemaster.Tekton.eval_notin_fold
+  Pipemaster.Tekton.when_decode
+  Pipemaster.Chain.tekton_keeps_gha
+  Pipemaster.Chain.tekton_keeps_gitlab
+  Pipemaster.Chain.tekton_keeps_woodpecker
+  Pipemaster.Chain.tekton_keeps_drone
+  Pipemaster.Chain.tekton_keeps_tekton
+  Pipemaster.Chain.gitlab_keeps_tekton
+  Pipemaster.Chain.woodpecker_keeps_tekton
+  Pipemaster.Chain.drone_keeps_tekton
+  Pipemaster.Chain.chain_tekton_gha
+  Pipemaster.Chain.chain_gha_tekton_gitlab
+  Pipemaster.Chain.chain_gitlab_drone_tekton_woodpecker
+  Pipemaster.Chain.cross_tekton_gha
+  Pipemaster.Chain.cross_tekton_gitlab
 )
 required_lean="$(printf '`%s, ' "${required[@]}")"
 required_lean="[${required_lean%, }]"

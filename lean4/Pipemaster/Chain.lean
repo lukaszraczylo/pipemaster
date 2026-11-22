@@ -1,6 +1,7 @@
 import Pipemaster.RoundTrip
 import Pipemaster.Woodpecker
 import Pipemaster.Drone
+import Pipemaster.Tekton
 
 namespace Pipemaster
 namespace Chain
@@ -93,6 +94,16 @@ def drone : Adapter where
   Own := Drone.DroneOk
   decOwn := fun _ => inferInstance
   exact q hw ho := Drone.drone_from_to q ⟨hw, ho⟩
+
+/-- Mirrors tekton.New (provider/tekton/dialect.go). -/
+def tekton : Adapter where
+  Ast := Tekton.TDoc
+  emit := Tekton.toTekton
+  parse := Tekton.rawTekton
+  metaOf := Tekton.tektonMeta
+  Own := Tekton.TekOk
+  decOwn := fun _ => inferInstance
+  exact q hw ho := Tekton.tekton_from_to q ⟨hw, ho⟩
 
 /-- Mirrors roundtrip.Hop (internal/roundtrip/chain.go), rule 4: each hop emits, parses and pushes a layer.
 The layers are oldest first, as in `meta.Stack`. `Hop` applies a stack only if its top layer targets the source
@@ -355,17 +366,145 @@ theorem drone_keeps_gha : drone.Keeps gha := by
   have h := Drone.rawDrone_frag q hq.1 hq.2
   exact ⟨h.1, h.2.2.2.1 hg.2⟩
 
-/-- The six adapters. -/
-def adapters : List Adapter := [gha, gitea, forgejo, gitlab, woodpecker, drone]
+/-! ## Tekton in a chain
 
-theorem adapters_closed : Closed adapters := by
+The Tekton parser returns every job with no runner label and keeps names, retries and timeouts in the file
+(`Tekton.rawTekton_toTekton`), so it keeps every fragment (`Tekton.clearP_preserves`). The other adapters keep the
+Tekton fragment when the pipeline ID they assign is a short DNS label and their raw parse keeps the retry runs or
+drops them (`Tekton.tekOk_of_shape`). The three IDs are `gitlab-ci`, `woodpecker` and `drone`. -/
+
+theorem tekDns_gl :
+    Tekton.DnsId Gitlab.gitlabPipelineId ∧ Gitlab.gitlabPipelineId.length ≤ Tekton.maxPipeId := by
+  have ht : Gitlab.gitlabPipelineId.toList = ['g', 'i', 't', 'l', 'a', 'b', '-', 'c', 'i'] := by
+    unfold Gitlab.gitlabPipelineId; decide +kernel
+  refine ⟨?_, ?_⟩
+  · refine ⟨by simp [ht], ?_, by simp [ht], by simp [ht]⟩
+    intro c hc
+    rw [ht] at hc
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at hc
+    rcases hc with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> decide
+  · rw [← String.length_toList, ht]; decide +kernel
+
+theorem tekDns_wp :
+    Tekton.DnsId Woodpecker.wpPipelineId ∧ Woodpecker.wpPipelineId.length ≤ Tekton.maxPipeId := by
+  have ht : Woodpecker.wpPipelineId.toList = ['w', 'o', 'o', 'd', 'p', 'e', 'c', 'k', 'e', 'r'] := by
+    unfold Woodpecker.wpPipelineId; decide +kernel
+  refine ⟨?_, ?_⟩
+  · refine ⟨by simp [ht], ?_, by simp [ht], by simp [ht]⟩
+    intro c hc
+    rw [ht] at hc
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at hc
+    rcases hc with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> decide
+  · rw [← String.length_toList, ht]; decide +kernel
+
+theorem tekDns_drone :
+    Tekton.DnsId Drone.dronePipelineId ∧ Drone.dronePipelineId.length ≤ Tekton.maxPipeId := by
+  have ht : Drone.dronePipelineId.toList = ['d', 'r', 'o', 'n', 'e'] := by
+    unfold Drone.dronePipelineId; decide +kernel
+  refine ⟨?_, ?_⟩
+  · refine ⟨by simp [ht], ?_, by simp [ht], by simp [ht]⟩
+    intro c hc
+    rw [ht] at hc
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at hc
+    rcases hc with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> decide
+  · rw [← String.length_toList, ht]; decide +kernel
+
+theorem tekton_keeps_gha : tekton.Keeps gha := by
+  intro q hq hg
+  have hw := hq.1
+  have hraw : Tekton.rawTekton (Tekton.toTekton q) = Tekton.clearP q := Tekton.rawTekton_toTekton q hq.1 hq.2
+  have h := Tekton.clearP_preserves q
+  show Wf (Tekton.rawTekton (Tekton.toTekton q)) ∧ GhaOk (Tekton.rawTekton (Tekton.toTekton q))
+  rw [hraw]
+  exact ⟨h.1 hq.1, h.2.1 hg.2⟩
+
+theorem tekton_keeps_gitlab : tekton.Keeps gitlab := by
+  intro q hq hg
+  have hraw : Tekton.rawTekton (Tekton.toTekton q) = Tekton.clearP q := Tekton.rawTekton_toTekton q hq.1 hq.2
+  have h := Tekton.clearP_preserves q
+  show Wf (Tekton.rawTekton (Tekton.toTekton q)) ∧ GitlabOk (Tekton.rawTekton (Tekton.toTekton q))
+  rw [hraw]
+  exact ⟨h.1 hq.1, h.2.2.1 hg.2⟩
+
+theorem tekton_keeps_woodpecker : tekton.Keeps woodpecker := by
+  intro q hq hg
+  have hraw : Tekton.rawTekton (Tekton.toTekton q) = Tekton.clearP q := Tekton.rawTekton_toTekton q hq.1 hq.2
+  have h := Tekton.clearP_preserves q
+  show Wf (Tekton.rawTekton (Tekton.toTekton q)) ∧ Woodpecker.WpOk (Tekton.rawTekton (Tekton.toTekton q))
+  rw [hraw]
+  exact ⟨h.1 hq.1, h.2.2.2.1 hg.2⟩
+
+theorem tekton_keeps_drone : tekton.Keeps drone := by
+  intro q hq hg
+  have hraw : Tekton.rawTekton (Tekton.toTekton q) = Tekton.clearP q := Tekton.rawTekton_toTekton q hq.1 hq.2
+  have h := Tekton.clearP_preserves q
+  show Wf (Tekton.rawTekton (Tekton.toTekton q)) ∧ Drone.DroneOk (Tekton.rawTekton (Tekton.toTekton q))
+  rw [hraw]
+  exact ⟨h.1 hq.1, h.2.2.2.2.1 hg.2⟩
+
+theorem tekton_keeps_tekton : tekton.Keeps tekton := by
+  intro q hq hg
+  have hraw : Tekton.rawTekton (Tekton.toTekton q) = Tekton.clearP q := Tekton.rawTekton_toTekton q hq.1 hq.2
+  have h := Tekton.clearP_preserves q
+  show Wf (Tekton.rawTekton (Tekton.toTekton q)) ∧ Tekton.TekOk (Tekton.rawTekton (Tekton.toTekton q))
+  rw [hraw]
+  exact ⟨h.1 hq.1, h.2.2.2.2.2 hg.2⟩
+
+theorem gitlab_keeps_tekton : gitlab.Keeps tekton := by
+  intro q hq ht
+  have hraw := Gitlab.rawGitlab_toGitlab q hq.1 hq.2
+  have hf := rawGitlab_frag q hq.1 hq.2
+  refine ⟨hf.1, ?_⟩
+  show Tekton.TekOk (Gitlab.rawGitlab (Gitlab.toGitlab q))
+  exact Tekton.tekOk_of_shape q Gitlab.gitlabPipelineId tekDns_gl.1 tekDns_gl.2 Gitlab.strip
+    Gitlab.strip keep_strip keep_strip Tekton.tekKeep_strip Tekton.tekKeep_strip _ hraw ht.2
+
+theorem woodpecker_keeps_tekton : woodpecker.Keeps tekton := by
+  intro q hq ht
+  have hraw := Woodpecker.rawWp_toWp q hq.1 hq.2
+  have hf := Woodpecker.rawWp_frag q hq.1 hq.2
+  refine ⟨hf.1, ?_⟩
+  show Tekton.TekOk (Woodpecker.rawWp (Woodpecker.toWp q))
+  exact Tekton.tekOk_of_shape q Woodpecker.wpPipelineId tekDns_wp.1 tekDns_wp.2 Woodpecker.wpStripMain
+    Woodpecker.wpStripFin (fun j => keep_of_same (Woodpecker.same_main j)) (fun j => keep_of_same (Woodpecker.same_fin j))
+    Tekton.tekKeep_wpMain Tekton.tekKeep_wpFin _ hraw ht.2
+
+theorem drone_keeps_tekton : drone.Keeps tekton := by
+  intro q hq ht
+  have hraw := Drone.rawDrone_toDrone q hq.1 hq.2
+  have hf := Drone.rawDrone_frag q hq.1 hq.2
+  refine ⟨hf.1, ?_⟩
+  show Tekton.TekOk (Drone.rawDrone (Drone.toDrone q))
+  exact Tekton.tekOk_of_shape q Drone.dronePipelineId tekDns_drone.1 tekDns_drone.2 Drone.droneStripMain
+    Drone.droneStripFin Drone.keep_droneMain Drone.keep_droneFin Tekton.tekKeep_droneMain Tekton.tekKeep_droneFin _ hraw ht.2
+
+/-- The six adapters of the earlier phases. -/
+def sixAdapters : List Adapter := [gha, gitea, forgejo, gitlab, woodpecker, drone]
+
+theorem sixAdapters_closed : Closed sixAdapters := by
   intro a ha b hb
-  simp only [adapters, List.mem_cons, List.not_mem_nil, or_false] at ha hb
+  simp only [sixAdapters, List.mem_cons, List.not_mem_nil, or_false] at ha hb
   rcases ha with rfl | rfl | rfl | rfl | rfl | rfl <;> rcases hb with rfl | rfl | rfl | rfl | rfl | rfl <;>
     first | exact gha_keeps _ | exact gitlab_keeps_gha | exact gitlab_keeps_gitlab |
       exact gitlab_keeps_woodpecker | exact woodpecker_keeps_woodpecker | exact woodpecker_keeps_gitlab |
       exact woodpecker_keeps_gha | exact gitlab_keeps_drone | exact woodpecker_keeps_drone |
       exact drone_keeps_drone | exact drone_keeps_woodpecker | exact drone_keeps_gitlab | exact drone_keeps_gha
+
+/-- The seven adapters. -/
+def adapters : List Adapter := [gha, gitea, forgejo, gitlab, woodpecker, drone, tekton]
+
+theorem adapters_closed : Closed adapters := by
+  intro a ha b hb
+  simp only [adapters, List.mem_cons, List.not_mem_nil, or_false] at ha hb
+  rcases ha with rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+    rcases hb with rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+    first | exact gha_keeps _ | exact gitlab_keeps_gha | exact gitlab_keeps_gitlab |
+      exact gitlab_keeps_woodpecker | exact woodpecker_keeps_woodpecker | exact woodpecker_keeps_gitlab |
+      exact woodpecker_keeps_gha | exact gitlab_keeps_drone | exact woodpecker_keeps_drone |
+      exact drone_keeps_drone | exact drone_keeps_woodpecker | exact drone_keeps_gitlab | exact drone_keeps_gha |
+      exact tekton_keeps_gha | exact tekton_keeps_gitlab | exact tekton_keeps_woodpecker | exact tekton_keeps_drone |
+      exact tekton_keeps_tekton | exact gitlab_keeps_tekton | exact woodpecker_keeps_tekton |
+      exact drone_keeps_tekton
 
 /-- One hop through a member of a closed list keeps a pipeline in the fragment of every member. -/
 theorem chainFrag_hop (L : List Adapter) (hL : Closed L) (p : Pipe) (h : ChainFrag p L) (a : Adapter)
@@ -387,14 +526,14 @@ theorem chainFrag_pair (L : List Adapter) (hL : Closed L) (p : Pipe) (h : ChainF
   chainFrag_run L hL [b, c] (by intro a ha; simp at ha; rcases ha with rfl | rfl <;> assumption) p h
 
 /-- The intersection over the six adapters: both cross fragments, the Woodpecker fragment and the Drone fragment. -/
-theorem chainFrag_adapters_iff (p : Pipe) :
-    ChainFrag p adapters ↔ RoundTrip.Both p ∧ woodpecker.Frag p ∧ drone.Frag p := by
+theorem chainFrag_six_iff (p : Pipe) :
+    ChainFrag p sixAdapters ↔ RoundTrip.Both p ∧ woodpecker.Frag p ∧ drone.Frag p := by
   constructor
   · intro h
-    exact ⟨⟨h gha (by simp [adapters]), h gitlab (by simp [adapters])⟩, h woodpecker (by simp [adapters]),
-      h drone (by simp [adapters])⟩
+    exact ⟨⟨h gha (by simp [sixAdapters]), h gitlab (by simp [sixAdapters])⟩, h woodpecker (by simp [sixAdapters]),
+      h drone (by simp [sixAdapters])⟩
   · intro h a ha
-    simp only [adapters, List.mem_cons, List.not_mem_nil, or_false] at ha
+    simp only [sixAdapters, List.mem_cons, List.not_mem_nil, or_false] at ha
     rcases ha with rfl | rfl | rfl | rfl | rfl | rfl
     · exact h.1.1
     · exact h.1.1
@@ -402,6 +541,25 @@ theorem chainFrag_adapters_iff (p : Pipe) :
     · exact h.1.2
     · exact h.2.1
     · exact h.2.2
+
+/-- The intersection over the seven adapters: both cross fragments, and the Woodpecker, Drone and Tekton
+fragments. -/
+theorem chainFrag_adapters_iff (p : Pipe) :
+    ChainFrag p adapters ↔ RoundTrip.Both p ∧ woodpecker.Frag p ∧ drone.Frag p ∧ tekton.Frag p := by
+  constructor
+  · intro h
+    exact ⟨⟨h gha (by simp [adapters]), h gitlab (by simp [adapters])⟩, h woodpecker (by simp [adapters]),
+      h drone (by simp [adapters]), h tekton (by simp [adapters])⟩
+  · intro h a ha
+    simp only [adapters, List.mem_cons, List.not_mem_nil, or_false] at ha
+    rcases ha with rfl | rfl | rfl | rfl | rfl | rfl | rfl
+    · exact h.1.1
+    · exact h.1.1
+    · exact h.1.1
+    · exact h.1.2
+    · exact h.2.1
+    · exact h.2.2.1
+    · exact h.2.2.2
 
 /-- The adapters without Woodpecker and Drone, which have their own hops. -/
 def crossAdapters : List Adapter := [gha, gitea, forgejo, gitlab]
@@ -461,10 +619,10 @@ theorem chain_gha_drone_glb (p : Pipe) (h : RoundTrip.Both p ∧ drone.Frag p) :
 theorem chain_gitlab_drone_woodpecker (p : Pipe) (h : RoundTrip.Both p ∧ woodpecker.Frag p ∧ drone.Frag p) :
     unwind (hops p [gitlab, drone, woodpecker]).1 (hops p [gitlab, drone, woodpecker]).2 = p := by
   apply chain_roundtrip
-  apply chainFrag_run adapters adapters_closed _ _ p ((chainFrag_adapters_iff p).2 h)
+  apply chainFrag_run sixAdapters sixAdapters_closed _ _ p ((chainFrag_six_iff p).2 h)
   intro a ha
   simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
-  simp only [adapters, List.mem_cons, List.not_mem_nil, or_false]
+  simp only [sixAdapters, List.mem_cons, List.not_mem_nil, or_false]
   rcases ha with rfl | rfl | rfl <;> simp [gitlab, drone, woodpecker]
 
 /-- The cross round trip with metadata: a pipeline that survives Drone, then GHA, comes back from GHA. -/
@@ -478,6 +636,45 @@ theorem cross_drone_gitlab (p : Pipe) (h : RoundTrip.Both p ∧ drone.Frag p) :
     Gitlab.fromGitlab (Gitlab.toGitlab (Drone.fromDrone (Drone.toDrone p) (Drone.droneMeta p)))
       (Gitlab.gitlabMeta p) = p := by
   rw [Drone.drone_from_to p h.2]
+  exact Gitlab.gitlab_from_to p h.1.2
+
+/-- Tekton as the first hop, then GHA. -/
+theorem chain_tekton_gha (p : Pipe) (h : RoundTrip.Both p ∧ tekton.Frag p) :
+    unwind (hops p [tekton, gha]).1 (hops p [tekton, gha]).2 = p := by
+  apply chain_roundtrip
+  exact ⟨h.2, tekton_keeps_gha p h.2 h.1.1, trivial⟩
+
+/-- GHA, then Tekton, then GitLab. -/
+theorem chain_gha_tekton_gitlab (p : Pipe) (h : RoundTrip.Both p ∧ tekton.Frag p) :
+    unwind (hops p [gha, tekton, gitlab]).1 (hops p [gha, tekton, gitlab]).2 = p := by
+  apply chain_roundtrip
+  have hid : gha.parse (gha.emit p) = p := Gha.rawGha_toGha p h.1.1.1
+  refine ⟨h.1.1, ?_⟩
+  rw [hid]
+  exact ⟨h.2, tekton_keeps_gitlab p h.2 h.1.2, trivial⟩
+
+/-- GitLab, then Drone, then Tekton, then Woodpecker: the raw parses that drop the most differ at each hop. -/
+theorem chain_gitlab_drone_tekton_woodpecker (p : Pipe)
+    (h : RoundTrip.Both p ∧ woodpecker.Frag p ∧ drone.Frag p ∧ tekton.Frag p) :
+    unwind (hops p [gitlab, drone, tekton, woodpecker]).1 (hops p [gitlab, drone, tekton, woodpecker]).2 = p := by
+  apply chain_roundtrip
+  apply chainFrag_run adapters adapters_closed _ _ p ((chainFrag_adapters_iff p).2 h)
+  intro a ha
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
+  simp only [adapters, List.mem_cons, List.not_mem_nil, or_false]
+  rcases ha with rfl | rfl | rfl | rfl <;> simp [gitlab, drone, tekton, woodpecker]
+
+/-- The cross round trip with metadata: a pipeline that survives Tekton, then GHA, comes back from GHA. -/
+theorem cross_tekton_gha (p : Pipe) (h : RoundTrip.Both p ∧ tekton.Frag p) :
+    Gha.fromGha (Gha.toGha (Tekton.fromTekton (Tekton.toTekton p) (Tekton.tektonMeta p))) = p := by
+  rw [Tekton.tekton_from_to p h.2]
+  exact Gha.gha_from_to p h.1.1
+
+/-- The cross round trip with metadata: a pipeline that survives Tekton, then GitLab, comes back from GitLab. -/
+theorem cross_tekton_gitlab (p : Pipe) (h : RoundTrip.Both p ∧ tekton.Frag p) :
+    Gitlab.fromGitlab (Gitlab.toGitlab (Tekton.fromTekton (Tekton.toTekton p) (Tekton.tektonMeta p)))
+      (Gitlab.gitlabMeta p) = p := by
+  rw [Tekton.tekton_from_to p h.2]
   exact Gitlab.gitlab_from_to p h.1.2
 
 end Chain

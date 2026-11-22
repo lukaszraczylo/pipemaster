@@ -659,6 +659,47 @@ def droneAdapterCases : List (Json × Json) :=
       ("raw", coreJson (Drone.rawDrone (Drone.toDrone p))),
       ("core", coreJson (Drone.fromDrone (Drone.toDrone p) (Drone.droneMeta p)))])
 
+open Pipemaster.Tekton in
+def tekStepJson (s : Tekton.TStep) : Json :=
+  Json.mkObj [("name", s.name), ("disp", s.disp), ("script", strsJson s.script), ("env", varsJson s.env)]
+
+open Pipemaster.Tekton in
+def tekTaskJson (t : Tekton.TTask) : Json :=
+  Json.mkObj [("name", t.name), ("env", varsJson t.env), ("steps", Json.arr (t.steps.map tekStepJson).toArray),
+    ("noop", t.noop),
+    ("needs", match t.needs with | some ns => Json.arr (ns.map needJ).toArray | none => Json.null)]
+
+open Pipemaster.Tekton in
+def tekPTaskJson (t : Tekton.PTask) : Json :=
+  Json.mkObj [("name", t.name), ("disp", t.disp), ("task", tekTaskJson t.task), ("run_after", strsJson t.runAfter),
+    ("retries", optNat t.retries), ("timeout", Lean.toJson t.timeout), ("on_error", t.onError),
+    ("failed_only", t.failedOnly)]
+
+open Pipemaster.Tekton in
+def tekDocJson (d : Tekton.TDoc) : Json :=
+  Json.mkObj [("name", d.name), ("disp", d.disp), ("tasks", Json.arr (d.tasks.map tekPTaskJson).toArray),
+    ("finally", Json.arr (d.fin.map tekPTaskJson).toArray), ("trigs", Json.arr (d.trigs.map wpTrigJson).toArray)]
+
+/-- Pipelines with retry runs, which GitLab and Drone also take, and jobs with no step, which Tekton fills with a
+placeholder step. -/
+def tekExtraPipes : List Core.Pipe :=
+  [2, 3, 4].flatMap (fun r => finLayouts.map fun fs => pushAll [{ cj "a" with retry := r }] fs) ++
+    [pushAll [{ cj "a" with steps := [] }] [], pushAll [cj "a"] [{ cj "f" with steps := [] }],
+     pushAll [{ cj "a" with steps := [], retry := 2, timeout := 3 }] [{ cj "f" with steps := [], onFailure := true }],
+     { pushAll [{ cj "a" with retry := 3 }] [] with id := "my-ci", name := "My CI", pr := some ["main"] },
+     { pushAll [{ cj "a" with retry := 2, timeout := 90 }] [] with tag := some ["v*"], push := none },
+     { pushAll [{ cj "a" with name := "Build", retry := 4 }, { cj "b" with needs := needOn "a" false }] [] with
+         pr := some [] }]
+
+def tektonPipes : List Core.Pipe :=
+  (allPipes ++ wpExtraPipes ++ tekExtraPipes).filter fun p => decide (Wf p ∧ Tekton.TekOk p)
+
+def tektonAdapterCases : List (Json × Json) :=
+  tektonPipes.map fun p =>
+    (coreJson p, Json.mkObj [("tekton", tekDocJson (Tekton.toTekton p)),
+      ("raw", coreJson (Tekton.rawTekton (Tekton.toTekton p))),
+      ("core", coreJson (Tekton.fromTekton (Tekton.toTekton p) (Tekton.tektonMeta p)))])
+
 def crossAdapterCases : List (Json × Json) :=
   ghaPipes.map fun p =>
     let viaGitlab := Gha.fromGha (Gha.toGha (Gitlab.fromGitlab (Gitlab.toGitlab p) (Gitlab.gitlabMeta p)))
@@ -685,8 +726,9 @@ Bound: the number of ordered triples grows as n(n-1)(n-2), so at nine adapters (
 would give about 57 times 504 cases, near 57 MB. Each triple therefore takes at most `chainCaseCap / triples`
 pipelines (at least one), picked by `chainPick` so that the triples together still cover every pipeline. A case is
 about 2 KB (1990 bytes measured at four adapters), so the cap of 1400 cases keeps `chain.json` under 3 MB
-(at most 2.8 MB; at nine adapters the bound gives 2 pipelines per triple, 1008 cases, about 2.0 MB). At four
-adapters the cap allows every pipeline. -/
+(at most 2.8 MB; at nine adapters the bound gives 2 pipelines per triple, 1008 cases, about 2.0 MB). At seven
+adapters (210 triples) the bound gives 6 pipelines per triple, 1260 cases. At four adapters the cap allows every
+pipeline. -/
 
 def chainCaseCap : Nat := 1400
 
@@ -700,11 +742,11 @@ def chainPipes : List Core.Pipe :=
 
 /-- The pipelines in the fragment of every adapter (decided once per pipeline). -/
 def chainFragPipes : List Core.Pipe :=
-  chainPipes.filter fun p => decide (RoundTrip.Both p ∧ (Wf p ∧ Woodpecker.WpOk p) ∧ Drone.DroneOk p)
+  chainPipes.filter fun p => decide (RoundTrip.Both p ∧ (Wf p ∧ Woodpecker.WpOk p) ∧ Drone.DroneOk p ∧ Tekton.TekOk p)
 
 def chainAdapters : List (String × Chain.Adapter) :=
   [("gha", Chain.gha), ("gitea", Chain.gitea), ("forgejo", Chain.forgejo), ("gitlab", Chain.gitlab),
-   ("woodpecker", Chain.woodpecker), ("drone", Chain.drone)]
+   ("woodpecker", Chain.woodpecker), ("drone", Chain.drone), ("tekton", Chain.tekton)]
 
 def chainTriples : List ((String × Chain.Adapter) × (String × Chain.Adapter) × (String × Chain.Adapter)) :=
   chainAdapters.flatMap fun a => chainAdapters.flatMap fun b => chainAdapters.flatMap fun c =>
@@ -744,18 +786,20 @@ def main (args : List String) : IO UInt32 := do
     | _ => do IO.eprintln "usage: gen-vectors <output-dir> [name...]"; return 2
   IO.FS.createDirAll dir
   let want (name : String) : Bool := only.isEmpty || only.contains name
-  let files : List (String × String × List (Json × Json)) :=
-    [("dag", "Pipemaster.Dag.layers_respect_needs", GenVectors.dagCases),
-     ("matrix", "Pipemaster.Matrix.expand_mem", GenVectors.matrixCases),
-     ("ledger", "Pipemaster.Ledger.complete", GenVectors.ledgerCases),
-     ("gha", "Pipemaster.Gha.gha_from_to", GenVectors.ghaAdapterCases),
-     ("gitlab", "Pipemaster.Gitlab.gitlab_from_to", GenVectors.gitlabAdapterCases),
-     ("woodpecker", "Pipemaster.Woodpecker.woodpecker_from_to", GenVectors.woodpeckerAdapterCases),
-     ("drone", "Pipemaster.Drone.drone_from_to", GenVectors.droneAdapterCases),
-     ("cross", "Pipemaster.RoundTrip.cross_roundtrip", GenVectors.crossAdapterCases),
-     ("chain", "Pipemaster.Chain.chain_roundtrip", GenVectors.chainCases)]
-  for (name, thm, cases) in files do
+  let files : List (String × String × (Unit → List (Json × Json))) :=
+    [("dag", "Pipemaster.Dag.layers_respect_needs", fun _ => GenVectors.dagCases),
+     ("matrix", "Pipemaster.Matrix.expand_mem", fun _ => GenVectors.matrixCases),
+     ("ledger", "Pipemaster.Ledger.complete", fun _ => GenVectors.ledgerCases),
+     ("gha", "Pipemaster.Gha.gha_from_to", fun _ => GenVectors.ghaAdapterCases),
+     ("gitlab", "Pipemaster.Gitlab.gitlab_from_to", fun _ => GenVectors.gitlabAdapterCases),
+     ("woodpecker", "Pipemaster.Woodpecker.woodpecker_from_to", fun _ => GenVectors.woodpeckerAdapterCases),
+     ("drone", "Pipemaster.Drone.drone_from_to", fun _ => GenVectors.droneAdapterCases),
+     ("tekton", "Pipemaster.Tekton.tekton_from_to", fun _ => GenVectors.tektonAdapterCases),
+     ("cross", "Pipemaster.RoundTrip.cross_roundtrip", fun _ => GenVectors.crossAdapterCases),
+     ("chain", "Pipemaster.Chain.chain_roundtrip", fun _ => GenVectors.chainCases)]
+  for (name, thm, mk) in files do
     if want name then
+      let cases := mk ()
       IO.FS.writeFile s!"{dir}/{name}.json" (GenVectors.emit thm cases)
       IO.println s!"{name}: {cases.length} cases"
   if want "expr" then
