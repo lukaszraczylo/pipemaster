@@ -3,6 +3,8 @@ package tekton_test
 import (
 	"strings"
 	"testing"
+
+	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
 const goodTemplate = `apiVersion: triggers.tekton.dev/v1beta1
@@ -182,5 +184,49 @@ func TestMatrixParamValueMustBeAList(t *testing.T) {
 				t.Fatalf("matrix=%+v ext=%v", j.Matrix, j.Ext)
 			}
 		})
+	}
+}
+
+const structuredParams = `apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata: {name: ci}
+spec:
+  params:
+  - {name: flags, type: array, default: ["-v", "-x"]}
+  - {name: cfg, type: object, properties: {url: {type: string}}, default: {url: "https://example.com"}}
+  - {name: plain, default: "x"}
+  tasks:
+  - name: a
+    params:
+    - {name: flags, value: ["$(params.flags[*])"]}
+    taskSpec:
+      params: [{name: flags, type: array}]
+      steps: [{name: s, image: alpine, script: "true"}]
+`
+
+func TestStructuredParamDefaultKeepsItsType(t *testing.T) {
+	files, _ := identityOf(t, map[string]string{"p.yaml": structuredParams})
+	params := list(get(pipelineDoc(t, files, "ci"), "spec", "params"))
+	if len(params) != 3 {
+		t.Fatalf("params = %v", params)
+	}
+	if def := list(get(params[0], "default")); len(def) != 2 || def[0] != "-v" {
+		t.Fatalf("array default = %v", get(params[0], "default"))
+	}
+	if get(get(params[1], "default"), "url") != "https://example.com" {
+		t.Fatalf("object default = %v", get(params[1], "default"))
+	}
+}
+
+func TestOptionalStructuredInputGetsATypedDefault(t *testing.T) {
+	p := project(scriptJob("a", "true"))
+	p.Pipelines[0].Inputs = []ir.Input{{Name: "flags", Type: "array"}, {Name: "cfg", Type: "object"}}
+	files, _ := emit(t, p)
+	params := list(get(pipelineDoc(t, files, "ci"), "spec", "params"))
+	if _, ok := get(params[0], "default").([]any); !ok {
+		t.Fatalf("array default = %#v", get(params[0], "default"))
+	}
+	if _, ok := get(params[1], "default").(map[string]any); !ok {
+		t.Fatalf("object default = %#v", get(params[1], "default"))
 	}
 }

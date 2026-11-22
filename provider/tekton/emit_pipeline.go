@@ -153,13 +153,22 @@ func (e *emitter) pipelineParams(pp *plan, x map[string]any) *yaml.Node {
 		if in.Description != "" {
 			m.setStr("description", in.Description)
 		}
-		if !in.Required || in.Default != "" {
-			m.setStr("default", in.Default)
+		sub, kept := extra[in.Name].(map[string]any)
+		// A default that Ext holds keeps the type it had in the Tekton file.
+		if _, structured := sub["default"]; !structured && (!in.Required || in.Default != "") {
+			switch in.Type {
+			case "array":
+				m.set("default", seqOf())
+			case "object":
+				m.set("default", newMap().n)
+			default:
+				m.setStr("default", in.Default)
+			}
 		}
 		if in.Required && in.Default != "" {
 			e.lose(pp.path, caps.PipelineInputs, "input "+in.Name+": a Tekton param with a default is optional, so required is lost")
 		}
-		if sub, ok := extra[in.Name].(map[string]any); ok {
+		if kept {
 			_ = m.addExtra(sub, nil)
 		}
 		out.Content = append(out.Content, m.n)
