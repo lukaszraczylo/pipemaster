@@ -176,14 +176,14 @@ func (c *plCtx) callJobs(calls []*call, finally bool) ([]*ir.Job, error) {
 }
 
 // isGate tells a task that only runs a bare suspend template: it has no other key than its name, template and
-// dependencies, and the template holds an empty suspend and nothing else.
+// dependencies or depends, and the template holds an empty suspend and nothing else.
 func (c *plCtx) isGate(cl *call) bool {
 	tn, ok := text(cl.m.Vals["template"])
 	if !ok {
 		return false
 	}
 	for _, k := range cl.m.Order {
-		if k != "name" && k != "template" && k != "dependencies" {
+		if k != "name" && k != "template" && k != "dependencies" && k != "depends" {
 			return false
 		}
 	}
@@ -239,6 +239,7 @@ func (c *plCtx) foldGates(calls []*call, jobs []*ir.Job) []*ir.Job {
 			j.Manual = true
 			for _, g := range expandGate(n.JobID, fold) {
 				seen = append(seen, c.gateExt(gates[g]))
+				j.If = andExpr(fold[g].If, j.If)
 			}
 			for _, dn := range gateNeeds(n.JobID, fold) {
 				needs = appendNeed(needs, dn)

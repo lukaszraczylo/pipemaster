@@ -112,16 +112,12 @@ func (e *emitter) exitDeps(tc *jobCtx, d deps) deps {
 }
 
 // gateTasks writes the suspend task that holds a manual job or an approval. It returns the name of the first
-// gate, which the job waits for, and puts the dependencies on the gate.
+// gate, which the job waits for, and puts the dependencies and the depends expression on the gate.
 func (e *emitter) gateTasks(tc *jobCtx, d deps, jx map[string]any, out *jobOut) (string, deps) {
 	j, path := tc.jp.j, tc.jp.path
 	approval := j.Environment != nil && j.Environment.Approval
 	list, _ := jx[ExtGates].([]any)
 	if !j.Manual && !approval && len(list) == 0 {
-		return "", d
-	}
-	if d.depends != "" {
-		e.lose(path, caps.JobManual, "the task holds a depends expression, which a gate cannot carry; the gate is not written and the job runs with no approval")
 		return "", d
 	}
 	feature := caps.JobManual
@@ -154,6 +150,7 @@ func (e *emitter) gateTasks(tc *jobCtx, d deps, jx map[string]any, out *jobOut) 
 		gates = append(gates, gate{task: name, tmpl: tm})
 	}
 	deps := d
+	deps.depends = ""
 	for i, g := range gates {
 		t := newMap()
 		t.SetStr("name", g.task)
@@ -162,7 +159,11 @@ func (e *emitter) gateTasks(tc *jobCtx, d deps, jx map[string]any, out *jobOut) 
 		if i+1 < len(gates) {
 			next = []string{gates[i+1].task}
 		}
-		if len(next) > 0 {
+		switch {
+		case i+1 == len(gates) && d.depends != "":
+			// The last gate waits as the job would, so the job never runs without the approval.
+			t.SetStr("depends", d.depends)
+		case len(next) > 0:
 			t.Set("dependencies", strSeq(next))
 		}
 		out.tasks = append(out.tasks, t.N)
