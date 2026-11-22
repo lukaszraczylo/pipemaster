@@ -212,7 +212,11 @@ func (b *jobBuilder) outputs(r *reader) {
 			continue
 		}
 		b.job.Outputs = append(b.job.Outputs, ir.Output{Name: name})
-		if rest := restKeys(pm, "name"); len(rest) > 0 && !isOutputFile(pm, rest, name) {
+		rest := restKeys(pm, "name")
+		if len(rest) == 0 || isOutputFile(pm, rest, name) {
+			b.fileOutputs = append(b.fileOutputs, name)
+		}
+		if len(rest) > 0 && !isOutputFile(pm, rest, name) {
 			keptParams[name] = plain(pm.Subset(rest))
 			b.k.Note(caps.JobOutputs, "outputs.parameters "+name+": key "+strings.Join(rest, ", ")+" has no IR field; kept in Ext", pm.Lines["name"])
 		}

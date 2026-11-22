@@ -34,6 +34,8 @@ type jobBuilder struct {
 	artifactNeeds map[string]bool
 	// gitArts maps each step that a git input artifact made to the canonical text of that artifact.
 	gitArts map[*ir.Step]string
+	// fileOutputs names the outputs that the file holds as the emitter writes them.
+	fileOutputs []string
 	// outArts maps each output artifact name to the canonical text of its entry in the file.
 	outArts map[string]string
 	// holds maps each container ID to the canonical text of its container, without the dependencies.

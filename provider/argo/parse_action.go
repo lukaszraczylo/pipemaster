@@ -248,9 +248,15 @@ func (b *jobBuilder) collapseOutputs() {
 	}
 	for i := range b.job.Outputs {
 		o := &b.job.Outputs[i]
-		if v, ok := a.Values[o.Name]; ok && o.Value == "" {
-			o.Value = v
+		v, ok := a.Values[o.Name]
+		if !ok || o.Value != "" {
+			continue
 		}
+		if !slices.Contains(b.fileOutputs, o.Name) {
+			b.c.ignored(b.path+"/output/"+o.Name, caps.JobOutputs, "the output was edited after pipemaster wrote the file; the file content is kept")
+			continue
+		}
+		o.Value = v
 	}
 }
 
