@@ -16,6 +16,5 @@ version:
   stage: stage-0
   needs: []
   script:
-    # pipemaster:lost step.script pipeline/ci/job/version/step/tag: printf '%s' v1 > $(results.tag.path)
-    - "true"
     # pipemaster:step tag
+    - printf '%s' v1 > /dev/null

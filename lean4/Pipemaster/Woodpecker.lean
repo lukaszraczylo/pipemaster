@@ -507,7 +507,8 @@ def tplOpen : List Char → Bool
   | [] => false
 
 /-- A text that names the file of a Tekton result (`$(results.`). Outside Tekton the text is a command substitution
-that fails, so the emitter drops the line and reports job.outputs lost (emitkit result.go IsResultWrite). The model
+that fails, so the emitter points the result file at /dev/null and reports job.outputs lost (emitkit result.go
+NeutralizeResultWrite). The model
 refuses the whole prefix, which is stricter than the matcher. -/
 def resultOpen : List Char → Bool
   | '$' :: '(' :: 'r' :: 'e' :: 's' :: 'u' :: 'l' :: 't' :: 's' :: '.' :: _ => true

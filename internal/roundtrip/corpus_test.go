@@ -255,6 +255,9 @@ func TestCorpus(t *testing.T) {
 					}
 				}
 				checkEmitted(t, b.ID(), cross, crossKnown)
+				if f.provider == provider.Tekton && provider.Family(to) != provider.Tekton {
+					checkShellSyntax(t, b.ID(), cross)
+				}
 
 				c := verdictCounts(r.src, r.toRep)
 				fmt.Fprintf(&summary, "%s %s->%s native=%4d emulated=%4d external=%4d lost=%4d\n", f.name, a.ID(), b.ID(),

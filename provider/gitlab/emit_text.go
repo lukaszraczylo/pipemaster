@@ -201,11 +201,7 @@ func (e *emitter) field(path string, f caps.Feature, s string) (string, error) {
 // scriptLine converts one script entry. An entry with an expression GitLab cannot spell is commented out whole,
 // because dropping the part could change what the command does.
 func (e *emitter) scriptLine(path, s string) (out string, keep bool, err error) {
-	if emitkit.IsResultWrite(s) {
-		emitkit.LoseResultWrite(e.lose, path)
-		e.comment("step.script " + path + ": " + s)
-		return "", false, nil
-	}
+	s = emitkit.NeutralizeResultWrite(e.lose, path, s)
 	if !strings.Contains(s, "${{") {
 		return s, true, nil
 	}

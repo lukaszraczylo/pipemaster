@@ -13,10 +13,22 @@ var resultFileRE = regexp.MustCompile(`\$\(results\.[^)\s]+\.path\)`)
 // command substitution that fails, so no other emitter writes it.
 func IsResultWrite(line string) bool { return resultFileRE.MatchString(line) }
 
-// LoseResultWrite reports a script line that writes a Tekton result: the line is not written and the job output
-// that it fed has no value in the target file.
-func LoseResultWrite(lose func(path string, f caps.Feature, detail string), stepPath string) {
-	lose(stepPath, caps.StepScript, "the line writes a Tekton result file, which has no form in this target; it is not written")
+// resultSink is where a neutralised result write goes. The command still runs, so a line such as
+// `make && tee $(results.x.path)` keeps its other commands, and a compound command keeps its syntax.
+const resultSink = "/dev/null"
+
+// NeutralizeResultWrite replaces the result file of a script line by the null device and reports the loss: the
+// job output that the line fed has no value in the target file.
+func NeutralizeResultWrite(lose func(path string, f caps.Feature, detail string), stepPath, line string) string {
+	if !IsResultWrite(line) {
+		return line
+	}
+	loseResultWrite(lose, stepPath)
+	return resultFileRE.ReplaceAllString(line, resultSink)
+}
+
+func loseResultWrite(lose func(path string, f caps.Feature, detail string), stepPath string) {
+	lose(stepPath, caps.StepScript, "the line writes a Tekton result file, which has no form in this target; the write goes to "+resultSink)
 	jobPath := stepPath
 	if i := strings.LastIndex(stepPath, "/step/"); i >= 0 {
 		jobPath = stepPath[:i]

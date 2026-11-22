@@ -23,5 +23,8 @@ jobs:
       # pipemaster:emulated step.image pipeline/ci/job/version/step/tag
       - id: tag
         uses: docker://alpine:3.22
+        with:
+          entrypoint: /bin/sh
+          args: -ec 'printf '\''%s'\'' v1 > /dev/null'
     outputs:
       tag: ""

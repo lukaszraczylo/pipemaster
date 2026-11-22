@@ -1,13 +1,8 @@
-# pipemaster:lost step.script pipeline/ci/job/version/step/tag: the step has no command left
-# pipemaster:emulated step.action pipeline/ci/job/version/step/tag
-# pipemaster:arg {"step":"image:\n    ref: alpine:3.22\nid: tag\nkind: script\nscript:\n    - printf '%s' v1 \u003e $$(results.tag.path)\n","at":0}
-# pipemaster:emulated step.script pipeline/ci/job/version
-# pipemaster:emulated job.container pipeline/ci/job/version
 when:
   - event: push
   - event: tag
 steps:
-  - name: noop
-    image: ubuntu:latest
+  - name: tag
+    image: alpine:3.22
     commands:
-      - "true"
+      - printf '%s' v1 > /dev/null

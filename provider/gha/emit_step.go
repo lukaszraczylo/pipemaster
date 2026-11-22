@@ -199,15 +199,12 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 	return m.n, wrapped, nil
 }
 
-// withoutResultWrites drops the lines that write a Tekton result file, which no shell outside Tekton can run.
+// withoutResultWrites points the result files of Tekton at the null device, because no shell outside Tekton can
+// run the substitution.
 func (e *emitter) withoutResultWrites(sp string, lines []string) []string {
-	var out []string
+	out := make([]string, 0, len(lines))
 	for _, l := range lines {
-		if emitkit.IsResultWrite(l) {
-			emitkit.LoseResultWrite(e.lose, sp)
-			continue
-		}
-		out = append(out, l)
+		out = append(out, emitkit.NeutralizeResultWrite(e.lose, sp, l))
 	}
 	return out
 }

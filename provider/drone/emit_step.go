@@ -454,10 +454,7 @@ func (e *emitter) scriptStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
 	var lines []*yaml.Node
 	seen := map[string]int{}
 	for _, l := range commandTexts(st) {
-		if emitkit.IsResultWrite(l) {
-			emitkit.LoseResultWrite(e.lose, sp)
-			continue
-		}
+		l = emitkit.NeutralizeResultWrite(e.lose, sp, l)
 		b.hits = nil
 		out, keep, err := e.command(b, sp, l)
 		if err != nil {
