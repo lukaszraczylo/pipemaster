@@ -183,6 +183,9 @@ func (b *pipeBuilder) build(top *omap) (*ir.Pipeline, error) {
 	b.readResources(r)
 	b.readTypes(r)
 	list, _ := jobs.([]any)
+	if b.placeholder(list) {
+		list = nil
+	}
 	for i, raw := range list {
 		m, ok := asMap(raw)
 		name, _ := text(valueOf(m, "name"))

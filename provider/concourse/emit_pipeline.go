@@ -37,9 +37,11 @@ type pipeEmitter struct {
 // pipeline writes one IR pipeline as one file.
 func (e *emitter) pipeline(pl *ir.Pipeline, first bool) {
 	pp := "pipeline/" + pl.ID
-	if len(pl.Jobs) == 0 {
-		e.lose(pp, caps.ExtPassthrough, "the pipeline has no jobs, and a Concourse pipeline needs one; no file is written")
-		return
+	empty := len(pl.Jobs) == 0
+	if empty {
+		held := *pl
+		held.Jobs = []*ir.Job{{ID: placeholderJob, Steps: []*ir.Step{{ID: placeholderJob, Kind: ir.StepScript, Script: []string{placeholderCmd}}}}}
+		pl = &held
 	}
 	pe := &pipeEmitter{
 		e: e, pl: pl, path: pp, doc: &outDoc{}, byName: map[string]*source{}, jobName: map[string]string{},
@@ -62,6 +64,10 @@ func (e *emitter) pipeline(pl *ir.Pipeline, first bool) {
 	pe.pipelineMeta()
 	pe.buildSources()
 	jobs := pe.jobs()
+	if empty {
+		e.emulate(pp, caps.ExtPassthrough, "placeholder job", "the pipeline has no jobs, and a Concourse pipeline needs one; the job "+placeholderJob+" runs "+placeholderCmd)
+		e.markArg(caps.ExtPassthrough, pe.mpath+"/placeholder", placeholderArg{Hold: nodeCanon(jobs[0])})
+	}
 	top := newMap()
 	if n := pe.extNode(ExtResourceTypes); n != nil {
 		top.Set(ExtResourceTypes, n)

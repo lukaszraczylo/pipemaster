@@ -40,6 +40,11 @@ type secretArg struct {
 	Vars    []string `json:"vars,omitempty"`
 }
 
+// placeholderArg carries the canonical text of the job that keeps a pipeline with no jobs valid.
+type placeholderArg struct {
+	Hold string `json:"hold"`
+}
+
 // actionArg carries an action step that the file holds as a placeholder task, or as the source get for a checkout.
 type actionArg struct {
 	// Step is the IR step as YAML text.

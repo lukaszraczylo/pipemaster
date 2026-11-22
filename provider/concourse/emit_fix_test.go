@@ -143,3 +143,34 @@ func TestMidnightCronIsNotAnEmptySource(t *testing.T) {
 		t.Fatalf("cron came back as %q", cron)
 	}
 }
+
+func TestPipelineWithNoJobsEmitsAValidPlaceholder(t *testing.T) {
+	p := project()
+	files, rep := emit(t, p)
+	if _, ok := files[".concourse/ci.yml"]; !ok {
+		t.Fatalf("no file for the empty pipeline: %v", keys(files))
+	}
+	if !hasFeatureEntry(rep, string(caps.ExtPassthrough), "no jobs") {
+		t.Fatalf("no entry for the empty pipeline: %v", rep.Entries)
+	}
+	back, brep := reparse(t, files)
+	if got := back.Pipelines[0]; len(got.Jobs) != 0 {
+		t.Fatalf("the placeholder job came back: %v", got.Jobs)
+	}
+	if hasFeatureEntry(brep, string(caps.ExtPassthrough), "marker ignored") {
+		t.Fatalf("an unedited marker was ignored: %v", brep.Entries)
+	}
+}
+
+func TestEditedPlaceholderJobStaysAJob(t *testing.T) {
+	files, _ := emit(t, project())
+	src := files[".concourse/ci.yml"]
+	edited := strings.Replace(src, `- "true"`, "- echo edited", 1)
+	if edited == src {
+		t.Fatalf("placeholder script changed shape:\n%s", src)
+	}
+	back, rep := parseFiles(t, map[string]string{"ci.yml": edited})
+	if len(back.Pipelines[0].Jobs) != 1 || !hasFeatureEntry(rep, string(caps.ExtPassthrough), "marker ignored") {
+		t.Fatalf("jobs=%v entries=%v", back.Pipelines[0].Jobs, rep.Entries)
+	}
+}

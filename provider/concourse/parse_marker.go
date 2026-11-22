@@ -431,3 +431,17 @@ func (jb *jobBuilder) checkoutMarker(gets []any) *ir.Step {
 	}
 	return nil
 }
+
+// placeholder is true when the jobs are the one job that pipemaster wrote for a pipeline with no jobs.
+func (b *pipeBuilder) placeholder(list []any) bool {
+	var a placeholderArg
+	path := b.path() + "/placeholder"
+	if !b.arg(path, caps.ExtPassthrough, &a) {
+		return false
+	}
+	if len(list) != 1 || canonJSON(plain(list[0])) != a.Hold {
+		b.ignored(path, caps.ExtPassthrough, "the placeholder job was edited after pipemaster wrote it")
+		return false
+	}
+	return true
+}
