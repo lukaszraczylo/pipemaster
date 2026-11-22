@@ -32,6 +32,8 @@ type actionArg struct {
 	Arts []string `json:"arts,omitempty"`
 	// Outs is the canonical JSON of each output artifact in Arts, in the same order.
 	Outs []string `json:"outs,omitempty"`
+	// Needs names the jobs whose artifacts a download loaded for a need that the IR holds without artifacts.
+	Needs []string `json:"needs,omitempty"`
 	// Seq orders the steps that stand at the same place.
 	Seq int `json:"seq,omitempty"`
 }

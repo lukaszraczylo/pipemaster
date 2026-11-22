@@ -94,6 +94,11 @@ func (b *jobBuilder) collapseHeld() {
 	for _, h := range restored {
 		b.dropImage(h.arg.Image)
 		b.dropArtifacts(h.arg.Arts)
+		for name := range b.artifactNeeds {
+			if id, ok := b.taskID(name); ok && slices.Contains(h.arg.Needs, id) {
+				b.artifactNeeds[name] = false
+			}
+		}
 	}
 }
 

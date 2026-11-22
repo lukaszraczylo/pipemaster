@@ -2,6 +2,7 @@ package argo
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -239,6 +240,9 @@ func (sx *stepCtx) download(path string, t actions.Target) {
 			if n == name {
 				sx.dests[dst] = true
 				sx.inputArtifact(jp, name, dst)
+				if i := slices.IndexFunc(tc.jp.j.Needs, func(n ir.Need) bool { return n.JobID == jp.j.ID }); i < 0 || !tc.jp.j.Needs[i].Artifacts {
+					sx.act.Needs = append(sx.act.Needs, jp.j.ID)
+				}
 				return
 			}
 		}
