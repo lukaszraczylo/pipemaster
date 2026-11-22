@@ -288,7 +288,14 @@ func (e *emitter) taskArguments(tc *jobCtx, sx *stepCtx, jx map[string]any, disa
 	}
 	arts := append([]*yaml.Node{}, sx.argArts...)
 	if l, ok := jx["argument_artifacts"].([]any); ok {
+		written := map[string]bool{}
+		for _, a := range sx.argArts {
+			written[nodeName(a)] = true
+		}
 		for _, a := range l {
+			if m, isMap := a.(map[string]any); isMap && written[strOf(m["name"])] {
+				continue
+			}
 			arts = append(arts, e.node(path, "arguments", a))
 		}
 	}
@@ -303,4 +310,14 @@ func (e *emitter) taskArguments(tc *jobCtx, sx *stepCtx, jx map[string]any, disa
 	}
 	_ = args.AddExtra(rest, nil)
 	return args.N
+}
+
+// nodeName is the value of the name key of a mapping node.
+func nodeName(n *yaml.Node) string {
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		if n.Content[i].Value == "name" {
+			return n.Content[i+1].Value
+		}
+	}
+	return ""
 }

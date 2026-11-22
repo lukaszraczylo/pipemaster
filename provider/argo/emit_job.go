@@ -460,7 +460,14 @@ func (e *emitter) inputsKey(tc *jobCtx, tm *wmap, sx *stepCtx, jx map[string]any
 	}
 	arts := append([]*yaml.Node{}, sx.artIn...)
 	if l, ok := ext["artifacts"].([]any); ok {
+		written := map[string]bool{}
+		for _, a := range sx.artIn {
+			written[nodeName(a)] = true
+		}
 		for _, a := range l {
+			if m, isMap := a.(map[string]any); isMap && written[strOf(m["name"])] {
+				continue
+			}
 			arts = append(arts, e.node(tc.jp.path, "inputs", a))
 		}
 	}

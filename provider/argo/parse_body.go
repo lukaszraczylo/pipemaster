@@ -208,7 +208,7 @@ func (b *jobBuilder) outputs(r *reader) {
 			continue
 		}
 		b.job.Outputs = append(b.job.Outputs, ir.Output{Name: name})
-		if rest := restKeys(pm, "name"); len(rest) > 0 {
+		if rest := restKeys(pm, "name"); len(rest) > 0 && !isOutputFile(pm, rest, name) {
 			keptParams[name] = plain(pm.Subset(rest))
 			b.k.Note(caps.JobOutputs, "outputs.parameters "+name+": key "+strings.Join(rest, ", ")+" has no IR field; kept in Ext", pm.Lines["name"])
 		}
@@ -245,6 +245,18 @@ func (b *jobBuilder) outputs(r *reader) {
 	if len(kept) > 0 {
 		b.k.Out[keyOutputs] = kept
 	}
+}
+
+// isOutputFile is true for the one valueFrom that the emitter writes for an output: the path of its file and an
+// empty default. The emitter writes it again, so the Ext does not keep it.
+func isOutputFile(pm *omap, rest []string, name string) bool {
+	vf, ok := asMap(valueOf(pm, "valueFrom"))
+	if !ok || len(rest) != 1 || rest[0] != "valueFrom" || len(vf.Order) != 2 {
+		return false
+	}
+	p, hasPath := text(vf.Vals["path"])
+	d, hasDefault := text(vf.Vals["default"])
+	return hasPath && hasDefault && p == outputFile(name) && d == ""
 }
 
 // retry maps retryStrategy.limit to attempts; the other keys stay in Ext.
@@ -598,10 +610,12 @@ func (b *jobBuilder) containerSet(r *reader) error {
 		return err
 	}
 	b.placeNodes(order)
-	if mounts, ok := m.Vals["volumeMounts"]; ok && isWorkspaceMounts(mounts) {
+	mounts, hasMounts := m.Vals["volumeMounts"]
+	ownMounts := hasMounts && (isWorkspaceMounts(mounts) || b.isCacheMounts(mounts))
+	if ownMounts {
 		cr.Take("volumeMounts")
 	}
-	if rest := restKeys(m, "containers", "volumeMounts"); len(rest) > 0 || (m.Vals["volumeMounts"] != nil && !isWorkspaceMounts(m.Vals["volumeMounts"])) {
+	if rest := restKeys(m, "containers", "volumeMounts"); len(rest) > 0 || (hasMounts && !ownMounts) {
 		rest = restKeys(m, "containers")
 		for _, key := range rest {
 			cr.Take(key)
