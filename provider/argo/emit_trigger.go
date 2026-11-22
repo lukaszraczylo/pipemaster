@@ -110,6 +110,9 @@ func (e *emitter) cron(pp *plan, i int, path string, tr ir.Trigger, x map[string
 				spec[k] = v
 			}
 		}
+		if cw == nil {
+			spec["timezone"] = utcZone // GitHub schedules are UTC; the CronWorkflow default is the controller's zone.
+		}
 		if _, ok := spec["workflowSpec"]; !ok {
 			e.emptyContext(pp, path, caps.TriggerSchedule, "the CronWorkflow "+name)
 			spec["workflowSpec"] = map[string]any{"workflowTemplateRef": map[string]any{"name": pp.name}, "serviceAccountName": workflowSA}

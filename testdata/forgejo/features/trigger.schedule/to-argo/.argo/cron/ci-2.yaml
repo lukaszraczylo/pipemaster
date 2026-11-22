@@ -5,6 +5,7 @@ metadata:
 spec:
   schedules:
     - 30 5 * * 1-5
+  timezone: UTC
   workflowSpec:
     serviceAccountName: pipemaster-workflow
     workflowTemplateRef:

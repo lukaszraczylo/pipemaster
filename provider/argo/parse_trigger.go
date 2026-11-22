@@ -112,6 +112,7 @@ func (p *project) cronKeys(k *sink, cw map[string]any, spec *omap, inline bool) 
 			continue
 		case "timezone":
 			if t, _ := text(v); slices.Contains(utcZones, t) {
+				cw[key] = t // the IR default, kept so a re-emit does not fall back to the controller's zone
 				continue
 			}
 		case "suspend":
