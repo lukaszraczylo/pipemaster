@@ -613,3 +613,13 @@ func TestSecretNameConvention(t *testing.T) {
 		}
 	}
 }
+
+func TestMergedBranchesAreDeduplicated(t *testing.T) {
+	pl, _ := parseYAML(t, "resources:\n- {name: a, type: git, source: {uri: u, branch: main}}\n- {name: b, type: git, source: {uri: u, branch: main}}\n- {name: c, type: git, source: {uri: u, branch: dev}}\njobs:\n- name: j\n  plan:\n  - {get: a, trigger: true}\n  - {get: b, trigger: true}\n  - {get: c, trigger: true}\n"+echoTask)
+	if len(pl.Triggers) != 1 || !reflect.DeepEqual(pl.Triggers[0].Branches.Include, []string{"main", "dev"}) {
+		t.Fatalf("triggers = %+v", pl.Triggers)
+	}
+	if refs := ext(pl.Triggers[0].Ext)["resources"]; !reflect.DeepEqual(refs, []any{"a", "b", "c"}) {
+		t.Errorf("resources = %v", refs)
+	}
+}

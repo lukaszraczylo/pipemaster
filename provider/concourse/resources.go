@@ -157,7 +157,11 @@ func (b *pipeBuilder) mergePushes(in []sourceTrigger) []ir.Trigger {
 			at[i] = at[j]
 			t := &out[at[i]]
 			te := t.Ext[dialect].(map[string]any)
-			t.Branches.Include = append(t.Branches.Include, st.trig.Branches.Include...)
+			for _, br := range st.trig.Branches.Include {
+				if !slices.Contains(t.Branches.Include, br) {
+					t.Branches.Include = append(t.Branches.Include, br)
+				}
+			}
 			te[ExtResourcesRef] = append(te[ExtResourcesRef].([]any), st.trig.Ext[dialect].(map[string]any)[ExtResourcesRef].([]any)...)
 			b.note(caps.TriggerFilterBranch, caps.Lost, b.path(), "one push trigger with several branches",
 				fmt.Sprintf("resources %v are one push trigger with branches %v; Concourse runs the job once per branch event", te[ExtResourcesRef], t.Branches.Include), 0)
