@@ -1,6 +1,6 @@
 # Pinned versions
 
-These versions were verified on 2026-11-19. The Gitea, Forgejo, Woodpecker and Drone dialects follow them.
+These versions were verified on 2026-11-19. The Gitea, Forgejo, Woodpecker, Drone and Tekton dialects follow them.
 
 | Product | Version | Date |
 | --- | --- | --- |
@@ -13,6 +13,9 @@ These versions were verified on 2026-11-19. The Gitea, Forgejo, Woodpecker and D
 | Drone server | v2.28.2 | 2026-04-20 |
 | Drone docker runner | v1.8.5 | |
 | drone-cli | v1.9.0 | |
+| Tekton Pipelines | v1.18.0 | |
+| Tekton Triggers | v0.38.0 | |
+| kubeconform | v0.8.0 | |
 
 ## Sources
 
@@ -25,6 +28,9 @@ These versions were verified on 2026-11-19. The Gitea, Forgejo, Woodpecker and D
 - <https://woodpecker-ci.org/docs/usage/workflow-syntax>
 - <https://github.com/harness/harness/releases/tag/v2.28.2>
 - <https://docs.drone.io/pipeline/docker/syntax/>
+- <https://github.com/tektoncd/pipeline/releases/tag/v1.18.0>
+- <https://github.com/tektoncd/triggers/releases/tag/v0.38.0>
+- <https://github.com/yannh/kubeconform/releases/tag/v0.8.0>
 
 Drone is in maintenance mode. Harness ships occasional server releases from the `drone` branch, and no release has followed v2.28.2.
 
@@ -39,6 +45,7 @@ The emitter writes only the first directory of each list. The parser reads the f
 | `forgejo` | `.forgejo/workflows`, then `.gitea/workflows`, then `.github/workflows` (Forgejo `ListWorkflows`) |
 | `woodpecker` | `.woodpecker` (no subfolders), then `.woodpecker.yaml`, then `.woodpecker.yml` |
 | `drone` | `.drone.yml` |
+| `tekton` | `.tekton` (all YAML files, including subfolders) |
 
 ## Default action hosts
 

@@ -16,6 +16,7 @@ The provider ID is the value that you pass to `--from`, `--to`, `--via` and `--a
 | `gitlab` | GitLab CI | `.gitlab-ci.yml` and its local includes |
 | `woodpecker` | Woodpecker CI | `.yml` and `.yaml` files in `.woodpecker`, then `.woodpecker.yaml`, then `.woodpecker.yml` |
 | `drone` | Drone CI | `.drone.yml` |
+| `tekton` | Tekton Pipelines and Triggers | `.yaml` and `.yml` files in `.tekton`, including its subfolders |
 
 The parser reads the first directory of the list that exists and does not merge directories. The emitter writes only the first directory. If a repository holds both `.github/workflows` and `.gitea/workflows`, `detect` lists `gha` and `gitea`. Then `convert` needs `--from`. The pinned versions and the default action hosts are in [docs/versions.md](docs/versions.md).
 
@@ -394,3 +395,70 @@ Notes on the Drone provider:
 - Drone replaces `${NAME}` in the raw YAML before it parses the file. The literal `$` escape is `$$`.
 - A matrix becomes one pipeline document per cell. Each document carries a marker, so a return conversion can fold the cells into one matrix job.
 - The Drone OSS server does not evaluate `paths` filters. The converter reports them as lost and never emits them.
+
+## Feature support from GHA to Tekton
+
+The following table comes from `pipemaster caps --from gha --to tekton --format md`.
+
+| Feature | Gha | Tekton | Strategy |
+| --- | --- | --- | --- |
+| config.name | native | emulated | secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars (the Secret values and ConfigMap values are not written) |
+| display.name | native | native |  |
+| expr.opaque | native | native | (only opaque expressions of the tekton dialect; a cel entry from a Tekton file is written back and needs enable-api-fields: alpha; others are lost) |
+| ext.passthrough | native | native |  |
+| job.allow_failure | native | native |  |
+| job.artifacts | emulated | emulated | workspace on a PVC from volumeClaimTemplate (tasks on different nodes need ReadWriteMany or the affinity assistant) |
+| job.cache | emulated | emulated | workspace on a PVC from volumeClaimTemplate (tasks on different nodes need ReadWriteMany or the affinity assistant) |
+| job.container | native | native | stepTemplate image |
+| job.env | native | native |  |
+| job.environment | native | lost | (Tekton has no environment name or URL) |
+| job.environment.approval | external | lost | (Tekton has no approval gate) |
+| job.if | native | native | PipelineTask when (only the input/operator/values subset; any other condition is emulated or lost) |
+| job.manual | emulated | lost | (Tekton has no manual job gate) |
+| job.matrix | native | native | PipelineTask matrix (fail-fast and max-parallel are lost; axis values become strings) |
+| job.needs | native | native |  |
+| job.needs.artifacts | emulated | emulated | workspace on a PVC from volumeClaimTemplate (tasks on different nodes need ReadWriteMany or the affinity assistant) |
+| job.outputs | native | native | Task results |
+| job.retry | emulated | native |  |
+| job.runner | native | lost | (Tekton schedules pods, not runner labels) |
+| job.services | native | emulated | Task sidecars (the service is at localhost, not at its name) |
+| job.timeout | native | native |  |
+| pipeline.concurrency | native | lost | (Tekton has no concurrency group or cancel-in-progress) |
+| pipeline.env | native | emulated | copied into the stepTemplate env of each Task (a step variable of the same name wins) |
+| pipeline.finally | emulated | native | Pipeline finally (finally tasks cannot be ordered among themselves, so a needs edge between them is lost) |
+| pipeline.inputs | native | native | Pipeline params |
+| pipeline.permissions | native | lost | (permissions come from the ServiceAccount of the run) |
+| project.multi_pipeline | native | emulated | one Pipeline document per IR pipeline (each pipeline gets its own trigger) |
+| script.interpolation | native | native |  |
+| step.action | native | emulated | StepAction ref per actions.Lookup verdict (unknown actions are lost) |
+| step.continue_on_error | native | native |  |
+| step.env | native | native |  |
+| step.if | native | native | step when (only the input/operator/values subset; any other condition is emulated or lost) |
+| step.image | emulated | native |  |
+| step.script | native | native |  |
+| step.shell | native | native | shebang line of the script |
+| step.timeout | native | native |  |
+| step.workdir | native | native |  |
+| trigger.api | native | emulated | EventListener entry of the Tekton file (only an entry that a Tekton file held is written; any other API trigger is lost) |
+| trigger.filter.branches | native | emulated | CEL interceptor filter on the ref (the EventListener serves GitHub webhooks only) |
+| trigger.filter.paths | native | emulated | CEL interceptor filter on the changed files (the github interceptor needs addChangedFiles; the EventListener serves GitHub webhooks only) |
+| trigger.filter.tags | native | emulated | CEL interceptor filter on the ref (the EventListener serves GitHub webhooks only) |
+| trigger.manual | native | external | tkn pipeline start <name> (a person starts the run; the report names the command) |
+| trigger.pipeline_done | native | lost | (Tekton has no pipeline-completion trigger) |
+| trigger.pull_request | native | emulated | EventListener trigger with the github interceptor (the EventListener serves GitHub webhooks only) |
+| trigger.push | native | emulated | EventListener trigger with the github interceptor (the EventListener serves GitHub webhooks only) |
+| trigger.resource | lost | lost | (Tekton has no resource trigger) |
+| trigger.schedule | native | emulated | CronJob that posts to the EventListener (the CronJob and the listener must run in the same cluster) |
+| trigger.tag | native | emulated | EventListener trigger with the github interceptor (the EventListener serves GitHub webhooks only) |
+
+Notes on the Tekton provider:
+
+- The emitter writes the files under `.tekton/`. Each pipeline becomes one Pipeline in `pipeline.yaml`, and each job becomes a Task in `tasks/`. The triggers go to `triggers/`, the schedules to `cron/`, and the RBAC objects to `rbac/`. A `kustomization.yaml` lists the other files. The parser reads every YAML file under `.tekton/`, including subfolders.
+- The context of a run (branch, tag, event, commit, repository and pull request number) travels in reserved Pipeline params that start with `ctx-`, for example `ctx-branch` and `ctx-sha`. The pipeline declares only the params that its conditions or scripts use. The TriggerBinding fills them from the webhook payload.
+- The trigger support is GitHub only. The EventListener uses the `github` interceptor and a `cel` interceptor, so it serves GitHub webhooks and no other forge. The generated interceptor reads the webhook secret from the Secret `pipemaster-github-webhook`, key `token`. The operator must create this Secret.
+- A cron schedule becomes a CronJob. The job posts to the EventListener with the header `X-Pipemaster-Schedule: <pipeline>/<n>`, and the listener matches only that header. Any caller in the cluster can send this header. Restrict the listener with a NetworkPolicy, or add a shared-secret header. A scheduled run has an empty `ctx-repo`, so a checkout step in that run cannot clone.
+- The generated RBAC objects and the CronJob URL use the namespace `default`. Deploy the listener and the CronJob in that namespace, or edit the host and the subjects.
+- A secret becomes a `secretKeyRef` on the Secret `ci-secrets`. A variable becomes a `configMapKeyRef` on the ConfigMap `ci-vars`. The converter does not write the values. The operator must create both objects.
+- The cluster setup is external. The operator must install Tekton Pipelines and Tekton Triggers, apply the RBAC objects in `.tekton/rbac/`, and create the Secret and the ConfigMap. The converter reports no feature for this work.
+- A matrix passes only string values. The `finally` tasks run without an order among themselves, so a `needs` edge between them is lost. A step action becomes a StepAction reference.
+- The validator checks the emitted files against embedded Tekton and CronJob schemas, and the tests also run `kubeconform`. The pinned versions are in `docs/versions.md`.
