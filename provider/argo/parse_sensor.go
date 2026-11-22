@@ -227,6 +227,12 @@ func (p *project) buildTriggers(kinds []string, filters []dataFilter, k *sink) (
 			return nil, "a body.ref filter does not apply to pull request events"
 		case kind == eventPR:
 			tr.Kind, tr.Branches = ir.TriggerPR, ir.Filter{Include: base}
+			if !slices.ContainsFunc(filters, func(f dataFilter) bool { return f.path == pathAction }) {
+				p.rep.Add(report.Entry{
+					IRPath: k.Path, Feature: caps.TriggerFilterBranch, Level: caps.Emulated, Strategy: "default actions", SourceLoc: k.File,
+					Detail: "no data filter limits the pull request actions, so Argo starts on every action; the IR trigger starts on opened, reopened and synchronize only",
+				})
+			}
 		case len(base) > 0:
 			return nil, "a pull request base filter does not apply to push events"
 		case len(branches) > 0 && len(tags) > 0:
