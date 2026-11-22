@@ -65,7 +65,7 @@ func (e *emitter) trigger(pp *plan, i int) {
 	case ir.TriggerPush, ir.TriggerPR, ir.TriggerTag:
 		e.eventTrigger(pp, path, tr, x)
 	case ir.TriggerAPI:
-		e.apiTrigger(pp, path, x)
+		e.apiTrigger(pp, path, tr, x)
 	case ir.TriggerManual:
 		e.manual(pp, path, x)
 	}
@@ -82,7 +82,7 @@ func ownDoc(v any) docMap {
 }
 
 // cron adds a schedule to the CronWorkflow of the trigger. A suspended CronWorkflow that an Argo file held
-// arrives as an api trigger with no cron; its other schedules keep it suspended.
+// arrives as an api trigger that keeps its cron; the CronWorkflow stays suspended.
 func (e *emitter) cron(pp *plan, i int, path string, tr ir.Trigger, x map[string]any) {
 	if tr.Kind == ir.TriggerSchedule && tr.Cron == "" {
 		e.lose(path, caps.TriggerSchedule, "the schedule has no cron expression, which a CronWorkflow needs; no CronWorkflow is written")
@@ -121,18 +121,20 @@ func (e *emitter) cron(pp *plan, i int, path string, tr ir.Trigger, x map[string
 		ev.crons[name] = c
 		ev.cronOrder = append(ev.cronOrder, name)
 	}
-	if tr.Kind == ir.TriggerSchedule {
+	if tr.Cron != "" {
 		c.schedules[idx] = tr.Cron
+	}
+	if tr.Kind == ir.TriggerSchedule {
 		return
 	}
-	e.lose(path, caps.TriggerAPI, "the CronWorkflow "+name+" is suspended and its schedule is not in the IR; the file keeps it suspended with the schedules of its other triggers")
+	e.lose(path, caps.TriggerAPI, "the CronWorkflow "+name+" is suspended; no other provider starts it, and the file keeps it suspended")
 }
 
 // apiTrigger writes the Sensor trigger or the suspended CronWorkflow that an Argo file held. Any other API
 // trigger has no Argo form.
-func (e *emitter) apiTrigger(pp *plan, path string, x map[string]any) {
+func (e *emitter) apiTrigger(pp *plan, path string, tr ir.Trigger, x map[string]any) {
 	if _, ok := x["cronWorkflow"]; ok && e.own {
-		e.cron(pp, 0, path, ir.Trigger{Kind: ir.TriggerAPI}, x)
+		e.cron(pp, 0, path, tr, x)
 		return
 	}
 	if e.own && (x["trigger"] != nil || x["dependency"] != nil || x["dependencies"] != nil) {
