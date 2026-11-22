@@ -11,5 +11,6 @@ import Pipemaster.Gitlab
 import Pipemaster.Woodpecker
 import Pipemaster.Drone
 import Pipemaster.Tekton
+import Pipemaster.Argo
 import Pipemaster.RoundTrip
 import Pipemaster.Chain

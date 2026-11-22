@@ -126,6 +126,34 @@ required=(
   Pipemaster.Chain.chain_gitlab_drone_tekton_woodpecker
   Pipemaster.Chain.cross_tekton_gha
   Pipemaster.Chain.cross_tekton_gitlab
+  Pipemaster.Chain.chainFrag_seven_iff
+  Pipemaster.Chain.sevenAdapters_closed
+  Pipemaster.Argo.rawArgo_toArgo
+  Pipemaster.Argo.argo_from_to
+  Pipemaster.Argo.argo_depends_plain
+  Pipemaster.Argo.depends_bare_not_plain
+  Pipemaster.Argo.depends_succeeded_plain
+  Pipemaster.Argo.emptyFin_preserves
+  Pipemaster.Argo.argClear_preserves
+  Pipemaster.Argo.argoOk_of_shape
+  Pipemaster.Argo.finDrop_of_shape
+  Pipemaster.Argo.eval_decodeW
+  Pipemaster.Argo.argo_when_decode
+  Pipemaster.Chain.argo_keeps_gha
+  Pipemaster.Chain.argo_keeps_gitlab
+  Pipemaster.Chain.argo_keeps_woodpecker
+  Pipemaster.Chain.argo_keeps_drone
+  Pipemaster.Chain.argo_keeps_tekton
+  Pipemaster.Chain.argo_keeps_argo
+  Pipemaster.Chain.gitlab_keeps_argo
+  Pipemaster.Chain.woodpecker_keeps_argo
+  Pipemaster.Chain.drone_keeps_argo
+  Pipemaster.Chain.tekton_keeps_argo
+  Pipemaster.Chain.chain_argo_gha
+  Pipemaster.Chain.chain_gha_argo_gitlab
+  Pipemaster.Chain.chain_gitlab_argo_tekton_drone_woodpecker
+  Pipemaster.Chain.cross_argo_gha
+  Pipemaster.Chain.cross_argo_gitlab
 )
 required_lean="$(printf '`%s, ' "${required[@]}")"
 required_lean="[${required_lean%, }]"

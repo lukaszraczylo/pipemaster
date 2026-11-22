@@ -717,6 +717,57 @@ def tektonAdapterCases : List (Json × Json) :=
       ("raw", coreJson (Tekton.rawTekton (Tekton.toTekton p))),
       ("core", coreJson (Tekton.fromTekton (Tekton.toTekton p) (Tekton.tektonMeta p)))])
 
+open Pipemaster.Argo in
+def argoDepJson : Argo.DepExpr → Json
+  | .atom t r => Json.mkObj [("atom", t), ("res", match r with | some x => Json.str x | none => Json.null)]
+  | .and l r => Json.mkObj [("and", Json.arr #[argoDepJson l, argoDepJson r])]
+  | .or l r => Json.mkObj [("or", Json.arr #[argoDepJson l, argoDepJson r])]
+  | .not x => Json.mkObj [("not", argoDepJson x)]
+
+open Pipemaster.Argo in
+def argoWaitJson : Argo.Wait → Json
+  | .deps l => Json.mkObj [("deps", strsJson l)]
+  | .depends d => Json.mkObj [("depends", argoDepJson d)]
+
+open Pipemaster.Argo in
+def argoStepJson (s : Argo.AStep) : Json :=
+  Json.mkObj [("name", s.name), ("disp", s.disp), ("script", strsJson s.script), ("env", varsJson s.env)]
+
+open Pipemaster.Argo in
+def argoTaskJson (t : Argo.ATask) : Json :=
+  Json.mkObj [("name", t.name), ("disp", t.disp), ("wait", argoWaitJson t.wait), ("retries", optNat t.retries),
+    ("timeout", Lean.toJson t.timeout), ("on_error", t.onError), ("failed_only", t.failedOnly),
+    ("steps", Json.arr (t.steps.map argoStepJson).toArray), ("noop", t.noop), ("job_env", varsJson t.jobEnv)]
+
+open Pipemaster.Argo in
+def argoDocJson (d : Argo.ADoc) : Json :=
+  Json.mkObj [("name", d.name), ("disp", d.disp), ("tasks", Json.arr (d.tasks.map argoTaskJson).toArray),
+    ("finally", Json.arr (d.fin.map argoTaskJson).toArray), ("trigs", Json.arr (d.trigs.map wpTrigJson).toArray)]
+
+/-- Pipelines that exercise what Argo adds to the Tekton set: job variables beside step variables, a finally job with
+needs (which the raw parse loses and the metadata restores), with and without needs on a main job, and a job named
+`main`-like or reserved-adjacent. -/
+def argoExtraPipes : List Core.Pipe :=
+  let two : List Core.Step := [cstep "s1" ["echo 1"], cstep "s2" ["echo 2"]]
+  [pushAll [{ cj "a" with env := [⟨"K", "v"⟩], steps := two }] [],
+   pushAll [{ cj "a" with env := [⟨"K", "v"⟩, ⟨"L", "w"⟩], steps := [{ cstep "s1" ["echo 1"] with env := [⟨"M", "x"⟩] }] }] [],
+   pushAll [{ cj "a" with env := [⟨"K", "v"⟩], steps := [] }] [],
+   pushAll [cj "a"] [{ cj "f" with needs := needOn "a" false }],
+   pushAll [cj "a"] [{ cj "f" with needs := needOn "a" false, onFailure := true }],
+   pushAll [cj "a", { cj "b" with needs := needOn "a" false }] [{ cj "f" with needs := needOn "a" false }],
+   pushAll [cj "a", { cj "b" with needs := needOn "a" false }] [{ cj "f" with needs := needOn "b" false, onFailure := true }],
+   pushAll [{ cj "a" with retry := 2, timeout := 90, allowFailure := true }] [],
+   pushAll [{ cj "a" with name := "Build" }] [{ cj "f" with name := "Notify", onFailure := true }]] ++ tekExtraPipes
+
+def argoPipes : List Core.Pipe :=
+  (allPipes ++ wpExtraPipes ++ argoExtraPipes).filter fun p => decide (Wf p ∧ Argo.ArgoOk p)
+
+def argoAdapterCases : List (Json × Json) :=
+  argoPipes.map fun p =>
+    (coreJson p, Json.mkObj [("argo", argoDocJson (Argo.toArgo p)),
+      ("raw", coreJson (Argo.rawArgo (Argo.toArgo p))),
+      ("core", coreJson (Argo.fromArgo (Argo.toArgo p) (Argo.argoMeta p)))])
+
 def crossAdapterCases : List (Json × Json) :=
   ghaPipes.map fun p =>
     let viaGitlab := Gha.fromGha (Gha.toGha (Gitlab.fromGitlab (Gitlab.toGitlab p) (Gitlab.gitlabMeta p)))
@@ -725,7 +776,7 @@ def crossAdapterCases : List (Json × Json) :=
 
 /-! ## Chain vectors (Task 9)
 
-Every ordered choice of three distinct providers over `chainAdapters` (120 over six): the first is the origin, the other
+Every ordered choice of three distinct providers over `chainAdapters` (336 over eight): the first is the origin, the other
 two are the hops. Each case holds the IR as the origin parsed it, the IR after each hop's parse
 with no metadata applied, and the IR after unwinding the stack. The pipelines are a reduced subset of `allPipes`
 that lie in the fragment of every adapter (`Chain.chainFrag_adapters_iff`, with `Chain.chainFrag_run` for the hops):
@@ -743,8 +794,9 @@ Bound: the number of ordered triples grows as n(n-1)(n-2), so at nine adapters (
 would give about 57 times 504 cases, near 57 MB. Each triple therefore takes at most `chainCaseCap / triples`
 pipelines (at least one), picked by `chainPick` so that the triples together still cover every pipeline. A case is
 about 2 KB (1990 bytes measured at four adapters), so the cap of 1400 cases keeps `chain.json` under 3 MB
-(at most 2.8 MB; at nine adapters the bound gives 2 pipelines per triple, 1008 cases, about 2.0 MB). At seven
-adapters (210 triples) the bound gives 6 pipelines per triple, 1260 cases. At four adapters the cap allows every
+(at most 2.8 MB; at nine adapters the bound gives 2 pipelines per triple, 1008 cases, about 2.0 MB). At eight
+adapters (336 triples) the bound gives 4 pipelines per triple, 1344 cases, 2.5 MB. At seven adapters (210 triples)
+the bound gives 6 pipelines per triple, 1260 cases. At four adapters the cap allows every
 pipeline. -/
 
 def chainCaseCap : Nat := 1400
@@ -759,11 +811,13 @@ def chainPipes : List Core.Pipe :=
 
 /-- The pipelines in the fragment of every adapter (decided once per pipeline). -/
 def chainFragPipes : List Core.Pipe :=
-  chainPipes.filter fun p => decide (RoundTrip.Both p ∧ (Wf p ∧ Woodpecker.WpOk p) ∧ Drone.DroneOk p ∧ Tekton.TekOk p)
+  chainPipes.filter fun p => decide (RoundTrip.Both p ∧ (Wf p ∧ Woodpecker.WpOk p) ∧ Drone.DroneOk p ∧ Tekton.TekOk p ∧
+      Argo.ArgoOk p ∧ Argo.FinDrop p)
 
 def chainAdapters : List (String × Chain.Adapter) :=
   [("gha", Chain.gha), ("gitea", Chain.gitea), ("forgejo", Chain.forgejo), ("gitlab", Chain.gitlab),
-   ("woodpecker", Chain.woodpecker), ("drone", Chain.drone), ("tekton", Chain.tekton)]
+   ("woodpecker", Chain.woodpecker), ("drone", Chain.drone), ("tekton", Chain.tekton),
+   ("argo", Chain.argo)]
 
 def chainTriples : List ((String × Chain.Adapter) × (String × Chain.Adapter) × (String × Chain.Adapter)) :=
   chainAdapters.flatMap fun a => chainAdapters.flatMap fun b => chainAdapters.flatMap fun c =>
@@ -812,6 +866,7 @@ def main (args : List String) : IO UInt32 := do
      ("woodpecker", "Pipemaster.Woodpecker.woodpecker_from_to", fun _ => GenVectors.woodpeckerAdapterCases),
      ("drone", "Pipemaster.Drone.drone_from_to", fun _ => GenVectors.droneAdapterCases),
      ("tekton", "Pipemaster.Tekton.tekton_from_to", fun _ => GenVectors.tektonAdapterCases),
+     ("argo", "Pipemaster.Argo.argo_from_to", fun _ => GenVectors.argoAdapterCases),
      ("cross", "Pipemaster.RoundTrip.cross_roundtrip", fun _ => GenVectors.crossAdapterCases),
      ("chain", "Pipemaster.Chain.chain_roundtrip", fun _ => GenVectors.chainCases)]
   for (name, thm, mk) in files do
