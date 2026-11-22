@@ -213,7 +213,8 @@ func (c *plCtx) foldGates(calls []*call, jobs []*ir.Job) []*ir.Job {
 		for _, n := range j.Needs {
 			dependents[n.JobID]++
 		}
-		expr.NeedRefs(j.If, func(id string) { read[id] = true })
+		rest, _ := stripGateOK(j.If, gates)
+		expr.NeedRefs(rest, func(id string) { read[id] = true })
 	}
 	fold := map[string]*ir.Job{}
 	for _, j := range jobs {
@@ -237,9 +238,10 @@ func (c *plCtx) foldGates(calls []*call, jobs []*ir.Job) []*ir.Job {
 				continue
 			}
 			j.Manual = true
+			j.If, _ = stripGateOK(j.If, fold)
 			for _, g := range expandGate(n.JobID, fold) {
 				seen = append(seen, c.gateExt(gates[g]))
-				j.If = andExpr(fold[g].If, j.If)
+				j.If = andMissing(fold[g].If, j.If)
 			}
 			for _, dn := range gateNeeds(n.JobID, fold) {
 				needs = appendNeed(needs, dn)
@@ -306,4 +308,48 @@ func gateEntry(c *plCtx, j *ir.Job, cl *call) report.Entry {
 		IRPath: c.k.Path + "/job/" + j.ID, Feature: caps.JobManual, Level: caps.Lost, Strategy: c.k.Strategy(), SourceLoc: c.k.Loc(cl.m.Lines["name"]),
 		Detail: "task " + cl.name + " is a suspend template; job " + j.ID + " is manual and the suspend task is kept in Ext",
 	}
+}
+
+// stripGateOK removes the conjuncts `needs.<gate>.result == "success"` that the emitter writes to make a job wait
+// for its gate, and returns the rest. The result is nil when nothing remains.
+func stripGateOK[V any](e expr.Expr, gates map[string]V) (expr.Expr, bool) {
+	if e == nil {
+		return nil, false
+	}
+	var rest expr.Expr
+	var cut bool
+	for _, cj := range conjuncts(e) {
+		if b, ok := cj.(expr.Binary); ok && b.Op == expr.OpEq {
+			r, isRef := b.L.(expr.Ref)
+			l, isLit := b.R.(expr.Lit)
+			if isRef && isLit && len(r.Path) == 3 && r.Path[0] == expr.PrefixNeeds && r.Path[2] == "result" && l.Kind == expr.LitStr && l.Str == resultOf[atomSucceeded] {
+				if _, isGate := gates[r.Path[1]]; isGate {
+					cut = true
+					continue
+				}
+			}
+		}
+		rest = andExpr(rest, cj)
+	}
+	return rest, cut
+}
+
+// andMissing puts the conjuncts of l that r lacks in front of r.
+func andMissing(l, r expr.Expr) expr.Expr {
+	if l == nil {
+		return r
+	}
+	have := map[string]bool{}
+	if r != nil {
+		for _, cj := range conjuncts(r) {
+			have[expr.String(cj)] = true
+		}
+	}
+	var out expr.Expr
+	for _, cj := range conjuncts(l) {
+		if !have[expr.String(cj)] {
+			out = andExpr(out, cj)
+		}
+	}
+	return andExpr(out, r)
 }

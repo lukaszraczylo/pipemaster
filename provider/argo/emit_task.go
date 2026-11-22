@@ -151,6 +151,9 @@ func (e *emitter) gateTasks(tc *jobCtx, d deps, jx map[string]any, out *jobOut) 
 	}
 	deps := d
 	deps.depends = ""
+	if d.depends != "" {
+		deps.depends = gates[0].task + "." + atomSucceeded + " && (" + d.depends + ")"
+	}
 	for i, g := range gates {
 		t := newMap()
 		t.SetStr("name", g.task)
@@ -322,4 +325,37 @@ func nodeName(n *yaml.Node) string {
 		}
 	}
 	return ""
+}
+
+// uniformDepends rewrites the dependencies of a DAG as depends text when any task of the DAG has depends, because
+// Argo rejects a DAG that uses both. A plain need stays Succeeded only, as withDepends writes it.
+func uniformDepends(tasks []*yaml.Node) {
+	if !slices.ContainsFunc(tasks, func(n *yaml.Node) bool { return mapValue(n, "depends") != nil }) {
+		return
+	}
+	for _, n := range tasks {
+		seq := mapValue(n, "dependencies")
+		if seq == nil {
+			continue
+		}
+		var atoms []string
+		for _, c := range seq.Content {
+			atoms = append(atoms, c.Value+"."+atomSucceeded)
+		}
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			if n.Content[i].Value == "dependencies" {
+				n.Content[i].Value = "depends"
+				n.Content[i+1] = &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: strings.Join(atoms, " && ")}
+			}
+		}
+	}
+}
+
+func mapValue(n *yaml.Node, key string) *yaml.Node {
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		if n.Content[i].Value == key {
+			return n.Content[i+1]
+		}
+	}
+	return nil
 }

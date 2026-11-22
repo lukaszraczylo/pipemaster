@@ -100,6 +100,8 @@ func (e *emitter) pipelineDoc(pp *plan) error {
 		}
 		spec.Set("hooks", hooks.N)
 	}
+	uniformDepends(tasks)
+	uniformDepends(exits)
 	all := []*yaml.Node{dagTemplate(px, entryTemplate, "entrypoint_", tasks, true)}
 	if len(exits) > 0 {
 		all = append(all, dagTemplate(px, exitTemplate, "exit_", exits, false))

@@ -40,14 +40,14 @@ func TestNeedsOutputUsesDefault(t *testing.T) {
 	}
 }
 
-func TestPlainNeedUsesDependenciesAndStatusUsesDepends(t *testing.T) {
+func TestPlainNeedJoinsTheDependsOfADAGThatHasStatus(t *testing.T) {
 	a, b, c := scriptJob("a", "x"), scriptJob("b", "x"), scriptJob("c", "x")
 	b.Needs = []ir.Need{{JobID: "a"}}
 	c.Needs = []ir.Need{{JobID: "a"}}
 	c.If = eqStr([]string{"needs", "a", "result"}, "failure")
 	files, _ := emit(t, project(a, b, c))
 	ts := tasks(t, template(t, files))
-	if tb := named(t, ts, "b"); tb["depends"] != nil || len(list(tb["dependencies"])) != 1 {
+	if tb := named(t, ts, "b"); tb["depends"] != "a.Succeeded" || tb["dependencies"] != nil {
 		t.Errorf("b = %v", tb)
 	}
 	tc := named(t, ts, "c")
