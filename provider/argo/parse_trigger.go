@@ -55,7 +55,7 @@ func (p *project) cronTriggers(byName map[string]*ir.Pipeline, byCron map[*rawDo
 			cw["metadata"] = plain(rest)
 			k.Note(caps.TriggerSchedule, "CronWorkflow "+name+": metadata has no IR field; kept in Ext", d.Line)
 		}
-		suspended := p.cronKeys(k, cw, spec, inline)
+		suspended := p.cronKeys(k, cw, spec, inline || isEmittedCronSpec(wspec))
 		for i, cron := range crons {
 			tr := ir.Trigger{Kind: ir.TriggerSchedule, Cron: cron}
 			if suspended {
@@ -73,6 +73,13 @@ func (p *project) cronTriggers(byName map[string]*ir.Pipeline, byCron map[*rawDo
 			})
 		}
 	}
+}
+
+// isEmittedCronSpec is true when a workflowSpec is the one that the emitter writes for a pipeline: the template
+// reference and the service account, and nothing else. The reference has already found the pipeline.
+func isEmittedCronSpec(ws *omap) bool {
+	sa, _ := text(valueOf(ws, "serviceAccountName"))
+	return ws != nil && len(ws.Order) == 2 && refName(ws) != "" && sa == workflowSA
 }
 
 // schedulesOf reads schedules, or the legacy schedule.
