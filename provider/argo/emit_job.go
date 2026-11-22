@@ -615,6 +615,8 @@ var _ = slices.Contains[[]string]
 type serviceArg struct {
 	Ports      []string `json:"ports,omitempty"`
 	Entrypoint []string `json:"entrypoint,omitempty"`
+	// Image is the image reference that the sidecar was written with.
+	Image string `json:"image,omitempty"`
 }
 
 func (e *emitter) markService(path string, sv ir.Service) {
@@ -623,7 +625,7 @@ func (e *emitter) markService(path string, sv ir.Service) {
 		a.Ports = sv.Ports
 	}
 	if len(sv.Image.Entrypoint) > 0 {
-		a.Entrypoint = sv.Image.Entrypoint
+		a.Entrypoint, a.Image = sv.Image.Entrypoint, sv.Image.Ref
 		e.lose(path, caps.JobServices, "the entrypoint of service "+sv.Name+" has no Argo form; the sidecar runs the image entrypoint")
 	}
 	if a.Ports == nil && a.Entrypoint == nil {

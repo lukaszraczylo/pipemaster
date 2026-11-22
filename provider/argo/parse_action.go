@@ -212,7 +212,7 @@ func (c *plCtx) placeholderMarker(pl *ir.Pipeline) {
 }
 
 // serviceMarker gives a sidecar back the host ports and the entrypoint that the marker holds. The ports come back
-// only when the containerPorts are the ones that the emitter wrote.
+// only when the containerPorts are the ones that the emitter wrote, and the entrypoint only when the image is.
 func (b *jobBuilder) serviceMarker(sv *ir.Service) {
 	var a serviceArg
 	path := b.path + "/service/" + sv.Name
@@ -229,6 +229,13 @@ func (b *jobBuilder) serviceMarker(sv *ir.Service) {
 		} else {
 			b.c.ignored(path, caps.JobServices, "the service ports were edited after pipemaster wrote them")
 		}
+	}
+	if len(a.Entrypoint) == 0 {
+		return
+	}
+	if sv.Image.Ref != a.Image {
+		b.c.ignored(path, caps.JobServices, "the service image was edited after pipemaster wrote the file; the file content is kept")
+		return
 	}
 	sv.Image.Entrypoint = a.Entrypoint
 }
