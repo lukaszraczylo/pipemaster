@@ -303,21 +303,21 @@ func (tc *taskCtx) text(sc *stepScope, path string, f caps.Feature, m textMode, 
 	return out, len(lost) == 0, nil
 }
 
-// scriptLine converts one script line. A line with an expression that has no spelling is commented out whole,
-// because dropping the part could change what the command does.
-func (tc *taskCtx) scriptLine(sc *stepScope, path, s string) (string, error) {
+// scriptLine converts one script line. why is empty when the line stays; otherwise it names the expressions that
+// have no spelling, and the caller comments out the whole statement around the line, because dropping the part
+// could change what the command does.
+func (tc *taskCtx) scriptLine(sc *stepScope, path, s string) (out, why string, err error) {
 	parts, err := partsOf(s)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	held := sc.snapshot()
 	out, lost := tc.convert(sc, path, scriptText, parts)
 	if len(lost) == 0 {
-		return out, nil
+		return out, "", nil
 	}
 	sc.restore(held)
-	tc.e.lose(path, caps.ScriptInterpolation, "no Tekton spelling for expression "+strings.Join(lost, ", ")+"; the line is commented out")
-	return "# pipemaster:lost script.interpolation: " + commentSafe(s), nil
+	return "", "no Tekton spelling for expression " + strings.Join(lost, ", "), nil
 }
 
 // valueNode renders an env value. A secret or vars reference becomes a valueFrom entry. nil means the value was lost.

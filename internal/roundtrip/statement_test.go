@@ -4,6 +4,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/provider"
 )
 
@@ -47,6 +48,48 @@ func TestUntranslatableLineLeavesValidShell(t *testing.T) {
 				t.Fatal(err)
 			}
 			checkShellSyntax(t, target, files)
+		})
+	}
+}
+
+const unspellableWorkflow = `name: ci
+on: push
+jobs:
+  k:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo start
+          if [ "${{ hashFiles('**/go.sum') }}" = x ]; then
+            echo y
+            exit 1
+          fi
+          echo done
+`
+
+// An expression with no spelling in any target must leave valid shell, in Tekton too.
+func TestUnspellableExpressionLeavesValidShell(t *testing.T) {
+	src := fstest.MapFS{".github/workflows/ci.yml": {Data: []byte(unspellableWorkflow)}}
+	p, _, err := prov(t, provider.GHA).Parse(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []string{provider.Woodpecker, provider.Drone, provider.GitLab, provider.Tekton} {
+		t.Run(target, func(t *testing.T) {
+			files, rep, err := prov(t, target).Emit(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			checkShellSyntax(t, target, files)
+			n := 0
+			for _, e := range rep.Entries {
+				if e.Feature == caps.ScriptInterpolation {
+					n++
+				}
+			}
+			if n != 1 {
+				t.Errorf("want one script.interpolation entry for the commented statement, got %d", n)
+			}
 		})
 	}
 }

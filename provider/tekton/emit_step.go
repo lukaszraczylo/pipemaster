@@ -12,6 +12,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -176,17 +177,30 @@ func (tc *taskCtx) stepExt(m *wmap, st *ir.Step) error {
 	return nil
 }
 
-// scriptLines converts the script of a step.
+// scriptLines converts the script of a step. A line with no spelling is commented out with the rest of its
+// statement, line by line, so the lines that stay are valid shell.
 func (tc *taskCtx) scriptLines(sc *stepScope, st *ir.Step, sp string) ([]string, error) {
-	var lines []string
-	for _, l := range st.Script {
-		out, err := tc.scriptLine(sc, sp, l)
-		if err != nil {
+	outs := make([]string, len(st.Script))
+	why := make([]string, len(st.Script))
+	lost := make([]bool, len(st.Script))
+	for i, l := range st.Script {
+		var err error
+		if outs[i], why[i], err = tc.scriptLine(sc, sp, l); err != nil {
 			return nil, err
 		}
-		lines = append(lines, out)
+		lost[i] = why[i] != ""
 	}
-	return lines, nil
+	for _, span := range emitkit.CommentSpans(st.Script, lost) {
+		first := ""
+		for i := span.From; i <= span.To; i++ {
+			outs[i] = "# pipemaster:lost script.interpolation: " + commentSafe(st.Script[i])
+			if first == "" {
+				first = why[i]
+			}
+		}
+		tc.e.lose(sp, caps.ScriptInterpolation, emitkit.SpanDetail(first, span.To-span.From+1, span.Open))
+	}
+	return outs, nil
 }
 
 // stepImage picks the image of a step: its own, the one a setup action chose, or the default. The job
