@@ -23,6 +23,9 @@ const (
 
 var osArch = regexp.MustCompile(osArchLabel)
 
+// placeholderStepID is the step ID that every provider reports for the step it adds to a job without steps.
+const placeholderStepID = "script"
+
 // jobSkip lists the job Ext keys that the emitter writes through its own code.
 var jobSkip = map[string]bool{
 	ExtImplicitNeeds: true, ExtDepends: true, ExtGates: true, ExtArguments: true, keyInputs: true, keyOutputs: true,
@@ -274,6 +277,9 @@ func (e *emitter) containerTemplate(tc *jobCtx, tm *wmap, conts []*container, jx
 		c.m.Set("args", seqOf(str("true")))
 		c.m.SetStr("workingDir", workspaceMount)
 		conts = append(conts, c)
+		if len(tc.jp.j.Steps) == 0 {
+			e.lose(path+"/step/"+placeholderStepID, caps.StepScript, "the job has no steps; a no-op container keeps the template valid")
+		}
 		e.emulate(path, caps.StepScript, "no-op container", "the job runs no script, so a container named main carries its inputs and outputs")
 		if err := e.markArg(caps.StepScript, path, struct{}{}); err != nil {
 			e.lose(path, caps.StepScript, "the no-op marker cannot be written: "+err.Error())
