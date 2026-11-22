@@ -1,16 +1,13 @@
 package concourse
 
 import (
-	"errors"
 	"io/fs"
 	"path"
 	"sort"
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
-	"github.com/lukaszraczylo/pipemaster/report"
 	"github.com/lukaszraczylo/pipemaster/validate"
 	"github.com/lukaszraczylo/pipemaster/validate/schemas"
 )
@@ -23,9 +20,6 @@ const (
 	keyPlan = "plan"
 )
 
-// ErrNoEmitter means the provider reads pipelines but does not write them yet.
-var ErrNoEmitter = errors.New("concourse: no emitter")
-
 type adapter struct{}
 
 // New returns the Concourse provider.
@@ -37,11 +31,6 @@ func init() {
 }
 
 func (adapter) ID() string { return dialect }
-
-// Emit is not available yet.
-func (adapter) Emit(*ir.Project) (map[string][]byte, *report.Report, error) {
-	return nil, nil, ErrNoEmitter
-}
 
 // SourceFiles lists the YAML files under .concourse/ that Parse reads, in path order.
 func (adapter) SourceFiles(fsys fs.FS) ([]string, error) { return yamlFiles(fsys) }

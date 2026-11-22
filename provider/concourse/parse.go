@@ -20,6 +20,7 @@ var knownTop = []string{ExtResourceTypes, ExtVarSources, ExtGroups, ExtDisplay, 
 type srcFile struct {
 	top  *omap
 	name string
+	data []byte
 }
 
 // Parse reads the YAML files under .concourse/ into one pipeline per file that has a jobs list.
@@ -36,14 +37,14 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	others := map[string]any{}
 	var otherNames []string
 	for _, f := range files {
-		top, err := readFile(fsys, f, rep)
+		top, data, err := readFile(fsys, f, rep)
 		if err != nil {
 			return nil, nil, err
 		}
 		switch {
 		case top == nil:
 		case isPipeline(top):
-			pipes = append(pipes, srcFile{name: f, top: top})
+			pipes = append(pipes, srcFile{name: f, top: top, data: data})
 		default:
 			others[f] = plain(top)
 			otherNames = append(otherNames, f)
@@ -60,7 +61,9 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 			return nil, nil, fmt.Errorf("concourse: %s and %s both name pipeline %q", prev, src.name, id)
 		}
 		byID[id] = src.name
-		pl, err := newPipelineBuilder(rep, src.name, id).build(src.top)
+		pb := newPipelineBuilder(rep, src.name, id)
+		pb.readMarks(src.data)
+		pl, err := pb.build(src.top)
 		if err != nil {
 			return nil, nil, fmt.Errorf("%s: %w", src.name, err)
 		}
@@ -76,22 +79,22 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 }
 
 // readFile decodes one file with the fly-compatible decoder; an empty file is nil. A document that is no mapping is an error.
-func readFile(fsys fs.FS, file string, rep *report.Report) (*omap, error) {
+func readFile(fsys fs.FS, file string, rep *report.Report) (*omap, []byte, error) {
 	data, err := fs.ReadFile(fsys, file)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	node, err := DecodeNode(data)
 	if errors.Is(err, ErrNoDocument) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", file, err)
+		return nil, nil, fmt.Errorf("%s: %w", file, err)
 	}
 	b := &ynode.Builder{}
 	v, err := b.Build(node, 0)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", file, err)
+		return nil, nil, fmt.Errorf("%s: %w", file, err)
 	}
 	for _, l := range b.Skipped {
 		rep.Add(report.Entry{
@@ -100,13 +103,13 @@ func readFile(fsys fs.FS, file string, rep *report.Report) (*omap, error) {
 		})
 	}
 	if sc, isScal := v.(ynode.Scal); v == nil || (isScal && sc.Null()) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	top, ok := asMap(v)
 	if !ok {
-		return nil, fmt.Errorf("%s: a Concourse file must be a mapping", file)
+		return nil, nil, fmt.Errorf("%s: a Concourse file must be a mapping", file)
 	}
-	return top, nil
+	return top, data, nil
 }
 
 func isPipeline(top *omap) bool {
@@ -141,6 +144,8 @@ func extMap(pl *ir.Pipeline) map[string]any {
 
 // pipeBuilder is the state of one pipeline file.
 type pipeBuilder struct {
+	marks    map[ir.FeatureUse][]string
+	bare     map[ir.FeatureUse]bool
 	rep      *report.Report
 	res      map[string]*resource
 	types    map[string]bool
@@ -173,6 +178,7 @@ func (b *pipeBuilder) build(top *omap) (*ir.Pipeline, error) {
 	pl := &ir.Pipeline{ID: b.id}
 	k := newSink(b.rep, b.file, b.path())
 	r := newReader(top)
+	b.pipelineName(pl)
 	jobs, _ := r.Take(keyJobs)
 	b.readResources(r)
 	b.readTypes(r)
@@ -194,6 +200,7 @@ func (b *pipeBuilder) build(top *omap) (*ir.Pipeline, error) {
 	}
 	b.triggers(pl, built)
 	b.concurrency(pl, built)
+	b.applyJobNames(pl)
 	b.keepResources(k)
 	for _, key := range knownTop {
 		if v, ok := r.Take(key); ok {

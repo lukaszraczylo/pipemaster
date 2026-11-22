@@ -295,6 +295,9 @@ var weekdays = map[string]string{"sunday": "0", "monday": "1", "tuesday": "2", "
 // timeTrigger reads the forms of a time resource that a cron line expresses: a fixed interval that divides the
 // hour or the day, and a day list with no window. The cron is approximate, so each use has a report entry.
 func (b *pipeBuilder) timeTrigger(r *resource) sourceTrigger {
+	if st, ok := b.scheduleMarker(r); ok {
+		return st
+	}
 	src := r.source()
 	var interval string
 	var days []string

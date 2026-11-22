@@ -53,15 +53,22 @@ func (b *pipeBuilder) job(m *omap) *builtJob {
 	bj := &builtJob{job: j}
 	plan, _ := r.Take(keyPlan)
 	steps, _ := plan.([]any)
+	steps = jb.allowFailure(steps)
 	steps = jb.unwrap(steps)
 	gets := jb.leadingGets(&steps)
+	steps, _ = jb.matrixMarker(steps)
+	if co := jb.checkoutMarker(gets); co != nil {
+		j.Steps = append(j.Steps, co)
+	}
 	for _, s := range steps {
 		j.Steps = append(j.Steps, jb.step(s)...)
 	}
+	jb.ifMarker()
 	jb.hooks(r)
 	b.collect(bj, plan, m)
 	jb.serial(r, bj)
 	jb.needs(bj, plan)
+	jb.gateMarker(bj)
 	if len(gets) > 0 {
 		jb.k.Out[ExtGets] = gets
 	}

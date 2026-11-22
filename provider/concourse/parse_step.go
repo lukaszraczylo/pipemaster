@@ -149,6 +149,7 @@ func (jb *jobBuilder) taskStep(m *omap) *ir.Step {
 		return jb.opaque(m, "task", "the task has no name or not exactly one of config and file", m.Lines["task"])
 	}
 	st := &ir.Step{ID: jb.uniqueID(name), Name: name}
+	written := st.ID
 	k := newSink(jb.k.Rep, jb.b.file, jb.path+"/step/"+st.ID)
 	r := newReader(m)
 	r.Take("task")
@@ -167,7 +168,20 @@ func (jb *jobBuilder) taskStep(m *omap) *ir.Step {
 	jb.env(st, k, cfgParams, r)
 	k.KeepRest(r)
 	st.Ext = k.Ext()
+	st = jb.heldAction(m, written, st)
+	if st.Kind == ir.StepScript {
+		jb.applyMarkers(st, written)
+	}
 	return st
+}
+
+// applyMarkers reads the markers of a task, which the emitter keyed by the written task name.
+func (jb *jobBuilder) applyMarkers(st *ir.Step, written string) {
+	st.ID = written
+	jb.guardLines(st)
+	jb.workdirMarker(st)
+	jb.secretMarker(st)
+	jb.nameMarker(st)
 }
 
 // config reads an inline task config into the step. It returns the config params, which the step env reads.
@@ -262,6 +276,10 @@ func (jb *jobBuilder) command(st *ir.Step, k *sink, cmd string, argv []string, l
 			st.Shell = cmd
 			for _, l := range strings.Split(strings.TrimSuffix(script, "\n"), "\n") {
 				st.Script = append(st.Script, escapeLine(l))
+			}
+			if cmd == shellCommand && len(flags) == 1 && flags[0] == defaultFlags {
+				st.Shell = ""
+				return
 			}
 			k.Out[ExtShellFlags] = plainStrings(flags)
 			k.Note(caps.StepShell, fmt.Sprintf("shell flags %v are kept in Ext; the IR holds the shell and the script", flags), line)

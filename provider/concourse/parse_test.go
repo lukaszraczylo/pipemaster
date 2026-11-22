@@ -60,13 +60,6 @@ func TestSourceFilesAndIDRules(t *testing.T) {
 	}
 }
 
-func TestEmitIsNotYetAvailable(t *testing.T) {
-	_, _, err := concourse.New().Emit(&ir.Project{})
-	if err == nil {
-		t.Fatalf("Emit err = %v", err)
-	}
-}
-
 func TestGitTrigger(t *testing.T) {
 	pl, _ := parseYAML(t, "resources:\n- name: repo\n  type: git\n  source:\n    uri: https://example.com/r.git\n    branch: main\n    paths: [src/**]\n    ignore_paths: [docs/**]\njobs:\n- name: build\n  plan:\n  - {get: repo, trigger: true}\n"+echoTask)
 	if len(pl.Triggers) != 1 {
