@@ -550,6 +550,11 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, r *reader) error {
 		}
 	}
 	st.Script = []string{strings.Join(words, " ")}
+	if strings.Contains(st.Script[0], "${{") {
+		// The emitter writes a line with a reference as a shell script, so the lists have no use in Ext.
+		k.Note(caps.StepScript, "command and args are written as one script line; the lists hold a reference and are not kept", 0)
+		return nil
+	}
 	k.Out[ExtScriptLine] = st.Script[0]
 	k.Out[ExtCommand] = plain(cmd)
 	k.Out[ExtArgs] = plain(args)
