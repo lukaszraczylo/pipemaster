@@ -331,6 +331,7 @@ func (e *emitter) finishStep(c *docCtx, sp string, st *ir.Step, name string, bod
 	}
 	if e.cut {
 		e.cut = false
+		e.lose(sp, caps.StepIf, "an image or workdir lost an expression, so the step is disabled")
 		e.comment("step " + sp + ": an image or workdir lost an expression, so the step is disabled")
 		n, err := condNode(disabledSet(), nil)
 		if err != nil {

@@ -193,6 +193,7 @@ func (e *emitter) finishStep(c *wfCtx, sp string, st *ir.Step, idx int, body *wm
 	}
 	if e.cut {
 		e.cut = false
+		e.lose(sp, caps.StepIf, "an image or workdir lost an expression, so the step is disabled")
 		e.comment("step " + sp + ": an image or workdir lost an expression, so the step is disabled")
 		m.set(keyWhen, whenNode(neverEntries(nil)))
 	} else if raw, ok := ext[keyWhen]; ok {
