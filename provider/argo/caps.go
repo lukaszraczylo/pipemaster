@@ -47,6 +47,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.PipelineConcurrency:    {Level: caps.Emulated, Strategy: "synchronization mutex", Caveat: "cancel-in-progress is lost; a second run waits for the mutex"},
 		caps.StepIf:                 {Level: caps.Emulated, Strategy: "guard in the script that reads context values from env", Caveat: "containerSet has no when, so every step condition runs as a shell guard that reads context values from env; a condition with no guard form disables the script and the container still starts; " + setOrder},
 		caps.StepContinueOnError:    {Level: caps.Emulated, Strategy: "script line trap 'exit 0' EXIT with a marker comment", Caveat: "containerSet has no continueOn and no depends; a container that exits non-zero stops its dependents, so the trap makes the exit code zero"},
+		caps.StepShell:              {Level: caps.Emulated, Strategy: "container command <shell> -ec", Caveat: "only bash, dash, zsh, ash and sh run as the container command, and the image must provide the shell; any other shell is lost and the script runs under sh"},
 		caps.StepAction:             {Level: caps.Emulated, Strategy: "container image per actions.Lookup verdict", Caveat: "unknown actions are lost"},
 		caps.ConfigName:             {Level: caps.Emulated, Strategy: "secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars", Caveat: "the Secret values and ConfigMap values are not written"},
 		caps.ProjectMultiPipeline:   {Level: caps.Emulated, Strategy: "one WorkflowTemplate per IR pipeline", Caveat: "each pipeline gets its own trigger"},
@@ -56,8 +57,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.JobEnvironment:         {Level: caps.Lost, Caveat: "Argo has no environment name or URL"},
 		caps.PipelinePermissions:    {Level: caps.Lost, Caveat: "permissions come from the ServiceAccount of the Workflow"},
 		caps.StepTimeout:            {Level: caps.Lost, Caveat: "containerSet has no timeout per container; the template timeout covers the whole job"},
-		caps.StepShell:              {Level: caps.Lost, Caveat: "a shell reaches Argo only through the container command"},
-		caps.TriggerPipelineDone:    {Level: caps.Lost, Caveat: "Argo has no pipeline-completion trigger"},
+				caps.TriggerPipelineDone:    {Level: caps.Lost, Caveat: "Argo has no pipeline-completion trigger"},
 		caps.TriggerResource:        {Level: caps.Lost, Caveat: "Argo has no resource trigger"},
 	} {
 		m[f] = s

@@ -20,18 +20,24 @@ const resultSink = "/dev/null"
 // NeutralizeResultWrite replaces the result file of a script line by the null device and reports the loss: the
 // job output that the line fed has no value in the target file.
 func NeutralizeResultWrite(lose func(path string, f caps.Feature, detail string), stepPath, line string) string {
+	return NeutralizeResultWriteWhy(lose, stepPath, line, "has no form in this target")
+}
+
+// NeutralizeResultWriteWhy is NeutralizeResultWrite with the reason, for a target that has job outputs of its own.
+// why completes the sentence "a Tekton result file ...".
+func NeutralizeResultWriteWhy(lose func(path string, f caps.Feature, detail string), stepPath, line, why string) string {
 	if !IsResultWrite(line) {
 		return line
 	}
-	loseResultWrite(lose, stepPath)
+	loseResultWrite(lose, stepPath, why)
 	return resultFileRE.ReplaceAllString(line, resultSink)
 }
 
-func loseResultWrite(lose func(path string, f caps.Feature, detail string), stepPath string) {
-	lose(stepPath, caps.StepScript, "the line writes a Tekton result file, which has no form in this target; the write goes to "+resultSink)
+func loseResultWrite(lose func(path string, f caps.Feature, detail string), stepPath, why string) {
+	lose(stepPath, caps.StepScript, "the line writes a Tekton result file, which "+why+"; the write goes to "+resultSink)
 	jobPath := stepPath
 	if i := strings.LastIndex(stepPath, "/step/"); i >= 0 {
 		jobPath = stepPath[:i]
 	}
-	lose(jobPath, caps.JobOutputs, "a Tekton result is written by a script line, which has no form in this target; the output has no value")
+	lose(jobPath, caps.JobOutputs, "a Tekton result is written by a script line, which "+why+"; the output has no value")
 }

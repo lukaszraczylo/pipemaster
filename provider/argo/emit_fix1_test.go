@@ -358,3 +358,44 @@ func TestEditedGateKeepsTheFileAndReportsTheMarker(t *testing.T) {
 		}
 	}
 }
+
+func shellJob(shell string) *ir.Job {
+	j := scriptJob("build", "diff <(echo a) <(echo b)")
+	j.Steps[0].Shell = shell
+	return j
+}
+
+func TestBashShellRunsAsTheContainerCommand(t *testing.T) {
+	p := project(shellJob("bash"))
+	files, rep := emit(t, p)
+	text := files[".argo/workflows/ci.yaml"]
+	if !strings.Contains(text, "- bash\n") || strings.Contains(text, "- sh\n") {
+		t.Errorf("the container does not run bash:\n%s", text)
+	}
+	if len(entries(rep, "provide bash")) == 0 {
+		t.Errorf("no entry says that the image must provide bash: %v", rep.Entries)
+	}
+	back := roundTrip(t, files)
+	if got := back.Pipelines[0].Jobs[0].Steps[0].Shell; got != "bash" {
+		t.Errorf("shell after the trip = %q", got)
+	}
+}
+
+func TestOtherShellsAreReportedNotChangedSilently(t *testing.T) {
+	_, rep := emit(t, project(shellJob("pwsh")))
+	if len(entries(rep, "pwsh")) == 0 {
+		t.Errorf("no entry for the pwsh shell: %v", rep.Entries)
+	}
+}
+
+func TestResultWriteWordingNamesArgoOutputFiles(t *testing.T) {
+	_, rep := emit(t, project(scriptJob("build", "echo hi | tee $(results.x.path)")))
+	for _, e := range rep.Entries {
+		if strings.Contains(e.Detail, "no form in this target") {
+			t.Errorf("the entry names no Argo output file: %s", e.Detail)
+		}
+	}
+	if len(entries(rep, "/workspace/.pipemaster/outputs")) == 0 {
+		t.Errorf("no entry names the Argo output directory: %v", rep.Entries)
+	}
+}

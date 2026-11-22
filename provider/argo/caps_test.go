@@ -22,12 +22,12 @@ func TestCapsLedger(t *testing.T) {
 			caps.TriggerPush, caps.TriggerPullRequest, caps.TriggerTag, caps.TriggerFilterBranch,
 			caps.TriggerFilterTags, caps.TriggerAPI, caps.JobMatrix, caps.JobServices, caps.JobCache,
 			caps.JobEnv, caps.PipelineEnv, caps.PipelineConcurrency, caps.StepIf, caps.StepContinueOnError,
-			caps.StepAction, caps.ConfigName, caps.ProjectMultiPipeline,
+			caps.StepAction, caps.StepShell, caps.ConfigName, caps.ProjectMultiPipeline,
 		},
 		caps.External: {caps.TriggerManual},
 		caps.Lost: {
 			caps.TriggerFilterPaths, caps.JobRunner, caps.JobEnvironment, caps.PipelinePermissions,
-			caps.StepTimeout, caps.StepShell, caps.TriggerPipelineDone, caps.TriggerResource,
+			caps.StepTimeout, caps.TriggerPipelineDone, caps.TriggerResource,
 		},
 	}
 	seen := map[caps.Feature]bool{}

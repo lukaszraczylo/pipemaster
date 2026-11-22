@@ -281,7 +281,7 @@ func (tc *jobCtx) convert(sc *stepScope, m textMode, parts []expr.Part) (out str
 // scriptLine converts one script line. why is empty when the line stays; otherwise the caller comments out the
 // whole statement around the line, because dropping the part could change what the command does.
 func (tc *jobCtx) scriptLine(sc *stepScope, path, s string) (out, why string, err error) {
-	s = emitkit.NeutralizeResultWrite(tc.e.lose, path, s)
+	s = emitkit.NeutralizeResultWriteWhy(tc.e.lose, path, s, "Argo does not read; it loads an output from a file under "+outputsDir)
 	parts, err := expr.ParseScriptTemplate(s)
 	if err != nil {
 		return "", "", err

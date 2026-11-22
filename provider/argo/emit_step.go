@@ -2,6 +2,7 @@ package argo
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -131,7 +132,7 @@ func (sx *stepCtx) containerFor(st *ir.Step, name string, last bool, jx map[stri
 			}
 		}
 	} else {
-		c.m.Set("command", strSeq([]string{shellCommand, shellFlags}))
+		c.m.Set("command", strSeq([]string{sx.shellOf(st, path), shellFlags}))
 		c.m.Set("args", seqOf(block(strings.Join(script, "\n"))))
 	}
 	workdir := workspaceMount
@@ -396,4 +397,21 @@ func actionRef(a *ir.ActionRef) string {
 		s += "@" + a.Ref
 	}
 	return s
+}
+
+// posixShells are the shells that run a script with -ec as the container command.
+var posixShells = []string{"bash", "dash", "zsh", "ash"}
+
+// shellOf picks the container command for the shell of a step. A shell with no -ec form stays sh and is reported.
+func (sx *stepCtx) shellOf(st *ir.Step, path string) string {
+	sh := strings.TrimSpace(st.Shell)
+	switch {
+	case sh == "" || sh == shellCommand:
+		return shellCommand
+	case slices.Contains(posixShells, sh):
+		sx.tc.e.emulate(path, caps.StepShell, "container command "+sh+" -ec", "the container runs "+sh+" -ec, so the image must provide "+sh)
+		return sh
+	}
+	sx.tc.e.lose(path, caps.StepShell, "the shell "+sh+" has no container command form; the script runs under "+shellCommand+" -ec")
+	return shellCommand
 }

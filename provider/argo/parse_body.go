@@ -3,6 +3,7 @@ package argo
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -468,8 +469,11 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, r *reader) error {
 	if !hasCmd && !hasArgs {
 		return nil
 	}
-	if lines, ok := b.shellScript(cmd, args); ok {
+	if lines, shell, ok := b.shellScript(cmd, args); ok {
 		st.Script = lines
+		if shell != shellCommand {
+			st.Shell = shell
+		}
 		return nil
 	}
 	var words []string
@@ -497,22 +501,21 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, r *reader) error {
 	return nil
 }
 
-// shellScript reads command [sh, -ec] with one argument as the script lines that the emitter writes.
-func (b *jobBuilder) shellScript(cmd, args any) ([]string, bool) {
+// shellScript reads command [shell, -ec] with one argument as the script lines that the emitter writes.
+func (b *jobBuilder) shellScript(cmd, args any) (lines []string, shell string, ok bool) {
 	c, okC := textList(cmd)
 	a, okA := textList(args)
-	if !okC || !okA || len(c) != 2 || c[0] != shellCommand || c[1] != shellFlags || len(a) != 1 {
-		return nil, false
+	if !okC || !okA || len(c) != 2 || (c[0] != shellCommand && !slices.Contains(posixShells, c[0])) || c[1] != shellFlags || len(a) != 1 {
+		return nil, "", false
 	}
-	var lines []string
 	for _, l := range strings.Split(strings.TrimSuffix(a[0], "\n"), "\n") {
 		tl, err := b.tx.template(l)
 		if err != nil {
-			return nil, false
+			return nil, "", false
 		}
 		lines = append(lines, tl)
 	}
-	return lines, true
+	return lines, c[0], true
 }
 
 // node is one container of a containerSet.
