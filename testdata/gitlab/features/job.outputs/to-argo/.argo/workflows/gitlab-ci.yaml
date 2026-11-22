@@ -29,8 +29,8 @@ spec:
               - -ec
             args:
               - |-
-                make version
                 mkdir -p /workspace/.pipemaster/outputs && printf '%s' "${PM_OUT_TAG}" > /workspace/.pipemaster/outputs/tag
+                make version
             workingDir: /workspace
             env:
               - name: PM_OUT_TAG

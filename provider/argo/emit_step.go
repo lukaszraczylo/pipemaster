@@ -126,12 +126,13 @@ func (sx *stepCtx) containerFor(st *ir.Step, name string, last bool, jx map[stri
 	c.m.SetStr("image", c.image)
 	script := tc.stepScripts(sc, path, st)
 	script = sx.guarded(sc, path, st, script)
+	if last {
+		// The writers come first, so a false guard, a disabled step or a failed command that continues cannot skip them.
+		script = append(tc.outputWriters(sc, path), script...)
+	}
 	if st.ContinueOnError {
 		script = append([]string{continueTrap}, script...)
 		e.emulate(path, caps.StepContinueOnError, "trap on exit", "the script ends with exit status 0, so a failure does not stop the containers that depend on it")
-	}
-	if last {
-		script = append(script, tc.outputWriters(sc, path)...)
 	}
 	if line, ok := sx0[ExtScriptLine].(string); ok && strings.Join(st.Script, "\n") == line && !st.ContinueOnError && st.If == nil && !strings.Contains(line, "${{") {
 		c.own = true

@@ -51,8 +51,8 @@ spec:
               - -ec
             args:
               - |-
-                make
                 mkdir -p /workspace/.pipemaster/outputs && printf '%s' "${PM_OUT_VER}" > /workspace/.pipemaster/outputs/ver
+                make
             workingDir: /workspace
             env:
               - name: PM_OUT_VER

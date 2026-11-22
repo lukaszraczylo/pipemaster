@@ -17,7 +17,7 @@ type varsArg struct {
 }
 
 // collapseSteps puts back what the emitter wrote around the user script: the continue-on-error trap, the
-// condition guard, the shell variables that stand for expressions and the output epilogue.
+// condition guard, the shell variables that stand for expressions and the output writers.
 func (b *jobBuilder) collapseSteps() {
 	var va varsArg
 	hasVars := markerArg(b.c.src.doc.Head, b.path, caps.ScriptInterpolation, &va)
@@ -28,13 +28,15 @@ func (b *jobBuilder) collapseSteps() {
 		if st.Script[0] == continueTrap {
 			st.ContinueOnError, st.Script = true, st.Script[1:]
 		}
+		if st == b.job.Steps[len(b.job.Steps)-1] {
+			b.outputValues(st)
+		}
 		drop := b.guard(st)
 		if hasVars {
 			drop = append(drop, b.scriptVars(st, va.Vars)...)
 		}
 		removeEnv(st, drop)
 	}
-	b.outputValues()
 }
 
 // guard moves a leading guard line into the step condition. It returns the env entries that only the guard read.
@@ -138,18 +140,13 @@ func (b *jobBuilder) scriptVars(st *ir.Step, vars map[string]string) []string {
 	return drop
 }
 
-// outputValues reads the epilogue that writes the value of a job output.
-func (b *jobBuilder) outputValues() {
-	if len(b.job.Steps) == 0 {
-		return
-	}
-	st := b.job.Steps[len(b.job.Steps)-1]
-	// The epilogue lines follow the order of the outputs, so the last output owns the last line.
-	for i := len(b.job.Outputs) - 1; i >= 0; i-- {
+// outputValues reads the lines that open the last step and write the value of each job output. They come before
+// the guard, so a skipped step still publishes the outputs.
+func (b *jobBuilder) outputValues(st *ir.Step) {
+	// The lines follow the order of the outputs, so the first output owns the first line.
+	for i := range b.job.Outputs {
 		o := &b.job.Outputs[i]
-		line := outputEpilogue(o.Name)
-		n := len(st.Script)
-		if n == 0 || st.Script[n-1] != line {
+		if len(st.Script) == 0 || st.Script[0] != outputEpilogue(o.Name) {
 			continue
 		}
 		env := outputEnv(o.Name)
@@ -157,7 +154,7 @@ func (b *jobBuilder) outputValues() {
 			if text, ok := outputText(v.Value); v.Name == env && ok {
 				o.Value = text
 				st.Env = append(st.Env[:j], st.Env[j+1:]...)
-				st.Script = st.Script[:n-1]
+				st.Script = st.Script[1:]
 				break
 			}
 		}
