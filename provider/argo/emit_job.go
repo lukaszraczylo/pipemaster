@@ -146,7 +146,11 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (jobOut, error) {
 	e.markJobEnv(j, jp.path)
 	e.markOutputs(j, jp.path)
 	e.markCache(j, jp.path)
-	e.markContainer(j, jp.path)
+	written := imageRef(j.Container)
+	if len(conts) > 0 {
+		written = conts[0].image
+	}
+	e.markContainer(j, jp.path, written, sx.image != "")
 	e.markArtifacts(j, jp.path)
 	if len(tc.vars) > 0 {
 		if err := e.markArg(caps.ScriptInterpolation, jp.path, varsArg{Vars: tc.vars}); err != nil {

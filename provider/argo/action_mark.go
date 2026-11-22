@@ -162,6 +162,8 @@ func (e *emitter) markDisabled(j *ir.Job, path string) {
 // containerArg holds the job image with the entrypoint that the file cannot carry.
 type containerArg struct {
 	Image string `json:"image"`
+	// Written is the image that the first container of the file got.
+	Written string `json:"written,omitempty"`
 }
 
 // canonJSON is the one-line text that two equal values share, whatever the key order.
@@ -181,14 +183,18 @@ func nodeCanon(n *yaml.Node) string {
 	return canonJSON(v)
 }
 
-func (e *emitter) markContainer(j *ir.Job, path string) {
-	if j.Container == nil || len(j.Container.Entrypoint) == 0 {
+// markContainer holds the job image when the file cannot: its entrypoint has no Argo form, or a setup action
+// gave the containers another image.
+func (e *emitter) markContainer(j *ir.Job, path, written string, replaced bool) {
+	if j.Container == nil || (len(j.Container.Entrypoint) == 0 && !replaced) {
 		return
 	}
-	e.lose(path, caps.JobContainer, "the entrypoint of the job image has no Argo form; the containers run sh -ec")
+	if len(j.Container.Entrypoint) > 0 {
+		e.lose(path, caps.JobContainer, "the entrypoint of the job image has no Argo form; the containers run sh -ec")
+	}
 	body, err := carryYAML(j.Container)
 	if err == nil {
-		err = e.markArg(caps.JobContainer, path, containerArg{Image: body})
+		err = e.markArg(caps.JobContainer, path, containerArg{Image: body, Written: written})
 	}
 	if err != nil {
 		e.lose(path, caps.JobContainer, "the image marker cannot be written: "+err.Error())

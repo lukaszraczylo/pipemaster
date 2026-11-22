@@ -130,12 +130,14 @@ func (b *jobBuilder) hasImage(ref string) bool {
 	return slices.ContainsFunc(b.job.Steps, func(st *ir.Step) bool { return st.Image != nil && st.Image.Ref == ref })
 }
 
-// dropImage clears the image that a setup action gave to the containers after it.
+// dropImage clears the image that a setup action gave to the containers after it. A job image that the marker holds
+// comes back from the marker.
 func (b *jobBuilder) dropImage(ref string) {
 	if ref == "" {
 		return
 	}
-	if c := b.job.Container; c != nil && c.Ref == ref && len(c.Entrypoint) == 0 {
+	var own containerArg
+	if c := b.job.Container; c != nil && c.Ref == ref && len(c.Entrypoint) == 0 && !markerArg(b.c.src.doc.Head, b.path, caps.JobContainer, &own) {
 		b.job.Container = nil
 	}
 	for _, st := range b.job.Steps {
@@ -308,7 +310,7 @@ func (b *jobBuilder) collapseContainer() {
 		return
 	}
 	var img ir.Image
-	if yaml.Unmarshal([]byte(a.Image), &img) != nil || b.job.Container == nil || b.job.Container.Ref != img.Ref {
+	if yaml.Unmarshal([]byte(a.Image), &img) != nil || b.job.Container == nil || b.job.Container.Ref != cmp.Or(a.Written, img.Ref) {
 		b.c.ignored(b.path, caps.JobContainer, "the job image was edited after pipemaster wrote the file; the file content is kept")
 		return
 	}
