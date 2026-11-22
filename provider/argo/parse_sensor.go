@@ -1,6 +1,7 @@
 package argo
 
 import (
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -84,7 +85,12 @@ func (p *project) dependency(dep *omap, k *sink) (out []ir.Trigger, used usedEve
 	}
 	extra := map[string]any{"dependency": plain(dep), "eventSource": p.eventSourceExt(es, espec, typ, eventName, entry, k)}
 	for i := range trs {
-		trs[i].Ext = ir.Ext{dialect: extra}
+		m := extra
+		if a, ok := trs[i].Ext[dialect].(map[string]any); ok {
+			m = maps.Clone(extra)
+			maps.Copy(m, a)
+		}
+		trs[i].Ext = ir.Ext{dialect: m}
 	}
 	return trs, usedEvent{srcName, typ + "/" + eventName}, ""
 }
@@ -229,7 +235,7 @@ func (p *project) githubKinds(entry *omap, filters []dataFilter) (kinds []string
 
 // buildTriggers makes one trigger per event kind with the branch and tag filters that the data filters hold.
 func (p *project) buildTriggers(kinds []string, filters []dataFilter, k *sink) ([]ir.Trigger, string) {
-	var branches, tags, base []string
+	var branches, tags, base, actions []string
 	var excBranches, excTags, excBase []string
 	for _, f := range filters {
 		var err string
@@ -261,9 +267,7 @@ func (p *project) buildTriggers(kinds []string, filters []dataFilter, k *sink) (
 		case pathBaseRef:
 			base, err = p.baseGlobs(f.values, k)
 		case pathAction:
-			if !sameSet(f.values, defaultPRActions) {
-				err = "the pull request actions are not opened, synchronize and reopened"
-			}
+			actions, err = p.actionTypes(f.values, k)
 		case pathPRState:
 			if !sameSet(f.values, []string{prStateOpen}) {
 				err = "the pull request state is not open"
@@ -283,6 +287,9 @@ func (p *project) buildTriggers(kinds []string, filters []dataFilter, k *sink) (
 			return nil, "a body.ref filter does not apply to pull request events"
 		case kind == eventPR:
 			tr.Kind, tr.Branches = ir.TriggerPR, ir.Filter{Include: base, Exclude: excBase}
+			if len(actions) > 0 {
+				tr.Ext = ir.Ext{dialect: map[string]any{extActions: toAny(actions)}}
+			}
 			if !slices.ContainsFunc(filters, func(f dataFilter) bool { return f.path == pathAction }) {
 				p.rep.Add(report.Entry{
 					IRPath: k.Path, Feature: caps.TriggerFilterBranch, Level: caps.Emulated, Strategy: "default actions", SourceLoc: k.File,
@@ -302,6 +309,31 @@ func (p *project) buildTriggers(kinds []string, filters []dataFilter, k *sink) (
 			tr.Branches = ir.Filter{Include: branches, Exclude: excBranches}
 		}
 		out = append(out, tr)
+	}
+	return out, ""
+}
+
+func toAny(l []string) []any {
+	out := make([]any, len(l))
+	for i, v := range l {
+		out[i] = v
+	}
+	return out
+}
+
+// actionTypes reads body.action values. The default set reads as no types; any other set is kept in Ext.
+func (p *project) actionTypes(values []string, k *sink) ([]string, string) {
+	if sameSet(values, defaultPRActions) {
+		return nil, ""
+	}
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		body, anchored := stripAnchors(v)
+		if !actionName.MatchString(body) {
+			return nil, "the pull request action pattern " + v + " is not an action name"
+		}
+		p.unanchored(k, v, anchored)
+		out = append(out, body)
 	}
 	return out, ""
 }

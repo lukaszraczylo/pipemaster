@@ -10,7 +10,7 @@ import (
 // The pipemaster Sensor format. A Sensor dependency carries one GitHub event class and its filters:
 //   - a push trigger with branches: data filter body.ref with the anchored regex ^refs/heads/<glob>$ per include glob;
 //   - a tag trigger: data filter body.ref with ^refs/tags/<glob>$ per include glob, or ^refs/tags/.*$ with none;
-//   - a pull request trigger: data filter body.action with opened, reopened and synchronize, and body.pull_request.base.ref
+//   - a pull request trigger: data filter body.action with the IR types as ^<type>$ (opened, reopened and synchronize when none), and body.pull_request.base.ref
 //     with the anchored regex ^<glob>$ per include glob;
 //   - an exclude: one exprs entry per excluded name, `ref != 'refs/heads/<name>'` (tags: refs/tags/, pull request: base != '<name>');
 //   - a pull request gate: one exprs entry `head == base` over body.pull_request.head.repo.full_name and
@@ -33,9 +33,81 @@ const (
 )
 
 var (
-	prActions   = defaultPRActions
 	globLiteral = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
+	actionName  = regexp.MustCompile(`^[a-z_]+$`)
 )
+
+const (
+	extGHA      = "gha"
+	extTypes    = "types"
+	extActions  = "actions"
+	typesNoForm = "a pull request type is not a webhook action name"
+)
+
+// anyStrings reads a string or a list of strings from Ext data.
+func anyStrings(v any) []string {
+	switch x := v.(type) {
+	case string:
+		return []string{x}
+	case []string:
+		return x
+	case []any:
+		var out []string
+		for _, e := range x {
+			s, ok := e.(string)
+			if !ok {
+				return nil
+			}
+			out = append(out, s)
+		}
+		return out
+	}
+	return nil
+}
+
+// prActions returns the Sensor values of the pull request actions of a trigger. The default set keeps plain values. The default holds when no source names a type. why is set for a type that
+// has no action name.
+func prActions(t ir.Trigger) (values []string, why string) {
+	var types []string
+	if m, ok := t.Ext[dialect].(map[string]any); ok {
+		types = anyStrings(m[extActions])
+	}
+	if len(types) == 0 {
+		if m, ok := t.Ext[extGHA].(map[string]any); ok {
+			types = anyStrings(m[extTypes])
+		}
+	}
+	if len(types) == 0 || sameSet(types, defaultPRActions) {
+		return defaultPRActions, ""
+	}
+	for _, ty := range types {
+		if !actionName.MatchString(ty) {
+			return nil, typesNoForm
+		}
+		values = append(values, regexAnchorBeg+ty+regexAnchorEnd)
+	}
+	return values, ""
+}
+
+// withoutTypes is x without the GHA types, which a Sensor action filter states.
+func withoutTypes(x ir.Ext) ir.Ext {
+	m, ok := x[extGHA].(map[string]any)
+	if !ok {
+		return x
+	}
+	out := ir.Ext{}
+	for k, v := range x {
+		out[k] = v
+	}
+	rest := map[string]any{}
+	for k, v := range m {
+		if k != extTypes {
+			rest[k] = v
+		}
+	}
+	out[extGHA] = rest
+	return out
+}
 
 // globRegex writes a branch or tag glob as an anchored-body regex; ok is false when the glob has no exact regex.
 func globRegex(g string) (string, bool) {
@@ -115,7 +187,11 @@ func triggerFilters(t ir.Trigger) (filters map[string]any, event, why string) {
 		}
 	case ir.TriggerPR:
 		event = eventPR
-		data = append(data, dataFilterNode(pathAction, prActions))
+		actions, bad := prActions(t)
+		if bad != "" {
+			return nil, "", bad
+		}
+		data = append(data, dataFilterNode(pathAction, actions))
 		vals, ok := anchored("", t.Branches.Include)
 		if !ok {
 			return nil, "", "a glob has no exact regex"

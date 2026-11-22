@@ -55,7 +55,11 @@ func (e *emitter) triggers() error {
 func (e *emitter) trigger(pp *plan, i int) {
 	tr := pp.pl.Triggers[i]
 	path := pp.path + "/trigger/" + strconv.Itoa(i)
-	e.foreignExt(path, tr.Ext)
+	fx := tr.Ext
+	if _, bad := prActions(tr); tr.Kind == ir.TriggerPR && bad == "" {
+		fx = withoutTypes(fx)
+	}
+	e.foreignExt(path, fx)
 	x := map[string]any{}
 	if e.own {
 		x = extOf(tr.Ext)

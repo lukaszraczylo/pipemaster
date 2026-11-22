@@ -175,8 +175,8 @@ func TestUnrecognisedSensorFiltersFailSafe(t *testing.T) {
 `,
 		"comparator": `      - {path: body.ref, type: string, value: ["refs/heads/main"], comparator: "!="}
 `,
-		"narrow pr action": `      - {path: headers.X-Github-Event, type: string, value: ["pull_request"]}
-      - {path: body.action, type: string, value: ["opened"]}
+		"regex pr action": `      - {path: headers.X-Github-Event, type: string, value: ["pull_request"]}
+      - {path: body.action, type: string, value: ["opened.*"]}
 `,
 		"or operator": `      - {path: body.ref, type: string, value: ["refs/heads/main"]}
       - {path: body.repository.fork, type: bool, value: ["false"]}
