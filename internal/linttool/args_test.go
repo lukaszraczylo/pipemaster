@@ -36,3 +36,10 @@ func TestArgoLintArgsAreOffline(t *testing.T) {
 		t.Errorf("want --offline and the file last: %v", args)
 	}
 }
+
+func TestFlyLintArgsRunStrict(t *testing.T) {
+	want := []string{"validate-pipeline", "--strict", "-c", "p.yml"}
+	if got := flyLintArgs("p.yml"); !slices.Equal(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}

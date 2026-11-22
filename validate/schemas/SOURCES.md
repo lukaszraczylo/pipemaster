@@ -77,3 +77,48 @@ https://pipemaster.invalid/schemas/argo/.
 | sensor_v1alpha1.json | datree CRDs-catalog `argoproj.io/sensor_v1alpha1.json` at commit 784ec895 | 429 | 226fc910586c36fb7cea4fcdbd5ac60e3715d0fdc849edbe5875232b588df354 | MIT (datree CRDs-catalog); the CRDs are Apache-2.0 (argoproj) |
 | workflow_v1alpha1.json | datree CRDs-catalog `argoproj.io/workflow_v1alpha1.json` at commit 784ec895 | 2960039 | 6dc457258ac10c9bb8c9903ac9e566c919b99feaa0d13bb91f085fd07f5ee231 | MIT (datree CRDs-catalog); the CRDs are Apache-2.0 (argoproj) |
 | workflowtemplate_v1alpha1.json | datree CRDs-catalog `argoproj.io/workflowtemplate_v1alpha1.json` at commit 784ec895 | 2758446 | bc9b2c61354fac39039165024d5152b52fb23cadc657c60c298848466bdfb68d | MIT (datree CRDs-catalog); the CRDs are Apache-2.0 (argoproj) |
+
+## Concourse (validate/schemas/concourse.json)
+
+Written by hand on 2026-11-22 from the Go structs of concourse/concourse tag `v8.3.3` (Apache-2.0; no Concourse code is
+imported or copied). Concourse publishes no schema. The tool reads the structs from
+`https://raw.githubusercontent.com/concourse/concourse/v8.3.3/atc/<file>`; the sha256 of each source file is below.
+Draft 2020-12, no external `$ref`. A step is a `oneOf` over the step kinds with `unevaluatedProperties: false`, so an
+unknown step key fails as it does in fly (`Step.UnknownFields`). The `source`, `params`, `config` of var sources and
+`user_data` maps are opaque. Unknown top-level, job, resource, resource type, task config and `across` keys fail, as in
+`fly validate-pipeline --strict`. References between objects (an unused resource, an unknown `passed` job) are checked
+by fly only. `task.privileged` is a boolean: fly 8.3.3 rejects `fuse-only`.
+
+| Schema part | Struct (file:type) |
+|---|---|
+| top level | `atc/config.go:Config` (also `GroupConfig`, `VarSourceConfig`, `ResourceConfig`, `ResourceType`, `Prototype`, `DisplayConfig`, `CheckEvery`) |
+| job | `atc/job_config.go:JobConfig`, `BuildLogRetention` |
+| step kinds and hooks | `atc/steps.go:Step.UnmarshalJSON`, `StepPrecedence`, `GetStep`, `PutStep`, `TaskStep`, `RunStep`, `SetPipelineStep`, `LoadVarStep`, `TryStep`, `DoStep`, `InParallelStep`, `InParallelConfig` |
+| modifiers | `atc/steps.go:AcrossStep`, `AcrossVarConfig`, `MaxInFlightConfig`, `RetryStep`, `TimeoutStep`, `OnSuccessStep`, `OnFailureStep`, `OnErrorStep`, `OnAbortStep`, `EnsureStep`, `VersionConfig`, `InputsConfig` |
+| task config | `atc/task.go:TaskConfig`, `ImageResource`, `TaskRunConfig`, `TaskInputConfig`, `TaskOutputConfig`, `TaskCacheConfig`, `TaskEnv` |
+| container limits | `atc/container_limits.go:ContainerLimits` |
+
+| Source file | Bytes | SHA-256 |
+|---|---|---|
+| atc/config.go | 12466 | 030ae50d6f0216c4bc84694ee62022ede5e115970e5ad181dfbd721af4596c3c |
+| atc/job_config.go | 2941 | 1d942d09a4b261d7bbffdde3d96554fb7dbe802b5e2ee219bff090d6cecdacb9 |
+| atc/steps.go | 19298 | f6ac0cce4e05fc48ba128cc53595dd94bdb3eefd6ad2a01f430a12e2ad436424 |
+| atc/task.go | 6592 | 4afd65fbaf2a4111935ab73a38555acdc5795cef5980c5dfd058279ba05c56a9 |
+| atc/container_limits.go | 1778 | 60e669b35f2cfa0ffe77b08e37394ed99e01dee0d0a1cc3b2ddcacc91d74eee6 |
+
+| File | Source | Bytes | SHA-256 | Licence |
+|---|---|---|---|---|
+| concourse.json | hand-written from the structs above, concourse/concourse `v8.3.3` | 11881 | 3e4e5a5751f9d4bce75ffde4454926d12e451d765426bcab0e60602729776ad7 | Apache-2.0 (concourse/concourse structs); the file is written by this repo |
+
+### fly v8.3.3 (scripts/install-linters.sh)
+
+Release assets `fly-8.3.3-<os>-<arch>.tgz` at https://github.com/concourse/concourse/releases/tag/v8.3.3. Upstream
+publishes `.sha1` files only. On 2026-11-22 the tool downloaded each asset and its `.sha1`, checked `shasum -a 1`
+against the `.sha1` (all four matched), then computed the sha256 that the installer pins.
+
+| Asset | SHA-1 (upstream) | SHA-256 (pinned) |
+|---|---|---|
+| fly-8.3.3-darwin-amd64.tgz | 4b0935aff86f1f671695994df5e3f0a0b7d1e0c3 | b3b01e16c1d427abdcfc3900506765b2aaa58caf7888e23b9b014a001568754d |
+| fly-8.3.3-darwin-arm64.tgz | 1f6077e77029bea6699db8ee18aa78d6a670cf41 | 184af588be75e8f3f2a8b9eeb718acc4092693ad38a42a6c4ce3565cfb1a9e77 |
+| fly-8.3.3-linux-amd64.tgz | 44f2cc88267b463efd5ff89647a4d24d343e37fa | e689fdc1209463410fafe7093a74769dc2a7965c995307e11253a037813f742c |
+| fly-8.3.3-linux-arm64.tgz | b69777f0d1824f482eea6acc8b9d2a95dd280a3d | d3e140cfb65793c08e0cfb62c7ffa11a6c1b46b15a15308ebefe858846ed5cf1 |

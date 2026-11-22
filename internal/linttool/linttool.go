@@ -21,10 +21,11 @@ const (
 	droneID       = "drone"
 	kubeconformID = "kubeconform"
 	argoID        = "argo"
+	flyID         = "fly"
 )
 
 // pinned maps a linter to the version its --version output must end with; scripts/install-linters.sh builds it.
-var pinned = map[string]string{woodpeckerID: "3.20.1", droneID: "1.9.0", kubeconformID: "0.8.0", argoID: "4.1.6"}
+var pinned = map[string]string{woodpeckerID: "3.20.1", droneID: "1.9.0", kubeconformID: "0.8.0", argoID: "4.1.6", flyID: "8.3.3"}
 
 // versionOK reports whether the binary at path is the pinned version. A linter without a pin always passes.
 func versionOK(name, path string) bool {
@@ -198,5 +199,30 @@ func ArgoLint(t testing.TB, name string, data []byte) (string, error) {
 		t.Fatal(err)
 	}
 	out, err := exec.Command(bin, argoLintArgs(p)...).CombinedOutput() // #nosec G204 -- pinned local binary, temp path
+	return string(out), err
+}
+
+// RequireFly is Require for fly.
+func RequireFly(t testing.TB) string { return Require(t, flyID) }
+
+// flyLintArgs is the fly argument list that validates file offline. --strict also rejects unknown resource source
+// keys and deprecated fields, so it is the oracle for emitted files. A bare `((var))` stays unresolved without error.
+func flyLintArgs(file string) []string {
+	return []string{"validate-pipeline", "--strict", "-c", file}
+}
+
+// FlyLint runs `fly validate-pipeline --strict` on one pipeline file and returns its output. The error is non-nil
+// when fly reports a problem.
+func FlyLint(t testing.TB, name string, data []byte) (string, error) {
+	t.Helper()
+	bin := RequireFly(t)
+	p := filepath.Join(t.TempDir(), filepath.Base(name))
+	if err := os.WriteFile(p, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(bin, flyLintArgs(p)...) // #nosec G204 -- pinned local binary, temp path
+	// An empty home keeps fly away from a ~/.flyrc target.
+	cmd.Env = append(os.Environ(), "HOME="+t.TempDir())
+	out, err := cmd.CombinedOutput()
 	return string(out), err
 }

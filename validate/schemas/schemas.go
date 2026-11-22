@@ -39,3 +39,8 @@ var Tekton embed.FS
 //
 //go:embed argo/*.json
 var Argo embed.FS
+
+// Concourse is the Concourse pipeline schema, written by hand from the v8.3.3 Go structs.
+//
+//go:embed concourse.json
+var Concourse []byte

@@ -182,7 +182,56 @@ install_argo() {
 	echo "installed argo $tag in $dest"
 }
 
+# fly ships tarballs with one `fly` binary. Upstream publishes sha1 files only, so the sha256 values below come from
+# the four v8.3.3 assets after each `.sha1` matched the download (docs: validate/schemas/SOURCES.md).
+install_fly() {
+	local tag="v8.3.3"
+	local os arch asset want
+	os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+	arch="$(uname -m)"
+	case "$arch" in
+	x86_64) arch="amd64" ;;
+	aarch64) arch="arm64" ;;
+	esac
+	asset="fly-${tag#v}-${os}-${arch}.tgz"
+	case "$asset" in
+	fly-8.3.3-darwin-amd64.tgz) want="b3b01e16c1d427abdcfc3900506765b2aaa58caf7888e23b9b014a001568754d" ;;
+	fly-8.3.3-darwin-arm64.tgz) want="184af588be75e8f3f2a8b9eeb718acc4092693ad38a42a6c4ce3565cfb1a9e77" ;;
+	fly-8.3.3-linux-amd64.tgz) want="e689fdc1209463410fafe7093a74769dc2a7965c995307e11253a037813f742c" ;;
+	fly-8.3.3-linux-arm64.tgz) want="d3e140cfb65793c08e0cfb62c7ffa11a6c1b46b15a15308ebefe858846ed5cf1" ;;
+	*)
+		echo "no pinned fly $tag release for $os/$arch" >&2
+		return 1
+		;;
+	esac
+	local stamp="$dest/.fly-$tag-$want"
+
+	if [[ -x "$dest/fly" && -f "$stamp" ]]; then
+		echo "fly $tag is already installed in $dest"
+		return 0
+	fi
+
+	local tmp got
+	tmp="$(mktemp -d "${TMPDIR:-/tmp}/install-linters.XXXXXX")"
+	trap "rm -rf '$tmp'" EXIT
+	curl -fsSL -o "$tmp/$asset" "https://github.com/concourse/concourse/releases/download/$tag/$asset"
+	got="$( (sha256sum "$tmp/$asset" 2>/dev/null || shasum -a 256 "$tmp/$asset") | cut -d' ' -f1)"
+	if [[ "$got" != "$want" ]]; then
+		rm -rf "$tmp"
+		echo "$asset has sha256 $got, expected $want" >&2
+		return 1
+	fi
+	tar -xzf "$tmp/$asset" -C "$tmp" fly
+	install -m 0755 "$tmp/fly" "$dest/fly"
+	rm -rf "$tmp"
+	trap - EXIT
+	rm -f "$dest"/.fly-*
+	touch "$stamp"
+	echo "installed fly $tag in $dest"
+}
+
 install_woodpecker
 install_drone
 install_kubeconform
 install_argo
+install_fly
