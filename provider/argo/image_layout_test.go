@@ -81,3 +81,15 @@ func TestEditedImageKeepsTheFileLayout(t *testing.T) {
 		t.Errorf("no marker ignored entry: %s", detail)
 	}
 }
+
+func TestImageWithAMatrixReferenceStaysOnTheStep(t *testing.T) {
+	j := imageJob(nil, "golang:${{ matrix.GO }}")
+	j.Matrix = &ir.Matrix{Axes: []ir.Axis{{Name: "GO", Values: []string{"1.24", "1.25"}}}}
+	got, detail := imageBack(t, j, nil)
+	if got.Container != nil || imageRefOf(got.Steps[0].Image) != "golang:${{ matrix.GO }}" {
+		t.Errorf("container = %s, step image = %s", imageRefOf(got.Container), imageRefOf(got.Steps[0].Image))
+	}
+	if strings.Contains(detail, "marker ignored") {
+		t.Errorf("unexpected entry: %s", detail)
+	}
+}

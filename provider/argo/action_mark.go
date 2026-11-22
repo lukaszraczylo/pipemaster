@@ -217,7 +217,7 @@ func (e *emitter) markContainer(j *ir.Job, path, written string, replaced bool) 
 type imagesArg struct {
 	// Steps holds the step image of each step as IR YAML.
 	Steps map[string]string `json:"steps,omitempty"`
-	// Wrote holds the image reference that each script step got in the file.
+	// Wrote holds the image reference of the IR that each script step runs.
 	Wrote map[string]string `json:"wrote"`
 	// Job is the job image as IR YAML, or empty.
 	Job string `json:"job,omitempty"`
@@ -231,11 +231,25 @@ func readImage(ref string) string {
 	return ref
 }
 
+// irImage is the image reference of the IR that a container runs: its own step image, then the job image. A
+// container with no script step runs the image that it was written with.
+func irImage(j *ir.Job, c *container) string {
+	if st := c.st; st != nil && st.Kind != ir.StepAction {
+		if st.Image != nil {
+			return st.Image.Ref
+		}
+		if j.Container != nil {
+			return j.Container.Ref
+		}
+	}
+	return c.image
+}
+
 // imageLayoutMatches is true when a reader of the file puts the images where the IR has them.
 func imageLayoutMatches(j *ir.Job, conts []*container) bool {
 	refs := map[string]bool{}
 	for _, c := range conts {
-		refs[c.image] = true
+		refs[irImage(j, c)] = true
 	}
 	for _, c := range conts {
 		st := c.st
@@ -246,7 +260,7 @@ func imageLayoutMatches(j *ir.Job, conts []*container) bool {
 		if st.Image != nil {
 			want = st.Image.Ref
 		}
-		if len(refs) == 1 && want != "" || len(refs) > 1 && want != readImage(c.image) {
+		if len(refs) == 1 && want != "" || len(refs) > 1 && want != readImage(irImage(j, c)) {
 			return false
 		}
 	}
@@ -280,7 +294,7 @@ func (e *emitter) markImages(j *ir.Job, path string, conts []*container) {
 		if st == nil || st.Kind == ir.StepAction {
 			continue
 		}
-		arg.Wrote[st.ID] = c.image
+		arg.Wrote[st.ID] = irImage(j, c)
 		if st.Image == nil {
 			continue
 		}
