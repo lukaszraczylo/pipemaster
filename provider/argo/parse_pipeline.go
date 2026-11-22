@@ -2,6 +2,7 @@ package argo
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
@@ -66,6 +67,7 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 	c.unreached()
 	pl.Ext = k.Ext()
 	c.pipelineEnvMarker(pl)
+	c.staleGates(append(slices.Clone(pl.Jobs), pl.Finally...))
 	return pl, nil
 }
 

@@ -133,6 +133,22 @@ func (c *plCtx) gateMarker(j *ir.Job) {
 	}
 }
 
+// staleGates reports a gate marker whose suspend task the file no longer holds. The job stays as written.
+func (c *plCtx) staleGates(jobs []*ir.Job) {
+	for _, j := range jobs {
+		if j.Manual || j.Environment != nil {
+			continue
+		}
+		path := "pipeline/" + c.plID + "/job/" + j.ID
+		for _, f := range []caps.Feature{caps.JobEnvironmentApproval, caps.JobManual} {
+			var a gateArg
+			if markerArg(c.src.doc.Head, path, f, &a) {
+				c.ignored(path, f, "the suspend task of the gate was removed or edited after pipemaster wrote the file; the job runs without a gate")
+			}
+		}
+	}
+}
+
 // sameEnv finds the variable name in every script step. ok is false when a step lacks it or two steps differ.
 func sameEnv(steps []*ir.Step, name string) (v ir.Var, ok bool) {
 	for _, st := range steps {

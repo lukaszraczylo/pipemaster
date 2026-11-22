@@ -4,6 +4,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/internal/linttool"
+	"go.yaml.in/yaml/v3"
 	"strings"
 	"testing"
 
@@ -299,5 +300,61 @@ func TestScheduleAndManualRunsReportEmptyContext(t *testing.T) {
 	}
 	if n != 2 {
 		t.Errorf("%d empty-context entries, want 2 (cron and manual): %v", n, rep.Entries)
+	}
+}
+
+func TestEditedGateKeepsTheFileAndReportsTheMarker(t *testing.T) {
+	a, b := scriptJob("a", "x"), scriptJob("b", "x")
+	b.Needs = []ir.Need{{JobID: "a"}}
+	b.Manual = true
+	files, _ := emit(t, project(a, b))
+	path := ".argo/workflows/ci.yaml"
+	var head []string
+	for _, l := range strings.Split(files[path], "\n") {
+		if strings.HasPrefix(l, "# pipemaster:") {
+			head = append(head, l)
+		}
+	}
+	d := docs(t, files[path])[0]
+	// The user deletes the suspend task and its template, and points b at a.
+	var tmpls []any
+	for _, tm := range list(get(d, "spec", "templates")) {
+		m := tm.(doc)
+		if m["name"] == "b-gate" {
+			continue
+		}
+		if m["name"] == "main" {
+			var kept []any
+			for _, tk := range list(get(m, "dag", "tasks")) {
+				task := tk.(doc)
+				if task["name"] == "b-gate" {
+					continue
+				}
+				if task["name"] == "b" {
+					task["dependencies"] = []any{"a"}
+				}
+				kept = append(kept, task)
+			}
+			m["dag"].(doc)["tasks"] = kept
+		}
+		tmpls = append(tmpls, m)
+	}
+	d["spec"].(doc)["templates"] = tmpls
+	out, err := yaml.Marshal(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	files[path] = strings.Join(head, "\n") + "\n" + string(out)
+	back, rep, err := parseRepo(files)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, files[path])
+	}
+	if len(entries(rep, "marker ignored")) == 0 {
+		t.Errorf("no marker ignored entry:\n%s", files[path])
+	}
+	for _, j := range back.Pipelines[0].Jobs {
+		if j.Manual {
+			t.Errorf("job %s is manual although the gate is gone", j.ID)
+		}
 	}
 }
