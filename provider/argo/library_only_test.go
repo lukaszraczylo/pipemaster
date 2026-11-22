@@ -46,3 +46,11 @@ func TestWorkflowWithOnlyATemplateRefKeepsItsDocumentWhenTheTemplateIsAbsent(t *
 		t.Errorf("A->A differs:\n%s", diff)
 	}
 }
+
+func TestTemplateWhoseEntrypointNamesNoTemplateIsALibrary(t *testing.T) {
+	dangling := "apiVersion: argoproj.io/v1alpha1\nkind: ClusterWorkflowTemplate\nmetadata: {name: lib}\nspec:\n  entrypoint: gone\n  templates:\n  - {name: a, container: {image: x}}\n"
+	p, _ := parseFiles(t, map[string]string{"lib.yaml": dangling})
+	if len(p.Pipelines) != 1 || len(p.Pipelines[0].Jobs) != 0 {
+		t.Fatalf("want one pipeline with no job, got %+v", p.Pipelines)
+	}
+}
