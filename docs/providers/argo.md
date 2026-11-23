@@ -4,11 +4,12 @@ The provider ID is `argo`. `docs/versions.md` pins Argo Workflows v4.1.6, Argo E
 
 ## Setup outside the pipeline files
 
-The caps table gives the verdict external for `trigger.manual`. A person starts the run with `argo submit --from workflowtemplate/<name>`, and the report names the command. The same table row lists more external work. The cluster needs more work:
+The caps table gives the verdict external for `trigger.manual`. The same table row also lists cluster work. The operator completes these items:
 
-- The EventSource entries name the placeholder repository `OWNER/REPO`. The operator must edit it before the first run.
-- A secret becomes a `secretKeyRef` on the Secret `ci-secrets`. A variable becomes a `configMapKeyRef` on the ConfigMap `ci-vars`. The converter does not write the values. The operator must create both objects.
-- The cluster setup is external. The operator must install Argo Workflows and Argo Events, create the EventBus, and expose the EventSource Service with an Ingress. The operator must also configure the artifact repository, apply the RBAC objects in `.argo/rbac/`, and create the Secret and the ConfigMap. The converter reports no feature for most of this work. The trigger.manual entry lists it.
+- `trigger.manual`: start the run with `argo submit --from workflowtemplate/<name>`. The report names the command.
+- Repository: edit the placeholder repository `OWNER/REPO` in the EventSource entries before the first run.
+- Secret and variable: create the Secret `ci-secrets` and the ConfigMap `ci-vars`. A secret becomes a `secretKeyRef` on the Secret. A variable becomes a `configMapKeyRef` on the ConfigMap. The converter does not write the values.
+- Cluster: install Argo Workflows and Argo Events, create the EventBus, and expose the EventSource Service with an Ingress. Configure the artifact repository and apply the RBAC objects in `.argo/rbac/`.
 
 ## Conversion notes
 

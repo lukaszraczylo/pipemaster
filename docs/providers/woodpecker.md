@@ -4,11 +4,11 @@ The provider ID is `woodpecker`. `docs/versions.md` pins Woodpecker CI v3.20.1. 
 
 ## Setup outside the pipeline files
 
-The caps table gives the verdict external for three features. The settings sit in the repository settings of Woodpecker.
+The caps table gives the verdict external for three features. Set each one in the repository settings of Woodpecker:
 
 - `job.timeout`: set Timeout. Woodpecker limits the whole pipeline, not a workflow.
-- A cron schedule is external. Woodpecker keeps the cron string in the repository settings, not in the workflow file.
-- Environment approval is external. Set it with the repository setting Require approval for.
+- `trigger.schedule`: create the cron job in the repository settings. Woodpecker keeps the cron string there, not in the workflow file.
+- `job.environment.approval`: set Require approval for in the repository settings.
 
 ## Conversion notes
 
