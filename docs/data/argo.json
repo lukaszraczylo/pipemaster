@@ -1,0 +1,694 @@
+{
+ "source": [
+  {
+   "path": ".argo/buildkit-argo-workflow-template.yaml",
+   "text": "# kubectl -n argo create secret generic rsa-secret --from-file=id_rsa=/home/lc/.ssh/id_rsa --from-file=id_rsa.pub=/home/lc/.ssh/id_rsa.pub\n# kubectl -n argo create secret docker-registry acr-regcred  --docker-email=xxxx --docker-username=xxxx  --docker-password=xxxxxx  --docker-server=registry.cn-shenzhen.aliyuncs.com\napiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata:\n  name: buildkit\nspec:\n  arguments:\n    parameters:\n      - name: repo\n        value: https://gitee.com/dev-ops/go-gin-rest-api.git\n      - name: branch\n        value: main\n      - name: path\n        value: go-gin-rest-api\n      - name: image\n        value: registry.cn-shenzhen.aliyuncs.com/dev-ops/go-gin-rest-api \n      - name: version\n        value: 1.0.1\n  entrypoint: main \n  volumes:\n  - name: workspace\n    hostPath:\n      path: /mnt/d/project/backup/workspace\n      type: Directory\n  - name: cache\n    hostPath:\n      path: /mnt/d/project/backup/cache\n      type: Directory\n  - name: rsa-secret \n    secret:\n      secretName: rsa-secret\n  - name: docker-secret\n    secret:\n      secretName: acr-regcred\n      items:\n      - key: .dockerconfigjson\n        path: config.json\n  templates:\n    - name: main\n      dag:\n        tasks:\n          - name: git-clone\n            template: git-clone\n            arguments:\n              parameters:\n                - name: repo\n                  value: \"{{workflow.parameters.repo}}\"\n                - name: branch\n                  value: \"{{workflow.parameters.branch}}\" \n                - name: path\n                  value: \"{{workflow.parameters.path}}\"\n          - name: build-image\n            template: build-image\n            arguments:\n              parameters:\n                - name: path\n                  value: \"{{workflow.parameters.path}}\"\n                - name: image\n                  value: \"{{workflow.parameters.image}}\"\n                - name: version\n                  value: \"{{workflow.parameters.version}}\"\n            depends: \"git-clone\"\n    - name: git-clone\n      inputs:\n        parameters:\n          - name: repo\n          - name: branch\n          - name: path\n      container:\n        volumeMounts:\n          - name: rsa-secret \n            readOnly: true\n            mountPath: \"~/.ssh\"\n          - mountPath: /workspace\n            name: workspace\n        image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n        workingDir: /workspace \n        command:\n          - git-clone-pull.sh\n        args:\n          - \"{{inputs.parameters.repo}}\"\n          - \"{{inputs.parameters.branch}}\"\n          - \"{{inputs.parameters.path}}\"\n    - name: build-image\n      inputs:\n        parameters:\n          - name: path\n          - name: image \n          - name: version \n      container:\n        image: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n        volumeMounts:\n          - name: workspace \n            mountPath: /workspace\n          - name: cache\n            mountPath: /cache\n          - name: docker-secret \n            mountPath: /home/user/.docker\n        workingDir: /workspace/{{inputs.parameters.path}}\n        env:\n          - name: BUILDKITD_FLAGS\n            value: --oci-worker-no-process-sandbox \n        command:\n          - buildctl-daemonless.sh\n        args: \n          - build\n          - --frontend\n          - dockerfile.v0\n          - --local\n          - context=.\n          - --local\n          - dockerfile=.\n          - --output\n          - type=image,name={{inputs.parameters.image}}:{{inputs.parameters.version}},push=true\n          - --export-cache\n          - type=local,mode=max,dest=/cache\n          - --import-cache\n          - type=local,src=/cache\n          - --export-cache\n          - type=registry,mode=max,ref={{inputs.parameters.image}}:buildkit-cache\n          - --import-cache\n          - type=registry,ref={{inputs.parameters.image}}:buildkit-cache\n          - --opt\n          - build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n        securityContext: \n            seccompProfile:\n              type: Unconfined \n            runAsUser: 1000\n            runAsGroup: 1000"
+  }
+ ],
+ "conversions": [
+  {
+   "id": "gha",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".github/workflows/buildkit.yml",
+     "text": "# pipemaster:emulated job.runner pipeline/buildkit/job/build-image\n# pipemaster:emulated job.runner pipeline/buildkit/job/git-clone\non:\n  # pipemaster:emulated pipeline.inputs pipeline/buildkit\n  workflow_dispatch:\n    inputs:\n      repo:\n        default: https://gitee.com/dev-ops/go-gin-rest-api.git\n      branch:\n        default: main\n      path:\n        default: go-gin-rest-api\n      image:\n        default: registry.cn-shenzhen.aliyuncs.com/dev-ops/go-gin-rest-api\n      version:\n        default: 1.0.1\njobs:\n  build-image:\n    needs:\n      - git-clone\n    if: false\n    runs-on: ubuntu-latest\n    container: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n    steps:\n      # pipemaster:lost job.if pipeline/buildkit/job/build-image: (needs.git-clone.result == 'success') || (needs.git-clone.result == 'skipped')\n      - id: main\n        run: buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name=${{ inputs.image }}:${{ inputs.version }},push=true\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \"type=registry,mode=max,ref=${{ inputs.image }}:buildkit-cache\" --import-cache \"type=registry,ref=${{ inputs.image }}:buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n        working-directory: /workspace/${{ inputs.path }}\n        env:\n          BUILDKITD_FLAGS: --oci-worker-no-process-sandbox\n  git-clone:\n    runs-on: ubuntu-latest\n    container: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n    steps:\n      - id: main\n        run: git-clone-pull.sh \"${{ inputs.repo }}\" \"${{ inputs.branch }}\" \"${{ inputs.path }}\"\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/buildkit",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumes has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (volumes) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (depends) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "job.if",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "depends git-clone has a task with no result, which also passes when the task is Skipped or Daemoned; the condition holds Succeeded or Skipped, and the Daemoned case is kept in the text in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "condition not expressible in GitHub Actions; job disabled"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumeMounts has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key securityContext has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (securityContext, volumeMounts) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumeMounts has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (volumeMounts) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
+    },
+    {
+     "path": "pipeline/buildkit",
+     "feature": "pipeline.inputs",
+     "level": "emulated",
+     "strategy": "workflow_dispatch trigger",
+     "detail": "inputs need a workflow_dispatch trigger; the pipeline had none"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "job.runner",
+     "level": "emulated",
+     "strategy": "default runner label ubuntu-latest",
+     "detail": "the IR holds no runner label"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone",
+     "feature": "job.runner",
+     "level": "emulated",
+     "strategy": "default runner label ubuntu-latest",
+     "detail": "the IR holds no runner label"
+    }
+   ]
+  },
+  {
+   "id": "gitlab",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".gitlab-ci.yml",
+     "text": "# pipemaster:emulated pipeline.inputs pipeline/buildkit\n# pipemaster:arg [{\"Name\":\"repo\",\"Type\":\"\",\"Default\":\"https://gitee.com/dev-ops/go-gin-rest-api.git\",\"Description\":\"\",\"Required\":false},{\"Name\":\"branch\",\"Type\":\"\",\"Default\":\"main\",\"Description\":\"\",\"Required\":false},{\"Name\":\"path\",\"Type\":\"\",\"Default\":\"go-gin-rest-api\",\"Description\":\"\",\"Required\":false},{\"Name\":\"image\",\"Type\":\"\",\"Default\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/go-gin-rest-api\",\"Description\":\"\",\"Required\":false},{\"Name\":\"version\",\"Type\":\"\",\"Default\":\"1.0.1\",\"Description\":\"\",\"Required\":false}]\n# pipemaster:emulated script.interpolation pipeline/buildkit\n# pipemaster:arg [{\"k\":\"t\",\"p\":\"job/build-image/step/main/script/0\",\"g\":\"buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \\\"type=image,name=$image:$version,push=true\\\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \\\"type=registry,mode=max,ref=$image:buildkit-cache\\\" --import-cache \\\"type=registry,ref=$image:buildkit-cache\\\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\",\"s\":\"buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \\\"type=image,name=$\\u007b{ inputs.image }}:$\\u007b{ inputs.version }},push=true\\\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \\\"type=registry,mode=max,ref=$\\u007b{ inputs.image }}:buildkit-cache\\\" --import-cache \\\"type=registry,ref=$\\u007b{ inputs.image }}:buildkit-cache\\\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\"},{\"k\":\"t\",\"p\":\"job/build-image/step/main/workdir\",\"g\":\"/workspace/$path\",\"s\":\"/workspace/$\\u007b{ inputs.path }}\"},{\"k\":\"t\",\"p\":\"job/git-clone/step/main/script/0\",\"g\":\"git-clone-pull.sh \\\"$repo\\\" \\\"$branch\\\" \\\"$path\\\"\",\"s\":\"git-clone-pull.sh \\\"$\\u007b{ inputs.repo }}\\\" \\\"$\\u007b{ inputs.branch }}\\\" \\\"$\\u007b{ inputs.path }}\\\"\"}]\nstages:\n  - stage-0\n  - stage-1\nvariables:\n  repo: https://gitee.com/dev-ops/go-gin-rest-api.git\n  branch: main\n  path: go-gin-rest-api\n  image: registry.cn-shenzhen.aliyuncs.com/dev-ops/go-gin-rest-api\n  version: 1.0.1\nworkflow:\n  rules:\n    - when: never\n# pipemaster:lost job.if pipeline/buildkit/job/build-image: (needs.git-clone.result == 'success') || (needs.git-clone.result == 'skipped')\nbuild-image:\n  stage: stage-1\n  image: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n  needs:\n    - git-clone\n  rules:\n    - when: never\n  script:\n    # pipemaster:step main\n    # pipemaster:emulated step.workdir pipeline/buildkit/job/build-image/step/main\n    # pipemaster:emulated step.env pipeline/buildkit/job/build-image/step/main\n    - |\n      (\n      cd \"/workspace/$path\" || exit 1\n      export BUILDKITD_FLAGS=\"--oci-worker-no-process-sandbox\"\n      buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name=$image:$version,push=true\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \"type=registry,mode=max,ref=$image:buildkit-cache\" --import-cache \"type=registry,ref=$image:buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n      )\ngit-clone:\n  stage: stage-0\n  image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n  needs: []\n  script:\n    # pipemaster:step main\n    - git-clone-pull.sh \"$repo\" \"$branch\" \"$path\"\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/buildkit",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumes has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "the pipeline has no trigger GitLab can express; workflow:rules never starts it"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (depends) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "job.if",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "depends git-clone has a task with no result, which also passes when the task is Skipped or Daemoned; the condition holds Succeeded or Skipped, and the Daemoned case is kept in the text in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "condition not expressible in GitLab CI; job disabled"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumeMounts has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key securityContext has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (securityContext, volumeMounts) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumeMounts has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (volumeMounts) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
+    },
+    {
+     "path": "pipeline/buildkit",
+     "feature": "pipeline.inputs",
+     "level": "emulated",
+     "strategy": "variables with description",
+     "detail": "input types and required flags are not enforced"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "step.env",
+     "level": "emulated",
+     "strategy": "export lines inside a subshell around the step"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "step.workdir",
+     "level": "emulated",
+     "strategy": "cd in a subshell around the step"
+    }
+   ]
+  },
+  {
+   "id": "woodpecker",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".woodpecker/build-image.yaml",
+     "text": "# pipemaster:emulated job.container pipeline/buildkit/job/build-image\n# pipemaster:arg {\"Ref\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\",\"Entrypoint\":null}\n# pipemaster:emulated script.interpolation pipeline/buildkit/job/build-image/step/main\n# pipemaster:arg {\"refs\":[\"inputs.image\",\"inputs.version\"],\"pos\":0}\n# pipemaster:lost step.workdir pipeline/buildkit/job/build-image/step/main: {{ inputs.path }}\n# pipemaster:lost step pipeline/buildkit/job/build-image/step/main: an image or workdir lost an expression, so the step is disabled\n# pipemaster:lost job.if pipeline/buildkit/job/build-image: (needs.git-clone.result == 'success') || (needs.git-clone.result == 'skipped')\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\n    evaluate: \"false\"\ndepends_on:\n  - git-clone\nsteps:\n  - name: main\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n    commands:\n      - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name=$${image}:$${version},push=true\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \"type=registry,mode=max,ref=$${image}:buildkit-cache\" --import-cache \"type=registry,ref=$${image}:buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n    environment:\n      BUILDKITD_FLAGS: --oci-worker-no-process-sandbox\n    directory: /workspace/\n    when:\n      - evaluate: \"false\"\n"
+    },
+    {
+     "path": ".woodpecker/git-clone.yaml",
+     "text": "# pipemaster:emulated job.container pipeline/buildkit/job/git-clone\n# pipemaster:arg {\"Ref\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\",\"Entrypoint\":null}\n# pipemaster:emulated script.interpolation pipeline/buildkit/job/git-clone/step/main\n# pipemaster:arg {\"refs\":[\"inputs.repo\",\"inputs.branch\",\"inputs.path\"],\"pos\":0}\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\nsteps:\n  - name: main\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n    commands:\n      - git-clone-pull.sh \"$${repo}\" \"$${branch}\" \"$${path}\"\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/buildkit",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumes has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (volumes) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit",
+     "feature": "pipeline.inputs",
+     "level": "lost",
+     "detail": "Woodpecker has no typed pipeline inputs"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (depends) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "job.if",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "depends git-clone has a task with no result, which also passes when the task is Skipped or Daemoned; the condition holds Succeeded or Skipped, and the Daemoned case is kept in the text in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "condition not expressible in Woodpecker CI; the workflow disabled"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumeMounts has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key securityContext has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (securityContext, volumeMounts) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "step.if",
+     "level": "lost",
+     "detail": "an image or workdir lost an expression, so the step is disabled"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "step.workdir",
+     "level": "lost",
+     "detail": "no Woodpecker spelling for expression inputs.path"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumeMounts has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (volumeMounts) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "script.interpolation",
+     "level": "external",
+     "strategy": "environment variable for input",
+     "detail": "input image is read as the variable image, which nothing sets; define it in the Woodpecker environment; input version is read as the variable version, which nothing sets; define it in the Woodpecker environment"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "script.interpolation",
+     "level": "external",
+     "strategy": "environment variable for input",
+     "detail": "input repo is read as the variable repo, which nothing sets; define it in the Woodpecker environment; input branch is read as the variable branch, which nothing sets; define it in the Woodpecker environment; input path is read as the variable path, which nothing sets; define it in the Woodpecker environment"
+    }
+   ]
+  },
+  {
+   "id": "drone",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".drone.yml",
+     "text": "# pipemaster:lost job.if pipeline/buildkit/job/build-image: (needs.git-clone.result == 'success') || (needs.git-clone.result == 'skipped')\n# pipemaster:emulated script.interpolation pipeline/buildkit/job/build-image/step/main\n# pipemaster:arg {\"at\":{\"inputs.image\":{\"at\":[0,1,2],\"of\":3},\"inputs.version\":{\"at\":[0],\"of\":1}},\"refs\":[\"inputs.image\",\"inputs.version\"],\"pos\":0}\n# pipemaster:lost step.workdir pipeline/buildkit/job/build-image/step/main: {{ inputs.path }}\n# pipemaster:lost step pipeline/buildkit/job/build-image/step/main: an image or workdir lost an expression, so the step is disabled\n# pipemaster:emulated job.container pipeline/buildkit/job/build-image\n# pipemaster:arg {\"Ref\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\",\"Entrypoint\":null,\"taken\":1}\nkind: pipeline\ntype: docker\nname: build-image\ntrigger:\n  event:\n    exclude:\n      - '**'\ndepends_on:\n  - git-clone\nsteps:\n  - name: main\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n    commands:\n      - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name=$${image}:$${version},push=true\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \"type=registry,mode=max,ref=$${image}:buildkit-cache\" --import-cache \"type=registry,ref=$${image}:buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n    environment:\n      BUILDKITD_FLAGS: --oci-worker-no-process-sandbox\n    working_dir: /workspace/\n    when:\n      event:\n        exclude:\n          - '**'\n---\n# pipemaster:emulated script.interpolation pipeline/buildkit/job/git-clone/step/main\n# pipemaster:arg {\"at\":{\"inputs.branch\":{\"at\":[0],\"of\":1},\"inputs.path\":{\"at\":[0],\"of\":1},\"inputs.repo\":{\"at\":[0],\"of\":1}},\"refs\":[\"inputs.repo\",\"inputs.branch\",\"inputs.path\"],\"pos\":0}\n# pipemaster:emulated job.container pipeline/buildkit/job/git-clone\n# pipemaster:arg {\"Ref\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\",\"Entrypoint\":null,\"taken\":1}\nkind: pipeline\ntype: docker\nname: git-clone\nsteps:\n  - name: main\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n    commands:\n      - git-clone-pull.sh \"$${repo}\" \"$${branch}\" \"$${path}\"\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/buildkit",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumes has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (volumes) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit",
+     "feature": "pipeline.inputs",
+     "level": "lost",
+     "detail": "Drone has no typed pipeline inputs"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (depends) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "job.if",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "depends git-clone has a task with no result, which also passes when the task is Skipped or Daemoned; the condition holds Succeeded or Skipped, and the Daemoned case is kept in the text in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "condition not expressible in Drone CI; the document disabled"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumeMounts has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key securityContext has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (securityContext, volumeMounts) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "step.if",
+     "level": "lost",
+     "detail": "an image or workdir lost an expression, so the step is disabled"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "step.workdir",
+     "level": "lost",
+     "detail": "no Drone spelling for expression inputs.path"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumeMounts has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (volumeMounts) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "script.interpolation",
+     "level": "external",
+     "strategy": "environment variable for input",
+     "detail": "input image is read as the variable image, which nothing sets; define it in the Drone environment; input version is read as the variable version, which nothing sets; define it in the Drone environment"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "script.interpolation",
+     "level": "external",
+     "strategy": "environment variable for input",
+     "detail": "input repo is read as the variable repo, which nothing sets; define it in the Drone environment; input branch is read as the variable branch, which nothing sets; define it in the Drone environment; input path is read as the variable path, which nothing sets; define it in the Drone environment"
+    }
+   ]
+  },
+  {
+   "id": "tekton",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".tekton/kustomization.yaml",
+     "text": "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n  - pipeline.yaml\n  - tasks/buildkit-build-image.yaml\n  - tasks/buildkit-git-clone.yaml\n"
+    },
+    {
+     "path": ".tekton/pipeline.yaml",
+     "text": "apiVersion: tekton.dev/v1\nkind: Pipeline\nmetadata:\n  name: buildkit\nspec:\n  params:\n    - name: repo\n      default: https://gitee.com/dev-ops/go-gin-rest-api.git\n    - name: branch\n      default: main\n    - name: path\n      default: go-gin-rest-api\n    - name: image\n      default: registry.cn-shenzhen.aliyuncs.com/dev-ops/go-gin-rest-api\n    - name: version\n      default: 1.0.1\n  tasks:\n    - name: build-image\n      taskRef:\n        name: buildkit-build-image\n      params:\n        - name: image\n          value: $(params.image)\n        - name: version\n          value: $(params.version)\n        - name: path\n          value: $(params.path)\n      runAfter:\n        - git-clone\n      when:\n        - input: pipemaster-disabled\n          operator: in\n          values:\n            - never\n    - name: git-clone\n      taskRef:\n        name: buildkit-git-clone\n      params:\n        - name: repo\n          value: $(params.repo)\n        - name: branch\n          value: $(params.branch)\n        - name: path\n          value: $(params.path)\n"
+    },
+    {
+     "path": ".tekton/tasks/buildkit-build-image.yaml",
+     "text": "apiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: buildkit-build-image\nspec:\n  params:\n    - name: image\n    - name: version\n    - name: path\n  stepTemplate:\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n  steps:\n    - name: main\n      script: buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name=$(params.image):$(params.version),push=true\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \"type=registry,mode=max,ref=$(params.image):buildkit-cache\" --import-cache \"type=registry,ref=$(params.image):buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n      env:\n        - name: BUILDKITD_FLAGS\n          value: --oci-worker-no-process-sandbox\n      workingDir: /workspace/$(params.path)\n"
+    },
+    {
+     "path": ".tekton/tasks/buildkit-git-clone.yaml",
+     "text": "apiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: buildkit-git-clone\nspec:\n  params:\n    - name: repo\n    - name: branch\n    - name: path\n  stepTemplate:\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n  steps:\n    - name: main\n      script: git-clone-pull.sh \"$(params.repo)\" \"$(params.branch)\" \"$(params.path)\"\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/buildkit",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumes has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (volumes) is not written to the Tekton file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (depends) is not written to the Tekton file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "job.if",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "depends git-clone has a task with no result, which also passes when the task is Skipped or Daemoned; the condition holds Succeeded or Skipped, and the Daemoned case is kept in the text in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "the condition has no Tekton when form and no shell guard; the task never runs"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumeMounts has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key securityContext has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumeMounts has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
+    }
+   ]
+  },
+  {
+   "id": "concourse",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".concourse/buildkit.yml",
+     "text": "# pipemaster:emulated ext.passthrough pipeline/buildkit/job/build-image/step/main/carry\n# pipemaster:arg {\"digest\":\"c02fd42275fccc009744b01e38ef79ab2507c24645d4a540e05f24c3eb48c27a\",\"carry\":\"id: main\\nkind: script\\nworkdir: /workspace/$\\u007b{ inputs.path }}\\nscript:\\n    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \\\"type=image,name=$\\u007b{ inputs.image }}:$\\u007b{ inputs.version }},push=true\\\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \\\"type=registry,mode=max,ref=$\\u007b{ inputs.image }}:buildkit-cache\\\" --import-cache \\\"type=registry,ref=$\\u007b{ inputs.image }}:buildkit-cache\\\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\\nenv:\\n    - name: BUILDKITD_FLAGS\\n      value:\\n        lit: --oci-worker-no-process-sandbox\\n\"}\n# pipemaster:emulated job.manual pipeline/buildkit/job/build-image\n# pipemaster:arg {\"manual\":false,\"held\":true,\"cond\":true}\n# pipemaster:emulated ext.passthrough pipeline/buildkit/job/build-image/carry\n# pipemaster:arg {\"digest\":\"6d09f8f2a4d3eaa5f914b2f46226c8711da51d3b717c66441820a4ddcdf30d6d\",\"carry\":\"if: (needs.git-clone.result == 'success') || (needs.git-clone.result == 'skipped')\\ncontainer:\\n    ref: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\\nid: build-image\\nneeds:\\n    - job: git-clone\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/buildkit/job/git-clone/step/main/carry\n# pipemaster:arg {\"digest\":\"d6dd2823612a2ad68c46842ff3844153d28898d0fe1fbd45abc53a158f235d24\",\"carry\":\"id: main\\nkind: script\\nscript:\\n    - git-clone-pull.sh \\\"$\\u007b{ inputs.repo }}\\\" \\\"$\\u007b{ inputs.branch }}\\\" \\\"$\\u007b{ inputs.path }}\\\"\\n\"}\n# pipemaster:emulated job.manual pipeline/buildkit/job/git-clone\n# pipemaster:arg {\"manual\":false,\"held\":true}\n# pipemaster:emulated ext.passthrough pipeline/buildkit/job/git-clone/carry\n# pipemaster:arg {\"digest\":\"62417b5c81cccb22e1b273c5bf9cb1a2704d663e98dbf25f15aa00f519baaa06\",\"carry\":\"container:\\n    ref: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\\nid: git-clone\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/buildkit/carry\n# pipemaster:arg {\"digest\":\"a9dcabdf146e13f0b705d5e79537530b2e20a76f3afe2b7c43e4cd921b73fc50\",\"carry\":\"id: buildkit\\ninputs:\\n    - name: repo\\n      default: https://gitee.com/dev-ops/go-gin-rest-api.git\\n    - name: branch\\n      default: main\\n    - name: path\\n      default: go-gin-rest-api\\n    - name: image\\n      default: registry.cn-shenzhen.aliyuncs.com/dev-ops/go-gin-rest-api\\n    - name: version\\n      default: 1.0.1\\n\"}\n# pipemaster:emulated trigger.manual pipeline/buildkit/job/git-clone\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\njobs:\n  - name: build-image\n    plan:\n      - get: source\n        passed:\n          - git-clone\n      - task: main\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit\n              tag: v0.12.1-rootless\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          params:\n            BUILDKITD_FLAGS: --oci-worker-no-process-sandbox\n          run:\n            path: sh\n            args:\n              - -ec\n              - '# pipemaster:lost buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name={{ inputs.image }}:{{ inputs.version }},push=true\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \"type=registry,mode=max,ref={{ inputs.image }}:buildkit-cache\" --import-cache \"type=registry,ref={{ inputs.image }}:buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct'\n            dir: workspace\n  - name: git-clone\n    plan:\n      - get: source\n      - task: main\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: registry.cn-shenzhen.aliyuncs.com/dev-ops/git\n              tag: v2.30.2\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          run:\n            path: sh\n            args:\n              - -ec\n              - '# pipemaster:lost git-clone-pull.sh \"{{ inputs.repo }}\" \"{{ inputs.branch }}\" \"{{ inputs.path }}\"'\n            dir: workspace\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/buildkit",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumes has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (volumes) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit",
+     "feature": "pipeline.inputs",
+     "level": "lost"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (depends) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "job.if",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "depends git-clone has a task with no result, which also passes when the task is Skipped or Daemoned; the condition holds Succeeded or Skipped, and the Daemoned case is kept in the text in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "the condition has no shell test form; the job has no triggering get, so a person starts it"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumeMounts has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key securityContext has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (securityContext, volumeMounts) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "detail": "no Concourse spelling for expression inputs.image, inputs.version, inputs.image, inputs.image; the line is commented out"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image/step/main",
+     "feature": "step.workdir",
+     "level": "lost",
+     "detail": "the working directory holds an expression, which a task dir cannot hold; the step runs in the checkout"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "key volumeMounts has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (volumeMounts) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "detail": "no Concourse spelling for expression inputs.repo, inputs.branch, inputs.path; the line is commented out"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone/step/main",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[argo]",
+     "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone",
+     "feature": "trigger.manual",
+     "level": "emulated",
+     "strategy": "get with no trigger",
+     "detail": "no trigger starts the job, so a person starts it"
+    }
+   ]
+  }
+ ]
+}
