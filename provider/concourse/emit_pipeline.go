@@ -8,7 +8,6 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
-	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 // topExt lists the pipeline Ext keys that are top-level keys of the file, in the order they are written.
@@ -83,11 +82,7 @@ func (e *emitter) pipeline(pl *ir.Pipeline, first bool) {
 			top.Set(k, n)
 		}
 	}
-	if extra, ok := pe.ext[ExtExtra].(map[string]any); ok {
-		for _, k := range sortedKeys(extra) {
-			e.lose(pp, caps.ExtPassthrough, "top-level key "+k+" is no Concourse key and is not written; "+report.AnchorKeyDetail)
-		}
-	}
+	pe.unwrittenKeys(pp)
 	pe.carryPipeline(top.N)
 	pe.doc.Root = top.N
 	e.files = append(e.files, &outFile{name: pe.file, doc: pe.doc})
@@ -177,4 +172,22 @@ func (pe *pipeEmitter) extDef(name string) map[string]any {
 		return c
 	}
 	return nil
+}
+
+// unwrittenKeys reports the unknown top-level keys of a Concourse-origin pipeline. Concourse rejects a key it does
+// not know, so none is written. The IR keeps them, and the metadata returns them.
+func (pe *pipeEmitter) unwrittenKeys(pp string) {
+	extra, _ := pe.ext[ExtExtra].(map[string]any)
+	holders := map[string]bool{}
+	list, _ := pe.ext[ExtAnchorKeys].([]any)
+	for _, k := range list {
+		holders[strOf(k)] = true
+	}
+	for _, k := range sortedKeys(extra) {
+		why := "the name is unknown to Concourse"
+		if holders[k] {
+			why = "it only holds YAML anchors, which the parser has resolved"
+		}
+		pe.e.lose(pp, caps.ExtPassthrough, "top-level key "+k+" is no Concourse key and is not written; "+why)
+	}
 }

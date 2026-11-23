@@ -12,6 +12,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 func TestUnspellableConditionOnAnEnvironmentJobReportsNoFalseEdit(t *testing.T) {
@@ -851,5 +852,45 @@ func TestUnreadableGitSourceKeyDoesNotDependOnKeyOrder(t *testing.T) {
 	b, _ := parseFiles(t, map[string]string{"ci.yml": file("      branch_filters: [x]\n      version_type: branches\n      uri: u\n")})
 	if x, y := a.Pipelines[0].Triggers[0].Ext, b.Pipelines[0].Triggers[0].Ext; !reflect.DeepEqual(x, y) {
 		t.Fatalf("the trigger Ext follows the key order:\n%v\n%v", x, y)
+	}
+}
+
+// keyReason is the part of the entries that speaks of one top-level key; the emitter joins them in one entry.
+func keyReason(t *testing.T, rep *report.Report, key string) string {
+	t.Helper()
+	for _, e := range rep.Entries {
+		if e.Feature != caps.ExtPassthrough || e.Level != caps.Lost {
+			continue
+		}
+		for _, part := range strings.Split(e.Detail, "; top-level key ") {
+			part = strings.TrimPrefix(part, "top-level key ")
+			if strings.HasPrefix(part, key+" is no Concourse key") {
+				return part
+			}
+		}
+	}
+	t.Fatalf("no entry for the key %s: %v", key, rep.Entries)
+	return ""
+}
+
+func TestMisspelledTopLevelKeyIsReportedAsUnknownNotAsAnchorHolder(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"ci.yml": "resouces:\n  - name: x\n" + anchorFile})
+	files, rep := emit(t, p)
+	if strings.Contains(files[".concourse/ci.yml"], "resouces") {
+		t.Fatal("the unknown key was written")
+	}
+	if got := keyReason(t, rep, "resouces"); strings.Contains(got, "anchor") || !strings.Contains(got, "unknown") {
+		t.Fatalf("the misspelled key reads %q", got)
+	}
+	if got := keyReason(t, rep, "anchors"); !strings.Contains(got, "only holds YAML anchors") {
+		t.Fatalf("the anchor holder reads %q", got)
+	}
+}
+
+func TestAnchorThatNothingAliasesDoesNotMakeAHolder(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"ci.yml": "lonely: &unused 1\n" + anchorFile})
+	_, rep := emit(t, p)
+	if got := keyReason(t, rep, "lonely"); strings.Contains(got, "anchor") {
+		t.Fatalf("an anchor that no alias reads made a holder: %q", got)
 	}
 }

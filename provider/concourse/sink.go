@@ -19,6 +19,8 @@ const (
 	ExtPrototypes    = "prototypes"
 	// ExtExtra is the pipeline Ext key of the unknown top-level keys, by name.
 	ExtExtra = "extra"
+	// ExtAnchorKeys is the pipeline Ext key that lists the ExtExtra keys that only hold YAML anchors.
+	ExtAnchorKeys = "anchor_keys"
 	// ExtFiles is the Ext key of the first pipeline that holds the YAML files that are no pipeline, by path.
 	ExtFiles = "files"
 	// ExtGets is the job Ext key of the source gets (git and time resources) of the leading plan block, verbatim.

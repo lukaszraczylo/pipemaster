@@ -76,3 +76,54 @@ func checkDuplicateKeys(n *yaml.Node) error {
 	}
 	return nil
 }
+
+// anchorHolders returns the top-level keys whose value defines an anchor that an alias outside that value reads.
+// The parser resolves aliases, so such a key adds nothing the rest of the file lacks.
+func anchorHolders(data []byte) map[string]bool {
+	doc, err := DecodeNode(data)
+	if err != nil || len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
+		return nil
+	}
+	pairs := doc.Content[0].Content
+	aliasedBy := make([]map[string]bool, len(pairs)/2)
+	for i := range aliasedBy {
+		aliasedBy[i] = map[string]bool{}
+		collectAliases(pairs[2*i], aliasedBy[i])
+		collectAliases(pairs[2*i+1], aliasedBy[i])
+	}
+	out := map[string]bool{}
+	for i := range aliasedBy {
+		defined := map[string]bool{}
+		collectAnchors(pairs[2*i+1], defined)
+		for j, aliases := range aliasedBy {
+			for name := range aliases {
+				if j != i && defined[name] {
+					out[pairs[2*i].Value] = true
+				}
+			}
+		}
+	}
+	return out
+}
+
+func collectAliases(n *yaml.Node, into map[string]bool) {
+	if n.Kind == yaml.AliasNode {
+		into[n.Value] = true
+		return
+	}
+	for _, c := range n.Content {
+		collectAliases(c, into)
+	}
+}
+
+func collectAnchors(n *yaml.Node, into map[string]bool) {
+	if n.Anchor != "" {
+		into[n.Anchor] = true
+	}
+	if n.Kind == yaml.AliasNode {
+		return
+	}
+	for _, c := range n.Content {
+		collectAnchors(c, into)
+	}
+}

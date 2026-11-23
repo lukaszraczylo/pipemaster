@@ -63,6 +63,7 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		byID[id] = src.name
 		pb := newPipelineBuilder(rep, src.name, id)
 		pb.readMarks(src.data)
+		pb.anchorKeys = anchorHolders(src.data)
 		pl, err := pb.build(src.top)
 		if err != nil {
 			return nil, nil, fmt.Errorf("%s: %w", src.name, err)
@@ -144,18 +145,20 @@ func extMap(pl *ir.Pipeline) map[string]any {
 
 // pipeBuilder is the state of one pipeline file.
 type pipeBuilder struct {
-	marks    map[ir.FeatureUse][]string
-	bare     map[ir.FeatureUse]bool
-	present  map[string]bool
-	rep      *report.Report
-	res      map[string]*resource
-	types    map[string]bool
-	used     map[string]bool
-	jobSet   map[string]bool
-	file     string
-	id       string
-	resOrder []*resource
-	jobNames []string
+	marks   map[ir.FeatureUse][]string
+	bare    map[ir.FeatureUse]bool
+	present map[string]bool
+	// anchorKeys holds the top-level keys whose value defines an anchor that the file aliases elsewhere.
+	anchorKeys map[string]bool
+	rep        *report.Report
+	res        map[string]*resource
+	types      map[string]bool
+	used       map[string]bool
+	jobSet     map[string]bool
+	file       string
+	id         string
+	resOrder   []*resource
+	jobNames   []string
 }
 
 func newPipelineBuilder(rep *report.Report, file, id string) *pipeBuilder {
@@ -216,12 +219,21 @@ func (b *pipeBuilder) build(top *omap) (*ir.Pipeline, error) {
 		}
 	}
 	extra := map[string]any{}
+	var holders []any
 	for _, key := range r.Rest() {
 		extra[key] = plain(top.Vals[key])
-		k.Note(caps.ExtPassthrough, "top-level key "+key+" is unknown to Concourse and may hold anchors; kept in Ext", r.Line(key))
+		if b.anchorKeys[key] {
+			holders = append(holders, key)
+			k.Note(caps.ExtPassthrough, "top-level key "+key+" only holds YAML anchors that the file aliases; kept in Ext", r.Line(key))
+			continue
+		}
+		k.Note(caps.ExtPassthrough, "top-level key "+key+" is unknown to Concourse; kept in Ext", r.Line(key))
 	}
 	if len(extra) > 0 {
 		k.Out[ExtExtra] = extra
+	}
+	if len(holders) > 0 {
+		k.Out[ExtAnchorKeys] = holders
 	}
 	if len(k.Out) > 0 {
 		pl.Ext = k.Ext()
