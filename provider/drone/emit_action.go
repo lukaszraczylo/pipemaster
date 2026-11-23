@@ -189,10 +189,13 @@ func (e *emitter) markAction(sp string, st *ir.Step, at int, image string) error
 	return e.markArg(caps.StepAction, sp, actionArg{Step: body, At: at, Image: image})
 }
 
-// withoutBookkeeping drops the keys a parser sets only to rebuild its own layout.
+// withoutBookkeeping drops the keys a parser sets only to rebuild its own layout, and the Ext of other providers.
 func withoutBookkeeping(x ir.Ext) ir.Ext {
 	var out ir.Ext
 	for prov, raw := range x {
+		if prov != dialect {
+			continue
+		}
 		m, ok := raw.(map[string]any)
 		if !ok {
 			if out == nil {
