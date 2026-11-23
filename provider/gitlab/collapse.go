@@ -662,3 +662,13 @@ func collapseJobIf(c *collapseCtx) bool {
 	j.If = src
 	return true
 }
+
+// collapseNoop removes the no-op script that the emitter wrote for a job with no steps.
+func collapseNoop(c *collapseCtx) bool {
+	j := findJobAt(c.pl, c.path)
+	if j == nil || len(j.Steps) != 1 || j.Steps[0].ID != defaultStepID || !slices.Equal(j.Steps[0].Script, []string{noopLine}) {
+		return false
+	}
+	j.Steps = nil
+	return true
+}

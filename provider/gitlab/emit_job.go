@@ -339,10 +339,14 @@ func (e *emitter) scriptKeys(m *omap, p *jobPrep, ext map[string]any) error {
 	if !hasAny && !isTrigger {
 		held := p.marks
 		p.marks = nil
-		p.add(secScript, str(noopLine))
+		if len(p.j.Steps) == 0 {
+			p.add(secScript, str(noopLine), emitkit.Marker(caps.StepScript, p.path))
+		} else {
+			p.add(secScript, str(noopLine))
+		}
 		p.marks = held
 		if len(p.j.Steps) == 0 {
-			e.lose(p.path+"/step/"+defaultStepID, caps.StepScript, "the job has no steps; a no-op script keeps the file valid")
+			e.emulate(p.path, caps.StepScript, "no-op script", "the job has no steps; a no-op script keeps the file valid")
 		}
 	}
 	if len(p.pending) > 0 || len(p.marks) > 0 {

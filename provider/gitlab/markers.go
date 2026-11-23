@@ -38,6 +38,7 @@ var collapsers = map[caps.Feature]collapser{
 	caps.PipelineConcurrency: collapseConcurrency,
 	caps.PipelineInputs:      collapseInputs,
 	caps.StepAction:          collapseAction,
+	caps.StepScript:          collapseNoop,
 }
 
 // lastCollapsers run after every other marker, because they read the lines the others restore.
