@@ -576,3 +576,14 @@ func TestSingleGetInParallelKeepsItsWrapper(t *testing.T) {
 		}
 	}
 }
+
+func TestManualEventConditionDoesNotComeBackFromTheCarry(t *testing.T) {
+	j := scriptJob("deploy", "make deploy")
+	j.Manual = true
+	j.If = eqRef("event", "manual")
+	files, _ := emit(t, project(j))
+	back, _ := reparse(t, files)
+	if got := back.Pipelines[0].Jobs[0].If; got != nil {
+		t.Fatalf("If = %v; want none, because the file does not hold the condition", got)
+	}
+}

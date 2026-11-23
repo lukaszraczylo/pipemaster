@@ -40,6 +40,9 @@ func (e *emitter) carry(path string, v any, digest string) {
 func (jx *jobEmitter) carryJob(node *yaml.Node) {
 	j := *jx.j
 	j.Steps, j.Ext = nil, nil
+	if j.Manual && isManualEvent(j.If) {
+		j.If = nil
+	}
 	jx.pe.e.carry(jx.mpath, &j, nodeText(node))
 }
 
