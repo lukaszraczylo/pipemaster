@@ -477,3 +477,37 @@ func TestForeignPluginStepKeepsItsPlaceAndComesBack(t *testing.T) {
 		t.Fatalf("an unedited file reported an ignored marker: %v", rep.Entries)
 	}
 }
+
+func TestResourceUsedOnlyByAVerbatimStepKeepsItsOrder(t *testing.T) {
+	src := `resources:
+  - name: tick
+    type: time
+    source: {interval: 1h}
+  - name: other
+    type: git
+    source: {uri: "https://example.com/o.git", branch: main}
+  - name: src
+    type: git
+    source: {uri: "https://example.com/x.git", branch: main}
+jobs:
+  - name: build
+    plan:
+      - get: src
+        trigger: true
+      - get: other
+      - task: t
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          run: {path: sh, args: [-ec, make]}
+`
+	p, _ := parseFiles(t, map[string]string{"ci.yml": src})
+	files, _ := emit(t, p)
+	var order []string
+	for _, r := range list(pipelineDoc(t, files)["resources"]) {
+		order = append(order, dict(r)["name"].(string))
+	}
+	if strings.Join(order, ",") != "other,src" {
+		t.Fatalf("resources = %v; want the file order other,src", order)
+	}
+}

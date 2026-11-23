@@ -355,6 +355,7 @@ func (pe *pipeEmitter) restore(t *ir.Trigger, tp string) {
 // resourceNodes writes the resources that a job uses; an unused resource is dropped, because fly rejects it.
 func (pe *pipeEmitter) resourceNodes() *yaml.Node {
 	var out []*yaml.Node
+	sort.SliceStable(pe.sources, pe.sourceLess)
 	for _, s := range pe.sources {
 		if !s.used {
 			pe.e.lose(pe.path, caps.ExtPassthrough, "the resource "+s.name+" is used by no job, and fly rejects an unused resource; it is not written")
