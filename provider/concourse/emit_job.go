@@ -41,9 +41,9 @@ type jobEmitter struct {
 	caches     []string
 	// finallyTasks lists the written names of the tasks that stand for finally jobs in the hooks.
 	finallyTasks []string
-	actSeq     int
-	manual     bool
-	held       bool
+	actSeq       int
+	manual       bool
+	held         bool
 }
 
 // jobs writes every job of the pipeline.
