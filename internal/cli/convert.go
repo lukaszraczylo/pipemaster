@@ -15,9 +15,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
-	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/meta"
-	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/report"
 	"github.com/lukaszraczylo/pipemaster/validate"
 )
@@ -93,18 +91,10 @@ func runConvert(args []string, _, stderr io.Writer) int {
 	if fullReturn {
 		originInvalid = stack.Layers[stack.Find(tgt.ID())].SourceInvalid
 	}
-	// A full return emits into the origin dialect, which can still lack a key the pipeline holds; no older layer
-	// keeps that key, so this output records it.
-	if !res.Restored || (fullReturn && dialectLoss(emitRep)) {
-		owner := src.ID()
-		if res.Restored {
-			owner = tgt.ID()
-		}
-		m := roundtrip.NewMeta(owner, proj, tgt, emitRep)
+	m := roundtrip.ReturnLayer(res, proj, src, tgt, emitRep)
+	if m != nil {
 		switch {
 		case res.Restored:
-			m.Residual, m.IDs = nil, nil
-			m.Ext = anchorKeyExt(m.Ext, emitRep)
 			m.SourceInvalid = originInvalid
 		case len(stack.Layers) == 0:
 			m.SourceInvalid = sourceFindings(src.ID(), srcFS, proj.Origin.Files)
@@ -147,37 +137,6 @@ func runConvert(args []string, _, stderr io.Writer) int {
 		return exitStrict
 	}
 	return exitOK
-}
-
-// dialectLoss reports whether the emit dropped a pipeline feature. Foreign Ext that the output never holds is not
-// one: it never belonged to the origin. A key that only holds anchors belonged to it. An external verdict asks for setup, it drops nothing.
-func dialectLoss(rep *report.Report) bool {
-	return slices.ContainsFunc(rep.Entries, func(e report.Entry) bool {
-		return e.Level == caps.Lost && (e.Feature != caps.ExtPassthrough || isAnchorKeyLoss(e))
-	})
-}
-
-// isAnchorKeyLoss is true for the entry of a top-level key that only holds YAML anchors.
-func isAnchorKeyLoss(e report.Entry) bool {
-	return e.Level == caps.Lost && e.Feature == caps.ExtPassthrough && strings.HasSuffix(e.Detail, report.AnchorKeyDetail)
-}
-
-// anchorKeyExt keeps, for a full return, the origin Ext of the pipelines whose anchor holder keys the emit left
-// out. The origin file lacks them and no older layer is left to return them.
-func anchorKeyExt(all map[string]ir.Ext, rep *report.Report) map[string]ir.Ext {
-	out := map[string]ir.Ext{}
-	for _, e := range rep.Entries {
-		if !isAnchorKeyLoss(e) {
-			continue
-		}
-		if ext, ok := all[e.IRPath]; ok {
-			out[e.IRPath] = ir.Ext{provider.Concourse: ext[provider.Concourse]}
-		}
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
 }
 
 // addMetaGap reports that the metadata lacks its emitted-form record, so --force cannot restore lost fields

@@ -13,6 +13,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/meta"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	_ "github.com/lukaszraczylo/pipemaster/provider/argo"
 	_ "github.com/lukaszraczylo/pipemaster/provider/concourse"
@@ -144,18 +145,39 @@ func targets(id string) []string {
 
 func isDialect(id string) bool { return provider.Family(id) != id }
 
-// dropsAnchorKeys is true when an emit left out top-level keys that only hold YAML anchors. The IR keeps them
-// and the metadata of that emit returns them.
-func dropsAnchorKeys(rep *report.Report) bool {
-	if rep == nil {
-		return false
+// returnInto emits proj into a with the command's own return layer and parses the files back, restoring the
+// layer as the roundtrip command does.
+func returnInto(t *testing.T, a provider.Provider, proj *ir.Project) (*ir.Project, *report.Report) {
+	t.Helper()
+	files, rep, err := a.Emit(proj)
+	if err != nil {
+		t.Fatalf("emit %s back: %v", a.ID(), err)
 	}
-	for _, e := range rep.Entries {
-		if e.Feature == caps.ExtPassthrough && e.Level == caps.Lost && strings.HasSuffix(e.Detail, report.AnchorKeyDetail) {
-			return true
+	stack := &meta.Stack{}
+	res := roundtrip.HopResult{Proj: proj, Out: stack, Restored: true}
+	if m := roundtrip.ReturnLayer(res, proj, a, a, rep); m != nil {
+		if err := roundtrip.RecordEmitted(m, a, files); err != nil {
+			t.Fatalf("record emitted: %v", err)
 		}
+		stack.Layers = append(stack.Layers, m)
 	}
-	return false
+	out := toFS(meta.AttachStack(files, stack))
+	back, _, err := a.Parse(out)
+	if err != nil {
+		t.Fatalf("parse %s back: %v", a.ID(), err)
+	}
+	loaded, err := meta.LoadStack(out, back.Origin.Files)
+	if err != nil {
+		t.Fatalf("load stack: %v", err)
+	}
+	if len(loaded.Layers) > 0 {
+		hop, err := roundtrip.Hop(back, loaded, out, a.ID(), a.ID(), false, &report.Report{})
+		if err != nil {
+			t.Fatalf("restore own layer: %v", err)
+		}
+		back = hop.Proj
+	}
+	return back, rep
 }
 
 func prov(t *testing.T, id string) provider.Provider {
@@ -232,6 +254,10 @@ func hops(t *testing.T, fsA fs.FS, a, b provider.Provider, embed bool, withMeta 
 		}
 		roundtrip.Restore(mid, lm)
 	}
+	if withMeta && !isDialect(a.ID()) {
+		r.back, r.backRep = returnInto(t, a, mid)
+		return r
+	}
 	files, rep2, err := a.Emit(mid)
 	if err != nil {
 		t.Fatalf("emit %s back: %v", a.ID(), err)
@@ -242,7 +268,7 @@ func hops(t *testing.T, fsA fs.FS, a, b provider.Provider, embed bool, withMeta 
 		t.Fatalf("parse %s back: %v", a.ID(), err)
 	}
 	// A dialect drops a key it cannot hold from the file and keeps it in the metadata of that emit.
-	if withMeta && (isDialect(a.ID()) || dropsAnchorKeys(rep2)) && rep2.Worst() >= caps.External {
+	if withMeta && rep2.Worst() >= caps.External {
 		roundtrip.Restore(r.back, roundtrip.NewMeta(a.ID(), r.src, a, rep2))
 	}
 	return r

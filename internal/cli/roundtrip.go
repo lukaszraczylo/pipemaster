@@ -60,6 +60,15 @@ func runRoundtrip(args []string, stdout, stderr io.Writer) int {
 		prev = next
 	}
 
+	if len(stack.Layers) > 0 {
+		res, err := roundtrip.Hop(cur, stack, curFS, src.ID(), src.ID(), false, rep)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "%v\n", err)
+			return exitError
+		}
+		cur = res.Proj
+	}
+
 	if err := rep.Render(stderr, "text"); err != nil {
 		_, _ = fmt.Fprintf(stderr, "render report: %v\n", err)
 		return exitError
@@ -84,8 +93,7 @@ func hop(proj *ir.Project, fsys fs.FS, in *meta.Stack, from, to provider.Provide
 		return nil, nil, nil, fmt.Errorf("emit %s: %w", to.ID(), err)
 	}
 	rep.Merge(r)
-	if !res.Restored {
-		m := roundtrip.NewMeta(from.ID(), res.Proj, to, r)
+	if m := roundtrip.ReturnLayer(res, res.Proj, from, to, r); m != nil {
 		if err := roundtrip.RecordEmitted(m, to, files); err != nil {
 			addMetaGap(rep, err)
 		}
