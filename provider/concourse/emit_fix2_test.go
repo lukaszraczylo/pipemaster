@@ -227,3 +227,33 @@ func bodyOf(src string) string {
 	}
 	return strings.Join(out, "\n")
 }
+
+func TestDroppedCarryNamesEachFieldItHeld(t *testing.T) {
+	j := scriptJob("test", "echo one\necho three", "echo ${{ matrix.os }}")
+	j.Runner = ir.Runner{Labels: []string{"self-hosted", "linux-big"}}
+	j.Env = []ir.Var{{Name: "JOBVAR", Value: ir.Value{Lit: "1"}}}
+	j.Matrix = &ir.Matrix{Axes: []ir.Axis{{Name: "os", Values: []string{"a", "b"}}}}
+	j.Steps[0].Image = &ir.Image{Ref: "golang:1.22"}
+	j.Steps[0].Env = []ir.Var{{Name: "MODE", Value: ir.Value{Lit: "fast"}}}
+	files, _ := emit(t, project(j))
+	src := files[".concourse/ci.yml"]
+	edited := src
+	if i := strings.Index(src, "\nresources:"); i >= 0 {
+		edited = src[:i] + strings.Replace(src[i:], "echo one", "echo uno", 1)
+	}
+	if edited == src {
+		t.Fatalf("no script line to edit:\n%s", src)
+	}
+	_, rep := parseFiles(t, map[string]string{"ci.yml": edited})
+	var text string
+	for _, e := range rep.Entries {
+		if strings.Contains(e.Detail, "marker ignored") {
+			text += e.Detail + "\n"
+		}
+	}
+	for _, want := range []string{"not restored: ", "runs-on labels [linux-big self-hosted]", "job env JOBVAR", "step image golang:1.22", "step env MODE"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("no %q in the ignored-marker entries:\n%s", want, text)
+		}
+	}
+}

@@ -2,6 +2,7 @@ package concourse
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -442,7 +443,13 @@ func (b *pipeBuilder) carryOf(path, digest string, into any) bool {
 		return false
 	}
 	if a.Digest != digest {
-		b.ignored(path+carrySuffix, caps.ExtPassthrough, "the text beside the carry of "+path+" was edited after pipemaster wrote it")
+		why := "the text beside the carry of " + path + " was edited after pipemaster wrote it"
+		if yaml.Unmarshal([]byte(a.Carry), into) == nil {
+			if held := carryFields(into); held != "" {
+				why += "; not restored: " + held
+			}
+		}
+		b.ignored(path+carrySuffix, caps.ExtPassthrough, why)
 		return false
 	}
 	if err := yaml.Unmarshal([]byte(a.Carry), into); err != nil {
@@ -596,4 +603,99 @@ func matrixKey(v string) (string, bool) {
 	}
 	rest = strings.TrimPrefix(rest, cellVar+".")
 	return rest, true
+}
+
+// carryFields names the IR fields that a carry held, for the entry of a carry that was dropped.
+func carryFields(v any) string {
+	var out []string
+	names := func(env []ir.Var) string {
+		n := make([]string, len(env))
+		for i, e := range env {
+			n[i] = e.Name
+		}
+		return strings.Join(n, ", ")
+	}
+	switch c := v.(type) {
+	case *ir.Step:
+		if c.Image != nil {
+			out = append(out, "step image "+c.Image.Ref)
+		}
+		if c.Shell != "" {
+			out = append(out, "step shell "+c.Shell)
+		}
+		if len(c.Env) > 0 {
+			out = append(out, "step env "+names(c.Env))
+		}
+		if c.WorkDir != "" {
+			out = append(out, "step workdir "+c.WorkDir)
+		}
+		if c.If != nil {
+			out = append(out, "step condition "+expr.String(c.If))
+		}
+		if len(c.Script) > 0 {
+			out = append(out, "step script")
+		}
+	case *ir.Job:
+		out = jobFields(c, names)
+	case *ir.Pipeline:
+		if len(c.Env) > 0 {
+			out = append(out, "pipeline env "+names(c.Env))
+		}
+		if len(c.Triggers) > 0 {
+			out = append(out, fmt.Sprintf("%d pipeline triggers", len(c.Triggers)))
+		}
+		if c.Concurrency != nil {
+			out = append(out, "pipeline concurrency")
+		}
+		if c.Permissions != nil {
+			out = append(out, "pipeline permissions")
+		}
+		if len(c.Inputs) > 0 {
+			out = append(out, "pipeline inputs")
+		}
+		if len(c.Finally) > 0 {
+			out = append(out, "finally jobs")
+		}
+	}
+	return strings.Join(out, ", ")
+}
+
+func jobFields(c *ir.Job, names func([]ir.Var) string) []string {
+	var out []string
+	if len(c.Runner.Labels) > 0 {
+		out = append(out, "runs-on labels "+fmt.Sprint(c.Runner.Labels))
+	}
+	if len(c.Runner.Selector) > 0 || c.Runner.Platform != "" {
+		out = append(out, "runner selector or platform")
+	}
+	if c.Container != nil {
+		out = append(out, "job image "+c.Container.Ref)
+	}
+	if len(c.Env) > 0 {
+		out = append(out, "job env "+names(c.Env))
+	}
+	if len(c.Cache) > 0 {
+		out = append(out, "job cache")
+	}
+	if len(c.Artifacts) > 0 || len(c.Outputs) > 0 {
+		out = append(out, "job artifacts")
+	}
+	if len(c.Services) > 0 {
+		out = append(out, "job services")
+	}
+	if c.Retry != nil && len(c.Retry.On) > 0 {
+		out = append(out, "retry conditions "+strings.Join(c.Retry.On, ", "))
+	}
+	if c.Environment != nil {
+		out = append(out, "environment "+c.Environment.Name)
+	}
+	if c.If != nil {
+		out = append(out, "job condition "+expr.String(c.If))
+	}
+	for _, n := range c.Needs {
+		if n.Artifacts || n.Optional {
+			out = append(out, "need flags of "+n.JobID)
+		}
+	}
+	return out
 }
