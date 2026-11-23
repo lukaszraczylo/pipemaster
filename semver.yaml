@@ -1,0 +1,25 @@
+# semver-generator (lukaszraczylo/semver-generator), read by the shared release workflow.
+# It computes the next version from the commit messages since the latest tag.
+#
+# force.existing: continue from the latest git tag.
+# force.strict false: a commit matching no wording still bumps patch.
+# force.minor: the minor floor, so the first release is 0.1.x.
+#
+# matching: regex, because fuzzy matching hits any word holding the keyword's letters
+# in order. A major release needs an explicit `Semver-Major: <what breaks>` trailer line.
+version: 1
+
+force:
+  existing: true
+  strict: false
+  minor: 1
+
+matching: regex
+
+wording:
+  patch:
+    - '(?m)^(fix|perf|refactor|revert|build|chore|ci|docs|style|test)(\([^)]*\))?!?:'
+  minor:
+    - '(?m)^feat(\([^)]*\))?!?:'
+  major:
+    - '(?m)^Semver-Major:'

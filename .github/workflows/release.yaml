@@ -1,0 +1,28 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".github/**"
+
+# Two pushes in quick succession can race to tag different commits; keep one run per ref.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    uses: lukaszraczylo/shared-actions/.github/workflows/go-release.yaml@6032b3a3e39de157dc903b9575221bf72e360e03
+    permissions:
+      id-token: write
+      contents: write
+      packages: write
+    with:
+      go-version: ">=1.27"
+      preflight-repos: lukaszraczylo/homebrew-taps
+    secrets: inherit
