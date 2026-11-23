@@ -399,3 +399,18 @@ func TestEditedFinallyHookIsKept(t *testing.T) {
 		t.Fatalf("no marker ignored entry: %v", rep.Entries)
 	}
 }
+
+func TestCarryDropsTheExtOfFinallyJobs(t *testing.T) {
+	p := finallyProject()
+	for _, f := range p.Pipelines[0].Finally {
+		f.Ext = ir.Ext{"gitlab": map[string]any{"stage": ".post"}}
+		f.Steps[0].Ext = ir.Ext{"gitlab": map[string]any{"section": "script"}}
+	}
+	files, _ := emit(t, p)
+	got, _ := reparse(t, files)
+	for _, f := range got.Pipelines[0].Finally {
+		if f.Ext != nil || f.Steps[0].Ext != nil {
+			t.Fatalf("finally job %s kept the Ext of another provider: %v %v", f.ID, f.Ext, f.Steps[0].Ext)
+		}
+	}
+}

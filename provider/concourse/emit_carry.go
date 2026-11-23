@@ -63,7 +63,24 @@ func (pe *pipeEmitter) carryPipeline(top *yaml.Node) {
 		t.Ext = nil
 		p.Triggers[i] = t
 	}
+	p.Finally = make([]*ir.Job, len(pe.pl.Finally))
+	for i, f := range pe.pl.Finally {
+		p.Finally[i] = withoutExt(f)
+	}
 	pe.e.carry(pe.mpath, &p, pipelineDigest(top))
+}
+
+// withoutExt copies a job without its Ext and the Ext of its steps; the carry holds no Ext of another provider.
+func withoutExt(j *ir.Job) *ir.Job {
+	c := *j
+	c.Ext = nil
+	c.Steps = make([]*ir.Step, len(j.Steps))
+	for i, st := range j.Steps {
+		s := *st
+		s.Ext = nil
+		c.Steps[i] = &s
+	}
+	return &c
 }
 
 // pipelineDigest is the text of the resources and of the top-level get steps of every job.
