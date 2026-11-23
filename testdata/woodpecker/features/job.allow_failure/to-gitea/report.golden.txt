@@ -1,4 +1,4 @@
 Loss report: woodpecker -> gitea
-[emulated] pipeline/woodpecker/job/ci job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/woodpecker/job/ci job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/woodpecker/job/ci/step/flaky step.image: uses: docker://<image> with entrypoint and args
 [emulated] pipeline/woodpecker/trigger/0 trigger.push: branches: '**' (GHA fires a push without filters for branches and tags; branches are named explicitly to leave tags out or beside a tag filter)

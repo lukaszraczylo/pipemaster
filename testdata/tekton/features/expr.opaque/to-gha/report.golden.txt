@@ -1,3 +1,3 @@
 Loss report: tekton -> gha
 [lost] pipeline/ci/job/build job.if (condition not expressible in GitHub Actions; job disabled)
-[emulated] pipeline/ci/job/build job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/ci/job/build job.runner: default runner label ubuntu-latest (the IR holds no runner label)

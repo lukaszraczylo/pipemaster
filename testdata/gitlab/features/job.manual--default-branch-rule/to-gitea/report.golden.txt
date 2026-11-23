@@ -1,6 +1,6 @@
 Loss report: gitlab -> gitea
 [lost] pipeline/gitlab-ci/job/publish job.if (condition not expressible in GitHub Actions; job disabled)
 [emulated] pipeline/gitlab-ci/job/publish job.manual: workflow_dispatch trigger
-[emulated] pipeline/gitlab-ci/job/publish job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/gitlab-ci/job/publish job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/gitlab-ci/job/publish step.action: actions/checkout step (GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs)
 [native] pipeline/gitlab-ci/job/publish/synth/checkout step.action (resolves against DEFAULT_ACTIONS_URL; default github)

@@ -1,8 +1,8 @@
 Loss report: drone -> forgejo
 [emulated] pipeline/drone pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)
 [emulated] pipeline/drone pipeline.finally: job with if: always() that needs every other job
-[emulated] pipeline/drone/job/build job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/drone/job/build job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/drone/job/build/step/build step.image: uses: docker://<image> with entrypoint and args
-[emulated] pipeline/drone/job/notify job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/drone/job/notify job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/drone/job/notify/step/notify step.image: uses: docker://<image> with entrypoint and args
 [emulated] pipeline/drone/trigger/0 trigger.push: branches: '**' (GHA fires a push without filters for branches and tags; branches are named explicitly to leave tags out or beside a tag filter)

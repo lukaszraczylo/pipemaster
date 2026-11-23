@@ -1,2 +1,2 @@
 Loss report: tekton -> gitea
-[emulated] pipeline/ci/job/flaky job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/ci/job/flaky job.runner: default runner label ubuntu-latest (the IR holds no runner label)

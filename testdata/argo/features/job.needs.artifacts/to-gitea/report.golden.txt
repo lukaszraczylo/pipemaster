@@ -3,9 +3,9 @@ Loss report: argo -> gitea
 [lost] pipeline/gitlab-ci/trigger/0 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the GHA file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci/trigger/1 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the GHA file; it is kept in round-trip metadata)
 [emulated] pipeline/gitlab-ci/job/compile job.artifacts: upload-artifact step at job end
-[emulated] pipeline/gitlab-ci/job/compile job.runner: default runner label ubuntu-latest (the pipeline named no runner)
-[emulated] pipeline/gitlab-ci/job/docs job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/gitlab-ci/job/compile job.runner: default runner label ubuntu-latest (the IR holds no runner label)
+[emulated] pipeline/gitlab-ci/job/docs job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/gitlab-ci/job/unit job.needs.artifacts: download-artifact step at job start
-[emulated] pipeline/gitlab-ci/job/unit job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/gitlab-ci/job/unit job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [native] pipeline/gitlab-ci/job/compile/synth/upload step.action (resolves against DEFAULT_ACTIONS_URL; default github)
 [native] pipeline/gitlab-ci/job/unit/synth/download step.action (resolves against DEFAULT_ACTIONS_URL; default github)

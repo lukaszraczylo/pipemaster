@@ -317,7 +317,7 @@ func (e *emitter) runsOn(m *omap, jp string, j *ir.Job, ext map[string]any, cons
 		if _, raw := ext[extRunsOn]; raw {
 			return nil
 		}
-		e.emulate(jp, caps.JobRunner, "default runner label "+defaultRunner, "the pipeline named no runner")
+		e.emulate(jp, caps.JobRunner, "default runner label "+defaultRunner, "the IR holds no runner label")
 		e.mark(caps.JobRunner, jp)
 		m.set("runs-on", str(defaultRunner))
 	case group == "" && len(rest) == 0 && len(labels) == 1:

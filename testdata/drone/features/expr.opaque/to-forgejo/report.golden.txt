@@ -1,6 +1,6 @@
 Loss report: drone -> forgejo
 [lost] pipeline/drone/job/ci/step/release step.if (condition not expressible in GitHub Actions; step disabled)
 [emulated] pipeline/drone pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)
-[emulated] pipeline/drone/job/ci job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/drone/job/ci job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/drone/job/ci/step/release step.image: uses: docker://<image> with entrypoint and args
 [emulated] pipeline/drone/trigger/0 trigger.push: branches: '**' (GHA fires a push without filters for branches and tags; branches are named explicitly to leave tags out or beside a tag filter)

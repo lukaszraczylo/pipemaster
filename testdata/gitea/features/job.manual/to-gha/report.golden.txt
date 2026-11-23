@@ -1,3 +1,3 @@
 Loss report: gitea -> gha
 [emulated] pipeline/gitlab-ci/job/deploy job.manual: workflow_dispatch trigger
-[emulated] pipeline/gitlab-ci/job/deploy job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/gitlab-ci/job/deploy job.runner: default runner label ubuntu-latest (the IR holds no runner label)

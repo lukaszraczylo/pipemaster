@@ -1,3 +1,3 @@
 Loss report: forgejo -> gitea
 [emulated] pipeline/gitlab-ci/job/build job.retry: step-level retry loop via shell (retry conditions are ignored; every failure retries)
-[emulated] pipeline/gitlab-ci/job/build job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/gitlab-ci/job/build job.runner: default runner label ubuntu-latest (the IR holds no runner label)

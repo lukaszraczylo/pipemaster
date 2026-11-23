@@ -1,3 +1,3 @@
 Loss report: drone -> forgejo
-[emulated] pipeline/drone/job/ci job.runner: default runner label ubuntu-latest (the pipeline named no runner)
+[emulated] pipeline/drone/job/ci job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/drone/job/ci/step/build step.image: uses: docker://<image> with entrypoint and args
