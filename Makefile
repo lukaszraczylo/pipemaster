@@ -1,4 +1,4 @@
-.PHONY: test chains lint lean vectors check linters
+.PHONY: test chains lint lint-real lean vectors check linters
 
 test:
 	go test ./...
@@ -10,6 +10,13 @@ chains:
 	go test ./internal/roundtrip -run TestChainMatrix -count=1
 
 lint:
+	golangci-lint run
+
+# Every test that runs a real linter, with every pinned linter required. The chain matrix runs under `make chains`.
+lint-real: export PIPEMASTER_REQUIRE_LINTERS = 1
+lint-real: export PATH := $(CURDIR)/.tools/bin:$(PATH)
+lint-real: linters
+	go test -count=1 -skip TestChainMatrix ./...
 	golangci-lint run
 
 linters:

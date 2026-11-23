@@ -230,8 +230,25 @@ install_fly() {
 	echo "installed fly $tag in $dest"
 }
 
+# actionlint builds with `go install`. The module proxy checks the module hash, so a replaced tag fails the build.
+install_actionlint() {
+	local tag="v1.7.12"
+	local stamp="$dest/.actionlint-$tag"
+
+	if [[ -x "$dest/actionlint" && -f "$stamp" ]]; then
+		echo "actionlint $tag is already built in $dest"
+		return 0
+	fi
+
+	GOBIN="$dest" go install "github.com/rhysd/actionlint/cmd/actionlint@$tag"
+	rm -f "$dest"/.actionlint-*
+	touch "$stamp"
+	echo "built actionlint $tag in $dest"
+}
+
 install_woodpecker
 install_drone
 install_kubeconform
 install_argo
 install_fly
+install_actionlint

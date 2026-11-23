@@ -128,7 +128,7 @@ func actionlint(t *testing.T, name string, data []byte) findings {
 	if err := os.WriteFile(p, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("actionlint", "-no-color", "-shellcheck=", "-pyflakes=", "-ignore", lintIgnore, p) // #nosec G204 -- fixed binary, temp path
+	cmd := exec.Command(linttool.RequireActionlint(t), "-no-color", "-shellcheck=", "-pyflakes=", "-ignore", lintIgnore, p) // #nosec G204 -- fixed binary, temp path
 	if b, err := cmd.CombinedOutput(); err != nil {
 		out.add(string(b))
 	}

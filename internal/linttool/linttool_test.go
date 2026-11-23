@@ -111,3 +111,36 @@ func TestFindRejectsAnotherFlyVersionOnPath(t *testing.T) {
 		t.Fatalf("Find returned the PATH binary of another version: %s", p)
 	}
 }
+
+func fakeActionlint(t *testing.T, version string) string {
+	t.Helper()
+	dir := t.TempDir()
+	script := "#!/bin/sh\nprintf '%s\\n' '" + version + "' 'installed by building from source' 'built with go1.26 compiler for darwin/arm64'\n"
+	if err := os.WriteFile(filepath.Join(dir, "actionlint"), []byte(script), 0o700); err != nil { // #nosec G306 -- test stub must be executable
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	return dir
+}
+
+func TestFindAcceptsThePinnedActionlintVersion(t *testing.T) {
+	dir := fakeActionlint(t, "1.7.12")
+	p, ok := linttool.Find("actionlint")
+	if !ok || p != filepath.Join(dir, "actionlint") {
+		t.Fatalf("Find = %q, %v; want the PATH binary", p, ok)
+	}
+}
+
+func TestFindRejectsAnotherActionlintVersionOnPath(t *testing.T) {
+	dir := fakeActionlint(t, "1.7.11")
+	if p, _ := linttool.Find("actionlint"); p == filepath.Join(dir, "actionlint") {
+		t.Fatalf("Find returned the PATH binary of another version: %s", p)
+	}
+}
+
+func TestFindAcceptsAnActionlintVersionWithAVPrefix(t *testing.T) {
+	dir := fakeActionlint(t, "v1.7.12")
+	if p, ok := linttool.Find("actionlint"); !ok || p != filepath.Join(dir, "actionlint") {
+		t.Fatalf("Find = %q, %v; want the PATH binary", p, ok)
+	}
+}

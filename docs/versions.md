@@ -21,6 +21,7 @@ These versions were verified on 2026-11-19. The Tekton Pipelines, Tekton Trigger
 | kubeconform | v0.8.0 | 2026-06-04 |
 | Concourse | v8.3.3 | 2026-11-03 |
 | fly | v8.3.3 | 2026-11-03 |
+| actionlint | v1.7.12 | 2026-03-30 |
 | concourse/time-resource | v1.11.6 | 2026-11-02 |
 
 ## Sources
@@ -43,6 +44,7 @@ These versions were verified on 2026-11-19. The Tekton Pipelines, Tekton Trigger
 - <https://github.com/concourse/concourse/releases/tag/v8.3.3>
 - <https://concourse-ci.org/docs/pipelines/>
 - <https://github.com/concourse/time-resource/tree/v1.11.6>
+- <https://github.com/rhysd/actionlint/releases/tag/v1.7.12>
 
 Drone is in maintenance mode. Harness ships occasional server releases from the `drone` branch, and no release has followed v2.28.2.
 

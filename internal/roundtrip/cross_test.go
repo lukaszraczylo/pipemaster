@@ -114,15 +114,7 @@ func TestCrossGolden(t *testing.T) {
 // requireLintersEnv makes a missing optional linter a failure instead of a skip.
 const requireLintersEnv = "PIPEMASTER_REQUIRE_LINTERS"
 
-func requireActionlint(t *testing.T) {
-	t.Helper()
-	if _, err := exec.LookPath("actionlint"); err != nil {
-		if os.Getenv(requireLintersEnv) == "1" {
-			t.Fatalf("actionlint is not installed and %s=1", requireLintersEnv)
-		}
-		t.Skip("actionlint is not installed; GHA outputs are not linted")
-	}
-}
+func requireActionlint(t *testing.T) { linttool.RequireActionlint(t) }
 
 func requireFly(t *testing.T) { linttool.RequireFly(t) }
 
@@ -165,7 +157,7 @@ func lintFile(t *testing.T, name string, data []byte) {
 	if err := os.WriteFile(p, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("actionlint", "-no-color", "-ignore", lintIgnore, p) // #nosec G204 -- fixed binary, temp path
+	cmd := exec.Command(linttool.RequireActionlint(t), "-no-color", "-ignore", lintIgnore, p) // #nosec G204 -- fixed binary, temp path
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Errorf("actionlint %s: %v\n%s", name, err, out)
 	}

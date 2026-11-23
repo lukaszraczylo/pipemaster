@@ -22,10 +22,11 @@ const (
 	kubeconformID = "kubeconform"
 	argoID        = "argo"
 	flyID         = "fly"
+	actionlintID  = "actionlint"
 )
 
 // pinned maps a linter to the version its --version output must end with; scripts/install-linters.sh builds it.
-var pinned = map[string]string{woodpeckerID: "3.20.1", droneID: "1.9.0", kubeconformID: "0.8.0", argoID: "4.1.6", flyID: "8.3.3"}
+var pinned = map[string]string{woodpeckerID: "3.20.1", droneID: "1.9.0", kubeconformID: "0.8.0", argoID: "4.1.6", flyID: "8.3.3", actionlintID: "1.7.12"}
 
 // versionOK reports whether the binary at path is the pinned version. A linter without a pin always passes.
 func versionOK(name, path string) bool {
@@ -39,8 +40,15 @@ func versionOK(name, path string) bool {
 		args = []string{"-v"}
 	case argoID:
 		args = []string{"version", "--short"}
+	case actionlintID:
+		args = []string{"-version"}
 	}
 	out, err := exec.Command(path, args...).Output() // #nosec G204 -- path of a local linter binary
+	if name == actionlintID {
+		// The version is the first line; the later lines name the build. A `go install` build prints it with a "v".
+		first, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n")
+		return err == nil && strings.TrimPrefix(strings.TrimSpace(first), "v") == want
+	}
 	return err == nil && strings.HasSuffix(strings.TrimSpace(string(out)), want)
 }
 
@@ -133,6 +141,9 @@ func DroneLint(t testing.TB, name string, data []byte) (string, error) {
 	out, err := exec.Command(bin, "lint", "--trusted", p).CombinedOutput() // #nosec G204 -- pinned local binary, temp path
 	return string(out), err
 }
+
+// RequireActionlint is Require for actionlint.
+func RequireActionlint(t testing.TB) string { return Require(t, actionlintID) }
 
 // RequireKubeconform is Require for kubeconform.
 func RequireKubeconform(t testing.TB) string { return Require(t, kubeconformID) }
