@@ -54,10 +54,9 @@ func checkCapsTables(t *testing.T, path, wantID string) int {
 func capsCommand(id string) string { return "caps --to " + id + " --format md" }
 
 // TestDocCapsTablesMatchTheCommand keeps each caps table of the README and of the provider docs equal to the command output.
+// The README may hold no table: the provider docs and the website carry them.
 func TestDocCapsTablesMatchTheCommand(t *testing.T) {
-	if checkCapsTables(t, "../../README.md", "") == 0 {
-		t.Error("no caps table found in the README")
-	}
+	checkCapsTables(t, "../../README.md", "")
 	for _, id := range provider.IDs() {
 		path := filepath.Join("../../docs/providers", id+".md")
 		if _, err := os.Stat(path); err != nil {
