@@ -48,3 +48,32 @@ func TestEditedHeldConcourseJobIsManualInGHA(t *testing.T) {
 		t.Errorf("the report does not say the job stays manual:\n%s", msg)
 	}
 }
+
+const unreadableBranchPipeline = `resources:
+  - name: app
+    type: git
+    source: {uri: ((git-uri)), branch: ((branch))}
+jobs:
+  - name: build
+    plan:
+      - get: app
+        trigger: true
+      - task: unit
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: ubuntu}}
+          inputs: [{name: app}]
+          run: {path: sh, args: [-ec, "make"]}
+`
+
+// An unreadable trigger becomes an API trigger; the GHA file names repository_dispatch for it, and the return trip
+// must not keep that name as an event of the pipeline.
+func TestUnreadableConcourseTriggerReturnsFromGHA(t *testing.T) {
+	src := t.TempDir()
+	writeTree(t, src, ".concourse/ci.yml", unreadableBranchPipeline)
+	for _, via := range []string{"gha", "gitlab"} {
+		if code, msg := runCLI("roundtrip", src, "--via", via); code != 0 {
+			t.Errorf("roundtrip via %s = %d\n%s", via, code, msg)
+		}
+	}
+}
