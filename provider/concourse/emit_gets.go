@@ -81,7 +81,7 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 	own := jx.ownGets()
 	noGets := false
 	if l, ok := jx.ext[ExtGets].([]any); ok && len(l) == 0 {
-		if len(j.Needs) == 0 {
+		if len(j.Needs) == 0 || jx.stepsHoldPassed() {
 			jx.held = len(jx.jobTriggers(nil)) == 0
 			return nil
 		}
@@ -167,6 +167,39 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 		return []*yaml.Node{ip.N}
 	}
 	return nodes
+}
+
+// stepsHoldPassed is true when a get that the file nested in a step of the plan carries a passed list, so the needs
+// already have a place in the file.
+func (jx *jobEmitter) stepsHoldPassed() bool {
+	for _, st := range jx.j.Steps {
+		if holdsPassed(extOf(st.Ext)) {
+			return true
+		}
+	}
+	return false
+}
+
+// holdsPassed looks through verbatim step values for a get with a passed list.
+func holdsPassed(v any) bool {
+	switch t := v.(type) {
+	case map[string]any:
+		if t["get"] != nil && t["passed"] != nil {
+			return true
+		}
+		for _, x := range t {
+			if holdsPassed(x) {
+				return true
+			}
+		}
+	case []any:
+		for _, x := range t {
+			if holdsPassed(x) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (jx *jobEmitter) hasTriggerSource() bool {

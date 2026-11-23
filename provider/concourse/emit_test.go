@@ -431,3 +431,39 @@ func TestNeedAddedToAJobOfAFileWithNoGetIsWritten(t *testing.T) {
 		}
 	}
 }
+
+const nestedGetFile = `resources:
+  - name: src
+    type: git
+    source: {uri: https://x/y.git, branch: main}
+jobs:
+  - name: a
+    plan:
+      - get: src
+        trigger: true
+      - task: t
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          run: {path: sh, args: [-c, "echo a"]}
+  - name: b
+    plan:
+      - task: t
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          run: {path: sh, args: [-c, "echo b"]}
+      - in_parallel:
+          - get: src
+            passed: [a]
+`
+
+// A passed list nested in the plan already holds the needs, so the emitter writes no second get.
+func TestNeedsHeldByANestedGetAddNoGet(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"ci.yml": nestedGetFile})
+	files, _ := emit(t, p)
+	plan := list(jobDoc(t, pipelineDoc(t, files), "b")["plan"])
+	if _, has := dict(plan[0])["get"]; has {
+		t.Fatalf("first step of b = %v, want no added get", plan[0])
+	}
+}
