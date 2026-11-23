@@ -10,17 +10,17 @@ The provider ID is the value that you pass to `--from`, `--to`, `--via` and `--a
 
 | ID | Provider | Pipeline files |
 | --- | --- | --- |
-| `gha` | GitHub Actions | `.yml` and `.yaml` files in `.github/workflows` |
-| `gitea` | Gitea Actions | `.yml` and `.yaml` files in `.gitea/workflows`, then `.github/workflows` |
-| `forgejo` | Forgejo Actions | `.yml` and `.yaml` files in `.forgejo/workflows`, then `.gitea/workflows`, then `.github/workflows` |
-| `gitlab` | GitLab CI | `.gitlab-ci.yml` and its local includes |
-| `woodpecker` | Woodpecker CI | `.yml` and `.yaml` files in `.woodpecker`, then `.woodpecker.yaml`, then `.woodpecker.yml` |
-| `drone` | Drone CI | `.drone.yml` |
-| `tekton` | Tekton Pipelines and Triggers | `.yaml` and `.yml` files in `.tekton`, including its subfolders |
-| `argo` | Argo Workflows and Argo Events | `.yaml` and `.yml` files in `.argo`, including its subfolders |
-| `concourse` | Concourse pipelines | `.yml` and `.yaml` files in `.concourse`, one pipeline for each file |
+| [`gha`](docs/providers/gha.md) | GitHub Actions | `.yml` and `.yaml` files in `.github/workflows` |
+| [`gitea`](docs/providers/gitea.md) | Gitea Actions | `.yml` and `.yaml` files in `.gitea/workflows`, then `.github/workflows` |
+| [`forgejo`](docs/providers/forgejo.md) | Forgejo Actions | `.yml` and `.yaml` files in `.forgejo/workflows`, then `.gitea/workflows`, then `.github/workflows` |
+| [`gitlab`](docs/providers/gitlab.md) | GitLab CI | `.gitlab-ci.yml` and its local includes |
+| [`woodpecker`](docs/providers/woodpecker.md) | Woodpecker CI | `.yml` and `.yaml` files in `.woodpecker`, then `.woodpecker.yaml`, then `.woodpecker.yml` |
+| [`drone`](docs/providers/drone.md) | Drone CI | `.drone.yml` |
+| [`tekton`](docs/providers/tekton.md) | Tekton Pipelines and Triggers | `.yaml` and `.yml` files in `.tekton`, including its subfolders |
+| [`argo`](docs/providers/argo.md) | Argo Workflows and Argo Events | `.yaml` and `.yml` files in `.argo`, including its subfolders |
+| [`concourse`](docs/providers/concourse.md) | Concourse pipelines | `.yml` and `.yaml` files in `.concourse`, one pipeline for each file |
 
-The parser reads the first directory of the list that exists and does not merge directories. The emitter writes only the first directory. If a repository holds both `.github/workflows` and `.gitea/workflows`, `detect` lists `gha` and `gitea`. Then `convert` needs `--from`. The pinned versions and the default action hosts are in [docs/versions.md](docs/versions.md).
+The parser reads the first directory of the list that exists and does not merge directories. The emitter writes only the first directory. If a repository holds both `.github/workflows` and `.gitea/workflows`, `detect` lists `gha` and `gitea`. Then `convert` needs `--from`. The pinned versions and the default action hosts are in [docs/versions.md](docs/versions.md). Each provider ID in the table above links to a page with its setup outside the pipeline files, its conversion notes and its feature table.
 
 ## Installing
 
@@ -41,7 +41,7 @@ The commands `detect`, `inspect`, `convert`, `roundtrip` and `validate` take a d
 | `pipemaster inspect <dir> [--from <provider>]` | Print the canonical IR of the directory. |
 | `pipemaster convert <dir> --to <provider> [--from <provider>] [-o <dir>] [--report text\|md\|json] [--strict] [--embed-meta] [--force]` | Convert the pipelines to another provider. |
 | `pipemaster roundtrip <dir> --via <provider> [--from <provider>]` | Convert there and back, then print any differences. |
-| `pipemaster caps --from <provider> --to <provider> [--format text\|md]` | Compare the feature support of two providers. |
+| `pipemaster caps [--from <provider>] --to <provider> [--format text\|md]` | Compare the feature support of two providers. Without `--from`, list the support of the target alone. |
 | `pipemaster validate <dir> --as <provider>` | Check the pipeline files against the provider schema. |
 
 ### Converting a pipeline
@@ -109,9 +109,9 @@ The report gives one verdict for each feature that the pipeline uses. The verdic
 
 ## Feature support from GHA to Gitea and Forgejo
 
-The following tables come from `pipemaster caps --from gha --to gitea --format md` and `pipemaster caps --from gha --to forgejo --format md`.
-
 ### Gitea
+
+The following table comes from `pipemaster caps --from gha --to gitea --format md`.
 
 | Feature | Gha | Gitea | Strategy |
 | --- | --- | --- | --- |
@@ -164,7 +164,11 @@ The following tables come from `pipemaster caps --from gha --to gitea --format m
 | trigger.schedule | native | native |  |
 | trigger.tag | native | native |  |
 
+The setup and the conversion notes of Gitea Actions are in [docs/providers/gitea.md](docs/providers/gitea.md).
+
 ### Forgejo
+
+The following table comes from `pipemaster caps --from gha --to forgejo --format md`.
 
 | Feature | Gha | Forgejo | Strategy |
 | --- | --- | --- | --- |
@@ -216,6 +220,8 @@ The following tables come from `pipemaster caps --from gha --to gitea --format m
 | trigger.resource | lost | lost | (GitHub Actions has no resource triggers) |
 | trigger.schedule | native | native |  |
 | trigger.tag | native | native |  |
+
+The setup and the conversion notes of Forgejo Actions are in [docs/providers/forgejo.md](docs/providers/forgejo.md).
 
 ## Feature support from GHA to GitLab
 
@@ -272,6 +278,8 @@ The following table comes from `pipemaster caps --from gha --to gitlab --format 
 | trigger.schedule | native | external | pipeline schedule in project settings (GitLab keeps the cron string outside the CI file) |
 | trigger.tag | native | native |  |
 
+The setup and the conversion notes of GitLab CI are in [docs/providers/gitlab.md](docs/providers/gitlab.md).
+
 ## Feature support from GHA to Woodpecker
 
 The following table comes from `pipemaster caps --from gha --to woodpecker --format md`. The columns follow the GitLab table.
@@ -327,15 +335,8 @@ The following table comes from `pipemaster caps --from gha --to woodpecker --for
 | trigger.schedule | native | external | when event cron; the schedule is a repo cron job (Woodpecker keeps the cron string in the repo settings (Cron), not in the workflow file) |
 | trigger.tag | native | native |  |
 
-### Woodpecker notes
+The setup and the conversion notes of Woodpecker CI are in [docs/providers/woodpecker.md](docs/providers/woodpecker.md).
 
-- The emitter writes one workflow file for each job in `.woodpecker/`. The parser reads the first form that exists and does not merge forms.
-- Woodpecker keeps only an `os/arch` runner label (`labels.platform`). The round-trip metadata restores the other labels when the chain returns to the origin. If a later hop emits GHA, Gitea or Forgejo, the emitter writes the default label `ubuntu-latest` and reports an emulated `job.runner` entry.
-- Woodpecker substitutes `${NAME}` in the raw YAML and turns `$$` into a literal `$`. Thus the emitter writes `$` in script and environment text as `$$`. The parser reverses this.
-- Woodpecker filters use doublestar globs. If a GHA filter uses `+` or `?`, doublestar cannot express it. The emitter then writes an anchored regular expression in `evaluate`.
-- A cron schedule is external. Woodpecker keeps the cron string in the repository settings, not in the workflow file.
-- Environment approval is external. Set it with the repository setting Require approval for.
-- The runner is lost. Only a platform label becomes `labels.platform`.
 
 ## Feature support from GHA to Drone
 
@@ -392,11 +393,8 @@ The following table comes from `pipemaster caps --from gha --to drone --format m
 | trigger.schedule | native | external | trigger event cron with the cron job name (cron jobs are set in the UI or with drone cron add; the report names the command) |
 | trigger.tag | native | native |  |
 
-Notes on the Drone provider:
+The setup and the conversion notes of Drone CI are in [docs/providers/drone.md](docs/providers/drone.md).
 
-- Drone replaces `${NAME}` in the raw YAML before it parses the file. The literal `$` escape is `$$`.
-- A matrix becomes one pipeline document per cell. Each document carries a marker, so a return conversion can fold the cells into one matrix job.
-- The Drone OSS server does not evaluate `paths` filters. The converter reports them as lost and never emits them.
 
 ## Feature support from GHA to Tekton
 
@@ -453,18 +451,8 @@ The following table comes from `pipemaster caps --from gha --to tekton --format 
 | trigger.schedule | native | emulated | CronJob that posts to the EventListener (the CronJob and the listener must run in the same cluster; the schedule listener has no signature check, so do not expose it) |
 | trigger.tag | native | emulated | EventListener trigger with the github interceptor (the EventListener serves GitHub webhooks only) |
 
-Notes on the Tekton provider:
+The setup and the conversion notes of Tekton are in [docs/providers/tekton.md](docs/providers/tekton.md).
 
-- The emitter writes the files under `.tekton/`. Each pipeline becomes one Pipeline in `pipeline.yaml`, and each job becomes a Task in `tasks/`. The triggers go to `triggers/`, the schedules to `cron/`, and the RBAC objects to `rbac/`. A `kustomization.yaml` lists the other files. The parser reads every YAML file under `.tekton/`, including subfolders.
-- The context of a run (branch, tag, event, commit, repository and pull request number) travels in reserved Pipeline params that start with `ctx-`, The twelve reserved names are `ctx-branch`, `ctx-tag`, `ctx-event`, `ctx-sha`, `ctx-repo`, `ctx-actor`, `ctx-pr-number`, `ctx-ref-name`, `ctx-ref-type`, `ctx-ref`, `ctx-pr-head-ref` and `ctx-pr-base-ref`. An input that has one of these names is written as `input-<name>`, and the marker restores it on the way back. The pipeline declares only the params that its conditions or scripts use. The TriggerBinding fills them from the webhook payload.
-- The trigger support is GitHub only. The EventListener uses the `github` interceptor and a `cel` interceptor, so it serves GitHub webhooks and no other forge. The generated interceptor reads the webhook secret from the Secret `pipemaster-github-webhook`, key `token`. The operator must create this Secret.
-- A cron schedule becomes a CronJob. The job posts to a second EventListener, `pipemaster-schedule`, with the header `X-Pipemaster-Schedule: <pipeline>/<n>`, and the listener entry matches only that header. The webhook listener `pipemaster` does not hold schedule entries, because GitHub must reach it from outside the cluster. Do not expose `pipemaster-schedule` with an Ingress. Any pod that reaches its service can start a run, so limit it with a NetworkPolicy that admits only the CronJob pods. The post has an empty body, so every `ctx-*` param is empty, and a checkout step in that run cannot clone.
-- The pull request filter admits only pull requests from the same repository (`head.repo.full_name == repository.full_name`). The code of a fork would otherwise run with every secret of the Task. Remove that term from the filter to accept forks.
-- The generated RBAC objects and the CronJob URL use the namespace `default`. Deploy the listener and the CronJob in that namespace, or edit the host and the subjects.
-- A secret becomes a `secretKeyRef` on the Secret `ci-secrets`. A variable becomes a `configMapKeyRef` on the ConfigMap `ci-vars`. The converter does not write the values. The operator must create both objects.
-- The cluster setup is external. The operator must install Tekton Pipelines and Tekton Triggers, apply the RBAC objects in `.tekton/rbac/`, and create the Secret and the ConfigMap. The converter reports no feature for this work.
-- A matrix passes only string values. The `finally` tasks run without an order among themselves, so a `needs` edge between them is lost. A step action becomes a StepAction reference.
-- The validator checks the emitted files against embedded Tekton and CronJob schemas, and the tests also run `kubeconform`. The pinned versions are in `docs/versions.md`. `make linters` runs `scripts/install-linters.sh`, which installs the pinned `kubeconform` into `.tools/bin` beside the other linters.
 
 ## Feature support from GHA to Argo
 
@@ -521,20 +509,8 @@ The following table comes from `pipemaster caps --from gha --to argo --format md
 | trigger.schedule | native | native | CronWorkflow with workflowTemplateRef |
 | trigger.tag | native | emulated | EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only) |
 
-Notes on the Argo provider:
+The setup and the conversion notes of Argo are in [docs/providers/argo.md](docs/providers/argo.md).
 
-- The emitter writes the files under `.argo/`. Each pipeline becomes one WorkflowTemplate in `workflows/`. The schedules go to `cron/` as CronWorkflows. The EventSource and the Sensor go to `events/eventsource.yaml` and `events/sensor.yaml`. The RBAC objects go to `rbac/`. The parser reads every YAML file under `.argo/`, including subfolders, and it skips a file that holds Helm template text.
-- The entrypoint of a WorkflowTemplate is the template `main`, a `dag` with one task for each job. A plain `needs` entry becomes `dependencies`. A `needs` entry with a status test becomes `depends`. The `finally` jobs run in an exit handler (`hooks.exit`) that holds a second `dag`.
-- A job becomes one `containerSet` template, and each step becomes one container. The containers share an `emptyDir` volume `workspace` that is mounted at `/workspace`, so the steps of a job see the same files. The last container is named `main` when the job has outputs, artifacts, a checkout, an upload or a download, because Argo reads these only from the container `main`.
-- An action that has no container form leaves a placeholder container that runs `true`. The marker in the file restores the action on the way back. If you edit or remove the placeholder, the converter keeps your file and reports that it ignored the marker.
-- The `containerSet` has no `when` and no `timeout` for a single container. A step condition becomes a shell guard that reads the context from container `env`. A step timeout is lost. The job timeout is the template timeout.
-- The context of a run travels in reserved workflow parameters that start with `ctx-`. They use the same twelve names as the Tekton provider. The containers read them from `env`, and the converter never writes them into script text, because Argo substitutes `{{...}}` without escaping. A run from a CronWorkflow or from `argo submit` has an empty `ctx-repo` and an empty `ctx-sha`, so a checkout in that run cannot clone.
-- The trigger support is GitHub only. A push, a pull request or a tag becomes an EventSource of type `github` and a Sensor. The Sensor holds a data filter for each trigger and a `k8s` trigger that creates a Workflow from the WorkflowTemplate. The Sensor fills the `ctx-*` parameters from the webhook payload. The EventSource reads the webhook secret from the Secret `pipemaster-github-webhook`, key `token`. The operator must create this Secret.
-- The EventSource entries name the placeholder repository `OWNER/REPO`. The operator must edit it before the first run.
-- The Sensor accepts a pull request only when the head repository equals the base repository. The code of a fork would otherwise run with every secret. Remove that term from the Sensor filter to accept forks.
-- A secret becomes a `secretKeyRef` on the Secret `ci-secrets`. A variable becomes a `configMapKeyRef` on the ConfigMap `ci-vars`. The converter does not write the values. The operator must create both objects.
-- The cluster setup is external. The operator must install Argo Workflows and Argo Events, create the EventBus, expose the EventSource Service with an Ingress, configure the artifact repository, apply the RBAC objects in `.argo/rbac/`, and create the Secret and the ConfigMap. The converter reports no feature for most of this work. The trigger.manual entry lists it.
-- The validator checks the emitted files against embedded schemas from the datree CRDs-catalog. The tests also run `argo lint --offline` on the workflow kinds. The Sensor and the EventSource schemas accept any content in `spec`, so the schema check is weak for them. The pinned versions are in `docs/versions.md`. `make linters` runs `scripts/install-linters.sh`, which installs the pinned `argo` CLI into `.tools/bin` beside the other linters.
 
 ## Feature support from GHA to Concourse
 
@@ -591,21 +567,8 @@ The following table comes from `pipemaster caps --from gha --to concourse --form
 | trigger.schedule | native | emulated | time resource get with trigger: true; the source is interval for a step that divides the hour or the day, start and stop for a daily window, and days for a day list (the time resource is built for at least once every N minutes, not for a wall-clock time. An interval counts from the last version, so it has no clock alignment, the first check emits a version at once, and an every-minute cron cannot fire faster than the check cadence. A daily window is 5 minutes wide, so the job starts within 5 minutes after the cron time; a window that passes midnight is lost when it has a day list. Any other cron form is lost with the cron text kept) |
 | trigger.tag | native | emulated | git resource with source.tag_filter (a tag trigger that also has a branch filter is lost, because one git resource cannot hold both sets) |
 
-Notes on the Concourse provider:
+The setup and the conversion notes of Concourse are in [docs/providers/concourse.md](docs/providers/concourse.md).
 
-- The emitter writes one file for each pipeline, `.concourse/<pipeline>.yml`, and every task is inline. The parser reads every `.yml` and `.yaml` file in `.concourse/` as one pipeline, and the file name is the pipeline ID. A file is a Concourse pipeline only when it has a top-level `jobs` list whose items have a `plan`. The parser rejects a repeated mapping key, as `fly` does, and it accepts anchors and `<<` merge keys.
-- A Concourse pipeline has no `on:` block, so a resource is the trigger. A `get` with `trigger: true` on a `git` resource is a push trigger. A `get` with `trigger: true` on a `time` resource is a schedule. The emitter writes only `git` and `time` resources. A task image is an inline `image_resource` of the task, not a pipeline resource. A trigger on any other resource type is lost, and the resource stays in the Ext data.
-- A git resource follows one branch. A push trigger with two exact branches becomes two resources, and the job runs once for each branch event. A branch glob is lost. A `git` resource filters tags with one `tag_filter` pattern, so a tag trigger that also has a branch filter is lost.
-- Each job starts with a `get` of the source resource, and each job has its own trigger set: a job whose `get` steps do not trigger is started by a person. A `needs` entry becomes `passed:` on a `get` of a resource that both jobs get, and the source resource is the usual one. A `passed:` list is an AND, so a job that needs jobs A and B runs on a version that went through both. If the job has no such resource, the emitter adds a `get` of a resource that the needed job gets and this job does not. If no resource orders the two jobs, the emitter does not write the edge and reports a lost `job.needs` entry.
-- The generated `git` resource has the placeholder `uri: ((git-uri))`. The operator must supply `git-uri` through a credential manager or `fly set-pipeline --var`. The report names this entry.
-- Each step becomes one `task` step with an inline `config`. Concourse runs each task in a fresh container, so the tasks of a job pass one artifact, `workspace`, from task to task. The artifact is both an input and an output of each task, and the first task maps the source artifact to it with `input_mapping`. A job with no script step writes no `workspace`. The artifact works only within one job. The scripts run as `sh -ec`, and a `((var))` never goes into a script text: values reach a script through task `params`.
-- A step with no image gets `ubuntu:latest`, and the report names this default. A PowerShell step runs with `run.path: powershell` or `pwsh` and `platform: windows`, only when the IR names that shell or a Windows runner. A script that may be PowerShell stays `sh`, and the report names the step.
-- A cron schedule becomes a `time` resource, and the conversion is approximate. The resource is built to run "at least once every N minutes", not at a wall-clock time. A step of N minutes or N hours that divides the hour or the day becomes `interval`, and an interval counts from the last version, so it has no clock alignment. A daily time becomes a window of 5 minutes (`start` and `stop`), so the job starts within 5 minutes after the cron time. A list of days becomes `days` on a daily window, and a day-list window that passes midnight is lost. A list of days combined with an interval step is lost. Any other cron form is lost, and the cron text stays in the Ext data. The pinned `time` resource is v1.11.6.
-- A `time` resource with an `interval` emits a version at its first check. A `time` resource with a window has no version until its first window passes, so a manual start before then has no input. The emitter does not write `initial_version`, because it starts the job at once. For a window resource, the operator can run `fly check-resource -r <pipeline>/<resource> --from time:2000-01-01T00:00:00Z` after `fly set-pipeline`. The report names this command for a window resource only.
-- Conditions use the shared shell guard on a script task. A status function becomes a job hook (`on_failure` or `ensure`), and several `finally` steps wrap in `do`. A condition with no guard form runs as a task whose first script line is `exit 0`, with a lost entry, and a job condition with no guard form leaves the job with no triggering `get`.
-- Concourse has no expression language, so every opaque expression is lost. An action with no task form leaves a placeholder task that runs `true`. A pipeline with no jobs gets a placeholder job. A marker comment in the file restores each of these on the way back. If you edit or remove the placeholder, the converter keeps your file and reports that it ignored the marker.
-- The parser keeps the YAML of a Concourse file that the IR cannot hold in the Ext data, and the emitter writes it back unchanged when the file returns to Concourse. The emitter writes no unknown top-level key of a Concourse file, because Concourse rejects it. It reports each such key as lost, with a different reason for a key that only holds YAML anchors. The metadata restores these keys on a return to Concourse.
-- The validator checks the emitted files against a schema that is written by hand from the v8.3.3 structs of Concourse, and the tests also run `fly validate-pipeline --strict`. The pinned versions are in `docs/versions.md`. `make linters` runs `scripts/install-linters.sh`, which installs the pinned `fly` into `.tools/bin` beside the other linters.
 
 ## Development
 
