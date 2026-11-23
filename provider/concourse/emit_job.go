@@ -39,8 +39,8 @@ type jobEmitter struct {
 	name       string
 	img        string
 	caches     []string
-	// nestedExtra lists the needs that no nested get names; the first nested get takes them into its passed list.
-	nestedExtra []any
+	// nestedExtra lists, by resource, the needs that the first nested get of that resource takes into its passed list.
+	nestedExtra map[string][]any
 	// finallyTasks lists the written names of the tasks that stand for finally jobs in the hooks.
 	finallyTasks []string
 	actSeq       int
@@ -301,6 +301,7 @@ func (jx *jobEmitter) plan() []*yaml.Node {
 	for _, st := range hooks {
 		jx.hookStep(st)
 	}
+	jx.reportUnplacedNeeds()
 	for _, f := range jx.pe.finallyFor(j) {
 		jx.finallyJob(f)
 	}

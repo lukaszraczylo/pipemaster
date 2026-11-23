@@ -1,11 +1,13 @@
 package concourse
 
 import (
+	"fmt"
 	"slices"
 
 	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
 // getKeys is the order of the keys of a get step.
@@ -80,23 +82,23 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 	}
 	own := jx.ownGets()
 	noGets := false
-	var uncovered map[string]bool
+	var fresh map[string][]any
 	if l, ok := jx.ext[ExtGets].([]any); ok && len(l) == 0 {
-		var nested bool
-		uncovered, nested = jx.needsNotInNestedGets()
-		if len(uncovered) == 0 {
+		missing, nested := jx.needsNotInNestedGets()
+		if len(missing) == 0 {
 			jx.held = len(jx.jobTriggers(nil)) == 0
 			return nil
 		}
-		if nested {
-			// Concourse rejects a second get of one resource in a job, so the nested list takes the new needs.
-			for _, n := range j.Needs {
-				if w, ok := pe.jobName[n.JobID]; ok && uncovered[w] {
-					jx.nestedExtra = append(jx.nestedExtra, w)
-				}
-			}
+		var add map[string][]any
+		add, fresh = jx.placeNeeds(missing, nested)
+		jx.nestedExtra = add
+		if len(fresh) == 0 {
 			jx.held = len(jx.jobTriggers(nil)) == 0
 			return nil
+		}
+		if len(nested) > 0 {
+			jx.held = len(jx.jobTriggers(nil)) == 0
+			return jx.freshGets(fresh)
 		}
 		noGets = true
 	}
@@ -118,8 +120,8 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 	}
 	_, fileGets := jx.ext[ExtGets].([]any)
 	if noGets {
-		// A passed list lives on a get, so a need on a job that had none adds the shared source.
-		names = []string{pe.primary.name}
+		// A passed list lives on a get, so a need on a job that had none adds a get of a resource the needed job uses.
+		names = sortedFresh(fresh, pe.primary.name)
 	}
 	for _, s := range pe.sources {
 		if (s.typ == typeGit || trig[s.name]) && !slices.Contains(names, s.name) && !fileGets {
@@ -129,7 +131,7 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 	jx.held = len(trig) == 0
 	var passed []any
 	for _, n := range j.Needs {
-		if w, ok := pe.jobName[n.JobID]; ok && (!noGets || uncovered[w]) {
+		if w, ok := pe.jobName[n.JobID]; ok {
 			passed = append(passed, w)
 		}
 	}
@@ -156,9 +158,13 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 		fileOrder, _ := m["passed"].([]any)
 		delete(m, "passed")
 		delete(m, "trigger")
-		if len(passed) > 0 && slices.Contains(holders, name) {
-			m["passed"] = passed
-			if sameSet(fileOrder, passed) {
+		pl := passed
+		if noGets {
+			pl = fresh[name]
+		}
+		if len(pl) > 0 && (noGets || slices.Contains(holders, name)) {
+			m["passed"] = pl
+			if sameSet(fileOrder, pl) {
 				m["passed"] = fileOrder
 			}
 		}
@@ -182,80 +188,201 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 	return nodes
 }
 
-// needsNotInNestedGets is the written names of the needs that no passed list of a get nested in a step of the plan
-// names. The nested lists stay as the file has them, so only these needs need a get of their own.
-func (jx *jobEmitter) needsNotInNestedGets() (map[string]bool, bool) {
+// needsNotInNestedGets lists the needs that no passed list of a get nested in a step of the plan names, and the
+// resources of those nested gets. The nested lists stay as the file has them. A get in a hook is no need to the
+// parser, so only the steps of the main plan count.
+func (jx *jobEmitter) needsNotInNestedGets() ([]ir.Need, []string) {
 	held := map[string]bool{}
-	nested := false
-	for _, st := range jx.j.Steps {
-		nested = nestedPassed(extOf(st.Ext), held) || nested
+	var nested []string
+	main, _ := jx.split()
+	for _, st := range main {
+		nestedGets(extOf(st.Ext), held, &nested)
 	}
-	out := map[string]bool{}
+	var out []ir.Need
 	for _, n := range jx.j.Needs {
 		if w, ok := jx.pe.jobName[n.JobID]; ok && !held[w] {
-			out[w] = true
+			out = append(out, n)
 		}
 	}
 	return out, nested
 }
 
-// nestedPassed adds the names of every passed list of a get in the verbatim step values to held, and tells whether
-// there is such a list.
-func nestedPassed(v any, held map[string]bool) bool {
-	found := false
+// getResource is the resource that a get step names.
+func getResource(m map[string]any) string {
+	if r, _ := m["resource"].(string); r != "" {
+		return r
+	}
+	n, _ := m["get"].(string)
+	return n
+}
+
+// nestedGets adds the names of every passed list of a get in the verbatim step values to held, and the resource of
+// every such get to res, in document order.
+func nestedGets(v any, held map[string]bool, res *[]string) {
 	switch t := v.(type) {
 	case map[string]any:
-		if l, ok := t["passed"].([]any); ok && t["get"] != nil {
-			found = true
-			for _, x := range l {
-				if n, ok := x.(string); ok {
-					held[n] = true
+		if t["get"] != nil {
+			if r := getResource(t); r != "" && !slices.Contains(*res, r) {
+				*res = append(*res, r)
+			}
+			if l, ok := t["passed"].([]any); ok {
+				for _, x := range l {
+					if n, ok := x.(string); ok {
+						held[n] = true
+					}
 				}
 			}
 		}
-		for _, x := range t {
-			found = nestedPassed(x, held) || found
+		for _, k := range sortedKeys(t) {
+			nestedGets(t[k], held, res)
 		}
 	case []any:
 		for _, x := range t {
-			found = nestedPassed(x, held) || found
+			nestedGets(x, held, res)
 		}
 	}
-	return found
 }
 
-// addNestedPassed puts the needs that no nested get names into the first passed list of a copy of v.
+// jobResources is the resources that a job gets: its own gets and the gets nested in its steps when a Concourse
+// file gave them, else every git resource and each resource that triggers.
+func (pe *pipeEmitter) jobResources(o *ir.Job) map[string]bool {
+	out := map[string]bool{}
+	if ext := extOf(o.Ext); pe.e.own && ext != nil {
+		if l, ok := ext[ExtGets].([]any); ok {
+			for _, raw := range l {
+				if m, ok := raw.(map[string]any); ok {
+					out[getResource(m)] = true
+				}
+			}
+			var nested []string
+			for _, st := range o.Steps {
+				nestedGets(extOf(st.Ext), map[string]bool{}, &nested)
+			}
+			for _, r := range nested {
+				out[r] = true
+			}
+			return out
+		}
+	}
+	for _, s := range pe.sources {
+		if s.typ == typeGit || s.trigger {
+			out[s.name] = true
+		}
+	}
+	return out
+}
+
+// placeNeeds decides where each need goes that no nested passed list names. Passed is an AND over the versions of
+// one resource, so a need joins the passed list of a nested get of a resource that the needed job also gets. Else it
+// goes on a new get of a resource that the needed job gets and this job does not. Else no passed list can order the
+// two jobs, and the edge is reported as lost.
+func (jx *jobEmitter) placeNeeds(missing []ir.Need, nested []string) (add, fresh map[string][]any) {
+	pe := jx.pe
+	add, fresh = map[string][]any{}, map[string][]any{}
+	// A get in a hook shares the name scope of the job, so fly rejects a second get of that resource.
+	var inHooks []string
+	_, hooks := jx.split()
+	for _, st := range hooks {
+		nestedGets(extOf(st.Ext), map[string]bool{}, &inHooks)
+	}
+	for _, n := range missing {
+		w := pe.jobName[n.JobID]
+		var rc map[string]bool
+		for _, o := range pe.pl.Jobs {
+			if o.ID == n.JobID {
+				rc = pe.jobResources(o)
+			}
+		}
+		if rc == nil {
+			for _, o := range pe.pl.Finally {
+				if o.ID == n.JobID {
+					rc = pe.jobResources(o)
+				}
+			}
+		}
+		if i := slices.IndexFunc(nested, func(r string) bool { return rc[r] }); i >= 0 {
+			add[nested[i]] = append(add[nested[i]], w)
+			continue
+		}
+		var pick string
+		for _, r := range sortedKeys(rc) {
+			if pe.byName[r] != nil && !slices.Contains(nested, r) && !slices.Contains(inHooks, r) && (pick == "" || r == pe.primary.name) {
+				pick = r
+			}
+		}
+		if pick == "" {
+			jx.pe.e.lose(jx.path, caps.JobNeeds, "the job "+w+" gets no resource that this job can also get, so no passed list orders the two; the need is not written")
+			continue
+		}
+		fresh[pick] = append(fresh[pick], w)
+	}
+	return add, fresh
+}
+
+// sortedFresh lists the resources of the new gets, the shared source first.
+func sortedFresh(fresh map[string][]any, primary string) []string {
+	out := sortedKeys(fresh)
+	if i := slices.Index(out, primary); i > 0 {
+		out = append([]string{primary}, slices.Delete(out, i, i+1)...)
+	}
+	return out
+}
+
+// freshGets writes a get with a passed list for each resource of fresh, beside the gets nested in the plan.
+func (jx *jobEmitter) freshGets(fresh map[string][]any) []*yaml.Node {
+	var nodes []*yaml.Node
+	for _, r := range sortedFresh(fresh, jx.pe.primary.name) {
+		jx.pe.byName[r].used = true
+		jx.taken[r] = true
+		nodes = append(nodes, orderedNode(map[string]any{"get": r, "passed": fresh[r]}, getKeys, nil))
+	}
+	return nodes
+}
+
+// addNestedPassed puts each need that joins a nested get into the passed list of the first get of its resource in a
+// copy of v.
 func (jx *jobEmitter) addNestedPassed(v any) any {
 	if len(jx.nestedExtra) == 0 {
 		return v
 	}
 	c := deepCopy(v)
-	if jx.extendFirstPassed(c) {
-		jx.nestedExtra = nil
+	for _, r := range sortedKeys(jx.nestedExtra) {
+		if jx.extendFirstPassed(c, r, jx.nestedExtra[r]) {
+			delete(jx.nestedExtra, r)
+		}
 	}
 	return c
 }
 
-func (jx *jobEmitter) extendFirstPassed(v any) bool {
+func (jx *jobEmitter) extendFirstPassed(v any, res string, names []any) bool {
 	switch t := v.(type) {
 	case map[string]any:
-		if l, ok := t["passed"].([]any); ok && t["get"] != nil {
-			t["passed"] = append(l, jx.nestedExtra...)
+		if t["get"] != nil && getResource(t) == res {
+			l, _ := t["passed"].([]any)
+			t["passed"] = append(l, names...)
 			return true
 		}
 		for _, k := range sortedKeys(t) {
-			if jx.extendFirstPassed(t[k]) {
+			if jx.extendFirstPassed(t[k], res, names) {
 				return true
 			}
 		}
 	case []any:
 		for _, x := range t {
-			if jx.extendFirstPassed(x) {
+			if jx.extendFirstPassed(x, res, names) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// reportUnplacedNeeds reports the needs that joined a nested get no step wrote.
+func (jx *jobEmitter) reportUnplacedNeeds() {
+	for _, r := range sortedKeys(jx.nestedExtra) {
+		jx.pe.e.lose(jx.path, caps.JobNeeds, fmt.Sprintf("the needs %v belong to a get of %s, and no step of the plan wrote one; they are not written", jx.nestedExtra[r], r))
+	}
+	jx.nestedExtra = nil
 }
 
 func (jx *jobEmitter) hasTriggerSource() bool {

@@ -572,3 +572,117 @@ func TestScriptTheArgsCannotSayComesBackExact(t *testing.T) {
 		}
 	}
 }
+
+const needTaskStep = `
+      - task: t
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          run: {path: sh, args: [-c, "echo x"]}`
+
+// needPlacementFile has the jobs a, c1 (gets src), c2 (gets other) and c3 (gets nothing), and a job b whose plan is
+// the given steps.
+func needPlacementFile(bPlan string) string {
+	return `resources:
+  - name: src
+    type: git
+    source: {uri: https://x/y.git, branch: main}
+  - name: other
+    type: git
+    source: {uri: https://x/z.git, branch: main}
+jobs:
+  - name: a
+    plan:
+      - get: src
+        trigger: true` + needTaskStep + `
+  - name: c1
+    plan:
+      - get: src
+        trigger: true` + needTaskStep + `
+  - name: c2
+    plan:
+      - get: other
+        trigger: true` + needTaskStep + `
+  - name: c3
+    plan:` + needTaskStep + `
+  - name: b
+    plan:` + bPlan + `
+`
+}
+
+const (
+	nestedPlan = needTaskStep + `
+      - in_parallel:
+          - get: src
+            passed: [a]`
+	noGetPlan = needTaskStep
+)
+
+// Whatever need is added, the file must pass fly --strict, and a need that no passed list can write is reported.
+func TestAddedNeedIsWrittenWhereFlyAcceptsIt(t *testing.T) {
+	for _, tc := range []struct {
+		name, plan, need string
+		want             []string
+		lost             bool
+	}{
+		{name: "nested get, shared resource", plan: nestedPlan, need: "c1", want: []string{"a", "c1"}},
+		{name: "nested get, other resource", plan: nestedPlan, need: "c2", want: []string{"a", "c2"}},
+		{name: "nested get, no resource", plan: nestedPlan, need: "c3", want: []string{"a"}, lost: true},
+		{name: "no get, shared resource", plan: noGetPlan, need: "c1", want: []string{"c1"}},
+		{name: "no get, other resource", plan: noGetPlan, need: "c2", want: []string{"c2"}},
+		{name: "no get, no resource", plan: noGetPlan, need: "c3", lost: true},
+	} {
+		p, _ := parseFiles(t, map[string]string{"ci.yml": needPlacementFile(tc.plan)})
+		for _, j := range p.Pipelines[0].Jobs {
+			if j.ID == "b" {
+				j.Needs = append(j.Needs, ir.Need{JobID: tc.need})
+			}
+		}
+		files, rep := emit(t, p)
+		back, _ := reparse(t, files)
+		var got []string
+		for _, j := range back.Pipelines[0].Jobs {
+			if j.ID == "b" {
+				for _, n := range j.Needs {
+					got = append(got, n.JobID)
+				}
+			}
+		}
+		slices.Sort(got)
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("%s: b needs %v, want %v", tc.name, got, tc.want)
+		}
+		if lost := hasFeatureEntry(rep, string(caps.JobNeeds), "need is not written"); lost != tc.lost {
+			t.Errorf("%s: lost entry = %v, want %v", tc.name, lost, tc.lost)
+		}
+	}
+}
+
+// A need must be written or reported whichever step kind nests the get that holds the passed list.
+func TestNeedBesideAGetNestedInAHookIsNotDropped(t *testing.T) {
+	plan := needTaskStep + `
+    on_success:
+      in_parallel:
+        - get: src
+          passed: [a]`
+	p, _ := parseFiles(t, map[string]string{"ci.yml": needPlacementFile(plan)})
+	for _, j := range p.Pipelines[0].Jobs {
+		if j.ID == "b" {
+			j.Needs = append(j.Needs, ir.Need{JobID: "c1"})
+		}
+	}
+	files, rep := emit(t, p)
+	back, _ := reparse(t, files)
+	var got []string
+	for _, j := range back.Pipelines[0].Jobs {
+		if j.ID == "b" {
+			for _, n := range j.Needs {
+				got = append(got, n.JobID)
+			}
+		}
+	}
+	slices.Sort(got)
+	if !slices.Equal(got, []string{"a", "c1"}) && !hasFeatureEntry(rep, string(caps.JobNeeds), "not written") {
+		t.Fatalf("b needs %v with no entry: %v", got, rep.Entries)
+	}
+}
