@@ -587,3 +587,47 @@ func TestManualEventConditionDoesNotComeBackFromTheCarry(t *testing.T) {
 		t.Fatalf("If = %v; want none, because the file does not hold the condition", got)
 	}
 }
+
+func TestJobGetsOnlyTheResourcesTheFileGave(t *testing.T) {
+	src := `resources:
+  - name: a
+    type: git
+    source: {uri: "https://example.com/a.git", branch: main}
+  - name: b
+    type: git
+    source: {uri: "https://example.com/b.git", branch: main}
+jobs:
+  - name: one
+    plan:
+      - get: a
+        trigger: true
+      - task: t
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          run: {path: sh, args: [-ec, make]}
+  - name: two
+    plan:
+      - get: b
+        trigger: true
+      - task: t
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          run: {path: sh, args: [-ec, make]}
+`
+	p, _ := parseFiles(t, map[string]string{"ci.yml": src})
+	files, _ := emit(t, p)
+	d := pipelineDoc(t, files)
+	for job, want := range map[string]string{"one": "a", "two": "b"} {
+		var gets []string
+		for _, s := range list(jobDoc(t, d, job)["plan"]) {
+			if g, ok := dict(s)["get"].(string); ok {
+				gets = append(gets, g)
+			}
+		}
+		if strings.Join(gets, ",") != want {
+			t.Fatalf("job %s gets %v; want only %s", job, gets, want)
+		}
+	}
+}

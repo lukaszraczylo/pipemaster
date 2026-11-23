@@ -99,8 +99,9 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 			names = append(names, g.name)
 		}
 	}
+	_, fileGets := jx.ext[ExtGets].([]any)
 	for _, s := range pe.sources {
-		if (s.typ == typeGit || trig[s.name]) && !slices.Contains(names, s.name) {
+		if (s.typ == typeGit || trig[s.name]) && !slices.Contains(names, s.name) && !fileGets {
 			names = append(names, s.name)
 		}
 	}
