@@ -197,6 +197,9 @@ func (jx *jobEmitter) guarded(sc *scope, path, name string, st *ir.Step, body []
 	cond := st.If
 	if cond != nil {
 		if s, ok := statusOf(cond); ok && (s == "always" || s == "success") {
+			if s == "always" {
+				e.lose(path, caps.StepIf, "always() on a step inside the plan has no Concourse form; the step runs only while the steps before it succeed")
+			}
 			cond = nil
 		}
 	}

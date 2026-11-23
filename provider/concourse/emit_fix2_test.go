@@ -336,3 +336,18 @@ func TestFinallyStepsWithTheSameIDStayParseable(t *testing.T) {
 		}
 	}
 }
+
+func TestAlwaysOnAPlanStepIsReportedLost(t *testing.T) {
+	j := &ir.Job{ID: "build", Steps: []*ir.Step{
+		{ID: "first", Kind: ir.StepScript, Script: []string{"make"}},
+		{ID: "mid", Kind: ir.StepScript, Script: []string{"echo mid"}, If: callOf("always")},
+		{ID: "last", Kind: ir.StepScript, Script: []string{"echo last"}},
+	}}
+	_, rep := emit(t, project(j))
+	for _, e := range rep.Entries {
+		if e.Feature == caps.StepIf && e.Level == caps.Lost && e.IRPath == "pipeline/ci/job/build/step/mid" {
+			return
+		}
+	}
+	t.Fatalf("no lost step.if entry for the always() step: %v", rep.Entries)
+}
