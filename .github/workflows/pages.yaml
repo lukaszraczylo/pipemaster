@@ -40,9 +40,10 @@ jobs:
           set -euo pipefail
           rm -rf .site
           mkdir .site
-          for f in index.html data.json CNAME robots.txt sitemap.xml; do
+          for f in index.html CNAME robots.txt sitemap.xml; do
             cp "docs/$f" ".site/$f"
           done
+          cp -R docs/data .site/data
           echo "publishing:"
           find .site -type f | sort | sed 's/^/  /'
 

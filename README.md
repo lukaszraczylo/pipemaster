@@ -90,7 +90,7 @@ Secret names map between providers. Secret values, runner registration, webhooks
 | `make release-check` | `goreleaser check`, then a snapshot build of every target into `dist/` without publishing. |
 | `make lean`, `make vectors` | Builds the Lean 4 model in `lean4/` and regenerates the test vectors in `testdata/lean-vectors`. |
 
-The website lives in `docs/index.html` and reads `docs/data.json`. `go test ./internal/roundtrip -run TestSiteData -update` regenerates that data from `testdata/site`, and the test fails when the two disagree.
+The website lives in `docs/index.html` and reads `docs/data/`. `go test ./internal/roundtrip -run TestSiteData -update` regenerates that data from `testdata/site` and six corpus pipelines, and the test fails when the two disagree.
 
 ## Licence
 
