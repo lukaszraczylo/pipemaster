@@ -454,3 +454,12 @@ func TestOwnResourcesKeepTheirOrder(t *testing.T) {
 		t.Fatalf("resource order = %v; want [tick src]", names)
 	}
 }
+
+func TestTaskNameIsNoDisplayName(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"ci.yml": resourceOrderFile})
+	for _, st := range p.Pipelines[0].Jobs[0].Steps {
+		if st.Name != "" {
+			t.Fatalf("step %s has the name %q; a name equal to the ID is no display name", st.ID, st.Name)
+		}
+	}
+}

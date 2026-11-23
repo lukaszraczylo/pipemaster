@@ -71,6 +71,16 @@ func (jb *jobBuilder) uniqueID(name string) string {
 	return name
 }
 
+// named makes a step whose ID is the task or step name. The Name is set only when the ID differs, because a Name
+// equal to the ID is no display name and would not survive a provider whose step name is its ID.
+func (jb *jobBuilder) named(name string) *ir.Step {
+	st := &ir.Step{ID: jb.uniqueID(name)}
+	if st.ID != name {
+		st.Name = name
+	}
+	return st
+}
+
 func (jb *jobBuilder) opaque(val any, kind, why string, line int) *ir.Step {
 	name := strings.ReplaceAll(kind, "_", "-")
 	if m, ok := asMap(val); ok {
@@ -78,7 +88,8 @@ func (jb *jobBuilder) opaque(val any, kind, why string, line int) *ir.Step {
 			name = n
 		}
 	}
-	st := &ir.Step{ID: jb.uniqueID(name), Name: name, Kind: ir.StepPlugin}
+	st := jb.named(name)
+	st.Kind = ir.StepPlugin
 	st.Ext = ir.Ext{dialect: map[string]any{ExtKind: kind, ExtStep: plain(val)}}
 	feature := caps.ExtPassthrough
 	if kind == "across" {
@@ -92,7 +103,8 @@ func (jb *jobBuilder) opaque(val any, kind, why string, line int) *ir.Step {
 func (jb *jobBuilder) resourceStep(m *omap, kind string) *ir.Step {
 	name, _ := text(m.Vals[kind])
 	res := resourceName(m)
-	st := &ir.Step{ID: jb.uniqueID(name), Name: name, Kind: ir.StepResource}
+	st := jb.named(name)
+	st.Kind = ir.StepResource
 	k := newSink(jb.k.Rep, jb.b.file, jb.path+"/step/"+st.ID)
 	r := newReader(m)
 	jb.timeout(st, r)
@@ -148,7 +160,7 @@ func (jb *jobBuilder) taskStep(m *omap) *ir.Step {
 	if !ok || hasCfg == hasFile {
 		return jb.opaque(m, "task", "the task has no name or not exactly one of config and file", m.Lines["task"])
 	}
-	st := &ir.Step{ID: jb.uniqueID(name), Name: name}
+	st := jb.named(name)
 	written := st.ID
 	k := newSink(jb.k.Rep, jb.b.file, jb.path+"/step/"+st.ID)
 	r := newReader(m)
