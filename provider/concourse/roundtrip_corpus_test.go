@@ -103,13 +103,14 @@ func TestShellTasksOfTheCorpusPassTheirShellSyntaxCheck(t *testing.T) {
 			if code := cli.Run([]string{"convert", dir, "--from", from, "--to", "concourse", "-o", out}, &so, &se); code != 0 {
 				t.Fatalf("convert = %d\n%s", code, se.String())
 			}
+			reported := strings.Count(so.String()+se.String(), "may be PowerShell")
 			files, _ := filepath.Glob(filepath.Join(out, ".concourse", "*.yml"))
 			for _, f := range files {
 				b, err := os.ReadFile(f) // #nosec G304 -- file written by this test
 				if err != nil {
 					t.Fatal(err)
 				}
-				checkShellTasks(t, string(b))
+				checkShellTasks(t, string(b), reported)
 			}
 		})
 	}

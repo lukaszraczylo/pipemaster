@@ -166,8 +166,10 @@ func eqRef(ref, lit string) expr.Expr {
 }
 
 // checkShellTasks runs the syntax check of each task's own shell on its script.
-func checkShellTasks(t *testing.T, src string) {
+// A script that fails the check is allowed only when the file reports it as possible PowerShell.
+func checkShellTasks(t *testing.T, src string, reported int) {
 	t.Helper()
+	failed := 0
 	var doc map[string]any
 	if err := yaml.Unmarshal([]byte(src), &doc); err != nil {
 		t.Fatal(err)
@@ -185,7 +187,9 @@ func checkShellTasks(t *testing.T, src string) {
 				args, _ := run["args"].([]any)
 				if (shell == "sh" || shell == "bash") && len(args) > 0 {
 					script, _ := args[len(args)-1].(string)
-					syntaxCheck(t, shell, script)
+					if !passesSyntax(shell, script) {
+						failed++
+					}
 				}
 			}
 			for _, e := range x {
@@ -194,6 +198,18 @@ func checkShellTasks(t *testing.T, src string) {
 		}
 	}
 	walk(doc)
+	if failed > reported {
+		t.Errorf("%d scripts fail the syntax check, %d are reported as possible PowerShell", failed, reported)
+	}
+}
+
+func passesSyntax(shell, script string) bool {
+	cmd := exec.Command("sh", "-n")
+	if shell == "bash" {
+		cmd = exec.Command("bash", "-n")
+	}
+	cmd.Stdin = strings.NewReader(script)
+	return cmd.Run() == nil
 }
 
 // syntaxCheck runs sh -n or bash -n on the script.

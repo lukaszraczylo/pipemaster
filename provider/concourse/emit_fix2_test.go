@@ -258,19 +258,47 @@ func TestDroppedCarryNamesEachFieldItHeld(t *testing.T) {
 	}
 }
 
-func TestPowershellScriptRunsUnderPowershellWithAnEntry(t *testing.T) {
-	j := scriptJob("win", "$env:GOCACHE = (Resolve-Path $env:GOCACHE).Path", "choco install -y make")
+func TestShellLookingLikePowershellStaysShWithAnEntry(t *testing.T) {
+	for name, script := range map[string]string{
+		"heredoc": "cat <<EOF\nContent-Type: text/plain\nEOF",
+		"perl":    "perl -e '\n$total = 0;\nprint $total;\n'",
+		"echo":    "echo 'a\nGet-Foo bar\nb'",
+	} {
+		t.Run(name, func(t *testing.T) {
+			files, rep := emit(t, project(scriptJob("j", script)))
+			body := bodyOf(files[".concourse/ci.yml"])
+			if !strings.Contains(body, "path: sh") || strings.Contains(body, "platform: windows") || strings.Contains(body, "powershell") {
+				t.Fatalf("an sh script was switched:\n%s", body)
+			}
+			_ = rep
+		})
+	}
+	files, rep := emit(t, project(scriptJob("j", "choco install -y make")))
+	if !strings.Contains(bodyOf(files[".concourse/ci.yml"]), "path: sh") || !hasFeatureEntry(rep, string(caps.StepShell), "may be PowerShell") {
+		t.Fatalf("no lost entry for a script that reads as PowerShell: %v", rep.Entries)
+	}
+}
+
+func TestWindowsRunnerSwitchesToPowershell(t *testing.T) {
+	j := scriptJob("win", "Write-Host hi")
+	j.Runner = ir.Runner{Labels: []string{"windows-latest"}}
 	files, rep := emit(t, project(j))
-	src := files[".concourse/ci.yml"]
-	if strings.Contains(bodyOf(src), "path: sh") {
-		t.Fatalf("a PowerShell script runs under sh:\n%s", src)
+	body := bodyOf(files[".concourse/ci.yml"])
+	if !strings.Contains(body, "path: powershell") || !strings.Contains(body, "platform: windows") || !hasFeatureEntry(rep, string(caps.StepShell), "powershell -Command") {
+		t.Fatalf("windows runner not honoured: %v\n%s", rep.Entries, body)
 	}
-	if !strings.Contains(bodyOf(src), "path: powershell") || !hasFeatureEntry(rep, string(caps.StepShell), "PowerShell") {
-		t.Fatalf("no powershell task or entry: %v\n%s", rep.Entries, src)
+}
+
+func TestMixedJobSetsPlatformPerTask(t *testing.T) {
+	j := scriptJob("mix", "echo linux")
+	j.Steps = append(j.Steps, &ir.Step{ID: "mix-ps", Kind: ir.StepScript, Script: []string{"Write-Host hi"}, Shell: "pwsh"})
+	files, rep := emit(t, project(j))
+	body := bodyOf(files[".concourse/ci.yml"])
+	if strings.Count(body, "platform: windows") != 1 || strings.Count(body, "platform: linux") != 1 {
+		t.Fatalf("platform is not per task:\n%s", body)
 	}
-	back, _ := parseFiles(t, files)
-	if back.Pipelines[0].Jobs[0].Steps[0].Shell != "" {
-		t.Fatalf("shell added by the round trip: %q", back.Pipelines[0].Jobs[0].Steps[0].Shell)
+	if !hasFeatureEntry(rep, string(caps.StepShell), "other tasks of the job") {
+		t.Fatalf("no entry for the mixed job: %v", rep.Entries)
 	}
 }
 

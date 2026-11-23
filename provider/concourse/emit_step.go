@@ -269,7 +269,7 @@ func (jx *jobEmitter) config(sc *scope, path string, st *ir.Step, ext map[string
 	e := jx.pe.e
 	cfgExt, _ := ext[ExtConfig].(map[string]any)
 	cfg := newMap()
-	platform := jx.platform(cfgExt)
+	platform := jx.platform(cfgExt, sc.ps)
 	cfg.SetStr("platform", platform)
 	if platform != "windows" {
 		cfg.Set("image_resource", jx.image(sc, path, st, ext))
@@ -315,15 +315,19 @@ func (jx *jobEmitter) config(sc *scope, path string, st *ir.Step, ext map[string
 	return cfg.N
 }
 
-func (jx *jobEmitter) platform(cfgExt map[string]any) string {
+// platform is the platform of one task: a PowerShell task needs Windows, the rest follow the job runner.
+func (jx *jobEmitter) platform(cfgExt map[string]any, ps bool) string {
 	if p, _ := cfgExt["platform"].(string); p != "" {
 		return p
+	}
+	if ps {
+		return "windows"
 	}
 	switch p := jx.j.Runner.Platform; p {
 	case "linux", "windows", "darwin":
 		return p
 	}
-	if jx.windows() || jx.psJob() {
+	if jx.windows() {
 		return "windows"
 	}
 	return defaultPlatform
@@ -351,14 +355,16 @@ func (jx *jobEmitter) run(sc *scope, path string, st *ir.Step, ext map[string]an
 		}
 		if sc.ps {
 			shell := jx.psShell(st)
-			why := "the task runs " + shell + " -Command, so the worker must provide " + shell
-			if strings.TrimSpace(st.Shell) == "" {
-				why = "the IR names no shell and the script reads as PowerShell (inferred); " + why
+			jx.pe.e.emulate(path, caps.StepShell, "run.path "+shell, "the task runs "+shell+" -Command, so the worker must provide "+shell)
+			if jx.mixed() {
+				jx.pe.e.emulate(path, caps.StepShell, "platform windows", "the other tasks of the job run on "+defaultPlatform+"; Concourse sets the platform per task, so the job needs both kinds of worker")
 			}
-			jx.pe.e.emulate(path, caps.StepShell, "run.path "+shell, why)
 			run.SetStr("path", shell)
 			run.Set("args", strSeq(append(psFlags(ext), strings.Join(script, "\n"))))
 		} else {
+			if strings.TrimSpace(st.Shell) == "" && looksPowershell(script) {
+				jx.pe.e.lose(path, caps.StepShell, "the script may be PowerShell, but the IR names no shell and the runner is not Windows; it runs under "+shellCommand)
+			}
 			run.SetStr("path", jx.shellOf(st, path))
 			run.Set("args", strSeq(append(flags, strings.Join(script, "\n"))))
 		}
@@ -500,26 +506,35 @@ func (jx *jobEmitter) windows() bool {
 		return true
 	}
 	for _, l := range r.Labels {
-		if strings.Contains(strings.ToLower(l), "windows") {
+		if windowsText(l) {
 			return true
 		}
 	}
-	return false
+	return windowsImage(jx.j)
 }
 
-// powershell is true when the step runs PowerShell: it names the shell, or it names no shell and the job is on Windows.
+func windowsText(s string) bool {
+	s = strings.ToLower(s)
+	return strings.Contains(s, "windows") || strings.Contains(s, "servercore") || strings.Contains(s, "nanoserver")
+}
+
+func windowsImage(j *ir.Job) bool {
+	return j.Container != nil && windowsText(j.Container.Ref)
+}
+
+// powershell is true when the step runs PowerShell: the IR names the shell, or it names none and the runner is Windows. Script text alone never decides.
 func (jx *jobEmitter) powershell(st *ir.Step) bool {
 	if sh := strings.TrimSpace(st.Shell); sh != "" {
 		return slices.Contains(psShells, strings.ToLower(baseShell(sh)))
 	}
-	return jx.windows() || looksPowershell(st.Script)
+	return jx.windows()
 }
 
 // psLineRE matches the lines that only PowerShell or choco reads: a $var or $env:var assignment, a Verb-Noun
 // cmdlet at the start of a line, or choco.
 var psLineRE = regexp.MustCompile(`^\s*(\$[A-Za-z_][\w:]*\s*[+-]?=|[A-Z][a-z]+-[A-Z][A-Za-z]+\b|choco\s)`)
 
-// looksPowershell infers PowerShell from the script text when the IR names no shell.
+// looksPowershell reports a script that may be PowerShell; the caller only warns.
 func looksPowershell(script []string) bool {
 	for _, l := range script {
 		if psLineRE.MatchString(l) {
@@ -549,12 +564,21 @@ func psFlags(ext map[string]any) []string {
 	return []string{"-NoProfile", "-NonInteractive", "-Command"}
 }
 
-// psJob is true when a step of the job runs PowerShell; the task then needs a worker that has it.
-func (jx *jobEmitter) psJob() bool {
+// mixed is true when the job has PowerShell tasks and tasks of another kind on a runner that is not Windows.
+func (jx *jobEmitter) mixed() bool {
+	if jx.windows() {
+		return false
+	}
+	var ps, other bool
 	for _, st := range jx.j.Steps {
-		if st.Kind == ir.StepScript && jx.powershell(st) {
-			return true
+		if st.Kind != ir.StepScript {
+			continue
+		}
+		if jx.powershell(st) {
+			ps = true
+		} else {
+			other = true
 		}
 	}
-	return false
+	return ps && other
 }
