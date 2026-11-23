@@ -576,7 +576,7 @@ The setup and the conversion notes of Concourse are in [docs/providers/concourse
 
 ## Development
 
-`make check` runs the tests, `golangci-lint` and the Lean checks. It runs `go test -short ./...`, and the short form runs a deterministic sample of the chain matrix. The sample keeps one chain for each middle hop of each source provider. Every provider is a source, a middle hop and a target at least once. The full matrix at nine providers takes about 285 seconds and about 1.4 GB of memory. `make chains` runs the full matrix.
+`make check` requires the pinned linter versions, so run `make linters` first. `make check` runs the tests, `golangci-lint` and the Lean checks. It runs `go test -short ./...`, and the short form runs a deterministic sample of the chain matrix. The sample keeps one chain for each middle hop of each source provider. Every provider is a source, a middle hop and a target at least once. The full matrix at nine providers takes about 285 seconds and about 1.4 GB of memory. `make chains` runs the full matrix.
 
 `make linters` builds or downloads the pinned linters into `.tools/bin`: actionlint, woodpecker-cli, drone, kubeconform, argo and fly. The versions are in `docs/versions.md`. `make lint-real` runs `make linters`, then every test except the chain matrix without `-short`, then `golangci-lint`. It sets `PIPEMASTER_REQUIRE_LINTERS=1`, so a missing or wrong-version linter fails the run instead of skipping its tests. It took about 97 seconds on a warm build cache (measured once on an Apple Silicon Mac).
 
