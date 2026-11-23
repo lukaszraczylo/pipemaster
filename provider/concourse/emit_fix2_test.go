@@ -1,6 +1,7 @@
 package concourse_test
 
 import (
+	"reflect"
 	"slices"
 
 	"go.yaml.in/yaml/v3"
@@ -839,5 +840,16 @@ func TestAnchorHolderKeysAreNotWrittenAndAreReported(t *testing.T) {
 	}
 	if pl := p.Pipelines[0]; pl.Ext == nil {
 		t.Fatal("the IR lost the anchor holder keys")
+	}
+}
+
+func TestUnreadableGitSourceKeyDoesNotDependOnKeyOrder(t *testing.T) {
+	file := func(keys string) string {
+		return "resources:\n  - name: source\n    type: git\n    source:\n" + keys + "jobs:\n  - name: build\n    plan:\n      - get: source\n        trigger: true\n      - task: t\n        config:\n          platform: linux\n          image_resource: {type: registry-image, source: {repository: x}}\n          run: {path: echo}\n"
+	}
+	a, _ := parseFiles(t, map[string]string{"ci.yml": file("      uri: u\n      version_type: branches\n      branch_filters: [x]\n")})
+	b, _ := parseFiles(t, map[string]string{"ci.yml": file("      branch_filters: [x]\n      version_type: branches\n      uri: u\n")})
+	if x, y := a.Pipelines[0].Triggers[0].Ext, b.Pipelines[0].Triggers[0].Ext; !reflect.DeepEqual(x, y) {
+		t.Fatalf("the trigger Ext follows the key order:\n%v\n%v", x, y)
 	}
 }

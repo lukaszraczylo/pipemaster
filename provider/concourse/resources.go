@@ -243,7 +243,10 @@ func (b *pipeBuilder) gitTrigger(r *resource) sourceTrigger {
 	}
 	var branch, tag string
 	var paths, ignore []string
-	for _, key := range src.Order {
+	// Sorted keys make the first unreadable key independent of the key order of the file.
+	keys := slices.Clone(src.Order)
+	slices.Sort(keys)
+	for _, key := range keys {
 		v := src.Vals[key]
 		switch key {
 		case "branch", "tag_filter":
