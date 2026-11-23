@@ -79,6 +79,10 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 		jx.manual = false
 	}
 	own := jx.ownGets()
+	if l, ok := jx.ext[ExtGets].([]any); ok && len(l) == 0 {
+		jx.held = true
+		return nil
+	}
 	var holders []string
 	for _, g := range own {
 		if l, ok := g.m["passed"].([]any); ok && len(l) > 0 {

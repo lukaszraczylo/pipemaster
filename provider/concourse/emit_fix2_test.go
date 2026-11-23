@@ -5,6 +5,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"fmt"
 	"strings"
 	"testing"
 
@@ -520,6 +521,45 @@ func TestManualJobWithItsEventConditionReportsNoLostCondition(t *testing.T) {
 	for _, e := range rep.Entries {
 		if e.Feature == caps.JobIf && e.Level == caps.Lost {
 			t.Fatalf("the manual condition of a manual job is reported lost: %+v", e)
+		}
+	}
+}
+
+const noLeadingGetFile = `resources:
+  - name: src
+    type: git
+    source:
+      uri: https://example.com/x.git
+      branch: main
+jobs:
+  - name: build
+    plan:
+      - get: src
+        trigger: true
+      - task: t
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          run: {path: sh, args: [-ec, make]}
+  - name: ship
+    plan:
+      - task: t
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          run: {path: sh, args: [-ec, ship]}
+`
+
+func TestJobWithNoLeadingSourceGetGetsNoneBack(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"ci.yml": noLeadingGetFile})
+	files, _ := emit(t, p)
+	back, _ := reparse(t, files)
+	if len(back.Pipelines[0].Jobs) != 2 {
+		t.Fatalf("jobs = %d", len(back.Pipelines[0].Jobs))
+	}
+	for i, j := range back.Pipelines[0].Jobs {
+		if got, want := fmt.Sprint(j.Ext), fmt.Sprint(p.Pipelines[0].Jobs[i].Ext); got != want {
+			t.Fatalf("job %s Ext = %s; want %s", j.ID, got, want)
 		}
 	}
 }

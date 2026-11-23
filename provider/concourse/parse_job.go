@@ -86,8 +86,9 @@ func (b *pipeBuilder) job(m *omap) *builtJob {
 	jb.serial(r, bj)
 	jb.needs(bj, plan)
 	jb.gateMarker(bj)
-	if len(gets) > 0 {
-		jb.k.Out[ExtGets] = gets
+	jb.k.Out[ExtGets] = gets
+	if len(gets) == 0 {
+		jb.k.Out[ExtGets] = []any{}
 	}
 	jb.k.KeepRest(r)
 	j.Ext = jb.k.Ext()
