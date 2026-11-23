@@ -32,15 +32,49 @@ var (
 	pinned     = map[string]*entry{}
 	patterns   = map[string][]string{}
 	sharedByID = map[[sha256.Size]byte]*entry{}
-	resources  = map[string][]byte{}
+	resources  = map[string]func() []byte{}
+	lazy       = map[string]*sync.Once{}
+	lazyLoad   = map[string]func(){}
 )
 
 // RegisterResource makes a schema file that a pinned schema references by URL available offline. A second
 // registration of the same URL replaces the first.
 func RegisterResource(url string, data []byte) {
+	RegisterLazyResource(url, func() []byte { return data })
+}
+
+// RegisterLazyResource is RegisterResource for a file that load produces on first use.
+func RegisterLazyResource(url string, load func() []byte) {
 	regMu.Lock()
 	defer regMu.Unlock()
-	resources[url] = data
+	resources[url] = load
+}
+
+// registerLazy records id and its file patterns now and runs load, which must call Register for id, on the
+// first validation for id. It panics on a duplicate id.
+func registerLazy(id string, patternList []string, load func()) {
+	regMu.Lock()
+	defer regMu.Unlock()
+	if _, dup := lazy[id]; dup {
+		panic("validate: duplicate schema registration for " + id)
+	}
+	if _, dup := pinned[id]; dup {
+		panic("validate: duplicate schema registration for " + id)
+	}
+	lazy[id] = &sync.Once{}
+	lazyLoad[id] = load
+	patterns[id] = append([]string(nil), patternList...)
+}
+
+// ensure runs the deferred registration of id, if it has one.
+func ensure(id string) {
+	regMu.RLock()
+	once, ok := lazy[id]
+	load := lazyLoad[id]
+	regMu.RUnlock()
+	if ok {
+		once.Do(load)
+	}
 }
 
 // Register pins schema (JSON) for provider id and the fs.Glob patterns of its files. Providers with
@@ -72,12 +106,12 @@ type offlineLoader struct{}
 
 func (offlineLoader) Load(url string) (any, error) {
 	regMu.RLock()
-	data, ok := resources[url]
+	load, ok := resources[url]
 	regMu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("network access refused for %s", url)
 	}
-	return jsonschema.UnmarshalJSON(bytes.NewReader(data))
+	return jsonschema.UnmarshalJSON(bytes.NewReader(load()))
 }
 
 func compileDoc(id string, raw []byte) (*jsonschema.Schema, error) {
@@ -94,6 +128,7 @@ func compileDoc(id string, raw []byte) (*jsonschema.Schema, error) {
 }
 
 func schemaFor(providerID string) (*jsonschema.Schema, error) {
+	ensure(providerID)
 	regMu.RLock()
 	e, ok := pinned[providerID]
 	regMu.RUnlock()
@@ -257,9 +292,14 @@ func Patterns(providerID string) []string {
 func Providers() []string {
 	regMu.RLock()
 	defer regMu.RUnlock()
-	ids := make([]string, 0, len(pinned))
+	ids := make([]string, 0, len(pinned)+len(lazy))
 	for id := range pinned {
 		ids = append(ids, id)
+	}
+	for id := range lazy {
+		if _, done := pinned[id]; !done {
+			ids = append(ids, id)
+		}
 	}
 	sort.Strings(ids)
 	return ids

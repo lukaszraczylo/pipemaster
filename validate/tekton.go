@@ -21,6 +21,7 @@ var kinds = map[string]map[string]bool{}
 // knownKind reports whether v is a document File must validate. Providers without per-document dispatch
 // validate every document.
 func knownKind(providerID string, v any) bool {
+	ensure(providerID)
 	regMu.RLock()
 	set, ok := kinds[providerID]
 	regMu.RUnlock()
@@ -50,7 +51,7 @@ type dispatchRule struct {
 // RegisterTekton pins the embedded Tekton schemas for provider id. File validates each document by apiVersion
 // and kind and skips a kind without a schema; it returns ErrNoSchema when no document of a file has one.
 func RegisterTekton(id string, patternList []string) {
-	registerDispatched(id, schemas.Tekton, tektonDir, tektonBase, patternList)
+	registerLazy(id, patternList, func() { registerDispatched(id, schemas.Tekton, tektonDir, tektonBase, patternList) })
 }
 
 // registerDispatched pins the schema files in dir of fsys, and dispatch.json among them, for provider id.

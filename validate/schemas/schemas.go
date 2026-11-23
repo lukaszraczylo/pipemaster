@@ -10,6 +10,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -38,8 +39,10 @@ var Drone []byte
 //go:embed kubernetes-definitions.json.gz
 var kubernetesDefinitionsGz []byte
 
-// KubernetesDefinitions is the Kubernetes schema file that drone.json references. It is stored gzip-compressed.
-var KubernetesDefinitions = mustGunzip("kubernetes-definitions.json.gz", kubernetesDefinitionsGz)
+// KubernetesDefinitions returns the Kubernetes schema file that drone.json references. It decompresses the file on the first call.
+var KubernetesDefinitions = sync.OnceValue(func() []byte {
+	return mustGunzip("kubernetes-definitions.json.gz", kubernetesDefinitionsGz)
+})
 
 //go:embed tekton/*.json.gz
 var tektonGz embed.FS
@@ -60,8 +63,14 @@ var Argo fs.FS = &gzFS{src: argoGz}
 //go:embed concourse.json
 var Concourse []byte
 
+var gunzipped atomic.Int64
+
+// Loaded reports whether any compressed schema file has been decompressed in this process.
+func Loaded() bool { return gunzipped.Load() > 0 }
+
 // mustGunzip panics on a corrupt embedded file: that is a build defect.
 func mustGunzip(name string, data []byte) []byte {
+	gunzipped.Add(1)
 	r, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
 		panic("schemas: " + name + ": " + err.Error())

@@ -27,7 +27,7 @@ func New() provider.Provider { return adapter{} }
 
 func init() {
 	provider.Register(New())
-	validate.RegisterResource(kubernetesDefsURL, schemas.KubernetesDefinitions)
+	validate.RegisterLazyResource(kubernetesDefsURL, schemas.KubernetesDefinitions)
 	validate.Register(dialect, schemas.Drone, []string{fileYML})
 }
 

@@ -11,5 +11,5 @@ const (
 // document by apiVersion and kind and skips a kind without a schema; it returns ErrNoSchema when no document of
 // a file has one.
 func RegisterArgo(id string, patternList []string) {
-	registerDispatched(id, schemas.Argo, argoDir, argoBase, patternList)
+	registerLazy(id, patternList, func() { registerDispatched(id, schemas.Argo, argoDir, argoBase, patternList) })
 }

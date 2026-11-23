@@ -50,7 +50,7 @@ func read(t *testing.T, path string) []byte {
 	t.Helper()
 	switch {
 	case path == "kubernetes-definitions.json":
-		return schemas.KubernetesDefinitions
+		return schemas.KubernetesDefinitions()
 	case strings.HasPrefix(path, "argo/"):
 		b, err := fs.ReadFile(schemas.Argo, path)
 		if err != nil {
