@@ -45,3 +45,7 @@ func (r *Report) Worst() caps.Level {
 	}
 	return worst
 }
+
+// AnchorKeyDetail ends the detail of a lost entry for a top-level key that only holds YAML anchors. The key
+// belongs to the origin file, so a full return records it in a metadata layer.
+const AnchorKeyDetail = "it only holds YAML anchors, which the parser has resolved"

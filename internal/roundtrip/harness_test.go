@@ -151,7 +151,7 @@ func dropsAnchorKeys(rep *report.Report) bool {
 		return false
 	}
 	for _, e := range rep.Entries {
-		if e.Feature == caps.ExtPassthrough && e.Level == caps.Lost && strings.Contains(e.Detail, "only holds YAML anchors") {
+		if e.Feature == caps.ExtPassthrough && e.Level == caps.Lost && strings.HasSuffix(e.Detail, report.AnchorKeyDetail) {
 			return true
 		}
 	}

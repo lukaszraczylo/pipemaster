@@ -8,6 +8,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 // topExt lists the pipeline Ext keys that are top-level keys of the file, in the order they are written.
@@ -84,7 +85,7 @@ func (e *emitter) pipeline(pl *ir.Pipeline, first bool) {
 	}
 	if extra, ok := pe.ext[ExtExtra].(map[string]any); ok {
 		for _, k := range sortedKeys(extra) {
-			e.lose(pp, caps.ExtPassthrough, "top-level key "+k+" is no Concourse key and is not written; it only holds YAML anchors, which the parser has resolved")
+			e.lose(pp, caps.ExtPassthrough, "top-level key "+k+" is no Concourse key and is not written; "+report.AnchorKeyDetail)
 		}
 	}
 	pe.carryPipeline(top.N)
