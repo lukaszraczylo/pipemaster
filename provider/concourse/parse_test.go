@@ -214,7 +214,7 @@ func TestNonGitResourceBecomesResourceSteps(t *testing.T) {
 }
 
 func TestPassedMapsToNeeds(t *testing.T) {
-	pl, _ := parseYAML(t, "resources:\n- {name: a, type: git, source: {uri: u, branch: main}}\n- {name: b, type: git, source: {uri: u2, branch: main}}\njobs:\n- name: one\n  plan:\n  - {get: a, trigger: true}\n  - {get: b}\n"+echoTask+"- name: two\n  plan:\n  - {get: a, trigger: true}\n"+echoTask+
+	pl, _ := parseYAML(t, "resources:\n- {name: a, type: git, source: {uri: u, branch: main}}\n- {name: b, type: git, source: {uri: u, branch: main}}\njobs:\n- name: one\n  plan:\n  - {get: a, trigger: true}\n  - {get: b}\n"+echoTask+"- name: two\n  plan:\n  - {get: a, trigger: true}\n"+echoTask+
 		"- name: three\n  plan:\n  - in_parallel:\n    - {get: a, trigger: true, passed: [one, two]}\n    - {get: b, passed: [one]}\n"+echoTask)
 	j := job(t, pl, "three")
 	var ids []string

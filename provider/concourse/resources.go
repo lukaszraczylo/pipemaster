@@ -276,6 +276,9 @@ func (b *pipeBuilder) gitTrigger(r *resource) sourceTrigger {
 		}
 	}
 	uri, _ := text(src.Vals["uri"])
+	if literalURI(uri) && b.distinctGitURIs() > 1 {
+		return b.failSafe(r, r.name, "the resource watches the repository "+uri+", which is not the converted repository: the pipeline has several git uris and only a ((var)) uri names the repository of the pipeline")
+	}
 	t := ir.Trigger{Kind: ir.TriggerPush, Ext: resourceExt(r.name)}
 	t.Paths = ir.Filter{Include: paths, Exclude: ignore}
 	if tag != "" {
@@ -284,13 +287,44 @@ func (b *pipeBuilder) gitTrigger(r *resource) sourceTrigger {
 		}
 		t.Kind = ir.TriggerTag
 		t.Tags.Include = []string{tag}
+		b.watched(r, caps.TriggerTag, uri, "tags "+tag)
 		return sourceTrigger{trig: t}
 	}
 	if branch == "" {
 		return b.failSafe(r, r.name, "source.branch is not set and Concourse follows the default branch")
 	}
 	t.Branches.Include = []string{branch}
+	b.watched(r, caps.TriggerPush, uri, "branch "+branch)
 	return sourceTrigger{trig: t, uri: "uri:" + uri, merge: uri != "" && !strings.Contains(uri, varOpen)}
+}
+
+// literalURI is true for a git uri that names one fixed repository.
+func literalURI(uri string) bool { return uri != "" && !strings.Contains(uri, varOpen) }
+
+// distinctGitURIs counts the different uris of the git resources of the pipeline.
+func (b *pipeBuilder) distinctGitURIs() int {
+	seen := map[string]bool{}
+	for _, r := range b.resOrder {
+		if !b.builtin(r, typeGit) {
+			continue
+		}
+		if src := r.source(); src != nil {
+			if u, ok := text(src.Vals["uri"]); ok && u != "" {
+				seen[u] = true
+			}
+		}
+	}
+	return len(seen)
+}
+
+// watched says which repository a git trigger watches. The IR trigger belongs to the repository that holds the
+// converted pipeline, so the entry names the uri that the Concourse resource follows.
+func (b *pipeBuilder) watched(r *resource, f caps.Feature, uri, what string) {
+	if uri == "" {
+		uri = "(no uri)"
+	}
+	b.note(f, caps.Emulated, b.path(), "trigger of the converted repository",
+		fmt.Sprintf("the git resource %s watches %s (%s); the trigger fires on pushes to the repository that holds the converted pipeline", r.name, uri, what), lineOf(r))
 }
 
 var weekdays = map[string]string{"sunday": "0", "monday": "1", "tuesday": "2", "wednesday": "3", "thursday": "4", "friday": "5", "saturday": "6"}
