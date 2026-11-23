@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
 # pipemaster:arg {"digest":"614688d955c08ff89bac2f7d1f6c9f1f64e48e7f4f368ccafc133c0df00f0a7b","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/build
-# pipemaster:arg {"manual":false,"held":true}
+# pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
 # pipemaster:arg {"digest":"aca4b8986b59d75101e0e5ac3570907135bd66ef7c558a134bfc4d6b3582dfec","carry":"if: |\n    opaque(gitlab): workflow:\n        name: $PIPELINE_NAME\n        rules:\n            - if: $CI_COMMIT_TAG\n              when: never\n            - if: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n              variables:\n                PIPELINE_NAME: MR pipeline\n            - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH\n              variables:\n                PIPELINE_NAME: Default branch pipeline\nid: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry

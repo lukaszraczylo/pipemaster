@@ -3,7 +3,7 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
 # pipemaster:arg {"digest":"4281de54e46cde38fa0458a7445b8a5e2f6f67c30a48661b00c4b8bd65c07409","carry":"id: build-step-1\nkind: script\nscript:\n    - 'echo $\u007b{ opaque(gha): env[github.job] }}'\n"}
 # pipemaster:emulated job.manual pipeline/ci/job/build
-# pipemaster:arg {"manual":false,"held":true}
+# pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
 # pipemaster:arg {"digest":"8f9522636fceaa7c4428258f3ffc56f59165c91e6d399385548509bafe410561","carry":"if: 'opaque(gha): fromJSON(''{\"a\":1}'').a == 1'\nid: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry

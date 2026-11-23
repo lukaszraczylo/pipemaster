@@ -92,14 +92,17 @@ func (b *pipeBuilder) job(m *omap) *builtJob {
 	b.collect(bj, plan, m)
 	jb.serial(r, bj)
 	jb.needs(bj, plan)
-	jb.gateMarker(bj)
+	needCarry := jb.gateMarker(bj)
 	jb.k.Out[ExtGets] = gets
 	if len(gets) == 0 {
 		jb.k.Out[ExtGets] = []any{}
 	}
 	jb.k.KeepRest(r)
 	j.Ext = jb.k.Ext()
-	jb.carryJob(m)
+	if !jb.carryJob(m) && needCarry {
+		j.Manual = true
+		jb.b.ignored(jb.path, caps.JobManual, "the job was edited after pipemaster wrote it, so its condition is not restored; the job stays manual")
+	}
 	jb.untried()
 	return bj
 }

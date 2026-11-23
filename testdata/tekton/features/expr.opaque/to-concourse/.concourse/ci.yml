@@ -3,7 +3,7 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
 # pipemaster:arg {"digest":"b263d257dc41c05f4e7348ddce7b85b2c4ca2cb9295544f61103720b382c73b0","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/ci/job/build
-# pipemaster:arg {"manual":false,"held":true}
+# pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
 # pipemaster:arg {"digest":"d44fcfcf923655909b4c9c89fc5cfa4c9b3c983ec1934006b426b0d7a43e8386","carry":"if: 'opaque(tekton): {\"input\":\"pipemaster-disabled\",\"operator\":\"in\",\"values\":[\"never\"]}'\nid: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry

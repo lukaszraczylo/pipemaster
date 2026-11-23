@@ -116,17 +116,20 @@ func (b *pipeBuilder) applyJobNames(pl *ir.Pipeline) {
 	}
 }
 
-// gateMarker puts back the manual flag and the environment of a job that has no triggering get.
-func (jb *jobBuilder) gateMarker(bj *builtJob) {
+// gateMarker puts back the manual flag and the environment of a job that has no triggering get. It returns true
+// when the job is held for a condition that only the carry of the job holds: the caller must then see the carry
+// restored, or the job stays manual.
+func (jb *jobBuilder) gateMarker(bj *builtJob) bool {
 	var a gateArg
 	if !jb.b.arg(jb.path, caps.JobManual, &a) {
-		return
+		return false
 	}
 	if a.Held != bj.job.Manual {
 		jb.b.ignored(jb.path, caps.JobManual, "the triggering gets of the job were edited after pipemaster wrote them")
-		return
+		return false
 	}
 	jb.job.Manual, jb.job.Environment = a.Manual, a.Environment
+	return a.Held && !a.Manual && a.Cond
 }
 
 // ifMarker moves a condition that every script task repeats back to the job.
@@ -527,10 +530,10 @@ func (jb *jobBuilder) untried() {
 }
 
 // carryJob puts back the job fields that the plan cannot say.
-func (jb *jobBuilder) carryJob(m *omap) {
+func (jb *jobBuilder) carryJob(m *omap) bool {
 	var c ir.Job
 	if !jb.b.carryOf(jb.path, digestOf(plainValue(m)), &c) {
-		return
+		return false
 	}
 	j := jb.job
 	needs := j.Needs
@@ -541,6 +544,7 @@ func (jb *jobBuilder) carryJob(m *omap) {
 	}
 	c.ID, c.Name, c.Steps, c.Ext, c.Needs = j.ID, j.Name, j.Steps, j.Ext, needs
 	*j = c
+	return true
 }
 
 // carryPipeline puts back the pipeline fields that the resources and gets cannot say.

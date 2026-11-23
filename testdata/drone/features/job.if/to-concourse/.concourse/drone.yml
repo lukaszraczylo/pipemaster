@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/step/build/carry
 # pipemaster:arg {"digest":"aff55752408a94ea8e52e4642edb7ea910edbcfb6c72d530adaa7bd8dad8c2d8","carry":"image:\n    ref: golang:1.25\nid: build\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/drone/job/ci
-# pipemaster:arg {"manual":false,"held":true}
+# pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/carry
 # pipemaster:arg {"digest":"1c015356478a8fb542b802c00017401854225ad84d28e99f8a7aa8407c38ac74","carry":"if: (event == 'push') \u0026\u0026 (actor == 'release-bot')\nid: ci\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/carry

@@ -33,6 +33,8 @@ type gateArg struct {
 	Manual      bool            `json:"manual"`
 	// Held is true when the file has no triggering get for the job.
 	Held bool `json:"held"`
+	// Cond is true when the job is held for a condition that only the carry of the job holds.
+	Cond bool `json:"cond,omitempty"`
 }
 
 // secretArg lists the task params whose kind differs from what their name says: Secrets are secrets that look

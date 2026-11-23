@@ -121,3 +121,23 @@ func TestDisabledStepComesBack(t *testing.T) {
 		t.Fatalf("disabled step came back as %+v", st)
 	}
 }
+
+func TestEditedHeldJobStaysManual(t *testing.T) {
+	notify := scriptJob("notify", "echo failed")
+	notify.Needs = []ir.Need{{JobID: "build"}}
+	notify.If = expr.Call{Name: "failure"}
+	p := project(scriptJob("build", "make"), notify)
+	back, rep := editedParse(t, p, "echo failed", "echo failed; echo more")
+	var got *ir.Job
+	for _, j := range back.Pipelines[0].Jobs {
+		if j.ID == "notify" {
+			got = j
+		}
+	}
+	if got == nil || !got.Manual {
+		t.Fatalf("an edited held job runs with no gate: %+v", got)
+	}
+	if !hasEntry(rep, "stays manual") {
+		t.Fatalf("no entry says the job stays manual: %v", rep.Entries)
+	}
+}

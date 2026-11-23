@@ -46,6 +46,8 @@ type jobEmitter struct {
 	actSeq       int
 	manual       bool
 	held         bool
+	// condHeld is true when the job condition has no form in the file, so the carry holds it and the job has no trigger.
+	condHeld bool
 }
 
 // jobs writes every job of the pipeline.
@@ -194,7 +196,7 @@ func (jx *jobEmitter) meta() {
 func (jx *jobEmitter) gateMarker() {
 	j := jx.j
 	if j.Manual || j.Environment != nil || jx.held {
-		jx.pe.e.markArg(caps.JobManual, jx.mpath, gateArg{Manual: j.Manual, Environment: j.Environment, Held: jx.held})
+		jx.pe.e.markArg(caps.JobManual, jx.mpath, gateArg{Manual: j.Manual, Environment: j.Environment, Held: jx.held, Cond: jx.condHeld})
 	}
 }
 
@@ -221,7 +223,7 @@ func (jx *jobEmitter) condition() {
 	}
 	refs, ok := guardRefs(j.If)
 	if !ok || !guardable(j.If) {
-		jx.manual = true
+		jx.manual, jx.condHeld = true, true
 		e.lose(jx.path, caps.JobIf, "the condition has no shell test form; the job has no triggering get, so a person starts it")
 		return
 	}
@@ -229,7 +231,7 @@ func (jx *jobEmitter) condition() {
 	for _, r := range refs {
 		env, spelled := probe.refVar(r)
 		if want, named := exprconcourse.EnvName(r); !spelled || !named || env != want {
-			jx.manual = true
+			jx.manual, jx.condHeld = true, true
 			e.lose(jx.path, caps.JobIf, "the reference "+expr.String(r)+" has no spelling in a Concourse task; the job has no triggering get, so a person starts it")
 			return
 		}

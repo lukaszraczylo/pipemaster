@@ -3,7 +3,7 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/step/deploy-step-1/carry
 # pipemaster:arg {"digest":"d7e254c72ff31179c9edddd6c2047f7ef98071f3a219dcbd2d7887d655afea41","carry":"id: deploy-step-1\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/ci/job/deploy
-# pipemaster:arg {"manual":false,"held":true}
+# pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry
 # pipemaster:arg {"digest":"76cb527d2fd8553a05ded834c76a595dfe15b718b49d4f2a97be99ed82ce832e","carry":"if: (ref == 'refs/heads/main') \u0026\u0026 (event == 'push')\nid: deploy\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry

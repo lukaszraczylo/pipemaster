@@ -5,7 +5,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/step/script/carry
 # pipemaster:arg {"digest":"6ac8bb717fb74619f0b0d413adf44cd17815a59a5d88fe285138520772bbb9dd","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/deploy
-# pipemaster:arg {"manual":false,"held":true}
+# pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/carry
 # pipemaster:arg {"digest":"02cca936bdf5900f3864b171aa5fae581ac48e1dad825d2567db93cb38cef91f","carry":"if: |\n    opaque(gitlab): - changes: '!reference [.remote-patterns]'\n      if: $CI_COMMIT_TAG\nid: deploy\nneeds:\n    - job: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
