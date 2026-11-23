@@ -80,7 +80,7 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 	}
 	own := jx.ownGets()
 	if l, ok := jx.ext[ExtGets].([]any); ok && len(l) == 0 {
-		jx.held = true
+		jx.held = len(jx.jobTriggers(nil)) == 0
 		return nil
 	}
 	var holders []string

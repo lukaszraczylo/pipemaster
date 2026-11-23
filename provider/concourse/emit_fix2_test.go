@@ -648,3 +648,53 @@ func TestPassedListKeepsTheOrderOfTheFile(t *testing.T) {
 		}
 	}
 }
+
+func TestOpaqueParallelGetsKeepTheTriggerOfTheJob(t *testing.T) {
+	src := `resources:
+  - name: tick
+    type: time
+    source: {interval: 1h}
+  - name: src
+    type: git
+    source: {uri: "https://example.com/a.git", branch: main}
+  - name: img
+    type: registry-image
+    source: {repository: alpine}
+jobs:
+  - name: other
+    plan:
+      - get: src
+        trigger: true
+      - task: t
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          run: {path: sh, args: [-ec, make]}
+  - name: bump
+    plan:
+      - in_parallel:
+          - get: src
+          - get: tick
+            trigger: true
+          - get: img
+      - task: t
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          run: {path: sh, args: [-ec, make]}
+`
+	p, _ := parseFiles(t, map[string]string{"ci.yml": src})
+	files, _ := emit(t, p)
+	back, _ := reparse(t, files)
+	for i, j := range back.Pipelines[0].Jobs {
+		if want := p.Pipelines[0].Jobs[i]; j.Manual != want.Manual {
+			t.Fatalf("job %s Manual = %v; want %v", j.ID, j.Manual, want.Manual)
+		}
+	}
+	if rep := fmt.Sprint(p.Pipelines[0].Jobs[1].Ext); !strings.Contains(rep, "triggers") {
+		t.Fatalf("the job keeps no trigger set: %s", rep)
+	}
+	if strings.Contains(files[".concourse/ci.yml"], `"held":true`) {
+		t.Fatalf("a job with a triggering get in a verbatim step is marked as held")
+	}
+}
