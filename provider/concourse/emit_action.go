@@ -251,14 +251,6 @@ func (c *chain) verbatim(st *ir.Step, path string) *yaml.Node {
 	jx := c.jx
 	e := jx.pe.e
 	ext := extOf(st.Ext)
-	if !e.own || ext == nil {
-		feature := caps.ExtPassthrough
-		if st.Kind == ir.StepPlugin {
-			feature = caps.StepAction
-		}
-		e.lose(path, feature, "the "+string(st.Kind)+" step has no Concourse form outside a Concourse file; the step is not written")
-		return nil
-	}
 	switch st.Kind {
 	case ir.StepPlugin:
 		raw, ok := ext[ExtStep]

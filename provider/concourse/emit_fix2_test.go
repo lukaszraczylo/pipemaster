@@ -463,3 +463,17 @@ func TestTaskNameIsNoDisplayName(t *testing.T) {
 		}
 	}
 }
+
+func TestForeignPluginStepKeepsItsPlaceAndComesBack(t *testing.T) {
+	plugin := &ir.Step{ID: "publish", Kind: ir.StepPlugin, Image: &ir.Image{Ref: "plugins/docker"}, With: map[string]ir.Value{"repo": {Lit: "example/app"}}}
+	j := &ir.Job{ID: "build", Steps: []*ir.Step{{ID: "build", Kind: ir.StepScript, Script: []string{"make"}}, plugin}}
+	files, _ := emit(t, project(j))
+	got, rep := reparse(t, files)
+	steps := got.Pipelines[0].Jobs[0].Steps
+	if len(steps) != 2 || steps[1].Kind != ir.StepPlugin || steps[1].Image == nil || steps[1].Image.Ref != "plugins/docker" {
+		t.Fatalf("steps = %+v; want the plugin step back in place", steps)
+	}
+	if hasFeatureEntry(rep, string(caps.StepAction), "marker ignored") {
+		t.Fatalf("an unedited file reported an ignored marker: %v", rep.Entries)
+	}
+}

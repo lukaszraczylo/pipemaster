@@ -58,6 +58,14 @@ func (c *chain) step(st *ir.Step) []*yaml.Node {
 	case ir.StepScript, "":
 		return []*yaml.Node{c.script(st, path)}
 	case ir.StepResource, ir.StepPlugin, ir.StepTask:
+		if ext := extOf(st.Ext); !e.own || ext == nil {
+			feature := caps.ExtPassthrough
+			if st.Kind == ir.StepPlugin {
+				feature = caps.StepAction
+			}
+			e.lose(path, feature, "the "+string(st.Kind)+" step has no Concourse form outside a Concourse file; a placeholder task keeps its place")
+			return c.placeholder(st, path, actionArg{})
+		}
 		n := c.verbatim(st, path)
 		if n == nil {
 			return nil
