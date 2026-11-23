@@ -88,10 +88,11 @@ func TestMatrixEditIsKept(t *testing.T) {
 	if edited == src {
 		edited = strings.Replace(src, "1.22", "1.23", 1)
 	}
-	back, _ := parseFiles(t, map[string]string{"ci.yml": edited})
+	back, rep := parseFiles(t, map[string]string{"ci.yml": edited})
 	if back.Pipelines[0].Jobs[0].Matrix != nil {
 		t.Fatalf("an edited across was restored as the matrix")
 	}
+	wantIgnored(t, rep, caps.JobMatrix, "across")
 }
 
 func actionJob() *ir.Job {
@@ -129,12 +130,13 @@ func TestHeldActionEditIsKept(t *testing.T) {
 	if edited == src {
 		t.Fatalf("placeholder script changed shape:\n%s", src)
 	}
-	back, _ := parseFiles(t, map[string]string{"ci.yml": edited})
+	back, rep := parseFiles(t, map[string]string{"ci.yml": edited})
 	for _, s := range back.Pipelines[0].Jobs[0].Steps {
 		if s.Kind == ir.StepAction {
 			t.Fatalf("an edited placeholder was restored as an action: %+v", s)
 		}
 	}
+	wantIgnored(t, rep, caps.StepAction, "setup")
 }
 
 func TestNameCollisionIsResolvedDeterministically(t *testing.T) {
