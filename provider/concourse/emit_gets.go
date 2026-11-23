@@ -148,7 +148,7 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 	if len(trig) == 0 && !jx.manual && len(j.Needs) == 0 && len(pe.sources) > 0 && !jx.hasTriggerSource() {
 		e.emulate(jx.path, caps.TriggerManual, "get with no trigger", "no trigger starts the job, so a person starts it")
 	}
-	if jx.ext[ExtGetsParallel] == true && len(nodes) > 1 {
+	if jx.ext[ExtGetsParallel] == true && len(nodes) > 0 {
 		ip := newMap()
 		ip.Set("in_parallel", seqOf(nodes...))
 		return []*yaml.Node{ip.N}

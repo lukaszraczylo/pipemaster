@@ -563,3 +563,16 @@ func TestJobWithNoLeadingSourceGetGetsNoneBack(t *testing.T) {
 		}
 	}
 }
+
+func TestSingleGetInParallelKeepsItsWrapper(t *testing.T) {
+	src := strings.Replace(noLeadingGetFile, "      - task: t\n        config:\n          platform: linux\n          image_resource: {type: registry-image, source: {repository: alpine}}\n          run: {path: sh, args: [-ec, ship]}\n",
+		"      - in_parallel:\n          - get: src\n            passed: [build]\n      - task: t\n        config:\n          platform: linux\n          image_resource: {type: registry-image, source: {repository: alpine}}\n          run: {path: sh, args: [-ec, ship]}\n", 1)
+	p, _ := parseFiles(t, map[string]string{"ci.yml": src})
+	files, _ := emit(t, p)
+	back, _ := reparse(t, files)
+	for i, j := range back.Pipelines[0].Jobs {
+		if got, want := fmt.Sprint(j.Ext), fmt.Sprint(p.Pipelines[0].Jobs[i].Ext); got != want {
+			t.Fatalf("job %s Ext = %s; want %s", j.ID, got, want)
+		}
+	}
+}
