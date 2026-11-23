@@ -314,3 +314,25 @@ func TestNamedPowershellShellIsHonoured(t *testing.T) {
 		t.Fatalf("shell lost: %q", back.Pipelines[0].Jobs[0].Steps[0].Shell)
 	}
 }
+
+func TestFinallyStepsWithTheSameIDStayParseable(t *testing.T) {
+	named := func(id, script string) *ir.Job {
+		j := scriptJob(id, script)
+		j.Steps[0].ID = "script"
+		return j
+	}
+	p := project(named("build", "make"))
+	p.Pipelines[0].Finally = []*ir.Job{named("cleanup", "rm -rf x"), named("report", "echo done")}
+	files, _ := emit(t, p)
+	got, _ := reparse(t, files)
+	seen := map[string]bool{}
+	for _, j := range got.Pipelines[0].Jobs {
+		clear(seen)
+		for _, s := range j.Steps {
+			if seen[s.ID] {
+				t.Fatalf("job %s holds the step id %s twice", j.ID, s.ID)
+			}
+			seen[s.ID] = true
+		}
+	}
+}

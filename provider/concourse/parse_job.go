@@ -40,6 +40,8 @@ type jobBuilder struct {
 	job *ir.Job
 	k   *sink
 	ids map[string]int
+	// taken holds the final IDs of the task steps read so far; a restored ID must not repeat one.
+	taken map[string]bool
 	// tried holds the steps whose carry said continue_on_error; a try in the file must still say it.
 	tried map[*ir.Step]string
 	path  string
@@ -48,7 +50,7 @@ type jobBuilder struct {
 func (b *pipeBuilder) job(m *omap) *builtJob {
 	name, _ := text(m.Vals["name"])
 	j := &ir.Job{ID: name}
-	jb := &jobBuilder{b: b, job: j, ids: map[string]int{}, path: b.path() + "/job/" + name}
+	jb := &jobBuilder{b: b, job: j, ids: map[string]int{}, taken: map[string]bool{}, path: b.path() + "/job/" + name}
 	jb.k = newSink(b.rep, b.file, jb.path)
 	r := newReader(m)
 	r.Take("name")

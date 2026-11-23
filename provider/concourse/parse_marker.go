@@ -61,9 +61,14 @@ func (jb *jobBuilder) nameMarker(st *ir.Step) {
 		return
 	}
 	st.Name = a.Name
-	if a.ID != "" {
-		st.ID = a.ID
+	if a.ID == "" {
+		return
 	}
+	if jb.taken[a.ID] {
+		jb.b.ignored(jb.path+"/step/"+st.ID, caps.DisplayName, "the step ID "+a.ID+" is already used by another step of the job")
+		return
+	}
+	st.ID = a.ID
 }
 
 // applyJobNames puts back the IDs and names of the jobs that the emitter renamed, and the needs that name them.
@@ -480,7 +485,12 @@ func (jb *jobBuilder) carryStep(m *omap, written string, st *ir.Step) {
 		jb.tried[st] = written
 	}
 	c.ContinueOnError = false
+	id := st.ID
 	*st = c
+	if st.ID != id && jb.taken[st.ID] {
+		st.ID = id
+		jb.b.ignored(jb.path+"/step/"+written, caps.ExtPassthrough, "the carry ID "+c.ID+" is already used by another step of the job")
+	}
 }
 
 // untried reports the steps whose carry held continue_on_error and that no try wraps any more.

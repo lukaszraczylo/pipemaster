@@ -184,6 +184,7 @@ func (jb *jobBuilder) applyMarkers(m *omap, st *ir.Step, written string) {
 	jb.nameMarker(st)
 	jb.matrixBack(st)
 	jb.carryStep(m, written, st)
+	jb.taken[st.ID] = true
 }
 
 // config reads an inline task config into the step. It returns the config params, which the step env reads.
