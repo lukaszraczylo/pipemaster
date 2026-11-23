@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerates validate/schemas/tekton/*.json from the pinned Tekton CRDs. It is a recipe, not part of `make check`:
+# Regenerates validate/schemas/tekton/*.json.gz from the pinned Tekton CRDs. It is a recipe, not part of `make check`:
 # the generated files are committed, and a pin change here must come with a SOURCES.md update.
 set -euo pipefail
 
@@ -51,7 +51,7 @@ fi
 (cd "$work/gen" && FILENAME_FORMAT='{kind}_{version}' python3 -I "$work/conv/openapi2jsonschema.py" "$work"/crds/300-*.yaml)
 
 mkdir -p "$out"
-rm -f "$out"/*.json
+rm -f "$out"/*.json "$out"/*.json.gz
 # The converter puts a boolean additionalProperties key into the properties map of any node that declares a field
 # named "properties" (ParamSpec.properties). kubeconform then reports the schema as missing. The fix drops that key.
 python3 -I - "$work/gen" "$out" <<'PY'
@@ -113,4 +113,8 @@ if [[ "$got" != "$cronjob_sha256" ]]; then
 	echo "cronjob-batch-v1.json has sha256 $got, expected $cronjob_sha256" >&2
 	exit 1
 fi
+# Deterministic: -n drops the name and mtime. The sha256 pins above are of the plain files.
+for f in "$out"/*.json; do
+	gzip -9n -f "$f"
+done
 echo "wrote $out"

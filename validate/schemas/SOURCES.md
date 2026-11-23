@@ -1,5 +1,10 @@
 # Vendored schemas
 
+The generated sets (every file in `tekton/` and `argo/`, and `kubernetes-definitions.json`) are stored
+gzip-compressed as `<name>.json.gz`, written by `gzip -9n` (no name, no mtime, so the output is deterministic).
+The Bytes and SHA-256 columns below describe the plain JSON. To read a file, run `gzip -dc <name>.json.gz`.
+`schemas.go` serves the decompressed bytes under the same `.json` names.
+
 Fetched 2026-11-18. Both are JSON Schema draft-07 and have no external `$ref`
 (checked with grep: every `$ref` starts with `#`), so nothing else is vendored.
 

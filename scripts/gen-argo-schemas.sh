@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerates validate/schemas/argo/ from the pinned datree CRDs-catalog files. It is a recipe, not part of
+# Regenerates validate/schemas/argo/*.json.gz from the pinned datree CRDs-catalog files. It is a recipe, not part of
 # `make check`: the files are committed, and a pin change here must come with a SOURCES.md update.
 set -euo pipefail
 
@@ -20,7 +20,7 @@ want_for() {
 }
 
 mkdir -p "$out"
-rm -f "$out"/*.json
+rm -f "$out"/*.json "$out"/*.json.gz
 for k in workflow workflowtemplate clusterworkflowtemplate cronworkflow sensor eventsource; do
 	f="${k}_v1alpha1.json"
 	curl -fsSL -o "$out/$f" "$raw/$f"
@@ -51,4 +51,8 @@ with open(os.path.join(dst, "dispatch.json"), "w") as f:
     json.dump(dispatch, f, indent=2)
     f.write("\n")
 PY
+# Deterministic: -n drops the name and mtime. The sha256 pins above are of the plain files.
+for f in "$out"/*.json; do
+	gzip -9n -f "$f"
+done
 echo "wrote $out"
