@@ -43,10 +43,14 @@ func carryYAML(v any) (string, error) {
 	return string(b), err
 }
 
-// withoutBookkeeping drops the Ext keys that a parser sets only to rebuild its own layout.
+// withoutBookkeeping drops the Ext keys that a parser sets only to rebuild its own layout, and the Ext of other
+// providers, which round-trip metadata keeps.
 func withoutBookkeeping(x ir.Ext) ir.Ext {
 	var out ir.Ext
 	for prov, raw := range x {
+		if prov != dialect {
+			continue
+		}
 		m, ok := raw.(map[string]any)
 		if !ok {
 			out = setExt(out, prov, raw)
