@@ -15,7 +15,10 @@ import (
 	"github.com/lukaszraczylo/pipemaster/internal/vectors"
 )
 
-const dirFacts = "gha-gitlab-facts"
+const (
+	dirFacts = "gha-gitlab-facts"
+	dirGuard = "gha-gitlab-guard"
+)
 
 var branchFacts = expr.Facts{Branch: true}
 
@@ -33,8 +36,17 @@ func loadFactEnvs(t *testing.T) ([]canonEnv, []vectors.Case) {
 	return envs, cases
 }
 
-// prWoodpeckerView is what a Woodpecker pull request run presents: CI_COMMIT_BRANCH is the target branch, not
-// the source ref, so the branch name is not the ref_name GHA sees there.
+// factOut is one vector result; a null truthiness is an environment the case's facts rule out.
+type factOut struct {
+	Tr   json.RawMessage `json:"tr"`
+	Src  []*bool         `json:"src"`
+	Tgt  []*bool         `json:"tgt"`
+	Wp   []*bool         `json:"wp"`
+	WpOK bool            `json:"wp_ok"`
+}
+
+// factWoodpeckerView is what a Woodpecker run presents (Mirrors wpMap in Pipemaster/TranslateFacts.lean): on a
+// pull request CI_COMMIT_BRANCH is the target branch and there is no CI_COMMIT_TAG.
 func (e canonEnv) factWoodpeckerView() expr.Env {
 	v := e.gitlabView()
 	delete(v, "event")
@@ -42,13 +54,24 @@ func (e canonEnv) factWoodpeckerView() expr.Env {
 		v["event"] = wpEvents[*e.Event]
 	}
 	if e.Event != nil && *e.Event == "pull_request" {
-		v["branch"] = "main"
+		delete(v, "tag")
+		v["branch"] = wpTarget
 	}
 	return woodpecker.UnsetEnv{Env: v}
 }
 
+// wpTarget is the target branch of a Woodpecker pull request run in the vectors (wpTarget in lean4/GenVectors.lean).
+const wpTarget = "main"
+
+func eqAllowed(t *testing.T, i, j int, what string, got bool, want *bool) {
+	t.Helper()
+	if want != nil && got != *want {
+		t.Errorf("case %d env %d: %s = %v, Lean = %v", i, j, what, got, *want)
+	}
+}
+
 // TestTranslateFactsVectors checks Go against the Lean model: the rewrite and translation agree with the
-// vectors, and the target keeps the source's truthiness on every environment the facts allow.
+// vectors, the GitLab-class target keeps the source's truthiness, and so does Woodpecker on its own environment.
 func TestTranslateFactsVectors(t *testing.T) {
 	envs, cases := loadFactEnvs(t)
 	count := map[string]int{}
@@ -57,21 +80,22 @@ func TestTranslateFactsVectors(t *testing.T) {
 			Dir  string          `json:"dir"`
 			Expr json.RawMessage `json:"expr"`
 		}
-		var out vectorOut
+		var out factOut
 		if err := json.Unmarshal(c.In, &in); err != nil {
 			t.Fatal(err)
 		}
 		if err := json.Unmarshal(c.Out, &out); err != nil {
 			t.Fatal(err)
 		}
-		if in.Dir != dirFacts {
+		facts := map[string]expr.Facts{dirFacts: branchFacts, dirGuard: {}}[in.Dir]
+		if in.Dir != dirFacts && in.Dir != dirGuard {
 			t.Fatalf("case %d: direction %q", i, in.Dir)
 		}
 		src, err := decodeExpr(in.Expr, gha.Lang.ID)
 		if err != nil {
 			t.Fatalf("case %d: %v", i, err)
 		}
-		got, ok := expr.Translate(expr.AssumeBranch(src), gha.Lang, gitlab.Lang)
+		got, ok := expr.Translate(expr.Assume(src, facts.Branch), gha.Lang, gitlab.Lang)
 		if string(out.Tr) == "null" {
 			count["refused"]++
 			if ok {
@@ -87,12 +111,23 @@ func TestTranslateFactsVectors(t *testing.T) {
 			t.Errorf("case %d %s: Go = %v, %v; Lean = %s", i, expr.String(src), got, ok, expr.String(want))
 			continue
 		}
-		count["translated"]++
-		checkEval(t, i, src, got, gha.Lang, gitlab.Lang, envs,
-			func(e canonEnv) view { return e.ghaView() }, func(e canonEnv) view { return e.gitlabView() }, out)
-		checkFactsWoodpecker(t, i, src, envs, out, count)
+		count[in.Dir]++
+		if len(out.Src) != len(envs) || len(out.Tgt) != len(envs) || len(out.Wp) != len(envs) {
+			t.Fatalf("case %d: result lengths for %d envs", i, len(envs))
+		}
+		for j, e := range envs {
+			s := holdsOf(t, src, e.ghaView(), gha.Lang.Sem)
+			eqAllowed(t, i, j, "GHA source", s, out.Src[j])
+			if out.Src[j] != nil {
+				eqAllowed(t, i, j, "GitLab-class target", holdsOf(t, got, e.gitlabView(), gitlab.Lang.Sem), out.Tgt[j])
+				if g := holdsOf(t, got, e.gitlabView(), gitlab.Lang.Sem); g != s {
+					t.Errorf("case %d env %d %s -> %s: target %v, source %v", i, j, expr.String(src), expr.String(got), g, s)
+				}
+			}
+		}
+		checkFactsWoodpecker(t, i, src, facts, envs, out, count)
 	}
-	for _, k := range []string{"translated", "refused", "woodpecker"} {
+	for _, k := range []string{dirFacts, dirGuard, "refused", "woodpecker"} {
 		if count[k] < 20 {
 			t.Errorf("only %d cases for %q; the vectors lost coverage", count[k], k)
 		}
@@ -100,13 +135,19 @@ func TestTranslateFactsVectors(t *testing.T) {
 	t.Logf("cases: %v", count)
 }
 
-// checkFactsWoodpecker runs the same facts translation to Woodpecker and holds it to the Lean source result,
-// with the pull request branch set to the target branch as Woodpecker reports it.
-func checkFactsWoodpecker(t *testing.T, i int, src expr.Expr, envs []canonEnv, out vectorOut, count map[string]int) {
+// checkFactsWoodpecker runs the facts translation to Woodpecker and holds it to the Lean source result on
+// Woodpecker's environment, where a pull request run reports the target branch.
+func checkFactsWoodpecker(t *testing.T, i int, src expr.Expr, facts expr.Facts, envs []canonEnv, out factOut, count map[string]int) {
 	t.Helper()
-	wp, ok := expr.TranslateFacts(src, gha.Lang, woodpecker.Lang, branchFacts)
+	wp, ok := expr.TranslateFacts(src, gha.Lang, woodpecker.Lang, facts)
+	if tb := expr.TranslatableFacts(src, gha.Lang, woodpecker.Lang, facts); tb != ok {
+		t.Errorf("case %d %s: TranslatableFacts = %v, TranslateFacts = %v", i, expr.String(src), tb, ok)
+	}
 	if !ok {
 		return
+	}
+	if !out.WpOK {
+		t.Errorf("case %d %s: Go translates to Woodpecker, Lean model refuses (guardOk)", i, expr.String(src))
 	}
 	count["woodpecker"]++
 	if text, err := woodpecker.Print(wp); err != nil {
@@ -115,8 +156,12 @@ func checkFactsWoodpecker(t *testing.T, i int, src expr.Expr, envs []canonEnv, o
 		t.Errorf("case %d: %q prints again as %q (%v)", i, text, again, err)
 	}
 	for j, e := range envs {
-		if g := woodpeckerHolds(t, wp, e.factWoodpeckerView()); g != out.Src[j] {
-			t.Errorf("case %d env %d %s -> %s: Woodpecker = %v, GHA source = %v", i, j, expr.String(src), expr.String(wp), g, out.Src[j])
+		if out.Src[j] == nil {
+			continue
+		}
+		g := woodpeckerHolds(t, wp, e.factWoodpeckerView())
+		if g != *out.Src[j] || g != *out.Wp[j] {
+			t.Errorf("case %d env %d %s -> %s: Woodpecker = %v, GHA source = %v, Lean wp = %v", i, j, expr.String(src), expr.String(wp), g, *out.Src[j], *out.Wp[j])
 		}
 	}
 }
@@ -141,9 +186,11 @@ func TestTranslateFactsTable(t *testing.T) {
 		// A branch guard gains the pull request test: CI_COMMIT_BRANCH is the target branch there.
 		{`github.ref_type == 'branch' && github.ref_name == 'main'`, "woodpecker",
 			`!(CI_PIPELINE_EVENT matches "(?i)^pull_request$") && CI_COMMIT_BRANCH matches "(?i)^main$"`, branchFacts},
-		// Without the facts the guarded form translates as it always did.
+		// Without the facts the guarded form still excludes pull requests: Woodpecker reports the target branch there.
 		{`github.ref_type == 'branch' && github.ref_name == 'main'`, "woodpecker",
-			`CI_COMMIT_BRANCH matches "(?i)^main$"`, expr.Facts{}},
+			`!(CI_PIPELINE_EVENT matches "(?i)^pull_request$") && CI_COMMIT_BRANCH matches "(?i)^main$"`, expr.Facts{}},
+		{`github.ref_type == 'branch' && github.ref_name != 'main'`, "woodpecker", ``, expr.Facts{}},
+		{`github.ref_type == 'branch' && startsWith(github.ref_name, 'rel')`, "woodpecker", ``, expr.Facts{}},
 		// A tag guard names no branch and keeps its shape.
 		{`github.ref_type == 'tag' && github.ref_name == 'v1'`, "woodpecker",
 			`CI_COMMIT_TAG matches "(?i)^v1$"`, branchFacts},

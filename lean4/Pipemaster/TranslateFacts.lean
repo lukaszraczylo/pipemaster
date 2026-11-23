@@ -92,11 +92,22 @@ theorem lower_ne_of_numLike {r s : String} (hr : numLike r = true) (hs : okEq s 
   rw [numLike_lower, numLike_lower, hr, hs'] at this
   exact absurd this (by decide)
 
-/-- What the trigger set guarantees about a run (Mirrors expr.Facts (expr/translate_facts.go)): a run that is
-not a pull request has a branch ref, and a pull request run names its ref `<number>/merge`. -/
-structure BranchFact (env : Env) : Prop where
+/-- What every pipeline with a pull request trigger guarantees (Mirrors expr.Facts (expr/translate_facts.go)):
+a pull request run has a branch ref type and names its ref `<number>/merge`. -/
+structure PrFact (env : Env) : Prop where
+  ref : env.event = some .pullRequest → env.refType = some .branch
+  name : env.event = some .pullRequest → ∀ r, env.refName = some r → numLike r = true
+
+/-- The facts of a trigger set with no tag trigger: also, a run that is not a pull request has a branch ref. -/
+structure BranchFact (env : Env) : Prop extends PrFact env where
   branch : env.event ≠ some .pullRequest → env.refType = some .branch
-  pr : env.event = some .pullRequest → ∀ r, env.refName = some r → numLike r = true
+
+/-- The facts `assume fa` relies on: `fa` says the branch facts hold. -/
+def Fact (fa : Bool) (env : Env) : Prop :=
+  PrFact env ∧ (fa = true → env.event ≠ some .pullRequest → env.refType = some .branch)
+
+theorem BranchFact.fact {env : Env} (F : BranchFact env) : Fact true env :=
+  ⟨F.toPrFact, fun _ => F.branch⟩
 
 def evIsPr : E := .eq (.ref .event) (.str "pull_request")
 def evNotPr : E := .ne (.ref .event) (.str "pull_request")
@@ -112,18 +123,18 @@ def isEqCmp : E → Bool
   | .eq l r => isNameCmp l r
   | _ => false
 
-/-- Mirrors expr.AssumeBranch (expr/translate_facts.go): states the trigger facts in each ref_name comparison.
-A branch guard on such a comparison names the branch already, so it stays and only the pull request test is
-added. Every other guarded test stays as it is. -/
-def assumeBranch : E → E
-  | .eq l r => if isNameCmp l r then .and evNotPr (.and brGuard (.eq l r)) else .eq l r
-  | .ne l r => if isNameCmp l r then .or evIsPr (.not (.and brGuard (.eq l r))) else .ne l r
-  | .not x => .not (assumeBranch x)
+/-- Mirrors expr.Assume (expr/translate_facts.go): states the pull request facts in each branch-guarded ref_name
+equality and, when `fa` says the branch facts hold, in each ref_name comparison. A branch guard on such an equality
+names the branch already, so it stays and only the pull request test is added. Every other guarded test stays. -/
+def assume (fa : Bool) : E → E
+  | .eq l r => if fa && isNameCmp l r then .and evNotPr (.and brGuard (.eq l r)) else .eq l r
+  | .ne l r => if fa && isNameCmp l r then .or evIsPr (.not (.and brGuard (.eq l r))) else .ne l r
+  | .not x => .not (assume fa x)
   | .and l r =>
     if typeGuard l = some .branch && isEqCmp r then .and evNotPr (.and l r)
     else if (typeGuard l).isSome && nameTest r then .and l r
-    else .and (assumeBranch l) (assumeBranch r)
-  | .or l r => .or (assumeBranch l) (assumeBranch r)
+    else .and (assume fa l) (assume fa r)
+  | .or l r => .or (assume fa l) (assume fa r)
   | e => e
 
 theorem eval_evIsPr (env : Env) :
@@ -143,7 +154,7 @@ theorem eval_brGuard (env : Env) (h : env.refType = some .branch) :
   simp [brGuard, eval, refV, ghaView, h, eqV, rtName]
 
 /-- On a pull request the ref_name comparison is false. -/
-theorem nameCmp_pr {env : Env} (F : BranchFact env) (hp : env.event = some .pullRequest) {l r : E}
+theorem nameCmp_pr {env : Env} (F : PrFact env) (hp : env.event = some .pullRequest) {l r : E}
     (h : isNameCmp l r = true) : eval .gha (ghaView env) (.eq l r) = .bool false := by
   have key : ∀ s, okEq s = true →
       eqV .gha (refV (ghaView env) .refName) (.str s) = false := by
@@ -154,7 +165,7 @@ theorem nameCmp_pr {env : Env} (F : BranchFact env) (hp : env.event = some .pull
     cases hn : env.refName with
     | none => simp [refV, ghaView, hn, eqV, hne]
     | some r0 =>
-      have := lower_ne_of_numLike (F.pr hp r0 hn) hs
+      have := lower_ne_of_numLike (F.name hp r0 hn) hs
       simp [refV, ghaView, hn, eqV, this]
   unfold isNameCmp at h
   split at h
@@ -166,15 +177,17 @@ theorem nameCmp_pr {env : Env} (F : BranchFact env) (hp : env.event = some .pull
     simp [key s h]
   · simp at h
 
-theorem eval_assume_cmp {env : Env} (F : BranchFact env) {l r : E} (h : isNameCmp l r = true) :
+theorem eval_assume_cmp {env : Env} (F : PrFact env) (hb : env.event ≠ some .pullRequest → env.refType = some .branch)
+    {l r : E} (h : isNameCmp l r = true) :
     eval .gha (ghaView env) (.and evNotPr (.and brGuard (.eq l r))) = eval .gha (ghaView env) (.eq l r) := by
   by_cases hp : env.event = some .pullRequest
   · rw [nameCmp_pr F hp h]
     simp [eval, eval_evNotPr, hp, logicalTruthy, truthy]
-  · have hg := eval_brGuard env (F.branch hp)
+  · have hg := eval_brGuard env (hb hp)
     simp [eval, eval_evNotPr, hp, hg, logicalTruthy, truthy]
 
-theorem eval_assume_ne {env : Env} (F : BranchFact env) {l r : E} (h : isNameCmp l r = true) :
+theorem eval_assume_ne {env : Env} (F : PrFact env) (hb : env.event ≠ some .pullRequest → env.refType = some .branch)
+    {l r : E} (h : isNameCmp l r = true) :
     eval .gha (ghaView env) (.or evIsPr (.not (.and brGuard (.eq l r)))) = eval .gha (ghaView env) (.ne l r) := by
   have hne : eval .gha (ghaView env) (.ne l r) =
       .bool (!truthy (eval .gha (ghaView env) (.eq l r))) := by
@@ -184,11 +197,11 @@ theorem eval_assume_ne {env : Env} (F : BranchFact env) {l r : E} (h : isNameCmp
   · have := nameCmp_pr F hp h
     rw [hne, this]
     simp [eval, eval_evIsPr, hp, logicalTruthy, truthy]
-  · have hg := eval_brGuard env (F.branch hp)
+  · have hg := eval_brGuard env (hb hp)
     rw [hne]
     simp [eval, eval_evIsPr, hp, hg, logicalTruthy, truthy]
 
-theorem eval_assume_guard {env : Env} (F : BranchFact env) {l r : E} (hg : typeGuard l = some .branch)
+theorem eval_assume_guard {env : Env} (F : PrFact env) {l r : E} (hg : typeGuard l = some .branch)
     (hr : isEqCmp r = true) :
     eval .gha (ghaView env) (.and evNotPr (.and l r)) = eval .gha (ghaView env) (.and l r) := by
   obtain ⟨a, b, rfl⟩ : ∃ a b, r = .eq a b := by
@@ -202,50 +215,412 @@ theorem eval_assume_guard {env : Env} (F : BranchFact env) {l r : E} (hg : typeG
     by_cases ht : env.refType = some .branch
     · simp [eval, eval_evNotPr, hp, hl, ht, h1, logicalTruthy, truthy]
     · simp [eval, eval_evNotPr, hp, hl, ht, logicalTruthy, truthy]
-  · have ht := F.branch hp
-    simp [eval, eval_evNotPr, hp, hl, ht, logicalTruthy, truthy]
+  · simp [eval, eval_evNotPr, hp, logicalTruthy, truthy]
 
 /-- The rewrite does not change the value of any expression, on an environment the facts allow. -/
-theorem eval_assume {env : Env} (F : BranchFact env) :
-    ∀ e : E, eval .gha (ghaView env) (assumeBranch e) = eval .gha (ghaView env) e := by
+theorem eval_assume {fa : Bool} {env : Env} (F : Fact fa env) :
+    ∀ e : E, eval .gha (ghaView env) (assume fa e) = eval .gha (ghaView env) e := by
   intro e
   induction e with
   | eq l r =>
-    simp only [assumeBranch]
+    simp only [assume]
     split
-    · exact eval_assume_cmp F ‹_›
+    · rename_i h
+      simp only [Bool.and_eq_true] at h
+      obtain ⟨rfl, hc⟩ := h
+      exact eval_assume_cmp F.1 (F.2 rfl) hc
     · rfl
   | ne l r =>
-    simp only [assumeBranch]
+    simp only [assume]
     split
-    · exact eval_assume_ne F ‹_›
+    · rename_i h
+      simp only [Bool.and_eq_true] at h
+      obtain ⟨rfl, hc⟩ := h
+      exact eval_assume_ne F.1 (F.2 rfl) hc
     · rfl
-  | not x ih => simp [assumeBranch, eval, ih]
+  | not x ih => simp [assume, eval, ih]
   | and l r ihl ihr =>
-    simp only [assumeBranch]
+    simp only [assume]
     split
     · rename_i hg
       simp only [Bool.and_eq_true, decide_eq_true_eq] at hg
-      exact eval_assume_guard F hg.1 hg.2
+      exact eval_assume_guard F.1 hg.1 hg.2
     · split
       · rfl
       · simp [eval, ihl, ihr]
-  | or l r ihl ihr => simp [assumeBranch, eval, ihl, ihr]
+  | or l r ihl ihr => simp [assume, eval, ihl, ihr]
   | _ => rfl
 
 /-- The expressions that translate once the facts are stated (Mirrors expr.TranslatableFacts (expr/translate_facts.go)). -/
-def TranslatableFacts (e : E) : Prop := Translatable (assumeBranch e)
+def TranslatableFacts (fa : Bool) (e : E) : Prop := Translatable (assume fa e)
 
-/-- Under the trigger facts, the translation of the rewritten condition has the truthiness of the source on
+/-- Under the facts, the translation of the rewritten condition has the truthiness of the source on
 every environment the facts allow. -/
-theorem trFacts_sound {e : E} (env : Env) (F : BranchFact env) (h : TranslatableFacts e) :
-    ∃ e', tr (assumeBranch e) = some e' ∧
+theorem trFacts_sound {fa : Bool} {e : E} (env : Env) (F : Fact fa env) (h : TranslatableFacts fa e) :
+    ∃ e', tr (assume fa e) = some e' ∧
       holds .gitlab (mapEnv env) e' = holds .gha (ghaView env) e := by
   obtain ⟨e', he', hh⟩ := tr_sound env h
   refine ⟨e', he', ?_⟩
   rw [hh]
   unfold holds
   rw [eval_assume F e]
+
+
+/-! ### Woodpecker
+
+Woodpecker is in the GitLab class, but on a pull request CI_COMMIT_BRANCH holds the target branch and
+CI_COMMIT_TAG is unset. `wpMap` is that environment; `mapEnv` gives the source ref there. A translation that
+tests the branch ref without excluding pull requests does not agree with the source on `wpMap`. -/
+
+/-- Mirrors the Woodpecker variables (expr/woodpecker/vocab.go): a pull request run has the target branch `tgt`
+in CI_COMMIT_BRANCH and no CI_COMMIT_TAG. -/
+def wpMap (env : Env) (tgt : Option String) : View
+  | .branch => if env.event = some .pullRequest then tgt else mapEnv env .branch
+  | .tag => if env.event = some .pullRequest then none else mapEnv env .tag
+  | r => mapEnv env r
+
+/-- The event test `event !~ /^merge_request_event$/i`: false on a pull request. -/
+def guardsPr : E → Bool
+  | .nrx (.ref .event) .exact s => s == "merge_request_event"
+  | _ => false
+
+/-- The event test `event =~ /^merge_request_event$/i`: true on a pull request. -/
+def guardsPrOr : E → Bool
+  | .rx (.ref .event) .exact s => s == "merge_request_event"
+  | _ => false
+
+/-- Every read of the branch ref sits behind a pull request test, so the value of the expression does not
+depend on what CI_COMMIT_BRANCH holds on a pull request. -/
+def PRG : E → Bool
+  | .ref r => r != .branch
+  | .not x => PRG x
+  | .and l r => guardsPr l || (PRG l && PRG r)
+  | .or l r => guardsPrOr l || (PRG l && PRG r)
+  | .eq l r | .ne l r | .lt l r | .startsWith l r | .endsWith l r | .contains l r => PRG l && PRG r
+  | .rx x _ _ | .nrx x _ _ | .rawRx x _ | .call _ x => PRG x
+  | _ => true
+
+theorem wpMap_eq_mapEnv {env : Env} (tgt : Option String) (hp : env.event ≠ some .pullRequest) :
+    wpMap env tgt = mapEnv env := by
+  funext r
+  cases r <;> simp [wpMap, hp]
+
+theorem guardsPr_eval {env : Env} (V : View) (hV : V .event = mapEnv env .event) (hp : env.event = some .pullRequest)
+    {l : E} (h : guardsPr l = true) : eval .gitlab V l = .bool false := by
+  unfold guardsPr at h
+  split at h
+  · rename_i s
+    have hs : s = "merge_request_event" := by simpa using h
+    subst hs
+    simp [eval, refV, hV, mapEnv, hp, evGl, matchV, modeTest]
+  · simp at h
+
+theorem guardsPrOr_eval {env : Env} (V : View) (hV : V .event = mapEnv env .event) (hp : env.event = some .pullRequest)
+    {l : E} (h : guardsPrOr l = true) : eval .gitlab V l = .bool true := by
+  unfold guardsPrOr at h
+  split at h
+  · rename_i s
+    have hs : s = "merge_request_event" := by simpa using h
+    subst hs
+    simp [eval, refV, hV, mapEnv, hp, evGl, matchV, modeTest]
+  · simp at h
+
+/-- Where the branch ref is behind a pull request test, Woodpecker and the GitLab class agree. -/
+theorem view_change (env : Env) (tgt : Option String)
+    (hr : env.event = some .pullRequest → env.refType = some .branch) :
+    ∀ e : E, PRG e = true → eval .gitlab (wpMap env tgt) e = eval .gitlab (mapEnv env) e := by
+  by_cases hp : env.event = some .pullRequest
+  · intro e
+    have hev : wpMap env tgt .event = mapEnv env .event := by simp [wpMap]
+    induction e with
+    | ref r =>
+      intro h
+      have hr' : r ≠ .branch := by simpa [PRG] using h
+      have ht := hr hp
+      cases r <;> simp [eval, refV, wpMap, mapEnv, hp, ht] at hr' ⊢
+    | and l r ihl ihr =>
+      intro h
+      simp only [PRG, Bool.or_eq_true, Bool.and_eq_true] at h
+      rcases h with hg | ⟨h1, h2⟩
+      · have a := guardsPr_eval (wpMap env tgt) hev hp hg
+        have b := guardsPr_eval (mapEnv env) rfl hp hg
+        simp [eval, a, b, logicalTruthy, rubyTruthy]
+      · simp [eval, ihl h1, ihr h2]
+    | or l r ihl ihr =>
+      intro h
+      simp only [PRG, Bool.or_eq_true, Bool.and_eq_true] at h
+      rcases h with hg | ⟨h1, h2⟩
+      · have a := guardsPrOr_eval (wpMap env tgt) hev hp hg
+        have b := guardsPrOr_eval (mapEnv env) rfl hp hg
+        simp [eval, a, b, logicalTruthy, rubyTruthy]
+      · simp [eval, ihl h1, ihr h2]
+    | not x ih => intro h; simp [eval, ih (by simpa [PRG] using h)]
+    | eq l r ihl ihr =>
+      intro h
+      simp only [PRG, Bool.and_eq_true] at h
+      simp [eval, ihl h.1, ihr h.2]
+    | ne l r ihl ihr =>
+      intro h
+      simp only [PRG, Bool.and_eq_true] at h
+      simp [eval, ihl h.1, ihr h.2]
+    | lt l r ihl ihr => intro _; simp [eval]
+    | startsWith l r ihl ihr => intro _; simp [eval]
+    | endsWith l r ihl ihr => intro _; simp [eval]
+    | contains l r ihl ihr => intro _; simp [eval]
+    | call n x ih => intro _; simp [eval]
+    | rx x m s ih => intro h; simp [eval, ih (by simpa [PRG] using h)]
+    | nrx x m s ih => intro h; simp [eval, ih (by simpa [PRG] using h)]
+    | _ => intro _; simp [eval]
+  · intro e _
+    rw [wpMap_eq_mapEnv tgt hp]
+
+
+/-- Translated comparisons read only the refs ref_name, sha and event. -/
+theorem trEq_PRG {neg : Bool} {l r e' : E} (h : trEq neg l r = some e') : PRG e' = true := by
+  have key : ∀ (x : Ref) (s : String), trCmp neg x s = some e' → PRG e' = true := by
+    intro x s hx
+    cases x
+    case event =>
+      simp only [trCmp] at hx
+      obtain ⟨e0, _, rfl⟩ := Option.map_eq_some_iff.mp hx
+      cases neg <;> simp [rxNode, PRG]
+    case refName | sha =>
+      simp only [trCmp] at hx
+      split at hx
+      · cases hx; cases neg <;> simp [rxNode, PRG]
+      · simp at hx
+    all_goals simp [trCmp] at hx
+  unfold trEq at h
+  split at h
+  · exact key _ _ h
+  · exact key _ _ h
+  · simp at h
+
+theorem trAffE_PRG {m : Mode} {a b e' : E} (h : trAffE m a b = some e') : PRG e' = true := by
+  unfold trAffE at h
+  split at h
+  · rename_i x s
+    cases x
+    case refName | sha =>
+      simp only [trAff] at h
+      split at h
+      · cases h; simp [PRG]
+      · simp at h
+    all_goals simp [trAff] at h
+  · simp at h
+
+theorem isEqCmp_nameTest {r : E} (h : isEqCmp r = true) : nameTest r = true := by
+  cases r <;> simp [isEqCmp] at h
+  rename_i a b
+  unfold isNameCmp at h
+  split at h <;> simp_all [nameTest]
+
+theorem tr_guard_eq {l r : E} (hg : typeGuard l = some .branch) (hr : isEqCmp r = true) :
+    ∃ m s, tr (.and l r) = some (.rx (.ref .branch) m s) := by
+  obtain ⟨m, s, h⟩ := nameTest_tr (isEqCmp_nameTest hr)
+  exact ⟨m, s, by simp [tr, hg, h, rtRef]⟩
+
+theorem tr_evNotPr : tr evNotPr = some (.nrx (.ref .event) .exact "merge_request_event") := by
+  have : lower "pull_request" = "pull_request" := by decide
+  simp [evNotPr, tr, trEq, trCmp, evOfGha, this, rxNode, evGl]
+
+theorem tr_evIsPr : tr evIsPr = some (.rx (.ref .event) .exact "merge_request_event") := by
+  have : lower "pull_request" = "pull_request" := by decide
+  simp [evIsPr, tr, trEq, trCmp, evOfGha, this, rxNode, evGl]
+
+theorem isNameCmp_typeGuard {a b : E} (h : isNameCmp a b = true) : typeGuard (.eq a b) = none := by
+  unfold isNameCmp at h
+  split at h
+  · simp [typeGuard]
+  · simp [typeGuard]
+  · simp at h
+
+theorem typeGuard_assume (fa : Bool) (l : E) : typeGuard (assume fa l) = typeGuard l := by
+  cases l
+  case eq a b =>
+    simp only [assume]
+    split
+    · rename_i h
+      simp only [Bool.and_eq_true] at h
+      rw [isNameCmp_typeGuard h.2]
+      rfl
+    · rfl
+  case ne a b =>
+    simp only [assume]
+    split <;> simp [typeGuard]
+  case not x => simp [assume, typeGuard]
+  case and a b =>
+    simp only [assume]
+    split
+    · simp [typeGuard]
+    · split <;> simp [typeGuard]
+  case or a b => simp [assume, typeGuard]
+  all_goals rfl
+
+theorem nameTest_assume {fa : Bool} {r : E} (h : nameTest (assume fa r) = true) : nameTest r = true := by
+  cases r
+  case eq a b =>
+    simp only [assume] at h
+    split at h
+    · simp [nameTest] at h
+    · exact h
+  case ne a b =>
+    simp only [assume] at h
+    split at h <;> simp [nameTest] at h
+  case not x => simp [assume, nameTest] at h
+  case and a b =>
+    simp only [assume] at h
+    split at h
+    · simp [nameTest] at h
+    · split at h <;> simp [nameTest] at h
+  case or a b => simp [assume, nameTest] at h
+  all_goals exact h
+
+/-- Guarded branch tests that the rewrite cannot make exact on a pull request: a branch guard on an affix test. -/
+def guardOk : E → Bool
+  | .not x => guardOk x
+  | .and l r => !(typeGuard l = some .branch && nameTest r && !isEqCmp r) && guardOk l && guardOk r
+  | .or l r => guardOk l && guardOk r
+  | _ => true
+
+/-- Mirrors expr.TranslatableFacts (expr/translate_facts.go) for a Woodpecker target. -/
+def TranslatableWp (fa : Bool) (e : E) : Prop := guardOk e = true ∧ Translatable (assume fa e)
+
+
+theorem typeGuard_evNotPr : typeGuard evNotPr = none := by simp [evNotPr, typeGuard]
+theorem typeGuard_evIsPr : typeGuard evIsPr = none := by simp [evIsPr, typeGuard]
+theorem bv_evNotPr : bv evNotPr = true := by simp [evNotPr, bv]
+theorem bv_evIsPr : bv evIsPr = true := by simp [evIsPr, bv]
+
+theorem typeGuard_brGuard : typeGuard brGuard = some .branch := by
+  have : lower "branch" = "branch" := by decide
+  simp [brGuard, typeGuard, this]
+
+theorem tr_and_ev {X : E} {m : Mode} {s : String} (hX : tr X = some (.rx (.ref .branch) m s)) :
+    tr (.and evNotPr X) = some (.and (.nrx (.ref .event) .exact "merge_request_event") (.rx (.ref .branch) m s)) := by
+  simp [tr, typeGuard_evNotPr, hX, bv_evNotPr, tr_evNotPr]
+
+theorem tr_or_ev {X : E} {m : Mode} {s : String} (hX : tr X = some (.rx (.ref .branch) m s)) :
+    tr (.or evIsPr (.not X)) = some (.or (.rx (.ref .event) .exact "merge_request_event") (.not (.rx (.ref .branch) m s))) := by
+  simp [tr, bv_evIsPr, hX, tr_evIsPr]
+
+theorem tr_PRG (fa : Bool) : ∀ e e' : E, guardOk e = true → tr (assume fa e) = some e' → PRG e' = true := by
+  intro e
+  induction e with
+  | eq l r =>
+    intro e' _ h
+    simp only [assume] at h
+    split at h
+    · rename_i hc
+      simp only [Bool.and_eq_true] at hc
+      obtain ⟨m, s, h1⟩ := tr_guard_eq (l := brGuard) (r := .eq l r) typeGuard_brGuard (by simpa [isEqCmp] using hc.2)
+      rw [tr_and_ev h1] at h
+      cases h
+      simp [PRG, guardsPr]
+    · exact trEq_PRG (by simpa [tr] using h)
+  | ne l r =>
+    intro e' _ h
+    simp only [assume] at h
+    split at h
+    · rename_i hc
+      simp only [Bool.and_eq_true] at hc
+      obtain ⟨m, s, h1⟩ := tr_guard_eq (l := brGuard) (r := .eq l r) typeGuard_brGuard (by simpa [isEqCmp] using hc.2)
+      have h2 : tr (.and brGuard (.eq l r)) = some (.rx (.ref .branch) m s) := h1
+      rw [tr_or_ev h2] at h
+      cases h
+      simp [PRG, guardsPrOr]
+    · exact trEq_PRG (by simpa [tr] using h)
+  | startsWith a b => intro e' _ h; exact trAffE_PRG (by simpa [assume, tr] using h)
+  | endsWith a b => intro e' _ h; exact trAffE_PRG (by simpa [assume, tr] using h)
+  | contains a b => intro e' _ h; exact trAffE_PRG (by simpa [assume, tr] using h)
+  | not x ih =>
+    intro e' hg h
+    simp only [assume, tr] at h
+    obtain ⟨a, ha, rfl⟩ := Option.map_eq_some_iff.mp h
+    simpa [PRG] using ih a (by simpa [guardOk] using hg) ha
+  | or l r ihl ihr =>
+    intro e' hg h
+    simp only [assume, tr] at h
+    split at h
+    · obtain ⟨a, ha, h2⟩ := Option.bind_eq_some_iff.mp h
+      obtain ⟨b, hb, rfl⟩ := Option.map_eq_some_iff.mp h2
+      simp only [guardOk, Bool.and_eq_true] at hg
+      have := ihl a hg.1 ha
+      have := ihr b hg.2 hb
+      simp [PRG, *]
+    · simp at h
+  | and l r ihl ihr =>
+    intro e' hg h
+    simp only [guardOk, Bool.and_eq_true, Bool.not_eq_true'] at hg
+    simp only [assume] at h
+    split at h
+    · rename_i hc
+      simp only [Bool.and_eq_true, decide_eq_true_eq] at hc
+      obtain ⟨m, s, h1⟩ := tr_guard_eq hc.1 hc.2
+      rw [tr_and_ev h1] at h
+      cases h
+      simp [PRG, guardsPr]
+    · rename_i hc
+      split at h
+      · rename_i hc2
+        simp only [Bool.and_eq_true, Option.isSome_iff_exists] at hc2
+        obtain ⟨⟨t, ht⟩, hn⟩ := hc2
+        obtain ⟨m, s, h1⟩ := nameTest_tr hn
+        simp only [tr, ht, h1] at h
+        cases h
+        cases t
+        · exfalso
+          have hb : isEqCmp r = false := by
+            by_contra hh
+            simp only [Bool.and_eq_true, decide_eq_true_eq] at hc
+            exact hc ⟨ht, by simpa using hh⟩
+          have := hg.1.1
+          simp [ht, hn, hb] at this
+        · simp [PRG, rtRef]
+      · rename_i hc2
+        simp only [tr] at h
+        split at h
+        · rename_i t m s hg1 hr1
+          exfalso
+          rw [typeGuard_assume] at hg1
+          have hn := nameTest_assume (tr_rx_name hr1)
+          apply hc2
+          simp [hg1, hn]
+        · split at h
+          · obtain ⟨a, ha, h2⟩ := Option.bind_eq_some_iff.mp h
+            obtain ⟨b, hb, rfl⟩ := Option.map_eq_some_iff.mp h2
+            have := ihl a hg.1.2 ha
+            have := ihr b hg.2 hb
+            simp [PRG, *]
+          · simp at h
+  | ref r =>
+    intro e' _ h
+    cases r <;> simp [assume, tr] at h <;> (subst h; simp [PRG])
+  | _ => intro e' _ h; simp [assume, tr] at h
+
+
+/-- Under the facts, the Woodpecker translation of the rewritten condition has the truthiness of the source, on
+Woodpecker's own environment: a pull request holds the target branch in CI_COMMIT_BRANCH. -/
+theorem trFactsWp_sound {fa : Bool} {e : E} (env : Env) (tgt : Option String) (F : Fact fa env)
+    (h : TranslatableWp fa e) :
+    ∃ e', tr (assume fa e) = some e' ∧
+      holds .gitlab (wpMap env tgt) e' = holds .gha (ghaView env) e := by
+  obtain ⟨e', he', hh⟩ := trFacts_sound (e := e) env F h.2
+  refine ⟨e', he', ?_⟩
+  have hp := tr_PRG fa e e' h.1 he'
+  unfold holds at hh ⊢
+  rw [view_change env tgt F.1.ref e' hp, hh]
+
+/-- Why the pull request test exists: the plain translation of a branch-guarded ref_name test reads the target
+branch on a pull request, where the GHA ref_name is `<number>/merge`. -/
+theorem guard_pr_unsound : ∃ (env : Env) (tgt : Option String), PrFact env ∧
+    holds .gitlab (wpMap env tgt) (.rx (.ref .branch) .exact "main") ≠
+      holds .gha (ghaView env) (.and brGuard (.eq (.ref .refName) (.str "main"))) := by
+  refine ⟨⟨some "12/merge", some .branch, some .pullRequest, none, none⟩, some "main", ⟨?_, ?_⟩, by decide⟩
+  · intro _; rfl
+  · intro _ r hr
+    cases hr
+    decide
 
 end TranslateFacts
 end Pipemaster

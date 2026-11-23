@@ -374,28 +374,44 @@ def exprCases : List (Json × Json) := ghaCases ++ gitlabCases
 
 def exprEnvsJson : Json := Json.arr (exprEnvs.map envJson).toArray
 
-/-- Environments a trigger set without tag triggers allows (BranchFact): every run that is not a pull request has a
-branch ref, and a pull request names its ref `<number>/merge`. -/
+/-- Environments for the trigger-fact vectors. A pull request has a branch ref type and a ref named
+`<number>/merge` (PrFact); the first six are also free of tag runs (BranchFact), the last two are tag runs. -/
 def factEnvs : List Expr.Env :=
   [⟨some "main", some .branch, some .push, some "abc", some "x"⟩,
    ⟨some "MAIN", some .branch, some .push, some "ABC", none⟩,
    ⟨some "dev", some .branch, some .schedule, none, none⟩,
    ⟨some "", some .branch, some .workflowDispatch, some "", some ""⟩,
-   ⟨none, some .branch, none, none, none⟩,
    ⟨some "12/merge", some .branch, some .pullRequest, some "abc", none⟩,
-   ⟨some "7/merge", some .branch, some .pullRequest, none, none⟩,
-   ⟨none, none, some .pullRequest, none, none⟩]
+   ⟨none, some .branch, some .pullRequest, none, none⟩,
+   ⟨some "main", some .tag, some .push, some "abc", none⟩,
+   ⟨some "v1", some .tag, some .workflowDispatch, none, none⟩]
 
 def factEnvsJson : Json := Json.arr (factEnvs.map envJson).toArray
 
+/-- The target branch a Woodpecker pull request run reports. -/
+def wpTarget : Option String := some "main"
+
+open Expr TranslateFacts in
+/-- Mirrors PrFact and BranchFact on the environment list. -/
+def factOk (fa : Bool) (env : Env) : Bool :=
+  let pr := env.event == some .pullRequest
+  (!pr || (env.refType == some .branch && (match env.refName with | some r => Translate.numLike r | none => true))) &&
+  (!fa || pr || env.refType == some .branch)
+
+def optBoolsJson (bs : List (Option Bool)) : Json :=
+  Json.arr (bs.map fun | some b => Json.bool b | none => Json.null).toArray
+
 open Expr Translate TranslateFacts in
-def factCase (e : E) : Json × Json :=
-  let out := match tr (assumeBranch e) with
+def factCase (dir : String) (fa : Bool) (e : E) : Json × Json :=
+  let on (f : Env → Bool) : List (Option Bool) := factEnvs.map fun env => if factOk fa env then some (f env) else none
+  let out := match tr (assume fa e) with
     | none => Json.mkObj [("tr", Json.null)]
     | some t => Json.mkObj [("tr", exprJson t),
-        ("src", boolsJson (factEnvs.map fun env => holds .gha (ghaView env) e)),
-        ("tgt", boolsJson (factEnvs.map fun env => holds .gitlab (mapEnv env) t))]
-  (Json.mkObj [("dir", "gha-gitlab-facts"), ("expr", exprJson e)], out)
+        ("wp_ok", Json.bool (guardOk e)),
+        ("src", optBoolsJson (on fun env => holds .gha (ghaView env) e)),
+        ("tgt", optBoolsJson (on fun env => holds .gitlab (mapEnv env) t)),
+        ("wp", optBoolsJson (on fun env => holds .gitlab (wpMap env wpTarget) t))]
+  (Json.mkObj [("dir", dir), ("expr", exprJson e)], out)
 
 open Expr in
 def factExprs : List E :=
@@ -416,7 +432,8 @@ def factExprs : List E :=
   let p1 := atoms ++ others ++ guarded
   p1 ++ p1.map E.not ++ joinAll core core
 
-def factCases : List (Json × Json) := factExprs.map factCase
+def factCases : List (Json × Json) :=
+  factExprs.map (factCase "gha-gitlab-facts" true) ++ factExprs.map (factCase "gha-gitlab-guard" false)
 
 
 /-! ## Adapter vectors (Task 23)
@@ -981,6 +998,6 @@ def main (args : List String) : IO UInt32 := do
     IO.println s!"expr: {GenVectors.exprCases.length} cases"
   if want "expr-facts" then
     IO.FS.writeFile s!"{dir}/expr-facts.json"
-      (GenVectors.emit "Pipemaster.TranslateFacts.trFacts_sound" GenVectors.factCases (some GenVectors.factEnvsJson))
+      (GenVectors.emit "Pipemaster.TranslateFacts.trFactsWp_sound" GenVectors.factCases (some GenVectors.factEnvsJson))
     IO.println s!"expr-facts: {GenVectors.factCases.length} cases"
   return 0

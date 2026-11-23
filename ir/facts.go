@@ -2,8 +2,9 @@ package ir
 
 // RulesOutTags reports whether no run of the pipeline can start on a tag ref. The facts a condition may use then
 // hold: a run that is not a pull request has a branch ref. It is conservative, and false when unsure:
-//   - push, pr and schedule triggers qualify. A tag push is its own trigger kind, a pull request ref is a merge
-//     ref, and a schedule runs on a branch.
+//   - push and pr triggers qualify. A tag push is its own trigger kind and a pull request ref is a merge ref.
+//   - a schedule trigger does not: GHA runs it on the default branch, but Woodpecker runs a cron on the branch its
+//     UI entry names, so a ref_name test could hold there and not in the source.
 //   - a manual trigger does not: GHA starts a dispatch from a tag as readily as from a branch.
 //   - an api, pipeline_done or resource trigger does not: its ref depends on the sender.
 //   - a pull_request_target trigger does not: its ref is the base branch, so ref_name is a branch name there.
@@ -16,7 +17,7 @@ func (p *Pipeline) RulesOutTags() bool {
 	for i := range p.Triggers {
 		t := &p.Triggers[i]
 		switch t.Kind {
-		case TriggerPush, TriggerSchedule:
+		case TriggerPush:
 		case TriggerPR:
 			if namesEvent(t.Ext, eventPRTarget) {
 				return false

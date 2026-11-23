@@ -385,7 +385,7 @@ func TestMapKeyIsRestored(t *testing.T) {
 func TestEmitConditions(t *testing.T) {
 	t.Run("translatable subset", func(t *testing.T) {
 		j := wpJob("ci", wpStep("s", "x"))
-		j.If = ghaCond(t, "github.ref_type == 'branch' && startsWith(github.ref_name, 'release')")
+		j.If = ghaCond(t, "github.ref_type == 'branch' && github.ref_name == 'main'")
 		body, _ := one(t, wpProject(ghaOrigin, j))
 		if !strings.Contains(body, "evaluate:") || strings.Contains(body, `"false"`) {
 			t.Errorf("a translatable condition must stay a condition:\n%s", body)

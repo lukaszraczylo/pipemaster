@@ -14,7 +14,7 @@ func TestRulesOutTags(t *testing.T) {
 		want bool
 	}{
 		{"push and pr", ir.Pipeline{Triggers: []ir.Trigger{tr(ir.TriggerPush), tr(ir.TriggerPR)}}, true},
-		{"schedule", ir.Pipeline{Triggers: []ir.Trigger{tr(ir.TriggerSchedule)}}, true},
+		{"schedule", ir.Pipeline{Triggers: []ir.Trigger{tr(ir.TriggerSchedule)}}, false},
 		{"no trigger", ir.Pipeline{}, false},
 		{"tag", ir.Pipeline{Triggers: []ir.Trigger{tr(ir.TriggerPush), tr(ir.TriggerTag)}}, false},
 		{"manual may run on a tag", ir.Pipeline{Triggers: []ir.Trigger{tr(ir.TriggerPush), tr(ir.TriggerManual)}}, false},

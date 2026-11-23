@@ -33,6 +33,10 @@ required=(
   Pipemaster.Translate.naive_and_unsound
   Pipemaster.TranslateFacts.eval_assume
   Pipemaster.TranslateFacts.trFacts_sound
+  Pipemaster.TranslateFacts.view_change
+  Pipemaster.TranslateFacts.tr_PRG
+  Pipemaster.TranslateFacts.trFactsWp_sound
+  Pipemaster.TranslateFacts.guard_pr_unsound
   Pipemaster.TranslateClass.eval_congr
   Pipemaster.TranslateClass.rename_sound
   Pipemaster.TranslateClass.tr_sound_dialect
