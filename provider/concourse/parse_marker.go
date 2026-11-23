@@ -463,7 +463,26 @@ func (jb *jobBuilder) carryStep(m *omap, written string, st *ir.Step) {
 		script = c.Script
 	}
 	c.Script, c.Ext = script, st.Ext
+	if _, bare := statusOf(c.If); bare {
+		c.If = st.If
+	}
+	if c.ContinueOnError {
+		if jb.tried == nil {
+			jb.tried = map[*ir.Step]string{}
+		}
+		jb.tried[st] = written
+	}
+	c.ContinueOnError = false
 	*st = c
+}
+
+// untried reports the steps whose carry held continue_on_error and that no try wraps any more.
+func (jb *jobBuilder) untried() {
+	for _, st := range jb.job.Steps {
+		if name, ok := jb.tried[st]; ok && !st.ContinueOnError {
+			jb.b.ignored(jb.path+"/step/"+name, caps.StepContinueOnError, "the carry holds continue_on_error true, but no try wraps the task "+name+" in the file")
+		}
+	}
 }
 
 // carryJob puts back the job fields that the plan cannot say.

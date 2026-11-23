@@ -36,11 +36,13 @@ type builtJob struct {
 
 // jobBuilder is the state of one job.
 type jobBuilder struct {
-	b    *pipeBuilder
-	job  *ir.Job
-	k    *sink
-	ids  map[string]int
-	path string
+	b   *pipeBuilder
+	job *ir.Job
+	k   *sink
+	ids map[string]int
+	// tried holds the steps whose carry said continue_on_error; a try in the file must still say it.
+	tried map[*ir.Step]string
+	path  string
 }
 
 func (b *pipeBuilder) job(m *omap) *builtJob {
@@ -75,6 +77,7 @@ func (b *pipeBuilder) job(m *omap) *builtJob {
 	jb.k.KeepRest(r)
 	j.Ext = jb.k.Ext()
 	jb.carryJob(m)
+	jb.untried()
 	return bj
 }
 
