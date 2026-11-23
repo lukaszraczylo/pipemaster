@@ -4,6 +4,8 @@ test:
 	go test ./...
 
 # The full chain matrix; `make check` runs a deterministic sample of it.
+chains: export PIPEMASTER_REQUIRE_LINTERS = 1
+chains: export PATH := $(CURDIR)/.tools/bin:$(PATH)
 chains:
 	go test ./internal/roundtrip -run TestChainMatrix -count=1
 
