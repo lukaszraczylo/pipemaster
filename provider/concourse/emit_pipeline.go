@@ -84,7 +84,7 @@ func (e *emitter) pipeline(pl *ir.Pipeline, first bool) {
 	}
 	if extra, ok := pe.ext[ExtExtra].(map[string]any); ok {
 		for _, k := range sortedKeys(extra) {
-			top.Set(k, e.node(pp, "top-level key "+k, extra[k]))
+			e.lose(pp, caps.ExtPassthrough, "top-level key "+k+" is no Concourse key and is not written; it only holds YAML anchors, which the parser has resolved")
 		}
 	}
 	pe.carryPipeline(top.N)

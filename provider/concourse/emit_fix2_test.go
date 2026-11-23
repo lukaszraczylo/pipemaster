@@ -792,3 +792,52 @@ func TestCachesThatDifferPerTaskStayInTheTask(t *testing.T) {
 		t.Fatalf("the cache of one task was written %d times:\n%s", got, files[".concourse/ci.yml"])
 	}
 }
+
+const anchorFile = `anchors: &git-uri ssh://git.example/x.git
+retries: &retries 2
+resources:
+  - name: source
+    type: git
+    source:
+      uri: *git-uri
+      branch: main
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - task: compile
+        attempts: *retries
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+          inputs:
+            - name: source
+          run:
+            path: sh
+            args:
+              - -ec
+              - go build ./...
+`
+
+func TestAnchorHolderKeysAreNotWrittenAndAreReported(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"ci.yml": anchorFile})
+	files, rep := emit(t, p)
+	out := files[".concourse/ci.yml"]
+	for _, key := range []string{"anchors:", "retries:"} {
+		if strings.Contains(out, "\n"+key) || strings.HasPrefix(out, key) {
+			t.Fatalf("the top-level key %s was written:\n%s", key, out)
+		}
+	}
+	for _, key := range []string{"anchors", "retries"} {
+		if !hasFeatureEntry(rep, string(caps.ExtPassthrough), "top-level key "+key) {
+			t.Fatalf("no entry for the key %s: %v", key, rep.Entries)
+		}
+	}
+	if pl := p.Pipelines[0]; pl.Ext == nil {
+		t.Fatal("the IR lost the anchor holder keys")
+	}
+}
