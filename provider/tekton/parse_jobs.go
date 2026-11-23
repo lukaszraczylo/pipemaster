@@ -352,4 +352,3 @@ func (b *jobBuilder) finish() {
 	}
 	b.job.Ext = b.k.Ext()
 }
-

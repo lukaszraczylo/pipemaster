@@ -61,25 +61,25 @@ type (
 )
 
 const (
-	vectorOrigin   = "gha"
-	pipelineFile   = ".tekton/pipeline.yaml"
-	tasksPrefix    = ".tekton/tasks/"
-	vecListenerFile   = ".tekton/triggers/eventlistener.yaml"
-	wantAPI        = "tekton.dev/v1"
-	wantImage      = "alpine:3.22"
-	statusInput    = "$(tasks.status)"
-	statusFailed   = "Failed"
-	kindPR         = "pr"
-	kindPush       = "push"
-	kindTag        = "tag"
-	featPR         = "trigger.pull_request"
-	featPush       = "trigger.push"
-	featTag        = "trigger.tag"
-	featImage      = "step.image"
-	featNoop       = "step.script"
-	featNeeds      = "job.needs"
-	minutes        = time.Minute
-	triggerSegment = "/trigger/"
+	vectorOrigin    = "gha"
+	pipelineFile    = ".tekton/pipeline.yaml"
+	tasksPrefix     = ".tekton/tasks/"
+	vecListenerFile = ".tekton/triggers/eventlistener.yaml"
+	wantAPI         = "tekton.dev/v1"
+	wantImage       = "alpine:3.22"
+	statusInput     = "$(tasks.status)"
+	statusFailed    = "Failed"
+	kindPR          = "pr"
+	kindPush        = "push"
+	kindTag         = "tag"
+	featPR          = "trigger.pull_request"
+	featPush        = "trigger.push"
+	featTag         = "trigger.tag"
+	featImage       = "step.image"
+	featNoop        = "step.script"
+	featNeeds       = "job.needs"
+	minutes         = time.Minute
+	triggerSegment  = "/trigger/"
 )
 
 var generatedFiles = []string{

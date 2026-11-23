@@ -28,7 +28,7 @@ func rewriteRefs(v any, prefix string, renames map[string]string) {
 		olds = append(olds, regexp.QuoteMeta(o))
 	}
 	sort.Slice(olds, func(i, j int) bool { return len(olds[i]) > len(olds[j]) })
-	rw.re = regexp.MustCompile(`\b`+prefix+`(\.|\[['"])(` + strings.Join(olds, "|") + `)(['"]\]|[^A-Za-z0-9_'"-]|$)`)
+	rw.re = regexp.MustCompile(`\b` + prefix + `(\.|\[['"])(` + strings.Join(olds, "|") + `)(['"]\]|[^A-Za-z0-9_'"-]|$)`)
 	rw.walk(reflect.ValueOf(v))
 }
 
