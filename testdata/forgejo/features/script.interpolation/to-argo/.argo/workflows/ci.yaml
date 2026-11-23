@@ -1,6 +1,6 @@
 # pipemaster:lost script pipeline/ci/job/build/step/build-step-1: echo "{{ gha.github.workspace }}"
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
-# pipemaster:arg {"step":"ext:\n    gha:\n        _derived_id: true\nid: build-step-1\nkind: script\nscript:\n    - echo \"sha $\u007b{ sha }} on $\u007b{ ref_name }}\"\n    - echo \"$\u007b{ gha.github.workspace }}\"\n","hold":"{\"args\":[\"echo \\\"sha ${PM_CTX_SHA} on ${PM_CTX_REF_NAME}\\\"\"],\"command\":[\"sh\",\"-ec\"],\"env\":[{\"name\":\"PM_CTX_SHA\",\"value\":\"{{workflow.parameters.ctx-sha}}\"},{\"name\":\"PM_CTX_REF_NAME\",\"value\":\"{{workflow.parameters.ctx-ref-name}}\"}],\"image\":\"alpine:3.22\",\"name\":\"build-step-1\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:arg {"step":"id: build-step-1\nkind: script\nscript:\n    - echo \"sha $\u007b{ sha }} on $\u007b{ ref_name }}\"\n    - echo \"$\u007b{ gha.github.workspace }}\"\n","hold":"{\"args\":[\"echo \\\"sha ${PM_CTX_SHA} on ${PM_CTX_REF_NAME}\\\"\"],\"command\":[\"sh\",\"-ec\"],\"env\":[{\"name\":\"PM_CTX_SHA\",\"value\":\"{{workflow.parameters.ctx-sha}}\"},{\"name\":\"PM_CTX_REF_NAME\",\"value\":\"{{workflow.parameters.ctx-ref-name}}\"}],\"image\":\"alpine:3.22\",\"name\":\"build-step-1\",\"workingDir\":\"/workspace\"}"}
 # pipemaster:emulated script.interpolation pipeline/ci/job/build
 # pipemaster:arg {"vars":{"PM_CTX_REF_NAME":"ref_name","PM_CTX_SHA":"sha"}}
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0

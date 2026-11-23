@@ -1,0 +1,39 @@
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/build/carry
+# pipemaster:arg {"digest":"3ca172678480ff6b22f1029ebcdd4bc342c559c604a945b6a18944660f0bc5f9","carry":"image:\n    ref: alpine:3.20\nid: build\nkind: script\nscript:\n    - 'curl -H \"Authorization: Bearer $\u007b{ secrets.TOKEN }}\" \"https://$\u007b{ vars.REGION }}.example.org\"'\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry
+# pipemaster:arg {"digest":"cdc8f6994dcda7621492ecb8c1b31a161309a8cfb099a45f774b5f3f62f257b9","carry":"id: ci\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: woodpecker\ntriggers:\n    - kind: push\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: ci
+    plan:
+      - get: source
+        trigger: true
+      - task: build
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: alpine
+              tag: "3.20"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          params:
+            TOKEN: ((TOKEN))
+            REGION: ((REGION))
+          run:
+            path: sh
+            args:
+              - -ec
+              - 'curl -H "Authorization: Bearer ${TOKEN}" "https://${REGION}.example.org"'

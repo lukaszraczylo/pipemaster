@@ -1,0 +1,54 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"Build and test","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated display.name pipeline/ci/job/build
+# pipemaster:arg {"name":"Build the binary","id":"build","written":"build","kind":"job"}
+# pipemaster:emulated display.name pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"name":"Compile","id":"build-step-1","written":"build-step-1","kind":"step"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
+# pipemaster:arg {"digest":"ad1221d8c3b59dfcdae4f6dec211dd78bfdccc1bc61fef58c49269bbb8c6fb8b","carry":"id: build-step-1\nname: Compile\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
+# pipemaster:arg {"digest":"6c6e24f40c0dbc0fc2be84e32b3f4a48aa4b89efb723318ea1e7af8a4dcca2cd","carry":"id: build\nname: Build the binary\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: Build and test\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/build
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - go build ./...
+        tags:
+          - ubuntu-latest

@@ -1,0 +1,84 @@
+# pipemaster:emulated step.image pipeline/ci/job/lint
+# pipemaster:arg {"steps":{"lint-step-1":"ref: ubuntu:latest\n"},"wrote":{"lint-step-1":"ubuntu:latest"}}
+# pipemaster:emulated step.image pipeline/ci/job/ship
+# pipemaster:arg {"steps":{"ship-step-1":"ref: ubuntu:latest\n"},"wrote":{"ship-step-1":"ubuntu:latest"}}
+# pipemaster:emulated step.image pipeline/ci/job/test
+# pipemaster:arg {"steps":{"test-step-1":"ref: ubuntu:latest\n"},"wrote":{"test-step-1":"ubuntu:latest"}}
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
+# pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/1
+# pipemaster:emulated trigger.push pipeline/ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+  annotations:
+    workflows.argoproj.io/title: needs
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: lint
+            template: lint
+          - name: ship
+            template: ship
+            dependencies:
+              - lint
+              - test
+          - name: test
+            template: test
+    - name: lint
+      containerSet:
+        containers:
+          - name: lint-step-1
+            image: ubuntu:latest
+            command:
+              - sh
+              - -ec
+            args:
+              - echo lint
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: ship
+      containerSet:
+        containers:
+          - name: ship-step-1
+            image: ubuntu:latest
+            command:
+              - sh
+              - -ec
+            args:
+              - echo ship
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: test
+      containerSet:
+        containers:
+          - name: test-step-1
+            image: ubuntu:latest
+            command:
+              - sh
+              - -ec
+            args:
+              - echo test
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

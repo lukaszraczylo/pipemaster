@@ -1,0 +1,44 @@
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
+# pipemaster:arg {"digest":"010c65c50264251fc71670f893faa92ee2c057a286cfed1b5df3069d163cb77e","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
+# pipemaster:arg {"digest":"62f314ad604a43aeff38bf064c0469f6a51f442a8aa2bb601ee677beb61a0324","carry":"container:\n    ref: golang:1.22\n    entrypoint:\n        - \"\"\nid: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+              tag: "1.22"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make

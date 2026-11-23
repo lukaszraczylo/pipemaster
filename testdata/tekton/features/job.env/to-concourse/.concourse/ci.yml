@@ -1,0 +1,51 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"jobenv","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
+# pipemaster:arg {"digest":"7fcb8631d70a7361fd8322711ab8557bcaff74ee45315a8d456712bfab45a423","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
+# pipemaster:arg {"digest":"571bdfd8adbaa687c43f5027cf69d447900fca292bfa5fa3801ef52dd0890a28","carry":"id: build\nenv:\n    - name: GOFLAGS\n      value:\n        lit: -trimpath\n    - name: API\n      value:\n        secret: API_KEY\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: jobenv\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.env pipeline/ci/job/build
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          params:
+            GOFLAGS: -trimpath
+            API: ((API_KEY))
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo ok

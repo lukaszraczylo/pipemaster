@@ -1,0 +1,53 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"ext","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated step.workdir pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"workdir":"app","wrote":"workspace/app"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
+# pipemaster:arg {"digest":"2744e2926c066d7b4b78cba87b30c5e35f37adb0dd08d5603e046bf983bf3169","carry":"id: build-step-1\nkind: script\nshell: bash\nworkdir: app\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
+# pipemaster:arg {"digest":"8fccce0f7517b6b04afd73e1ca75f041da667f3cd8f0c7bc584a96c2e9b408e3","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: ext\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated job.runner pipeline/ci/job/build
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: bash
+            args:
+              - -ec
+              - echo ok
+            dir: workspace/app
+        tags:
+          - ubuntu-latest

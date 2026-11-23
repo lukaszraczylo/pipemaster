@@ -15,7 +15,7 @@ steps:
 # pipemaster:lost script.interpolation pipeline/ci/job/test/step/test-step-1: echo {{ matrix.os }} {{ matrix.go }} {{ needs.prod.outputs.ver }}
 # pipemaster:lost step.script pipeline/ci/job/test/step/test-step-1: the step has no command left
 # pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1
-# pipemaster:arg {"step":"ext:\n    gha:\n        _derived_id: true\nid: test-step-1\nkind: script\nscript:\n    - echo $$\u007b{ matrix.os }} $$\u007b{ matrix.go }} $$\u007b{ needs.prod.outputs.ver }}\n","at":0}
+# pipemaster:arg {"step":"id: test-step-1\nkind: script\nscript:\n    - echo $$\u007b{ matrix.os }} $$\u007b{ matrix.go }} $$\u007b{ needs.prod.outputs.ver }}\n","at":0}
 # pipemaster:emulated step.script pipeline/ci/job/test
 # pipemaster:emulated job.container pipeline/ci/job/test
 # pipemaster:emulated job.matrix pipeline/ci/job/test
@@ -38,7 +38,7 @@ steps:
 # pipemaster:lost script.interpolation pipeline/ci/job/test/step/test-step-1: echo {{ matrix.os }} {{ matrix.go }} {{ needs.prod.outputs.ver }}
 # pipemaster:lost step.script pipeline/ci/job/test/step/test-step-1: the step has no command left
 # pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1
-# pipemaster:arg {"step":"ext:\n    gha:\n        _derived_id: true\nid: test-step-1\nkind: script\nscript:\n    - echo $$\u007b{ matrix.os }} $$\u007b{ matrix.go }} $$\u007b{ needs.prod.outputs.ver }}\n","at":0}
+# pipemaster:arg {"step":"id: test-step-1\nkind: script\nscript:\n    - echo $$\u007b{ matrix.os }} $$\u007b{ matrix.go }} $$\u007b{ needs.prod.outputs.ver }}\n","at":0}
 # pipemaster:emulated step.script pipeline/ci/job/test
 # pipemaster:emulated job.container pipeline/ci/job/test
 # pipemaster:emulated job.matrix pipeline/ci/job/test
@@ -61,7 +61,7 @@ steps:
 # pipemaster:lost script.interpolation pipeline/ci/job/test/step/test-step-1: echo {{ matrix.os }} {{ matrix.go }} {{ needs.prod.outputs.ver }}
 # pipemaster:lost step.script pipeline/ci/job/test/step/test-step-1: the step has no command left
 # pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1
-# pipemaster:arg {"step":"ext:\n    gha:\n        _derived_id: true\nid: test-step-1\nkind: script\nscript:\n    - echo $$\u007b{ matrix.os }} $$\u007b{ matrix.go }} $$\u007b{ needs.prod.outputs.ver }}\n","at":0}
+# pipemaster:arg {"step":"id: test-step-1\nkind: script\nscript:\n    - echo $$\u007b{ matrix.os }} $$\u007b{ matrix.go }} $$\u007b{ needs.prod.outputs.ver }}\n","at":0}
 # pipemaster:emulated step.script pipeline/ci/job/test
 # pipemaster:emulated job.container pipeline/ci/job/test
 # pipemaster:emulated job.matrix pipeline/ci/job/test

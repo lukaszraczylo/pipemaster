@@ -1,0 +1,17 @@
+# pipemaster:emulated job.runner pipeline/ci/job/build
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-run
+# pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo on $\u007b{ branch }}"]}
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # pipemaster:emulated step.image pipeline/ci/job/build/step/build-run
+      - id: build-run
+        uses: docker://ubuntu:latest
+        with:
+          entrypoint: /bin/sh
+          args: -ec 'echo on ${{ github.ref_type == 'branch' && github.ref_name || '' }}'

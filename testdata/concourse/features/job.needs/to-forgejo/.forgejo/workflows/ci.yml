@@ -1,0 +1,51 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/lint
+# pipemaster:emulated step.image pipeline/ci/job/lint/step/lint-step-1
+# pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo lint"]}
+# pipemaster:emulated job.runner pipeline/ci/job/ship
+# pipemaster:emulated step.image pipeline/ci/job/ship/step/ship-step-1
+# pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo ship"]}
+# pipemaster:emulated job.runner pipeline/ci/job/test
+# pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
+# pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo test"]}
+name: needs
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      # pipemaster:emulated step.image pipeline/ci/job/lint/step/lint-step-1
+      - id: lint-step-1
+        uses: docker://ubuntu:latest
+        with:
+          entrypoint: /bin/sh
+          args: -ec 'echo lint'
+  ship:
+    needs:
+      - lint
+      - test
+    runs-on: ubuntu-latest
+    steps:
+      # pipemaster:emulated step.image pipeline/ci/job/ship/step/ship-step-1
+      - id: ship-step-1
+        uses: docker://ubuntu:latest
+        with:
+          entrypoint: /bin/sh
+          args: -ec 'echo ship'
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
+      - id: test-step-1
+        uses: docker://ubuntu:latest
+        with:
+          entrypoint: /bin/sh
+          args: -ec 'echo test'

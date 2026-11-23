@@ -1,0 +1,43 @@
+# pipemaster:emulated step.workdir pipeline/gitlab-ci/job/build/step/build-step-1
+# pipemaster:arg {"workdir":"./cmd/app","wrote":"workspace/cmd/app"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/build-step-1/carry
+# pipemaster:arg {"digest":"bac2be7178b025be67dee531d9e7a11d0aa265a1d627faf7baad3ccdd4c7372f","carry":"id: build-step-1\nkind: script\nworkdir: ./cmd/app\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
+# pipemaster:arg {"digest":"d2408006da7fded7c942ca4b7c6a56eb8e9c2e54be436d3abbd9add2c26b476a","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/build-step-1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - ls
+            dir: workspace/cmd/app
+        tags:
+          - ubuntu-latest

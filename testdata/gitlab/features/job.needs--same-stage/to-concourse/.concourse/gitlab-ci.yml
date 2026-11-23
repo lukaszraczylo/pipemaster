@@ -1,0 +1,108 @@
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/check/step/script/carry
+# pipemaster:arg {"digest":"d31f491ddffa574899cf2bdf4ab78444cd1b298ccee8bf865aa56011cff31114","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/check/carry
+# pipemaster:arg {"digest":"d0b5dd85a1d2aaebac2b3cb5f93efc9858ff0d9a3b031a150dcb1de0c13099f9","carry":"id: check\nneeds:\n    - job: compile\n    - job: package\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/step/script/carry
+# pipemaster:arg {"digest":"929e6783f98b1e428e0ec038efd82153fa757bfd0a1d2b96b2cee89d0df33756","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/carry
+# pipemaster:arg {"digest":"9b27f753f27770b301c8c754dbcc32a74b889f41026bfe90c5aa8b10ad205c17","carry":"id: compile\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package/step/script/carry
+# pipemaster:arg {"digest":"52012c4f0770215a546273e000e2c62e0dfa5397ff09eb2e0d363b47dcb1cb32","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package/carry
+# pipemaster:arg {"digest":"0de9f13488cef6188034c0805af9e28e665be1b14e579cb515c7f60b09df12da","carry":"id: package\nneeds:\n    - job: compile\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"add971fd9586cfd52d8452aa85abfd6191adbbc1fad8c596312d2c5a4d5ff3ca","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/check/step/script
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/compile/step/script
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/package/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: check
+    plan:
+      - get: source
+        passed:
+          - compile
+          - package
+        trigger: true
+      - get: source-tags
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make check
+  - name: compile
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make compile
+  - name: package
+    plan:
+      - get: source
+        passed:
+          - compile
+        trigger: true
+      - get: source-tags
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make package

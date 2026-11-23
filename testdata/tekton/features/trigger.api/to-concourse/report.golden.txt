@@ -1,0 +1,6 @@
+Loss report: tekton -> concourse
+[lost] pipeline/ci ext.passthrough (Ext of provider tekton (resources) is not written to the Concourse file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider tekton (bindings, listener, name, serviceAccountName, serviceAccountScope, template) is not written to the Concourse file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/0 trigger.api
+[emulated] pipeline/ci/job/build trigger.manual: get with no trigger (no trigger starts the job, so a person starts it)
+[emulated] pipeline/ci/job/build/step/build-step-1 step.image: default image (the task names no image, so it runs ubuntu:latest)

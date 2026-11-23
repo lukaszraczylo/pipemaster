@@ -1,0 +1,48 @@
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
+# pipemaster:arg {"digest":"327ca5f5ea0d29ae14bc221e8ada2ee7315766877c3c4ca8b47beb54f762cdeb","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
+# pipemaster:arg {"digest":"03d8bd361c5eea7928bfdc0893a0c07ab6879939221a7bf1c3665f0a2e6ae37d","carry":"retry:\n    attempts: 3\nid: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: build
+    plan:
+      - do:
+          - get: source
+            trigger: true
+          - get: source-tags
+            trigger: true
+          - task: script
+            input_mapping:
+              workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: ubuntu
+                  tag: latest
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              run:
+                path: sh
+                args:
+                  - -ec
+                  - make
+        attempts: 3

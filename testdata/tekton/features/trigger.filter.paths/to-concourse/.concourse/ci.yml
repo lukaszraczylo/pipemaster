@@ -1,0 +1,53 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"paths","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
+# pipemaster:arg {"digest":"6e5bd93d1202c0711215e1e35e8345fe93d7c9f9ddbadc90aa242cecabfa708c","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
+# pipemaster:arg {"digest":"8ed2abd2fe6eb8fac2064736caa4329c2525c2847383ab5ff9f4a94710db90b5","carry":"id: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"f0a32d5e719a2f78568f030bbd867aef5b9fa5327f8f09e725faa00ba01166f1","carry":"id: ci\nname: paths\ntriggers:\n    - kind: pr\n      paths:\n        exclude:\n            - '**.md'\n    - kind: push\n      paths:\n        include:\n            - src/**\n            - '!src/docs/**'\n    - kind: tag\n      paths:\n        include:\n            - src/**\n            - '!src/docs/**'\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/2
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+      paths:
+        - src/**
+        - '!src/docs/**'
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+      paths:
+        - src/**
+        - '!src/docs/**'
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo ok

@@ -1,0 +1,116 @@
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/images/step/script/carry
+# pipemaster:arg {"digest":"e7a742ba897ea2656e0952b980ea16a7768ee3a1117ab105df16876f934ab50b","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated job.matrix pipeline/gitlab-ci/job/images
+# pipemaster:arg {"matrix":"axes:\n    - name: TARGET\n      values:\n        - alpine\n        - ubuntu\n","across":"[{\"max_in_flight\":\"all\",\"values\":[\"alpine\",\"ubuntu\"],\"var\":\"TARGET\"}]"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/images/carry
+# pipemaster:arg {"digest":"5f37eb493f4e2d30b7d2d0be797e69323a560807051886cca717a49b816de21c","carry":"matrix:\n    axes:\n        - name: TARGET\n          values:\n            - alpine\n            - ubuntu\nid: images\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package/step/script/carry
+# pipemaster:arg {"digest":"52012c4f0770215a546273e000e2c62e0dfa5397ff09eb2e0d363b47dcb1cb32","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package/carry
+# pipemaster:arg {"digest":"993ba3659e29c441d8dcf509a1f2827d571e4556e1afea5dbd99693bc0cf4873","carry":"id: package\nneeds:\n    - job: images\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package-all/step/script/carry
+# pipemaster:arg {"digest":"88493d3d36774767445084948ddc8e6c6dd90530f9e18d66f61d33a477181253","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package-all/carry
+# pipemaster:arg {"digest":"3517da78915e937afcb8d7ed345a3f40c1393aa21b96fe4987637bd6313c00c9","carry":"id: package-all\nneeds:\n    - job: images\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"b455d135cccade9524885acf666bd98751568c44b191c3cedd6410b2d71082f3","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/images/step/script
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/package-all/step/script
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/package/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: images
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - do:
+          - task: script
+            input_mapping:
+              workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: ubuntu
+                  tag: latest
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              run:
+                path: sh
+                args:
+                  - -ec
+                  - make images
+        across:
+          - var: TARGET
+            values:
+              - alpine
+              - ubuntu
+            max_in_flight: all
+  - name: package
+    plan:
+      - get: source
+        passed:
+          - images
+        trigger: true
+      - get: source-tags
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make package
+  - name: package-all
+    plan:
+      - get: source
+        passed:
+          - images
+        trigger: true
+      - get: source-tags
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make package-all

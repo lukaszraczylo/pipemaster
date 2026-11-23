@@ -1,0 +1,50 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"stepenv","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:lost env GREETING: actor
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
+# pipemaster:arg {"digest":"868367c49a3e5e0b2ace141e49b5284e3fd91aabceccf76a6b0c1c369df5270d","carry":"id: build-step-1\nkind: script\nenv:\n    - name: GREETING\n      value:\n        expr: format('hello {0}', actor)\n    - name: KEY\n      value:\n        secret: KEY\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
+# pipemaster:arg {"digest":"3e720f3eb85067b404d26bd752317799ef4eb3b6c572746f8a9f547ff713ba9d","carry":"id: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: stepenv\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          params:
+            KEY: ((KEY))
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo "$GREETING"

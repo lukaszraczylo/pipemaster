@@ -1,0 +1,38 @@
+# pipemaster:emulated step.image pipeline/ci/job/build
+# pipemaster:arg {"steps":{"build-run":"ref: ubuntu:latest\n"},"wrote":{"build-run":"ubuntu:latest"}}
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-branch
+        value: ""
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+            when: '{{= workflow.parameters[''ctx-branch''] == ''main'' }}'
+    - name: build
+      containerSet:
+        containers:
+          - name: build-run
+            image: ubuntu:latest
+            command:
+              - sh
+              - -ec
+            args:
+              - make
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

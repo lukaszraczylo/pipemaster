@@ -1,0 +1,9 @@
+Loss report: concourse -> forgejo
+[lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/build ext.passthrough (Ext of provider concourse (gets) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/build job.if (condition not expressible in GitHub Actions; job disabled)
+[lost] pipeline/ci/job/build/step/build-run ext.passthrough (Ext of provider concourse (config, input_mapping) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata)
+[emulated] pipeline/ci pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)
+[emulated] pipeline/ci/job/build job.runner: default runner label ubuntu-latest (the IR holds no runner label)
+[emulated] pipeline/ci/job/build/step/build-run step.image: uses: docker://<image> with entrypoint and args

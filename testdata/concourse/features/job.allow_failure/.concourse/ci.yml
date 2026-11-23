@@ -1,0 +1,48 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"allow","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated job.allow_failure pipeline/ci/job/flaky
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/flaky
+# pipemaster:emulated step.image pipeline/ci/job/flaky/step/flaky-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+      branch: main
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: flaky
+    plan:
+      - try:
+          do:
+            - get: source
+              trigger: true
+            - get: source-tags
+              trigger: true
+            - task: flaky-step-1
+              input_mapping:
+                workspace: source
+              config:
+                platform: linux
+                image_resource:
+                  type: registry-image
+                  source:
+                    repository: ubuntu
+                    tag: latest
+                inputs:
+                  - name: workspace
+                outputs:
+                  - name: workspace
+                run:
+                  path: sh
+                  args:
+                    - -ec
+                    - echo ok
+              tags:
+                - ubuntu-latest

@@ -1,0 +1,63 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"matrix","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"matrix":"fail_fast: false\naxes:\n    - name: os\n      values:\n        - ubuntu-latest\n        - macos-latest\n    - name: go\n      values:\n        - \"1.24\"\n        - \"1.25\"\ninclude:\n    - - key: experimental\n        value: \"true\"\n      - key: go\n        value: \"1.25\"\n      - key: os\n        value: ubuntu-latest\nexclude:\n    - - key: go\n        value: \"1.24\"\n      - key: os\n        value: macos-latest\nmax_parallel: 2\n","across":"[{\"max_in_flight\":2,\"values\":[{\"experimental\":\"\",\"go\":\"1.24\",\"os\":\"ubuntu-latest\"},{\"experimental\":\"true\",\"go\":\"1.25\",\"os\":\"ubuntu-latest\"},{\"experimental\":\"\",\"go\":\"1.25\",\"os\":\"macos-latest\"}],\"var\":\"matrix\"}]"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/test
+# pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+      branch: main
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: test
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - do:
+          - task: test-step-1
+            input_mapping:
+              workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: ubuntu
+                  tag: latest
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              params:
+                PM_MATRIX_GO: ((.:matrix.go))
+              run:
+                path: sh
+                args:
+                  - -ec
+                  - echo ${PM_MATRIX_GO}
+            tags:
+              - ${{ matrix.os }}
+        across:
+          - var: matrix
+            values:
+              - go: "1.24"
+                os: ubuntu-latest
+                experimental: ""
+              - go: "1.25"
+                os: ubuntu-latest
+                experimental: "true"
+              - go: "1.25"
+                os: macos-latest
+                experimental: ""
+            max_in_flight: 2

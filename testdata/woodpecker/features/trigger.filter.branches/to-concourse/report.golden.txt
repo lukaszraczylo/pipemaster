@@ -1,0 +1,4 @@
+Loss report: woodpecker -> concourse
+[lost] pipeline/woodpecker/trigger/0 trigger.filter.branches (the branch exclude list wip has no form: a git resource follows one exact branch)
+[emulated] pipeline/woodpecker ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
+[emulated] pipeline/woodpecker/trigger/0 trigger.push: one git resource per branch (the branches main, develop are 2 git resources, and the job runs once per branch event)

@@ -1,0 +1,16 @@
+Loss report: concourse -> gitea
+[lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/lint ext.passthrough (Ext of provider concourse (gets) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/lint/step/lint-step-1 ext.passthrough (Ext of provider concourse (config, input_mapping, tags) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/ship ext.passthrough (Ext of provider concourse (gets) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/ship/step/ship-step-1 ext.passthrough (Ext of provider concourse (config, input_mapping, tags) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/test ext.passthrough (Ext of provider concourse (gets) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/test/step/test-step-1 ext.passthrough (Ext of provider concourse (config, input_mapping, tags) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata)
+[emulated] pipeline/ci/job/lint job.runner: default runner label ubuntu-latest (the IR holds no runner label)
+[emulated] pipeline/ci/job/lint/step/lint-step-1 step.image: uses: docker://<image> with entrypoint and args
+[emulated] pipeline/ci/job/ship job.runner: default runner label ubuntu-latest (the IR holds no runner label)
+[emulated] pipeline/ci/job/ship/step/ship-step-1 step.image: uses: docker://<image> with entrypoint and args
+[emulated] pipeline/ci/job/test job.runner: default runner label ubuntu-latest (the IR holds no runner label)
+[emulated] pipeline/ci/job/test/step/test-step-1 step.image: uses: docker://<image> with entrypoint and args

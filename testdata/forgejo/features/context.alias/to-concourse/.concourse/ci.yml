@@ -1,0 +1,80 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"alias","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"if":"ref_name == 'main'","script":"# pipemaster:lost echo {{ ref_name }}"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
+# pipemaster:arg {"digest":"59b316e1ac2306c07842ac6d733d5e668e4f1a4f8ee5fac7692ec1da4a85282b","carry":"if: ref_name == 'main'\nid: build-step-1\nkind: script\nscript:\n    - echo $\u007b{ ref_name }}\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-2/carry
+# pipemaster:arg {"digest":"2adf9588b6804a21c761c61cead4ca6a4e01f055859e12c247883d59bc94f0b5","carry":"if: sha != ''\nid: build-step-2\nkind: script\nscript:\n    - echo $\u007b{ sha }}\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
+# pipemaster:arg {"digest":"2d1b7b9e9e8f5585245295defbba148bfc2893e51adbb37ff9e2b02ba89f83a3","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: alias\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/build
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-2
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - |-
+                exit 0 # pipemaster:guard the step condition has no shell form
+                # pipemaster:lost echo {{ ref_name }}
+        tags:
+          - docker
+      - task: build-step-2
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - |-
+                PM_CTX_SHA="$(cat workspace/.git/commit)"; export PM_CTX_SHA # pipemaster:ctx
+                if ! [ "$PM_CTX_SHA" != '' ]; then exit 0; fi # pipemaster:guard
+                echo ${PM_CTX_SHA}
+        tags:
+          - docker

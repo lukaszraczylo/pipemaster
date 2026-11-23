@@ -1,0 +1,78 @@
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
+# pipemaster:arg {"digest":"19e824e1d53642ad317d42fcbe4647d4db5c3aafbdfcc982fb4fb19e81e7961b","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
+# pipemaster:arg {"digest":"70fb28daac9b1ddbce714a2cbe7dc4db06091493430ad1336983fabf1ce15957","carry":"id: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/step/script/carry
+# pipemaster:arg {"digest":"32ab9285b7d2b3ed87220176e8453de5f145ed6fa4ea5095b2bb2e0fc899ea59","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated job.manual pipeline/gitlab-ci/job/deploy
+# pipemaster:arg {"manual":false,"held":true}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/carry
+# pipemaster:arg {"digest":"94ddac65020c703a2bda6f8895dea2e3308db289ba113d2c44c45377ad3e105d","carry":"if: |\n    opaque(gitlab): - changes: '!reference [.remote-patterns]'\n      if: $CI_COMMIT_TAG\nid: deploy\nneeds:\n    - job: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"93a840984bed14dcbe079def3a4b6d1c1e13b0c203ceaddca5a3c8612e91aebf","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/deploy/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - |-
+                !reference [.remote-setup, script]
+                make
+  - name: deploy
+    plan:
+      - get: source
+        passed:
+          - build
+      - get: source-tags
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make deploy

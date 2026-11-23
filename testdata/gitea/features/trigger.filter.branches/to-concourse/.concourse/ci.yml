@@ -1,0 +1,51 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"branches","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
+# pipemaster:arg {"digest":"71f9470c69189de6d5e862911ed33f9708be024a513ddb1c437bdb43c3770d45","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
+# pipemaster:arg {"digest":"061ba1f0d9c9dbb8b631c46d1f58d6bbf774d6940d7c35661b6db7128cf3dff6","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"e289ae10a377c3613d98409cd7d69b62a719a30717076ff254bf9a2b7fc90bd3","carry":"id: ci\nname: branches\ntriggers:\n    - kind: pr\n      branches:\n        exclude:\n            - wip/**\n    - kind: push\n      branches:\n        include:\n            - main\n            - release/**\n            - '!release/old'\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/build
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.push pipeline/ci/trigger/1
+resources:
+  - name: source-main
+    type: git
+    source:
+      uri: ((git-uri))
+      branch: main
+  - name: source-release-old
+    type: git
+    source:
+      uri: ((git-uri))
+      branch: '!release/old'
+jobs:
+  - name: build
+    plan:
+      - get: source-main
+        trigger: true
+      - get: source-release-old
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source-main
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo ok
+        tags:
+          - ubuntu-latest

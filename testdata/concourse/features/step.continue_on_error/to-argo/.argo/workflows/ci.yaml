@@ -1,0 +1,42 @@
+# pipemaster:emulated step.image pipeline/ci/job/build
+# pipemaster:arg {"steps":{"build-step-1":"ref: ubuntu:latest\n"},"wrote":{"build-step-1":"ubuntu:latest"}}
+# pipemaster:emulated step.continue_on_error pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
+# pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/1
+# pipemaster:emulated trigger.push pipeline/ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+  annotations:
+    workflows.argoproj.io/title: coe
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+    - name: build
+      containerSet:
+        containers:
+          - name: build-step-1
+            image: ubuntu:latest
+            command:
+              - sh
+              - -ec
+            args:
+              - |-
+                trap 'exit 0' EXIT # pipemaster:continue-on-error
+                echo ok
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

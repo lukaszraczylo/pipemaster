@@ -1,0 +1,58 @@
+# pipemaster:emulated step.image pipeline/ci/job/build
+# pipemaster:arg {"steps":{"build-step-1":"ref: ubuntu:latest\n"},"wrote":{"build-step-1":"ubuntu:latest"}}
+# pipemaster:emulated config.name pipeline/ci/ref/secrets.API_TOKEN
+# pipemaster:emulated config.name pipeline/ci/ref/secrets.DEPLOY_KEY
+# pipemaster:emulated config.name pipeline/ci/ref/vars.REGION
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
+# pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/1
+# pipemaster:emulated trigger.push pipeline/ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+  annotations:
+    workflows.argoproj.io/title: config
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+    - name: build
+      containerSet:
+        containers:
+          - name: build-step-1
+            image: ubuntu:latest
+            command:
+              - sh
+              - -ec
+            args:
+              - echo "${REGION}"
+            workingDir: /workspace
+            env:
+              - name: KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: ci-secrets
+                    key: DEPLOY_KEY
+              - name: API_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: ci-secrets
+                    key: API_TOKEN
+              - name: REGION
+                valueFrom:
+                  configMapKeyRef:
+                    name: ci-vars
+                    key: REGION
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

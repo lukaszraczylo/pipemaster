@@ -1,0 +1,14 @@
+# pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/0
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - tag
+  ref:
+    - refs/tags/v*
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok

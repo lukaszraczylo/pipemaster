@@ -1,0 +1,23 @@
+# pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
+# pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["make"]}
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
+      - id: script
+        uses: docker://ubuntu:latest
+        with:
+          entrypoint: /bin/sh
+          args: -ec make

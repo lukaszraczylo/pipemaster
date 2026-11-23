@@ -1,0 +1,44 @@
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/test/step/script/carry
+# pipemaster:arg {"digest":"114fa7664b55160e3f7bde5f3b21cc77ee26168b526ae7d6a555c219c1700ae0","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/test/carry
+# pipemaster:arg {"digest":"ddb99381b0db5d160d73c7dadb7b18e92b591e696b1ba4f751a3986a3920e6d4","carry":"container:\n    ref: golang:1.22\nid: test\nservices:\n    - name: postgres\n      image:\n        ref: postgres:15\n    - name: cache\n      image:\n        ref: redis:7\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: test
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+              tag: "1.22"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make test

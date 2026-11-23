@@ -1,0 +1,50 @@
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/deploy
+# pipemaster:arg {"if":"branch == 'main'"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/step/script/carry
+# pipemaster:arg {"digest":"d5b348c3b4b5b14a5183ae9907548474705862a68738afe1eea0df8e027836b0","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/carry
+# pipemaster:arg {"digest":"9f1f1fcc4cc00e24f4797035139264ccce060b10ed856fe2a9125a0accd69c2d","carry":"if: branch == 'main'\nid: deploy\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/deploy/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: deploy
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - |-
+                PM_CTX_BRANCH="$(cat workspace/.git/branch)"; export PM_CTX_BRANCH # pipemaster:ctx
+                if ! [ "$PM_CTX_BRANCH" = 'main' ]; then exit 0; fi # pipemaster:guard
+                make deploy

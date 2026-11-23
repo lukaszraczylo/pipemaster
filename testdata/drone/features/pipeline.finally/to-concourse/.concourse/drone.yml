@@ -1,0 +1,60 @@
+# pipemaster:emulated ext.passthrough pipeline/drone/job/build/step/build/carry
+# pipemaster:arg {"digest":"99513467dac5c3188d98ab4528d7fb2f62c10e0bd5d5b366821a1e194cf137f7","carry":"image:\n    ref: golang:1.25\nid: build\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/drone/job/build/step/notify/carry
+# pipemaster:arg {"digest":"4fe1164ebef6a552f0cc62d799cfe8c1b3667fb764e3e39e5f9234a15edf1d22","carry":"image:\n    ref: alpine:3.20\nid: notify\nkind: script\n"}
+# pipemaster:emulated pipeline.finally pipeline/drone
+# pipemaster:arg {"job":"build","digest":"56aafdb0c27c290a65ad1e8531800bfb57557001802fc9eb4971090a49c99b2e","tasks":["notify"]}
+# pipemaster:emulated ext.passthrough pipeline/drone/job/build/carry
+# pipemaster:arg {"digest":"be85cf38d3c25f0924f301498bb9762f886ed4db317020bcb94f21a59175a002","carry":"id: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/drone/carry
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: drone\ntriggers:\n    - kind: push\nfinally:\n    - id: notify\n      needs:\n        - job: build\n      steps:\n        - image:\n            ref: alpine:3.20\n          id: notify\n          kind: script\n          script:\n            - ./notify.sh\n"}
+# pipemaster:emulated ext.passthrough pipeline/drone
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - task: build
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+              tag: "1.25"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - go build ./...
+    ensure:
+      task: notify
+      input_mapping:
+        workspace: source
+      config:
+        platform: linux
+        image_resource:
+          type: registry-image
+          source:
+            repository: alpine
+            tag: "3.20"
+        inputs:
+          - name: workspace
+        outputs:
+          - name: workspace
+        run:
+          path: sh
+          args:
+            - -ec
+            - ./notify.sh

@@ -1,5 +1,5 @@
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
-# pipemaster:arg {"step":"if: always()\next:\n    gha:\n        _derived_id: true\nid: build-step-1\nkind: script\nscript:\n    - echo cleanup\n","hold":"{\"args\":[\"exit 0 # pipemaster:lost the step condition has no shell form\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-1\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:arg {"step":"if: always()\nid: build-step-1\nkind: script\nscript:\n    - echo cleanup\n","hold":"{\"args\":[\"exit 0 # pipemaster:lost the step condition has no shell form\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-1\",\"workingDir\":\"/workspace\"}"}
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0

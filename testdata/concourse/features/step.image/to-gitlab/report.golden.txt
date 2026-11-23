@@ -1,0 +1,11 @@
+Loss report: concourse -> gitlab
+[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
+[lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the GitLab file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/build ext.passthrough (Ext of provider concourse (gets) is not written to the GitLab file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/build/step/build-step-1 ext.passthrough (Ext of provider concourse (config, input_mapping, tags) is not written to the GitLab file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/build/step/build-step-1 step.image (GitLab sets the image per job, not per step)
+[lost] pipeline/ci/job/deploy ext.passthrough (Ext of provider concourse (gets) is not written to the GitLab file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/deploy/step/deploy-step-1 ext.passthrough (Ext of provider concourse (config, input_mapping, tags) is not written to the GitLab file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/deploy/step/deploy-step-1 step.image (GitLab sets the image per job, not per step)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the GitLab file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider concourse (resources) is not written to the GitLab file; it is kept in round-trip metadata)

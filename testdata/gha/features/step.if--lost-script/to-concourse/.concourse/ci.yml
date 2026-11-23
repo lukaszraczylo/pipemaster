@@ -1,0 +1,78 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"ci","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/check/step/meta/carry
+# pipemaster:arg {"digest":"3038cdec378e45facb9cc11236db20e63fd1fd09fa0e92b194ee168efe283d40","carry":"id: meta\nkind: script\n"}
+# pipemaster:emulated display.name pipeline/ci/job/check/step/check-step-2
+# pipemaster:arg {"name":"Inspect","id":"check-step-2","written":"check-step-2","kind":"step"}
+# pipemaster:emulated step.if pipeline/ci/job/check/step/check-step-2
+# pipemaster:arg {"if":"event != 'pull_request'","script":"# pipemaster:lost docker inspect {{ steps.meta.outputs.version }}"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/check/step/check-step-2/carry
+# pipemaster:arg {"digest":"659b417d1bc4692d80803b6c8250161fd0f055de60c54b084704a6634068688b","carry":"if: event != 'pull_request'\nid: check-step-2\nname: Inspect\nkind: script\nscript:\n    - docker inspect $\u007b{ steps.meta.outputs.version }}\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/check/carry
+# pipemaster:arg {"digest":"d38f67894ca2375a669c733230b45315258d5a37d0cc93f1f69087d6ae63e76d","carry":"id: check\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/check
+# pipemaster:emulated step.image pipeline/ci/job/check/step/check-step-2
+# pipemaster:emulated step.image pipeline/ci/job/check/step/meta
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: check
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: meta
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo "version=1" >> "$GITHUB_OUTPUT"
+        tags:
+          - ubuntu-latest
+      - task: check-step-2
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - |-
+                exit 0 # pipemaster:guard the step condition has no shell form
+                # pipemaster:lost docker inspect {{ steps.meta.outputs.version }}
+        tags:
+          - ubuntu-latest

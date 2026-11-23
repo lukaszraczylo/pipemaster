@@ -1,0 +1,40 @@
+origin:
+    provider: concourse
+    dialect: concourse
+    files:
+        - .concourse/drone.yml
+pipelines:
+    - ext:
+        concourse:
+            resources:
+                - name: source
+                  source:
+                    uri: ((git-uri))
+                  type: git
+      id: drone
+      jobs:
+        - environment:
+            name: production
+            approval: true
+          ext:
+            concourse:
+                gets:
+                    - get: source
+          id: deploy
+          steps:
+            - image:
+                ref: alpine:3.20
+              ext:
+                concourse:
+                    config:
+                        inputs:
+                            - name: workspace
+                        outputs:
+                            - name: workspace
+                        platform: linux
+                    input_mapping:
+                        workspace: source
+              id: deploy
+              kind: script
+              script:
+                - ./deploy.sh

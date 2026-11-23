@@ -1,0 +1,119 @@
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
+# pipemaster:arg {"digest":"639c1aae896a36acc9c1110431d05133cba5ec7277d2963d3a376418f4fac69a","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
+# pipemaster:arg {"digest":"c058e18972be206de78eb8a9faaede6c90623797eea28b292bd85e236e00a9b1","carry":"container:\n    ref: alpine:3\nretry:\n    attempts: 2\nid: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/common/step/script/carry
+# pipemaster:arg {"digest":"64354c96feab9a986f482f716d9e71ec20d65dbeff5fdce892118ae7a6c49f45","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/common/carry
+# pipemaster:arg {"digest":"91c162c61c1d1bc8f1735c655d49f1d5250bf58a8689acfa41098095ed97ce06","carry":"container:\n    ref: alpine:3\nretry:\n    attempts: 2\nid: common\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/prod/step/script/carry
+# pipemaster:arg {"digest":"dc7b014ae896d2435e33d6d2a3192a5a9788d95c745dac931b4ec5e05030f52d","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/prod/carry
+# pipemaster:arg {"digest":"a8a8debdef75f43730ef4183560c02392d5799ab9af04173dfbad734c19541ad","carry":"container:\n    ref: alpine:3\nretry:\n    attempts: 2\nid: prod\nneeds:\n    - job: build\n    - job: common\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: SHARED\n      value:\n        lit: \"1\"\n"}
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci
+# pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
+# pipemaster:emulated job.retry pipeline/gitlab-ci/job/common
+# pipemaster:emulated job.retry pipeline/gitlab-ci/job/prod
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: build
+    plan:
+      - do:
+          - get: source
+            trigger: true
+          - get: source-tags
+            trigger: true
+          - task: script
+            input_mapping:
+              workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: alpine
+                  tag: "3"
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              params:
+                SHARED: "1"
+              run:
+                path: sh
+                args:
+                  - -ec
+                  - make
+        attempts: 2
+  - name: common
+    plan:
+      - do:
+          - get: source
+            trigger: true
+          - get: source-tags
+            trigger: true
+          - task: script
+            input_mapping:
+              workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: alpine
+                  tag: "3"
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              params:
+                SHARED: "1"
+              run:
+                path: sh
+                args:
+                  - -ec
+                  - echo common
+        attempts: 2
+  - name: prod
+    plan:
+      - do:
+          - get: source
+            passed:
+              - build
+              - common
+            trigger: true
+          - get: source-tags
+          - task: script
+            input_mapping:
+              workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: alpine
+                  tag: "3"
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              params:
+                SHARED: "1"
+              run:
+                path: sh
+                args:
+                  - -ec
+                  - ./deploy.sh
+        attempts: 2

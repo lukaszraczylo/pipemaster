@@ -1,0 +1,19 @@
+# pipemaster:emulated trigger.filter.branches pipeline/ci
+# pipemaster:arg "- ext:\n    concourse:\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
+# pipemaster:emulated job.allow_failure pipeline/ci/job/flaky
+kind: pipeline
+type: docker
+name: flaky
+trigger:
+  event:
+    - push
+    - tag
+  ref:
+    - refs/heads/main
+    - refs/tags/*
+steps:
+  - name: flaky-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok
+    failure: ignore

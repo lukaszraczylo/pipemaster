@@ -1,0 +1,17 @@
+# pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/0
+# pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/1
+# pipemaster:arg {"evaluate":"CI_COMMIT_TAG matches \"^v[0-9]+\\\\.[0-9]+\\\\.[0-9]+$$\""}
+# pipemaster:emulated trigger.filter.tags pipeline/ci
+# pipemaster:arg "- ext:\n    concourse:\n        resources:\n            - source-tags-2\n  kind: tag\n  tags:\n    include:\n        - '!v*-rc*'\n- ext:\n    concourse:\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - v[0-9]+.[0-9]+.[0-9]+\n"
+when:
+  - event: tag
+    ref:
+      exclude:
+        - refs/tags/v*-rc*
+  - event: tag
+    evaluate: CI_COMMIT_TAG matches "^v[0-9]+\\.[0-9]+\\.[0-9]+$$"
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok

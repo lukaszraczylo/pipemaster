@@ -1,0 +1,48 @@
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/lint/step/script/carry
+# pipemaster:arg {"digest":"dfc708a3e349b172519cb5be6167a55cfbfde448e1ac61f01574c05f761e25f2","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/lint/carry
+# pipemaster:arg {"digest":"2cfb515a609b4ac689f54c73de32aa0f9d7df2a8db5d5fe2b55432925381fccc","carry":"id: lint\nenv:\n    - name: GOCACHE\n      value:\n        lit: $CI_PROJECT_DIR/.cache/go-build\n    - name: GOMODCACHE\n      value:\n        lit: $CI_PROJECT_DIR/.cache/go-mod\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated job.env pipeline/gitlab-ci/job/lint
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/lint/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: lint
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          params:
+            GOCACHE: $CI_PROJECT_DIR/.cache/go-build
+            GOMODCACHE: $CI_PROJECT_DIR/.cache/go-mod
+          run:
+            path: sh
+            args:
+              - -ec
+              - make lint

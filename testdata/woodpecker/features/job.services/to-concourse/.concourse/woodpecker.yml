@@ -1,0 +1,36 @@
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/test/carry
+# pipemaster:arg {"digest":"85d9112f96bd2fd55404bd5b9de6e09069ad1383eceb019006946d44a2846a4b","carry":"image:\n    ref: golang:1.25\nid: test\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry
+# pipemaster:arg {"digest":"0b0db5ea8c99abb1853dd0b6eac8910740b3ca8ac8b9e670a49d1849d6b0e616","carry":"id: ci\nservices:\n    - name: db\n      image:\n        ref: postgres:17\n      env:\n        - name: POSTGRES_PASSWORD\n          value:\n            lit: example\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: woodpecker\ntriggers:\n    - kind: push\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: ci
+    plan:
+      - get: source
+        trigger: true
+      - task: test
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+              tag: "1.25"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - go test ./...

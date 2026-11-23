@@ -1,0 +1,37 @@
+# pipemaster:emulated job.if pipeline/ci/job/build
+# pipemaster:arg {"if":"branch == 'main'"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-run
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+      branch: main
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - task: build-run
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - |-
+                PM_CTX_BRANCH="$(cat workspace/.git/branch)"; export PM_CTX_BRANCH # pipemaster:ctx
+                if ! [ "$PM_CTX_BRANCH" = 'main' ]; then exit 0; fi # pipemaster:guard
+                make

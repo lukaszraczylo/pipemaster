@@ -1,0 +1,53 @@
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/0
+# pipemaster:arg {"kind":"tag","name":"ci-tag-0","branches":{"Include":null,"Exclude":null},"tags":{"Include":["!v*-rc*"],"Exclude":null},"paths":{"Include":null,"Exclude":null}}
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+# pipemaster:arg {"kind":"tag","name":"ci-tag-1","branches":{"Include":null,"Exclude":null},"tags":{"Include":["v[0-9]+.[0-9]+.[0-9]+"],"Exclude":null},"paths":{"Include":null,"Exclude":null}}
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: pipemaster
+spec:
+  serviceAccountName: pipemaster-triggers
+  triggers:
+    - name: ci-tag-0
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: eventTypes
+              value:
+                - push
+            - name: secretRef
+              value:
+                secretName: pipemaster-github-webhook
+                secretKey: token
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: "false"
+      bindings:
+        - ref: ci-github
+      template:
+        ref: ci-run
+    - name: ci-tag-1
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: eventTypes
+              value:
+                - push
+            - name: secretRef
+              value:
+                secretName: pipemaster-github-webhook
+                secretKey: token
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: "false"
+      bindings:
+        - ref: ci-github
+      template:
+        ref: ci-run

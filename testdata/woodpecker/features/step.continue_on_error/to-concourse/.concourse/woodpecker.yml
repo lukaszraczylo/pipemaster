@@ -1,0 +1,38 @@
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/lint/carry
+# pipemaster:arg {"digest":"ec27371dda860fe2d31ef240cc63d32c10047e6ac56d0ac050ee23801ba49e14","carry":"image:\n    ref: golangci/golangci-lint:v2\nid: lint\nkind: script\ncontinue_on_error: true\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry
+# pipemaster:arg {"digest":"795def6bbb8659663da362a6ec92bc24008f1f0f6c1ead72a6541fe0472a47df","carry":"id: ci\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: woodpecker\ntriggers:\n    - kind: push\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker
+# pipemaster:emulated step.continue_on_error pipeline/woodpecker/job/ci/step/lint
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: ci
+    plan:
+      - get: source
+        trigger: true
+      - try:
+          task: lint
+          input_mapping:
+            workspace: source
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source:
+                repository: golangci/golangci-lint
+                tag: v2
+            inputs:
+              - name: workspace
+            outputs:
+              - name: workspace
+            run:
+              path: sh
+              args:
+                - -ec
+                - golangci-lint run

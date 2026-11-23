@@ -1,0 +1,65 @@
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/lint/step/lint/carry
+# pipemaster:arg {"digest":"ec27371dda860fe2d31ef240cc63d32c10047e6ac56d0ac050ee23801ba49e14","carry":"image:\n    ref: golangci/golangci-lint:v2\nid: lint\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/lint/carry
+# pipemaster:arg {"digest":"f7e1a0e5cd93c273eb52a48966ecccdc4a3c0aaa5f69adf963dd45fe13532915","carry":"id: lint\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ship/step/ship/carry
+# pipemaster:arg {"digest":"ff80d301be1eeb0d2ee3b89741e6fd68d944b76e19c5f98c1d156a3fc5ad45af","carry":"image:\n    ref: alpine:3.20\nid: ship\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ship/carry
+# pipemaster:arg {"digest":"b21d8ed710e57da879f45a60b2eeb46a197ce2c1c873be6b77171c0012942ffe","carry":"id: ship\nneeds:\n    - job: lint\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
+# pipemaster:arg {"digest":"5a437d0d0db7cb0e44a455b9472ff964ab9dd879df98054eab0e2949d6fe5191","carry":"id: woodpecker\ntriggers:\n    - kind: push\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: lint
+    plan:
+      - get: source
+        trigger: true
+      - task: lint
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golangci/golangci-lint
+              tag: v2
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - golangci-lint run
+  - name: ship
+    plan:
+      - get: source
+        passed:
+          - lint
+        trigger: true
+      - task: ship
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: alpine
+              tag: "3.20"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - ./ship.sh

@@ -1,0 +1,118 @@
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/build-step-1
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: cache\n    ref: v4\nwith:\n    key:\n        lit: go-mod\n    path:\n        lit: ~/go/pkg/mod\nid: build-step-1\nkind: action\n","task":"build-step-1","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"build-step-1\"}"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/build-step-2/carry
+# pipemaster:arg {"digest":"ac30566221b4766c8dff7634f681445514fc4ba0f24433c2985c47f85c383b22","carry":"id: build-step-2\nkind: script\n"}
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/build-step-3
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\nid: build-step-3\nkind: action\n","task":"build-step-3","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"build-step-3\"}"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
+# pipemaster:arg {"digest":"60a2850d7671be428371493d969f856f48b3e32fee811fe9c8c1fdb6f89ace4c","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/test/step/test-step-1
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\nid: test-step-1\nkind: action\n","task":"test-step-1","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"test-step-1\"}"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/test/step/test-step-2/carry
+# pipemaster:arg {"digest":"7aab2c410a79ece1d594f476b76a3693e02d1fbb4fdec1dc593413bb05f64a23","carry":"id: test-step-2\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/test/carry
+# pipemaster:arg {"digest":"5fcff3138e9cc4a37c76a47e9a99acb31a5cc56073b706e80fea027913b513b8","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"45ccad76918a30b965c250ae4114592623aed42b88890de31c892e091082be63","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/build-step-2
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/test
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/test/step/test-step-2
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - task: build-step-1
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          run:
+            path: sh
+            args:
+              - -ec
+              - "true"
+      - task: build-step-2
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make build
+        tags:
+          - ubuntu-latest
+      - task: build-step-3
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          run:
+            path: sh
+            args:
+              - -ec
+              - "true"
+  - name: test
+    plan:
+      - get: source
+        passed:
+          - build
+        trigger: true
+      - task: test-step-1
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          run:
+            path: sh
+            args:
+              - -ec
+              - "true"
+      - task: test-step-2
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make test
+        tags:
+          - ubuntu-latest

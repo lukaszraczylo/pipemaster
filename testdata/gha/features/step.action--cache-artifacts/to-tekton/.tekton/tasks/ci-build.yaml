@@ -1,13 +1,13 @@
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v4\next:\n    gha:\n        _derived_id: true\nid: build-step-1\nkind: action\n","wrote":"{\"name\":\"build-step-1\",\"params\":[{\"name\":\"url\",\"value\":\"https://github.com/$(params.ctx-repo).git\"},{\"name\":\"revision\",\"value\":\"$(params.ctx-sha)\"},{\"name\":\"output-path\",\"value\":\"/workspace\"}],\"ref\":{\"params\":[{\"name\":\"url\",\"value\":\"https://github.com/tektoncd-catalog/git-clone.git\"},{\"name\":\"revision\",\"value\":\"v1.7.1\"},{\"name\":\"pathInRepo\",\"value\":\"stepaction/git-clone/git-clone.yaml\"}],\"resolver\":\"git\"}}","at":0}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v4\nid: build-step-1\nkind: action\n","wrote":"{\"name\":\"build-step-1\",\"params\":[{\"name\":\"url\",\"value\":\"https://github.com/$(params.ctx-repo).git\"},{\"name\":\"revision\",\"value\":\"$(params.ctx-sha)\"},{\"name\":\"output-path\",\"value\":\"/workspace\"}],\"ref\":{\"params\":[{\"name\":\"url\",\"value\":\"https://github.com/tektoncd-catalog/git-clone.git\"},{\"name\":\"revision\",\"value\":\"v1.7.1\"},{\"name\":\"pathInRepo\",\"value\":\"stepaction/git-clone/git-clone.yaml\"}],\"resolver\":\"git\"}}","at":0}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: cache\n    ref: v4\nwith:\n    key:\n        lit: go-mod\n    path:\n        lit: ~/go/pkg/mod\next:\n    gha:\n        _derived_id: true\nid: build-step-2\nkind: action\n","at":1,"seq":1}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: cache\n    ref: v4\nwith:\n    key:\n        lit: go-mod\n    path:\n        lit: ~/go/pkg/mod\nid: build-step-2\nkind: action\n","at":1,"seq":1}
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-3
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-4
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-4
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\next:\n    gha:\n        _derived_id: true\nid: build-step-4\nkind: action\n","wrote":"{\"image\":\"alpine:3.22\",\"name\":\"build-step-4\",\"script\":\"set -e\\nmkdir -p '/pipemaster/artifacts/dist'\\ntar -cf - 'dist/' | tar -xf - -C '/pipemaster/artifacts/dist'\"}","at":2,"seq":2}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\nid: build-step-4\nkind: action\n","wrote":"{\"image\":\"alpine:3.22\",\"name\":\"build-step-4\",\"script\":\"set -e\\nmkdir -p '/pipemaster/artifacts/dist'\\ntar -cf - 'dist/' | tar -xf - -C '/pipemaster/artifacts/dist'\"}","at":2,"seq":2}
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:

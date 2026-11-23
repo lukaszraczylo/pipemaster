@@ -1,0 +1,21 @@
+# pipemaster:emulated job.runner pipeline/ci/job/flaky
+# pipemaster:emulated step.image pipeline/ci/job/flaky/step/flaky-step-1
+# pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo ok"]}
+name: allow
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+jobs:
+  flaky:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      # pipemaster:emulated step.image pipeline/ci/job/flaky/step/flaky-step-1
+      - id: flaky-step-1
+        uses: docker://ubuntu:latest
+        with:
+          entrypoint: /bin/sh
+          args: -ec 'echo ok'

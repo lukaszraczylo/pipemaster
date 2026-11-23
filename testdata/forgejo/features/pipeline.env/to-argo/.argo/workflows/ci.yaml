@@ -1,6 +1,6 @@
 # pipemaster:lost expr.opaque pipeline/ci/job/build: gha.github.run_number
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
-# pipemaster:arg {"step":"ext:\n    gha:\n        _derived_id: true\nid: build-step-1\nkind: script\nscript:\n    - echo ok\n","hold":"{\"args\":[\"echo ok\"],\"command\":[\"sh\",\"-ec\"],\"env\":[{\"name\":\"CGO_ENABLED\",\"value\":\"0\"},{\"name\":\"VERSION\",\"value\":\"3.1\"},{\"name\":\"TOKEN\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"DEPLOY_TOKEN\",\"name\":\"ci-secrets\"}}}],\"image\":\"alpine:3.22\",\"name\":\"build-step-1\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:arg {"step":"id: build-step-1\nkind: script\nscript:\n    - echo ok\n","hold":"{\"args\":[\"echo ok\"],\"command\":[\"sh\",\"-ec\"],\"env\":[{\"name\":\"CGO_ENABLED\",\"value\":\"0\"},{\"name\":\"VERSION\",\"value\":\"3.1\"},{\"name\":\"TOKEN\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"DEPLOY_TOKEN\",\"name\":\"ci-secrets\"}}}],\"image\":\"alpine:3.22\",\"name\":\"build-step-1\",\"workingDir\":\"/workspace\"}"}
 # pipemaster:emulated pipeline.env pipeline/ci
 # pipemaster:arg {"vars":"- name: CGO_ENABLED\n  value:\n    lit: \"0\"\n- name: VERSION\n  value:\n    lit: \"3.1\"\n- name: TOKEN\n  value:\n    secret: DEPLOY_TOKEN\n- name: LABEL\n  value:\n    expr: format('build-{0}', gha.github.run_number)\n","names":["CGO_ENABLED","VERSION","TOKEN","LABEL"]}
 # pipemaster:emulated config.name pipeline/ci/ref/secrets.DEPLOY_TOKEN

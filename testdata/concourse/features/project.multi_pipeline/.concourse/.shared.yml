@@ -1,0 +1,38 @@
+# pipemaster:emulated display.name pipeline/.shared
+# pipemaster:arg {"name":"shared","id":".shared","written":".shared","kind":"pipeline"}
+# pipemaster:emulated job.manual pipeline/.shared/job/run
+# pipemaster:arg {"manual":false,"held":true}
+# pipemaster:emulated ext.passthrough pipeline/.shared
+# pipemaster:emulated job.runner pipeline/.shared/job/run
+# pipemaster:emulated trigger.manual pipeline/.shared/job/run
+# pipemaster:emulated step.image pipeline/.shared/job/run/step/run-step-1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: run
+    plan:
+      - get: source
+      - task: run-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo run
+        tags:
+          - ubuntu-latest

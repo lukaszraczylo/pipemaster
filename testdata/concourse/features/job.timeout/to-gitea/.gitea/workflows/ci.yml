@@ -1,0 +1,21 @@
+# pipemaster:emulated job.runner pipeline/ci/job/build
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo ok"]}
+name: timeout
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+      - id: build-step-1
+        uses: docker://ubuntu:latest
+        with:
+          entrypoint: /bin/sh
+          args: -ec 'echo ok'

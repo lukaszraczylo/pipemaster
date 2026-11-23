@@ -1,0 +1,71 @@
+# pipemaster:emulated step.action pipeline/ci/job/call/step/call-step-1
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'self:'\n    owner: org\n    repo: shared\n    path: .gitea/workflows/build.yml\n    ref: main\next:\n    gha:\n        _derived_id: true\nid: call-step-1\nkind: pipeline_call\n","task":"call-step-1","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"call-step-1\"}"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/call/carry
+# pipemaster:arg {"digest":"176ad586d40aa9296c62e380b4f8c7884cba86737229712a525c872a401ae90f","carry":"id: call\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/plain/step/plain-step-1/carry
+# pipemaster:arg {"digest":"20a69744fee66afc9d6f83fe356a639bebe7351ddcbe7af86d3aa78ceb94ef40","carry":"id: plain-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/plain/carry
+# pipemaster:arg {"digest":"b5c91c2e9d544de3323a748ddf78d1b6427f7ba9927f13a67280c9a250127b8a","carry":"id: plain\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"42516277b815005ac96966b3b0f0c44c8d2d03296ba9d6d69ba87d78b52281ef","carry":"id: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/plain
+# pipemaster:emulated step.image pipeline/ci/job/plain/step/plain-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: call
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: call-step-1
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          run:
+            path: sh
+            args:
+              - -ec
+              - "true"
+  - name: plain
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: plain-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo ok
+        tags:
+          - ubuntu-latest

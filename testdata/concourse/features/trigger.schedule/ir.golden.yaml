@@ -1,0 +1,75 @@
+origin:
+    provider: concourse
+    dialect: concourse
+    files:
+        - .concourse/ci.yml
+pipelines:
+    - ext:
+        concourse:
+            resources:
+                - name: source
+                  source:
+                    uri: ((git-uri))
+                  type: git
+                - name: schedule
+                  source:
+                    days:
+                        - Sunday
+                    start: "00:00"
+                    stop: "00:05"
+                  type: time
+                - name: schedule-2
+                  source:
+                    days:
+                        - Monday
+                        - Tuesday
+                        - Wednesday
+                        - Thursday
+                        - Friday
+                    start: "05:30"
+                    stop: "05:35"
+                  type: time
+      id: ci
+      name: nightly
+      triggers:
+        - ext:
+            concourse:
+                resources:
+                    - schedule
+          kind: schedule
+          cron: 0 0 * * 0
+        - ext:
+            concourse:
+                resources:
+                    - schedule-2
+          kind: schedule
+          cron: 30 5 * * 1-5
+      jobs:
+        - ext:
+            concourse:
+                gets:
+                    - get: source
+                    - get: schedule
+                      trigger: true
+                    - get: schedule-2
+                      trigger: true
+          id: build
+          steps:
+            - image:
+                ref: ubuntu:latest
+              ext:
+                concourse:
+                    config:
+                        inputs:
+                            - name: workspace
+                        outputs:
+                            - name: workspace
+                        platform: linux
+                    input_mapping:
+                        workspace: source
+                    tags:
+                        - ubuntu-latest
+              id: build-step-1
+              kind: script
+              script:
+                - echo ok

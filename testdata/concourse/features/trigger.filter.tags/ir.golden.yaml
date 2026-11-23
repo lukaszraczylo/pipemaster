@@ -1,0 +1,66 @@
+origin:
+    provider: concourse
+    dialect: concourse
+    files:
+        - .concourse/ci.yml
+pipelines:
+    - ext:
+        concourse:
+            resources:
+                - name: source-tags
+                  source:
+                    tag_filter: v[0-9]+.[0-9]+.[0-9]+
+                    uri: ((git-uri))
+                  type: git
+                - name: source-tags-2
+                  source:
+                    tag_filter: '!v*-rc*'
+                    uri: ((git-uri))
+                  type: git
+      id: ci
+      name: tags
+      triggers:
+        - ext:
+            concourse:
+                resources:
+                    - source-tags-2
+          kind: tag
+          tags:
+            include:
+                - '!v*-rc*'
+        - ext:
+            concourse:
+                resources:
+                    - source-tags
+          kind: tag
+          tags:
+            include:
+                - v[0-9]+.[0-9]+.[0-9]+
+      jobs:
+        - ext:
+            concourse:
+                gets:
+                    - get: source-tags
+                      trigger: true
+                    - get: source-tags-2
+                      trigger: true
+          id: build
+          steps:
+            - image:
+                ref: ubuntu:latest
+              ext:
+                concourse:
+                    config:
+                        inputs:
+                            - name: workspace
+                        outputs:
+                            - name: workspace
+                        platform: linux
+                    input_mapping:
+                        workspace: source-tags
+                    tags:
+                        - ubuntu-latest
+              id: build-step-1
+              kind: script
+              script:
+                - echo ok

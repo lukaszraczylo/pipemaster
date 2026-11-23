@@ -1,0 +1,49 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"ci","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
+# pipemaster:arg {"digest":"453016804990377547f7a3183847c060e3368ca1e6893d6cb2b68e1367df37f6","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
+# pipemaster:arg {"digest":"f8c636aee13dda81df9ff22d30898a394ead44fa324dfcb14831c5cf17e8d62b","carry":"id: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"77585707a709079490d29076ae4634dea501301181d9cf627a8c13aea0585f3a","carry":"id: ci\nname: ci\ntriggers:\n    - kind: push\n      branches:\n        include:\n            - main\n            - develop\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+resources:
+  - name: source-main
+    type: git
+    source:
+      uri: ((git-uri))
+      branch: main
+  - name: source-develop
+    type: git
+    source:
+      uri: ((git-uri))
+      branch: develop
+jobs:
+  - name: build
+    plan:
+      - get: source-main
+        trigger: true
+      - get: source-develop
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source-main
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo ok

@@ -1,0 +1,39 @@
+# pipemaster:emulated job.environment.approval pipeline/drone/job/deploy
+# pipemaster:arg {"environment":{"Name":"production","URL":"","Approval":true}}
+# pipemaster:emulated step.image pipeline/drone/job/deploy
+# pipemaster:arg {"steps":{"deploy":"ref: alpine:3.20\n"},"wrote":{"deploy":"alpine:3.20"}}
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: drone
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: deploy-gate
+            template: deploy-gate
+          - name: deploy
+            template: deploy
+            dependencies:
+              - deploy-gate
+    - name: deploy-gate
+      suspend: {}
+    - name: deploy
+      containerSet:
+        containers:
+          - name: deploy
+            image: alpine:3.20
+            command:
+              - sh
+              - -ec
+            args:
+              - ./deploy.sh
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

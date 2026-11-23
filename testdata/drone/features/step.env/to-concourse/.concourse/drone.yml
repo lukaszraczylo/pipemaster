@@ -1,0 +1,39 @@
+# pipemaster:emulated ext.passthrough pipeline/drone/job/ci/step/build/carry
+# pipemaster:arg {"digest":"84fef655ec346626b72885d1165a57e1f48def1b1ff22dd258d4a1a0e10f3870","carry":"image:\n    ref: golang:1.25\nid: build\nkind: script\nenv:\n    - name: GOFLAGS\n      value:\n        lit: -trimpath\n    - name: TOKEN\n      value:\n        secret: deploy_token\n"}
+# pipemaster:emulated ext.passthrough pipeline/drone/job/ci/carry
+# pipemaster:arg {"digest":"d163b4d08f2044b31ec654180a03befc8a6197e674769324063943631977a40d","carry":"id: ci\n"}
+# pipemaster:emulated ext.passthrough pipeline/drone/carry
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: drone\ntriggers:\n    - kind: push\n"}
+# pipemaster:emulated ext.passthrough pipeline/drone
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: ci
+    plan:
+      - get: source
+        trigger: true
+      - task: build
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+              tag: "1.25"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          params:
+            GOFLAGS: -trimpath
+            TOKEN: ((deploy_token))
+          run:
+            path: sh
+            args:
+              - -ec
+              - go build ./...

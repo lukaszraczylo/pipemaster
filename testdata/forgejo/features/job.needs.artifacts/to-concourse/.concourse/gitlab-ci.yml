@@ -1,0 +1,109 @@
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/step/script/carry
+# pipemaster:arg {"digest":"327ca5f5ea0d29ae14bc221e8ada2ee7315766877c3c4ca8b47beb54f762cdeb","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/carry
+# pipemaster:arg {"digest":"d29dd631b94e918ddd68a2c5abd3ad884272716a7c304b10b0c0e584b746c393","carry":"id: compile\nartifacts:\n    - paths:\n        - bin/\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/docs/step/script/carry
+# pipemaster:arg {"digest":"c48dea39f77c6036fd8211ec5bb6ef45291f6a6431d4c87400d6007946c935e6","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/docs/carry
+# pipemaster:arg {"digest":"e72191fca0a6049fdb62cefaabf1d6b6d2bef88c1005d12f8e7c369ddc791257","carry":"id: docs\nneeds:\n    - job: compile\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/unit/step/script/carry
+# pipemaster:arg {"digest":"ad179a31a0c137ad8c0b6dbf4a1159f896ef2fc927dadce86430a7ba09aba60a","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/unit/carry
+# pipemaster:arg {"digest":"1f9cc158e0e23a05df1abff3328333d366e759f6d71499115a2540247afb4964","carry":"id: unit\nneeds:\n    - job: compile\n      artifacts: true\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"52022eb20a9d46380bf82027397ec0061a6888534d3356eab57ea7e117d6da6d","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/compile/step/script
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/docs/step/script
+# pipemaster:emulated job.needs.artifacts pipeline/gitlab-ci/job/unit
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/unit/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: compile
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make
+  - name: docs
+    plan:
+      - get: source
+        passed:
+          - compile
+        trigger: true
+      - get: source-tags
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make docs
+  - name: unit
+    plan:
+      - get: source
+        passed:
+          - compile
+        trigger: true
+      - get: source-tags
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make test

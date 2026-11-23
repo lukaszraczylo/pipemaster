@@ -1,0 +1,97 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"matrix multi axis","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/prod/step/prod-step-1/carry
+# pipemaster:arg {"digest":"463773d19898dc8c82dba4b9949db2cc9b8e04b250637426f5880fbb6f38d3bf","carry":"id: prod-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/prod/carry
+# pipemaster:arg {"digest":"d93aa84ead6a77aa8153fe4e132f1cd545e4ad025e4e2f0ec426dc151fd2a94d","carry":"id: prod\nrunner:\n    labels:\n        - ubuntu-latest\noutputs:\n    - name: ver\n      value: v1\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
+# pipemaster:arg {"digest":"630abe58124079e355e0c0889a52fb21777234de559d4393a3f1f674762f121b","carry":"id: test-step-1\nkind: script\nscript:\n    - echo $\u007b{ matrix.os }} $\u007b{ matrix.go }} $\u007b{ needs.prod.outputs.ver }}\n"}
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"matrix":"axes:\n    - name: os\n      values:\n        - linux\n        - mac\n    - name: go\n      values:\n        - \"1.24\"\n        - \"1.25\"\nexclude:\n    - - key: go\n        value: \"1.24\"\n      - key: os\n        value: mac\n","across":"[{\"max_in_flight\":\"all\",\"values\":[{\"go\":\"1.24\",\"os\":\"linux\"},{\"go\":\"1.25\",\"os\":\"linux\"},{\"go\":\"1.25\",\"os\":\"mac\"}],\"var\":\"matrix\"}]"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
+# pipemaster:arg {"digest":"670192584e19edc5c5a3315b7de1c1c5f4f0f082c3b337d994564ab1f0097b8b","carry":"matrix:\n    axes:\n        - name: os\n          values:\n            - linux\n            - mac\n        - name: go\n          values:\n            - \"1.24\"\n            - \"1.25\"\n    exclude:\n        - - key: go\n            value: \"1.24\"\n          - key: os\n            value: mac\nid: test\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: prod\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"679d95435dfb91da2a4c7011b70236d262e33cd721e8e60f8e278420d8e54597","carry":"id: ci\nname: matrix multi axis\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/prod
+# pipemaster:emulated step.image pipeline/ci/job/prod/step/prod-step-1
+# pipemaster:emulated job.runner pipeline/ci/job/test
+# pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: prod
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: prod-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make
+        tags:
+          - ubuntu-latest
+  - name: test
+    plan:
+      - get: source
+        passed:
+          - prod
+        trigger: true
+      - get: source-tags
+      - do:
+          - task: test-step-1
+            input_mapping:
+              workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: ubuntu
+                  tag: latest
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              run:
+                path: sh
+                args:
+                  - -ec
+                  - '# pipemaster:lost echo {{ matrix.os }} {{ matrix.go }} {{ needs.prod.outputs.ver }}'
+            tags:
+              - ubuntu-latest
+        across:
+          - var: matrix
+            values:
+              - go: "1.24"
+                os: linux
+              - go: "1.25"
+                os: linux
+              - go: "1.25"
+                os: mac
+            max_in_flight: all

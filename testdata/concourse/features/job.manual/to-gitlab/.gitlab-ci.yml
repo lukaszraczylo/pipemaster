@@ -1,0 +1,8 @@
+workflow:
+  rules:
+    - when: never
+deploy:
+  needs: []
+  script:
+    - make deploy
+  when: manual

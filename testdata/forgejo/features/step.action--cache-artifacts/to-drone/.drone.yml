@@ -1,10 +1,10 @@
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: checkout\n    ref: v4\next:\n    gha:\n        _derived_id: true\nid: build-step-1\nkind: action\n","at":0}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: checkout\n    ref: v4\nid: build-step-1\nkind: action\n","at":0}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: cache\n    ref: v4\nwith:\n    key:\n        lit: go-mod\n    path:\n        lit: ~/go/pkg/mod\next:\n    gha:\n        _derived_id: true\nid: build-step-2\nkind: action\n","at":0}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: cache\n    ref: v4\nwith:\n    key:\n        lit: go-mod\n    path:\n        lit: ~/go/pkg/mod\nid: build-step-2\nkind: action\n","at":0}
 # pipemaster:emulated job.container pipeline/ci/job/build
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-4
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\next:\n    gha:\n        _derived_id: true\nid: build-step-4\nkind: action\n","at":1}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\nid: build-step-4\nkind: action\n","at":1}
 kind: pipeline
 type: docker
 name: build
@@ -20,7 +20,7 @@ steps:
 ---
 # pipemaster:lost step pipeline/ci/job/test/step/test-step-1 downloads dist
 # pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\next:\n    gha:\n        _derived_id: true\nid: test-step-1\nkind: action\n","at":0}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\nid: test-step-1\nkind: action\n","at":0}
 # pipemaster:emulated job.container pipeline/ci/job/test
 kind: pipeline
 type: docker

@@ -1,0 +1,43 @@
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/build-step-1/carry
+# pipemaster:arg {"digest":"59b02dc381bde33cb5aee4f0677f8d4010c7bec0fd5c5319be6e8f2c94b8a21f","carry":"id: build-step-1\nkind: script\nenv:\n    - name: GREETING\n      value:\n        lit: hello\n    - name: MODE\n      value:\n        lit: fast\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
+# pipemaster:arg {"digest":"76bb4cd6ba7f1261f4f331f28a0132898e70010ef82cf80883f5cd7625ce082a","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/build-step-1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          params:
+            GREETING: hello
+            MODE: fast
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo "$GREETING"
+        tags:
+          - ubuntu-latest

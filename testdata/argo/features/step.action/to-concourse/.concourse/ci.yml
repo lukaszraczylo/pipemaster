@@ -1,0 +1,87 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"action","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v4\nwith:\n    fetch-depth:\n        lit: \"0\"\n    token:\n        secret: PAT\nid: build-step-1\nkind: action\n","task":"build-step-1","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"build-step-1\"}"}
+# pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: setup-go\n    ref: v5\nwith:\n    go-version:\n        lit: \"1.24\"\nid: build-step-2\nkind: action\n","task":"build-step-2","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"build-step-2\"}","image":"golang:1.24"}
+# pipemaster:lost uses: docker://alpine:3.20
+# pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-3
+# pipemaster:arg {"step":"action:\n    kind: docker\n    image: alpine:3.20\nid: build-step-3\nkind: action\n","task":"build-step-3","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"build-step-3\"}"}
+# pipemaster:lost uses: ./.github/actions/setup
+# pipemaster:emulated step.action pipeline/ci/job/build/step/local
+# pipemaster:arg {"step":"action:\n    kind: local\n    path: ./.github/actions/setup\nid: local\nkind: action\n","task":"local","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"local\"}"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
+# pipemaster:arg {"digest":"5fc10e0a1f85de289d87bda0644132b92a3095484c9749f646bbe17246ef0982","carry":"id: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: action\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          run:
+            path: sh
+            args:
+              - -ec
+              - "true"
+      - task: build-step-2
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          run:
+            path: sh
+            args:
+              - -ec
+              - "true"
+      - task: build-step-3
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          run:
+            path: sh
+            args:
+              - -ec
+              - "true"
+      - task: local
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          run:
+            path: sh
+            args:
+              - -ec
+              - "true"

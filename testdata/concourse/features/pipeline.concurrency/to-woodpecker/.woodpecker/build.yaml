@@ -1,0 +1,14 @@
+# pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/1
+when:
+  - event: push
+    branch: main
+  - event: tag
+    ref: refs/tags/*
+concurrency:
+  limit: 1
+  group: ci-${CI_COMMIT_REF}
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok

@@ -1,0 +1,21 @@
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:arg {"kind":"push","branches":{"Include":["main"],"Exclude":null}}
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+# pipemaster:arg {"kind":"tag","tags":{"Include":["*"],"Exclude":null}}
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_TAG =~ /^[^\/]*$/
+build:
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - echo cleanup
+    # pipemaster:step build-step-2
+    # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
+    # pipemaster:arg "false"
+    # pipemaster:lost step.if pipeline/ci/job/build/step/build-step-2: event == 'push'
+    - |
+      if false; then
+      echo push
+      fi

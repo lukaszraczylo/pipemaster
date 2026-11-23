@@ -1,0 +1,14 @@
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - cron
+  cron:
+    - ci-schedule-0
+    - ci-schedule-1
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok

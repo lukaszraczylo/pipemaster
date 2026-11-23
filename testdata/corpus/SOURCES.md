@@ -1,10 +1,10 @@
 # Corpus sources
 
 Real-world CI pipelines stored verbatim for `TestCorpus` (`internal/roundtrip/corpus_test.go`).
-The directory of an entry is `testdata/corpus/<#>-<gha, gitea, forgejo, gitlab, woodpecker, drone, tekton or argo>-<slug>`.
+The directory of an entry is `testdata/corpus/<#>-<gha, gitea, forgejo, gitlab, woodpecker, drone, tekton, argo or concourse>-<slug>`.
 Every file is byte-identical to the file at the pinned commit; the test run does not edit them.
 
-- Fetch date: 2026-11-18 for entries 01 to 27, 2026-11-19 for entries 28 to 40 and 2026-11-20 for entries 41 to 50 and 2026-11-21 for entries 51 to 71 and 2026-11-22 for entries 72 to 79.
+- Fetch date: 2026-11-18 for entries 01 to 27, 2026-11-19 for entries 28 to 40 and 2026-11-20 for entries 41 to 50 and 2026-11-21 for entries 51 to 71 and 2026-11-22 for entries 72 to 79 and 2026-11-23 for entries 81 to 86.
 - Each repository is public, and its licence was read before use: from the host API (GitHub `license.spdx_id`, GitLab `license.key`), or, for entries 28 to 40,
   from the `LICENSE` file of the repository at the pinned commit.
   Every licence is MIT, Apache-2.0, BSD-3-Clause or, for entry 60 only, MPL-2.0. Entries 63 to 71 are Apache-2.0. Entry 72 is BSD-3-Clause, entry 73, 74 and 75 are Apache-2.0, entries 76 and 78 are MIT, entry 77 is Apache-2.0 and entry 79 is BSD-3-Clause.
@@ -99,6 +99,11 @@ Every file is byte-identical to the file at the pinned commit; the test run does
 | 77 | argocd-handson | Argo | <https://github.com/yoonjk/argocd-handson> | `13be905bf5b102d4f0d9d6e0a9e8894cee7411af` | Apache-2.0 | `lab07/01/ci-workflowtemplate-buildah-commit.yaml`<br>`lab07/01/ci-sensor.yaml`<br>`lab05/02/sensor.yaml`<br>`lab05/02/eventsource.yaml` |
 | 78 | kind-argo-lab | Argo | <https://github.com/hortonew/kind-argo-lab> | `01b11d9c8a79c10f2e57ee78005fb8442608a9d1` | MIT | `charts/argo-workflows/templates/kaniko-build-workflowtemplate.yaml`<br>`charts/argo-events/templates/sensor-workflow-trigger.yaml`<br>`charts/argo-events/templates/eventsource-gitea.yaml` |
 | 79 | smiggiddy-argo | Argo | <https://github.com/smiggiddy/argo> | `86f4924023551cab7571943e74477873af7fd43c` | BSD-3-Clause | `argo-workflows/templates/buildkit.yaml`<br>`argo-workflows/build-excalidraw.yaml` |
+| 81 | bosh | Concourse | <https://github.com/cloudfoundry/bosh> | `404e4581039fe17c25123e11f0da99cd07769908` | Apache-2.0 | `ci/pipeline.yml` (stored as `.concourse/pipeline.yml`) |
+| 83 | 7f-ephemeral-pipelines | Concourse | <https://github.com/7Factor/7f-ephemeral-pipelines> | `0cd32f821c464bb10651fe5c0d8f74b2a1d3f4ba` | MIT | `ci/pipelines/pipeline.yml` (stored as `.concourse/pipeline.yml`) |
+| 84 | setup-runtime-resource | Concourse | <https://github.com/SoluReal/setup-runtime-resource> | `30302fcc420a45abbd1488489087b116527ecd73` | MIT | `ci/pipeline.yml` (stored as `.concourse/pipeline.yml`) |
+| 85 | cli-ci | Concourse | <https://github.com/cloudfoundry/cli-ci> | `7f253f00b18907571ab18f16476d5431f8ddea3a` | Apache-2.0 | `ci/cli-release/pipeline.yml` (stored as `.concourse/cli-release.yml`)<br>`ci/cli-v8-toolsmiths/pipeline.yml` (stored as `.concourse/cli-v8-toolsmiths.yml`) |
+| 86 | capi-ci | Concourse | <https://github.com/cloudfoundry/capi-ci> | `889f7ae99544ba51a1b2a60f758a51b01c5a377b` | Apache-2.0 | `ci/cve-pipeline.yml` (stored as `.concourse/cve-pipeline.yml`) |
 
 Woodpecker entries (41 to 50):
 
@@ -133,3 +138,12 @@ Argo entries (72 to 75):
 - Entries 72 to 74 keep the file name of the source path, in `.argo/`. Entry 75 keeps the subdirectories `event-sources/` and `sensors/`, and holds `.argo/dag-diamond.yaml` from entry 74, so that a Workflow exists for the Sensor to run.
 - Entries 76 to 79 are rows 2, 4, 5 and 6 of section 8 of `docs/superpowers/research/argo.md`, copied byte for byte from the pinned commit into `.argo/` with the file name of the source path. Entry 76 holds two ClusterWorkflowTemplates and no workflow, entry 77 holds a template with no entrypoint, a Sensor and a webhook EventSource, and entry 79 holds a Workflow that only names a WorkflowTemplate. Those shapes parse into a pipeline with no job, with the documents kept in Ext.
 - Not stored, because the pinned file does not parse or does not round trip: `ci-workflow-s3.yml` of pipekit (a `parameters` key under `spec`, which the Argo schema rejects), `git-checkout-pr.yml` of pipekit (its tags read workflow parameters that no file declares), and `cron-workflow.yaml` of argo-workflows (the schedule is every minute, which the GHA linter rejects). The Helm-templated files of the research list are not stored. The entry numbers are not reused.
+
+Concourse entries (81 to 86):
+
+- Rows 2, 5, 6, 7 and 8 of section 8 of `docs/superpowers/research/concourse.md`. The raw URL is `https://raw.githubusercontent.com/<repository>/<commit>/<path>`. Every file is byte-identical to the file at the pinned commit, and `fly validate-pipeline --strict` (fly 8.3.3) accepts each one.
+- The licence text was read at the pinned commit before use: Apache License 2.0 (`LICENSE`) for the Apache-2.0 entries, and the MIT text for entries 83 and 84. Each file holds only `((var))` references.
+- SHA-256: entry 81 `5939f6ff52fd71282ca78d0ec09c57f35a028dba2e56ed717c5c91bdaaf6bc4a`, 83 `8bcf00edf536b106492e63ef7658cb833cee470d11efdcef22dae94b699f3e1d`, 84 `2466e172c8a4b508a702b78a72f6464a6cc6b6365ae1010b4688ab78633bcc79`, 85 `cli-release.yml` `0aab42bcaf4bee6e5974a96e68874d1cb03310df6be428416166e32bf2162324`, 85 `cli-v8-toolsmiths.yml` `d696bcf16dd394d92e36c7ba59b874768d8218bd08179fa32cb92cd98a992e2c`, 86 `5fdd02d49aee46e1e45ff8c96ce36edfbb481556d3a88968a46586c172f5cb9d`.
+- The two files of entry 85 take distinct names because a pipeline ID is the file base name and both sources are called `pipeline.yml`.
+- Entry 80 (row 1, concourse/examples `pipelines/multi-branch/parent.yml`) and entry 82 (row 3, cloudfoundry/bosh-backup-and-restore `ci/pipeline.yml`) are not in the corpus: `fly validate-pipeline --strict` rejects them although the plain command accepts them. Row 1 has a `((instance_pipeline_name))` set_pipeline identifier that 8.3.3 flags as a deprecation, and strict mode turns a deprecation into an error. Row 3 holds top-level anchor holder keys that strict mode reports as unknown fields. The entry numbers do not shift. Row 4 and the flagged rows are not used.
+- Entry 86 is also the file `testdata/concourse/capi-ci-cve-pipeline.yml`, which the parser tests read.

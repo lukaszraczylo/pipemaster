@@ -1,0 +1,90 @@
+origin:
+    provider: concourse
+    dialect: concourse
+    files:
+        - .concourse/ci.yml
+pipelines:
+    - ext:
+        concourse:
+            resources:
+                - name: source
+                  source:
+                    branch: main
+                    uri: ((git-uri))
+                  type: git
+                - name: source-tags
+                  source:
+                    tag_filter: '*'
+                    uri: ((git-uri))
+                  type: git
+      id: ci
+      name: matrix
+      triggers:
+        - ext:
+            concourse:
+                resources:
+                    - source
+          kind: push
+          branches:
+            include:
+                - main
+        - ext:
+            concourse:
+                resources:
+                    - source-tags
+          kind: tag
+          tags:
+            include:
+                - '*'
+      jobs:
+        - matrix:
+            fail_fast: false
+            axes:
+                - name: os
+                  values:
+                    - ubuntu-latest
+                    - macos-latest
+                - name: go
+                  values:
+                    - "1.24"
+                    - "1.25"
+            include:
+                - - key: experimental
+                    value: "true"
+                  - key: go
+                    value: "1.25"
+                  - key: os
+                    value: ubuntu-latest
+            exclude:
+                - - key: go
+                    value: "1.24"
+                  - key: os
+                    value: macos-latest
+            max_parallel: 2
+          ext:
+            concourse:
+                gets:
+                    - get: source
+                      trigger: true
+                    - get: source-tags
+                      trigger: true
+          id: test
+          steps:
+            - image:
+                ref: ubuntu:latest
+              ext:
+                concourse:
+                    config:
+                        inputs:
+                            - name: workspace
+                        outputs:
+                            - name: workspace
+                        platform: linux
+                    input_mapping:
+                        workspace: source
+                    tags:
+                        - ${{ matrix.os }}
+              id: test-step-1
+              kind: script
+              script:
+                - echo ${{ matrix.go }}

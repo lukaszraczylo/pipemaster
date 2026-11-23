@@ -1,0 +1,41 @@
+# pipemaster:emulated job.manual pipeline/gitlab-ci/job/deploy
+# pipemaster:arg {"manual":true}
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/deploy
+# pipemaster:arg {"steps":{"script":"ref: ubuntu:latest\n"},"wrote":{"script":"ubuntu:latest"}}
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: gitlab-ci
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: deploy-gate
+            template: deploy-gate
+          - name: deploy
+            template: deploy
+            dependencies:
+              - deploy-gate
+            continueOn:
+              failed: true
+    - name: deploy-gate
+      suspend: {}
+    - name: deploy
+      containerSet:
+        containers:
+          - name: script
+            image: ubuntu:latest
+            command:
+              - sh
+              - -ec
+            args:
+              - make deploy
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

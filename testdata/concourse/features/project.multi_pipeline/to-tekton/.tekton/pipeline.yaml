@@ -1,0 +1,23 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  # pipemaster:id .shared
+  name: shared
+spec:
+  displayName: shared
+  tasks:
+    - name: run
+      taskRef:
+        name: shared-run
+---
+# pipemaster:emulated project.multi_pipeline pipeline/ci
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: CI
+  tasks:
+    - name: build
+      taskRef:
+        name: ci-build

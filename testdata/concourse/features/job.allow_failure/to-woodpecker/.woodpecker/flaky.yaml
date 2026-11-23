@@ -1,0 +1,13 @@
+# pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/1
+# pipemaster:emulated job.allow_failure pipeline/ci/job/flaky
+when:
+  - event: push
+    branch: main
+  - event: tag
+    ref: refs/tags/*
+steps:
+  - name: flaky-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok
+    failure: ignore

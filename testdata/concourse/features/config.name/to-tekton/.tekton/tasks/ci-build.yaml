@@ -1,0 +1,25 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-build
+spec:
+  steps:
+    - name: build-step-1
+      image: ubuntu:latest
+      script: echo "${REGION}"
+      env:
+        - name: KEY
+          valueFrom:
+            secretKeyRef:
+              name: ci-secrets
+              key: DEPLOY_KEY
+        - name: API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ci-secrets
+              key: API_TOKEN
+        - name: REGION
+          valueFrom:
+            configMapKeyRef:
+              name: ci-vars
+              key: REGION

@@ -1,0 +1,18 @@
+# pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/1
+# pipemaster:emulated trigger.filter.paths pipeline/ci
+# pipemaster:arg "- ext:\n    concourse:\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n  paths:\n    include:\n        - src/**\n        - '!src/docs/**'\n- ext:\n    concourse:\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n  paths:\n    include:\n        - src/**\n        - '!src/docs/**'\n"
+when:
+  - event: push
+    branch: main
+    path:
+      include:
+        - src/**
+      exclude:
+        - src/docs/**
+  - event: tag
+    ref: refs/tags/*
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok

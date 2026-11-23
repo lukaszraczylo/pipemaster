@@ -1,0 +1,15 @@
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"axes":[{"Name":"os","Values":["ubuntu-latest","macos-latest"]},{"Name":"go","Values":["1.24","1.25"]}],"exclude":[[{"Key":"go","Value":"1.24"},{"Key":"os","Value":"macos-latest"}]],"include":[[{"Key":"experimental","Value":"true"},{"Key":"go","Value":"1.25"},{"Key":"os","Value":"ubuntu-latest"}]]}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-test
+spec:
+  params:
+    - name: os
+    - name: go
+    - name: experimental
+  steps:
+    - name: test-step-1
+      image: ubuntu:latest
+      script: echo $(params.go)

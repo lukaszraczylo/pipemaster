@@ -1,0 +1,16 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: stepif
+  params:
+    - name: ctx-event
+      default: ""
+  tasks:
+    - name: build
+      taskRef:
+        name: ci-build
+      params:
+        - name: ctx-event
+          value: $(params.ctx-event)

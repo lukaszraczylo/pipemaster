@@ -1,0 +1,50 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"cond","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/step/deploy-step-1/carry
+# pipemaster:arg {"digest":"7b5d01634cba214907386f9727c3ad41ed7020dd740428f54539932be71db11b","carry":"id: deploy-step-1\nkind: script\n"}
+# pipemaster:emulated job.manual pipeline/ci/job/deploy
+# pipemaster:arg {"manual":false,"held":true}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry
+# pipemaster:arg {"digest":"e72f33e98a0080047bbbc5c7ef6c19d68835bf758d6fb5f78969149adb4b5e8d","carry":"if: (ref == 'refs/heads/main') \u0026\u0026 (event == 'push')\nid: deploy\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: ci\nname: cond\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/deploy
+# pipemaster:emulated step.image pipeline/ci/job/deploy/step/deploy-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: deploy
+    plan:
+      - get: source
+      - get: source-tags
+      - task: deploy-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo deploy
+        tags:
+          - ubuntu-latest

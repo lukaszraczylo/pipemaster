@@ -1,0 +1,62 @@
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/test/step/script/carry
+# pipemaster:arg {"digest":"ad179a31a0c137ad8c0b6dbf4a1159f896ef2fc927dadce86430a7ba09aba60a","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated job.matrix pipeline/gitlab-ci/job/test
+# pipemaster:arg {"matrix":"include:\n    - - key: GO\n        value: \"1.21\"\n      - key: OS\n        value: linux\n    - - key: GO\n        value: \"1.21\"\n      - key: OS\n        value: mac\n    - - key: GO\n        value: \"1.22\"\n      - key: OS\n        value: linux\n    - - key: GO\n        value: \"1.22\"\n      - key: OS\n        value: mac\n    - - key: GO\n        value: \"1.20\"\n      - key: OS\n        value: linux\n","across":"[{\"max_in_flight\":\"all\",\"values\":[{\"GO\":\"1.21\",\"OS\":\"linux\"},{\"GO\":\"1.21\",\"OS\":\"mac\"},{\"GO\":\"1.22\",\"OS\":\"linux\"},{\"GO\":\"1.22\",\"OS\":\"mac\"},{\"GO\":\"1.20\",\"OS\":\"linux\"}],\"var\":\"matrix\"}]"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/test/carry
+# pipemaster:arg {"digest":"c68a673a1110e4b7337716227be5a43550c8120b1f372a70e6081ad5ef5daec6","carry":"matrix:\n    include:\n        - - key: GO\n            value: \"1.21\"\n          - key: OS\n            value: linux\n        - - key: GO\n            value: \"1.21\"\n          - key: OS\n            value: mac\n        - - key: GO\n            value: \"1.22\"\n          - key: OS\n            value: linux\n        - - key: GO\n            value: \"1.22\"\n          - key: OS\n            value: mac\n        - - key: GO\n            value: \"1.20\"\n          - key: OS\n            value: linux\nid: test\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/test/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: test
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - do:
+          - task: script
+            input_mapping:
+              workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: ubuntu
+                  tag: latest
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              run:
+                path: sh
+                args:
+                  - -ec
+                  - make test
+        across:
+          - var: matrix
+            values:
+              - GO: "1.21"
+                OS: linux
+              - GO: "1.21"
+                OS: mac
+              - GO: "1.22"
+                OS: linux
+              - GO: "1.22"
+                OS: mac
+              - GO: "1.20"
+                OS: linux
+            max_in_flight: all

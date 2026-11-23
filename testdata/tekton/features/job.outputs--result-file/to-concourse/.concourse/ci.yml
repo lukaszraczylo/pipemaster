@@ -1,0 +1,77 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"outputs","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/use/step/use-step-1/carry
+# pipemaster:arg {"digest":"b25f0636c980a0bf7eaeb1098e66c4de76cde6f4fa027623f1a9c46abb0f7012","carry":"id: use-step-1\nkind: script\nscript:\n    - echo $\u007b{ needs.version.outputs.tag }}\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/use/carry
+# pipemaster:arg {"digest":"ade6e38f5bc9cc87acb23113796afc376784b9b9b4ec498e0e4e4a89519ff033","carry":"id: use\nneeds:\n    - job: version\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/version/step/tag/carry
+# pipemaster:arg {"digest":"bcdf9225cb9c482a19d526efa5d2b05df03949fc888ac5183d5ea3d8763b0daa","carry":"image:\n    ref: alpine:3.22\nid: tag\nkind: script\nscript:\n    - printf '%s' v1 \u003e $(results.tag.path)\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/version/carry
+# pipemaster:arg {"digest":"4079fabeab1ecaee4720e2babf2237ed8e55e81880aac994d451bfd3a38666a3","carry":"id: version\noutputs:\n    - name: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"460cb7f788627675abb4989267d447b54c68f62becb6f6e15e95e649c2453e3a","carry":"id: ci\nname: outputs\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated step.image pipeline/ci/job/use/step/use-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: use
+    plan:
+      - get: source
+        passed:
+          - version
+        trigger: true
+      - get: source-tags
+      - task: use-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - '# pipemaster:lost echo {{ needs.version.outputs.tag }}'
+  - name: version
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: tag
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: alpine
+              tag: "3.22"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - printf '%s' v1 > /dev/null

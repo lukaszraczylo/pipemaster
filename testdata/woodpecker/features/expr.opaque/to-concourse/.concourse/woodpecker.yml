@@ -1,0 +1,40 @@
+# pipemaster:emulated step.if pipeline/woodpecker/job/ci/step/release
+# pipemaster:arg {"if":"(event == 'tag') || @opaque('woodpecker', 'when.branch glob \"release/*\"')","script":"./release.sh"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/release/carry
+# pipemaster:arg {"digest":"4a6920f27ba655fe5fdbf8a15f6932ab256371f461148dd34ea5918752d5bec9","carry":"if: (event == 'tag') || @opaque('woodpecker', 'when.branch glob \"release/*\"')\nimage:\n    ref: alpine:3.20\nid: release\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry
+# pipemaster:arg {"digest":"3907daaf2cbc8d288058bf23b0dade061fb9c86745bf4a5854218457e079211a","carry":"id: ci\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: woodpecker\ntriggers:\n    - kind: push\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: ci
+    plan:
+      - get: source
+        trigger: true
+      - task: release
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: alpine
+              tag: "3.20"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - |-
+                exit 0 # pipemaster:guard the step condition has no shell form
+                ./release.sh

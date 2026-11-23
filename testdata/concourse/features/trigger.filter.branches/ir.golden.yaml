@@ -1,0 +1,66 @@
+origin:
+    provider: concourse
+    dialect: concourse
+    files:
+        - .concourse/ci.yml
+pipelines:
+    - ext:
+        concourse:
+            resources:
+                - name: source-main
+                  source:
+                    branch: main
+                    uri: ((git-uri))
+                  type: git
+                - name: source-release-old
+                  source:
+                    branch: '!release/old'
+                    uri: ((git-uri))
+                  type: git
+      id: ci
+      name: branches
+      triggers:
+        - ext:
+            concourse:
+                resources:
+                    - source-release-old
+          kind: push
+          branches:
+            include:
+                - '!release/old'
+        - ext:
+            concourse:
+                resources:
+                    - source-main
+          kind: push
+          branches:
+            include:
+                - main
+      jobs:
+        - ext:
+            concourse:
+                gets:
+                    - get: source-main
+                      trigger: true
+                    - get: source-release-old
+                      trigger: true
+          id: build
+          steps:
+            - image:
+                ref: ubuntu:latest
+              ext:
+                concourse:
+                    config:
+                        inputs:
+                            - name: workspace
+                        outputs:
+                            - name: workspace
+                        platform: linux
+                    input_mapping:
+                        workspace: source-main
+                    tags:
+                        - ubuntu-latest
+              id: build-step-1
+              kind: script
+              script:
+                - echo ok

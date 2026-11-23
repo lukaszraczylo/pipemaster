@@ -1,0 +1,10 @@
+# pipemaster:lost job.if pipeline/ci/job/build: branch == 'main'
+when:
+  - event: push
+    branch: main
+    evaluate: "false"
+steps:
+  - name: build-run
+    image: ubuntu:latest
+    commands:
+      - make

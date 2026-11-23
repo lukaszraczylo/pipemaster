@@ -1,0 +1,4 @@
+Loss report: woodpecker -> concourse
+[lost] pipeline/woodpecker/trigger/0 trigger.schedule (the cron line  has no time resource form; the cron text is kept in this comment and the trigger is not written)
+[emulated] pipeline/woodpecker ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
+[emulated] pipeline/woodpecker/job/ci trigger.manual: get with no trigger (no trigger starts the job, so a person starts it)

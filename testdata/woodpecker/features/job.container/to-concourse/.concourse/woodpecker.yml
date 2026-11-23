@@ -1,0 +1,36 @@
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/test/carry
+# pipemaster:arg {"digest":"fc704c5e0a6e7adaf12b29e75d5c8ffaab2a84fdacb4a33df96ad8d4d244566f","carry":"id: test\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry
+# pipemaster:arg {"digest":"22aae378a84658136567acf3b7702b6a04a616b2b023e1fea90a52396f7791b1","carry":"container:\n    ref: node:22\nid: ci\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: woodpecker\ntriggers:\n    - kind: push\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: ci
+    plan:
+      - get: source
+        trigger: true
+      - task: test
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: node
+              tag: "22"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - npm test

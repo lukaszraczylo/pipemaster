@@ -1,0 +1,20 @@
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/deploy
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/deploy/step/script
+# pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["make deploy"]}
+on:
+  # pipemaster:emulated job.manual pipeline/gitlab-ci/job/deploy
+  workflow_dispatch:
+jobs:
+  # pipemaster:emulated job.manual pipeline/gitlab-ci/job/deploy
+  deploy:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      # pipemaster:emulated step.image pipeline/gitlab-ci/job/deploy/step/script
+      - id: script
+        uses: docker://ubuntu:latest
+        with:
+          entrypoint: /bin/sh
+          args: -ec 'make deploy'

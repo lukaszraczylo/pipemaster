@@ -1,0 +1,11 @@
+# pipemaster:emulated trigger.filter.tags pipeline/gitlab-ci/trigger/1
+when:
+  - event: push
+    branch: main
+  - event: tag
+    ref: refs/tags/*
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make

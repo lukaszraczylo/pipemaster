@@ -1,0 +1,32 @@
+# pipemaster:emulated job.manual pipeline/drone/job/deploy
+# pipemaster:arg {"environment":{"Name":"production","URL":"","Approval":true},"manual":false,"held":true}
+# pipemaster:emulated ext.passthrough pipeline/drone
+# pipemaster:emulated job.environment.approval pipeline/drone/job/deploy
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: deploy
+    plan:
+      - get: source
+      - task: deploy
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: alpine
+              tag: "3.20"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - ./deploy.sh

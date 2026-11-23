@@ -258,6 +258,10 @@ func TestCorpus(t *testing.T) {
 				if f.provider == provider.Tekton && provider.Family(to) != provider.Tekton {
 					checkShellSyntax(t, b.ID(), cross)
 				}
+				if to == provider.Concourse {
+					checkConcourseShells(t, cross, r.toRep)
+					checkPowershellReported(t, cross, r.toRep)
+				}
 
 				c := verdictCounts(r.src, r.toRep)
 				fmt.Fprintf(&summary, "%s %s->%s native=%4d emulated=%4d external=%4d lost=%4d\n", f.name, a.ID(), b.ID(),
@@ -270,4 +274,43 @@ func TestCorpus(t *testing.T) {
 		return
 	}
 	golden.Assert(t, filepath.Join(corpusRoot, corpusSummary), summary.Bytes())
+}
+
+// checkPowershellReported fails when a Concourse task runs under PowerShell with no emulated step.shell entry, because sh -n
+// skips those tasks and the report must say why.
+func checkPowershellReported(t *testing.T, files map[string][]byte, rep *report.Report) {
+	t.Helper()
+	tasks := 0
+	for _, name := range names(files) {
+		n, err := powershellTasks(files[name])
+		if err != nil {
+			t.Errorf("%s: %v", name, err)
+		}
+		tasks += n
+	}
+	entries := 0
+	for _, e := range rep.Entries {
+		if e.Feature == caps.StepShell && e.Level == caps.Emulated && strings.Contains(e.Detail, "-Command") {
+			entries++
+		}
+	}
+	if entries < tasks {
+		t.Errorf("%d PowerShell tasks but %d step.shell entries", tasks, entries)
+	}
+}
+
+// checkConcourseShells runs the syntax check on every Concourse shell task. A script that fails is allowed only
+// when the report says that it may be PowerShell, which the emitter cannot tell from the IR.
+func checkConcourseShells(t *testing.T, files map[string][]byte, rep *report.Report) {
+	t.Helper()
+	reported := 0
+	for _, e := range rep.Entries {
+		if e.Feature == caps.StepShell && e.Level == caps.Lost && strings.Contains(e.Detail, "may be PowerShell") {
+			reported++
+		}
+	}
+	failed := shellFailures(t, provider.Concourse, files)
+	if len(failed) > reported {
+		t.Errorf("%d scripts fail the syntax check and %d are reported as possible PowerShell:\n%s", len(failed), reported, strings.Join(failed, "\n"))
+	}
 }

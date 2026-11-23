@@ -1,0 +1,42 @@
+# pipemaster:emulated step.image pipeline/ci/job/build
+# pipemaster:arg {"steps":{"build-run":"ref: ubuntu:latest\n"},"wrote":{"build-run":"ubuntu:latest"}}
+# pipemaster:emulated script.interpolation pipeline/ci/job/build
+# pipemaster:arg {"vars":{"PM_CTX_BRANCH":"branch"}}
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-branch
+        value: ""
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+    - name: build
+      containerSet:
+        containers:
+          - name: build-run
+            image: ubuntu:latest
+            command:
+              - sh
+              - -ec
+            args:
+              - echo on ${PM_CTX_BRANCH}
+            workingDir: /workspace
+            env:
+              - name: PM_CTX_BRANCH
+                value: '{{workflow.parameters.ctx-branch}}'
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

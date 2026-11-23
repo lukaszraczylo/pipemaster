@@ -1,0 +1,19 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-build
+spec:
+  params:
+    - name: ctx-event
+  steps:
+    - name: build-step-1
+      image: ubuntu:latest
+      script: echo cleanup
+    - name: build-step-2
+      image: ubuntu:latest
+      script: echo push
+      when:
+        - input: $(params.ctx-event)
+          operator: in
+          values:
+            - push

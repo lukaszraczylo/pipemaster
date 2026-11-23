@@ -1,0 +1,47 @@
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/test/carry
+# pipemaster:arg {"digest":"e98e48ad3bade46702798c6e01981bb83ae4623b910c44985bac4e25818f0110","carry":"image:\n    ref: golang:$\u007b{ matrix.GO_VERSION }}\nid: test\nkind: script\nscript:\n    - go test -tags $\u007b{ matrix.TAGS }} ./...\n"}
+# pipemaster:emulated job.matrix pipeline/woodpecker/job/ci
+# pipemaster:arg {"matrix":"include:\n    - - key: GO_VERSION\n        value: \"1.24\"\n      - key: TAGS\n        value: nethttp\n    - - key: GO_VERSION\n        value: \"1.25\"\n      - key: TAGS\n        value: netgo\n","across":"[{\"max_in_flight\":\"all\",\"values\":[{\"GO_VERSION\":\"1.24\",\"TAGS\":\"nethttp\"},{\"GO_VERSION\":\"1.25\",\"TAGS\":\"netgo\"}],\"var\":\"matrix\"}]"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry
+# pipemaster:arg {"digest":"c08d8583ee7ea5e9a4f6074a52829f25985860bde8ac65730c20b142575a07f8","carry":"matrix:\n    include:\n        - - key: GO_VERSION\n            value: \"1.24\"\n          - key: TAGS\n            value: nethttp\n        - - key: GO_VERSION\n            value: \"1.25\"\n          - key: TAGS\n            value: netgo\nid: ci\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: woodpecker\ntriggers:\n    - kind: push\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: ci
+    plan:
+      - get: source
+        trigger: true
+      - do:
+          - task: test
+            input_mapping:
+              workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: golang:((.
+                  tag: matrix.GO_VERSION))
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              run:
+                path: sh
+                args:
+                  - -ec
+                  - '# pipemaster:lost go test -tags {{ matrix.TAGS }} ./...'
+        across:
+          - var: matrix
+            values:
+              - GO_VERSION: "1.24"
+                TAGS: nethttp
+              - GO_VERSION: "1.25"
+                TAGS: netgo
+            max_in_flight: all

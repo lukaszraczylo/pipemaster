@@ -1,0 +1,39 @@
+# pipemaster:lost cron 
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/build/carry
+# pipemaster:arg {"digest":"99513467dac5c3188d98ab4528d7fb2f62c10e0bd5d5b366821a1e194cf137f7","carry":"image:\n    ref: golang:1.25\nid: build\nkind: script\n"}
+# pipemaster:emulated job.manual pipeline/woodpecker/job/ci
+# pipemaster:arg {"manual":false,"held":true}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry
+# pipemaster:arg {"digest":"c8b62ad362242c36961f1bbc497598baaeb0de3cb49d2fb1de3c5bcccc8d1c3f","carry":"id: ci\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
+# pipemaster:arg {"digest":"23421ff0998514f47173ea5b7668acb70c8af5e253b5c3264a1655012e26476f","carry":"id: woodpecker\ntriggers:\n    - kind: schedule\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker
+# pipemaster:emulated trigger.manual pipeline/woodpecker/job/ci
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: ci
+    plan:
+      - get: source
+      - task: build
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+              tag: "1.25"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - go build ./...

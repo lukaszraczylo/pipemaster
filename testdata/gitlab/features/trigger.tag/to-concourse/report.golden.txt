@@ -1,0 +1,4 @@
+Loss report: gitlab -> concourse
+[emulated] pipeline/gitlab-ci ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
+[emulated] pipeline/gitlab-ci/job/release/step/script step.image: default image (the task names no image, so it runs ubuntu:latest)
+[emulated] pipeline/gitlab-ci/trigger/0 trigger.tag: git resource with source.tag_filter (a tag trigger that also has a branch filter is lost, because one git resource cannot hold both sets)

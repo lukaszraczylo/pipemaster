@@ -1,0 +1,45 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"branches","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/build
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.push pipeline/ci/trigger/1
+resources:
+  - name: source-main
+    type: git
+    source:
+      uri: ((git-uri))
+      branch: main
+  - name: source-release-old
+    type: git
+    source:
+      uri: ((git-uri))
+      branch: '!release/old'
+jobs:
+  - name: build
+    plan:
+      - get: source-main
+        trigger: true
+      - get: source-release-old
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source-main
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo ok
+        tags:
+          - ubuntu-latest

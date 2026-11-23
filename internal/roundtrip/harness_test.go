@@ -15,6 +15,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	_ "github.com/lukaszraczylo/pipemaster/provider/argo"
+	_ "github.com/lukaszraczylo/pipemaster/provider/concourse"
 	_ "github.com/lukaszraczylo/pipemaster/provider/drone"
 	"github.com/lukaszraczylo/pipemaster/provider/gha"
 	_ "github.com/lukaszraczylo/pipemaster/provider/gitlab"

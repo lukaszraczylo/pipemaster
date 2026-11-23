@@ -1,0 +1,38 @@
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
+# pipemaster:arg {"digest":"d26f3cf80a4b5a637efa590cd7487fb9480d42c4aa2d61948823317f8ef949ee","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
+# pipemaster:arg {"digest":"e4fb4af742f0514768678fdb5b6155f28e92eceaf01e767c322e65626973cf12","carry":"id: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"a783cf49fb0241872239eaaed88aa8e193ee56e408c7f63d5955e0b105729860","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n      branches:\n        include:\n            - main\n            - release-**\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+      branch: main
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make build

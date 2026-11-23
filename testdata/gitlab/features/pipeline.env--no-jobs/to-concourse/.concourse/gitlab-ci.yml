@@ -1,0 +1,49 @@
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/placeholder/step/placeholder/carry
+# pipemaster:arg {"digest":"5cfd8d27510e4ca93e37762e026e3a44b176129ddd1138f34707aec0623f7887","carry":"id: placeholder\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/placeholder/carry
+# pipemaster:arg {"digest":"5d1a93b9934d24f9eb2d553c92f7073f65bb5b7b692c0d4c77e6be93e8e1fd9c","carry":"id: placeholder\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/placeholder
+# pipemaster:arg {"hold":"{\"name\":\"placeholder\",\"plan\":[{\"get\":\"source\",\"trigger\":true},{\"get\":\"source-tags\",\"trigger\":true},{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"inputs\":[{\"name\":\"workspace\"}],\"outputs\":[{\"name\":\"workspace\"}],\"params\":{\"REGION\":\"eu\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"input_mapping\":{\"workspace\":\"source\"},\"task\":\"placeholder\"}]}"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: REGION\n      value:\n        lit: eu\n"}
+# pipemaster:emulated pipeline.env pipeline/gitlab-ci
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/placeholder/step/placeholder
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: placeholder
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: placeholder
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          params:
+            REGION: eu
+          run:
+            path: sh
+            args:
+              - -ec
+              - "true"

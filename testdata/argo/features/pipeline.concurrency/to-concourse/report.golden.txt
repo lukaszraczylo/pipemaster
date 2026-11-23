@@ -1,0 +1,8 @@
+Loss report: argo -> concourse
+[lost] pipeline/ci pipeline.concurrency (cancel-in-progress is lost; a second build of a job in the group waits for the first)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the Concourse file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/0 trigger.filter.branches (the push trigger has no branch filter, and a git resource follows one branch; the resource follows the default branch of the repository)
+[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the Concourse file; it is kept in round-trip metadata)
+[emulated] pipeline/ci ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
+[emulated] pipeline/ci/job/build/step/build-step-1 step.image: default image (the task names no image, so it runs ubuntu:latest)
+[emulated] pipeline/ci/trigger/1 trigger.tag: git resource with source.tag_filter (a tag trigger that also has a branch filter is lost, because one git resource cannot hold both sets)

@@ -1,0 +1,14 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-build
+spec:
+  params:
+    - name: ctx-branch
+  steps:
+    - name: build-run
+      image: ubuntu:latest
+      script: echo on ${PM_CTX_BRANCH}
+      env:
+        - name: PM_CTX_BRANCH
+          value: $(params.ctx-branch)

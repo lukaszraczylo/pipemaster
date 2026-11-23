@@ -1,0 +1,36 @@
+# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test/carry
+# pipemaster:arg {"digest":"ff6b03a7d94118b21c060f84a5b6afb1864048d86c238c74426f1f26f0d29cc6","carry":"image:\n    ref: alpine:3.20\nid: test\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
+# pipemaster:arg {"digest":"121494fb80bf1c8d53b319d7e9b3ae96333207f72890d32d8cfff71a7d355470","carry":"id: test\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: ci\ntriggers:\n    - kind: push\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: test
+    plan:
+      - get: source
+        trigger: true
+      - task: test
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: alpine
+              tag: "3.20"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - ./test.sh

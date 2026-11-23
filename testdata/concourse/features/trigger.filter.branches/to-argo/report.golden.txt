@@ -1,0 +1,10 @@
+Loss report: concourse -> argo
+[lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the Argo file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/build ext.passthrough (Ext of provider concourse (gets) is not written to the Argo file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/build/step/build-step-1 ext.passthrough (Ext of provider concourse (config, input_mapping, tags) is not written to the Argo file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the Argo file; it is kept in round-trip metadata)
+[lost] pipeline/ci/trigger/0 trigger.filter.branches (the trigger is not written: a glob has no exact regex)
+[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider concourse (resources) is not written to the Argo file; it is kept in round-trip metadata)
+[external] pipeline/ci/trigger/1 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[emulated] pipeline/ci/trigger/0 trigger.push: EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only; the Argo Events controller needs the EventBus and a ServiceAccount, and the EventSource Service needs an Ingress)
+[emulated] pipeline/ci/trigger/1 trigger.filter.branches

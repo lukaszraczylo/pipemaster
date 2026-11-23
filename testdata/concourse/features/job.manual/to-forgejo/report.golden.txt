@@ -1,0 +1,7 @@
+Loss report: concourse -> forgejo
+[lost] pipeline/gitlab-ci ext.passthrough (Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/job/deploy ext.passthrough (Ext of provider concourse (gets) is not written to the GHA file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/job/deploy/step/script ext.passthrough (Ext of provider concourse (config, input_mapping) is not written to the GHA file; it is kept in round-trip metadata)
+[emulated] pipeline/gitlab-ci/job/deploy job.manual: workflow_dispatch trigger
+[emulated] pipeline/gitlab-ci/job/deploy job.runner: default runner label ubuntu-latest (the IR holds no runner label)
+[emulated] pipeline/gitlab-ci/job/deploy/step/script step.image: uses: docker://<image> with entrypoint and args

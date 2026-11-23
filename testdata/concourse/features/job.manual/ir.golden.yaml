@@ -1,0 +1,45 @@
+origin:
+    provider: concourse
+    dialect: concourse
+    files:
+        - .concourse/gitlab-ci.yml
+pipelines:
+    - ext:
+        concourse:
+            resources:
+                - name: source
+                  source:
+                    uri: ((git-uri))
+                  type: git
+                - name: source-tags
+                  source:
+                    tag_filter: '*'
+                    uri: ((git-uri))
+                  type: git
+      id: gitlab-ci
+      jobs:
+        - ext:
+            concourse:
+                gets:
+                    - get: source
+                    - get: source-tags
+          id: deploy
+          steps:
+            - image:
+                ref: ubuntu:latest
+              ext:
+                concourse:
+                    config:
+                        inputs:
+                            - name: workspace
+                        outputs:
+                            - name: workspace
+                        platform: linux
+                    input_mapping:
+                        workspace: source
+              id: script
+              kind: script
+              script:
+                - make deploy
+          allow_failure: true
+          manual: true

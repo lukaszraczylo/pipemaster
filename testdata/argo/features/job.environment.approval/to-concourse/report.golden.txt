@@ -1,0 +1,7 @@
+Loss report: argo -> concourse
+[lost] pipeline/drone/job/deploy ext.passthrough (Ext of provider argo (gates) is not written to the Concourse file; it is kept in round-trip metadata)
+[lost] pipeline/drone/job/deploy job.environment (Concourse has no environment name or URL)
+[lost] pipeline/drone/trigger/0 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the Concourse file; it is kept in round-trip metadata)
+[lost] pipeline/drone/trigger/0 trigger.filter.branches (the push trigger has no branch filter, and a git resource follows one branch; the resource follows the default branch of the repository)
+[emulated] pipeline/drone ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
+[emulated] pipeline/drone/job/deploy job.environment.approval: job with no triggering get (a person starts the job; the reviewer list is lost)

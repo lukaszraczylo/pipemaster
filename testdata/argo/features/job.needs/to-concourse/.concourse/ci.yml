@@ -1,0 +1,109 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"needs","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/lint/step/lint-step-1/carry
+# pipemaster:arg {"digest":"dacdf5e8e67c2128e1b479ab0443198372f814ce6e0a54f2518951399722c225","carry":"id: lint-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/lint/carry
+# pipemaster:arg {"digest":"66d6349affb85456757a90de5358937b9e97255e0e4dee00075f63cc4c7ad4c6","carry":"id: lint\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/ship/step/ship-step-1/carry
+# pipemaster:arg {"digest":"f4622616c9c9db3ebafb25250d628db4e95cc015ceb442d050bc56be4278d523","carry":"id: ship-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/ship/carry
+# pipemaster:arg {"digest":"deda8640ff8096d8697a454cba0cf0fe147af1c44d03be328207ad32a03188d4","carry":"id: ship\nneeds:\n    - job: lint\n    - job: test\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
+# pipemaster:arg {"digest":"fbce13fcc5fe25cb9d1bfa80f9ee464c3138eafb2a842349de963069b0f59dd7","carry":"id: test-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
+# pipemaster:arg {"digest":"0753a6c1b1fc59fe84f3f2ba05f983d1f39885aaa10885f6934a81ca119f56a6","carry":"id: test\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"118728fcc00220d3b4f3c4532f56a42ecf11cec63d03c7fac4a3b80c66b8a9a1","carry":"id: ci\nname: needs\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated step.image pipeline/ci/job/lint/step/lint-step-1
+# pipemaster:emulated step.image pipeline/ci/job/ship/step/ship-step-1
+# pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: lint
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: lint-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo lint
+  - name: ship
+    plan:
+      - get: source
+        passed:
+          - lint
+          - test
+        trigger: true
+      - get: source-tags
+      - task: ship-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo ship
+  - name: test
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: test-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo test

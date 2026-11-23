@@ -1,0 +1,9 @@
+workflow:
+  rules:
+    - when: never
+deploy:
+  needs: []
+  script:
+    # pipemaster:step deploy
+    - ./deploy.sh
+  environment: production

@@ -1,0 +1,13 @@
+# pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/1
+when:
+  - event: push
+    branch: main
+  - event: tag
+    ref: refs/tags/*
+depends_on:
+  - build
+steps:
+  - name: deploy-step-1
+    image: ubuntu:latest
+    commands:
+      - make deploy

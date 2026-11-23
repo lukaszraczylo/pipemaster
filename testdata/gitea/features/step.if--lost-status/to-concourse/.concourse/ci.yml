@@ -1,0 +1,124 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"lost status","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
+# pipemaster:arg {"digest":"d0bac062c0d39a6964a4e65a1f581837f926fad4f1f4c771d266576bdb374853","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
+# pipemaster:arg {"if":"failure()","script":"echo cleanup"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-2/carry
+# pipemaster:arg {"digest":"cb9ab85e8bca498401b4e8a41c906e741608a42904c492b56aef5da42f007ada","carry":"if: failure()\nid: build-step-2\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/config/carry
+# pipemaster:arg {"digest":"f5fe7d7060817af26e07546647815c31b8a88c3b63da4f4d81f067360ca06829","carry":"id: config\nkind: script\n"}
+# pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-4
+# pipemaster:arg {"if":"steps.config.outputs.configured == 'true'","script":"echo configured"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-4/carry
+# pipemaster:arg {"digest":"7204fb776b9f6c5800d893f32c7e6ea53d9d12492ca2a5bdfbbe097f234818af","carry":"if: steps.config.outputs.configured == 'true'\nid: build-step-4\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
+# pipemaster:arg {"digest":"f58534a25bde6055582e3485fffbb0e4c517c7f0641a4505b26b57bb936b8b75","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: lost status\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/build
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-2
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-4
+# pipemaster:emulated step.image pipeline/ci/job/build/step/config
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo build
+        tags:
+          - ubuntu-latest
+      - task: build-step-2
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - |-
+                exit 0 # pipemaster:guard the step condition has no shell form
+                echo cleanup
+        tags:
+          - ubuntu-latest
+      - task: config
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo "configured=true" >> "$GITHUB_OUTPUT"
+        tags:
+          - ubuntu-latest
+      - task: build-step-4
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - |-
+                exit 0 # pipemaster:guard the step condition has no shell form
+                echo configured
+        tags:
+          - ubuntu-latest

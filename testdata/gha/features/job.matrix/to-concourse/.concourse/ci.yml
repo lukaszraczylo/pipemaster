@@ -1,0 +1,65 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"matrix","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
+# pipemaster:arg {"digest":"0f3fb1a2cb7a1e7997e352641f3b178cb385edae84ec2c9337f37c3025247720","carry":"id: test-step-1\nkind: script\nscript:\n    - echo $\u007b{ matrix.go }}\n"}
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"matrix":"fail_fast: false\naxes:\n    - name: os\n      values:\n        - ubuntu-latest\n        - macos-latest\n    - name: go\n      values:\n        - \"1.24\"\n        - \"1.25\"\ninclude:\n    - - key: experimental\n        value: \"true\"\n      - key: go\n        value: \"1.25\"\n      - key: os\n        value: ubuntu-latest\nexclude:\n    - - key: go\n        value: \"1.24\"\n      - key: os\n        value: macos-latest\nmax_parallel: 2\n","across":"[{\"max_in_flight\":2,\"values\":[{\"experimental\":\"\",\"go\":\"1.24\",\"os\":\"ubuntu-latest\"},{\"experimental\":\"true\",\"go\":\"1.25\",\"os\":\"ubuntu-latest\"},{\"experimental\":\"\",\"go\":\"1.25\",\"os\":\"macos-latest\"}],\"var\":\"matrix\"}]"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
+# pipemaster:arg {"digest":"962516c218f881b6e61ea0677a9c6e7501c59b2b47e223a46bb098dad82ccadb","carry":"matrix:\n    fail_fast: false\n    axes:\n        - name: os\n          values:\n            - ubuntu-latest\n            - macos-latest\n        - name: go\n          values:\n            - \"1.24\"\n            - \"1.25\"\n    include:\n        - - key: experimental\n            value: \"true\"\n          - key: go\n            value: \"1.25\"\n          - key: os\n            value: ubuntu-latest\n    exclude:\n        - - key: go\n            value: \"1.24\"\n          - key: os\n            value: macos-latest\n    max_parallel: 2\nid: test\nrunner:\n    labels:\n        - $\u007b{ matrix.os }}\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: matrix\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: test
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - do:
+          - task: test-step-1
+            input_mapping:
+              workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: ubuntu
+                  tag: latest
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              params:
+                PM_MATRIX_GO: ((.:matrix.go))
+              run:
+                path: sh
+                args:
+                  - -ec
+                  - echo ${PM_MATRIX_GO}
+        across:
+          - var: matrix
+            values:
+              - go: "1.24"
+                os: ubuntu-latest
+                experimental: ""
+              - go: "1.25"
+                os: ubuntu-latest
+                experimental: "true"
+              - go: "1.25"
+                os: macos-latest
+                experimental: ""
+            max_in_flight: 2

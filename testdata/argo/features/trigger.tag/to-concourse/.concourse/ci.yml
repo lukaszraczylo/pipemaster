@@ -1,0 +1,42 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"tag","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
+# pipemaster:arg {"digest":"bbad345ee8b06f868f92050296c6fe169a00a95a901282fb293e2bc7d676d232","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
+# pipemaster:arg {"digest":"98b0262861f1577748453c1021194e7f1f2f55f232bdbc71613f57a5541b79a3","carry":"id: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"4e58d6484f8ec0d5e4260a5fb88107a486c701ec219051879c31501325493424","carry":"id: ci\nname: tag\ntriggers:\n    - kind: tag\n      tags:\n        include:\n            - v**\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/0
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/0
+resources:
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: v**
+jobs:
+  - name: build
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo ok

@@ -1,0 +1,33 @@
+# pipemaster:emulated step.image pipeline/ci/job/build
+# pipemaster:arg {"steps":{"build-step-1":"ref: ubuntu:latest\n"},"wrote":{"build-step-1":"ubuntu:latest"}}
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+  annotations:
+    workflows.argoproj.io/title: nightly
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+    - name: build
+      containerSet:
+        containers:
+          - name: build-step-1
+            image: ubuntu:latest
+            command:
+              - sh
+              - -ec
+            args:
+              - echo ok
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

@@ -1,0 +1,118 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"needs","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/lint/step/lint-step-1/carry
+# pipemaster:arg {"digest":"57228c879e4bf8ed2e0aef752c83e75e851e3631811e3e8bd6abdf280a553e85","carry":"id: lint-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/lint/carry
+# pipemaster:arg {"digest":"e61f058093da0dd08ca8bc7681bca975cc8d604987b4a4cb598fe57ebae698cb","carry":"id: lint\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/ship/step/ship-step-1/carry
+# pipemaster:arg {"digest":"acbe1f06177206a2b9bfbd5631351f8b8c922e02cfc6d6da5d02e530790dd4e5","carry":"id: ship-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/ship/carry
+# pipemaster:arg {"digest":"83bc881699eb85972df5cf8ea2904411a0bf7baca33d4d3b59b06c231f790ff9","carry":"id: ship\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: lint\n    - job: test\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
+# pipemaster:arg {"digest":"56a49103b4af83180829cbeed62d771a5030e85727af1def99328e6e9f7b1760","carry":"id: test-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
+# pipemaster:arg {"digest":"23b072fa415ae142e9083bd69d4a1779a2f1e23988457b513b33baf70899317d","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"118728fcc00220d3b4f3c4532f56a42ecf11cec63d03c7fac4a3b80c66b8a9a1","carry":"id: ci\nname: needs\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/lint
+# pipemaster:emulated step.image pipeline/ci/job/lint/step/lint-step-1
+# pipemaster:emulated job.runner pipeline/ci/job/ship
+# pipemaster:emulated step.image pipeline/ci/job/ship/step/ship-step-1
+# pipemaster:emulated job.runner pipeline/ci/job/test
+# pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: lint
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: lint-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo lint
+        tags:
+          - ubuntu-latest
+  - name: ship
+    plan:
+      - get: source
+        passed:
+          - lint
+          - test
+        trigger: true
+      - get: source-tags
+      - task: ship-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo ship
+        tags:
+          - ubuntu-latest
+  - name: test
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: test-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo test
+        tags:
+          - ubuntu-latest

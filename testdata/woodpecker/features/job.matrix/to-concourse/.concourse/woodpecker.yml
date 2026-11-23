@@ -1,0 +1,52 @@
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/test/carry
+# pipemaster:arg {"digest":"482322dc0536b3b1d555d04a1c3d1db126b459a4b60004a8395ace379ca3ff37","carry":"image:\n    ref: golang:$\u007b{ matrix.GO_VERSION }}\nid: test\nkind: script\nscript:\n    - go test ./...\n    - echo $\u007b{ matrix.OS }}\n"}
+# pipemaster:emulated job.matrix pipeline/woodpecker/job/ci
+# pipemaster:arg {"matrix":"axes:\n    - name: GO_VERSION\n      values:\n        - \"1.24\"\n        - \"1.25\"\n    - name: OS\n      values:\n        - linux\n        - darwin\n","across":"[{\"max_in_flight\":\"all\",\"values\":[\"1.24\",\"1.25\"],\"var\":\"GO_VERSION\"},{\"max_in_flight\":\"all\",\"values\":[\"linux\",\"darwin\"],\"var\":\"OS\"}]"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry
+# pipemaster:arg {"digest":"0e31f973d78196767e0d5b79e49e88c3f205666b142ce756ecafa2aef44966b0","carry":"matrix:\n    axes:\n        - name: GO_VERSION\n          values:\n            - \"1.24\"\n            - \"1.25\"\n        - name: OS\n          values:\n            - linux\n            - darwin\nid: ci\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: woodpecker\ntriggers:\n    - kind: push\n"}
+# pipemaster:emulated ext.passthrough pipeline/woodpecker
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: ci
+    plan:
+      - get: source
+        trigger: true
+      - do:
+          - task: test
+            input_mapping:
+              workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: golang:((.
+                  tag: GO_VERSION))
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              run:
+                path: sh
+                args:
+                  - -ec
+                  - |-
+                    go test ./...
+                    # pipemaster:lost echo {{ matrix.OS }}
+        across:
+          - var: GO_VERSION
+            values:
+              - "1.24"
+              - "1.25"
+            max_in_flight: all
+          - var: OS
+            values:
+              - linux
+              - darwin
+            max_in_flight: all

@@ -1,0 +1,91 @@
+origin:
+    provider: concourse
+    dialect: concourse
+    files:
+        - .concourse/ci.yml
+pipelines:
+    - ext:
+        concourse:
+            resources:
+                - name: source
+                  source:
+                    branch: main
+                    uri: ((git-uri))
+                  type: git
+                - name: source-tags
+                  source:
+                    tag_filter: '*'
+                    uri: ((git-uri))
+                  type: git
+      id: ci
+      name: action
+      triggers:
+        - ext:
+            concourse:
+                resources:
+                    - source
+          kind: push
+          branches:
+            include:
+                - main
+        - ext:
+            concourse:
+                resources:
+                    - source-tags
+          kind: tag
+          tags:
+            include:
+                - '*'
+      jobs:
+        - ext:
+            concourse:
+                gets:
+                    - get: source
+                      trigger: true
+                    - get: source-tags
+                      trigger: true
+          id: build
+          steps:
+            - action:
+                kind: repo
+                host: https://github.com
+                owner: actions
+                repo: checkout
+                ref: v4
+              with:
+                fetch-depth:
+                    lit: "0"
+                token:
+                    secret: PAT
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: action
+            - action:
+                kind: repo
+                host: https://github.com
+                owner: actions
+                repo: setup-go
+                ref: v5
+              with:
+                go-version:
+                    lit: "1.24"
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-2
+              kind: action
+            - action:
+                kind: docker
+                image: alpine:3.20
+              ext:
+                gha:
+                    _derived_id: true
+              id: build-step-3
+              kind: action
+            - action:
+                kind: local
+                path: ./.github/actions/setup
+              id: local
+              kind: action

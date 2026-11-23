@@ -1,0 +1,10 @@
+Loss report: gitlab -> concourse
+[lost] pipeline/gitlab-ci/job/package ext.passthrough (Ext of provider gitlab (needs_extra) is not written to the Concourse file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/job/package-all ext.passthrough (Ext of provider gitlab (needs_extra) is not written to the Concourse file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/trigger/0 trigger.filter.branches (the push trigger has no branch filter, and a git resource follows one branch; the resource follows the default branch of the repository)
+[emulated] pipeline/gitlab-ci ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
+[emulated] pipeline/gitlab-ci/job/images job.matrix: across over the axes (the tasks run once per cell inside one across step; the outputs of the cells are not visible after it)
+[emulated] pipeline/gitlab-ci/job/images/step/script step.image: default image (the task names no image, so it runs ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/package-all/step/script step.image: default image (the task names no image, so it runs ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/package/step/script step.image: default image (the task names no image, so it runs ubuntu:latest)
+[emulated] pipeline/gitlab-ci/trigger/1 trigger.tag: git resource with source.tag_filter (a tag trigger that also has a branch filter is lost, because one git resource cannot hold both sets)

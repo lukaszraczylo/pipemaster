@@ -1,0 +1,8 @@
+when:
+  - event: push
+    branch: main
+steps:
+  - name: build-run
+    image: ubuntu:latest
+    commands:
+      - echo on ${CI_COMMIT_BRANCH}

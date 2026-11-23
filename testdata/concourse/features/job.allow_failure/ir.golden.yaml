@@ -1,0 +1,67 @@
+origin:
+    provider: concourse
+    dialect: concourse
+    files:
+        - .concourse/ci.yml
+pipelines:
+    - ext:
+        concourse:
+            resources:
+                - name: source
+                  source:
+                    branch: main
+                    uri: ((git-uri))
+                  type: git
+                - name: source-tags
+                  source:
+                    tag_filter: '*'
+                    uri: ((git-uri))
+                  type: git
+      id: ci
+      name: allow
+      triggers:
+        - ext:
+            concourse:
+                resources:
+                    - source
+          kind: push
+          branches:
+            include:
+                - main
+        - ext:
+            concourse:
+                resources:
+                    - source-tags
+          kind: tag
+          tags:
+            include:
+                - '*'
+      jobs:
+        - ext:
+            concourse:
+                gets:
+                    - get: source
+                      trigger: true
+                    - get: source-tags
+                      trigger: true
+          id: flaky
+          steps:
+            - image:
+                ref: ubuntu:latest
+              ext:
+                concourse:
+                    config:
+                        inputs:
+                            - name: workspace
+                        outputs:
+                            - name: workspace
+                        platform: linux
+                    input_mapping:
+                        workspace: source
+                    tags:
+                        - ubuntu-latest
+              id: flaky-step-1
+              kind: script
+              script:
+                - echo ok
+          allow_failure: true

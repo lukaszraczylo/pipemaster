@@ -1,0 +1,38 @@
+# pipemaster:emulated ext.passthrough pipeline/drone/job/ci/step/build/carry
+# pipemaster:arg {"digest":"398ece9e61c888f24fa2807affe50e0a8fd76724a6fffd6b026f8953b59bcf70","carry":"image:\n    ref: golang:1.25\nid: build\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/drone/job/ci/carry
+# pipemaster:arg {"digest":"cb576575bf097a501c888fe73c5fb7e3c5811ac695416ca8627613ce1ccfa158","carry":"id: ci\n"}
+# pipemaster:emulated ext.passthrough pipeline/drone/carry
+# pipemaster:arg {"digest":"a8c9a82edc0f60b3cb714bd1f312cef502ec27fc2b81f2145f7f5f88a736dc25","carry":"id: drone\ntriggers:\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/drone
+# pipemaster:emulated trigger.tag pipeline/drone/trigger/0
+resources:
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: ci
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: build
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+              tag: "1.25"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - go build ./...

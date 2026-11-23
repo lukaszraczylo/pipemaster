@@ -1,0 +1,5 @@
+Loss report: gitlab -> concourse
+[lost] pipeline/gitlab-ci/trigger/0 trigger.schedule (the cron line  has no time resource form; the cron text is kept in this comment and the trigger is not written)
+[emulated] pipeline/gitlab-ci ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
+[emulated] pipeline/gitlab-ci/job/nightly trigger.manual: get with no trigger (no trigger starts the job, so a person starts it)
+[emulated] pipeline/gitlab-ci/job/nightly/step/script step.image: default image (the task names no image, so it runs ubuntu:latest)

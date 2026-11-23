@@ -1,0 +1,56 @@
+# pipemaster:emulated trigger.filter.branches pipeline/ci
+# pipemaster:arg "- ext:\n    concourse:\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
+kind: pipeline
+type: docker
+name: lint
+trigger:
+  event:
+    - push
+    - tag
+  ref:
+    - refs/heads/main
+    - refs/tags/*
+steps:
+  - name: lint-step-1
+    image: ubuntu:latest
+    commands:
+      - echo lint
+---
+# pipemaster:emulated trigger.filter.branches pipeline/ci
+# pipemaster:arg "- ext:\n    concourse:\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
+kind: pipeline
+type: docker
+name: ship
+trigger:
+  event:
+    - push
+    - tag
+  ref:
+    - refs/heads/main
+    - refs/tags/*
+depends_on:
+  - lint
+  - test
+steps:
+  - name: ship-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ship
+---
+# pipemaster:emulated trigger.filter.branches pipeline/ci
+# pipemaster:arg "- ext:\n    concourse:\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
+kind: pipeline
+type: docker
+name: test
+trigger:
+  event:
+    - push
+    - tag
+  ref:
+    - refs/heads/main
+    - refs/tags/*
+steps:
+  - name: test-step-1
+    image: ubuntu:latest
+    commands:
+      - echo test

@@ -1,0 +1,24 @@
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:arg {"kind":"push","branches":{"Include":["main"],"Exclude":null}}
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+# pipemaster:arg {"kind":"tag","tags":{"Include":["*"],"Exclude":null}}
+stages:
+  - stage-0
+  - stage-1
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_TAG =~ /^[^\/]*$/
+build:
+  stage: stage-0
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - make build
+deploy:
+  stage: stage-1
+  needs:
+    - build
+  script:
+    # pipemaster:step deploy-step-1
+    - make deploy

@@ -2,7 +2,7 @@
 # pipemaster:arg {"job":"if: 'opaque(gha): fromJSON(''{\"a\":1}'').a == 1'\nid: \"\"\n"}
 # pipemaster:lost script pipeline/ci/job/build/step/build-step-1: echo {{ opaque(gha): env[github.job] }}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
-# pipemaster:arg {"step":"ext:\n    gha:\n        _derived_id: true\nid: build-step-1\nkind: script\nscript:\n    - 'echo $\u007b{ opaque(gha): env[github.job] }}'\n","hold":"{\"args\":[\"\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-1\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:arg {"step":"id: build-step-1\nkind: script\nscript:\n    - 'echo $\u007b{ opaque(gha): env[github.job] }}'\n","hold":"{\"args\":[\"\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-1\",\"workingDir\":\"/workspace\"}"}
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1

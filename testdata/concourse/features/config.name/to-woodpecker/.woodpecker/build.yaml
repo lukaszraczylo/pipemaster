@@ -1,0 +1,19 @@
+# pipemaster:lost expr.opaque pipeline/ci/job/build/step/build-step-1: vars.REGION
+# pipemaster:emulated expr.opaque pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"vars":"- name: REGION\n  value:\n    expr: vars.REGION\n","at":[2],"pos":0}
+# pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/1
+when:
+  - event: push
+    branch: main
+  - event: tag
+    ref: refs/tags/*
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo "$${REGION}"
+    environment:
+      KEY:
+        from_secret: DEPLOY_KEY
+      API_TOKEN:
+        from_secret: API_TOKEN

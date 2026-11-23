@@ -1,0 +1,57 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: pipemaster
+spec:
+  dependencies:
+    - eventName: push
+      eventSourceName: pipemaster-github
+      filters:
+        data:
+          - path: body.ref
+            type: string
+            value:
+              - ^refs/heads/main$
+      name: ci-push
+    - eventName: push
+      eventSourceName: pipemaster-github
+      filters:
+        data:
+          - path: body.ref
+            type: string
+            value:
+              - ^refs/tags/[^/]*$
+      name: ci-tag
+  template:
+    serviceAccountName: pipemaster-sensor
+  triggers:
+    - template:
+        conditions: ci-push
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: ci-
+              spec:
+                serviceAccountName: pipemaster-workflow
+                workflowTemplateRef:
+                  name: ci
+        name: ci-push
+    - template:
+        conditions: ci-tag
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: ci-
+              spec:
+                serviceAccountName: pipemaster-workflow
+                workflowTemplateRef:
+                  name: ci
+        name: ci-tag

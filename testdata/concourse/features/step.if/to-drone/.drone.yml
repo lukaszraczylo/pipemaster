@@ -1,0 +1,25 @@
+# pipemaster:emulated trigger.filter.branches pipeline/ci
+# pipemaster:arg "- ext:\n    concourse:\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+    - tag
+  ref:
+    - refs/heads/main
+    - refs/tags/*
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo cleanup
+  - name: build-step-2
+    image: ubuntu:latest
+    commands:
+      - echo push
+    when:
+      event:
+        - push
+        - tag

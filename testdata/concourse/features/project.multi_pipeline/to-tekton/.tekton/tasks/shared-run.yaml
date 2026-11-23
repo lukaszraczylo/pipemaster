@@ -1,0 +1,9 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: shared-run
+spec:
+  steps:
+    - name: run-step-1
+      image: ubuntu:latest
+      script: echo run

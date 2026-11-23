@@ -1,0 +1,40 @@
+# pipemaster:emulated ext.passthrough pipeline/drone/job/ci/step/build/carry
+# pipemaster:arg {"digest":"ea9b70acabbf8a506362b4e8595382d8cfa5743b844f30b7a5744c07ccb22be5","carry":"image:\n    ref: alpine:3.20\nid: build\nkind: script\nscript:\n    - echo $\u007b{ sha }} on $\u007b{ branch }}\n    - 'echo \"cost: $5\"'\n"}
+# pipemaster:emulated ext.passthrough pipeline/drone/job/ci/carry
+# pipemaster:arg {"digest":"26d93b7c641477c3611ca05dbb035a757e9cf2dd062bfbe89d294d7e3c098c79","carry":"id: ci\n"}
+# pipemaster:emulated ext.passthrough pipeline/drone/carry
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: drone\ntriggers:\n    - kind: push\n"}
+# pipemaster:emulated ext.passthrough pipeline/drone
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: ci
+    plan:
+      - get: source
+        trigger: true
+      - task: build
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: alpine
+              tag: "3.20"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - |-
+                PM_CTX_SHA="$(cat workspace/.git/commit)"; export PM_CTX_SHA # pipemaster:ctx
+                PM_CTX_BRANCH="$(cat workspace/.git/branch)"; export PM_CTX_BRANCH # pipemaster:ctx
+                echo ${PM_CTX_SHA} on ${PM_CTX_BRANCH}
+                echo "cost: $5"

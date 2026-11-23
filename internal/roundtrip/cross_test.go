@@ -12,6 +12,7 @@ import (
 	"testing/fstest"
 
 	"github.com/lukaszraczylo/pipemaster/internal/golden"
+	"github.com/lukaszraczylo/pipemaster/internal/linttool"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/validate"
 )
@@ -55,6 +56,7 @@ var providerChecks = map[string]providerCheck{
 			"56-drone-mysql-operator", "59-drone-casper-node", "60-drone-go-markdown2confluence",
 		},
 	},
+	provider.Concourse:  {requireLinter: requireFly, lintFile: lintFly, lintFrom: provider.GHA},
 	provider.Woodpecker: {requireLinter: requireWoodpeckerCLI, lintFile: lintWoodpecker, lintFindings: woodpeckerFindings, lintFrom: provider.GHA, noGHAExpr: true},
 }
 
@@ -119,6 +121,15 @@ func requireActionlint(t *testing.T) {
 			t.Fatalf("actionlint is not installed and %s=1", requireLintersEnv)
 		}
 		t.Skip("actionlint is not installed; GHA outputs are not linted")
+	}
+}
+
+func requireFly(t *testing.T) { linttool.RequireFly(t) }
+
+func lintFly(t *testing.T, name string, data []byte) {
+	t.Helper()
+	if out, err := linttool.FlyLint(t, name, data); err != nil {
+		t.Errorf("fly %s: %v\n%s", name, err, out)
 	}
 }
 

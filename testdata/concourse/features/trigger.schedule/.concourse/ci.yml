@@ -1,0 +1,61 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"nightly","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated trigger.schedule pipeline/ci/trigger/0
+# pipemaster:arg {"cron":"0 0 * * 0","resource":"schedule","source":"{\"days\":[\"Sunday\"],\"start\":\"00:00\",\"stop\":\"00:05\"}"}
+# pipemaster:emulated trigger.schedule pipeline/ci/trigger/1
+# pipemaster:arg {"cron":"30 5 * * 1-5","resource":"schedule-2","source":"{\"days\":[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"],\"start\":\"05:30\",\"stop\":\"05:35\"}"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/build
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: schedule
+    type: time
+    source:
+      start: "00:00"
+      stop: "00:05"
+      days:
+        - Sunday
+  - name: schedule-2
+    type: time
+    source:
+      start: "05:30"
+      stop: "05:35"
+      days:
+        - Monday
+        - Tuesday
+        - Wednesday
+        - Thursday
+        - Friday
+jobs:
+  - name: build
+    plan:
+      - get: source
+      - get: schedule
+        trigger: true
+      - get: schedule-2
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo ok
+        tags:
+          - ubuntu-latest

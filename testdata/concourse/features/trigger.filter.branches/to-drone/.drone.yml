@@ -1,0 +1,19 @@
+# pipemaster:emulated trigger.filter.branches pipeline/ci
+# pipemaster:arg "- ext:\n    concourse:\n        resources:\n            - source-release-old\n  kind: push\n  branches:\n    include:\n        - '!release/old'\n- ext:\n    concourse:\n        resources:\n            - source-main\n  kind: push\n  branches:\n    include:\n        - main\n"
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+  ref:
+    exclude:
+      - refs/heads/release/old
+    include:
+      - refs/heads/**
+      - refs/heads/main
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - echo ok

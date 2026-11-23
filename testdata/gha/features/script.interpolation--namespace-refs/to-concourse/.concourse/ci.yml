@@ -1,0 +1,51 @@
+# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
+# pipemaster:arg {"digest":"db21b967a143ac1127d38d4b5e62892dd181baaf108024d8047b9d8c705b8f4c","carry":"id: test-step-1\nkind: script\nscript:\n    - echo $\u007b{ matrix.os }} $\u007b{ inputs.target }} $\u007b{ env.REGION }} $\u007b{ vars.LEVEL }}\n"}
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"matrix":"axes:\n    - name: os\n      values:\n        - ubuntu-latest\n        - macos-latest\n","across":"[{\"max_in_flight\":\"all\",\"values\":[\"ubuntu-latest\",\"macos-latest\"],\"var\":\"os\"}]"}
+# pipemaster:emulated job.manual pipeline/ci/job/test
+# pipemaster:arg {"manual":false,"held":true}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
+# pipemaster:arg {"digest":"86856383285f6877714cf2776fae7a1c6203e9ac8a38967e5b65933a262fbf87","carry":"matrix:\n    axes:\n        - name: os\n          values:\n            - ubuntu-latest\n            - macos-latest\nid: test\nrunner:\n    labels:\n        - $\u007b{ matrix.os }}\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"23421ff0998514f47173ea5b7668acb70c8af5e253b5c3264a1655012e26476f","carry":"id: ci\ntriggers:\n    - kind: manual\nenv:\n    - name: REGION\n      value:\n        lit: eu\ninputs:\n    - name: target\n      default: staging\n      description: Deploy target\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated pipeline.env pipeline/ci
+# pipemaster:emulated trigger.manual pipeline/ci/job/test
+# pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: test
+    plan:
+      - get: source
+      - do:
+          - task: test-step-1
+            input_mapping:
+              workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: ubuntu
+                  tag: latest
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              params:
+                REGION: eu
+              run:
+                path: sh
+                args:
+                  - -ec
+                  - '# pipemaster:lost echo {{ matrix.os }} {{ inputs.target }} {{ env.REGION }} {{ vars.LEVEL }}'
+        across:
+          - var: os
+            values:
+              - ubuntu-latest
+              - macos-latest
+            max_in_flight: all

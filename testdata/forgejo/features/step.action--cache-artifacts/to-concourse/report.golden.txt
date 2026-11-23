@@ -1,0 +1,12 @@
+Loss report: forgejo -> concourse
+[lost] pipeline/ci/job/build/step/build-step-2 step.action (a cache lives on the worker that ran the task and the key is not used; the cache path ~/go/pkg/mod is not a relative path inside the task directory; no cache path can be a task cache)
+[lost] pipeline/ci/trigger/0 trigger.filter.branches (the push trigger has no branch filter, and a git resource follows one branch; the resource follows the default branch of the repository)
+[external] pipeline/ci/job/test/step/test-step-1 step.action: the workspace input of the task; s3 or registry-image resource (only an upload in the same job is visible; the download reads an artifact that no earlier step of the job wrote; the operator sets up a resource that carries it from the job that uploads it)
+[emulated] pipeline/ci ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
+[emulated] pipeline/ci/job/build job.runner: worker tags of the task (the tasks carry the worker tags ubuntu-latest; a build waits until a worker has them)
+[emulated] pipeline/ci/job/build/step/build-step-1 step.action: task per actions.Lookup verdict (unknown actions are lost)
+[emulated] pipeline/ci/job/build/step/build-step-3 step.image: default image (the task names no image, so it runs ubuntu:latest)
+[emulated] pipeline/ci/job/build/step/build-step-4 step.action: the workspace output of the task; placeholder task (later tasks of the same job read the files and other jobs cannot; Concourse does not run the action; a task that runs true keeps its place)
+[emulated] pipeline/ci/job/test job.runner: worker tags of the task (the tasks carry the worker tags ubuntu-latest; a build waits until a worker has them)
+[emulated] pipeline/ci/job/test/step/test-step-2 step.image: default image (the task names no image, so it runs ubuntu:latest)
+[emulated] pipeline/ci/trigger/1 trigger.tag: git resource with source.tag_filter (a tag trigger that also has a branch filter is lost, because one git resource cannot hold both sets)

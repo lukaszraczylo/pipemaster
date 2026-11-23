@@ -1,0 +1,17 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  params:
+    - name: ctx-branch
+      default: ""
+  tasks:
+    - name: build
+      taskRef:
+        name: ci-build
+      when:
+        - input: $(params.ctx-branch)
+          operator: in
+          values:
+            - main

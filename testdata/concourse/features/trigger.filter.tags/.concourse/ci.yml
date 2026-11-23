@@ -1,0 +1,46 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"tags","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/build
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/0
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/0
+resources:
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: v[0-9]+.[0-9]+.[0-9]+
+  - name: source-tags-2
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '!v*-rc*'
+jobs:
+  - name: build
+    plan:
+      - get: source-tags
+        trigger: true
+      - get: source-tags-2
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo ok
+        tags:
+          - ubuntu-latest

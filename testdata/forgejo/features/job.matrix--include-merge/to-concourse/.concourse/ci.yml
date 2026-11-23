@@ -1,0 +1,63 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"ci","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
+# pipemaster:arg {"digest":"b3666fa8733b955262e49ec4d7087a7e86ff315dc38dca60f062a636a822c07c","carry":"id: test-step-1\nkind: script\nscript:\n    - go test $\u007b{ matrix.go }}\n"}
+# pipemaster:emulated job.matrix pipeline/ci/job/test
+# pipemaster:arg {"matrix":"axes:\n    - name: go\n      values:\n        - \"1.21\"\n        - \"1.22\"\ninclude:\n    - - key: experimental\n        value: \"true\"\n      - key: go\n        value: \"1.22\"\n","across":"[{\"max_in_flight\":\"all\",\"values\":[{\"experimental\":\"\",\"go\":\"1.21\"},{\"experimental\":\"true\",\"go\":\"1.22\"}],\"var\":\"matrix\"}]"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
+# pipemaster:arg {"digest":"9fd1ab0d8fca1380fbbda29d3c62c3cedeb18a661ffea59a07c544c5a54307ae","carry":"matrix:\n    axes:\n        - name: go\n          values:\n            - \"1.21\"\n            - \"1.22\"\n    include:\n        - - key: experimental\n            value: \"true\"\n          - key: go\n            value: \"1.22\"\nid: test\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/test
+# pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: test
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - do:
+          - task: test-step-1
+            input_mapping:
+              workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: ubuntu
+                  tag: latest
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              params:
+                PM_MATRIX_GO: ((.:matrix.go))
+              run:
+                path: sh
+                args:
+                  - -ec
+                  - go test ${PM_MATRIX_GO}
+            tags:
+              - ubuntu-latest
+        across:
+          - var: matrix
+            values:
+              - go: "1.21"
+                experimental: ""
+              - go: "1.22"
+                experimental: "true"
+            max_in_flight: all

@@ -1,0 +1,168 @@
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/step/script/carry
+# pipemaster:arg {"digest":"d26f3cf80a4b5a637efa590cd7487fb9480d42c4aa2d61948823317f8ef949ee","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/carry
+# pipemaster:arg {"digest":"08e0b75625512013394cc7e273a20984291ca24d904b545081f9d88047290ea7","carry":"id: compile\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/lint/step/script/carry
+# pipemaster:arg {"digest":"d076beb90b111932810b3f838ea7e48635abdcfd27ffa73ed6ea33638a53a4df","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/lint/carry
+# pipemaster:arg {"digest":"592e6aca8ce16ce2a6ccc378de30809e167c3ac02f2d1a3d7b4df8adda8523e4","carry":"id: lint\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/summary/step/script/carry
+# pipemaster:arg {"digest":"f4b12de802d1b3e2c949a8d6f90a0db39576fa32480b95b8d68c049c76660af3","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated display.name pipeline/gitlab-ci/job/summary/step/script-2
+# pipemaster:arg {"id":"script","written":"script-2","kind":"step"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/summary/step/script-2/carry
+# pipemaster:arg {"digest":"8bf4040e8441a330fb67e6e5a6470bfc3251cd128335b0f489bad769360502a7","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:arg {"job":"summary","digest":"d88293a1f8cae4cdb7ec40e9ebb6b387af2b7bba636346509157b82dc8b2d47f","tasks":["script-2"]}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/summary/carry
+# pipemaster:arg {"digest":"b17164b9b5622dfc18b07e5c2bbc4f168d97c420c8fd00a277929afb80186454","carry":"id: summary\nneeds:\n    - job: compile\n    - job: lint\n    - job: unit\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/unit/step/script/carry
+# pipemaster:arg {"digest":"ad179a31a0c137ad8c0b6dbf4a1159f896ef2fc927dadce86430a7ba09aba60a","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/unit/carry
+# pipemaster:arg {"digest":"5d0794bccb318d720f300996620cd7e05cbc4ae272765262fa6adbe4065020ec","carry":"id: unit\nneeds:\n    - job: compile\n    - job: lint\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"5b03eb3bbe0ef4b389553aa33337ffd761377aadd1e808c311391cd8919804c0","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nfinally:\n    - id: cleanup\n      needs:\n        - job: compile\n      steps:\n        - id: script\n          kind: script\n          script:\n            - make clean\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/cleanup/step/script
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/cleanup/step/script
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/compile/step/script
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/lint/step/script
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/summary/step/script
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/unit/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: compile
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make build
+  - name: lint
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make lint
+  - name: summary
+    plan:
+      - get: source
+        passed:
+          - compile
+          - lint
+          - unit
+        trigger: true
+      - get: source-tags
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make report
+    ensure:
+      task: script-2
+      input_mapping:
+        workspace: source
+      config:
+        platform: linux
+        image_resource:
+          type: registry-image
+          source:
+            repository: ubuntu
+            tag: latest
+        inputs:
+          - name: workspace
+        outputs:
+          - name: workspace
+        run:
+          path: sh
+          args:
+            - -ec
+            - make clean
+  - name: unit
+    plan:
+      - get: source
+        passed:
+          - compile
+          - lint
+        trigger: true
+      - get: source-tags
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make test

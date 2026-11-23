@@ -1,0 +1,2450 @@
+---
+groups:
+  - name: bosh
+    jobs:
+      - gate
+      - bump-deps
+      - bump-golang-deps
+      - bump-packages
+      - unit-common
+      - unit-monitor
+      - unit-nats-sync
+      - unit-release
+      - unit-director-sqlite
+      - unit-director-mysql-8
+      - unit-director-postgres-13
+      - unit-director-postgres-15
+      - brats-utils
+      - run-bundle-audit
+      - integration-postgres
+      - integration-postgres-hotswap
+      - integration-mysql
+      - candidate-release
+      - create-bosh-candidate-release-compiled-noble
+      - bats-noble
+      - bats-noble-cleanup-leftovers
+      - bats-jammy-fips
+      - bats-jammy-fips-cleanup-leftovers
+      - brats-acceptance-noble
+      - brats-performance-noble
+      - bdrats-noble
+      - upgrade-postgres-noble
+      - upgrade-postgres-noble-cleanup-leftovers
+      - upgrade-mysql-noble
+      - upgrade-mysql-noble-cleanup-leftovers
+      - delivery
+
+  - name: stemcell-noble
+    jobs:
+      - create-bosh-candidate-release-compiled-noble
+      - bats-noble
+      - bats-noble-cleanup-leftovers
+      - brats-acceptance-noble
+      - brats-performance-noble
+      - bdrats-noble
+      - upgrade-postgres-noble
+      - upgrade-postgres-noble-cleanup-leftovers
+      - upgrade-mysql-noble
+      - upgrade-mysql-noble-cleanup-leftovers
+
+  - name: stemcell-jammy-fips
+    jobs:
+      - bats-jammy-fips
+      - bats-jammy-fips-cleanup-leftovers
+
+  - name: stemcell-resolute
+    jobs:
+      - create-bosh-candidate-release-compiled-resolute
+      - bats-resolute
+      - bats-resolute-cleanup-leftovers
+      - brats-acceptance-resolute
+      - bdrats-resolute
+
+  - name: cut-release
+    jobs:
+      - automatically-release-new-patch
+      - bump-major
+      - bump-minor
+      - bump-patch
+      - finalize-release
+
+  - name: container-images
+    jobs:
+      - build-main-postgres-13
+      - build-main-postgres-15
+      - build-main-mysql-8-0
+      - build-integration
+      - build-docker-cpi
+      - build-warden-cpi
+
+  - name: all
+    jobs:
+      - "*"
+
+jobs:
+  - name: gate
+    serial_groups:
+      - integration-mysql
+      - integration-postgres
+      - integration-postgres-hotswap
+      - unit-common
+      - unit-monitor
+      - unit-nats-sync
+      - unit-release
+      - unit-director-sqlite
+      - unit-director-mysql-8
+      - unit-director-postgres-13
+      - unit-director-postgres-15
+      - run-bundle-audit
+      - brats-utils
+    plan:
+      - get: bosh
+        trigger: true
+
+  - name: brats-utils
+    serial: true
+    serial_groups: [ brats-utils ]
+    build_log_retention:
+      builds: 250
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: integration-image
+          - get: bosh
+            trigger: true
+            passed: [ gate ]
+      - do:
+          - task: test-brats-utils
+            file: bosh-ci/ci/shared/brats/test-utils.yml
+            image: integration-image
+            privileged: true
+
+  - name: unit-common
+    public: true
+    serial: true
+    serial_groups: [ unit-common ]
+    build_log_retention:
+      builds: 250
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh
+            trigger: true
+            passed: [ gate ]
+          - get: integration-image
+      - task: test-rake-task
+        file: bosh-ci/ci/tasks/test-rake-task.yml
+        image: integration-image
+        timeout: 2h
+        params:
+          DB: sqlite
+          RAKE_TASK: spec:unit:common
+
+  - name: unit-monitor
+    public: true
+    serial: true
+    serial_groups: [ unit-monitor ]
+    build_log_retention:
+      builds: 250
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh
+            trigger: true
+            passed: [ gate ]
+          - get: integration-image
+      - task: test-rake-task
+        file: bosh-ci/ci/tasks/test-rake-task.yml
+        image: integration-image
+        timeout: 2h
+        params:
+          DB: sqlite
+          RAKE_TASK: spec:unit:monitor
+
+  - name: unit-nats-sync
+    public: true
+    serial: true
+    serial_groups: [ unit-nats-sync ]
+    build_log_retention:
+      builds: 250
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh
+            trigger: true
+            passed: [ gate ]
+          - get: integration-image
+      - task: test-rake-task
+        file: bosh-ci/ci/tasks/test-rake-task.yml
+        image: integration-image
+        timeout: 2h
+        params:
+          DB: sqlite
+          RAKE_TASK: spec:unit:nats_sync
+
+  - name: unit-release
+    public: true
+    serial: true
+    serial_groups: [ unit-release ]
+    build_log_retention:
+      builds: 250
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh
+            trigger: true
+            passed: [ gate ]
+          - get: integration-image
+      - task: test-rake-task
+        file: bosh-ci/ci/tasks/test-rake-task.yml
+        image: integration-image
+        timeout: 2h
+        params:
+          DB: sqlite
+          RAKE_TASK: spec:unit:release
+
+  - name: unit-director-sqlite
+    public: true
+    serial: true
+    serial_groups: [ unit-director-sqlite ]
+    build_log_retention:
+      builds: 250
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh
+            trigger: true
+            passed: [ gate ]
+          - get: integration-image
+      - task: test-rake-task
+        file: bosh-ci/ci/tasks/test-rake-task.yml
+        image: integration-image
+        timeout: 2h
+        params:
+          DB: sqlite
+          RAKE_TASK: spec:unit:director
+
+  - name: unit-director-mysql-8
+    public: true
+    serial: true
+    serial_groups: [ unit-director-mysql-8 ]
+    build_log_retention:
+      builds: 250
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh
+            passed: [ gate ]
+            trigger: true
+          - get: integration-mysql-8-0-image
+      - task: test-rake-task
+        file: bosh-ci/ci/tasks/test-rake-task.yml
+        image: integration-mysql-8-0-image
+        timeout: 2h
+        privileged: true
+        params:
+          DB: mysql
+          RAKE_TASK: spec:unit:director
+
+  - name: unit-director-postgres-13
+    public: true
+    serial: true
+    serial_groups: [ unit-director-postgres-13 ]
+    build_log_retention:
+      builds: 250
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh
+            passed: [ gate ]
+            trigger: true
+          - get: integration-postgres-13-image
+      - task: test-rake-task
+        file: bosh-ci/ci/tasks/test-rake-task.yml
+        image: integration-postgres-13-image
+        timeout: 2h
+        privileged: true
+        params:
+          DB: postgresql
+          RAKE_TASK: spec:unit:director
+
+  - name: unit-director-postgres-15
+    public: true
+    serial: true
+    serial_groups: [ unit-director-postgres-15 ]
+    build_log_retention:
+      builds: 250
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh
+            passed: [ gate ]
+            trigger: true
+          - get: integration-postgres-15-image
+      - task: test-rake-task
+        file: bosh-ci/ci/tasks/test-rake-task.yml
+        image: integration-postgres-15-image
+        timeout: 2h
+        privileged: true
+        params:
+          DB: postgresql
+          RAKE_TASK: spec:unit:director
+
+  - name: run-bundle-audit
+    public: true
+    serial: true
+    serial_groups: [ run-bundle-audit ]
+    build_log_retention:
+      builds: 250
+    plan:
+      - get: bosh
+        trigger: true
+        passed: [ gate ]
+      - task: test-bundle-audit
+        config:
+          inputs:
+            - name: bosh
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              tag: &branch_name main
+              repository: ghcr.io/cloudfoundry/bosh/integration
+              username: ((github_read_write_packages.username))
+              password: ((github_read_write_packages.password))
+          run:
+            path: /bin/bash
+            args:
+              - -exc
+              - |
+                set -eu -o pipefail
+                set -x
+                cd bosh/src
+                gem install bundler:"$(grep -A 1 'BUNDLED WITH' Gemfile.lock | tail -n 1 | awk '{$1=$1};1')";
+                bundle install
+                bundle exec bundle-audit version
+                bundle exec bundle-audit update
+                bundle exec bundle-audit check
+
+  - name: integration-postgres
+    public: true
+    serial: true
+    serial_groups: [ integration-postgres ]
+    build_log_retention:
+      builds: 250
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh
+            trigger: true
+            passed: [ gate ]
+          - get: bosh-cli
+            trigger: true
+            params:
+              globs:
+                - "bosh-cli-*-linux-amd64"
+          - get: bosh-agent
+          - get: integration-postgres-15-image
+          - get: config-server
+          - get: release-details
+      - task: tests
+        file: bosh-ci/ci/tasks/test-rake-task.yml
+        image: integration-postgres-15-image
+        privileged: true
+        params:
+          DB: postgresql
+          RAKE_TASK: spec:integration
+          PARALLEL_TEST_MULTIPLY_PROCESSES: &parallel_test_multiplier "0.6"
+      - put: release-details
+        params:
+          repository: release-details
+          rebase: true
+
+  - name: integration-postgres-hotswap
+    public: true
+    serial: true
+    serial_groups: [ integration-postgres-hotswap ]
+    build_log_retention:
+      builds: 250
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh
+            trigger: true
+            passed: [ gate ]
+          - get: bosh-cli
+            trigger: true
+            params:
+              globs:
+                - "bosh-cli-*-linux-amd64"
+          - get: bosh-agent
+          - get: integration-postgres-15-image
+          - get: config-server
+          - get: release-details
+      - task: tests
+        file: bosh-ci/ci/tasks/test-rake-task.yml
+        image: integration-postgres-15-image
+        privileged: true
+        params:
+          DB: postgresql
+          RAKE_TASK: spec:integration
+          PARALLEL_TEST_MULTIPLY_PROCESSES: *parallel_test_multiplier
+          UPDATE_VM_STRATEGY: create-swap-delete
+      - put: release-details
+        params:
+          repository: release-details
+          rebase: true
+
+  - name: integration-mysql
+    public: true
+    serial: true
+    serial_groups: [ integration-mysql ]
+    build_log_retention:
+      builds: 250
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh
+            passed: [ gate ]
+            trigger: true
+          - get: bosh-cli
+            trigger: true
+            params:
+              globs:
+                - "bosh-cli-*-linux-amd64"
+          - get: bosh-agent
+          - get: integration-mysql-8-0-image
+          - get: config-server
+          - get: release-details
+      - task: tests
+        file: bosh-ci/ci/tasks/test-rake-task.yml
+        image: integration-mysql-8-0-image
+        privileged: true
+        params:
+          DB: mysql
+          RAKE_TASK: spec:integration
+          PARALLEL_TEST_MULTIPLY_PROCESSES: *parallel_test_multiplier
+      - put: release-details
+        params:
+          repository: release-details
+          rebase: true
+
+  - name: candidate-release
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh
+            trigger: true
+            passed:
+              - unit-common
+              - unit-monitor
+              - unit-nats-sync
+              - unit-release
+              - unit-director-sqlite
+              - unit-director-mysql-8
+              - unit-director-postgres-13
+              - unit-director-postgres-15
+              - integration-mysql
+              - integration-postgres
+              - integration-postgres-hotswap
+              - run-bundle-audit
+          - get: bosh-cli
+            params:
+              globs:
+                - "bosh-cli-*-linux-amd64"
+          - get: integration-image
+      - task: make
+        file: bosh-ci/ci/tasks/make-candidate.yml
+        image: integration-image
+      - put: bosh-candidate-release-tarballs
+        params:
+          file: "release/bosh-dev-release.tgz"
+
+
+  - name: create-bosh-candidate-release-compiled-noble
+    old_name: create-bosh-candidate-release-compiled
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: ubuntu-noble-stemcell-registry-image
+          - get: bosh
+            passed: [ candidate-release ]
+          - get: bosh-deployment
+          - get: release
+            resource: bosh-candidate-release-tarballs
+            passed: [ candidate-release ]
+            trigger: true
+      - task: export-release
+        file: bosh-deployment/ci/tasks/shared/bosh-agent-compile.yml
+        image: ubuntu-noble-stemcell-registry-image
+      - put: bosh-candidate-release-compiled-noble
+        params:
+          file: "compiled-release/*.tgz"
+
+  - name: bats-noble
+    old_name: bats
+    serial: true
+    serial_groups: [ bats-noble ]
+    plan:
+      - do:
+          - in_parallel:
+              - get: bosh-ci
+              - get: integration-image
+              - get: bosh-candidate-release-tarballs
+                passed: [ create-bosh-candidate-release-compiled-noble ]
+              - get: bosh-release
+                resource: bosh-candidate-release-compiled-noble
+                trigger: true
+                passed: [ create-bosh-candidate-release-compiled-noble ]
+              - get: stemcell
+                resource: gcp-stemcell-noble
+              - get: bosh-cli
+                params:
+                  globs:
+                    - "bosh-cli-*-linux-amd64"
+              - get: bats
+              - get: bosh-deployment
+              - get: bosh
+                passed: [ create-bosh-candidate-release-compiled-noble ]
+          - put: terraform
+            resource: gcp-terraform
+            params:
+              env_name: bosh-bats-noble
+              terraform_source: bosh-ci/ci/bats/iaas/gcp/terraform
+              vars:
+                name: bosh-bats-noble
+          - do:
+              - task: deploy-director
+                file: bosh-ci/ci/bats/tasks/deploy-director.yml
+                image: integration-image
+                input_mapping:
+                  environment: terraform
+                params:
+                  BAT_INFRASTRUCTURE: gcp
+                  GCP_JSON_KEY: ((gcp_json_key))
+                  DEPLOY_ARGS: |-
+                    -o bosh-deployment/external-ip-not-recommended.yml
+                    -o bosh-ci/ci/bats/ops/use-custom-stemcell.yml
+              - task: prepare-bats-config
+                file: bosh-ci/ci/bats/iaas/gcp/prepare-bats-config.yml
+                image: integration-image
+                params:
+                  STEMCELL_NAME: bosh-google-kvm-ubuntu-noble
+              - task: run-bats
+                file: bats/ci/tasks/run-bats.yml
+                image: integration-image
+        ensure:
+          do:
+            - task: teardown
+              file: bosh-ci/ci/bats/tasks/destroy-director.yml
+              image: integration-image
+            - put: terraform
+              resource: gcp-terraform
+              no_get: true
+              params:
+                action: destroy
+                env_name: bosh-bats-noble
+                terraform_source: bosh-ci/ci/bats/iaas/gcp/terraform
+                vars:
+                  name: bosh-bats-noble
+              on_failure:
+                task: delete-stale-terraform-state
+                file: bosh-ci/ci/tasks/delete-stale-terraform-state.yml
+                image: integration-image
+                params:
+                  GCP_JSON_KEY: ((gcp_json_key))
+                  TERRAFORM_STATE_URI: gs://bosh-director-pipeline/bats-terraform/bosh-bats-noble.tfstate
+              ensure:
+                task: cleanup-leftover-environments
+                file: bosh-ci/ci/tasks/cleanup-leftovers.yml
+                image: integration-image
+                params:
+                  # NOTE: leftovers uses substring matching. Env names are "bosh-" plus
+                  # the job name, and every stemcell-specific name carries its stemcell
+                  # line, so no filter matches another env of ours and none is broad
+                  # enough to reach another pipeline's resources in this GCP project.
+                  LEFTOVERS_FILTER: bosh-bats-noble
+                  GCP_JSON_KEY: ((gcp_json_key))
+
+  - name: bats-noble-cleanup-leftovers
+    old_name: bats-cleanup-leftovers
+    serial: true
+    serial_groups: [ bats-noble ]
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: integration-image
+          - get: daily
+            trigger: true
+      - task: cleanup-leftover-environments
+        file: bosh-ci/ci/tasks/cleanup-leftovers.yml
+        image: integration-image
+        params:
+          # NOTE: leftovers uses substring matching. Env names are "bosh-" plus
+          # the job name, and every stemcell-specific name carries its stemcell
+          # line, so no filter matches another env of ours and none is broad
+          # enough to reach another pipeline's resources in this GCP project.
+          LEFTOVERS_FILTER: bosh-bats-noble
+          GCP_JSON_KEY: ((gcp_json_key))
+      - task: delete-stale-terraform-state
+        file: bosh-ci/ci/tasks/delete-stale-terraform-state.yml
+        image: integration-image
+        params:
+          GCP_JSON_KEY: ((gcp_json_key))
+          TERRAFORM_STATE_URI: gs://bosh-director-pipeline/bats-terraform/bosh-bats-noble.tfstate
+
+  - name: bats-jammy-fips
+    old_name: bats-fips
+    serial: true
+    serial_groups: [ bats-jammy-fips ]
+    plan:
+      - do:
+          - in_parallel:
+              - get: bosh-ci
+              - get: integration-image
+                # NOTE: because FIPS is still Jammy based the non-compiled release is used
+              - get: bosh-release
+                resource: bosh-candidate-release-tarballs
+                trigger: true
+                passed: [ create-bosh-candidate-release-compiled-noble ]
+              - get: bosh-candidate-release-compiled-noble
+                passed: [ create-bosh-candidate-release-compiled-noble ]
+              - get: stemcell
+                resource: gcp-stemcell-jammy-fips
+              - get: bosh-cli
+                params:
+                  globs:
+                    - "bosh-cli-*-linux-amd64"
+              - get: bats
+              - get: bosh-deployment
+              - get: bosh
+                passed: [ create-bosh-candidate-release-compiled-noble ]
+          - put: terraform
+            resource: gcp-terraform
+            params:
+              env_name: bosh-bats-jammy-fips
+              terraform_source: bosh-ci/ci/bats/iaas/gcp/terraform
+              vars:
+                name: bosh-bats-jammy-fips
+          - do:
+              - task: deploy-director
+                file: bosh-ci/ci/bats/tasks/deploy-director.yml
+                image: integration-image
+                input_mapping:
+                  environment: terraform
+                params:
+                  BAT_INFRASTRUCTURE: gcp
+                  GCP_JSON_KEY: ((gcp_json_key))
+                  DEPLOY_ARGS: |-
+                    -o bosh-deployment/misc/source-releases/bpm.yml
+                    -o bosh-deployment/external-ip-not-recommended.yml
+                    -o bosh-ci/ci/bats/ops/use-custom-stemcell.yml
+              - task: prepare-bats-config
+                file: bosh-ci/ci/bats/iaas/gcp/prepare-bats-config.yml
+                image: integration-image
+                params:
+                  STEMCELL_NAME: bosh-google-kvm-ubuntu-jammy-fips-go_agent
+              - task: run-bats
+                file: bats/ci/tasks/run-bats.yml
+                image: integration-image
+        ensure:
+          do:
+            - task: teardown
+              file: bosh-ci/ci/bats/tasks/destroy-director.yml
+              image: integration-image
+            - put: terraform
+              resource: gcp-terraform
+              no_get: true
+              params:
+                action: destroy
+                env_name: bosh-bats-jammy-fips
+                terraform_source: bosh-ci/ci/bats/iaas/gcp/terraform
+                vars:
+                  name: bosh-bats-jammy-fips
+              on_failure:
+                task: delete-stale-terraform-state
+                file: bosh-ci/ci/tasks/delete-stale-terraform-state.yml
+                image: integration-image
+                params:
+                  GCP_JSON_KEY: ((gcp_json_key))
+                  TERRAFORM_STATE_URI: gs://bosh-director-pipeline/bats-terraform/bosh-bats-jammy-fips.tfstate
+              ensure:
+                task: cleanup-leftover-environments
+                file: bosh-ci/ci/tasks/cleanup-leftovers.yml
+                image: integration-image
+                params:
+                  # NOTE: leftovers uses substring matching. Env names are "bosh-" plus
+                  # the job name, and every stemcell-specific name carries its stemcell
+                  # line, so no filter matches another env of ours and none is broad
+                  # enough to reach another pipeline's resources in this GCP project.
+                  LEFTOVERS_FILTER: bosh-bats-jammy-fips
+                  GCP_JSON_KEY: ((gcp_json_key))
+
+  - name: bats-jammy-fips-cleanup-leftovers
+    old_name: bats-fips-cleanup-leftovers
+    serial: true
+    serial_groups: [ bats-jammy-fips ]
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: integration-image
+          - get: daily
+            trigger: true
+      - task: cleanup-leftover-environments
+        file: bosh-ci/ci/tasks/cleanup-leftovers.yml
+        image: integration-image
+        params:
+          # NOTE: leftovers uses substring matching. Env names are "bosh-" plus
+          # the job name, and every stemcell-specific name carries its stemcell
+          # line, so no filter matches another env of ours and none is broad
+          # enough to reach another pipeline's resources in this GCP project.
+          LEFTOVERS_FILTER: bosh-bats-jammy-fips
+          GCP_JSON_KEY: ((gcp_json_key))
+      - task: delete-stale-terraform-state
+        file: bosh-ci/ci/tasks/delete-stale-terraform-state.yml
+        image: integration-image
+        params:
+          GCP_JSON_KEY: ((gcp_json_key))
+          TERRAFORM_STATE_URI: gs://bosh-director-pipeline/bats-terraform/bosh-bats-jammy-fips.tfstate
+
+  - name: brats-acceptance-noble
+    old_name: brats-acceptance
+    serial: true
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh
+            passed: [ create-bosh-candidate-release-compiled-noble ]
+          - get: bosh-dns-release
+          - get: stemcell
+            resource: warden-stemcell-noble
+          - get: director-stemcell
+            resource: warden-stemcell-noble
+          - get: bosh-candidate-release-tarballs
+            passed: [ create-bosh-candidate-release-compiled-noble ]
+          - get: bosh-release
+            resource: bosh-candidate-release-tarballs
+            passed: [ create-bosh-candidate-release-compiled-noble ]
+          - get: bosh-candidate-release-compiled-noble
+            trigger: true
+            passed: [ create-bosh-candidate-release-compiled-noble ]
+          - get: bosh-deployment
+          - get: docker-cpi-image
+      - do:
+          - put: brats-terraform
+            params:
+              # Spelled out at each use, like every other env in this pipeline:
+              # the env name is the one thing that must change when a job is
+              # copied for another stemcell line, so a shared anchor for it
+              # would survive the copy unnoticed. The credentials below are
+              # identical across lines, so those stay anchored.
+              env_name: bosh-brats-noble
+              terraform_source: bosh-ci/ci/shared/brats/terraform
+              vars:
+                <<: &brats-terraform-vars
+                  aws_access_key_id: ((brats_rds_terraform_aws_access_key.username))
+                  aws_secret_access_key: ((brats_rds_terraform_aws_access_key.password))
+                  database_name: brats
+                  database_username: ((brats_database_user.username))
+                  database_password: ((brats_database_user.password))
+                job: brats-acceptance-noble
+          - task: test-brats-acceptance
+            file: bosh-ci/ci/shared/brats/test-acceptance.yml
+            image: docker-cpi-image
+            input_mapping:
+              database-metadata: brats-terraform
+            privileged: true
+            params:
+              RDS_MYSQL_EXTERNAL_DB_USER: ((brats_database_user.username))
+              RDS_MYSQL_EXTERNAL_DB_PASSWORD: ((brats_database_user.password))
+              RDS_MYSQL_EXTERNAL_DB_NAME: brats
+              RDS_POSTGRES_EXTERNAL_DB_USER: ((brats_database_user.username))
+              RDS_POSTGRES_EXTERNAL_DB_PASSWORD: ((brats_database_user.password))
+              RDS_POSTGRES_EXTERNAL_DB_NAME: brats
+              GCP_MYSQL_EXTERNAL_DB_USER: ((brats_database_user.username))
+              GCP_MYSQL_EXTERNAL_DB_PASSWORD: ((brats_database_user.password))
+              GCP_MYSQL_EXTERNAL_DB_NAME: brats
+              GCP_POSTGRES_EXTERNAL_DB_USER: ((brats_database_user.username))
+              GCP_POSTGRES_EXTERNAL_DB_PASSWORD: ((brats_database_user.password))
+              GCP_POSTGRES_EXTERNAL_DB_NAME: brats
+              DIRECTOR_STEMCELL_OS: ubuntu-noble
+              STEMCELL_OS: ubuntu-noble
+        ensure:
+          put: brats-terraform
+          no_get: true
+          params:
+            env_name: bosh-brats-noble
+            terraform_source: bosh-ci/ci/shared/brats/terraform
+            vars:
+              <<: *brats-terraform-vars
+              job: brats-acceptance-noble
+            action: destroy
+          attempts: 3
+
+  - name: brats-performance-noble
+    old_name: brats-performance
+    serial: true
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: integration-image
+          - get: bosh
+            passed: [ create-bosh-candidate-release-compiled-noble ]
+          - get: bosh-release
+            resource: bosh-candidate-release-compiled-noble
+            trigger: true
+          - get: cf-deployment
+          - get: docker-cpi-image
+          - get: stemcell
+            resource: warden-stemcell-noble
+          - get: director-stemcell
+            resource: warden-stemcell-noble
+      - do:
+          - task: test-brats-performance
+            image: docker-cpi-image
+            file: bosh-ci/ci/shared/brats/test-performance.yml
+            privileged: true
+            params:
+              DIRECTOR_STEMCELL_OS: ubuntu-noble
+              STEMCELL_OS: ubuntu-noble
+
+  - name: bdrats-noble
+    old_name: bosh-disaster-recovery-acceptance-tests
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: integration-image
+          - get: bosh
+            passed: [ create-bosh-candidate-release-compiled-noble ]
+          - get: stemcell
+            resource: warden-stemcell-noble
+          - get: bosh-candidate-release-tarballs
+            passed: [ create-bosh-candidate-release-compiled-noble ]
+          - get: bosh-release
+            resource: bosh-candidate-release-compiled-noble
+            trigger: true
+            passed: [ create-bosh-candidate-release-compiled-noble ]
+          - get: bosh-disaster-recovery-acceptance-tests
+          - get: bosh-deployment
+          - get: bbr-cli-binary
+            params:
+              globs: [ "bbr*-linux-amd64" ]
+          - get: docker-cpi-image
+      - do:
+          - task: test-bdrats
+            image: docker-cpi-image
+            file: bosh-ci/ci/tasks/test-bdrats.yml
+            privileged: true
+            params:
+              DIRECTOR_OPS_FILES: ""
+
+  - name: upgrade-postgres-noble
+    old_name: upgrade-postgres
+    serial: true
+    serial_groups: [ upgrade-postgres-noble ]
+    plan:
+      - do:
+          - in_parallel:
+              - get: bosh-ci
+              - get: integration-image
+              - get: bosh
+                passed: [ create-bosh-candidate-release-compiled-noble ]
+              - get: stemcell
+                resource: gcp-stemcell-noble
+              - get: bosh-deployment
+              - get: bosh-cli
+                params:
+                  globs:
+                    - "bosh-cli-*-linux-amd64"
+              - get: bosh-release
+                resource: bosh-candidate-release-compiled-noble
+                trigger: true
+                passed: [ create-bosh-candidate-release-compiled-noble ]
+              - get: last-released-bosh-release
+              - get: zookeeper-release
+          - put: terraform
+            resource: gcp-terraform
+            params:
+              env_name: bosh-upgrade-postgres-noble
+              terraform_source: bosh-ci/ci/bats/iaas/gcp/terraform
+              vars:
+                name: bosh-upgrade-postgres-noble
+      - do:
+          - task: deploy-previous-version
+            image: integration-image
+            file: bosh-ci/ci/bats/tasks/deploy-director.yml
+            input_mapping:
+              environment: terraform
+              bosh-release: last-released-bosh-release
+            params:
+              BAT_INFRASTRUCTURE: gcp
+              GCP_JSON_KEY: ((gcp_json_key))
+              DEPLOY_ARGS: |-
+                -o bosh-deployment/external-ip-not-recommended.yml
+          - task: deploy-zookeeper
+            file: bosh-ci/ci/tasks/deploy-zookeeper.yml
+            image: integration-image
+            params:
+              CPI: gcp
+          - task: upgrade-to-current-version
+            image: integration-image
+            file: bosh-ci/ci/bats/tasks/deploy-director.yml
+            input_mapping:
+              environment: terraform
+            params:
+              BAT_INFRASTRUCTURE: gcp
+              GCP_JSON_KEY: ((gcp_json_key))
+              DEPLOY_ARGS: |-
+                -o bosh-deployment/external-ip-not-recommended.yml
+          - task: wait-for-agents
+            image: integration-image
+            file: bosh-ci/ci/tasks/wait-for-agents.yml
+          - task: recreate-zookeeper
+            image: integration-image
+            file: bosh-ci/ci/tasks/deploy-zookeeper.yml
+            params:
+              CPI: gcp
+        ensure:
+          do:
+            - task: teardown
+              image: integration-image
+              file: bosh-ci/ci/bats/tasks/destroy-director.yml
+            - put: terraform
+              resource: gcp-terraform
+              no_get: true
+              params:
+                action: destroy
+                env_name: bosh-upgrade-postgres-noble
+                terraform_source: bosh-ci/ci/bats/iaas/gcp/terraform
+                vars:
+                  name: bosh-upgrade-postgres-noble
+              on_failure:
+                task: delete-stale-terraform-state
+                file: bosh-ci/ci/tasks/delete-stale-terraform-state.yml
+                image: integration-image
+                params:
+                  GCP_JSON_KEY: ((gcp_json_key))
+                  TERRAFORM_STATE_URI: gs://bosh-director-pipeline/bats-terraform/bosh-upgrade-postgres-noble.tfstate
+              ensure:
+                task: cleanup-leftover-environments
+                file: bosh-ci/ci/tasks/cleanup-leftovers.yml
+                image: integration-image
+                params:
+                  LEFTOVERS_FILTER: bosh-upgrade-postgres-noble
+                  GCP_JSON_KEY: ((gcp_json_key))
+
+  - name: upgrade-postgres-noble-cleanup-leftovers
+    old_name: upgrade-postgres-cleanup-leftovers
+    serial_groups: [ upgrade-postgres-noble ]
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: integration-image
+          - get: daily
+            trigger: true
+      - task: cleanup-leftover-environments
+        file: bosh-ci/ci/tasks/cleanup-leftovers.yml
+        image: integration-image
+        params:
+          LEFTOVERS_FILTER: bosh-upgrade-postgres-noble
+          GCP_JSON_KEY: ((gcp_json_key))
+      - task: delete-stale-terraform-state
+        file: bosh-ci/ci/tasks/delete-stale-terraform-state.yml
+        image: integration-image
+        params:
+          GCP_JSON_KEY: ((gcp_json_key))
+          TERRAFORM_STATE_URI: gs://bosh-director-pipeline/bats-terraform/bosh-upgrade-postgres-noble.tfstate
+
+  - name: upgrade-mysql-noble
+    old_name: upgrade-mysql
+    serial: true
+    serial_groups: [ upgrade-mysql-noble ]
+    plan:
+      - do:
+          - in_parallel:
+              - get: bosh-ci
+              - get: integration-image
+              - get: bosh
+                passed: [ create-bosh-candidate-release-compiled-noble ]
+              - get: stemcell
+                resource: gcp-stemcell-noble
+              - get: bosh-deployment
+              - get: bosh-cli
+                params:
+                  globs:
+                    - "bosh-cli-*-linux-amd64"
+              - get: bosh-release
+                resource: bosh-candidate-release-compiled-noble
+                trigger: true
+                passed: [ create-bosh-candidate-release-compiled-noble ]
+              - get: last-released-bosh-release
+              - get: zookeeper-release
+          - put: terraform
+            resource: gcp-terraform
+            params:
+              env_name: bosh-upgrade-mysql-noble
+              terraform_source: bosh-ci/ci/bats/iaas/gcp/terraform
+              vars:
+                name: bosh-upgrade-mysql-noble
+                create_mysql_db: true
+      - do:
+          - task: deploy-previous-version
+            image: integration-image
+            file: bosh-ci/ci/bats/tasks/deploy-director.yml
+            input_mapping:
+              environment: terraform
+              bosh-release: last-released-bosh-release
+            params:
+              BAT_INFRASTRUCTURE: gcp
+              GCP_JSON_KEY: ((gcp_json_key))
+              DEPLOY_ARGS: |-
+                -o bosh-deployment/external-ip-not-recommended.yml
+                -o bosh-deployment/misc/external-db.yml
+          - task: deploy-zookeeper
+            image: integration-image
+            file: bosh-ci/ci/tasks/deploy-zookeeper.yml
+            params:
+              CPI: gcp
+          - task: upgrade-to-current-version
+            image: integration-image
+            file: bosh-ci/ci/bats/tasks/deploy-director.yml
+            input_mapping:
+              environment: terraform
+            params:
+              BAT_INFRASTRUCTURE: gcp
+              GCP_JSON_KEY: ((gcp_json_key))
+              DEPLOY_ARGS: |-
+                -o bosh-deployment/external-ip-not-recommended.yml
+                -o bosh-deployment/misc/external-db.yml
+          - task: wait-for-agents
+            image: integration-image
+            file: bosh-ci/ci/tasks/wait-for-agents.yml
+          - task: recreate-zookeeper
+            image: integration-image
+            file: bosh-ci/ci/tasks/deploy-zookeeper.yml
+            params:
+              CPI: gcp
+        ensure:
+          do:
+            - task: teardown
+              image: integration-image
+              file: bosh-ci/ci/bats/tasks/destroy-director.yml
+            - put: terraform
+              resource: gcp-terraform
+              no_get: true
+              params:
+                action: destroy
+                env_name: bosh-upgrade-mysql-noble
+                terraform_source: bosh-ci/ci/bats/iaas/gcp/terraform
+                vars:
+                  name: bosh-upgrade-mysql-noble
+              on_failure:
+                task: delete-stale-terraform-state
+                file: bosh-ci/ci/tasks/delete-stale-terraform-state.yml
+                image: integration-image
+                params:
+                  GCP_JSON_KEY: ((gcp_json_key))
+                  TERRAFORM_STATE_URI: gs://bosh-director-pipeline/bats-terraform/bosh-upgrade-mysql-noble.tfstate
+              ensure:
+                task: cleanup-leftover-environments
+                file: bosh-ci/ci/tasks/cleanup-leftovers.yml
+                image: integration-image
+                params:
+                  LEFTOVERS_FILTER: bosh-upgrade-mysql-noble
+                  GCP_JSON_KEY: ((gcp_json_key))
+
+  - name: upgrade-mysql-noble-cleanup-leftovers
+    old_name: upgrade-mysql-cleanup-leftovers
+    serial_groups: [ upgrade-mysql-noble ]
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: integration-image
+          - get: daily
+            trigger: true
+      - task: cleanup-leftover-environments
+        file: bosh-ci/ci/tasks/cleanup-leftovers.yml
+        image: integration-image
+        params:
+          LEFTOVERS_FILTER: bosh-upgrade-mysql-noble
+          GCP_JSON_KEY: ((gcp_json_key))
+      - task: delete-stale-terraform-state
+        file: bosh-ci/ci/tasks/delete-stale-terraform-state.yml
+        image: integration-image
+        params:
+          GCP_JSON_KEY: ((gcp_json_key))
+          TERRAFORM_STATE_URI: gs://bosh-director-pipeline/bats-terraform/bosh-upgrade-mysql-noble.tfstate
+
+  #
+  # Ubuntu Resolute stemcell line.
+  #
+  # Each job below is its noble twin with the stemcell resources, the compiled
+  # release resource, the stemcell OS params and the env name swapped. Nothing
+  # downstream (delivery included) has a `passed:` constraint on any of them, so
+  # a red resolute job reports a real problem without blocking a bosh release.
+  #
+
+  - name: create-bosh-candidate-release-compiled-resolute
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: ubuntu-resolute-stemcell-registry-image
+          - get: bosh
+            passed: [ candidate-release ]
+          - get: bosh-deployment
+          - get: release
+            resource: bosh-candidate-release-tarballs
+            passed: [ candidate-release ]
+            trigger: true
+      - task: export-release
+        file: bosh-deployment/ci/tasks/shared/bosh-agent-compile.yml
+        image: ubuntu-resolute-stemcell-registry-image
+      - put: bosh-candidate-release-compiled-resolute
+        params:
+          file: "compiled-release/*.tgz"
+
+  - name: bats-resolute
+    serial: true
+    serial_groups: [ bats-resolute ]
+    plan:
+      - do:
+          - in_parallel:
+              - get: bosh-ci
+              - get: integration-image
+              - get: bosh-candidate-release-tarballs
+                passed: [ create-bosh-candidate-release-compiled-resolute ]
+              - get: bosh-release
+                resource: bosh-candidate-release-compiled-resolute
+                trigger: true
+                passed: [ create-bosh-candidate-release-compiled-resolute ]
+              - get: stemcell
+                resource: gcp-stemcell-resolute
+              - get: bosh-cli
+                params:
+                  globs:
+                    - "bosh-cli-*-linux-amd64"
+              - get: bats
+              - get: bosh-deployment
+              - get: bosh
+                passed: [ create-bosh-candidate-release-compiled-resolute ]
+          - put: terraform
+            resource: gcp-terraform
+            params:
+              env_name: bosh-bats-resolute
+              terraform_source: bosh-ci/ci/bats/iaas/gcp/terraform
+              vars:
+                name: bosh-bats-resolute
+          - do:
+              - task: deploy-director
+                file: bosh-ci/ci/bats/tasks/deploy-director.yml
+                image: integration-image
+                input_mapping:
+                  environment: terraform
+                params:
+                  BAT_INFRASTRUCTURE: gcp
+                  GCP_JSON_KEY: ((gcp_json_key))
+                  DEPLOY_ARGS: |-
+                    -o bosh-deployment/external-ip-not-recommended.yml
+                    -o bosh-ci/ci/bats/ops/use-custom-stemcell.yml
+              - task: prepare-bats-config
+                file: bosh-ci/ci/bats/iaas/gcp/prepare-bats-config.yml
+                image: integration-image
+                params:
+                  STEMCELL_NAME: bosh-google-kvm-ubuntu-resolute
+              - task: run-bats
+                file: bats/ci/tasks/run-bats.yml
+                image: integration-image
+        ensure:
+          do:
+            - task: teardown
+              file: bosh-ci/ci/bats/tasks/destroy-director.yml
+              image: integration-image
+            - put: terraform
+              resource: gcp-terraform
+              no_get: true
+              params:
+                action: destroy
+                env_name: bosh-bats-resolute
+                terraform_source: bosh-ci/ci/bats/iaas/gcp/terraform
+                vars:
+                  name: bosh-bats-resolute
+              on_failure:
+                task: delete-stale-terraform-state
+                file: bosh-ci/ci/tasks/delete-stale-terraform-state.yml
+                image: integration-image
+                params:
+                  GCP_JSON_KEY: ((gcp_json_key))
+                  TERRAFORM_STATE_URI: gs://bosh-director-pipeline/bats-terraform/bosh-bats-resolute.tfstate
+              ensure:
+                task: cleanup-leftover-environments
+                file: bosh-ci/ci/tasks/cleanup-leftovers.yml
+                image: integration-image
+                params:
+                  # NOTE: leftovers uses substring matching. Env names are "bosh-" plus
+                  # the job name, and every stemcell-specific name carries its stemcell
+                  # line, so no filter matches another env of ours and none is broad
+                  # enough to reach another pipeline's resources in this GCP project.
+                  LEFTOVERS_FILTER: bosh-bats-resolute
+                  GCP_JSON_KEY: ((gcp_json_key))
+
+  - name: bats-resolute-cleanup-leftovers
+    serial: true
+    serial_groups: [ bats-resolute ]
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: integration-image
+          - get: daily
+            trigger: true
+      - task: cleanup-leftover-environments
+        file: bosh-ci/ci/tasks/cleanup-leftovers.yml
+        image: integration-image
+        params:
+          # NOTE: leftovers uses substring matching. Env names are "bosh-" plus
+          # the job name, and every stemcell-specific name carries its stemcell
+          # line, so no filter matches another env of ours and none is broad
+          # enough to reach another pipeline's resources in this GCP project.
+          LEFTOVERS_FILTER: bosh-bats-resolute
+          GCP_JSON_KEY: ((gcp_json_key))
+      - task: delete-stale-terraform-state
+        file: bosh-ci/ci/tasks/delete-stale-terraform-state.yml
+        image: integration-image
+        params:
+          GCP_JSON_KEY: ((gcp_json_key))
+          TERRAFORM_STATE_URI: gs://bosh-director-pipeline/bats-terraform/bosh-bats-resolute.tfstate
+
+  - name: brats-acceptance-resolute
+    serial: true
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh
+            passed: [ create-bosh-candidate-release-compiled-resolute ]
+          - get: bosh-dns-release
+          - get: stemcell
+            resource: warden-stemcell-resolute
+          - get: director-stemcell
+            resource: warden-stemcell-resolute
+          - get: bosh-candidate-release-tarballs
+            passed: [ create-bosh-candidate-release-compiled-resolute ]
+            # brats deploys its inner director from the source release, on every
+            # stemcell line; the compiled release below is only fetched to tie
+            # this job to the candidate that was compiled for resolute.
+          - get: bosh-release
+            resource: bosh-candidate-release-tarballs
+            passed: [ create-bosh-candidate-release-compiled-resolute ]
+          - get: bosh-candidate-release-compiled-resolute
+            trigger: true
+            passed: [ create-bosh-candidate-release-compiled-resolute ]
+          - get: bosh-deployment
+          - get: docker-cpi-image
+      - do:
+          - put: brats-terraform
+            params:
+              env_name: bosh-brats-resolute
+              terraform_source: bosh-ci/ci/shared/brats/terraform
+              vars:
+                <<: *brats-terraform-vars
+                job: brats-acceptance-resolute
+          - task: test-brats-acceptance
+            file: bosh-ci/ci/shared/brats/test-acceptance.yml
+            image: docker-cpi-image
+            input_mapping:
+              database-metadata: brats-terraform
+            privileged: true
+            params:
+              RDS_MYSQL_EXTERNAL_DB_USER: ((brats_database_user.username))
+              RDS_MYSQL_EXTERNAL_DB_PASSWORD: ((brats_database_user.password))
+              RDS_MYSQL_EXTERNAL_DB_NAME: brats
+              RDS_POSTGRES_EXTERNAL_DB_USER: ((brats_database_user.username))
+              RDS_POSTGRES_EXTERNAL_DB_PASSWORD: ((brats_database_user.password))
+              RDS_POSTGRES_EXTERNAL_DB_NAME: brats
+              GCP_MYSQL_EXTERNAL_DB_USER: ((brats_database_user.username))
+              GCP_MYSQL_EXTERNAL_DB_PASSWORD: ((brats_database_user.password))
+              GCP_MYSQL_EXTERNAL_DB_NAME: brats
+              GCP_POSTGRES_EXTERNAL_DB_USER: ((brats_database_user.username))
+              GCP_POSTGRES_EXTERNAL_DB_PASSWORD: ((brats_database_user.password))
+              GCP_POSTGRES_EXTERNAL_DB_NAME: brats
+              DIRECTOR_STEMCELL_OS: ubuntu-resolute
+              STEMCELL_OS: ubuntu-resolute
+        ensure:
+          put: brats-terraform
+          no_get: true
+          params:
+            env_name: bosh-brats-resolute
+            terraform_source: bosh-ci/ci/shared/brats/terraform
+            vars:
+              <<: *brats-terraform-vars
+              job: brats-acceptance-resolute
+            action: destroy
+          attempts: 3
+
+  - name: bdrats-resolute
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: integration-image
+          - get: bosh
+            passed: [ create-bosh-candidate-release-compiled-resolute ]
+          - get: stemcell
+            resource: warden-stemcell-resolute
+          - get: bosh-candidate-release-tarballs
+            passed: [ create-bosh-candidate-release-compiled-resolute ]
+          - get: bosh-release
+            resource: bosh-candidate-release-compiled-resolute
+            trigger: true
+            passed: [ create-bosh-candidate-release-compiled-resolute ]
+          - get: bosh-disaster-recovery-acceptance-tests
+          - get: bosh-deployment
+          - get: bbr-cli-binary
+            params:
+              globs: [ "bbr*-linux-amd64" ]
+          - get: docker-cpi-image
+      - do:
+          - task: test-bdrats
+            image: docker-cpi-image
+            file: bosh-ci/ci/tasks/test-bdrats.yml
+            privileged: true
+            params:
+              DIRECTOR_OPS_FILES: "docker/use-resolute.yml misc/use-compiled-resolute-releases.yml"
+
+  - name: delivery
+    plan:
+      - in_parallel:
+          - get: bosh
+            trigger: true
+            passed:
+              - bats-noble
+              - brats-acceptance-noble
+              - bdrats-noble
+              - upgrade-postgres-noble
+              - upgrade-mysql-noble
+
+  - name: finalize-release
+    disable_manual_trigger: true
+    serial_groups:
+      - version
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: integration-image
+          - get: bosh-cli-registry-image
+          - get: bosh-shared-ci
+          - get: bosh
+            passed: [ delivery ]
+          - get: bosh-cli
+            params:
+              globs:
+                - "bosh-cli-*-linux-amd64"
+          - get: version
+            trigger: true
+          - get: release-notes
+      - task: prepare-release
+        file: bosh-ci/ci/tasks/prepare-release.yml
+        image: integration-image
+      - task: create-final-release
+        image: bosh-cli-registry-image
+        file: bosh-shared-ci/tasks/release/create-final-release.yml
+        input_mapping:
+          release_repo: bosh
+        params:
+          GIT_USER_NAME: &git_user_name CF-Bosh CI-Bot
+          GIT_USER_EMAIL: &git_user_email cf-bosh-ci-bot@localhost
+          PRIVATE_YML: |
+            blobstore:
+              options:
+                credentials_source: static
+                json_key: '((gcp_json_key))'
+      - put: bosh
+        params:
+          repository: release_repo
+          merge: true
+          tag: release_metadata/tag-name
+      - put: bosh-github-release
+        params:
+          name: release_metadata/tag-name
+          tag: release_metadata/tag-name
+          body: release-notes/release-notes.md
+          commitish: bosh/.git/ref
+          generate_release_notes: true
+      - put: release-notes
+        params:
+          file: release_metadata/empty-file
+
+  - name: automatically-release-new-patch
+    serial_groups:
+      - version
+    plan:
+      - in_parallel:
+          - get: bosh-shared-ci
+          - get: bosh-security-scanner-registry-image
+          - get: bosh
+            trigger: true
+            passed:
+              - delivery
+          - get: current-version
+            resource: version
+          - get: patched-version
+            resource: version
+            params:
+              bump: patch
+      - try:
+          task: check-for-patched-cves
+          file: bosh-shared-ci/tasks/release/check-for-patched-cves.yml
+          image: bosh-security-scanner-registry-image
+          input_mapping:
+            input_repo: bosh
+            version: current-version
+          params:
+            SEVERITY: CRITICAL,HIGH
+          on_success:
+            do:
+              - put: release-notes
+                params:
+                  file: release-notes/release-notes.md
+              - put: version
+                params:
+                  file: patched-version/version
+      - task: ensure-cve-checker-succeeded
+        file: bosh-shared-ci/tasks/release/ensure-task-succeeded.yml
+        image: bosh-security-scanner-registry-image
+        input_mapping:
+          task-output-folder: patched_cves
+      - try:
+          task: check-for-updated-vendored-packages
+          file: bosh-shared-ci/tasks/release/check-for-updated-vendored-packages.yml
+          image: bosh-security-scanner-registry-image
+          input_mapping:
+            input_repo: bosh
+            version: current-version
+          params:
+            PACKAGES:
+              - director-ruby-4.0
+              - nginx
+          on_success:
+            do:
+              - put: release-notes
+                params:
+                  file: release-notes/release-notes.md
+              - put: version
+                params:
+                  file: patched-version/version
+      - task: ensure-update-package-check-succeeded
+        file: bosh-shared-ci/tasks/release/ensure-task-succeeded.yml
+        image: bosh-security-scanner-registry-image
+        input_mapping:
+          task-output-folder: package-updates
+      - try:
+          task: check-for-updated-blobs
+          file: bosh-shared-ci/tasks/release/check-for-updated-blobs.yml
+          image: bosh-security-scanner-registry-image
+          input_mapping:
+            input_repo: bosh
+            version: current-version
+          params:
+            BLOBS:
+              - mariadb-connector
+              - nats-server
+              - postgresql-10
+              - postgresql-13
+              - postgresql-15
+          on_success:
+            do:
+              - put: release-notes
+                params:
+                  file: release-notes/release-notes.md
+              - put: version
+                params:
+                  file: patched-version/version
+      - task: ensure-blob-update-checker-succeeded
+        file: bosh-shared-ci/tasks/release/ensure-task-succeeded.yml
+        image: bosh-security-scanner-registry-image
+        input_mapping:
+          task-output-folder: blob-updates
+
+  - name: bump-major
+    serial_groups:
+      - version
+    plan:
+      - put: version
+        params:
+          bump: major
+
+  - name: bump-minor
+    serial_groups:
+      - version
+    plan:
+      - put: version
+        params:
+          bump: minor
+
+  - name: bump-patch
+    serial_groups:
+      - version
+    plan:
+      - put: version
+        params:
+          bump: patch
+
+  - name: build-integration
+    public: true
+    serial: true
+    plan:
+      - get: weekly
+        trigger: true
+      - get: golang-registry-image
+        trigger: true
+      - get: ubuntu-registry-image
+        trigger: true
+      - get: ruby-release
+        trigger: true
+        passed:
+          - bump-packages
+      - get: bosh-ci
+      - get: bosh-ci-dockerfiles
+        trigger: true
+      - get: bosh
+      - get: bosh-deployment
+        params:
+          depth: 1
+      - task: build-docker-args
+        file: bosh-ci/ci/dockerfiles/integration/build-docker-args.yml
+        image: ubuntu-registry-image
+        params:
+          GITHUB_ACCESS_TOKEN: ((github_public_repo_token))
+          POSTGRES_MAJOR_VERSION: 13
+      - task: build-image
+        privileged: true
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: concourse/oci-build-task
+          inputs:
+            - name: bosh-ci-dockerfiles
+            - name: docker-build-args
+          outputs:
+            - name: image
+          params:
+            CONTEXT: .
+            DOCKERFILE: bosh-ci-dockerfiles/ci/dockerfiles/integration/Dockerfile
+            BUILD_ARGS_FILE: docker-build-args/docker-build-args.yml
+            BUILD_ARG_BASE_IMAGE: ubuntu:noble
+          run:
+            path: build
+      - put: integration-image
+        no_get: true
+        params:
+          image: image/image.tar
+
+  - name: build-main-postgres-13
+    public: true
+    serial: true
+    plan:
+      - get: bosh-ci-dockerfiles
+      - get: integration-image
+        trigger: true
+        params:
+          format: oci
+      - task: build-image
+        privileged: true
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: concourse/oci-build-task
+          inputs:
+            - name: bosh-ci-dockerfiles
+            - name: integration-image
+          outputs:
+            - name: image
+          params:
+            CONTEXT: bosh-ci-dockerfiles/ci/dockerfiles/main-postgres
+            BUILD_ARG_DB_VERSION: "13"
+            IMAGE_ARG_BASE_IMAGE: integration-image/image.tar
+          run:
+            path: build
+      - put: integration-postgres-13-image
+        no_get: true
+        params:
+          image: image/image.tar
+
+  - name: build-main-postgres-15
+    public: true
+    serial: true
+    plan:
+      - get: bosh-ci-dockerfiles
+      - get: integration-image
+        trigger: true
+        params:
+          format: oci
+      - task: build-image
+        privileged: true
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: concourse/oci-build-task
+          inputs:
+            - name: bosh-ci-dockerfiles
+            - name: integration-image
+          outputs:
+            - name: image
+          params:
+            CONTEXT: bosh-ci-dockerfiles/ci/dockerfiles/main-postgres
+            BUILD_ARG_DB_VERSION: "15"
+            IMAGE_ARG_BASE_IMAGE: integration-image/image.tar
+          run:
+            path: build
+      - put: integration-postgres-15-image
+        no_get: true
+        params:
+          image: image/image.tar
+
+  - name: build-main-mysql-8-0
+    public: true
+    serial: true
+    plan:
+      - get: bosh-ci-dockerfiles
+      - get: integration-image
+        trigger: true
+        params:
+          format: oci
+      - task: build-image
+        privileged: true
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: concourse/oci-build-task
+          inputs:
+            - name: bosh-ci-dockerfiles
+            - name: integration-image
+          outputs:
+            - name: image
+          params:
+            CONTEXT: bosh-ci-dockerfiles/ci/dockerfiles/main-mysql
+            IMAGE_ARG_BASE_IMAGE: integration-image/image.tar
+          run:
+            path: build
+      - put: integration-mysql-8-0-image
+        no_get: true
+        params:
+          image: image/image.tar
+
+  - name: build-docker-cpi
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh-ci-dockerfiles
+          - get: ubuntu-registry-image
+          - get: integration-image
+            trigger: true
+            params:
+              format: oci
+          - get: bosh-deployment
+            trigger: true
+      - task: copy-dependencies
+        file: bosh-ci/ci/tasks/prepare-build-context-for-container-cpi-image.yml
+        image: ubuntu-registry-image
+        params:
+          CONTAINER_CPI_TYPE: docker-cpi
+      - task: build-image
+        privileged: true
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: concourse/oci-build-task
+          inputs:
+            - name: docker-build-context
+            - name: integration-image
+          outputs:
+            - name: image
+          params:
+            CONTEXT: docker-build-context
+            IMAGE_ARG_BASE_IMAGE: integration-image/image.tar
+          run:
+            path: build
+      - put: docker-cpi-image
+        no_get: true
+        params:
+          image: image/image.tar
+
+  - name: build-warden-cpi
+    public: true
+    serial: true
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh-ci-dockerfiles
+          - get:  ubuntu-registry-image
+          - get: integration-image
+            trigger: true
+            params:
+              format: oci
+          - get: bosh-deployment
+            trigger: true
+      - task: copy-dependencies
+        file: bosh-ci/ci/tasks/prepare-build-context-for-container-cpi-image.yml
+        image: ubuntu-registry-image
+        params:
+          CONTAINER_CPI_TYPE: warden-cpi
+      - task: build-image
+        privileged: true
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: concourse/oci-build-task
+          inputs:
+            - name: docker-build-context
+            - name: integration-image
+          outputs:
+            - name: image
+          params:
+            CONTEXT: docker-build-context
+            IMAGE_ARG_BASE_IMAGE: integration-image/image.tar
+          run:
+            path: build
+      - put: warden-cpi-image
+        no_get: true
+        params:
+          image: image/image.tar
+
+  - name: bump-deps
+    serial: true
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: bosh
+          - get: ruby-release
+          - get: weekly
+            trigger: true
+          - get: integration-image
+          - get: bosh-ruby-release-image
+      - task: bump-gems
+        file: ruby-release/ci/tasks/shared/bump-gems.yml
+        input_mapping:
+          input-repo: bosh
+        output_mapping:
+          output-repo: bosh-out
+        params:
+          GEM_DIRS: src
+          GIT_USER_NAME: *git_user_name
+          GIT_USER_EMAIL: *git_user_email
+          PACKAGE: &director_ruby_version ruby-4.0
+          VENDOR: true
+          VENDOR_PATH: vendor/cache
+      - task: test
+        file: bosh-ci/ci/tasks/test-rake-task.yml
+        image: integration-image
+        timeout: 2h
+        input_mapping:
+          bosh: bosh-out
+        params:
+          DB: sqlite
+          RAKE_TASK: spec:unit:parallel
+      - put: bosh
+        params:
+          repository: bosh-out
+          rebase: true
+
+  - name: bump-golang-deps
+    public: true
+    plan:
+      - get: weekly
+        trigger: true
+      - get: bosh-ci
+      - get: bosh
+      - get: golang-release
+      - get: integration-image
+      - task: bump-deps
+        file: golang-release/ci/tasks/shared/bump-deps.yml
+        input_mapping:
+          input_repo: bosh
+        output_mapping:
+          output_repo: bosh-out
+        params:
+          SOURCE_PATH: src/brats/
+      - task: lint-brats
+        file: bosh-ci/ci/tasks/lint-brats.yml
+        image: integration-image
+        input_mapping:
+          bosh: bosh-out
+      - put: bosh
+        params:
+          repository: bosh-out
+          rebase: true
+
+  - name: bump-packages
+    serial: true
+    plan:
+      - in_parallel:
+          - get: bosh-ci
+          - get: integration-image
+          - get: bosh
+          - get: nginx-release
+            trigger: true
+          - get: mariadb-connector-c-resource
+            trigger: true
+          - get: postgres-13-src
+            trigger: true
+          - get: postgres-15-src
+            trigger: true
+          - get: ruby-release
+            trigger: true
+          - get: bosh-blobstore-dav
+            trigger: true
+          - get: bosh-blobstore-gcs
+            trigger: true
+          - get: bosh-blobstore-s3
+            trigger: true
+          - get: bosh-blobstore-azure-storage
+            trigger: true
+          - get: verify-multidigest-cli
+            trigger: true
+          - get: nats-server-github-release
+            trigger: true
+            params:
+              globs: [ nats-server-v*-linux-amd64.tar.gz ]
+      - task: bump-nginx-packages
+        file: nginx-release/ci/shared/bump-nginx-package.yml
+        image: integration-image
+        input_mapping:
+          input_repo: bosh
+        output_mapping:
+          output_repo: bosh-out
+        params:
+          PACKAGES: [ nginx ]
+          PRIVATE_YML: |
+            blobstore:
+              options:
+                credentials_source: static
+                json_key: '((gcp_json_key))'
+      - task: bump-mariadb-connector
+        file: bosh-ci/ci/tasks/bump-mariadb-connector.yml
+        image: integration-image
+        input_mapping:
+          bosh: bosh-out
+        output_mapping:
+          bosh: bosh-out
+        params:
+          GIT_USER_NAME: *git_user_name
+          GIT_USER_EMAIL: *git_user_email
+          PRIVATE_YML: |
+            blobstore:
+              options:
+                credentials_source: static
+                json_key: '((gcp_json_key))'
+      - task: bump-postgres-13-package
+        file: bosh-ci/ci/tasks/bump-postgres-packages.yml
+        image: integration-image
+        input_mapping:
+          bosh: bosh-out
+          postgres-src: postgres-13-src
+        output_mapping:
+          bosh: bosh-out
+        params:
+          GIT_USER_NAME: *git_user_name
+          GIT_USER_EMAIL: *git_user_email
+          MAJOR_VERSION: 13
+          PRIVATE_YML: |
+            blobstore:
+              options:
+                credentials_source: static
+                json_key: '((gcp_json_key))'
+      - task: bump-postgres-15-package
+        file: bosh-ci/ci/tasks/bump-postgres-packages.yml
+        image: integration-image
+        input_mapping:
+          bosh: bosh-out
+          postgres-src: postgres-15-src
+        output_mapping:
+          bosh: bosh-out
+        params:
+          GIT_USER_NAME: *git_user_name
+          GIT_USER_EMAIL: *git_user_email
+          MAJOR_VERSION: 15
+          PRIVATE_YML: |
+            blobstore:
+              options:
+                credentials_source: static
+                json_key: '((gcp_json_key))'
+      - task: bump-ruby-package
+        file: ruby-release/ci/tasks/shared/bump-ruby-package.yml
+        input_mapping:
+          bosh-release: bosh-out
+        output_mapping:
+          bosh-release: bosh-out
+        params:
+          GIT_USER_NAME: *git_user_name
+          GIT_USER_EMAIL: *git_user_email
+          PACKAGE: *director_ruby_version
+          PACKAGE_PREFIX: "director"
+          PRIVATE_YML: |
+            blobstore:
+              options:
+                credentials_source: static
+                json_key: '((gcp_json_key))'
+          RUBY_VERSION_PATH: src/.ruby-version
+      - task: bump-bosh-blobstore-dav
+        file: bosh-ci/ci/tasks/bump-blobstore-cli.yml
+        image: integration-image
+        input_mapping:
+          bosh: bosh-out
+          bosh-blobstore-cli: bosh-blobstore-dav
+        output_mapping:
+          bosh: bosh-out
+        params:
+          BLOBSTORE_TYPE: dav
+          GIT_USER_NAME: *git_user_name
+          GIT_USER_EMAIL: *git_user_email
+          PRIVATE_YML: |
+            blobstore:
+              options:
+                credentials_source: static
+                json_key: '((gcp_json_key))'
+      - task: bump-bosh-blobstore-gcs
+        file: bosh-ci/ci/tasks/bump-blobstore-cli.yml
+        image: integration-image
+        input_mapping:
+          bosh: bosh-out
+          bosh-blobstore-cli: bosh-blobstore-gcs
+        output_mapping:
+          bosh: bosh-out
+        params:
+          BLOBSTORE_TYPE: gcs
+          GIT_USER_NAME: *git_user_name
+          GIT_USER_EMAIL: *git_user_email
+          PRIVATE_YML: |
+            blobstore:
+              options:
+                credentials_source: static
+                json_key: '((gcp_json_key))'
+      - task: bump-bosh-blobstore-s3
+        file: bosh-ci/ci/tasks/bump-blobstore-cli.yml
+        image: integration-image
+        input_mapping:
+          bosh: bosh-out
+          bosh-blobstore-cli: bosh-blobstore-s3
+        output_mapping:
+          bosh: bosh-out
+        params:
+          BLOBSTORE_TYPE: s3
+          GIT_USER_NAME: *git_user_name
+          GIT_USER_EMAIL: *git_user_email
+          PRIVATE_YML: |
+            blobstore:
+              options:
+                credentials_source: static
+                json_key: '((gcp_json_key))'
+      - task: bump-bosh-blobstore-azure-storage
+        file: bosh-ci/ci/tasks/bump-blobstore-cli.yml
+        image: integration-image
+        input_mapping:
+          bosh: bosh-out
+          bosh-blobstore-cli: bosh-blobstore-azure-storage
+        output_mapping:
+          bosh: bosh-out
+        params:
+          BLOBSTORE_TYPE: azure-storage
+          GIT_USER_NAME: *git_user_name
+          GIT_USER_EMAIL: *git_user_email
+          PRIVATE_YML: |
+            blobstore:
+              options:
+                credentials_source: static
+                json_key: '((gcp_json_key))'
+      - task: bump-verify-multidigest-cli
+        file: bosh-ci/ci/tasks/bump-verify-multidigest-cli.yml
+        image: integration-image
+        input_mapping:
+          bosh: bosh-out
+        output_mapping:
+          bosh: bosh-out
+        params:
+          GIT_USER_NAME: *git_user_name
+          GIT_USER_EMAIL: *git_user_email
+          PRIVATE_YML: |
+            blobstore:
+              options:
+                credentials_source: static
+                json_key: '((gcp_json_key))'
+      - task: bump-nats-server
+        file: bosh-ci/ci/tasks/bump-nats-server.yml
+        image: integration-image
+        input_mapping:
+          bosh: bosh-out
+        output_mapping:
+          bosh: bosh-out
+        params:
+          GIT_USER_NAME: *git_user_name
+          GIT_USER_EMAIL: *git_user_email
+          PRIVATE_YML: |
+            blobstore:
+              options:
+                credentials_source: static
+                json_key: '((gcp_json_key))'
+      - put: bosh
+        params:
+          repository: bosh-out
+          rebase: true
+
+resource_types:
+  - name: terraform
+    type: registry-image
+    source:
+      repository: ljfranklin/terraform-resource
+
+  - name: gcs-resource
+    type: registry-image
+    source:
+      repository: frodenas/gcs-resource
+
+  - name: pivnet
+    type: registry-image
+    check_every: 168h
+    source:
+      repository: pivotalcf/pivnet-resource
+      tag: latest-final
+      username: ((dockerhub_username))
+      password: ((dockerhub_password))
+
+  - name: http-resource
+    type: registry-image
+    source:
+      repository: aequitas/http-resource
+
+  - name: semver
+    type: registry-image
+    source:
+      repository: concourse/semver-resource
+      tag: "1.6"
+
+  - name: bosh-io-stemcell
+    source:
+      repository: concourse/bosh-io-stemcell-resource
+      tag: 1.7.0
+    type: registry-image
+
+resources:
+  - name: mariadb-connector-c-resource
+    type: http-resource
+    source:
+      index: "https://mariadb.org/connector-c/all-releases/"
+      regex: '>(?P<version>3\.\d+.\d+)</a></td><td>\d{4}-\d{2}-\d{2}</td><td>Stable'
+      uri: "https://ftp.osuosl.org/pub/mariadb/connector-c-{version}/mariadb-connector-c-{version}-src.tar.gz"
+
+  - name: postgres-13-src
+    type: http-resource
+    source:
+      index: "https://ftp.postgresql.org/pub/source/"
+      regex: 'href="v(?P<version>13\.[0-9.]+)/"'
+      uri: "https://ftp.postgresql.org/pub/source/v{version}/postgresql-{version}.tar.gz"
+
+  - name: postgres-15-src
+    type: http-resource
+    source:
+      index: "https://ftp.postgresql.org/pub/source/"
+      regex: 'href="v(?P<version>15\.[0-9.]+)/"'
+      uri: "https://ftp.postgresql.org/pub/source/v{version}/postgresql-{version}.tar.gz"
+
+
+  - name: bosh-blobstore-dav
+    type: s3
+    source:
+      regexp: davcli-(.*)-linux-amd64
+      bucket: bosh-davcli-artifacts
+      access_key_id: ((bosh_davcli_pipeline_aws_access_key.username))
+      secret_access_key: ((bosh_davcli_pipeline_aws_access_key.password))
+
+  - name: bosh-blobstore-gcs
+    type: s3
+    source:
+      regexp: bosh-gcscli-(.*)-linux-amd64
+      bucket: bosh-gcscli-artifacts
+      access_key_id: ((bosh_gcscli_pipeline_aws_access_key.username))
+      secret_access_key: ((bosh_gcscli_pipeline_aws_access_key.password))
+
+  - name: bosh-blobstore-s3
+    type: s3
+    source:
+      regexp: s3cli-(.*)-linux-amd64
+      bucket: bosh-s3cli-artifacts
+      access_key_id: ((bosh_s3cli_pipeline_aws_access_key.username))
+      secret_access_key: ((bosh_s3cli_pipeline_aws_access_key.password))
+
+  - name: bosh-blobstore-azure-storage
+    type: s3
+    source:
+      regexp: azure-storage-cli-(.*)-linux-amd64
+      bucket: bosh-azure-storage-cli-artifacts
+      access_key_id: ((bosh_azure_storage_cli_pipeline_aws_access_key.username))
+      secret_access_key: ((bosh_azure_storage_cli_pipeline_aws_access_key.password))
+
+  - name: verify-multidigest-cli
+    type: gcs-resource
+    source:
+      regexp: verify-multidigest/verify-multidigest-(.*)-linux-amd64
+      bucket: bosh-director-pipeline
+      json_key: ((gcp_json_key))
+
+  - name: nats-server-github-release
+    type: github-release
+    source:
+      owner: nats-io
+      repository: nats-server
+      access_token: ((github_public_repo_token))
+
+  - name: weekly
+    type: time
+    source:
+      start: 3:00 -0700
+      stop: 4:30 -0700
+      days: [ Saturday ]
+
+  - name: daily
+    type: time
+    source:
+      interval: 24h
+
+  - name: bosh
+    type: git
+    source:
+      uri: git@github.com:cloudfoundry/bosh.git
+      branch: *branch_name
+      private_key: ((github_deploy_key_bosh.private_key))
+      ignore_paths:
+        - ci
+
+  - name: bosh-ci
+    type: git
+    source:
+      uri: https://github.com/cloudfoundry/bosh.git
+      branch: *branch_name
+      paths:
+        - ci
+        - src/brats
+
+  - name: bosh-ci-dockerfiles
+    type: git
+    source:
+      uri: https://github.com/cloudfoundry/bosh.git
+      branch: *branch_name
+      paths:
+        - ci/dockerfiles
+
+  - name: bosh-github-release
+    type: github-release
+    source:
+      owner: cloudfoundry
+      repository: bosh
+      access_token: ((github_public_repo_token))
+
+  - name: bosh-shared-ci
+    type: git
+    source:
+      uri: git@github.com:cloudfoundry/bosh-shared-ci.git
+      private_key: ((github_deploy_key_bosh-shared-ci.private_key))
+
+  - name: version
+    type: semver
+    source:
+      driver: git
+      uri: git@github.com:cloudfoundry/bosh.git
+      branch: release-details
+      file: release-version
+      private_key: ((github_deploy_key_bosh.private_key))
+      initial_version: 282.1.17
+
+  - name: release-details
+    type: git
+    source:
+      uri: git@github.com:cloudfoundry/bosh.git
+      branch: release-details
+      private_key: ((github_deploy_key_bosh.private_key))
+
+  - name: bosh-candidate-release-tarballs
+    type: gcs-resource
+    source:
+      bucket: bosh-director-oss-ci-candidate-release-tarballs
+      json_key: ((bosh_director_oss_ci_service_account_json))
+      versioned_file: "bosh-dev-release.tgz"
+
+  # ci/tasks/make-candidate.sh passes--timestamp-version so the captured integer is
+  # monotonically increasing
+  - name: bosh-candidate-release-compiled-noble
+    type: gcs-resource
+    source:
+      bucket: bosh-ci-candidate-compiled-releases
+      json_key: ((bosh_director_oss_ci_service_account_json))
+      regexp: "bosh-.*dev\\.(\\d+).*noble.*.tgz"
+
+  - name: bosh-candidate-release-compiled-resolute
+    type: gcs-resource
+    source:
+      bucket: bosh-ci-candidate-compiled-releases
+      json_key: ((bosh_director_oss_ci_service_account_json))
+      regexp: "bosh-.*dev\\.(\\d+).*resolute.*.tgz"
+
+  - name: bosh-disaster-recovery-acceptance-tests
+    type: git
+    source:
+      uri: https://github.com/cloudfoundry/bosh-disaster-recovery-acceptance-tests.git
+      branch: main
+
+  - name: bbr-cli-binary
+    type: github-release
+    source:
+      owner: cloudfoundry-incubator
+      repository: bosh-backup-and-restore
+      access_token: ((github_public_repo_token))
+
+  - name: gcp-terraform
+    type: terraform
+    source:
+      backend_type: gcs
+      backend_config:
+        bucket: bosh-director-pipeline
+        prefix: bats-terraform
+        credentials: ((gcp_json_key))
+      delete_on_failure: true
+      vars:
+        project_id: ((gcp_project_id))
+        gcp_credentials_json: ((gcp_json_key))
+
+  - name: brats-terraform
+    type: terraform
+    source:
+      backend_type: gcs
+      backend_config:
+        bucket: bosh-director-pipeline
+        prefix: brats-terraform
+        credentials: ((gcp_json_key))
+      delete_on_failure: true
+      vars:
+        pipeline: bosh-director
+        project_id: ((gcp_project_id))
+        gcp_credentials_json: ((gcp_json_key))
+
+  - name: zookeeper-release
+    type: git
+    source:
+      uri: https://github.com/cppforlife/zookeeper-release
+      branch: master
+
+  - name: bosh-cli
+    type: github-release
+    source:
+      owner: cloudfoundry
+      repository: bosh-cli
+      access_token: ((github_public_repo_token))
+
+  - name: bosh-dns-release
+    type: bosh-io-release
+    source:
+      repository: cloudfoundry/bosh-dns-release
+
+  - name: config-server
+    type: git
+    source:
+      uri: https://github.com/cloudfoundry/config-server-release.git
+      branch: main
+
+  #
+  # BATS
+  #
+
+  - name: bats
+    type: git
+    source:
+      uri: https://github.com/cloudfoundry/bosh-acceptance-tests.git
+
+  - name: bosh-deployment
+    type: git
+    source:
+      uri: https://github.com/cloudfoundry/bosh-deployment
+
+  - name: cf-deployment
+    type: git
+    source:
+      uri: https://github.com/cloudfoundry/cf-deployment
+
+  - name: gcp-stemcell-noble
+    type: bosh-io-stemcell
+    source:
+      name: bosh-google-kvm-ubuntu-noble
+
+  - name: gcp-stemcell-resolute
+    type: bosh-io-stemcell
+    source:
+      name: bosh-google-kvm-ubuntu-resolute
+
+  - name: gcp-stemcell-jammy-fips
+    type: bosh-io-stemcell
+    source:
+      name: bosh-google-kvm-ubuntu-jammy-fips-go_agent
+      auth:
+        access_key: ((hmac_accesskey))
+        secret_key: ((hmac_secret))
+      private_bucket:
+        endpoint: https://storage.googleapis.com
+        bucket: bosh-core-stemcells-fips
+        regexp: '(?P<version>[^/]+)/bosh-stemcell-[^/]+-google-kvm-ubuntu-jammy-fips-go_agent\.tgz'
+
+  - name: warden-stemcell-noble
+    type: bosh-io-stemcell
+    source:
+      name: bosh-warden-boshlite-ubuntu-noble
+
+  - name: warden-stemcell-resolute
+    type: bosh-io-stemcell
+    source:
+      name: bosh-warden-boshlite-ubuntu-resolute
+
+  - name: bosh-agent
+    type: git
+    source:
+      uri: https://github.com/cloudfoundry/bosh-agent
+      branch: main
+
+  - name: nginx-release
+    type: git
+    source:
+      branch: main
+      uri: https://github.com/cloudfoundry/bosh-package-nginx-release.git
+
+  - name: golang-release
+    type: git
+    source:
+      uri: https://github.com/cloudfoundry/bosh-package-golang-release.git
+      branch: main
+
+  - name: ruby-release
+    type: git
+    source:
+      uri: https://github.com/cloudfoundry/bosh-package-ruby-release.git
+      branch: main
+
+  - name: integration-image
+    type: registry-image
+    source:
+      repository: ghcr.io/cloudfoundry/bosh/integration
+      tag: *branch_name
+      username: ((github_read_write_packages.username))
+      password: ((github_read_write_packages.password))
+
+  - name: integration-mysql-8-0-image
+    type: registry-image
+    source:
+      repository: ghcr.io/cloudfoundry/bosh/main-mysql-8.0
+      tag: *branch_name
+      username: ((github_read_write_packages.username))
+      password: ((github_read_write_packages.password))
+
+  - name: integration-postgres-13-image
+    type: registry-image
+    source:
+      repository: ghcr.io/cloudfoundry/bosh/main-postgres-13
+      tag: *branch_name
+      username: ((github_read_write_packages.username))
+      password: ((github_read_write_packages.password))
+
+  - name: integration-postgres-15-image
+    type: registry-image
+    source:
+      repository: ghcr.io/cloudfoundry/bosh/main-postgres-15
+      tag: *branch_name
+      username: ((github_read_write_packages.username))
+      password: ((github_read_write_packages.password))
+
+  - name: docker-cpi-image
+    type: registry-image
+    source:
+      repository: ghcr.io/cloudfoundry/bosh/docker-cpi
+      tag: *branch_name
+      username: ((github_read_write_packages.username))
+      password: ((github_read_write_packages.password))
+
+  - name: bosh-cli-registry-image
+    type: registry-image
+    source:
+      repository: ghcr.io/cloudfoundry/bosh/cli
+      username: ((github_read_write_packages.username))
+      password: ((github_read_write_packages.password))
+
+  - name: ubuntu-noble-stemcell-registry-image
+    type: registry-image
+    source:
+      repository: ghcr.io/cloudfoundry/ubuntu-noble-stemcell
+      username: ((github_read_write_packages.username))
+      password: ((github_read_write_packages.password))
+
+  - name: ubuntu-resolute-stemcell-registry-image
+    type: registry-image
+    source:
+      repository: ghcr.io/cloudfoundry/ubuntu-resolute-stemcell
+      username: ((github_read_write_packages.username))
+      password: ((github_read_write_packages.password))
+
+  - name: bosh-security-scanner-registry-image
+    type: registry-image
+    source:
+      repository: bosh/security-scanner
+      username: ((dockerhub_username))
+      password: ((dockerhub_password))
+
+  - name: bosh-ruby-release-image
+    type: registry-image
+    source:
+      repository: bosh/ruby-release
+      username: ((dockerhub_username))
+      password: ((dockerhub_password))
+
+  - name: ubuntu-registry-image
+    type: registry-image
+    source:
+      repository: ubuntu
+      tag: latest
+      username: ((dockerhub_username))
+      password: ((dockerhub_password))
+
+  - name: golang-registry-image
+    type: registry-image
+    source:
+      repository: golang
+      tag: latest
+      username: ((dockerhub_username))
+      password: ((dockerhub_password))
+
+  - name: warden-cpi-image
+    type: registry-image
+    source:
+      repository: ghcr.io/cloudfoundry/bosh/warden-cpi
+      tag: *branch_name
+      username: ((github_read_write_packages.username))
+      password: ((github_read_write_packages.password))
+
+  - name: last-released-bosh-release
+    type: bosh-io-release
+    source:
+      repository: cloudfoundry/bosh
+      tarball: true
+
+  - name: release-notes
+    type: gcs-resource
+    source:
+      bucket: bosh-director-pipeline
+      json_key: ((gcp_json_key))
+      versioned_file: bosh-director/release-notes.md
+      initial_version: "0"
+      initial_content_text: ""

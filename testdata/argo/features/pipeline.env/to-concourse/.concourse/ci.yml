@@ -1,0 +1,53 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"env","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:lost env LABEL: gha.github.run_number
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
+# pipemaster:arg {"digest":"cb07377014a82f472203534dd997b84ce904231dac02c9d0af5fc81ef9057d25","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
+# pipemaster:arg {"digest":"42ba6536c42ce4740462afab320a6e01a1bdbbb06a66cca1f172b8ac806871c0","carry":"id: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: env\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: CGO_ENABLED\n      value:\n        lit: \"0\"\n    - name: VERSION\n      value:\n        lit: \"3.1\"\n    - name: TOKEN\n      value:\n        secret: DEPLOY_TOKEN\n    - name: LABEL\n      value:\n        expr: format('build-{0}', gha.github.run_number)\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated pipeline.env pipeline/ci
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          params:
+            CGO_ENABLED: "0"
+            VERSION: "3.1"
+            TOKEN: ((DEPLOY_TOKEN))
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo ok

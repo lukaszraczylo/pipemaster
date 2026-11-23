@@ -1,7 +1,7 @@
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
-# pipemaster:arg {"step":"if: failure()\next:\n    gha:\n        _derived_id: true\nid: build-step-2\nkind: script\nscript:\n    - echo cleanup\n","hold":"{\"args\":[\"exit 0 # pipemaster:lost the step condition has no shell form\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-2\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:arg {"step":"if: failure()\nid: build-step-2\nkind: script\nscript:\n    - echo cleanup\n","hold":"{\"args\":[\"exit 0 # pipemaster:lost the step condition has no shell form\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-2\",\"workingDir\":\"/workspace\"}"}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-4
-# pipemaster:arg {"step":"if: steps.config.outputs.configured == 'true'\next:\n    gha:\n        _derived_id: true\nid: build-step-4\nkind: script\nscript:\n    - echo configured\n","hold":"{\"args\":[\"exit 0 # pipemaster:lost the step condition has no shell form\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-4\",\"workingDir\":\"/workspace\"}","seq":1}
+# pipemaster:arg {"step":"if: steps.config.outputs.configured == 'true'\nid: build-step-4\nkind: script\nscript:\n    - echo configured\n","hold":"{\"args\":[\"exit 0 # pipemaster:lost the step condition has no shell form\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-4\",\"workingDir\":\"/workspace\"}","seq":1}
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1

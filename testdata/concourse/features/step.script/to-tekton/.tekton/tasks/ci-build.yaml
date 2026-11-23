@@ -1,0 +1,12 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-build
+spec:
+  steps:
+    - name: build-step-1
+      displayName: Build
+      image: ubuntu:latest
+      script: |-
+        go build ./...
+        go test ./...

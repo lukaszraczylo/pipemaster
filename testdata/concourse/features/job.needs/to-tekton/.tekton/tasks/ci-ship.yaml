@@ -1,0 +1,9 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-ship
+spec:
+  steps:
+    - name: ship-step-1
+      image: ubuntu:latest
+      script: echo ship

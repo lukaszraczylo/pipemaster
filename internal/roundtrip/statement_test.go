@@ -41,7 +41,7 @@ func TestUntranslatableLineLeavesValidShell(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, target := range []string{provider.Woodpecker, provider.Drone, provider.GitLab, provider.Argo} {
+	for _, target := range []string{provider.Woodpecker, provider.Drone, provider.GitLab, provider.Argo, provider.Concourse} {
 		t.Run(target, func(t *testing.T) {
 			files, _, err := prov(t, target).Emit(p)
 			if err != nil {
@@ -74,7 +74,7 @@ func TestUnspellableExpressionLeavesValidShell(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, target := range []string{provider.Woodpecker, provider.Drone, provider.GitLab, provider.Tekton, provider.Argo} {
+	for _, target := range []string{provider.Woodpecker, provider.Drone, provider.GitLab, provider.Tekton, provider.Argo, provider.Concourse} {
 		t.Run(target, func(t *testing.T) {
 			files, rep, err := prov(t, target).Emit(p)
 			if err != nil {
