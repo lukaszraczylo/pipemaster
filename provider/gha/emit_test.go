@@ -518,3 +518,20 @@ func TestStepKindsWithNoGHAFormEmitAPlaceholderAndReportLoss(t *testing.T) {
 		})
 	}
 }
+
+func TestShellPathIsWrittenAsTheShellNameAndReportedLost(t *testing.T) {
+	p := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "ci", Triggers: []ir.Trigger{{Kind: ir.TriggerPush}}, Jobs: []*ir.Job{{
+		ID: "b", Steps: []*ir.Step{{ID: "t", Kind: ir.StepScript, Script: []string{"make"}, Shell: "/bin/bash"}},
+	}}}}}
+	files, rep, err := gha.New(gha.GHA).Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(files[".github/workflows/ci.yml"])
+	if !strings.Contains(out, "shell: bash\n") || strings.Contains(out, "/bin/bash") {
+		t.Fatalf("shell is not the name:\n%s", out)
+	}
+	if e := entry(rep, caps.StepShell); e == nil || e.Level != caps.Lost {
+		t.Fatalf("no lost step.shell entry: %v", rep.Entries)
+	}
+}
