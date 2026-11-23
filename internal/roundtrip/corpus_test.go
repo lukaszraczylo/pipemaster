@@ -15,6 +15,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/internal/golden"
+	"github.com/lukaszraczylo/pipemaster/internal/linttool"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -227,6 +228,9 @@ func TestCorpus(t *testing.T) {
 				t.Fatalf("identity emit: %v", err)
 			}
 			checkEmitted(t, a.ID(), self, sourceProblems(t, f))
+			if a.ID() == provider.Concourse {
+				checkFlyStrict(t, f.name, self)
+			}
 		})
 		healthy = healthy && ok
 		// A GHA-family target keeps the source's own linter findings, so only new ones fail.
@@ -258,6 +262,7 @@ func TestCorpus(t *testing.T) {
 				if to == provider.Concourse {
 					checkConcourseShells(t, cross, r.toRep)
 					checkPowershellReported(t, cross, r.toRep)
+					checkFlyStrict(t, f.name, cross)
 				}
 
 				c := verdictCounts(r.src, r.toRep)
@@ -293,6 +298,28 @@ func checkPowershellReported(t *testing.T, files map[string][]byte, rep *report.
 	}
 	if entries < tasks {
 		t.Errorf("%d PowerShell tasks but %d step.shell entries", tasks, entries)
+	}
+}
+
+// flyStrictExceptions names the corpus entries whose converted Concourse output fails fly validate-pipeline
+// --strict, with the reason. No other entry may fail.
+var flyStrictExceptions = map[string]string{
+	"80-concourse-examples-multi-branch": "the source set_pipeline identifier ((instance_pipeline_name)) is a deprecation that the output keeps, as the source does",
+}
+
+// checkFlyStrict runs fly validate-pipeline --strict on the converted Concourse files of a corpus entry.
+func checkFlyStrict(t *testing.T, entry string, files map[string][]byte) {
+	t.Helper()
+	requireFly(t)
+	_, excepted := flyStrictExceptions[entry]
+	for _, name := range names(files) {
+		out, err := linttool.FlyLint(t, name, files[name])
+		switch {
+		case err != nil && !excepted:
+			t.Errorf("fly %s: %v\n%s", name, err, out)
+		case err == nil && excepted:
+			t.Errorf("fly accepts %s, so %s needs no exception", name, entry)
+		}
 	}
 }
 
