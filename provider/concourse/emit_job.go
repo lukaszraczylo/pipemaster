@@ -39,6 +39,8 @@ type jobEmitter struct {
 	name       string
 	img        string
 	caches     []string
+	// finallyTasks lists the written names of the tasks that stand for finally jobs in the hooks.
+	finallyTasks []string
 	actSeq     int
 	manual     bool
 	held       bool
@@ -131,10 +133,16 @@ func (pe *pipeEmitter) job(j *ir.Job) *yaml.Node {
 		m.Set(serialGroupsKey, strSeq([]string{c.Group}))
 	}
 	m.Set("plan", seqOf(plan...))
+	hookText := map[string]any{}
 	for _, h := range hookOrder {
 		if nodes := jx.hooks[h]; len(nodes) > 0 {
-			m.Set(h, hookNode(nodes))
+			hn := hookNode(nodes)
+			m.Set(h, hn)
+			hookText[h] = nodeValue(hn)
 		}
+	}
+	if len(jx.finallyTasks) > 0 {
+		e.markArg(caps.PipelineFinally, pe.mpath, finallyArg{Job: jx.name, Tasks: jx.finallyTasks, Digest: digestOf(hookText)})
 	}
 	if jx.ext != nil {
 		if err := m.AddExtra(jx.ext, jobSkip); err != nil {
@@ -343,6 +351,7 @@ func (jx *jobEmitter) finallyJob(f *ir.Job) {
 	jx.path = fp
 	ch := &chain{jx: jx}
 	nodes := ch.steps(f.Steps)
+	jx.finallyTasks = append(jx.finallyTasks, taskNames(nodes)...)
 	jx.j = saved
 	jx.path = jx.pe.path + "/job/" + saved.ID
 	jx.hooks[hook] = append(jx.hooks[hook], nodes...)
@@ -370,4 +379,26 @@ func (jx *jobEmitter) hookChain(hook string) *chain {
 	c := &chain{jx: jx}
 	jx.hookChains[hook] = c
 	return c
+}
+
+// taskNames lists the names of the task steps in the nodes, at any depth.
+func taskNames(nodes []*yaml.Node) []string {
+	var out []string
+	var walk func(n *yaml.Node)
+	walk = func(n *yaml.Node) {
+		if n.Kind == yaml.MappingNode {
+			for i := 0; i+1 < len(n.Content); i += 2 {
+				if n.Content[i].Value == "task" && n.Content[i+1].Kind == yaml.ScalarNode {
+					out = append(out, n.Content[i+1].Value)
+				}
+			}
+		}
+		for _, c := range n.Content {
+			walk(c)
+		}
+	}
+	for _, n := range nodes {
+		walk(n)
+	}
+	return out
 }

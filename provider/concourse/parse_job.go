@@ -28,6 +28,10 @@ var stepHooks = []string{"on_success", "on_failure", "on_error", "on_abort", "en
 // builtJob is a parsed job with what the pipeline needs to know about it.
 type builtJob struct {
 	job *ir.Job
+	// written maps a task step to the name that the file gives its task.
+	written map[*ir.Step]string
+	// name is the job name as the file writes it; hookDigest is the digest of its hooks.
+	name, hookDigest string
 	// roots lists the resources that a get without passed triggers on.
 	roots []string
 	// groups lists the concurrency groups of serial and serial_groups.
@@ -42,6 +46,8 @@ type jobBuilder struct {
 	ids map[string]int
 	// taken holds the final IDs of the task steps read so far; a restored ID must not repeat one.
 	taken map[string]bool
+	// written maps each task step to its task name in the file.
+	written map[*ir.Step]string
 	// tried holds the steps whose carry said continue_on_error; a try in the file must still say it.
 	tried map[*ir.Step]string
 	path  string
@@ -50,11 +56,18 @@ type jobBuilder struct {
 func (b *pipeBuilder) job(m *omap) *builtJob {
 	name, _ := text(m.Vals["name"])
 	j := &ir.Job{ID: name}
-	jb := &jobBuilder{b: b, job: j, ids: map[string]int{}, taken: map[string]bool{}, path: b.path() + "/job/" + name}
+	jb := &jobBuilder{b: b, job: j, ids: map[string]int{}, taken: map[string]bool{}, written: map[*ir.Step]string{}, path: b.path() + "/job/" + name}
 	jb.k = newSink(b.rep, b.file, jb.path)
 	r := newReader(m)
 	r.Take("name")
-	bj := &builtJob{job: j}
+	bj := &builtJob{job: j, name: name, written: jb.written}
+	hookText := map[string]any{}
+	for _, h := range hooks {
+		if v := m.Vals[h.key]; v != nil {
+			hookText[h.key] = plainValue(v)
+		}
+	}
+	bj.hookDigest = digestOf(hookText)
 	plan, _ := r.Take(keyPlan)
 	steps, _ := plan.([]any)
 	steps = jb.allowFailure(steps)

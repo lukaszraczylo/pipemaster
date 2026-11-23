@@ -365,3 +365,37 @@ func TestForeignPluginStepIsLostAsAnAction(t *testing.T) {
 	}
 	t.Fatalf("no lost step.action entry for the plugin step: %v", rep.Entries)
 }
+
+func finallyProject() *ir.Project {
+	p := project(scriptJob("build", "make"))
+	p.Pipelines[0].Triggers = []ir.Trigger{pushOn("main")}
+	p.Pipelines[0].Finally = []*ir.Job{scriptJob("cleanup", "rm -rf x"), scriptJob("report", "echo done")}
+	return p
+}
+
+func TestFinallyJobsComeBackAsFinallyJobs(t *testing.T) {
+	files, _ := emit(t, finallyProject())
+	got, rep := reparse(t, files)
+	pl := got.Pipelines[0]
+	if len(pl.Finally) != 2 || len(pl.Jobs[0].Steps) != 1 {
+		t.Fatalf("finally = %d, build steps = %d; want 2 and 1", len(pl.Finally), len(pl.Jobs[0].Steps))
+	}
+	if hasFeatureEntry(rep, string(caps.PipelineFinally), "marker ignored") {
+		t.Fatalf("an unedited file reported an ignored marker: %v", rep.Entries)
+	}
+}
+
+func TestEditedFinallyHookIsKept(t *testing.T) {
+	files, _ := emit(t, finallyProject())
+	src := files[".concourse/ci.yml"]
+	i := strings.LastIndex(src, "- rm -rf x")
+	src = src[:i] + "- rm -rf y" + src[i+len("- rm -rf x"):]
+	got, rep := parseFiles(t, map[string]string{"ci.yml": src})
+	pl := got.Pipelines[0]
+	if len(pl.Finally) != 0 || len(pl.Jobs[0].Steps) != 3 {
+		t.Fatalf("finally = %d, build steps = %d; want 0 and 3", len(pl.Finally), len(pl.Jobs[0].Steps))
+	}
+	if !hasFeatureEntry(rep, string(caps.PipelineFinally), "marker ignored") {
+		t.Fatalf("no marker ignored entry: %v", rep.Entries)
+	}
+}

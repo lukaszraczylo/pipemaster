@@ -206,6 +206,7 @@ func (b *pipeBuilder) build(top *omap) (*ir.Pipeline, error) {
 	b.concurrency(pl, built)
 	b.applyJobNames(pl)
 	b.carryPipeline(top, rawList, pl)
+	b.finallyHooks(pl, built)
 	b.keepResources(k)
 	for _, key := range knownTop {
 		if v, ok := r.Take(key); ok {

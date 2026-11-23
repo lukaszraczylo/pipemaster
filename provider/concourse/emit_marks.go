@@ -78,3 +78,11 @@ type disabledArg struct {
 	If     string `json:"if"`
 	Script string `json:"script"`
 }
+
+// finallyArg names the job whose hooks hold the finally jobs, the tasks that stand for them, and the digest of
+// the hooks, so the parser removes those tasks only when the hooks are unedited.
+type finallyArg struct {
+	Job    string   `json:"job"`
+	Digest string   `json:"digest"`
+	Tasks  []string `json:"tasks"`
+}

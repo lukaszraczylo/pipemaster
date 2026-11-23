@@ -172,6 +172,7 @@ func (jb *jobBuilder) taskStep(m *omap) *ir.Step {
 	if st.Kind == ir.StepScript {
 		jb.applyMarkers(m, st, written)
 	}
+	jb.written[st] = written
 	return st
 }
 

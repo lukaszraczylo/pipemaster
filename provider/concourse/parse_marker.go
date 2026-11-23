@@ -709,3 +709,39 @@ func jobFields(c *ir.Job, names func([]ir.Var) string) []string {
 	}
 	return out
 }
+
+// finallyHooks takes the finally jobs that the carry restored out of the hooks that stood for them. When the
+// hooks were edited, the file wins: the finally jobs are not restored and the hook steps stay.
+func (b *pipeBuilder) finallyHooks(pl *ir.Pipeline, built []*builtJob) {
+	if len(pl.Finally) == 0 {
+		return
+	}
+	var a finallyArg
+	if !b.arg(b.path(), caps.PipelineFinally, &a) {
+		return
+	}
+	var sink *builtJob
+	for _, bj := range built {
+		if bj.name == a.Job {
+			sink = bj
+		}
+	}
+	taskSet := map[string]bool{}
+	for _, t := range a.Tasks {
+		taskSet[t] = true
+	}
+	found := 0
+	if sink != nil {
+		for _, st := range sink.job.Steps {
+			if taskSet[sink.written[st]] {
+				found++
+			}
+		}
+	}
+	if sink == nil || sink.hookDigest != a.Digest || found != len(a.Tasks) {
+		pl.Finally = nil
+		b.ignored(b.path(), caps.PipelineFinally, "the hooks of the job "+a.Job+" were edited after pipemaster wrote them; the finally jobs are not restored and the hook steps stay")
+		return
+	}
+	sink.job.Steps = slices.DeleteFunc(sink.job.Steps, func(st *ir.Step) bool { return taskSet[sink.written[st]] })
+}
