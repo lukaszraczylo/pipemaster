@@ -24,15 +24,15 @@ The parser reads the first directory of the list that exists and does not merge 
 
 ## Installing
 
-Download a release archive for Linux, macOS or Windows from the GitHub releases page. Each archive holds the binary, the license, this README and the docs. The file `checksums.txt` lists the SHA-256 sum of each archive.
-
-To install with Go, run `go install github.com/lukaszraczylo/pipemaster/cmd/pipemaster@latest`. A binary built this way reports the version `dev`.
-
-To build from a checkout, use the command below. The module needs Go 1.27.
+Build the command from a checkout. The module needs Go 1.27.
 
 ```sh
 go build -o pipemaster ./cmd/pipemaster
 ```
+
+After the first release is published, you can use the two other paths. Download a release archive for Linux, macOS or Windows from the GitHub releases page. Each archive holds the binary, the license, this README and the docs. The file `checksums.txt` lists the SHA-256 sum of each archive.
+
+You can also run `go install github.com/lukaszraczylo/pipemaster/cmd/pipemaster@latest`. A binary built this way reports the tag that you install. A binary built from a checkout reports a version derived from its commit.
 
 ## Using the command line
 
