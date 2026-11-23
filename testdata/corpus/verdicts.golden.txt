@@ -519,7 +519,7 @@
 68-tekton-build-definitions tekton->gitlab native=   2 emulated=   1 external=   0 lost=   6
 68-tekton-build-definitions tekton->woodpecker native=   1 emulated=   4 external=   1 lost=   9
 69-tekton-pipelines-tutorial tekton->argo native=   9 emulated=   1 external=   0 lost=  19
-69-tekton-pipelines-tutorial tekton->concourse native=   7 emulated=   8 external=   0 lost=  16
+69-tekton-pipelines-tutorial tekton->concourse native=   6 emulated=   9 external=   0 lost=  16
 69-tekton-pipelines-tutorial tekton->drone native=   7 emulated=  11 external=   0 lost=  26
 69-tekton-pipelines-tutorial tekton->forgejo native=   6 emulated=  10 external=   0 lost=  19
 69-tekton-pipelines-tutorial tekton->gha native=   6 emulated=  10 external=   0 lost=  19
