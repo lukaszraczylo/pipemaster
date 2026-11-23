@@ -1,6 +1,7 @@
 package concourse_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -283,5 +284,26 @@ func TestPipelineCallStepIsAPlaceholderAndComesBack(t *testing.T) {
 	got := back.Pipelines[0].Jobs[0].Steps
 	if len(got) != 2 || got[1].Kind != ir.StepPipelineCall || got[1].Action == nil || got[1].Action.Path != "./.github/workflows/w.yml" {
 		t.Fatalf("steps came back as %+v", got)
+	}
+}
+
+func TestLostLineWithAVarSyntaxKeepsNoVarInTheScript(t *testing.T) {
+	j := scriptJob("build", "echo start", "echo '((not_a_var))'", "echo done")
+	files, rep := emit(t, project(j))
+	if !hasEntry(rep, "holds ((") {
+		t.Fatalf("no entry reports the line: %v", rep.Entries)
+	}
+	back, _ := reparse(t, files)
+	if got := back.Pipelines[0].Jobs[0].Steps[0].Script; !slices.Equal(got, j.Steps[0].Script) {
+		t.Fatalf("script came back as %q", got)
+	}
+	edited := strings.Replace(files[".concourse/ci.yml"], "echo done", "echo done; echo more", 1)
+	got, rep2 := parseFiles(t, map[string]string{"ci.yml": edited})
+	script := got.Pipelines[0].Jobs[0].Steps[0].Script
+	if len(script) == 0 || !strings.Contains(strings.Join(script, "\n"), "echo done; echo more") {
+		t.Fatalf("an edited file lost its script: %q", script)
+	}
+	if hasEntry(rep2, "run is kept in Ext and the step runs nothing") {
+		t.Fatalf("the parser dropped the script: %v", rep2.Entries)
 	}
 }

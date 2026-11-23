@@ -269,7 +269,8 @@ def StepOk (s : Core.Step) : Prop := CcId s.id ∧ sourcePrefix.isPrefixOf s.id.
 instance (s : Core.Step) : Decidable (StepOk s) := by unfold StepOk; exact inferInstance
 
 /-- A script that the emitter writes as given: at least one line (an empty script is written as `true`), and no `((`
-in a line (the emitter comments such a line out as a Concourse variable and carries the script instead). -/
+in a line (the emitter comments such a line out with the `((` broken to `( (`, so Concourse reads no variable in the
+comment, and carries the script instead). -/
 def ScriptOk (sc : List String) : Prop :=
   sc ≠ [] ∧ ∀ l ∈ sc, ¬ (['(', '('] <:+: l.toList)
 

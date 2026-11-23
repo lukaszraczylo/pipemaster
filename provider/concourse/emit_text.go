@@ -265,12 +265,21 @@ func (s *scope) scriptLines(path string, script []string) []string {
 			if first == "" {
 				first = why[k]
 			}
-			out = append(out, lostPrefix+commentSafe(script[k]))
+			out = append(out, lostPrefix+noVarSyntax(commentSafe(script[k])))
 		}
 		e.lose(path, caps.ScriptInterpolation, emitkit.SpanDetail(first, sp.To-sp.From+1, sp.Open))
 		i = sp.To
 	}
 	return out
+}
+
+// noVarSyntax breaks every ((, which Concourse reads as a credential variable even inside a comment of a script.
+// The carry marker holds the original line.
+func noVarSyntax(s string) string {
+	for strings.Contains(s, varOpen) {
+		s = strings.ReplaceAll(s, varOpen, "( (")
+	}
+	return s
 }
 
 // valueText writes an env value as the text of a task param: a reference to a secret or var becomes ((name)) and
