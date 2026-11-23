@@ -294,13 +294,6 @@ func (fp *fileParser) parseAPI(res *onResult, m *mapping, name string) error {
 	if err := finishTrigger(&t, m); err != nil {
 		return err
 	}
-	// The emitter writes repository_dispatch for an API trigger that names no event, so the name alone is no Ext.
-	if own, _ := t.Ext[fp.dialect].(map[string]any); len(own) == 1 && own[extEvent] == evRepoDisp {
-		delete(t.Ext, fp.dialect)
-		if len(t.Ext) == 0 {
-			t.Ext = nil
-		}
-	}
 	res.triggers = append(res.triggers, t)
 	return nil
 }

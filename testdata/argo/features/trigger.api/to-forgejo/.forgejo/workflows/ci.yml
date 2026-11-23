@@ -1,3 +1,4 @@
+# pipemaster:emulated trigger.api pipeline/ci/trigger/0
 # pipemaster:emulated job.runner pipeline/ci/job/build
 name: api
 on:

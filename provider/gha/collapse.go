@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
@@ -81,6 +82,8 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			collapseHost(e, markedStep(pl, u.IRPath), args[u])
 		case caps.JobRetry:
 			collapseRetry(markedJob(pl, u.IRPath), args[u])
+		case caps.TriggerAPI:
+			dropSynthEvent(pl, u.IRPath, provider.Family(e.d.ID))
 		case caps.TriggerPush:
 			dropMatchAll(pl, ir.TriggerPush, func(t *ir.Trigger) *ir.Filter { return &t.Branches })
 		case caps.TriggerTag:
@@ -101,6 +104,22 @@ func markedJob(pl *ir.Pipeline, path string) *ir.Job {
 		}
 	}
 	return nil
+}
+
+// dropSynthEvent removes the event name the emitter chose for an API trigger that named none.
+func dropSynthEvent(pl *ir.Pipeline, path, family string) {
+	rest, ok := strings.CutPrefix(path, "pipeline/"+pl.ID+"/trigger/")
+	i, err := strconv.Atoi(rest)
+	if !ok || err != nil || i < 0 || i >= len(pl.Triggers) || pl.Triggers[i].Kind != ir.TriggerAPI {
+		return
+	}
+	t := &pl.Triggers[i]
+	if own, _ := t.Ext[family].(map[string]any); len(own) == 1 && own[extEvent] == evRepoDisp {
+		delete(t.Ext, family)
+		if len(t.Ext) == 0 {
+			t.Ext = nil
+		}
+	}
 }
 
 func dropMatchAll(pl *ir.Pipeline, kind ir.TriggerKind, pick func(*ir.Trigger) *ir.Filter) {

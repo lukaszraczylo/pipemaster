@@ -396,6 +396,7 @@ func (e *emitter) apiEvent(b *onBuilder, path string, t *ir.Trigger) error {
 	if name == "" {
 		name = evRepoDisp
 		e.emulate(path, caps.TriggerAPI, evRepoDisp, "the API trigger names no event; repository_dispatch is used")
+		e.mark(caps.TriggerAPI, path)
 	}
 	m, err := eventMap(ext, extEvent)
 	if err != nil {
