@@ -18,6 +18,7 @@ The provider ID is the value that you pass to `--from`, `--to`, `--via` and `--a
 | `drone` | Drone CI | `.drone.yml` |
 | `tekton` | Tekton Pipelines and Triggers | `.yaml` and `.yml` files in `.tekton`, including its subfolders |
 | `argo` | Argo Workflows and Argo Events | `.yaml` and `.yml` files in `.argo`, including its subfolders |
+| `concourse` | Concourse pipelines | `.yml` and `.yaml` files in `.concourse`, one pipeline for each file |
 
 The parser reads the first directory of the list that exists and does not merge directories. The emitter writes only the first directory. If a repository holds both `.github/workflows` and `.gitea/workflows`, `detect` lists `gha` and `gitea`. Then `convert` needs `--from`. The pinned versions and the default action hosts are in [docs/versions.md](docs/versions.md).
 
@@ -535,6 +536,77 @@ Notes on the Argo provider:
 - The cluster setup is external. The operator must install Argo Workflows and Argo Events, create the EventBus, expose the EventSource Service with an Ingress, configure the artifact repository, apply the RBAC objects in `.argo/rbac/`, and create the Secret and the ConfigMap. The converter reports no feature for most of this work. The trigger.manual entry lists it.
 - The validator checks the emitted files against embedded schemas from the datree CRDs-catalog. The tests also run `argo lint --offline` on the workflow kinds. The Sensor and the EventSource schemas accept any content in `spec`, so the schema check is weak for them. The pinned versions are in `docs/versions.md`. `make linters` runs `scripts/install-linters.sh`, which installs the pinned `argo` CLI into `.tools/bin` beside the other linters.
 
+## Feature support from GHA to Concourse
+
+The following table comes from `pipemaster caps --from gha --to concourse --format md`.
+
+| Feature | Gha | Concourse | Strategy |
+| --- | --- | --- | --- |
+| config.name | native | native | ((name)) in task params (the credential manager that resolves ((name)) is external, and a ((var)) never goes into a script text) |
+| display.name | native | native |  |
+| expr.opaque | native | lost | (Concourse has no expression language, so every opaque expression is lost) |
+| ext.passthrough | native | native |  |
+| job.allow_failure | native | emulated | try around the plan (the job shows success, not failure) |
+| job.artifacts | emulated | emulated | workspace artifact handed from task to task (inputs and outputs of the same name) (only within one job; a job with no script step writes no workspace) |
+| job.cache | emulated | emulated | task config caches |
+| job.container | native | native | image_resource on every task |
+| job.env | native | emulated | copied into the params of every task (a step variable of the same name wins) |
+| job.environment | native | lost | (Concourse has no environment name or URL) |
+| job.environment.approval | external | emulated | job with no triggering get, started by a person (Concourse has no approver identity: anyone who may trigger the job approves it, and the reviewer list is lost; a job whose get steps carry different trigger sets keeps the set in Ext[concourse][triggers], and a job whose get steps do not trigger is started by a person) |
+| job.if | native | emulated | shared shell guard on script tasks; a status function becomes a job hook (on_failure or ensure) (a condition with no guard form leaves the job with no triggering get, so a person starts it, and adds a lost entry) |
+| job.manual | emulated | emulated | job with no triggering get, started by a person (no approver identity; a job whose get steps carry different trigger sets keeps the set in Ext[concourse][triggers], and a job whose get steps do not trigger is started by a person) |
+| job.matrix | native | emulated | across over the axes (outputs of the substep are not visible outside the across step) |
+| job.needs | native | native | passed on the get of the shared source resource (passed lists are an AND) |
+| job.needs.artifacts | emulated | external | s3 or registry-image resource between the jobs (the operator sets up the s3 or registry resource and its credentials; Concourse passes no artifact between jobs by itself) |
+| job.outputs | native | lost | (a Concourse job has no named outputs for other jobs) |
+| job.retry | emulated | emulated | attempts on a do wrapper of the plan |
+| job.runner | native | emulated | worker tags of the task (tags name workers, not hosted runner labels) |
+| job.services | native | lost | (Concourse tasks have no service containers) |
+| job.timeout | native | emulated | timeout on a do wrapper of the plan |
+| pipeline.concurrency | native | emulated | serial_groups on the jobs (cancel-in-progress is lost; a second build waits) |
+| pipeline.env | native | emulated | copied into the params of every task (a step variable of the same name wins) |
+| pipeline.finally | emulated | emulated | job hook (ensure) on the single sink job (several finally steps wrap in do; a pipeline with no single sink job loses the finally steps) |
+| pipeline.inputs | native | lost | (a Concourse pipeline has no run-time inputs; fly set-pipeline vars apply at set time) |
+| pipeline.permissions | native | lost | (permissions come from the team and the credential manager) |
+| project.multi_pipeline | native | emulated | one pipeline file per IR pipeline under .concourse/ (each pipeline needs its own fly set-pipeline and gets its own triggers) |
+| script.interpolation | native | native |  |
+| step.action | native | emulated | task per actions.Lookup verdict (unknown actions are lost) |
+| step.continue_on_error | native | native | try around the task |
+| step.env | native | native | task params |
+| step.if | native | emulated | shared shell guard in the script of the task (a condition with no guard form runs as a task whose first script line is exit 0, with a lost entry) |
+| step.image | emulated | native | task config image_resource |
+| step.script | native | native | task config run.path and run.args |
+| step.shell | native | emulated | run.path names the shell (the image must provide the shell) |
+| step.timeout | native | native | task timeout |
+| step.workdir | native | native | task config run.dir |
+| trigger.api | native | lost | (Concourse has no resource, listener or Ext entry that the emitter can restore for an API trigger, so it is lost; a webhook_token on a resource is kept in Ext only) |
+| trigger.filter.branches | native | native | source.branch of the git resource (one exact branch per resource; a glob is lost) |
+| trigger.filter.paths | native | native | source.paths and source.ignore_paths of the git resource |
+| trigger.filter.tags | native | emulated | source.tag_filter of the git resource (one glob(7) pattern per resource; an exclude pattern is lost) |
+| trigger.manual | native | native | job with no triggering get |
+| trigger.pipeline_done | native | lost | (Concourse has no pipeline-completion trigger) |
+| trigger.pull_request | native | lost | (Concourse has no pull request resource type in its core; a pull request resource type must be configured by the operator) |
+| trigger.push | native | native | git resource get with trigger: true (a git resource follows one branch, so a push trigger with two exact branches is two resources and the job runs once per branch event) |
+| trigger.resource | lost | lost | (the emitter writes git and time resources only; a trigger on any other resource is lost) |
+| trigger.schedule | native | emulated | time resource get with trigger: true; the source is interval for a step that divides the hour or the day, start and stop for a daily window, and days for a day list (the time resource is built for at least once every N minutes, not for a wall-clock time. An interval counts from the last version, so it has no clock alignment, the first check emits a version at once, and an every-minute cron cannot fire faster than the check cadence. A daily window is 5 minutes wide, so the job starts within 5 minutes after the cron time; a window that passes midnight is lost when it has a day list. Any other cron form is lost with the cron text kept) |
+| trigger.tag | native | emulated | git resource with source.tag_filter (a tag trigger that also has a branch filter is lost, because one git resource cannot hold both sets) |
+
+Notes on the Concourse provider:
+
+- The emitter writes one file for each pipeline, `.concourse/<pipeline>.yml`, and every task is inline. The parser reads every `.yml` and `.yaml` file in `.concourse/` as one pipeline, and the file name is the pipeline ID. A file is a Concourse pipeline only when it has a top-level `jobs` list whose items have a `plan`. The parser rejects a repeated mapping key, as `fly` does, and it accepts anchors and `<<` merge keys.
+- A Concourse pipeline has no `on:` block, so a resource is the trigger. A `get` with `trigger: true` on a `git` resource is a push trigger. A `get` with `trigger: true` on a `time` resource is a schedule. The emitter writes only `git`, `time` and `registry-image` resources. A trigger on any other resource type is lost, and the resource stays in the Ext data.
+- A git resource follows one branch. A push trigger with two exact branches becomes two resources, and the job runs once for each branch event. A branch glob is lost. A `git` resource filters tags with one `tag_filter` pattern, so a tag trigger that also has a branch filter is lost.
+- Each job starts with a `get` of the source resource, and each job has its own trigger set: a job whose `get` steps do not trigger is started by a person. A `needs` entry becomes `passed:` on the `get` of the source resource. A `passed:` list is an AND, so a job that needs jobs A and B runs on a version that went through both.
+- The generated `git` resource has the placeholder `uri: ((git-uri))`. The operator must supply `git-uri` through a credential manager or `fly set-pipeline --var`. The report names this entry.
+- Each step becomes one `task` step with an inline `config`. Concourse runs each task in a fresh container, so the tasks of a job pass one artifact, `workspace`, from task to task. The artifact is both an input and an output of each task, and the first task maps the source artifact to it with `input_mapping`. A job with no script step writes no `workspace`. The artifact works only within one job. The scripts run as `sh -ec`, and a `((var))` never goes into a script text: values reach a script through task `params`.
+- A task image is a `registry-image` resource. A step with no image gets `ubuntu:latest`, and the report names this default. A PowerShell step runs with `run.path: powershell` or `pwsh` and `platform: windows`, only when the IR names that shell or a Windows runner. A script that may be PowerShell stays `sh`, and the report names the step.
+- A cron schedule becomes a `time` resource, and the conversion is approximate. The resource is built to run "at least once every N minutes", not at a wall-clock time. A step of N minutes or N hours that divides the hour or the day becomes `interval`, and an interval counts from the last version, so it has no clock alignment. A daily time becomes a window of 5 minutes (`start` and `stop`), so the job starts within 5 minutes after the cron time. A list of days becomes `days`, and a day-list window that passes midnight is lost. Any other cron form is lost, and the cron text stays in the Ext data. The pinned `time` resource is v1.11.6.
+- A `time` resource has no version before its first interval or window ends. The emitter does not write `initial_version`, because it starts the job at once. After `fly set-pipeline`, the operator can run `fly check-resource -r <pipeline>/<resource> --from time:2000-01-01T00:00:00Z`. The report names this command.
+- Conditions use the shared shell guard on a script task. A status function becomes a job hook (`on_failure` or `ensure`), and several `finally` steps wrap in `do`. A condition with no guard form runs as a task whose first script line is `exit 0`, with a lost entry, and a job condition with no guard form leaves the job with no triggering `get`.
+- Concourse has no expression language, so every opaque expression is lost. An action with no task form leaves a placeholder task that runs `true`. A pipeline with no jobs gets a placeholder job. A marker comment in the file restores each of these on the way back. If you edit or remove the placeholder, the converter keeps your file and reports that it ignored the marker.
+- The parser keeps the YAML of a Concourse file that the IR cannot hold in the Ext data, and the emitter writes it back unchanged when the file returns to Concourse. A top-level key that only holds an anchor, such as `shared:`, is not written to a Concourse output and is reported as lost.
+- The validator checks the emitted files against a schema that is written by hand from the v8.3.3 structs of Concourse, and the tests also run `fly validate-pipeline --strict`. The pinned versions are in `docs/versions.md`. `make linters` runs `scripts/install-linters.sh`, which installs the pinned `fly` into `.tools/bin` beside the other linters.
+
 ## Development
 
-`make check` runs the tests, `golangci-lint` and the Lean checks. It runs `go test -short ./...`, and the short form runs a deterministic sample of the chain matrix. The sample keeps one chain for each middle hop of each source provider. Every provider is a source, a middle hop and a target at least once. The full matrix at eight providers takes about 200 seconds and about 1.2 GB of memory. `make chains` runs the full matrix.
+`make check` runs the tests, `golangci-lint` and the Lean checks. It runs `go test -short ./...`, and the short form runs a deterministic sample of the chain matrix. The sample keeps one chain for each middle hop of each source provider. Every provider is a source, a middle hop and a target at least once. The full matrix at nine providers takes about 285 seconds and about 1.4 GB of memory. `make chains` runs the full matrix.

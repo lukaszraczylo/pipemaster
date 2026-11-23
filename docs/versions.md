@@ -1,6 +1,6 @@
 # Pinned versions
 
-These versions were verified on 2026-11-19. The Tekton Pipelines, Tekton Triggers and kubeconform rows were verified on 2026-11-21. The Argo rows were verified on 2026-11-22. The Gitea, Forgejo, Woodpecker, Drone, Tekton and Argo dialects follow them.
+These versions were verified on 2026-11-19. The Tekton Pipelines, Tekton Triggers and kubeconform rows were verified on 2026-11-21. The Argo rows were verified on 2026-11-22. The Concourse rows were verified on 2026-11-23. The Gitea, Forgejo, Woodpecker, Drone, Tekton, Argo and Concourse dialects follow them.
 
 | Product | Version | Date |
 | --- | --- | --- |
@@ -19,6 +19,9 @@ These versions were verified on 2026-11-19. The Tekton Pipelines, Tekton Trigger
 | Argo Events | v1.9.11 | 2026-07-13 |
 | argo CLI | v4.1.6 | 2026-10-22 |
 | kubeconform | v0.8.0 | 2026-06-04 |
+| Concourse | v8.3.3 | 2026-11-03 |
+| fly | v8.3.3 | 2026-11-03 |
+| concourse/time-resource | v1.11.6 | |
 
 ## Sources
 
@@ -37,6 +40,9 @@ These versions were verified on 2026-11-19. The Tekton Pipelines, Tekton Trigger
 - <https://github.com/argoproj/argo-events/releases/tag/v1.9.11>
 - <https://github.com/datreeio/CRDs-catalog/tree/784ec895547a36e548e6810b41f27baade3a0890/argoproj.io>
 - <https://github.com/yannh/kubeconform/releases/tag/v0.8.0>
+- <https://github.com/concourse/concourse/releases/tag/v8.3.3>
+- <https://concourse-ci.org/docs/pipelines/>
+- <https://github.com/concourse/time-resource/tree/v1.11.6>
 
 Drone is in maintenance mode. Harness ships occasional server releases from the `drone` branch, and no release has followed v2.28.2.
 
@@ -53,6 +59,7 @@ The emitter writes only the first directory of each list. The parser reads the f
 | `drone` | `.drone.yml` |
 | `tekton` | `.tekton` (all YAML files, including subfolders) |
 | `argo` | `.argo` (all YAML files, including subfolders) |
+| `concourse` | `.concourse` (all YAML files, one pipeline for each file) |
 
 ## Default action hosts
 
