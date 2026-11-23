@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -408,5 +410,53 @@ func TestConvertBackFromPhase1Metadata(t *testing.T) {
 				t.Errorf("not an exact return:\n got %v\nwant %v", got, wantDoc)
 			}
 		})
+	}
+}
+
+func TestCapsSingleProvider(t *testing.T) {
+	code, out, errs := run(t, "caps", "--to", "drone", "--format", "md")
+	if code != 0 {
+		t.Fatalf("code=%d stderr=%q", code, errs)
+	}
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	features := caps.AllFeatures()
+	if len(lines) != len(features)+2 {
+		t.Fatalf("got %d lines, want %d:\n%s", len(lines), len(features)+2, out)
+	}
+	if lines[0] != "| Feature | Drone | Strategy |" {
+		t.Fatalf("header = %q", lines[0])
+	}
+	p, err := provider.Get("drone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := p.Caps().Lookup("job.matrix").Level.String()
+	var row string
+	for _, l := range lines[2:] {
+		if strings.HasPrefix(l, "| job.matrix |") {
+			row = l
+		}
+	}
+	if !strings.HasPrefix(row, "| job.matrix | "+want+" |") {
+		t.Errorf("job.matrix row = %q, want level %q", row, want)
+	}
+	for i, f := range features {
+		if !strings.HasPrefix(lines[i+2], "| "+string(f)+" |") {
+			t.Errorf("row %d = %q, want feature %s", i, lines[i+2], f)
+		}
+	}
+	if code, _, errs := run(t, "caps"); code != 2 || !strings.Contains(errs, "usage: pipemaster caps") {
+		t.Errorf("no flags: code=%d stderr=%q", code, errs)
+	}
+	if code, _, _ := run(t, "caps", "--from", "drone"); code != 2 {
+		t.Errorf("--from alone: code=%d, want 2", code)
+	}
+	code, text, errs := run(t, "caps", "--to", "drone")
+	if code != 0 {
+		t.Fatalf("text form: code=%d stderr=%q", code, errs)
+	}
+	tl := strings.Split(strings.TrimRight(text, "\n"), "\n")
+	if len(tl) != len(features)+1 || strings.Fields(tl[0])[0] != "FEATURE" || strings.Fields(tl[0])[1] != "DRONE" || strings.Fields(tl[0])[2] != "STRATEGY" {
+		t.Errorf("text form header or row count wrong:\n%s", text)
 	}
 }

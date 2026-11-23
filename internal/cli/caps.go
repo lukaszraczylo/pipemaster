@@ -10,7 +10,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 )
 
-const capsUsage = "usage: pipemaster caps --from <provider> --to <provider> [--format text|md]\n"
+const capsUsage = "usage: pipemaster caps [--from <provider>] --to <provider> [--format text|md]\n"
 
 func runCaps(args []string, stdout, stderr io.Writer) int {
 	fset := flag.NewFlagSet("caps", flag.ContinueOnError)
@@ -20,28 +20,34 @@ func runCaps(args []string, stdout, stderr io.Writer) int {
 	if _, ok := parseArgs(fset, args, 0, capsUsage, stderr); !ok {
 		return exitUsage
 	}
-	if *from == "" || *to == "" || (*format != "text" && *format != "md") {
+	if *to == "" || (*format != "text" && *format != "md") {
 		_, _ = fmt.Fprint(stderr, capsUsage)
-		return exitUsage
-	}
-	p, ok := getProvider(*from, stderr)
-	if !ok {
 		return exitUsage
 	}
 	q, ok := getProvider(*to, stderr)
 	if !ok {
 		return exitUsage
 	}
+	qm := q.Caps()
 
-	rows := [][]string{{"FEATURE", strings.ToUpper(p.ID()), strings.ToUpper(q.ID()), "STRATEGY"}}
-	pm, qm := p.Caps(), q.Caps()
-	for _, f := range caps.AllFeatures() {
-		qs := qm.Lookup(f)
-		note := qs.Strategy
-		if qs.Caveat != "" {
-			note = strings.TrimSpace(note + " (" + qs.Caveat + ")")
+	var rows [][]string
+	if *from == "" {
+		rows = [][]string{{"FEATURE", strings.ToUpper(q.ID()), "STRATEGY"}}
+		for _, f := range caps.AllFeatures() {
+			qs := qm.Lookup(f)
+			rows = append(rows, []string{string(f), qs.Level.String(), capsStrategy(qs)})
 		}
-		rows = append(rows, []string{string(f), pm.Lookup(f).Level.String(), qs.Level.String(), note})
+	} else {
+		p, ok := getProvider(*from, stderr)
+		if !ok {
+			return exitUsage
+		}
+		pm := p.Caps()
+		rows = [][]string{{"FEATURE", strings.ToUpper(p.ID()), strings.ToUpper(q.ID()), "STRATEGY"}}
+		for _, f := range caps.AllFeatures() {
+			qs := qm.Lookup(f)
+			rows = append(rows, []string{string(f), pm.Lookup(f).Level.String(), qs.Level.String(), capsStrategy(qs)})
+		}
 	}
 
 	if *format == "md" {
@@ -73,4 +79,11 @@ func writeCapsMarkdown(w io.Writer, rows [][]string) {
 			_, _ = fmt.Fprintf(w, "|%s\n", strings.Repeat(" --- |", len(r)))
 		}
 	}
+}
+
+func capsStrategy(s caps.Support) string {
+	if s.Caveat == "" {
+		return s.Strategy
+	}
+	return strings.TrimSpace(s.Strategy + " (" + s.Caveat + ")")
 }
