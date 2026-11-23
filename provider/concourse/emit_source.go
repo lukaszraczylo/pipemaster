@@ -22,8 +22,10 @@ const (
 	timeSourceKeys = "interval start stop days"
 	// uriNote tells the operator what the generated git resources need.
 	uriNote = "the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager"
-	// firstVersionNote explains the time resource start-up gap.
-	firstVersionNote = "a time resource has no version until its first window or interval passes, so a person who starts the job before then finds no input; run fly check-resource -r <pipeline>/%s --from time:2000-01-01T00:00:00Z once after set-pipeline (initial_version: true is not written because it starts the job at once, outside the window)"
+	// intervalNote and windowNote explain the first version of a time resource. The check emits at once only
+	// when no previous version exists and the resource has no window.
+	intervalNote = "an interval time resource emits a version at its first check, so the job starts soon after set-pipeline; initial_version: true is not written"
+	windowNote   = "a window time resource has no version until its first window passes, so a person who starts the job before then finds no input; run fly check-resource -r <pipeline>/%s --from time:2000-01-01T00:00:00Z once after set-pipeline (initial_version: true is not written because it starts the job at once, outside the window)"
 )
 
 // source is one resource of the pipeline file.
@@ -326,7 +328,11 @@ func (pe *pipeEmitter) schedule(t *ir.Trigger, tp string) {
 		}
 		src[k] = v
 	}
-	e.emulate(tp, caps.TriggerSchedule, "time resource", fmt.Sprintf(firstVersionNote, name))
+	note := fmt.Sprintf(windowNote, name)
+	if _, interval := want["interval"]; interval {
+		note = intervalNote
+	}
+	e.emulate(tp, caps.TriggerSchedule, "time resource", note)
 	e.markArg(caps.TriggerSchedule, tp, scheduleArg{Cron: t.Cron, Resource: name, Source: canonJSON(def[keySource])})
 	pe.add(&source{name: name, typ: typeTime, def: def, trigger: true})
 }

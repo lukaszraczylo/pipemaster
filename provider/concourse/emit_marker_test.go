@@ -253,3 +253,18 @@ func TestRenamedPipelineFileKeepsTheNameAndReportsTheLostName(t *testing.T) {
 	_, rep := parseFiles(t, map[string]string{"other.yml": files[".concourse/ci.yml"]})
 	wantIgnored(t, rep, caps.DisplayName, "display name", "ID")
 }
+
+func TestFirstVersionNoteSeparatesIntervalFromWindow(t *testing.T) {
+	cases := []struct{ cron, has, hasNot string }{
+		{"*/15 * * * *", "emits a version at its first check", "has no version"},
+		{"0 3 * * *", "has no version until its first window passes", "emits a version at its first check"},
+	}
+	for _, c := range cases {
+		p := scheduleProject()
+		p.Pipelines[0].Triggers[0].Cron = c.cron
+		_, rep := emit(t, p)
+		if !hasFeatureEntry(rep, string(caps.TriggerSchedule), c.has) || hasFeatureEntry(rep, string(caps.TriggerSchedule), c.hasNot) {
+			t.Errorf("%s: want %q and not %q in %v", c.cron, c.has, c.hasNot, rep.Entries)
+		}
+	}
+}
