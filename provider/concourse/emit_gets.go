@@ -100,6 +100,7 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 			names = append(names, s.name)
 		}
 	}
+	jx.held = len(trig) == 0
 	var passed []any
 	for _, n := range j.Needs {
 		if w, ok := pe.jobName[n.JobID]; ok {

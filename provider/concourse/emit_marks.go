@@ -31,6 +31,8 @@ type matrixArg struct {
 type gateArg struct {
 	Environment *ir.Environment `json:"environment,omitempty"`
 	Manual      bool            `json:"manual"`
+	// Held is true when the file has no triggering get for the job.
+	Held bool `json:"held"`
 }
 
 // secretArg lists the task params whose kind differs from what their name says: Secrets are secrets that look

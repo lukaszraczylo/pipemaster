@@ -41,6 +41,7 @@ type jobEmitter struct {
 	caches     []string
 	actSeq     int
 	manual     bool
+	held       bool
 }
 
 // jobs writes every job of the pipeline.
@@ -123,6 +124,7 @@ func (pe *pipeEmitter) job(j *ir.Job) *yaml.Node {
 	}
 	jx.meta()
 	plan := jx.plan()
+	jx.gateMarker()
 	m := newMap()
 	m.SetStr("name", jx.name)
 	if c := pe.pl.Concurrency; c != nil && !pe.serial {
@@ -160,11 +162,8 @@ func (jx *jobEmitter) meta() {
 		e.markArg(caps.DisplayName, jx.mpath, nameArg{Name: j.Name, ID: j.ID, Written: jx.name, Kind: "job"})
 	}
 	jx.manual = j.Manual || (j.Environment != nil && j.Environment.Approval)
-	if j.Manual || j.Environment != nil {
-		e.markArg(caps.JobManual, jx.mpath, gateArg{Manual: j.Manual, Environment: j.Environment})
-		if j.Manual {
-			e.emulate(jx.path, caps.JobManual, "job with no triggering get", "a person starts the job; Concourse has no approver identity")
-		}
+	if j.Manual {
+		e.emulate(jx.path, caps.JobManual, "job with no triggering get", "a person starts the job; Concourse has no approver identity")
 	}
 	if j.Environment != nil && j.Environment.Approval {
 		e.emulate(jx.path, caps.JobEnvironmentApproval, "job with no triggering get", "a person starts the job; the reviewer list is lost")
@@ -176,6 +175,14 @@ func (jx *jobEmitter) meta() {
 		jx.cachePaths()
 	}
 	jx.condition()
+}
+
+// gateMarker writes the gate of the job once the gets are known: the file holds a triggering get or it does not.
+func (jx *jobEmitter) gateMarker() {
+	j := jx.j
+	if j.Manual || j.Environment != nil || jx.held {
+		jx.pe.e.markArg(caps.JobManual, jx.mpath, gateArg{Manual: j.Manual, Environment: j.Environment, Held: jx.held})
+	}
 }
 
 // condition decides how the job condition is written: a status function that always holds is dropped, a

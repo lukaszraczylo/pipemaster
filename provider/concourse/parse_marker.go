@@ -97,8 +97,7 @@ func (jb *jobBuilder) gateMarker(bj *builtJob) {
 	if !jb.b.arg(jb.path, caps.JobManual, &a) {
 		return
 	}
-	gated := a.Manual || (a.Environment != nil && a.Environment.Approval)
-	if gated != bj.job.Manual {
+	if a.Held != bj.job.Manual {
 		jb.b.ignored(jb.path, caps.JobManual, "the triggering gets of the job were edited after pipemaster wrote them")
 		return
 	}
