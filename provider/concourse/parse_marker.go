@@ -32,6 +32,25 @@ func (b *pipeBuilder) arg(path string, f caps.Feature, into any) bool {
 	return len(lines) > 0 && json.Unmarshal([]byte(lines[0]), into) == nil
 }
 
+// orphanNames reports the display-name markers whose pipeline, job or step is no longer in the file. The markers
+// are keyed by the written name, so a rename in the file leaves its marker with no node to restore.
+func (b *pipeBuilder) orphanNames() {
+	var orphans []ir.FeatureUse
+	for u := range b.marks {
+		if u.Feature == caps.DisplayName && !b.present[u.IRPath] && u.IRPath != b.path() {
+			orphans = append(orphans, u)
+		}
+	}
+	slices.SortFunc(orphans, func(x, y ir.FeatureUse) int { return strings.Compare(x.IRPath, y.IRPath) })
+	for _, u := range orphans {
+		var a nameArg
+		if !b.arg(u.IRPath, u.Feature, &a) {
+			continue
+		}
+		b.ignored(u.IRPath, caps.DisplayName, "the "+a.Kind+" "+a.Written+" is no longer in the file under that name; the display name and the ID "+a.ID+" are lost")
+	}
+}
+
 // marked is true when the file has a marker, with or without an argument, for the feature at the path.
 func (b *pipeBuilder) marked(path string, f caps.Feature) bool {
 	u := ir.FeatureUse{IRPath: path, Feature: f}

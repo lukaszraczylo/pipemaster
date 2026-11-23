@@ -58,6 +58,7 @@ func (b *pipeBuilder) job(m *omap) *builtJob {
 	j := &ir.Job{ID: name}
 	jb := &jobBuilder{b: b, job: j, ids: map[string]int{}, taken: map[string]bool{}, written: map[*ir.Step]string{}, path: b.path() + "/job/" + name}
 	jb.k = newSink(b.rep, b.file, jb.path)
+	b.present[jb.path] = true
 	r := newReader(m)
 	r.Take("name")
 	bj := &builtJob{job: j, name: name, written: jb.written}

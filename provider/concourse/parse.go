@@ -146,6 +146,7 @@ func extMap(pl *ir.Pipeline) map[string]any {
 type pipeBuilder struct {
 	marks    map[ir.FeatureUse][]string
 	bare     map[ir.FeatureUse]bool
+	present  map[string]bool
 	rep      *report.Report
 	res      map[string]*resource
 	types    map[string]bool
@@ -158,7 +159,7 @@ type pipeBuilder struct {
 }
 
 func newPipelineBuilder(rep *report.Report, file, id string) *pipeBuilder {
-	return &pipeBuilder{rep: rep, file: file, id: id, res: map[string]*resource{}, types: map[string]bool{}, used: map[string]bool{}, jobSet: map[string]bool{}}
+	return &pipeBuilder{rep: rep, file: file, id: id, res: map[string]*resource{}, types: map[string]bool{}, used: map[string]bool{}, jobSet: map[string]bool{}, present: map[string]bool{}}
 }
 
 func (b *pipeBuilder) path() string { return "pipeline/" + b.id }
@@ -207,6 +208,7 @@ func (b *pipeBuilder) build(top *omap) (*ir.Pipeline, error) {
 	b.applyJobNames(pl)
 	b.carryPipeline(top, rawList, pl)
 	b.finallyHooks(pl, built)
+	b.orphanNames()
 	b.keepResources(k)
 	for _, key := range knownTop {
 		if v, ok := r.Take(key); ok {

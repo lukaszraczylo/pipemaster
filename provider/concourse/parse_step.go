@@ -62,9 +62,11 @@ func (jb *jobBuilder) uniqueID(name string) string {
 		name = "step"
 	}
 	jb.ids[name]++
+	jb.b.present[jb.path+"/step/"+name] = true
 	if n := jb.ids[name]; n > 1 {
 		id := fmt.Sprintf("%s-%d", name, n)
 		jb.ids[id]++
+		jb.b.present[jb.path+"/step/"+id] = true
 		jb.k.Rep.Add(jb.entry(caps.ExtPassthrough, caps.Emulated, "step id made unique", fmt.Sprintf("step name %s is used again in the job; the id is %s and the name stays", name, id), 0))
 		return id
 	}

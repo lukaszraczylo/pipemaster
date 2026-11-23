@@ -228,3 +228,28 @@ func TestStepWorkdirComesBack(t *testing.T) {
 		t.Fatalf("workdir came back as %q", got)
 	}
 }
+
+func TestEditedStepNameKeepsTheFileAndReportsTheLostName(t *testing.T) {
+	j := scriptJob("build", "make")
+	j.Steps[0].Name = "Compile"
+	_, rep := editedParse(t, project(j), "task: build-run", "task: renamed")
+	wantIgnored(t, rep, caps.DisplayName, "display name", "ID")
+}
+
+func TestEditedJobNameKeepsTheFileAndReportsTheLostName(t *testing.T) {
+	j := scriptJob("build", "make")
+	j.Name = "Build it"
+	back, rep := editedParse(t, project(j), "  - name: build\n", "  - name: renamed\n")
+	if got := back.Pipelines[0].Jobs[0]; got.ID != "renamed" || got.Name != "" {
+		t.Fatalf("job came back as %q %q", got.ID, got.Name)
+	}
+	wantIgnored(t, rep, caps.DisplayName, "display name", "ID")
+}
+
+func TestRenamedPipelineFileKeepsTheNameAndReportsTheLostName(t *testing.T) {
+	p := project(scriptJob("build", "make"))
+	p.Pipelines[0].Name = "CI"
+	files, _ := emit(t, p)
+	_, rep := parseFiles(t, map[string]string{"other.yml": files[".concourse/ci.yml"]})
+	wantIgnored(t, rep, caps.DisplayName, "display name", "ID")
+}
