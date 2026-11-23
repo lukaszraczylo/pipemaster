@@ -1,4 +1,4 @@
-.PHONY: test chains lint lint-real lean vectors check linters
+.PHONY: test chains lint lint-real lean vectors check linters release-check
 
 test:
 	go test ./...
@@ -36,3 +36,8 @@ check:
 	scripts/check-vectors.sh
 	scripts/lean-axioms.sh
 	scripts/lean-currency.sh
+
+# Validates the release config and builds every target into dist/ without publishing.
+release-check:
+	goreleaser check
+	goreleaser release --snapshot --clean --skip=publish

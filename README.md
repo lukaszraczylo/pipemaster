@@ -24,7 +24,11 @@ The parser reads the first directory of the list that exists and does not merge 
 
 ## Installing
 
-Build the command from a checkout. The module needs Go 1.27.
+Download a release archive for Linux, macOS or Windows from the GitHub releases page. Each archive holds the binary, the license, this README and the docs. The file `checksums.txt` lists the SHA-256 sum of each archive.
+
+To install with Go, run `go install github.com/lukaszraczylo/pipemaster/cmd/pipemaster@latest`. A binary built this way reports the version `dev`.
+
+To build from a checkout, use the command below. The module needs Go 1.27.
 
 ```sh
 go build -o pipemaster ./cmd/pipemaster
@@ -575,3 +579,5 @@ The setup and the conversion notes of Concourse are in [docs/providers/concourse
 `make check` runs the tests, `golangci-lint` and the Lean checks. It runs `go test -short ./...`, and the short form runs a deterministic sample of the chain matrix. The sample keeps one chain for each middle hop of each source provider. Every provider is a source, a middle hop and a target at least once. The full matrix at nine providers takes about 285 seconds and about 1.4 GB of memory. `make chains` runs the full matrix.
 
 `make linters` builds or downloads the pinned linters into `.tools/bin`: actionlint, woodpecker-cli, drone, kubeconform, argo and fly. The versions are in `docs/versions.md`. `make lint-real` runs `make linters`, then every test except the chain matrix without `-short`, then `golangci-lint`. It sets `PIPEMASTER_REQUIRE_LINTERS=1`, so a missing or wrong-version linter fails the run instead of skipping its tests. It took about 97 seconds on a warm build cache (measured once on an Apple Silicon Mac).
+
+`make release-check` validates `.goreleaser.yaml` with `goreleaser check`. Then it builds a snapshot of every target into `dist/` without publishing. The command needs goreleaser v2 on the PATH. It leaves tracked files unchanged.

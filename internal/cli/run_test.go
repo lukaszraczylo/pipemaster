@@ -11,7 +11,7 @@ func TestRunVersion(t *testing.T) {
 	if code := Run([]string{"version"}, &out, &errb); code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
-	if got, want := out.String(), "pipemaster dev\n"; got != want {
+	if got, want := out.String(), "pipemaster "+Version+"\n"; got != want {
 		t.Fatalf("stdout = %q, want %q", got, want)
 	}
 }
