@@ -3,6 +3,7 @@ import Pipemaster.Woodpecker
 import Pipemaster.Drone
 import Pipemaster.Tekton
 import Pipemaster.Argo
+import Pipemaster.Concourse
 
 namespace Pipemaster
 namespace Chain
@@ -117,6 +118,17 @@ def argo : Adapter where
   Own := fun p => Argo.ArgoOk p ∧ Argo.FinDrop p
   decOwn := fun _ => inferInstance
   exact q hw ho := Argo.argo_from_to q ⟨hw, ho.1⟩
+
+/-- Mirrors concourse.New (provider/concourse/dialect.go). The raw parse of Concourse is the pipeline itself on the
+fragment (`Concourse.rawConcourse_toConcourse`), so a hop through it needs no extra condition. -/
+def concourse : Adapter where
+  Ast := Concourse.CDoc
+  emit := Concourse.toConcourse
+  parse := Concourse.rawConcourse
+  metaOf := Core.metaOf
+  Own := Concourse.ConcourseOk
+  decOwn := fun _ => inferInstance
+  exact q hw ho := Concourse.concourse_from_to q ⟨hw, ho⟩
 
 /-- Mirrors roundtrip.Hop (internal/roundtrip/chain.go), rule 4: each hop emits, parses and pushes a layer.
 The layers are oldest first, as in `meta.Stack`. `Hop` applies a stack only if its top layer targets the source
@@ -624,12 +636,59 @@ theorem tekton_keeps_argo : tekton.Keeps argo := by
   · show Argo.FinDrop (Tekton.rawTekton (Tekton.toTekton q))
     rw [hraw]; exact Argo.finDrop_clearP q ha.2.2
 
-/-- The eight adapters. -/
-def adapters : List Adapter := [gha, gitea, forgejo, gitlab, woodpecker, drone, tekton, argo]
+/-- A hop through Concourse returns the pipeline it received, so it keeps every fragment. -/
+theorem concourse_keeps (b : Adapter) : concourse.Keeps b :=
+  Adapter.keeps_of_id _ (fun q hq => Concourse.rawConcourse_toConcourse q hq.1) b
 
-theorem adapters_closed : Closed adapters := by
+theorem gitlab_keeps_concourse : gitlab.Keeps concourse := by
+  intro q hq hc
+  have hraw := Gitlab.rawGitlab_toGitlab q hq.1 hq.2
+  have hf := rawGitlab_frag q hq.1 hq.2
+  refine ⟨hf.1, ?_⟩
+  show Concourse.ConcourseOk (Gitlab.rawGitlab (Gitlab.toGitlab q))
+  exact Concourse.concOk_of_shape q Gitlab.gitlabPipelineId Gitlab.strip Gitlab.strip keep_strip keep_strip _ hraw hc.2
+
+theorem woodpecker_keeps_concourse : woodpecker.Keeps concourse := by
+  intro q hq hc
+  have hraw := Woodpecker.rawWp_toWp q hq.1 hq.2
+  have hf := Woodpecker.rawWp_frag q hq.1 hq.2
+  refine ⟨hf.1, ?_⟩
+  show Concourse.ConcourseOk (Woodpecker.rawWp (Woodpecker.toWp q))
+  exact Concourse.concOk_of_shape q Woodpecker.wpPipelineId Woodpecker.wpStripMain Woodpecker.wpStripFin
+    (fun j => keep_of_same (Woodpecker.same_main j)) (fun j => keep_of_same (Woodpecker.same_fin j)) _ hraw hc.2
+
+theorem drone_keeps_concourse : drone.Keeps concourse := by
+  intro q hq hc
+  have hraw := Drone.rawDrone_toDrone q hq.1 hq.2
+  have hf := Drone.rawDrone_frag q hq.1 hq.2
+  refine ⟨hf.1, ?_⟩
+  show Concourse.ConcourseOk (Drone.rawDrone (Drone.toDrone q))
+  exact Concourse.concOk_of_shape q Drone.dronePipelineId Drone.droneStripMain Drone.droneStripFin
+    Drone.keep_droneMain Drone.keep_droneFin _ hraw hc.2
+
+theorem tekton_keeps_concourse : tekton.Keeps concourse := by
+  intro q hq hc
+  have hraw : Tekton.rawTekton (Tekton.toTekton q) = Tekton.clearP q := Tekton.rawTekton_toTekton q hq.1 hq.2
+  have h := Tekton.clearP_preserves q
+  refine ⟨by show Wf (Tekton.rawTekton (Tekton.toTekton q)); rw [hraw]; exact h.1 hq.1, ?_⟩
+  show Concourse.ConcourseOk (Tekton.rawTekton (Tekton.toTekton q))
+  rw [hraw]; exact Concourse.concOk_clearP q hc.2
+
+theorem argo_keeps_concourse : argo.Keeps concourse := by
+  intro q hq hc
+  have hraw := Argo.rawArgo_toArgo q hq.1 hq.2.1
+  have h := Argo.argClear_preserves q hq.2.2
+  refine ⟨by show Wf (Argo.rawArgo (Argo.toArgo q)); rw [hraw]; exact h.1 hq.1, ?_⟩
+  show Concourse.ConcourseOk (Argo.rawArgo (Argo.toArgo q))
+  rw [hraw, Argo.argClear_eq]
+  exact Concourse.concOk_clearP _ (Concourse.concOk_emptyFin q hc.2)
+
+/-- The eight adapters of the earlier phases. -/
+def eightAdapters : List Adapter := [gha, gitea, forgejo, gitlab, woodpecker, drone, tekton, argo]
+
+theorem eightAdapters_closed : Closed eightAdapters := by
   intro a ha b hb
-  simp only [adapters, List.mem_cons, List.not_mem_nil, or_false] at ha hb
+  simp only [eightAdapters, List.mem_cons, List.not_mem_nil, or_false] at ha hb
   rcases ha with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
     rcases hb with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
     first | exact gha_keeps _ | exact gitlab_keeps_gha | exact gitlab_keeps_gitlab |
@@ -641,6 +700,26 @@ theorem adapters_closed : Closed adapters := by
       exact drone_keeps_tekton | exact argo_keeps_gha | exact argo_keeps_gitlab | exact argo_keeps_woodpecker |
       exact argo_keeps_drone | exact argo_keeps_tekton | exact argo_keeps_argo | exact gitlab_keeps_argo |
       exact woodpecker_keeps_argo | exact drone_keeps_argo | exact tekton_keeps_argo
+
+/-- The nine adapters. -/
+def adapters : List Adapter := [gha, gitea, forgejo, gitlab, woodpecker, drone, tekton, argo, concourse]
+
+theorem adapters_closed : Closed adapters := by
+  intro a ha b hb
+  simp only [adapters, List.mem_cons, List.not_mem_nil, or_false] at ha hb
+  rcases ha with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+    rcases hb with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+    first | exact gha_keeps _ | exact gitlab_keeps_gha | exact gitlab_keeps_gitlab |
+      exact gitlab_keeps_woodpecker | exact woodpecker_keeps_woodpecker | exact woodpecker_keeps_gitlab |
+      exact woodpecker_keeps_gha | exact gitlab_keeps_drone | exact woodpecker_keeps_drone |
+      exact drone_keeps_drone | exact drone_keeps_woodpecker | exact drone_keeps_gitlab | exact drone_keeps_gha |
+      exact tekton_keeps_gha | exact tekton_keeps_gitlab | exact tekton_keeps_woodpecker | exact tekton_keeps_drone |
+      exact tekton_keeps_tekton | exact gitlab_keeps_tekton | exact woodpecker_keeps_tekton |
+      exact drone_keeps_tekton | exact argo_keeps_gha | exact argo_keeps_gitlab | exact argo_keeps_woodpecker |
+      exact argo_keeps_drone | exact argo_keeps_tekton | exact argo_keeps_argo | exact gitlab_keeps_argo |
+      exact woodpecker_keeps_argo | exact drone_keeps_argo | exact tekton_keeps_argo | exact concourse_keeps _ |
+      exact gitlab_keeps_concourse | exact woodpecker_keeps_concourse | exact drone_keeps_concourse |
+      exact tekton_keeps_concourse | exact argo_keeps_concourse
 
 /-- One hop through a member of a closed list keeps a pipeline in the fragment of every member. -/
 theorem chainFrag_hop (L : List Adapter) (hL : Closed L) (p : Pipe) (h : ChainFrag p L) (a : Adapter)
@@ -697,16 +776,16 @@ theorem chainFrag_seven_iff (p : Pipe) :
     · exact h.2.2.1
     · exact h.2.2.2
 
-/-- The intersection over the eight adapters: both cross fragments, and the Woodpecker, Drone, Tekton and Argo
+/-- The intersection over the eight adapters of the earlier phases: both cross fragments, and the Woodpecker, Drone, Tekton and Argo
 fragments. -/
-theorem chainFrag_adapters_iff (p : Pipe) :
-    ChainFrag p adapters ↔ RoundTrip.Both p ∧ woodpecker.Frag p ∧ drone.Frag p ∧ tekton.Frag p ∧ argo.Frag p := by
+theorem chainFrag_eight_iff (p : Pipe) :
+    ChainFrag p eightAdapters ↔ RoundTrip.Both p ∧ woodpecker.Frag p ∧ drone.Frag p ∧ tekton.Frag p ∧ argo.Frag p := by
   constructor
   · intro h
-    exact ⟨⟨h gha (by simp [adapters]), h gitlab (by simp [adapters])⟩, h woodpecker (by simp [adapters]),
-      h drone (by simp [adapters]), h tekton (by simp [adapters]), h argo (by simp [adapters])⟩
+    exact ⟨⟨h gha (by simp [eightAdapters]), h gitlab (by simp [eightAdapters])⟩, h woodpecker (by simp [eightAdapters]),
+      h drone (by simp [eightAdapters]), h tekton (by simp [eightAdapters]), h argo (by simp [eightAdapters])⟩
   · intro h a ha
-    simp only [adapters, List.mem_cons, List.not_mem_nil, or_false] at ha
+    simp only [eightAdapters, List.mem_cons, List.not_mem_nil, or_false] at ha
     rcases ha with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
     · exact h.1.1
     · exact h.1.1
@@ -716,6 +795,29 @@ theorem chainFrag_adapters_iff (p : Pipe) :
     · exact h.2.2.1
     · exact h.2.2.2.1
     · exact h.2.2.2.2
+
+/-- The intersection over the nine adapters: both cross fragments, and the Woodpecker, Drone, Tekton, Argo and Concourse
+fragments. -/
+theorem chainFrag_adapters_iff (p : Pipe) :
+    ChainFrag p adapters ↔
+      RoundTrip.Both p ∧ woodpecker.Frag p ∧ drone.Frag p ∧ tekton.Frag p ∧ argo.Frag p ∧ concourse.Frag p := by
+  constructor
+  · intro h
+    exact ⟨⟨h gha (by simp [adapters]), h gitlab (by simp [adapters])⟩, h woodpecker (by simp [adapters]),
+      h drone (by simp [adapters]), h tekton (by simp [adapters]), h argo (by simp [adapters]),
+      h concourse (by simp [adapters])⟩
+  · intro h a ha
+    simp only [adapters, List.mem_cons, List.not_mem_nil, or_false] at ha
+    rcases ha with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+    · exact h.1.1
+    · exact h.1.1
+    · exact h.1.1
+    · exact h.1.2
+    · exact h.2.1
+    · exact h.2.2.1
+    · exact h.2.2.2.1
+    · exact h.2.2.2.2.1
+    · exact h.2.2.2.2.2
 
 /-- The adapters without Woodpecker and Drone, which have their own hops. -/
 def crossAdapters : List Adapter := [gha, gitea, forgejo, gitlab]
@@ -855,10 +957,10 @@ theorem chain_gitlab_argo_tekton_drone_woodpecker (p : Pipe)
     unwind (hops p [gitlab, argo, tekton, drone, woodpecker]).1
       (hops p [gitlab, argo, tekton, drone, woodpecker]).2 = p := by
   apply chain_roundtrip
-  apply chainFrag_run adapters adapters_closed _ _ p ((chainFrag_adapters_iff p).2 h)
+  apply chainFrag_run eightAdapters eightAdapters_closed _ _ p ((chainFrag_eight_iff p).2 h)
   intro a ha
   simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
-  simp only [adapters, List.mem_cons, List.not_mem_nil, or_false]
+  simp only [eightAdapters, List.mem_cons, List.not_mem_nil, or_false]
   rcases ha with rfl | rfl | rfl | rfl | rfl <;> simp [gitlab, argo, tekton, drone, woodpecker]
 
 /-- The cross round trip with metadata: a pipeline that survives Argo, then GHA, comes back from GHA. -/
@@ -872,6 +974,47 @@ theorem cross_argo_gitlab (p : Pipe) (h : RoundTrip.Both p ∧ Argo.ArgoFrag p) 
     Gitlab.fromGitlab (Gitlab.toGitlab (Argo.fromArgo (Argo.toArgo p) (Argo.argoMeta p)))
       (Gitlab.gitlabMeta p) = p := by
   rw [Argo.argo_from_to p h.2]
+  exact Gitlab.gitlab_from_to p h.1.2
+
+/-- Concourse as the first hop, then GHA. -/
+theorem chain_concourse_gha (p : Pipe) (h : RoundTrip.Both p ∧ concourse.Frag p) :
+    unwind (hops p [concourse, gha]).1 (hops p [concourse, gha]).2 = p := by
+  apply chain_roundtrip
+  exact ⟨h.2, concourse_keeps gha p h.2 h.1.1, trivial⟩
+
+/-- GHA, then Concourse, then GitLab. -/
+theorem chain_gha_concourse_gitlab (p : Pipe) (h : RoundTrip.Both p ∧ concourse.Frag p) :
+    unwind (hops p [gha, concourse, gitlab]).1 (hops p [gha, concourse, gitlab]).2 = p := by
+  apply chain_roundtrip
+  have hid : gha.parse (gha.emit p) = p := Gha.rawGha_toGha p h.1.1.1
+  refine ⟨h.1.1, ?_⟩
+  rw [hid]
+  exact ⟨h.2, concourse_keeps gitlab p h.2 h.1.2, trivial⟩
+
+/-- GitLab, then Argo, then Concourse, then Tekton, then Drone, then Woodpecker: six hops through the raw parses that
+drop the most. -/
+theorem chain_gitlab_argo_concourse_tekton_drone_woodpecker (p : Pipe)
+    (h : RoundTrip.Both p ∧ woodpecker.Frag p ∧ drone.Frag p ∧ tekton.Frag p ∧ argo.Frag p ∧ concourse.Frag p) :
+    unwind (hops p [gitlab, argo, concourse, tekton, drone, woodpecker]).1
+      (hops p [gitlab, argo, concourse, tekton, drone, woodpecker]).2 = p := by
+  apply chain_roundtrip
+  apply chainFrag_run adapters adapters_closed _ _ p ((chainFrag_adapters_iff p).2 h)
+  intro a ha
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
+  simp only [adapters, List.mem_cons, List.not_mem_nil, or_false]
+  rcases ha with rfl | rfl | rfl | rfl | rfl | rfl <;> simp [gitlab, argo, concourse, tekton, drone, woodpecker]
+
+/-- The cross round trip with metadata: a pipeline that survives Concourse, then GHA, comes back from GHA. -/
+theorem cross_concourse_gha (p : Pipe) (h : RoundTrip.Both p ∧ Concourse.ConcourseFrag p) :
+    Gha.fromGha (Gha.toGha (Concourse.fromConcourse (Concourse.toConcourse p) (Core.metaOf p))) = p := by
+  rw [Concourse.concourse_from_to p h.2]
+  exact Gha.gha_from_to p h.1.1
+
+/-- The cross round trip with metadata: a pipeline that survives Concourse, then GitLab, comes back from GitLab. -/
+theorem cross_concourse_gitlab (p : Pipe) (h : RoundTrip.Both p ∧ Concourse.ConcourseFrag p) :
+    Gitlab.fromGitlab (Gitlab.toGitlab (Concourse.fromConcourse (Concourse.toConcourse p) (Core.metaOf p)))
+      (Gitlab.gitlabMeta p) = p := by
+  rw [Concourse.concourse_from_to p h.2]
   exact Gitlab.gitlab_from_to p h.1.2
 
 end Chain

@@ -155,6 +155,26 @@ required=(
   Pipemaster.Chain.chain_gitlab_argo_tekton_drone_woodpecker
   Pipemaster.Chain.cross_argo_gha
   Pipemaster.Chain.cross_argo_gitlab
+  Pipemaster.Concourse.uniqName_fresh
+  Pipemaster.Concourse.uniqFrom_disjoint
+  Pipemaster.Concourse.concourse_passed
+  Pipemaster.Concourse.readJob_cjob
+  Pipemaster.Concourse.rawConcourse_toConcourse
+  Pipemaster.Concourse.concourse_from_to
+  Pipemaster.Concourse.concOk_of_shape
+  Pipemaster.Concourse.concOk_clearP
+  Pipemaster.Concourse.concOk_emptyFin
+  Pipemaster.Chain.concourse_keeps
+  Pipemaster.Chain.gitlab_keeps_concourse
+  Pipemaster.Chain.woodpecker_keeps_concourse
+  Pipemaster.Chain.drone_keeps_concourse
+  Pipemaster.Chain.tekton_keeps_concourse
+  Pipemaster.Chain.argo_keeps_concourse
+  Pipemaster.Chain.chain_concourse_gha
+  Pipemaster.Chain.chain_gha_concourse_gitlab
+  Pipemaster.Chain.chain_gitlab_argo_concourse_tekton_drone_woodpecker
+  Pipemaster.Chain.cross_concourse_gha
+  Pipemaster.Chain.cross_concourse_gitlab
 )
 required_lean="$(printf '`%s, ' "${required[@]}")"
 required_lean="[${required_lean%, }]"

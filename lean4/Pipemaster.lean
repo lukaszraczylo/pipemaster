@@ -12,5 +12,6 @@ import Pipemaster.Woodpecker
 import Pipemaster.Drone
 import Pipemaster.Tekton
 import Pipemaster.Argo
+import Pipemaster.Concourse
 import Pipemaster.RoundTrip
 import Pipemaster.Chain

@@ -770,6 +770,57 @@ def argoAdapterCases : List (Json × Json) :=
       ("raw", coreJson (Argo.rawArgo (Argo.toArgo p))),
       ("core", coreJson (Argo.fromArgo (Argo.toArgo p) (Argo.argoMeta p)))])
 
+open Pipemaster.Concourse in
+def concTaskJson (t : Concourse.CTask) : Json :=
+  Json.mkObj [("name", t.name), ("script", strsJson t.script), ("cid", t.cid), ("cname", t.cname),
+    ("cenv", varsJson t.cenv)]
+
+open Pipemaster.Concourse in
+def concJobJson (j : Concourse.CJob) : Json :=
+  Json.mkObj [("name", j.name), ("disp", j.disp), ("passed", strsJson j.passed),
+    ("body", Json.arr (j.body.map concTaskJson).toArray), ("hook", Json.arr (j.hook.map concTaskJson).toArray),
+    ("carry", coreJobJson j.carry)]
+
+open Pipemaster.Concourse in
+def concDocJson (d : Concourse.CDoc) : Json :=
+  Json.mkObj [("file", d.file), ("carry", coreJson d.carry), ("jobs", Json.arr (d.jobs.map concJobJson).toArray),
+    ("fin_job", d.finJob), ("fin_tasks", strsJson d.finTasks)]
+
+/-- Pipelines that exercise what Concourse adds to the Woodpecker set: a need on a job with no step (the producer, the
+consumer and both), a three-job chain with a finally job on its sink, finally steps whose IDs clash with the steps of
+the sink job (the emitter appends `-2`, `-3`), a pipeline with two sinks (the finally job has no hook), job and step
+names with digits, dashes and underscores, and script lines that read like markers. -/
+def concExtraPipes : List Core.Pipe :=
+  let two : List Core.Step := [cstep "s1" ["echo 1"], cstep "s2" ["echo 2"]]
+  let clash : Core.Job := { cj "a" with steps := [cstep "s1" ["echo 1"], cstep "s1-2" ["echo 2"]] }
+  let marker : Core.Job :=
+    { cj "a" with steps := [cstep "s1" ["# pipemaster:ctx", "echo (x)", "  x  ", "exit 0 # pipemaster:guard"]] }
+  [pushAll [{ cj "a" with steps := [] }, { cj "b" with needs := needOn "a" false }] [],
+   pushAll [cj "a", { cj "b" with needs := needOn "a" false, steps := [] }] [],
+   pushAll [{ cj "a" with steps := [] }, { cj "b" with needs := needOn "a" false, steps := [] }] [],
+   pushAll [{ cj "a" with manual := true }, { cj "b" with needs := needOn "a" false }] [],
+   pushAll [cj "a", { cj "b" with needs := needOn "a" false }, { cj "c" with needs := needOn "b" false }] [cj "f"],
+   pushAll [cj "a", { cj "b" with needs := needOn "a" false }, { cj "c" with needs := [⟨"a", false⟩, ⟨"b", true⟩] }]
+     [{ cj "f" with onFailure := true }],
+   pushAll [clash] [cj "f"], pushAll [{ cj "a" with steps := two }] [cj "f", cj "g"],
+   pushAll [{ cj "a" with steps := two }, cj "b"] [cj "f"],
+   pushAll [cj "a", cj "b"] [{ cj "f" with steps := [] }],
+   pushAll [{ cj "a" with steps := [] }] [{ cj "f" with steps := two }],
+   pushAll [{ cj "build-1" with steps := [cstep "unit_test" ["make"], cstep "e2e-2" ["make e2e"]] },
+     { cj "deploy_2" with needs := needOn "build-1" false }] [],
+   pushAll [marker] [], pushAll [{ cj "a" with env := [⟨"K", "((v))"⟩, ⟨"L", "true"⟩, ⟨"M", ""⟩] }] []] ++ wpExtraPipes
+
+def concourseOk (p : Core.Pipe) : Bool := decide (Wf p ∧ Concourse.ConcourseOk p)
+
+def concoursePipes : List Core.Pipe :=
+  (allPipes ++ concExtraPipes).filter concourseOk
+
+def concourseAdapterCases : List (Json × Json) :=
+  concoursePipes.map fun p =>
+    (coreJson p, Json.mkObj [("concourse", concDocJson (Concourse.toConcourse p)),
+      ("raw", coreJson (Concourse.rawConcourse (Concourse.toConcourse p))),
+      ("core", coreJson (Concourse.fromConcourse (Concourse.toConcourse p) (Core.metaOf p)))])
+
 def crossAdapterCases : List (Json × Json) :=
   ghaPipes.map fun p =>
     let viaGitlab := Gha.fromGha (Gha.toGha (Gitlab.fromGitlab (Gitlab.toGitlab p) (Gitlab.gitlabMeta p)))
@@ -814,12 +865,12 @@ def chainPipes : List Core.Pipe :=
 /-- The pipelines in the fragment of every adapter (decided once per pipeline). -/
 def chainFragPipes : List Core.Pipe :=
   chainPipes.filter fun p => decide (RoundTrip.Both p ∧ (Wf p ∧ Woodpecker.WpOk p) ∧ Drone.DroneOk p ∧ Tekton.TekOk p ∧
-      Argo.ArgoOk p ∧ Argo.FinDrop p)
+      Argo.ArgoOk p ∧ Argo.FinDrop p ∧ Concourse.ConcourseOk p)
 
 def chainAdapters : List (String × Chain.Adapter) :=
   [("gha", Chain.gha), ("gitea", Chain.gitea), ("forgejo", Chain.forgejo), ("gitlab", Chain.gitlab),
    ("woodpecker", Chain.woodpecker), ("drone", Chain.drone), ("tekton", Chain.tekton),
-   ("argo", Chain.argo)]
+   ("argo", Chain.argo), ("concourse", Chain.concourse)]
 
 def chainTriples : List ((String × Chain.Adapter) × (String × Chain.Adapter) × (String × Chain.Adapter)) :=
   chainAdapters.flatMap fun a => chainAdapters.flatMap fun b => chainAdapters.flatMap fun c =>
@@ -869,6 +920,7 @@ def main (args : List String) : IO UInt32 := do
      ("drone", "Pipemaster.Drone.drone_from_to", fun _ => GenVectors.droneAdapterCases),
      ("tekton", "Pipemaster.Tekton.tekton_from_to", fun _ => GenVectors.tektonAdapterCases),
      ("argo", "Pipemaster.Argo.argo_from_to", fun _ => GenVectors.argoAdapterCases),
+     ("concourse", "Pipemaster.Concourse.concourse_from_to", fun _ => GenVectors.concourseAdapterCases),
      ("cross", "Pipemaster.RoundTrip.cross_roundtrip", fun _ => GenVectors.crossAdapterCases),
      ("chain", "Pipemaster.Chain.chain_roundtrip", fun _ => GenVectors.chainCases)]
   for (name, thm, mk) in files do
