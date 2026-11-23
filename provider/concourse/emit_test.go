@@ -382,3 +382,52 @@ func TestUnguardableJobConditionLeavesNoTriggeringGet(t *testing.T) {
 		t.Fatalf("no JobIf entry: %v", rep.Entries)
 	}
 }
+
+const noGetJobFile = `resources:
+  - name: src
+    type: git
+    source: {uri: https://x/y.git, branch: main}
+jobs:
+  - name: a
+    plan:
+      - get: src
+        trigger: true
+      - task: t
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          run: {path: sh, args: [-c, "echo a"]}
+  - name: b
+    plan:
+      - task: t
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          run: {path: sh, args: [-c, "echo b"]}
+`
+
+// A need that an edit adds to a job whose file had no get must still order the jobs: the job gets the source
+// with a passed list, and stays a job that only a person starts.
+func TestNeedAddedToAJobOfAFileWithNoGetIsWritten(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"ci.yml": noGetJobFile})
+	for _, j := range p.Pipelines[0].Jobs {
+		if j.ID == "b" {
+			j.Needs = []ir.Need{{JobID: "a"}}
+		}
+	}
+	files, _ := emit(t, p)
+	get := dict(list(jobDoc(t, pipelineDoc(t, files), "b")["plan"])[0])
+	passed := list(get["passed"])
+	if get["get"] != "src" || len(passed) != 1 || passed[0] != "a" {
+		t.Fatalf("first step of b = %v, want a get of src with passed [a]", get)
+	}
+	if get["trigger"] == true {
+		t.Fatalf("b was a manual job, but its get triggers: %v", get)
+	}
+	back, _ := reparse(t, files)
+	for _, j := range back.Pipelines[0].Jobs {
+		if j.ID == "b" && (len(j.Needs) != 1 || j.Needs[0].JobID != "a" || !j.Manual) {
+			t.Fatalf("b came back as needs %v manual %v", j.Needs, j.Manual)
+		}
+	}
+}

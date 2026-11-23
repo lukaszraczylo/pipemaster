@@ -79,9 +79,13 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 		jx.manual = false
 	}
 	own := jx.ownGets()
+	noGets := false
 	if l, ok := jx.ext[ExtGets].([]any); ok && len(l) == 0 {
-		jx.held = len(jx.jobTriggers(nil)) == 0
-		return nil
+		if len(j.Needs) == 0 {
+			jx.held = len(jx.jobTriggers(nil)) == 0
+			return nil
+		}
+		noGets = true
 	}
 	var holders []string
 	for _, g := range own {
@@ -100,6 +104,10 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 		}
 	}
 	_, fileGets := jx.ext[ExtGets].([]any)
+	if noGets {
+		// A passed list lives on a get, so a need on a job that had none adds the shared source.
+		names = []string{pe.primary.name}
+	}
 	for _, s := range pe.sources {
 		if (s.typ == typeGit || trig[s.name]) && !slices.Contains(names, s.name) && !fileGets {
 			names = append(names, s.name)
