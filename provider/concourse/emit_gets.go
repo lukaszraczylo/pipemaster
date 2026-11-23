@@ -132,10 +132,14 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 		if m == nil {
 			m = map[string]any{"get": name}
 		}
+		fileOrder, _ := m["passed"].([]any)
 		delete(m, "passed")
 		delete(m, "trigger")
 		if len(passed) > 0 && slices.Contains(holders, name) {
 			m["passed"] = passed
+			if sameSet(fileOrder, passed) {
+				m["passed"] = fileOrder
+			}
 		}
 		if trig[name] {
 			m["trigger"] = true
@@ -174,4 +178,18 @@ func (pe *pipeEmitter) adopt(name string) *source {
 	}
 	typ, _ := def[keyType].(string)
 	return pe.add(&source{name: name, typ: typ, def: def})
+}
+
+// sameSet is true when both lists hold the same names, whatever their order; the IR keeps needs as a set, and the
+// file order is the one a reader expects to see again.
+func sameSet(a, b []any) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for _, v := range a {
+		if !slices.Contains(b, v) {
+			return false
+		}
+	}
+	return true
 }

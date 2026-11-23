@@ -631,3 +631,20 @@ jobs:
 		}
 	}
 }
+
+func TestPassedListKeepsTheOrderOfTheFile(t *testing.T) {
+	task := "      - task: t\n        config:\n          platform: linux\n          image_resource: {type: registry-image, source: {repository: alpine}}\n          run: {path: sh, args: [-ec, make]}\n"
+	src := "resources:\n  - name: src\n    type: git\n    source: {uri: \"https://example.com/a.git\", branch: main}\njobs:\n" +
+		"  - name: a\n    plan:\n      - get: src\n        trigger: true\n" + task +
+		"  - name: b\n    plan:\n      - get: src\n        trigger: true\n" + task +
+		"  - name: z\n    plan:\n      - get: src\n        passed: [b, a]\n" + task
+	p, _ := parseFiles(t, map[string]string{"ci.yml": src})
+	files, _ := emit(t, p)
+	for _, s := range list(jobDoc(t, pipelineDoc(t, files), "z")["plan"]) {
+		if g := dict(s); g["get"] == "src" {
+			if got := fmt.Sprint(g["passed"]); got != "[b a]" {
+				t.Fatalf("passed = %s; want [b a]", got)
+			}
+		}
+	}
+}
