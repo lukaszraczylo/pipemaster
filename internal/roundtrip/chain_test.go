@@ -533,7 +533,7 @@ func TestChainMatrix(t *testing.T) {
 	total := 0
 	for i, a := range provider.IDs() {
 		chains := chainsFrom(a)
-		if testing.Short() {
+		if testing.Short() || raceEnabled {
 			chains = sampleChains(i, chains)
 		}
 		inputs := chainInputs(t, a)
