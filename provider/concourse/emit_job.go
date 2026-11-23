@@ -176,8 +176,11 @@ func (jx *jobEmitter) meta() {
 	if j.Environment != nil && j.Environment.Approval {
 		e.emulate(jx.path, caps.JobEnvironmentApproval, "job with no triggering get", "a person starts the job; the reviewer list is lost")
 	}
-	if len(j.Runner.Labels) > 0 {
-		e.emulate(jx.path, caps.JobRunner, "worker tags of the task", "the tasks carry the worker tags "+strings.Join(j.Runner.Labels, ", ")+"; a build waits until a worker has them")
+	if tags := jx.workerTags(); len(tags) > 0 {
+		e.emulate(jx.path, caps.JobRunner, "worker tags of the task", "the tasks carry the worker tags "+strings.Join(tags, ", ")+"; a build waits until a worker has them")
+	}
+	if len(jx.workerTags()) < len(j.Runner.Labels) {
+		e.lose(jx.path, caps.JobRunner, "a runner label with an expression names no worker tag; the tasks do not carry it")
 	}
 	if len(j.Cache) > 0 {
 		jx.cachePaths()

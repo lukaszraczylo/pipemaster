@@ -698,3 +698,18 @@ jobs:
 		t.Fatalf("a job with a triggering get in a verbatim step is marked as held")
 	}
 }
+
+func TestRunnerLabelWithAnExpressionIsNoWorkerTag(t *testing.T) {
+	j := scriptJob("build", "make")
+	j.Runner.Labels = []string{"${{ matrix.os }}"}
+	files, rep := emit(t, project(j))
+	if strings.Contains(files[".concourse/ci.yml"], "tags:") {
+		t.Fatalf("an expression is written as a worker tag:\n%s", files[".concourse/ci.yml"])
+	}
+	for _, e := range rep.Entries {
+		if e.Feature == caps.JobRunner && e.Level == caps.Lost {
+			return
+		}
+	}
+	t.Fatalf("no lost job.runner entry: %v", rep.Entries)
+}

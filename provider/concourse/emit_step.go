@@ -129,8 +129,8 @@ func (c *chain) script(st *ir.Step, path string) *yaml.Node {
 		c.mapped = true
 	}
 	m.Set("config", cfg)
-	if len(jx.j.Runner.Labels) > 0 {
-		m.Set("tags", strSeq(jx.j.Runner.Labels))
+	if labels := jx.workerTags(); len(labels) > 0 {
+		m.Set("tags", strSeq(labels))
 	}
 	if st.Timeout != nil {
 		m.SetStr("timeout", durationText(st.Timeout))
@@ -592,4 +592,15 @@ func (jx *jobEmitter) mixed() bool {
 		}
 	}
 	return ps && other
+}
+
+// workerTags returns the runner labels that a worker can carry. A label with an expression names no worker.
+func (jx *jobEmitter) workerTags() []string {
+	var out []string
+	for _, l := range jx.j.Runner.Labels {
+		if !strings.Contains(l, "${{") {
+			out = append(out, l)
+		}
+	}
+	return out
 }
