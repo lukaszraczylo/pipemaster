@@ -654,3 +654,16 @@ func TestFinallyTaskReadingAResultKeepsOneNeed(t *testing.T) {
 		t.Fatalf("needs = %+v\n%s", n, joinFiles(files))
 	}
 }
+
+func TestHeldStepConditionIsReportedLost(t *testing.T) {
+	st := &ir.Step{ID: "put", Kind: ir.StepResource, If: expr.Call{Name: "always"}, Ext: ir.Ext{"concourse": map[string]any{"put": "gcp-env"}}}
+	p := &ir.Project{Origin: ir.Origin{Provider: "concourse", Dialect: "concourse"},
+		Pipelines: []*ir.Pipeline{{ID: "ci", Jobs: []*ir.Job{{ID: "build", Steps: []*ir.Step{st}}}}}}
+	_, rep := emit(t, p)
+	for _, e := range rep.Entries {
+		if e.IRPath == "pipeline/ci/job/build/step/put" && e.Feature == caps.StepIf && e.Level == caps.Lost {
+			return
+		}
+	}
+	t.Fatalf("no lost step.if entry for a step that the marker holds without its condition: %v", rep.Entries)
+}

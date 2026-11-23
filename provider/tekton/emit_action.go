@@ -119,6 +119,9 @@ func withoutBookkeeping(x ir.Ext) ir.Ext {
 // markAction writes the marker that holds a step the file does not have as written. The step keeps no condition:
 // the IR states conditions in the dialect of its origin, and a restored one would read in the wrong dialect.
 func (tc *taskCtx) markAction(b *stepBook, sp string, st *ir.Step, image string, written *wmap) error {
+	if st.If != nil && written == nil {
+		tc.e.lose(sp, caps.StepIf, "the marker of a step the file does not hold keeps no condition")
+	}
 	held := *st
 	held.If = nil
 	held.Ext = withoutBookkeeping(st.Ext)
