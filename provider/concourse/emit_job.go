@@ -39,6 +39,8 @@ type jobEmitter struct {
 	name       string
 	img        string
 	caches     []string
+	// nestedExtra lists the needs that no nested get names; the first nested get takes them into its passed list.
+	nestedExtra []any
 	// finallyTasks lists the written names of the tasks that stand for finally jobs in the hooks.
 	finallyTasks []string
 	actSeq       int

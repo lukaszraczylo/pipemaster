@@ -80,8 +80,21 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 	}
 	own := jx.ownGets()
 	noGets := false
+	var uncovered map[string]bool
 	if l, ok := jx.ext[ExtGets].([]any); ok && len(l) == 0 {
-		if len(j.Needs) == 0 || jx.stepsHoldPassed() {
+		var nested bool
+		uncovered, nested = jx.needsNotInNestedGets()
+		if len(uncovered) == 0 {
+			jx.held = len(jx.jobTriggers(nil)) == 0
+			return nil
+		}
+		if nested {
+			// Concourse rejects a second get of one resource in a job, so the nested list takes the new needs.
+			for _, n := range j.Needs {
+				if w, ok := pe.jobName[n.JobID]; ok && uncovered[w] {
+					jx.nestedExtra = append(jx.nestedExtra, w)
+				}
+			}
 			jx.held = len(jx.jobTriggers(nil)) == 0
 			return nil
 		}
@@ -116,7 +129,7 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 	jx.held = len(trig) == 0
 	var passed []any
 	for _, n := range j.Needs {
-		if w, ok := pe.jobName[n.JobID]; ok {
+		if w, ok := pe.jobName[n.JobID]; ok && (!noGets || uncovered[w]) {
 			passed = append(passed, w)
 		}
 	}
@@ -169,32 +182,75 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 	return nodes
 }
 
-// stepsHoldPassed is true when a get that the file nested in a step of the plan carries a passed list, so the needs
-// already have a place in the file.
-func (jx *jobEmitter) stepsHoldPassed() bool {
+// needsNotInNestedGets is the written names of the needs that no passed list of a get nested in a step of the plan
+// names. The nested lists stay as the file has them, so only these needs need a get of their own.
+func (jx *jobEmitter) needsNotInNestedGets() (map[string]bool, bool) {
+	held := map[string]bool{}
+	nested := false
 	for _, st := range jx.j.Steps {
-		if holdsPassed(extOf(st.Ext)) {
-			return true
+		nested = nestedPassed(extOf(st.Ext), held) || nested
+	}
+	out := map[string]bool{}
+	for _, n := range jx.j.Needs {
+		if w, ok := jx.pe.jobName[n.JobID]; ok && !held[w] {
+			out[w] = true
 		}
 	}
-	return false
+	return out, nested
 }
 
-// holdsPassed looks through verbatim step values for a get with a passed list.
-func holdsPassed(v any) bool {
+// nestedPassed adds the names of every passed list of a get in the verbatim step values to held, and tells whether
+// there is such a list.
+func nestedPassed(v any, held map[string]bool) bool {
+	found := false
 	switch t := v.(type) {
 	case map[string]any:
-		if t["get"] != nil && t["passed"] != nil {
-			return true
+		if l, ok := t["passed"].([]any); ok && t["get"] != nil {
+			found = true
+			for _, x := range l {
+				if n, ok := x.(string); ok {
+					held[n] = true
+				}
+			}
 		}
 		for _, x := range t {
-			if holdsPassed(x) {
+			found = nestedPassed(x, held) || found
+		}
+	case []any:
+		for _, x := range t {
+			found = nestedPassed(x, held) || found
+		}
+	}
+	return found
+}
+
+// addNestedPassed puts the needs that no nested get names into the first passed list of a copy of v.
+func (jx *jobEmitter) addNestedPassed(v any) any {
+	if len(jx.nestedExtra) == 0 {
+		return v
+	}
+	c := deepCopy(v)
+	if jx.extendFirstPassed(c) {
+		jx.nestedExtra = nil
+	}
+	return c
+}
+
+func (jx *jobEmitter) extendFirstPassed(v any) bool {
+	switch t := v.(type) {
+	case map[string]any:
+		if l, ok := t["passed"].([]any); ok && t["get"] != nil {
+			t["passed"] = append(l, jx.nestedExtra...)
+			return true
+		}
+		for _, k := range sortedKeys(t) {
+			if jx.extendFirstPassed(t[k]) {
 				return true
 			}
 		}
 	case []any:
 		for _, x := range t {
-			if holdsPassed(x) {
+			if jx.extendFirstPassed(x) {
 				return true
 			}
 		}

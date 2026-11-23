@@ -254,6 +254,7 @@ func (c *chain) verbatim(st *ir.Step, path string) *yaml.Node {
 	switch st.Kind {
 	case ir.StepPlugin:
 		raw, ok := ext[ExtStep]
+		raw = jx.addNestedPassed(raw)
 		if !ok {
 			e.lose(path, caps.ExtPassthrough, "the plugin step has no verbatim step to write")
 			return nil
@@ -261,7 +262,7 @@ func (c *chain) verbatim(st *ir.Step, path string) *yaml.Node {
 		jx.useResources(raw)
 		return e.node(path, "the step", raw)
 	case ir.StepResource:
-		m, _ := deepCopy(ext).(map[string]any)
+		m, _ := jx.addNestedPassed(deepCopy(ext)).(map[string]any)
 		if st.Timeout != nil {
 			m["timeout"] = durationText(st.Timeout)
 		}

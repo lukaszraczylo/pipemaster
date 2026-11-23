@@ -1,6 +1,7 @@
 package concourse_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -465,5 +466,89 @@ func TestNeedsHeldByANestedGetAddNoGet(t *testing.T) {
 	plan := list(jobDoc(t, pipelineDoc(t, files), "b")["plan"])
 	if _, has := dict(plan[0])["get"]; has {
 		t.Fatalf("first step of b = %v, want no added get", plan[0])
+	}
+}
+
+const nestedGetThreeJobsFile = `resources:
+  - name: src
+    type: git
+    source: {uri: https://x/y.git, branch: main}
+jobs:
+  - name: a
+    plan:
+      - get: src
+        trigger: true
+      - task: t
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          run: {path: sh, args: [-c, "echo a"]}
+  - name: c
+    plan:
+      - get: src
+        trigger: true
+      - task: t
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          run: {path: sh, args: [-c, "echo c"]}
+  - name: d
+    plan:
+      - get: src
+        trigger: true
+      - task: t
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          run: {path: sh, args: [-c, "echo d"]}
+  - name: b
+    plan:
+      - task: t
+        config:
+          platform: linux
+          image_resource: {type: registry-image, source: {repository: alpine}}
+          run: {path: sh, args: [-c, "echo b"]}
+      - in_parallel:
+          - get: src
+            passed: [a]
+`
+
+func needsOfAfterEdit(t *testing.T, added ...string) []string {
+	t.Helper()
+	p, _ := parseFiles(t, map[string]string{"ci.yml": nestedGetThreeJobsFile})
+	for _, j := range p.Pipelines[0].Jobs {
+		if j.ID == "b" {
+			for _, id := range added {
+				j.Needs = append(j.Needs, ir.Need{JobID: id})
+			}
+		}
+	}
+	files, _ := emit(t, p)
+	back, _ := reparse(t, files)
+	var got []string
+	for _, j := range back.Pipelines[0].Jobs {
+		if j.ID == "b" {
+			for _, n := range j.Needs {
+				got = append(got, n.JobID)
+			}
+		}
+	}
+	slices.Sort(got)
+	return got
+}
+
+// A need that is not in the nested passed list must still be written, whether one or several are new.
+func TestNeedAddedBesideANestedGetIsKept(t *testing.T) {
+	for _, tc := range []struct {
+		want  []string
+		added []string
+	}{
+		{want: []string{"a"}},
+		{added: []string{"c"}, want: []string{"a", "c"}},
+		{added: []string{"c", "d"}, want: []string{"a", "c", "d"}},
+	} {
+		if got := needsOfAfterEdit(t, tc.added...); !slices.Equal(got, tc.want) {
+			t.Fatalf("added %v: b needs %v, want %v", tc.added, got, tc.want)
+		}
 	}
 }
