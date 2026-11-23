@@ -34,7 +34,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.JobCache:               {Level: caps.Emulated, Strategy: "shared workspace of the steps in one workflow", Caveat: "nothing persists between runs"},
 		caps.JobArtifacts:           {Level: caps.Emulated, Strategy: "shared workspace of the steps in one workflow", Caveat: "other workflows cannot read the files"},
 		caps.JobOutputs:             {Level: caps.Lost, Caveat: "Woodpecker steps cannot pass values to other workflows"},
-		caps.StepAction:             {Level: caps.Native, Strategy: "per actions.Lookup verdict; a plugin step is native", Caveat: "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step"},
+		caps.StepAction:             {Level: caps.Native, Strategy: "per actions.Lookup verdict; a plugin step is native", Caveat: "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"},
 		caps.StepTimeout:            {Level: caps.Lost, Caveat: "Woodpecker has only a pipeline timeout in the repo settings"},
 		caps.StepShell:              {Level: caps.Lost, Caveat: "Woodpecker runs commands in the image entrypoint shell"},
 		caps.ProjectMultiPipeline:   {Level: caps.Emulated, Strategy: "each job of each pipeline is a workflow named <pipeline>-<job>", Caveat: "each workflow carries its pipeline's trigger condition"},

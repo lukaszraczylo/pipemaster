@@ -3,6 +3,7 @@ package gitlab
 import (
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -45,9 +46,15 @@ func (e *emitter) foreignExt(path string, x ir.Ext) {
 
 // loseName reports a display name the file cannot hold; only a job name equal to its key is written.
 func (e *emitter) loseName(path, name, key string) {
-	if name != "" && name != key {
-		e.lose(path, caps.DisplayName, "GitLab CI has no display name here; the name is kept in round-trip metadata")
+	if name == "" || name == key {
+		return
 	}
+	if key == "" && strings.HasPrefix(path, "pipeline/") && !strings.Contains(path[len("pipeline/"):], "/") && !pipelineName(name) {
+		e.lose(path, caps.DisplayName, "the pipeline name cannot be written as workflow:name: it is empty, over "+
+			strconv.Itoa(workflowNameMax)+" bytes, or holds a dollar sign that GitLab expands as a variable; the name is kept in round-trip metadata")
+		return
+	}
+	e.lose(path, caps.DisplayName, "GitLab CI has no display name here; the name is kept in round-trip metadata")
 }
 
 // workflowNameMax is the longest text GitLab takes for workflow:name.
@@ -60,8 +67,11 @@ func pipelineName(name string) bool {
 }
 
 // secretSetup reports that the operator creates the variable of a secret. One entry names every secret of a
-// node, because the ledger keeps one entry for each node and feature.
+// node, because the ledger keeps one entry for each node and feature. A service secret reports under job.env.
 func (e *emitter) secretSetup(path string, f caps.Feature, name string) {
+	if f == caps.JobServices {
+		f = caps.JobEnv // the services entry also holds the ports verdict and would hide the setup
+	}
 	u := e.use(path, f)
 	if e.secrets == nil {
 		e.secrets = map[ir.FeatureUse][]string{}

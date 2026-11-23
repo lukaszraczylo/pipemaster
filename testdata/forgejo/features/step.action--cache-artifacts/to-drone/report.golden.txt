@@ -6,7 +6,7 @@ Loss report: forgejo -> drone
 [lost] pipeline/ci/job/test/step/test-step-1 ext.passthrough (the action reference actions/download-artifact@v4 is not in the Drone file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/test/step/test-step-1 step.action (no upload of artifact dist in this document; documents do not share a workspace)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
-[emulated] pipeline/ci/job/build/step/build-step-1 step.action: per actions.Lookup verdict; a plugin step with settings (unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step)
+[emulated] pipeline/ci/job/build/step/build-step-1 step.action: per actions.Lookup verdict; a plugin step with settings (unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth)
 [emulated] pipeline/ci/job/build/step/build-step-2 step.action: shared workspace of the steps in one document (nothing persists between runs)
 [emulated] pipeline/ci/job/build/step/build-step-4 step.action: shared workspace of the steps in one document (other documents cannot read the files)
 [emulated] pipeline/ci/job/test job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

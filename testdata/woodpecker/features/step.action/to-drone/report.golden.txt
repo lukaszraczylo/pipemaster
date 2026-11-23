@@ -1,2 +1,2 @@
 Loss report: woodpecker -> drone
-[emulated] pipeline/woodpecker/job/ci/step/checkout step.action: per actions.Lookup verdict; a plugin step with settings (unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step)
+[emulated] pipeline/woodpecker/job/ci/step/checkout step.action: per actions.Lookup verdict; a plugin step with settings (unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth)

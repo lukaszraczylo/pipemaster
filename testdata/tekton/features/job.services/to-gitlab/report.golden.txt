@@ -1,2 +1,3 @@
 Loss report: tekton -> gitlab
 [lost] pipeline/ci/job/test job.services (service ports have no GitLab keyword; services are reachable by alias)
+[external] pipeline/ci/job/test job.env: create DB_PASSWORD as a masked CI/CD variable in the project settings, protected too for protected branches (a GitLab file cannot mark a secret as one; it writes DB_PASSWORD as plain variable references and the operator sets the values there)

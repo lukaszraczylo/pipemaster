@@ -96,3 +96,33 @@ func TestTwoSecretsOnOneJobAreBothNamed(t *testing.T) {
 	}
 	t.Errorf("no external entry names both secrets: %+v", rep.Entries)
 }
+
+func TestServiceSecretSetupStaysVisibleBesideThePortsLoss(t *testing.T) {
+	j := glJob("build", glStep("make"))
+	j.Services = []ir.Service{{
+		Name: "db", Image: ir.Image{Ref: "postgres:16"}, Ports: []string{"5432"},
+		Env: []ir.Var{{Name: "PW", Value: ir.Value{Kind: ir.ValueSecret, Secret: "DB_PASSWORD"}}},
+	}}
+	_, rep := emitFiles(t, &ir.Project{Pipelines: []*ir.Pipeline{{ID: "gitlab-ci", Jobs: []*ir.Job{j}}}})
+	var ports, setup bool
+	for _, e := range rep.Entries {
+		ports = ports || (e.Feature == caps.JobServices && e.Level == caps.Lost && strings.Contains(e.Detail, "ports"))
+		setup = setup || (e.Level == caps.External && strings.Contains(e.Strategy, "DB_PASSWORD"))
+	}
+	if !ports || !setup {
+		t.Errorf("ports lost = %v, secret setup named = %v: %+v", ports, setup, rep.Entries)
+	}
+}
+
+func TestUnwritablePipelineNameSaysWhy(t *testing.T) {
+	_, rep := emitFiles(t, namedProject("price $5"))
+	for _, e := range rep.Entries {
+		if e.Feature == caps.DisplayName && e.IRPath == "pipeline/gitlab-ci" {
+			if !strings.Contains(e.Detail, "workflow:name") || strings.Contains(e.Detail, "no display name here") {
+				t.Errorf("detail = %q", e.Detail)
+			}
+			return
+		}
+	}
+	t.Errorf("no display.name entry: %+v", rep.Entries)
+}

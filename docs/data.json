@@ -578,7 +578,7 @@
    },
    "step.action": {
     "level": "emulated",
-    "note": "per actions.Lookup verdict; a plugin step with settings (unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step)"
+    "note": "per actions.Lookup verdict; a plugin step with settings (unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth)"
    },
    "step.continue_on_error": {
     "level": "native"
@@ -1581,7 +1581,7 @@
    },
    "step.action": {
     "level": "native",
-    "note": "per actions.Lookup verdict; a plugin step is native (unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step)"
+    "note": "per actions.Lookup verdict; a plugin step is native (unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth)"
    },
    "step.continue_on_error": {
     "level": "native"
@@ -1878,7 +1878,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "per actions.Lookup verdict; a plugin step with settings",
-     "detail": "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step"
+     "detail": "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"
     },
     {
      "path": "pipeline/ci/job/test",
@@ -1892,7 +1892,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "per actions.Lookup verdict; a plugin step with settings",
-     "detail": "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step"
+     "detail": "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"
     }
    ]
   },
