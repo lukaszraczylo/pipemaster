@@ -1,3 +1,5 @@
+workflow:
+  name: jobenv
 build:
   needs: []
   variables:

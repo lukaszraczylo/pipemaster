@@ -1,3 +1,5 @@
+workflow:
+  name: lost status
 build:
   tags:
     - ubuntu-latest

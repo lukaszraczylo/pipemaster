@@ -1,3 +1,5 @@
+workflow:
+  name: stepif
 build:
   tags:
     - ubuntu-latest

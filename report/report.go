@@ -19,6 +19,9 @@ type Report struct {
 	Source  string  `json:"source"`
 	Target  string  `json:"target"`
 	Entries []Entry `json:"entries"`
+	// Retained holds source fields the round-trip metadata keeps although the target file holds an equivalent,
+	// so they are no loss to report. They stay out of the printed and JSON report.
+	Retained []Entry `json:"-"`
 }
 
 // Add appends e.
@@ -30,6 +33,7 @@ func (r *Report) Merge(o *Report) {
 		return
 	}
 	r.Entries = append(r.Entries, o.Entries...)
+	r.Retained = append(r.Retained, o.Retained...)
 }
 
 // Worst returns the highest level present, or Native when there are none.

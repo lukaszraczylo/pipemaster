@@ -1,3 +1,5 @@
+workflow:
+  name: shell
 build:
   tags:
     - ubuntu-latest

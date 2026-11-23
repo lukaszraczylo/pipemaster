@@ -1,3 +1,5 @@
+workflow:
+  name: coe
 build:
   needs: []
   script:

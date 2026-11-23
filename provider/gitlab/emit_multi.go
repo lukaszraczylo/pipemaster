@@ -135,6 +135,7 @@ func (e *emitter) foldPipelines(pls []*ir.Pipeline) (*ir.Pipeline, error) {
 				"each job carries its pipeline's trigger condition and a marker; workflow:rules is the union of all triggers")
 		}
 		e.foreignExt(pp, pl.Ext)
+		e.loseName(pp, pl.Name, "")
 		shared, group, inputs, err := e.foldShared(pp, pl)
 		if err != nil {
 			return nil, err

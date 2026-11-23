@@ -172,8 +172,28 @@ func sameTriggers(a, b []ir.Trigger) bool {
 	return ok
 }
 
-// workflow writes workflow:rules from the triggers. The original block is restored when it still says what the triggers say.
+// workflow writes workflow:name and workflow:rules; a nil result means the file needs no workflow block.
 func (e *emitter) workflow(pl *ir.Pipeline) (*yaml.Node, error) {
+	n, err := e.workflowRules(pl)
+	if err != nil || !pipelineName(pl.Name) {
+		return n, err
+	}
+	name := str(pl.Name)
+	if n == nil {
+		w := newMap()
+		w.set("name", name)
+		return w.n, nil
+	}
+	if cur := get(n, "name"); cur != nil {
+		*cur = *name
+		return n, nil
+	}
+	n.Content = append([]*yaml.Node{str("name"), name}, n.Content...)
+	return n, nil
+}
+
+// workflowRules writes workflow:rules from the triggers. The original block is restored when it still says what the triggers say.
+func (e *emitter) workflowRules(pl *ir.Pipeline) (*yaml.Node, error) {
 	for i := range pl.Triggers {
 		e.triggerNotes(triggerPath(pl.ID, i), &pl.Triggers[i])
 		e.foreignExt(triggerPath(pl.ID, i), pl.Triggers[i].Ext)

@@ -453,10 +453,10 @@ def TekKeep (j x : Core.Job) : Prop :=
 
 /-- A pipeline whose jobs keep what `Drone.Keep` and `TekKeep` list keeps the Tekton fragment, when its ID is a short
 DNS label. -/
-theorem tekOk_of_shape (p : Pipe) (pid : String) (hpid : DnsId pid) (hlen : pid.length ≤ maxPipeId)
+theorem tekOk_of_shape (p : Pipe) {nm : String} (pid : String) (hpid : DnsId pid) (hlen : pid.length ≤ maxPipeId)
     (fm ff : Core.Job → Core.Job) (hm : ∀ j, Drone.Keep j (fm j)) (hf : ∀ j, Drone.Keep j (ff j))
     (km : ∀ j, TekKeep j (fm j)) (kf : ∀ j, TekKeep j (ff j)) (q : Pipe)
-    (hq : q = { id := pid, name := "", push := p.push, tag := p.tag, pr := p.pr,
+    (hq : q = { id := pid, name := nm, push := p.push, tag := p.tag, pr := p.pr,
                 jobs := p.jobs.map fm, fin := p.fin.map ff }) :
     TekOk p → TekOk q := by
   intro ho

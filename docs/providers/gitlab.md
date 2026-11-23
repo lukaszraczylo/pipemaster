@@ -23,7 +23,7 @@ The following table comes from `pipemaster caps --to gitlab --format md`.
 | Feature | Gitlab | Strategy |
 | --- | --- | --- |
 | config.name | native |  |
-| display.name | lost | (step and pipeline names have no GitLab field; a job name survives only as its key) |
+| display.name | native | the pipeline name (workflow:name) (step names and job display names have no GitLab field and are lost; a job name survives only as its key; a pipeline name with a dollar sign or over 255 characters is lost) |
 | expr.opaque | native | (only opaque expressions of the gitlab dialect; others are lost) |
 | ext.passthrough | native |  |
 | job.allow_failure | native |  |
@@ -50,7 +50,7 @@ The following table comes from `pipemaster caps --to gitlab --format md`.
 | pipeline.permissions | lost | (job token scope is a project setting) |
 | project.multi_pipeline | emulated | jobs of every pipeline in one file under <pipeline>:<job> keys (each job carries its pipeline's trigger condition; stage names and inputs are not restored) |
 | script.interpolation | native |  |
-| step.action | native | per actions.Lookup verdict (unknown actions are lost) |
+| step.action | native | per actions.Lookup verdict (unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes the pinned default actions/checkout (not the source ref) with fetch-depth and submodules from GIT_DEPTH and GIT_SUBMODULE_STRATEGY) |
 | step.continue_on_error | emulated | \|\| true after each line of the step |
 | step.env | emulated | export lines inside a subshell around the step |
 | step.if | emulated | shell guard around the step's lines (step reports success instead of skipped) |

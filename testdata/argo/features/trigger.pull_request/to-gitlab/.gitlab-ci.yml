@@ -1,6 +1,7 @@
 # pipemaster:emulated trigger.pull_request pipeline/ci/trigger/0
 # pipemaster:arg {"kind":"pr"}
 workflow:
+  name: pr
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 build:

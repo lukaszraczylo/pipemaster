@@ -424,9 +424,9 @@ Concourse keeps every fragment (`Chain.Adapter.keeps_of_id`). The converse needs
 adapter keeps the Concourse fragment: its job IDs, step IDs and scripts, which every raw parse keeps. -/
 
 /-- A pipeline whose jobs keep what `Drone.Keep` lists keeps the Concourse fragment. -/
-theorem concOk_of_shape (p : Pipe) (pid : String) (fm ff : Core.Job → Core.Job) (hm : ∀ j, Drone.Keep j (fm j))
+theorem concOk_of_shape (p : Pipe) {nm : String} (pid : String) (fm ff : Core.Job → Core.Job) (hm : ∀ j, Drone.Keep j (fm j))
     (hf : ∀ j, Drone.Keep j (ff j)) (q : Pipe)
-    (hq : q = { id := pid, name := "", push := p.push, tag := p.tag, pr := p.pr,
+    (hq : q = { id := pid, name := nm, push := p.push, tag := p.tag, pr := p.pr,
                 jobs := p.jobs.map fm, fin := p.fin.map ff }) :
     ConcourseOk p → ConcourseOk q := by
   intro ho

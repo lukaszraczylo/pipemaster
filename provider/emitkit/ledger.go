@@ -26,6 +26,7 @@ type Ledger struct {
 	noted  map[ir.FeatureUse]bool
 	source string
 	target string
+	kept   []report.Entry
 }
 
 // NewLedger starts a ledger for a source-to-target conversion against target matrix m.
@@ -63,6 +64,12 @@ func (l *Ledger) Note(u ir.FeatureUse, s caps.Support, detail string) {
 	l.state[u] = cur
 }
 
+// Retain asks for the source fields of u in the round-trip metadata without a report entry, for a feature
+// the target file holds as an equivalent.
+func (l *Ledger) Retain(u ir.FeatureUse, detail string) {
+	l.kept = append(l.kept, entryFor(u, caps.Support{Level: caps.Lost}, detail))
+}
+
 // Emitted returns the uses accounted at Native level, sorted.
 func (l *Ledger) Emitted() []ir.FeatureUse {
 	var out []ir.FeatureUse
@@ -85,7 +92,7 @@ func (l *Ledger) FinishNoted(uses []ir.FeatureUse) (*report.Report, error) {
 }
 
 func (l *Ledger) finish(uses []ir.FeatureUse, withNotes bool) (*report.Report, error) {
-	r := &report.Report{Source: l.source, Target: l.target}
+	r := &report.Report{Source: l.source, Target: l.target, Retained: l.kept}
 	for u, e := range l.state {
 		if e.Level != caps.Native || (withNotes && l.noted[u] && e.Detail != "") {
 			r.Add(e)

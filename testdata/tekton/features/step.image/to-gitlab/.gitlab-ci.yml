@@ -1,6 +1,8 @@
 stages:
   - stage-0
   - stage-1
+workflow:
+  name: base
 build:
   stage: stage-0
   needs: []

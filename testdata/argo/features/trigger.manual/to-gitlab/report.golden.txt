@@ -1,2 +1,2 @@
 Loss report: argo -> gitlab
-[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
+No losses: every feature converted natively.

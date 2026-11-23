@@ -1,6 +1,7 @@
 # pipemaster:emulated trigger.pull_request pipeline/ci/trigger/0
 # pipemaster:arg {"kind":"pr","branches":{"Include":["main"],"Exclude":null}}
 workflow:
+  name: pr
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
 build:

@@ -1,0 +1,10 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  displayName: Release build
+  tasks:
+    - name: build
+      taskRef:
+        name: gitlab-ci-build

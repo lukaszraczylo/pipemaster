@@ -40,6 +40,8 @@ structure TrigMark where
   deriving DecidableEq, Repr
 
 structure Pipeline where
+  /-- `workflow:name`; empty when the key is absent. -/
+  name : String
   stages : List String
   /-- `workflow:rules` as (kind, include) pairs, one per trigger; `none` when the key is absent. -/
   rules : Option (List TrigMark)
@@ -125,8 +127,15 @@ def needsMarks (p : Pipe) : Bool := match p.pr with
   | some (_ :: _) => true
   | _ => false
 
+/-- The longest `workflow:name` GitLab takes (gitlab workflowNameMax). -/
+def workflowNameMax : Nat := 255
+
+/-- Mirrors gitlab.pipelineName (provider/gitlab/emit_text.go): a name with a dollar sign would expand as a variable. -/
+def writesName (s : String) : Bool := s ≠ "" ∧ s.utf8ByteSize ≤ workflowNameMax ∧ !s.contains '$'
+
 /-- Mirrors gitlab.Emit (provider/gitlab/emit.go) on the core subset. -/
 def toGitlab (p : Pipe) : Pipeline where
+  name := if writesName p.name then p.name else ""
   stages := stagesOf p
   rules := if isDefaultTriggers p ∨ trigMarks p = [] then none else some (trigMarks p)
   jobs := p.jobs.map (mainJob p) ++ p.fin.map (finJob p)
@@ -181,7 +190,7 @@ def gitlabMeta (p : Pipe) : Meta :=
 /-- The pipeline Parse builds before the round-trip metadata is applied. -/
 def rawGitlab (g : Pipeline) : Pipe :=
   { id := gitlabPipelineId
-    name := ""
+    name := g.name
     push := parseTriggers g kindPush
     tag := parseTriggers g kindTag
     pr := parseTriggers g kindPr
@@ -331,7 +340,7 @@ theorem isFin_fin (p : Pipe) (j : Core.Job) : isFin (finJob p j) = true := by
 
 theorem rawGitlab_toGitlab (p : Pipe) (hw : Wf p) (hg : GitlabOk p) :
     rawGitlab (toGitlab p) =
-      { id := gitlabPipelineId, name := "", push := p.push, tag := p.tag, pr := p.pr,
+      { id := gitlabPipelineId, name := if writesName p.name then p.name else "", push := p.push, tag := p.tag, pr := p.pr,
         jobs := p.jobs.map strip, fin := p.fin.map strip } := by
   obtain ⟨_, _, _, _, _, _, _, _, _, hon, hman⟩ := hw
   obtain ⟨hany, _, hfree⟩ := hg
@@ -384,8 +393,11 @@ theorem gitlab_from_to (p : Pipe) (h : GitlabFrag p) : fromGitlab (toGitlab p) (
     restoreJob_strip p hn (fun j hj => (hsteps j hj).2) j (by simp [Pipe.all, hj])
   have hpid : ((gitlabMeta p).ids gitlabPipelineId).getD gitlabPipelineId = p.id := by
     rw [hid]; by_cases h : p.id = gitlabPipelineId <;> simp [h]
-  have hnm : fill "" ((gitlabMeta p).names (.pipe p.id)) = p.name := by
-    simp only [gitlabMeta, metaOf, if_true]; exact fill_nameOf _
+  have hnm : fill (if writesName p.name then p.name else "") ((gitlabMeta p).names (.pipe p.id)) = p.name := by
+    simp only [gitlabMeta, metaOf, if_true]
+    split
+    · exact fill_self _
+    · exact fill_nameOf _
   unfold restore
   simp only [hpid, hnm, List.map_map]
   have e1 : List.map (restoreJob (gitlabMeta p) p.id ∘ strip) p.jobs = p.jobs :=

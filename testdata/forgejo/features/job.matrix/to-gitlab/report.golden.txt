@@ -1,3 +1,2 @@
 Loss report: forgejo -> gitlab
-[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [lost] pipeline/ci/job/test job.matrix (fail-fast and max-parallel have no GitLab equivalent)

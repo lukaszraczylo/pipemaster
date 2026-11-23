@@ -1,3 +1,2 @@
 Loss report: tekton -> gitlab
-[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [emulated] pipeline/ci/job/test job.matrix: expanded into one parallel:matrix entry per combination (include and exclude have no GitLab form, and a single include combination reads back as an axis list)

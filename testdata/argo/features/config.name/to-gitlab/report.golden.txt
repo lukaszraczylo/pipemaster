@@ -1,6 +1,5 @@
 Loss report: argo -> gitlab
-[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
-[lost] pipeline/ci pipeline.env (secret API_TOKEN is written as the variable $API_TOKEN; a GitLab file cannot mark it as a secret)
-[lost] pipeline/ci/job/build/step/build-step-1 step.env (secret DEPLOY_KEY is written as the variable $DEPLOY_KEY; a GitLab file cannot mark it as a secret)
 [lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the GitLab file; it is kept in round-trip metadata)
 [lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the GitLab file; it is kept in round-trip metadata)
+[external] pipeline/ci pipeline.env: create API_TOKEN as a masked CI/CD variable in the project settings, protected too for protected branches (a GitLab file cannot mark a secret as one; it writes API_TOKEN as plain variable references and the operator sets the values there)
+[external] pipeline/ci/job/build/step/build-step-1 step.env: create DEPLOY_KEY as a masked CI/CD variable in the project settings, protected too for protected branches (a GitLab file cannot mark a secret as one; it writes DEPLOY_KEY as plain variable references and the operator sets the values there)

@@ -7,6 +7,7 @@ variables:
     value: staging
     description: Where to deploy
 workflow:
+  name: inputs
   rules:
     - if: $CI_PIPELINE_SOURCE == "web"
 build:

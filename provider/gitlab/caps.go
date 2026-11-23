@@ -21,7 +21,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.JobEnvironmentApproval: {Level: caps.External, Strategy: "protected environment approval rules in project settings"},
 		caps.JobMatrix:              {Level: caps.Native, Strategy: "parallel:matrix", Caveat: "include and exclude are expanded into explicit entries"},
 		caps.JobOutputs:             {Level: caps.Emulated, Strategy: "dotenv artifact report"},
-		caps.StepAction:             {Level: caps.Native, Strategy: "per actions.Lookup verdict", Caveat: "unknown actions are lost"},
+		caps.StepAction:             {Level: caps.Native, Strategy: "per actions.Lookup verdict", Caveat: "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes the pinned default actions/checkout (not the source ref) with fetch-depth and submodules from GIT_DEPTH and GIT_SUBMODULE_STRATEGY"},
 		caps.StepImage:              {Level: caps.Lost, Caveat: "GitLab sets the image per job, not per step"},
 		caps.StepIf:                 {Level: caps.Emulated, Strategy: "shell guard around the step's lines", Caveat: "step reports success instead of skipped"},
 		caps.StepEnv:                {Level: caps.Emulated, Strategy: "export lines inside a subshell around the step"},
@@ -29,7 +29,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.StepTimeout:            {Level: caps.Lost, Caveat: "GitLab has only a job timeout"},
 		caps.StepWorkdir:            {Level: caps.Emulated, Strategy: "cd in a subshell around the step"},
 		caps.StepShell:              {Level: caps.Lost, Caveat: "GitLab runs scripts in the runner's configured shell"},
-		caps.DisplayName:            {Level: caps.Lost, Caveat: "step and pipeline names have no GitLab field; a job name survives only as its key"},
+		caps.DisplayName:            {Level: caps.Native, Strategy: "the pipeline name (workflow:name)", Caveat: "step names and job display names have no GitLab field and are lost; a job name survives only as its key; a pipeline name with a dollar sign or over 255 characters is lost"},
 		caps.ExprOpaque:             {Level: caps.Native, Caveat: "only opaque expressions of the gitlab dialect; others are lost"},
 	} {
 		m[f] = s

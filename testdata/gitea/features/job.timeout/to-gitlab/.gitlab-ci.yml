@@ -1,3 +1,5 @@
+workflow:
+  name: timeout
 build:
   tags:
     - ubuntu-latest

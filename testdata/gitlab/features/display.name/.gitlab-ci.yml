@@ -1,0 +1,5 @@
+workflow:
+  name: Release build
+build:
+  script:
+    - make

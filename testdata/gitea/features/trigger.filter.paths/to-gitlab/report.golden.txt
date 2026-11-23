@@ -1,5 +1,4 @@
 Loss report: gitea -> gitlab
-[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [lost] pipeline/ci/trigger/0 trigger.filter.paths (rules:changes has no exclude patterns)
 [lost] pipeline/ci/trigger/1 trigger.filter.paths (rules:changes has no exclude patterns)
 [lost] pipeline/ci/trigger/2 trigger.filter.paths (rules:changes has no exclude patterns)

@@ -1,3 +1,2 @@
 Loss report: gitea -> gitlab
-[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
-[lost] pipeline/ci/job/build/step/build-step-1 step.env (secret GITHUB_TOKEN is written as the variable $GITHUB_TOKEN; a GitLab file cannot mark it as a secret)
+[external] pipeline/ci/job/build/step/build-step-1 step.env: create GITEA_DEPLOY, GITHUB_TOKEN as a masked CI/CD variable in the project settings, protected too for protected branches (a GitLab file cannot mark a secret as one; it writes GITEA_DEPLOY, GITHUB_TOKEN as plain variable references and the operator sets the values there)

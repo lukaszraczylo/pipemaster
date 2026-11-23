@@ -164,7 +164,9 @@ func isDisabledCall(e report.Entry, d irDiff) bool {
 func covered(d irDiff, reps ...*report.Report) bool {
 	accepted := fieldFeatures[d.Field]
 	for _, r := range reps {
-		for _, e := range r.Entries {
+		// Retained entries are the mapped clone steps: the report names no loss, and the caps caveat of the
+		// target states what a return without metadata writes.
+		for _, e := range append(slices.Clone(r.Entries), r.Retained...) {
 			if e.Level >= caps.External && atOrBelow(e.IRPath, d.Path) && slices.Contains(accepted, e.Feature) {
 				return true
 			}

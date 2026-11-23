@@ -1,3 +1,5 @@
+workflow:
+  name: expression label
 # pipemaster:lost script.interpolation pipeline/ci/job/test: {{ matrix.os || 'ubuntu-latest' }}
 test:
   needs: []

@@ -1,3 +1,2 @@
 Loss report: drone -> gitlab
 [lost] pipeline/drone/job/ci/step/build step.image (GitLab sets the image per job, not per step)
-[lost] pipeline/drone/job/ci/step/checkout ext.passthrough (the action reference actions/checkout@v4 is not in the GitLab file; it is kept in round-trip metadata)

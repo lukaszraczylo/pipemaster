@@ -1,6 +1,7 @@
 # pipemaster:emulated trigger.pipeline_done pipeline/ci/trigger/0
 # pipemaster:arg {"kind":"pipeline_done","branches":{"Include":["main"],"Exclude":null}}
 workflow:
+  name: after
   rules:
     - when: never
 build:

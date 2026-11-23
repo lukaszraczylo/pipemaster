@@ -8,6 +8,7 @@ variables:
   TOKEN: $DEPLOY_TOKEN
   LABEL: build-
 workflow:
+  name: env
   rules:
     - if: $CI_COMMIT_BRANCH
     - if: $CI_COMMIT_TAG

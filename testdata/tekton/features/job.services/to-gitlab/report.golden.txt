@@ -1,3 +1,2 @@
 Loss report: tekton -> gitlab
-[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
-[lost] pipeline/ci/job/test job.services (secret DB_PASSWORD is written as the variable $DB_PASSWORD; a GitLab file cannot mark it as a secret)
+[lost] pipeline/ci/job/test job.services (service ports have no GitLab keyword; services are reachable by alias)

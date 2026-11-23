@@ -1,5 +1,4 @@
 Loss report: tekton -> gitlab
-[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-step-1 ext.passthrough (Ext of provider tekton (securityContext) is not written to the GitLab file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-step-1 step.shell (GitLab runs scripts in the runner's configured shell, not bash)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.workdir: cd in a subshell around the step

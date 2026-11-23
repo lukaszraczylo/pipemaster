@@ -1,4 +1,3 @@
 Loss report: forgejo -> gitlab
-[lost] pipeline/ci/job/build/step/build-step-1 ext.passthrough (the action reference actions/checkout@v4 is not in the GitLab file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-step-2 step.action: image selection (missing input go-version)
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (no GitLab mapping for action org/tool/sub@v2)

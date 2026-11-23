@@ -1,3 +1,5 @@
+workflow:
+  name: stepenv
 build:
   tags:
     - ubuntu-latest

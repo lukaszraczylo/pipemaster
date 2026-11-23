@@ -1,6 +1,6 @@
 Loss report: gha -> gitlab
-[lost] pipeline/ci display.name (step and pipeline names have no GitLab field; a job name survives only as its key)
-[lost] pipeline/deploy display.name (step and pipeline names have no GitLab field; a job name survives only as its key)
+[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
+[lost] pipeline/deploy display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [lost] pipeline/deploy/trigger/0 ext.passthrough (Ext of provider gha (inputs) is not written to the GitLab file; it is kept in round-trip metadata)
 [emulated] pipeline/deploy pipeline.inputs: variable copied into every job of the pipeline (the pipeline marker keeps the input list)
 [emulated] pipeline/deploy project.multi_pipeline: jobs of every pipeline in one file under <pipeline>:<job> keys (each job carries its pipeline's trigger condition and a marker; workflow:rules is the union of all triggers)

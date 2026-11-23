@@ -1,3 +1,5 @@
+workflow:
+  name: opaque
 # pipemaster:lost expr.opaque pipeline/ci/job/build: opaque(tekton): {"input":"pipemaster-disabled","operator":"in","values":["never"]}
 build:
   needs: []

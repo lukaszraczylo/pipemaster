@@ -1,6 +1,5 @@
 Loss report: forgejo -> woodpecker
 [lost] pipeline/ci/job/build job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
-[lost] pipeline/ci/job/build/step/build-step-1 ext.passthrough (the action reference actions/checkout@v4 is not in the Woodpecker file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-step-2 step.action: image selection (missing input go-version)
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (no Woodpecker mapping for action org/tool/sub@v2)
 [lost] pipeline/ci/job/build/step/script step.script (the job has no steps; a no-op step keeps the workflow valid)

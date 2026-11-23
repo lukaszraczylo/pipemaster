@@ -1,3 +1,2 @@
 Loss report: gha -> gitlab
-[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-step-1 display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)

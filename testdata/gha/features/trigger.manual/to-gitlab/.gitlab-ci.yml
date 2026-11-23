@@ -1,4 +1,5 @@
 workflow:
+  name: manual
   rules:
     - if: $CI_PIPELINE_SOURCE == "web"
 build:

@@ -23,6 +23,7 @@ type emitter struct {
 	from     *expr.Dialect
 	fold     *folded
 	deadOut  map[string]bool
+	secrets  map[ir.FeatureUse][]string
 	comments []string
 }
 
@@ -47,6 +48,30 @@ func (e *emitter) loseName(path, name, key string) {
 	if name != "" && name != key {
 		e.lose(path, caps.DisplayName, "GitLab CI has no display name here; the name is kept in round-trip metadata")
 	}
+}
+
+// workflowNameMax is the longest text GitLab takes for workflow:name.
+const workflowNameMax = 255
+
+// pipelineName reports whether name can be written as workflow:name. GitLab expands $VAR in it, so a name
+// with a dollar sign or a workflow expression would read differently; it stays in round-trip metadata.
+func pipelineName(name string) bool {
+	return name != "" && len(name) <= workflowNameMax && !strings.Contains(name, "$")
+}
+
+// secretSetup reports that the operator creates the variable of a secret. One entry names every secret of a
+// node, because the ledger keeps one entry for each node and feature.
+func (e *emitter) secretSetup(path string, f caps.Feature, name string) {
+	u := e.use(path, f)
+	if e.secrets == nil {
+		e.secrets = map[ir.FeatureUse][]string{}
+	}
+	if !slices.Contains(e.secrets[u], name) {
+		e.secrets[u] = append(e.secrets[u], name)
+	}
+	names := strings.Join(e.secrets[u], ", ")
+	e.external(path, f, "create "+names+" as a masked CI/CD variable in the project settings, protected too for protected branches",
+		"a GitLab file cannot mark a secret as one; it writes "+names+" as plain variable references and the operator sets the values there")
 }
 
 func (e *emitter) emulate(path string, f caps.Feature, strategy, detail string) {
@@ -229,7 +254,7 @@ func (e *emitter) value(path string, f caps.Feature, v ir.Value) (text string, o
 			e.lose(path, caps.ExprOpaque, "secret name "+v.Secret+" is not a GitLab variable name")
 			return "", false, nil
 		}
-		e.lose(path, f, "secret "+v.Secret+" is written as the variable $"+v.Secret+"; a GitLab file cannot mark it as a secret")
+		e.secretSetup(path, f, v.Secret)
 		return "$" + v.Secret, true, nil
 	case ir.ValueExpr:
 		return e.exprValue(path, v.Expr)

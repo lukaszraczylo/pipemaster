@@ -3,6 +3,8 @@ variables:
   VERSION: "3.1"
   TOKEN: $DEPLOY_TOKEN
   LABEL: build-
+workflow:
+  name: env
 # pipemaster:lost expr.opaque pipeline/ci: gha.github.run_number
 build:
   needs: []

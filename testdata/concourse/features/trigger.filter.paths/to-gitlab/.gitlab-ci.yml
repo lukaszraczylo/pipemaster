@@ -3,6 +3,7 @@
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 # pipemaster:arg {"kind":"tag","tags":{"Include":["*"],"Exclude":null},"paths":{"Include":["src/**","!src/docs/**"],"Exclude":null}}
 workflow:
+  name: paths
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:

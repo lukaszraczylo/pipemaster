@@ -1,6 +1,5 @@
 Loss report: gitea -> woodpecker
 [lost] pipeline/ci/job/build job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
-[lost] pipeline/ci/job/build/step/build-step-1 ext.passthrough (the action reference actions/checkout@v4 is not in the Woodpecker file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-step-2 step.action (no Woodpecker mapping for action org/tool@v2)
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (no Woodpecker mapping for action org/local-action@main)
 [lost] pipeline/ci/job/build/step/build-step-4 step.action (no Woodpecker mapping for action /checkout)

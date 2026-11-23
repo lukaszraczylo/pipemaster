@@ -2,6 +2,8 @@
 # pipemaster:arg [{"k":"t","p":"job/build/step/build-step-1/script/0","g":"echo \"$REGION\"","s":"echo \"$\u007b{ vars.REGION }}\""}]
 variables:
   API_TOKEN: $API_TOKEN
+workflow:
+  name: config
 build:
   tags:
     - ubuntu-latest

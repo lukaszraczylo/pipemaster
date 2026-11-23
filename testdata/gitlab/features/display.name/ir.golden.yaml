@@ -1,0 +1,25 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - ext:
+        gitlab:
+            workflow:
+                name: Release build
+      id: gitlab-ci
+      name: Release build
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - id: build
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make

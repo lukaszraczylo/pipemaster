@@ -67,7 +67,11 @@ func (e *emitter) mapAction(c *wfCtx, sp string, st *ir.Step) (string, error) {
 		e.unapplied(sp, st)
 		return "", nil
 	}
-	e.lose(sp, caps.ExtPassthrough, "the action reference "+actionRef(st.Action)+" is not in the Woodpecker file; it is kept in round-trip metadata")
+	if detail := "the action reference " + actionRef(st.Action) + " is not in the Woodpecker file; it is kept in round-trip metadata"; t.WritesEquivalent() {
+		e.led.Retain(use(sp, caps.ExtPassthrough), detail)
+	} else {
+		e.lose(sp, caps.ExtPassthrough, detail)
+	}
 	e.unapplied(sp, st)
 	return e.applyTarget(c, sp, t)
 }

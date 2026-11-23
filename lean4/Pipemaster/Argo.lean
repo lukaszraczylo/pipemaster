@@ -624,10 +624,10 @@ theorem finDrop_clearP (q : Pipe) : FinDrop q → FinDrop (Tekton.clearP q) := b
 
 /-- A pipeline whose jobs keep what `Drone.Keep` and `Tekton.TekKeep` list keeps the Argo fragment, when its ID is a
 short DNS label. -/
-theorem argoOk_of_shape (p : Pipe) (pid : String) (hpid : DnsId pid) (hlen : pid.length ≤ maxPipeId)
+theorem argoOk_of_shape (p : Pipe) {nm : String} (pid : String) (hpid : DnsId pid) (hlen : pid.length ≤ maxPipeId)
     (fm ff : Core.Job → Core.Job) (hm : ∀ j, Drone.Keep j (fm j)) (hf : ∀ j, Drone.Keep j (ff j))
     (km : ∀ j, Tekton.TekKeep j (fm j)) (kf : ∀ j, Tekton.TekKeep j (ff j)) (q : Pipe)
-    (hq : q = { id := pid, name := "", push := p.push, tag := p.tag, pr := p.pr,
+    (hq : q = { id := pid, name := nm, push := p.push, tag := p.tag, pr := p.pr,
                 jobs := p.jobs.map fm, fin := p.fin.map ff }) :
     ArgoOk p → ArgoOk q := by
   intro ho
@@ -658,9 +658,9 @@ theorem argoOk_of_shape (p : Pipe) (pid : String) (hpid : DnsId pid) (hlen : pid
 
 /-- The same shape keeps `FinDrop`, because a raw parse that keeps the need lists empty or full keeps their emptiness
 (`Drone.Keep`). -/
-theorem finDrop_of_shape (p : Pipe) (pid : String) (fm ff : Core.Job → Core.Job)
+theorem finDrop_of_shape (p : Pipe) {nm : String} (pid : String) (fm ff : Core.Job → Core.Job)
     (hm : ∀ j, Drone.Keep j (fm j)) (hf : ∀ j, Drone.Keep j (ff j)) (q : Pipe)
-    (hq : q = { id := pid, name := "", push := p.push, tag := p.tag, pr := p.pr,
+    (hq : q = { id := pid, name := nm, push := p.push, tag := p.tag, pr := p.pr,
                 jobs := p.jobs.map fm, fin := p.fin.map ff }) :
     FinDrop p → FinDrop q := by
   intro hd

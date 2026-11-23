@@ -489,7 +489,7 @@ open Pipemaster.Gitlab in
 def gitlabJson (g : Gitlab.Pipeline) : Json :=
   let trig (m : Gitlab.TrigMark) : Json :=
     Json.mkObj [("idx", Lean.toJson m.idx), ("kind", m.kind), ("include", strsJson m.incl)]
-  Json.mkObj [("stages", strsJson g.stages),
+  Json.mkObj [("name", g.name), ("stages", strsJson g.stages),
     ("rules", match g.rules with | some rs => Json.arr (rs.map trig).toArray | none => Json.null),
     ("jobs", Json.arr (g.jobs.map glJobJson).toArray), ("marks", Json.arr (g.marks.map trig).toArray)]
 

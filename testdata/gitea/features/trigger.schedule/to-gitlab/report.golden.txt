@@ -1,4 +1,3 @@
 Loss report: gitea -> gitlab
-[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [external] pipeline/ci/trigger/0 trigger.schedule: pipeline schedule in project settings (create a pipeline schedule: Settings > CI/CD > Schedules, cron `0 0 * * 0`)
 [external] pipeline/ci/trigger/1 trigger.schedule: pipeline schedule in project settings (create a pipeline schedule: Settings > CI/CD > Schedules, cron `30 5 * * 1-5`)

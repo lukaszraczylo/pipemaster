@@ -3,6 +3,7 @@
 # pipemaster:emulated trigger.push pipeline/ci/trigger/1
 # pipemaster:arg {"kind":"push","branches":{"Include":["main","release/**","!release/old"],"Exclude":null}}
 workflow:
+  name: branches
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME !~ /^wip\/.*$/)
     - if: ($CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^release\/.*$/) && $CI_COMMIT_BRANCH != "release/old"

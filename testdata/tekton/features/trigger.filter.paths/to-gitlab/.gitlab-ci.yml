@@ -5,6 +5,7 @@
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/2
 # pipemaster:arg {"kind":"tag","paths":{"Include":["src/**","!src/docs/**"],"Exclude":null}}
 workflow:
+  name: paths
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH

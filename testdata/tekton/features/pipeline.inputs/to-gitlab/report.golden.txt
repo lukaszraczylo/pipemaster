@@ -1,4 +1,3 @@
 Loss report: tekton -> gitlab
-[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [lost] pipeline/ci ext.passthrough (the pipeline has no trigger GitLab can express; workflow:rules never starts it)
 [lost] pipeline/ci pipeline.inputs (input dry-run is not a unique variable name)

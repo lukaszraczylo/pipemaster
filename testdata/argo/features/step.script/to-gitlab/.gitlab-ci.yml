@@ -3,6 +3,7 @@
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 # pipemaster:arg {"kind":"tag"}
 workflow:
+  name: script
   rules:
     - if: $CI_COMMIT_BRANCH
     - if: $CI_COMMIT_TAG

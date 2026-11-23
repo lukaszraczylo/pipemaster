@@ -1,3 +1,5 @@
+workflow:
+  name: ext
 build:
   needs: []
   script:

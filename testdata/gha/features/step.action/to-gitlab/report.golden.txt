@@ -1,6 +1,4 @@
 Loss report: gha -> gitlab
-[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
-[lost] pipeline/ci/job/build/step/build-step-1 ext.passthrough (the action reference actions/checkout@v4 is not in the GitLab file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-step-1 step.action (input token has no GitLab equivalent)
 [lost] pipeline/ci/job/build/step/build-step-2 ext.passthrough (the action reference actions/setup-go@v5 is not in the GitLab file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (no GitLab mapping for action docker://alpine:3.20)

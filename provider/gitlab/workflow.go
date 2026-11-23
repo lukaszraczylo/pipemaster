@@ -33,6 +33,7 @@ var (
 // is an opaque condition for every job, because the default triggers are wider than the rules.
 func (s *state) workflow(pl *ir.Pipeline, r *reader) (guard expr.Expr, err error) {
 	w := r.peek("workflow")
+	var named bool
 	trigs, ok, why := s.workflowTriggers(w)
 	if w != nil && !ok {
 		v, err := s.plain(w)
@@ -61,7 +62,13 @@ func (s *state) workflow(pl *ir.Pipeline, r *reader) (guard expr.Expr, err error
 			})
 		}
 	}
-	s.noteWorkflowKeys(w)
+	if n := get(w, "name"); n != nil {
+		if t, tok := scalarText(n); tok && pipelineName(t) {
+			pl.Name = t
+			named = true
+		}
+	}
+	s.noteWorkflowKeys(w, named)
 	pl.Triggers = trigs
 	return guard, nil
 }
@@ -71,6 +78,9 @@ func (s *state) workflowTriggers(w *yaml.Node) ([]ir.Trigger, bool, string) {
 		return nil, false, ""
 	}
 	rn := get(w, "rules")
+	if rn == nil && len(entries(w)) == 1 && get(w, "name") != nil {
+		return []ir.Trigger{{Kind: ir.TriggerPush}, {Kind: ir.TriggerTag}}, true, ""
+	}
 	if rn == nil || rn.Kind != yaml.SequenceNode {
 		return nil, false, "no rules list"
 	}
@@ -246,11 +256,14 @@ func (s *state) guardJobs(pl *ir.Pipeline) {
 
 // noteWorkflowKeys reports the workflow settings that change a pipeline once it starts: its name, auto-cancel
 // policy and the variables a rule sets. The IR has no field for them, so they stay in Ext.
-func (s *state) noteWorkflowKeys(w *yaml.Node) {
+func (s *state) noteWorkflowKeys(w *yaml.Node, nameModelled bool) {
 	path := "pipeline/" + pipelineID
 	for _, e := range entries(w) {
 		switch e.name {
 		case "name", "auto_cancel":
+			if e.name == "name" && nameModelled {
+				continue
+			}
 			s.note(path, caps.ExtPassthrough, "kept in Ext[gitlab]", "workflow:"+e.name+" has no IR field; kept in Ext and not written to other targets", e.key)
 		case "rules":
 			for _, r := range e.val.Content {

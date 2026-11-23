@@ -1,4 +1,6 @@
 # pipemaster:emulated pipeline.concurrency pipeline/ci
+workflow:
+  name: conc
 # pipemaster:lost script.interpolation pipeline/ci: {{ ref }}
 build:
   tags:

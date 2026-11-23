@@ -1,6 +1,7 @@
 # pipemaster:emulated trigger.api pipeline/ci/trigger/0
 # pipemaster:arg {"kind":"api"}
 workflow:
+  name: push
   rules:
     - if: $CI_PIPELINE_SOURCE == "api"
 build:

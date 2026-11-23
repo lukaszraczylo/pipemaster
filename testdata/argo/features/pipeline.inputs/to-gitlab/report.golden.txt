@@ -1,3 +1,2 @@
 Loss report: argo -> gitlab
-[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [lost] pipeline/ci pipeline.inputs (input dry-run is not a unique variable name)

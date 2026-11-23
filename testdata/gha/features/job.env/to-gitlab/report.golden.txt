@@ -1,3 +1,2 @@
 Loss report: gha -> gitlab
-[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
-[lost] pipeline/ci/job/build job.env (secret API_KEY is written as the variable $API_KEY; a GitLab file cannot mark it as a secret)
+[external] pipeline/ci/job/build job.env: create API_KEY as a masked CI/CD variable in the project settings, protected too for protected branches (a GitLab file cannot mark a secret as one; it writes API_KEY as plain variable references and the operator sets the values there)

@@ -155,7 +155,12 @@ func (e *emitter) actionStep(p *jobPrep, st *ir.Step) error {
 		return nil
 	}
 	if !carriedKind(t.Kind) {
-		e.lose(sp, caps.ExtPassthrough, "the action reference "+ghaRef(st.Action)+" is not in the GitLab file; it is kept in round-trip metadata")
+		const detail = "the action reference %s is not in the GitLab file; it is kept in round-trip metadata"
+		if t.WritesEquivalent() {
+			e.led.Retain(e.use(sp, caps.ExtPassthrough), fmt.Sprintf(detail, ghaRef(st.Action)))
+		} else {
+			e.lose(sp, caps.ExtPassthrough, fmt.Sprintf(detail, ghaRef(st.Action)))
+		}
 	}
 	e.canonTarget(sp, &t)
 	return e.applyTarget(p, sp, st, t)

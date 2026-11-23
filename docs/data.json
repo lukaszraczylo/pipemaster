@@ -578,7 +578,7 @@
    },
    "step.action": {
     "level": "emulated",
-    "note": "per actions.Lookup verdict; a plugin step with settings (unknown actions are lost)"
+    "note": "per actions.Lookup verdict; a plugin step with settings (unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step)"
    },
    "step.continue_on_error": {
     "level": "native"
@@ -1131,8 +1131,8 @@
     "level": "native"
    },
    "display.name": {
-    "level": "lost",
-    "note": "(step and pipeline names have no GitLab field; a job name survives only as its key)"
+    "level": "native",
+    "note": "the pipeline name (workflow:name) (step names and job display names have no GitLab field and are lost; a job name survives only as its key; a pipeline name with a dollar sign or over 255 characters is lost)"
    },
    "expr.opaque": {
     "level": "native",
@@ -1222,7 +1222,7 @@
    },
    "step.action": {
     "level": "native",
-    "note": "per actions.Lookup verdict (unknown actions are lost)"
+    "note": "per actions.Lookup verdict (unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes the pinned default actions/checkout (not the source ref) with fetch-depth and submodules from GIT_DEPTH and GIT_SUBMODULE_STRATEGY)"
    },
    "step.continue_on_error": {
     "level": "emulated",
@@ -1581,7 +1581,7 @@
    },
    "step.action": {
     "level": "native",
-    "note": "per actions.Lookup verdict; a plugin step is native (unknown actions are lost)"
+    "note": "per actions.Lookup verdict; a plugin step is native (unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step)"
    },
    "step.continue_on_error": {
     "level": "native"
@@ -1861,22 +1861,10 @@
      "detail": "only the platform has a Drone form; other runner labels are lost"
     },
     {
-     "path": "pipeline/ci/job/deploy/step/deploy-step-1",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "the action reference actions/checkout@v4 is not in the Drone file; it is kept in round-trip metadata"
-    },
-    {
      "path": "pipeline/ci/job/test",
      "feature": "job.runner",
      "level": "lost",
      "detail": "only the platform has a Drone form; other runner labels are lost"
-    },
-    {
-     "path": "pipeline/ci/job/test/step/test-step-1",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "the action reference actions/checkout@v4 is not in the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/ci/job/deploy",
@@ -1890,7 +1878,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "per actions.Lookup verdict; a plugin step with settings",
-     "detail": "unknown actions are lost"
+     "detail": "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step"
     },
     {
      "path": "pipeline/ci/job/test",
@@ -1904,7 +1892,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "per actions.Lookup verdict; a plugin step with settings",
-     "detail": "unknown actions are lost"
+     "detail": "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step"
     }
    ]
   },
@@ -1987,33 +1975,16 @@
    "files": [
     {
      "path": ".gitlab-ci.yml",
-     "text": "# pipemaster:emulated trigger.pull_request pipeline/ci/trigger/0\n# pipemaster:arg {\"kind\":\"pr\",\"branches\":{\"Include\":[\"main\"],\"Exclude\":null}}\n# pipemaster:emulated trigger.push pipeline/ci/trigger/1\n# pipemaster:arg {\"kind\":\"push\",\"branches\":{\"Include\":[\"main\"],\"Exclude\":null}}\n# pipemaster:emulated script.interpolation pipeline/ci\n# pipemaster:arg [{\"k\":\"t\",\"p\":\"job/test/step/test-step-3/script/0\",\"g\":\"GOARCH=$arch go test ./...\",\"s\":\"GOARCH=$\\u007b{ matrix.arch }} go test ./...\"}]\nstages:\n  - stage-0\n  - stage-1\nworkflow:\n  rules:\n    - if: $CI_PIPELINE_SOURCE == \"merge_request_event\" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == \"main\"\n    - if: $CI_COMMIT_BRANCH == \"main\"\n# pipemaster:emulated job.if pipeline/ci/job/deploy\n# pipemaster:arg {\"src\":\"ref_name == 'main'\",\"from\":\"gha\"}\ndeploy:\n  stage: stage-1\n  image: alpine:3.22\n  tags:\n    - ubuntu-latest\n  needs:\n    - test\n  rules:\n    - if: $CI_COMMIT_REF_NAME =~ /^main$/i\n  script:\n    # pipemaster:step deploy-step-1\n    # pipemaster:step deploy-step-2\n    # pipemaster:emulated step.env pipeline/ci/job/deploy/step/deploy-step-2\n    - |\n      (\n      export TOKEN=\"$DEPLOY_TOKEN\"\n      ./scripts/deploy.sh\n      )\n  environment: production\ntest:\n  stage: stage-0\n  image: golang:1.27\n  tags:\n    - ubuntu-latest\n  needs: []\n  script:\n    # pipemaster:step test-step-1\n    # pipemaster:step test-step-2\n    - go vet ./...\n    # pipemaster:step test-step-3\n    - GOARCH=$arch go test ./...\n  parallel:\n    matrix:\n      - arch:\n          - amd64\n          - arm64\n"
+     "text": "# pipemaster:emulated trigger.pull_request pipeline/ci/trigger/0\n# pipemaster:arg {\"kind\":\"pr\",\"branches\":{\"Include\":[\"main\"],\"Exclude\":null}}\n# pipemaster:emulated trigger.push pipeline/ci/trigger/1\n# pipemaster:arg {\"kind\":\"push\",\"branches\":{\"Include\":[\"main\"],\"Exclude\":null}}\n# pipemaster:emulated script.interpolation pipeline/ci\n# pipemaster:arg [{\"k\":\"t\",\"p\":\"job/test/step/test-step-3/script/0\",\"g\":\"GOARCH=$arch go test ./...\",\"s\":\"GOARCH=$\\u007b{ matrix.arch }} go test ./...\"}]\nstages:\n  - stage-0\n  - stage-1\nworkflow:\n  name: ci\n  rules:\n    - if: $CI_PIPELINE_SOURCE == \"merge_request_event\" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == \"main\"\n    - if: $CI_COMMIT_BRANCH == \"main\"\n# pipemaster:emulated job.if pipeline/ci/job/deploy\n# pipemaster:arg {\"src\":\"ref_name == 'main'\",\"from\":\"gha\"}\ndeploy:\n  stage: stage-1\n  image: alpine:3.22\n  tags:\n    - ubuntu-latest\n  needs:\n    - test\n  rules:\n    - if: $CI_COMMIT_REF_NAME =~ /^main$/i\n  script:\n    # pipemaster:step deploy-step-1\n    # pipemaster:step deploy-step-2\n    # pipemaster:emulated step.env pipeline/ci/job/deploy/step/deploy-step-2\n    - |\n      (\n      export TOKEN=\"$DEPLOY_TOKEN\"\n      ./scripts/deploy.sh\n      )\n  environment: production\ntest:\n  stage: stage-0\n  image: golang:1.27\n  tags:\n    - ubuntu-latest\n  needs: []\n  script:\n    # pipemaster:step test-step-1\n    # pipemaster:step test-step-2\n    - go vet ./...\n    # pipemaster:step test-step-3\n    - GOARCH=$arch go test ./...\n  parallel:\n    matrix:\n      - arch:\n          - amd64\n          - arm64\n"
     }
    ],
    "report": [
     {
-     "path": "pipeline/ci",
-     "feature": "display.name",
-     "level": "lost",
-     "detail": "GitLab CI has no display name here; the name is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/ci/job/deploy/step/deploy-step-1",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "the action reference actions/checkout@v4 is not in the GitLab file; it is kept in round-trip metadata"
-    },
-    {
      "path": "pipeline/ci/job/deploy/step/deploy-step-2",
      "feature": "step.env",
-     "level": "lost",
-     "detail": "secret DEPLOY_TOKEN is written as the variable $DEPLOY_TOKEN; a GitLab file cannot mark it as a secret"
-    },
-    {
-     "path": "pipeline/ci/job/test/step/test-step-1",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "the action reference actions/checkout@v4 is not in the GitLab file; it is kept in round-trip metadata"
+     "level": "external",
+     "strategy": "create DEPLOY_TOKEN as a masked CI/CD variable in the project settings, protected too for protected branches",
+     "detail": "a GitLab file cannot mark a secret as one; it writes DEPLOY_TOKEN as plain variable references and the operator sets the values there"
     }
    ]
   },
@@ -2163,22 +2134,10 @@
      "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
     },
     {
-     "path": "pipeline/ci/job/deploy/step/deploy-step-1",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "the action reference actions/checkout@v4 is not in the Woodpecker file; it is kept in round-trip metadata"
-    },
-    {
      "path": "pipeline/ci/job/test",
      "feature": "job.runner",
      "level": "lost",
      "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
-    },
-    {
-     "path": "pipeline/ci/job/test/step/test-step-1",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "the action reference actions/checkout@v4 is not in the Woodpecker file; it is kept in round-trip metadata"
     }
    ]
   }

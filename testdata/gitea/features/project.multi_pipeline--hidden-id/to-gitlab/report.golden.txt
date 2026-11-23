@@ -1,7 +1,7 @@
 Loss report: gitea -> gitlab
-[lost] pipeline/.shared display.name (step and pipeline names have no GitLab field; a job name survives only as its key)
+[lost] pipeline/.shared display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [lost] pipeline/.shared/trigger/0 ext.passthrough (Ext of provider gha (event) is not written to the GitLab file; it is kept in round-trip metadata)
-[lost] pipeline/ci display.name (step and pipeline names have no GitLab field; a job name survives only as its key)
+[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [external] pipeline/.shared/trigger/0 trigger.api: pipeline trigger token or API call (create a pipeline trigger token (Settings > CI/CD > Pipeline trigger tokens) or call the pipelines API)
 [emulated] pipeline/.shared/job/run ext.passthrough: job key shared:run-job (the id .shared:run is a GitLab keyword or hidden-job name, so the job is written as shared:run-job and the id is kept in a marker comment)
 [emulated] pipeline/ci project.multi_pipeline: jobs of every pipeline in one file under <pipeline>:<job> keys (each job carries its pipeline's trigger condition and a marker; workflow:rules is the union of all triggers)

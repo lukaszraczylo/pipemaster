@@ -44,6 +44,7 @@ type (
 	}
 	vPipeline struct {
 		Rules  *[]vTrig `json:"rules"`
+		Name   string   `json:"name"`
 		Stages []string `json:"stages"`
 		Jobs   []vJob   `json:"jobs"`
 		Marks  []vTrig  `json:"marks"`
@@ -85,30 +86,36 @@ func ruleTrig(text string) (vTrig, error) {
 	return t, nil
 }
 
-func decodeRules(n *yaml.Node) (*[]vTrig, error) {
+// decodeWorkflow reads workflow:name and workflow:rules; the rules stay nil when the key is absent.
+func decodeWorkflow(n *yaml.Node) (name string, rules *[]vTrig, err error) {
 	es, err := vectors.Entries(n)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	out := []vTrig{}
 	for _, e := range es {
-		if e.Key != "rules" {
-			return nil, fmt.Errorf("workflow key %q is not modelled", e.Key)
-		}
-		for i, rn := range e.Val.Content {
-			res, err := vectors.Entries(rn)
-			if err != nil || len(res) != 1 || res[0].Key != "if" {
-				return nil, fmt.Errorf("rule %d is not a single if", i)
+		switch e.Key {
+		case "name":
+			name = e.Val.Value
+		case "rules":
+			out := []vTrig{}
+			for i, rn := range e.Val.Content {
+				res, err := vectors.Entries(rn)
+				if err != nil || len(res) != 1 || res[0].Key != "if" {
+					return "", nil, fmt.Errorf("rule %d is not a single if", i)
+				}
+				t, err := ruleTrig(res[0].Val.Value)
+				if err != nil {
+					return "", nil, err
+				}
+				t.Idx = i
+				out = append(out, t)
 			}
-			t, err := ruleTrig(res[0].Val.Value)
-			if err != nil {
-				return nil, err
-			}
-			t.Idx = i
-			out = append(out, t)
+			rules = &out
+		default:
+			return "", nil, fmt.Errorf("workflow key %q is not modelled", e.Key)
 		}
 	}
-	return &out, nil
+	return name, rules, nil
 }
 
 func decodeBlocks(n *yaml.Node) ([]vBlock, error) {
@@ -255,7 +262,7 @@ func decodePipeline(src []byte) (vPipeline, error) {
 				return p, err
 			}
 		case "workflow":
-			if p.Rules, err = decodeRules(e.Val); err != nil {
+			if p.Name, p.Rules, err = decodeWorkflow(e.Val); err != nil {
 				return p, err
 			}
 		default:

@@ -519,13 +519,13 @@ func TestDuplicateMarkersDoNotMultiplyArguments(t *testing.T) {
 	}
 }
 
-func TestCapsDeclareDisplayNameLost(t *testing.T) {
+func TestCapsDeclareDisplayNameNativeForPipelineName(t *testing.T) {
 	s := newProvider().(interface{ Caps() caps.Matrix }).Caps()[caps.DisplayName]
-	if s.Level != caps.Lost || s.Caveat == "" {
-		t.Fatalf("display.name caps = %+v, want lost with a caveat", s)
+	if s.Level != caps.Native || s.Caveat == "" {
+		t.Fatalf("display.name caps = %+v, want native with a caveat naming what is lost", s)
 	}
 	j := glJob("build", glStep("make"))
-	j.Name = "build"
+	j.Name = "Build it"
 	p := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "ci", Name: "CI", Jobs: []*ir.Job{j}}}}
 	_, rep := emitFiles(t, p)
 	got := map[string]bool{}
@@ -534,8 +534,8 @@ func TestCapsDeclareDisplayNameLost(t *testing.T) {
 			got[e.IRPath] = e.Level == caps.Lost
 		}
 	}
-	if !got["pipeline/ci"] {
-		t.Errorf("pipeline name must be reported lost: %+v", rep.Entries)
+	if lost, ok := got["pipeline/ci"]; ok && lost {
+		t.Errorf("a pipeline name is written and must not be reported lost: %+v", got)
 	}
 	if lost, ok := got["pipeline/ci/job/build"]; ok && !lost {
 		t.Errorf("a reported job name must be lost, got %+v", got)

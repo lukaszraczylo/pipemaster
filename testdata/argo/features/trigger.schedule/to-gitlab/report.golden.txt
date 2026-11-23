@@ -1,5 +1,4 @@
 Loss report: argo -> gitlab
-[lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider argo (cronWorkflow) is not written to the GitLab file; it is kept in round-trip metadata)
 [lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider argo (cronWorkflow) is not written to the GitLab file; it is kept in round-trip metadata)
 [external] pipeline/ci/trigger/0 trigger.schedule: pipeline schedule in project settings (create a pipeline schedule: Settings > CI/CD > Schedules, cron `0 0 * * 0`)

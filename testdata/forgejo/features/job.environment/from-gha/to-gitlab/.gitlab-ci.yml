@@ -1,3 +1,5 @@
+workflow:
+  name: env
 deploy:
   tags:
     - ubuntu-latest

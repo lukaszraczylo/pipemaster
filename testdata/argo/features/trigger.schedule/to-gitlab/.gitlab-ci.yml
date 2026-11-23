@@ -3,6 +3,7 @@
 # pipemaster:emulated trigger.schedule pipeline/ci/trigger/1
 # pipemaster:arg {"kind":"schedule","cron":"30 5 * * 1-5"}
 workflow:
+  name: nightly
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_PIPELINE_SOURCE == "schedule"

@@ -49,7 +49,7 @@ The following table comes from `pipemaster caps --to drone --format md`.
 | pipeline.permissions | lost | (token scopes are server and repo settings) |
 | project.multi_pipeline | emulated | each pipeline is a document named <pipeline>-<job> (each document carries its pipeline's trigger condition) |
 | script.interpolation | native |  |
-| step.action | emulated | per actions.Lookup verdict; a plugin step with settings (unknown actions are lost) |
+| step.action | emulated | per actions.Lookup verdict; a plugin step with settings (unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step) |
 | step.continue_on_error | native |  |
 | step.env | native |  |
 | step.if | native | step when (only the translatable expression subset; any other condition is emulated or lost) |

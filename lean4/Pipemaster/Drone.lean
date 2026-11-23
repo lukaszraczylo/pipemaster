@@ -784,9 +784,9 @@ theorem keep_needs_mem {j x : Core.Job} (hs : Keep j x) {n : Core.Need} (hn : n 
   exact ⟨n0, h0, e⟩
 
 /-- A pipeline whose jobs keep what `Keep` lists keeps each shared predicate of the input. -/
-theorem frag_of_shape (p : Pipe) (pid : String) (hpid : validId pid) (fm ff : Core.Job → Core.Job)
+theorem frag_of_shape (p : Pipe) {nm : String} (pid : String) (hpid : validId pid) (fm ff : Core.Job → Core.Job)
     (hm : ∀ j, Keep j (fm j)) (hf : ∀ j, Keep j (ff j)) (q : Pipe)
-    (hq : q = { id := pid, name := "", push := p.push, tag := p.tag, pr := p.pr,
+    (hq : q = { id := pid, name := nm, push := p.push, tag := p.tag, pr := p.pr,
                 jobs := p.jobs.map fm, fin := p.fin.map ff }) :
     (Wf p → Wf q) ∧ (Woodpecker.WpOk p → Woodpecker.WpOk q) ∧ (DroneOk p → DroneOk q) ∧
       (GhaOk p → GhaOk q) ∧ (GitlabOk p → GitlabOk q) := by

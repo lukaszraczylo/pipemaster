@@ -44,6 +44,13 @@ type Target struct {
 	Templated []string // sorted With keys whose value still holds `${{ }}` for the emitter to translate
 }
 
+// WritesEquivalent is true when the target file holds the real equivalent of the action, so the action
+// reference is round-trip data only: the implicit clone with a native or emulated verdict. An image choice
+// does not count, because a return trip without metadata cannot restore the action from the image.
+func (t Target) WritesEquivalent() bool {
+	return t.Support.Level <= caps.Emulated && t.Kind == KindImplicit
+}
+
 //go:embed mappings.yaml
 var embedded []byte
 

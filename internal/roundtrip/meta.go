@@ -15,7 +15,7 @@ import (
 // steps and the fields rep marks lost or external.
 func NewMeta(sourceID string, proj *ir.Project, target provider.Provider, rep *report.Report) *meta.Meta {
 	ids := IDsFor(target, proj)
-	lost, skipped := meta.CollectLost(proj, sourceEntries(rep, ids))
+	lost, skipped := meta.CollectLost(proj, append(sourceEntries(rep, ids), retainedEntries(rep, ids)...))
 	noteUnrecorded(rep, ids, skipped)
 	return &meta.Meta{
 		IDs:      ids,
@@ -59,8 +59,20 @@ func sourceEntries(rep *report.Report, ids map[string]string) []report.Entry {
 	if rep == nil {
 		return nil
 	}
-	out := make([]report.Entry, len(rep.Entries))
-	copy(out, rep.Entries)
+	return renamed(rep.Entries, ids)
+}
+
+// retainedEntries is sourceEntries for the fields the metadata keeps without a report entry.
+func retainedEntries(rep *report.Report, ids map[string]string) []report.Entry {
+	if rep == nil {
+		return nil
+	}
+	return renamed(rep.Retained, ids)
+}
+
+func renamed(entries []report.Entry, ids map[string]string) []report.Entry {
+	out := make([]report.Entry, len(entries))
+	copy(out, entries)
 	for i, e := range out {
 		for emitted, src := range ids {
 			rest, ok := strings.CutPrefix(e.IRPath, emitted)

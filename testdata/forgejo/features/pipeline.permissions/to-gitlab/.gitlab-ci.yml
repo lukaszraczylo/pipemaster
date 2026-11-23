@@ -1,3 +1,5 @@
+workflow:
+  name: perms
 build:
   tags:
     - docker

@@ -3,6 +3,8 @@
 stages:
   - stage-0
   - stage-1
+workflow:
+  name: outputs
 use:
   stage: stage-1
   needs:

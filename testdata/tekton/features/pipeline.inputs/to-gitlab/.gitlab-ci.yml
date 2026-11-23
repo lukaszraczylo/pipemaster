@@ -5,6 +5,7 @@ variables:
     value: staging
     description: Where to deploy
 workflow:
+  name: inputs
   rules:
     - when: never
 build:

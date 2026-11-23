@@ -101,7 +101,9 @@ func (e *emitter) document(pl *ir.Pipeline) (*yaml.Node, error) {
 		return nil, err
 	}
 	e.foreignExt("pipeline/"+pl.ID, pl.Ext)
-	e.loseName("pipeline/"+pl.ID, pl.Name, "")
+	if !pipelineName(pl.Name) {
+		e.loseName("pipeline/"+pl.ID, pl.Name, "")
+	}
 	ext := extOf(pl.Ext)
 	c := &pipeCtx{pl: pl, plan: plan, preps: map[string]*jobPrep{}, defKeys: defaultKeySet(ext), keys: jobKeys(pl, e.from != nil)}
 	for _, j := range allJobs(pl) {

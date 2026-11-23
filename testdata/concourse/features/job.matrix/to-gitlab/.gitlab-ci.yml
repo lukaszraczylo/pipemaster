@@ -5,6 +5,7 @@
 # pipemaster:emulated script.interpolation pipeline/ci
 # pipemaster:arg [{"k":"t","p":"job/test/step/test-step-1/script/0","g":"echo $go","s":"echo $\u007b{ matrix.go }}"}]
 workflow:
+  name: matrix
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_TAG =~ /^[^\/]*$/

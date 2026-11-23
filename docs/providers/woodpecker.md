@@ -52,7 +52,7 @@ The following table comes from `pipemaster caps --to woodpecker --format md`.
 | pipeline.permissions | lost | (token scopes are forge and repo settings) |
 | project.multi_pipeline | emulated | each job of each pipeline is a workflow named <pipeline>-<job> (each workflow carries its pipeline's trigger condition) |
 | script.interpolation | native |  |
-| step.action | native | per actions.Lookup verdict; a plugin step is native (unknown actions are lost) |
+| step.action | native | per actions.Lookup verdict; a plugin step is native (unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step) |
 | step.continue_on_error | native |  |
 | step.env | native |  |
 | step.if | native |  |

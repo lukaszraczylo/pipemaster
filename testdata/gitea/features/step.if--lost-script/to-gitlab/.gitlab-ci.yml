@@ -1,3 +1,5 @@
+workflow:
+  name: ci
 check:
   tags:
     - ubuntu-latest

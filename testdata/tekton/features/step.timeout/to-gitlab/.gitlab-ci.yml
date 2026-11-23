@@ -1,3 +1,5 @@
+workflow:
+  name: stepto
 build:
   needs: []
   script:
