@@ -658,6 +658,19 @@ func TestAddedNeedIsWrittenWhereFlyAcceptsIt(t *testing.T) {
 	}
 }
 
+// A script edited to an empty last line or a newline inside a line cannot be written in the args of a task of a
+// Concourse file, so the report must say that the parser reads it changed.
+func TestEditedScriptOfAConcourseFileIsReportedWhenTheArgsCannotSayIt(t *testing.T) {
+	for _, script := range [][]string{{"echo x", ""}, {"echo a\necho b"}} {
+		p, _ := parseFiles(t, map[string]string{"ci.yml": needPlacementFile(noGetPlan)})
+		p.Pipelines[0].Jobs[0].Steps[0].Script = script
+		_, rep := emit(t, p)
+		if !hasFeatureEntry(rep, string(caps.StepScript), "parser reads the script trimmed or split") {
+			t.Fatalf("no entry for script %q: %v", script, rep.Entries)
+		}
+	}
+}
+
 // A need must be written or reported whichever step kind nests the get that holds the passed list.
 func TestNeedBesideAGetNestedInAHookIsNotDropped(t *testing.T) {
 	plan := needTaskStep + `
