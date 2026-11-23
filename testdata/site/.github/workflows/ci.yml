@@ -1,0 +1,28 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container: golang:1.27
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - run: go vet ./...
+      - run: GOARCH=${{ matrix.arch }} go test ./...
+  deploy:
+    needs: test
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    container: alpine:3.22
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/deploy.sh
+        env:
+          TOKEN: ${{ secrets.DEPLOY_TOKEN }}

@@ -1,0 +1,2186 @@
+{
+ "providers": [
+  {
+   "id": "argo",
+   "name": "Argo Workflows"
+  },
+  {
+   "id": "concourse",
+   "name": "Concourse"
+  },
+  {
+   "id": "drone",
+   "name": "Drone CI"
+  },
+  {
+   "id": "forgejo",
+   "name": "Forgejo Actions"
+  },
+  {
+   "id": "gha",
+   "name": "GitHub Actions"
+  },
+  {
+   "id": "gitea",
+   "name": "Gitea Actions"
+  },
+  {
+   "id": "gitlab",
+   "name": "GitLab CI"
+  },
+  {
+   "id": "tekton",
+   "name": "Tekton"
+  },
+  {
+   "id": "woodpecker",
+   "name": "Woodpecker CI"
+  }
+ ],
+ "features": [
+  "config.name",
+  "display.name",
+  "expr.opaque",
+  "ext.passthrough",
+  "job.allow_failure",
+  "job.artifacts",
+  "job.cache",
+  "job.container",
+  "job.env",
+  "job.environment",
+  "job.environment.approval",
+  "job.if",
+  "job.manual",
+  "job.matrix",
+  "job.needs",
+  "job.needs.artifacts",
+  "job.outputs",
+  "job.retry",
+  "job.runner",
+  "job.services",
+  "job.timeout",
+  "pipeline.concurrency",
+  "pipeline.env",
+  "pipeline.finally",
+  "pipeline.inputs",
+  "pipeline.permissions",
+  "project.multi_pipeline",
+  "script.interpolation",
+  "step.action",
+  "step.continue_on_error",
+  "step.env",
+  "step.if",
+  "step.image",
+  "step.script",
+  "step.shell",
+  "step.timeout",
+  "step.workdir",
+  "trigger.api",
+  "trigger.filter.branches",
+  "trigger.filter.paths",
+  "trigger.filter.tags",
+  "trigger.manual",
+  "trigger.pipeline_done",
+  "trigger.pull_request",
+  "trigger.push",
+  "trigger.resource",
+  "trigger.schedule",
+  "trigger.tag"
+ ],
+ "caps": {
+  "argo": {
+   "config.name": {
+    "level": "emulated",
+    "note": "secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars (the Secret values and ConfigMap values are not written)"
+   },
+   "display.name": {
+    "level": "native"
+   },
+   "expr.opaque": {
+    "level": "native",
+    "note": "(only opaque expressions of the argo dialect; a {{= expr }} text from an Argo file is written back, others are lost)"
+   },
+   "ext.passthrough": {
+    "level": "native"
+   },
+   "job.allow_failure": {
+    "level": "native",
+    "note": "DAG task continueOn failed (continueOn does not combine with depends, so the emitter writes dependencies for such a task)"
+   },
+   "job.artifacts": {
+    "level": "native",
+    "note": "template outputs artifacts under /workspace (the artifact repository ConfigMap is external; artifacts save only from the container named main, one path per artifact (a second path gets a numbered name), a glob is not expanded and an expiry is lost)"
+   },
+   "job.cache": {
+    "level": "emulated",
+    "note": "PVC from volumeClaimTemplates (the cache lives for one Workflow unless the PVC is shared; tasks on different nodes need ReadWriteMany)"
+   },
+   "job.container": {
+    "level": "native",
+    "note": "image on every container of the containerSet"
+   },
+   "job.env": {
+    "level": "emulated",
+    "note": "copied into the env of every container of the set (a step variable of the same name wins)"
+   },
+   "job.environment": {
+    "level": "lost",
+    "note": "(Argo has no environment name or URL)"
+   },
+   "job.environment.approval": {
+    "level": "native",
+    "note": "suspend template as a gate task (Argo has no approver identity: anyone with RBAC to resume the Workflow can approve; the reviewer list is lost)"
+   },
+   "job.if": {
+    "level": "native",
+    "note": "DAG task when (the subset that the {{= expr }} printer writes becomes when; a status or result test becomes depends, and a task with continueOn or a need that may fail waits through depends; any other condition becomes when {{= false }} with a lost entry)"
+   },
+   "job.manual": {
+    "level": "native",
+    "note": "suspend template as a gate task (anyone with RBAC to resume the Workflow can start the job)"
+   },
+   "job.matrix": {
+    "level": "emulated",
+    "note": "DAG task withItems over the expanded cells (failFast and parallelism carry fail-fast and max-parallel only where they match; axis values become strings)"
+   },
+   "job.needs": {
+    "level": "native"
+   },
+   "job.needs.artifacts": {
+    "level": "native",
+    "note": "DAG task arguments artifacts from the needed task (the artifact repository ConfigMap is external; artifacts load only into a container named main)"
+   },
+   "job.outputs": {
+    "level": "native",
+    "note": "template outputs parameters read from files under /workspace/.pipemaster/outputs (outputs load only from the container named main; a value is written by a last script line of that container, and a parameter name that is not a valid name is lost)"
+   },
+   "job.retry": {
+    "level": "native",
+    "note": "template retryStrategy"
+   },
+   "job.runner": {
+    "level": "lost",
+    "note": "(Argo schedules pods; only a platform label can carry a node selector)"
+   },
+   "job.services": {
+    "level": "emulated",
+    "note": "template sidecars (the service is at localhost, not at its name)"
+   },
+   "job.timeout": {
+    "level": "native",
+    "note": "template timeout (the timeout counts Pending time too)"
+   },
+   "pipeline.concurrency": {
+    "level": "emulated",
+    "note": "synchronization mutex (cancel-in-progress is lost; a second run waits for the mutex)"
+   },
+   "pipeline.env": {
+    "level": "emulated",
+    "note": "copied into the env of every container (a step variable of the same name wins)"
+   },
+   "pipeline.finally": {
+    "level": "native",
+    "note": "exit handler (hooks.exit) that runs a second dag"
+   },
+   "pipeline.inputs": {
+    "level": "native",
+    "note": "spec arguments parameters (every input is a string parameter)"
+   },
+   "pipeline.permissions": {
+    "level": "lost",
+    "note": "(permissions come from the ServiceAccount of the Workflow)"
+   },
+   "project.multi_pipeline": {
+    "level": "emulated",
+    "note": "one WorkflowTemplate per IR pipeline (each pipeline gets its own trigger)"
+   },
+   "script.interpolation": {
+    "level": "native"
+   },
+   "step.action": {
+    "level": "emulated",
+    "note": "container image per actions.Lookup verdict (unknown actions are lost)"
+   },
+   "step.continue_on_error": {
+    "level": "emulated",
+    "note": "script line trap 'exit 0' EXIT with a marker comment (containerSet has no continueOn and no depends; a container that exits non-zero stops its dependents, so the trap makes the exit code zero)"
+   },
+   "step.env": {
+    "level": "native",
+    "note": "container env"
+   },
+   "step.if": {
+    "level": "emulated",
+    "note": "guard in the script that reads context values from env (containerSet has no when, so every step condition runs as a shell guard that reads context values from env; a condition with no guard form disables the script and the container still starts; a containerSet starts every container at once and each waits for its dependencies, and a container that exits non-zero stops its dependents)"
+   },
+   "step.image": {
+    "level": "native",
+    "note": "container image"
+   },
+   "step.script": {
+    "level": "native",
+    "note": "container args"
+   },
+   "step.shell": {
+    "level": "emulated",
+    "note": "container command <shell> -ec (only bash, dash, zsh, ash and sh run as the container command, and the image must provide the shell; any other shell is lost and the script runs under sh)"
+   },
+   "step.timeout": {
+    "level": "lost",
+    "note": "(containerSet has no timeout per container; the template timeout covers the whole job)"
+   },
+   "step.workdir": {
+    "level": "native",
+    "note": "container workingDir"
+   },
+   "trigger.api": {
+    "level": "emulated",
+    "note": "Sensor trigger kept in the Ext data, or a suspended CronWorkflow (only a trigger that an Argo file held is written back; any other API trigger is lost, and the schedule of a suspended CronWorkflow is not in the IR)"
+   },
+   "trigger.filter.branches": {
+    "level": "emulated",
+    "note": "Sensor data filter on body.ref (the EventSource is github and serves GitHub webhooks only; a glob becomes a regex and a glob with no exact regex is lost)"
+   },
+   "trigger.filter.paths": {
+    "level": "lost",
+    "note": "(a Sensor data filter cannot test the changed files of a push)"
+   },
+   "trigger.filter.tags": {
+    "level": "emulated",
+    "note": "Sensor data filter on body.ref (the EventSource is github and serves GitHub webhooks only; a glob becomes a regex and a glob with no exact regex is lost)"
+   },
+   "trigger.manual": {
+    "level": "external",
+    "note": "argo submit --from workflowtemplate/<name> (a person starts the run; the report names the command. The EventBus, the EventSource Service and Ingress, the artifact repository ConfigMap, the RBAC under .argo/rbac/, the ci-secrets Secret and the ci-vars ConfigMap values are external as well)"
+   },
+   "trigger.pipeline_done": {
+    "level": "lost",
+    "note": "(Argo has no pipeline-completion trigger)"
+   },
+   "trigger.pull_request": {
+    "level": "emulated",
+    "note": "EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only; the Sensor accepts pull requests from the same repository only, because a fork would run its code with every secret; the EventSource webhook needs Secret pipemaster-github-webhook with key token)"
+   },
+   "trigger.push": {
+    "level": "emulated",
+    "note": "EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only; the Argo Events controller needs the EventBus and a ServiceAccount, and the EventSource Service needs an Ingress)"
+   },
+   "trigger.resource": {
+    "level": "lost",
+    "note": "(Argo has no resource trigger)"
+   },
+   "trigger.schedule": {
+    "level": "native",
+    "note": "CronWorkflow with workflowTemplateRef"
+   },
+   "trigger.tag": {
+    "level": "emulated",
+    "note": "EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only)"
+   }
+  },
+  "concourse": {
+   "config.name": {
+    "level": "native",
+    "note": "((name)) in task params (the credential manager that resolves ((name)) is external, and a ((var)) never goes into a script text)"
+   },
+   "display.name": {
+    "level": "native"
+   },
+   "expr.opaque": {
+    "level": "lost",
+    "note": "(Concourse has no expression language, so every opaque expression is lost)"
+   },
+   "ext.passthrough": {
+    "level": "native"
+   },
+   "job.allow_failure": {
+    "level": "emulated",
+    "note": "try around the plan (the job shows success, not failure)"
+   },
+   "job.artifacts": {
+    "level": "emulated",
+    "note": "workspace artifact handed from task to task (inputs and outputs of the same name) (only within one job; a job with no script step writes no workspace)"
+   },
+   "job.cache": {
+    "level": "emulated",
+    "note": "task config caches"
+   },
+   "job.container": {
+    "level": "native",
+    "note": "image_resource on every task"
+   },
+   "job.env": {
+    "level": "emulated",
+    "note": "copied into the params of every task (a step variable of the same name wins)"
+   },
+   "job.environment": {
+    "level": "lost",
+    "note": "(Concourse has no environment name or URL)"
+   },
+   "job.environment.approval": {
+    "level": "emulated",
+    "note": "job with no triggering get, started by a person (Concourse has no approver identity: anyone who may trigger the job approves it, and the reviewer list is lost; a job whose get steps carry different trigger sets keeps the set in Ext[concourse][triggers], and a job whose get steps do not trigger is started by a person)"
+   },
+   "job.if": {
+    "level": "emulated",
+    "note": "shared shell guard on script tasks; a status function becomes a job hook (on_failure or ensure) (a condition with no guard form leaves the job with no triggering get, so a person starts it, and adds a lost entry)"
+   },
+   "job.manual": {
+    "level": "emulated",
+    "note": "job with no triggering get, started by a person (no approver identity; a job whose get steps carry different trigger sets keeps the set in Ext[concourse][triggers], and a job whose get steps do not trigger is started by a person)"
+   },
+   "job.matrix": {
+    "level": "emulated",
+    "note": "across over the axes (outputs of the substep are not visible outside the across step)"
+   },
+   "job.needs": {
+    "level": "native",
+    "note": "passed on the get of the shared source resource (passed lists are an AND)"
+   },
+   "job.needs.artifacts": {
+    "level": "external",
+    "note": "s3 or registry-image resource between the jobs (the operator sets up the s3 or registry resource and its credentials; Concourse passes no artifact between jobs by itself)"
+   },
+   "job.outputs": {
+    "level": "lost",
+    "note": "(a Concourse job has no named outputs for other jobs)"
+   },
+   "job.retry": {
+    "level": "emulated",
+    "note": "attempts on a do wrapper of the plan"
+   },
+   "job.runner": {
+    "level": "emulated",
+    "note": "worker tags of the task (tags name workers, not hosted runner labels)"
+   },
+   "job.services": {
+    "level": "lost",
+    "note": "(Concourse tasks have no service containers)"
+   },
+   "job.timeout": {
+    "level": "emulated",
+    "note": "timeout on a do wrapper of the plan"
+   },
+   "pipeline.concurrency": {
+    "level": "emulated",
+    "note": "serial_groups on the jobs (cancel-in-progress is lost; a second build waits)"
+   },
+   "pipeline.env": {
+    "level": "emulated",
+    "note": "copied into the params of every task (a step variable of the same name wins)"
+   },
+   "pipeline.finally": {
+    "level": "emulated",
+    "note": "job hook (ensure) on the single sink job (several finally steps wrap in do; a pipeline with no single sink job loses the finally steps)"
+   },
+   "pipeline.inputs": {
+    "level": "lost",
+    "note": "(a Concourse pipeline has no run-time inputs; fly set-pipeline vars apply at set time)"
+   },
+   "pipeline.permissions": {
+    "level": "lost",
+    "note": "(permissions come from the team and the credential manager)"
+   },
+   "project.multi_pipeline": {
+    "level": "emulated",
+    "note": "one pipeline file per IR pipeline under .concourse/ (each pipeline needs its own fly set-pipeline and gets its own triggers)"
+   },
+   "script.interpolation": {
+    "level": "native"
+   },
+   "step.action": {
+    "level": "emulated",
+    "note": "task per actions.Lookup verdict (unknown actions are lost)"
+   },
+   "step.continue_on_error": {
+    "level": "native",
+    "note": "try around the task"
+   },
+   "step.env": {
+    "level": "native",
+    "note": "task params"
+   },
+   "step.if": {
+    "level": "emulated",
+    "note": "shared shell guard in the script of the task (a condition with no guard form runs as a task whose first script line is exit 0, with a lost entry)"
+   },
+   "step.image": {
+    "level": "native",
+    "note": "task config image_resource"
+   },
+   "step.script": {
+    "level": "native",
+    "note": "task config run.path and run.args"
+   },
+   "step.shell": {
+    "level": "emulated",
+    "note": "run.path names the shell (the image must provide the shell)"
+   },
+   "step.timeout": {
+    "level": "native",
+    "note": "task timeout"
+   },
+   "step.workdir": {
+    "level": "native",
+    "note": "task config run.dir"
+   },
+   "trigger.api": {
+    "level": "lost",
+    "note": "(Concourse has no resource, listener or Ext entry that the emitter can restore for an API trigger, so it is lost; a webhook_token on a resource is kept in Ext only)"
+   },
+   "trigger.filter.branches": {
+    "level": "native",
+    "note": "source.branch of the git resource (one exact branch per resource; a glob is lost)"
+   },
+   "trigger.filter.paths": {
+    "level": "native",
+    "note": "source.paths and source.ignore_paths of the git resource"
+   },
+   "trigger.filter.tags": {
+    "level": "emulated",
+    "note": "source.tag_filter of the git resource (one glob(7) pattern per resource; an exclude pattern is lost)"
+   },
+   "trigger.manual": {
+    "level": "native",
+    "note": "job with no triggering get"
+   },
+   "trigger.pipeline_done": {
+    "level": "lost",
+    "note": "(Concourse has no pipeline-completion trigger)"
+   },
+   "trigger.pull_request": {
+    "level": "lost",
+    "note": "(Concourse has no pull request resource type in its core; a pull request resource type must be configured by the operator)"
+   },
+   "trigger.push": {
+    "level": "native",
+    "note": "git resource get with trigger: true (a git resource follows one branch, so a push trigger with two exact branches is two resources and the job runs once per branch event)"
+   },
+   "trigger.resource": {
+    "level": "lost",
+    "note": "(the emitter writes git and time resources only; a trigger on any other resource is lost)"
+   },
+   "trigger.schedule": {
+    "level": "emulated",
+    "note": "time resource get with trigger: true; the source is interval for a step that divides the hour or the day, start and stop for a daily window, and days for a day list (the time resource is built for at least once every N minutes, not for a wall-clock time. An interval counts from the last version, so it has no clock alignment, the first check emits a version at once, and an every-minute cron cannot fire faster than the check cadence. A daily window is 5 minutes wide, so the job starts within 5 minutes after the cron time; a window that passes midnight is lost when it has a day list. Any other cron form is lost with the cron text kept)"
+   },
+   "trigger.tag": {
+    "level": "emulated",
+    "note": "git resource with source.tag_filter (a tag trigger that also has a branch filter is lost, because one git resource cannot hold both sets)"
+   }
+  },
+  "drone": {
+   "config.name": {
+    "level": "native"
+   },
+   "display.name": {
+    "level": "native",
+    "note": "the pipeline and step names (a name that differs from the id is lost)"
+   },
+   "expr.opaque": {
+    "level": "native",
+    "note": "(only opaque expressions of the drone dialect; others are lost)"
+   },
+   "ext.passthrough": {
+    "level": "native"
+   },
+   "job.allow_failure": {
+    "level": "emulated",
+    "note": "failure ignore on every step (later steps still run after a failed step)"
+   },
+   "job.artifacts": {
+    "level": "emulated",
+    "note": "shared workspace of the steps in one document (other documents cannot read the files)"
+   },
+   "job.cache": {
+    "level": "emulated",
+    "note": "shared workspace of the steps in one document (nothing persists between runs)"
+   },
+   "job.container": {
+    "level": "native"
+   },
+   "job.env": {
+    "level": "native",
+    "note": "pipeline environment"
+   },
+   "job.environment": {
+    "level": "lost",
+    "note": "(Drone has no environment name or URL in the pipeline file)"
+   },
+   "job.environment.approval": {
+    "level": "emulated",
+    "note": "trigger event promote with target set to the environment (a person starts the build with drone build promote)"
+   },
+   "job.if": {
+    "level": "native",
+    "note": "pipeline trigger conditions (only the translatable expression subset; any other condition is emulated or lost)"
+   },
+   "job.manual": {
+    "level": "emulated",
+    "note": "trigger event custom (a person starts the build through the API or drone build create; the pipeline no longer runs on its normal events)"
+   },
+   "job.matrix": {
+    "level": "emulated",
+    "note": "one pipeline document per cell (fail-fast and max-parallel are lost; a failed sibling stops the others without order)"
+   },
+   "job.needs": {
+    "level": "native"
+   },
+   "job.needs.artifacts": {
+    "level": "lost",
+    "note": "(documents share no workspace)"
+   },
+   "job.outputs": {
+    "level": "lost",
+    "note": "(Drone steps cannot pass values to other pipelines)"
+   },
+   "job.retry": {
+    "level": "lost",
+    "note": "(Drone has no retry key; only clone.retries exists)"
+   },
+   "job.runner": {
+    "level": "lost",
+    "note": "(only the platform has a Drone form; other runner labels are lost)"
+   },
+   "job.services": {
+    "level": "native"
+   },
+   "job.timeout": {
+    "level": "external",
+    "note": "repo setting timeout (the setting has no per-pipeline or per-step form)"
+   },
+   "pipeline.concurrency": {
+    "level": "lost",
+    "note": "(Drone concurrency.limit is a count and the IR models a group and cancel-in-progress, not a limit)"
+   },
+   "pipeline.env": {
+    "level": "emulated",
+    "note": "copied into the environment of every pipeline document (a step variable of the same name wins)"
+   },
+   "pipeline.finally": {
+    "level": "emulated",
+    "note": "a document that depends on every other document and runs on trigger status success and failure (the server skips a stage whose status filter does not match the build result)"
+   },
+   "pipeline.inputs": {
+    "level": "lost",
+    "note": "(Drone has no typed pipeline inputs)"
+   },
+   "pipeline.permissions": {
+    "level": "lost",
+    "note": "(token scopes are server and repo settings)"
+   },
+   "project.multi_pipeline": {
+    "level": "emulated",
+    "note": "each pipeline is a document named <pipeline>-<job> (each document carries its pipeline's trigger condition)"
+   },
+   "script.interpolation": {
+    "level": "native"
+   },
+   "step.action": {
+    "level": "emulated",
+    "note": "per actions.Lookup verdict; a plugin step with settings (unknown actions are lost)"
+   },
+   "step.continue_on_error": {
+    "level": "native"
+   },
+   "step.env": {
+    "level": "native"
+   },
+   "step.if": {
+    "level": "native",
+    "note": "step when (only the translatable expression subset; any other condition is emulated or lost)"
+   },
+   "step.image": {
+    "level": "native"
+   },
+   "step.script": {
+    "level": "native"
+   },
+   "step.shell": {
+    "level": "lost",
+    "note": "(Drone compiles commands into its own set -e script)"
+   },
+   "step.timeout": {
+    "level": "lost",
+    "note": "(the docker runner ignores a step timeout)"
+   },
+   "step.workdir": {
+    "level": "native"
+   },
+   "trigger.api": {
+    "level": "lost",
+    "note": "(Drone starts API builds as event custom)"
+   },
+   "trigger.filter.branches": {
+    "level": "native",
+    "note": "trigger branch (only exact globs are native; for a pull request Drone matches the target branch)"
+   },
+   "trigger.filter.paths": {
+    "level": "lost",
+    "note": "(the Drone OSS server does not evaluate trigger.paths, so the emitter never writes it)"
+   },
+   "trigger.filter.tags": {
+    "level": "emulated",
+    "note": "ref filter refs/tags/<pattern> on the tag event (the glob dialect is doublestar; the parser reads it back as the tag trigger filter, and branch is not available on tag events)"
+   },
+   "trigger.manual": {
+    "level": "emulated",
+    "note": "trigger event custom (a person starts the build through the API or drone build create)"
+   },
+   "trigger.pipeline_done": {
+    "level": "lost",
+    "note": "(Drone has no pipeline-completion trigger)"
+   },
+   "trigger.pull_request": {
+    "level": "native"
+   },
+   "trigger.push": {
+    "level": "native"
+   },
+   "trigger.resource": {
+    "level": "lost",
+    "note": "(Drone CI has no resource triggers)"
+   },
+   "trigger.schedule": {
+    "level": "external",
+    "note": "trigger event cron with the cron job name (cron jobs are set in the UI or with drone cron add; the report names the command)"
+   },
+   "trigger.tag": {
+    "level": "native"
+   }
+  },
+  "forgejo": {
+   "config.name": {
+    "level": "native",
+    "note": "(a name the target rejects is external; create it under another name)"
+   },
+   "display.name": {
+    "level": "native"
+   },
+   "expr.opaque": {
+    "level": "native",
+    "note": "(only opaque expressions of the gha dialect; others are lost)"
+   },
+   "ext.passthrough": {
+    "level": "native"
+   },
+   "job.allow_failure": {
+    "level": "native"
+   },
+   "job.artifacts": {
+    "level": "emulated",
+    "note": "upload-artifact step at job end"
+   },
+   "job.cache": {
+    "level": "emulated",
+    "note": "actions/cache step"
+   },
+   "job.container": {
+    "level": "native"
+   },
+   "job.env": {
+    "level": "native"
+   },
+   "job.environment": {
+    "level": "lost",
+    "note": "(Forgejo does not document environment)"
+   },
+   "job.environment.approval": {
+    "level": "external",
+    "note": "configure required reviewers on the environment in repository settings"
+   },
+   "job.if": {
+    "level": "native"
+   },
+   "job.manual": {
+    "level": "emulated",
+    "note": "workflow_dispatch trigger"
+   },
+   "job.matrix": {
+    "level": "native"
+   },
+   "job.needs": {
+    "level": "native"
+   },
+   "job.needs.artifacts": {
+    "level": "emulated",
+    "note": "download-artifact step at job start"
+   },
+   "job.outputs": {
+    "level": "native"
+   },
+   "job.retry": {
+    "level": "emulated",
+    "note": "step-level retry loop via shell (Retry.Attempts is the total number of runs, so GitLab retry: N is Attempts N+1)"
+   },
+   "job.runner": {
+    "level": "native"
+   },
+   "job.services": {
+    "level": "native"
+   },
+   "job.timeout": {
+    "level": "native"
+   },
+   "pipeline.concurrency": {
+    "level": "native"
+   },
+   "pipeline.env": {
+    "level": "native"
+   },
+   "pipeline.finally": {
+    "level": "emulated",
+    "note": "job with if: always() that needs every other job"
+   },
+   "pipeline.inputs": {
+    "level": "native"
+   },
+   "pipeline.permissions": {
+    "level": "lost",
+    "note": "(Forgejo does not document permissions; the token has write access except on fork pull requests)"
+   },
+   "project.multi_pipeline": {
+    "level": "native"
+   },
+   "script.interpolation": {
+    "level": "native"
+   },
+   "step.action": {
+    "level": "native"
+   },
+   "step.continue_on_error": {
+    "level": "native"
+   },
+   "step.env": {
+    "level": "native"
+   },
+   "step.if": {
+    "level": "native"
+   },
+   "step.image": {
+    "level": "emulated",
+    "note": "uses: docker://<image> with entrypoint and args"
+   },
+   "step.script": {
+    "level": "native"
+   },
+   "step.shell": {
+    "level": "native"
+   },
+   "step.timeout": {
+    "level": "native"
+   },
+   "step.workdir": {
+    "level": "native"
+   },
+   "trigger.api": {
+    "level": "native"
+   },
+   "trigger.filter.branches": {
+    "level": "native"
+   },
+   "trigger.filter.paths": {
+    "level": "native"
+   },
+   "trigger.filter.tags": {
+    "level": "native"
+   },
+   "trigger.manual": {
+    "level": "native"
+   },
+   "trigger.pipeline_done": {
+    "level": "native",
+    "note": "workflow_run"
+   },
+   "trigger.pull_request": {
+    "level": "native"
+   },
+   "trigger.push": {
+    "level": "native"
+   },
+   "trigger.resource": {
+    "level": "lost",
+    "note": "(GitHub Actions has no resource triggers)"
+   },
+   "trigger.schedule": {
+    "level": "native"
+   },
+   "trigger.tag": {
+    "level": "native"
+   }
+  },
+  "gha": {
+   "config.name": {
+    "level": "native"
+   },
+   "display.name": {
+    "level": "native"
+   },
+   "expr.opaque": {
+    "level": "native",
+    "note": "(only opaque expressions of the gha dialect; others are lost)"
+   },
+   "ext.passthrough": {
+    "level": "native"
+   },
+   "job.allow_failure": {
+    "level": "native"
+   },
+   "job.artifacts": {
+    "level": "emulated",
+    "note": "upload-artifact step at job end"
+   },
+   "job.cache": {
+    "level": "emulated",
+    "note": "actions/cache step"
+   },
+   "job.container": {
+    "level": "native"
+   },
+   "job.env": {
+    "level": "native"
+   },
+   "job.environment": {
+    "level": "native"
+   },
+   "job.environment.approval": {
+    "level": "external",
+    "note": "configure required reviewers on the environment in repository settings"
+   },
+   "job.if": {
+    "level": "native"
+   },
+   "job.manual": {
+    "level": "emulated",
+    "note": "workflow_dispatch trigger"
+   },
+   "job.matrix": {
+    "level": "native"
+   },
+   "job.needs": {
+    "level": "native"
+   },
+   "job.needs.artifacts": {
+    "level": "emulated",
+    "note": "download-artifact step at job start"
+   },
+   "job.outputs": {
+    "level": "native"
+   },
+   "job.retry": {
+    "level": "emulated",
+    "note": "step-level retry loop via shell (Retry.Attempts is the total number of runs, so GitLab retry: N is Attempts N+1)"
+   },
+   "job.runner": {
+    "level": "native"
+   },
+   "job.services": {
+    "level": "native"
+   },
+   "job.timeout": {
+    "level": "native"
+   },
+   "pipeline.concurrency": {
+    "level": "native"
+   },
+   "pipeline.env": {
+    "level": "native"
+   },
+   "pipeline.finally": {
+    "level": "emulated",
+    "note": "job with if: always() that needs every other job"
+   },
+   "pipeline.inputs": {
+    "level": "native"
+   },
+   "pipeline.permissions": {
+    "level": "native"
+   },
+   "project.multi_pipeline": {
+    "level": "native"
+   },
+   "script.interpolation": {
+    "level": "native"
+   },
+   "step.action": {
+    "level": "native"
+   },
+   "step.continue_on_error": {
+    "level": "native"
+   },
+   "step.env": {
+    "level": "native"
+   },
+   "step.if": {
+    "level": "native"
+   },
+   "step.image": {
+    "level": "emulated",
+    "note": "uses: docker://<image> with entrypoint and args"
+   },
+   "step.script": {
+    "level": "native"
+   },
+   "step.shell": {
+    "level": "native"
+   },
+   "step.timeout": {
+    "level": "native"
+   },
+   "step.workdir": {
+    "level": "native"
+   },
+   "trigger.api": {
+    "level": "native"
+   },
+   "trigger.filter.branches": {
+    "level": "native"
+   },
+   "trigger.filter.paths": {
+    "level": "native"
+   },
+   "trigger.filter.tags": {
+    "level": "native"
+   },
+   "trigger.manual": {
+    "level": "native"
+   },
+   "trigger.pipeline_done": {
+    "level": "native",
+    "note": "workflow_run"
+   },
+   "trigger.pull_request": {
+    "level": "native"
+   },
+   "trigger.push": {
+    "level": "native"
+   },
+   "trigger.resource": {
+    "level": "lost",
+    "note": "(GitHub Actions has no resource triggers)"
+   },
+   "trigger.schedule": {
+    "level": "native"
+   },
+   "trigger.tag": {
+    "level": "native"
+   }
+  },
+  "gitea": {
+   "config.name": {
+    "level": "native",
+    "note": "(a name the target rejects is external; create it under another name)"
+   },
+   "display.name": {
+    "level": "native"
+   },
+   "expr.opaque": {
+    "level": "native",
+    "note": "(only opaque expressions of the gha dialect; others are lost)"
+   },
+   "ext.passthrough": {
+    "level": "native"
+   },
+   "job.allow_failure": {
+    "level": "native"
+   },
+   "job.artifacts": {
+    "level": "emulated",
+    "note": "upload-artifact step at job end"
+   },
+   "job.cache": {
+    "level": "emulated",
+    "note": "actions/cache step"
+   },
+   "job.container": {
+    "level": "native"
+   },
+   "job.env": {
+    "level": "native"
+   },
+   "job.environment": {
+    "level": "lost",
+    "note": "(Gitea ignores jobs.<id>.environment)"
+   },
+   "job.environment.approval": {
+    "level": "external",
+    "note": "configure required reviewers on the environment in repository settings"
+   },
+   "job.if": {
+    "level": "native"
+   },
+   "job.manual": {
+    "level": "emulated",
+    "note": "workflow_dispatch trigger"
+   },
+   "job.matrix": {
+    "level": "native"
+   },
+   "job.needs": {
+    "level": "native"
+   },
+   "job.needs.artifacts": {
+    "level": "emulated",
+    "note": "download-artifact step at job start"
+   },
+   "job.outputs": {
+    "level": "native"
+   },
+   "job.retry": {
+    "level": "emulated",
+    "note": "step-level retry loop via shell (Retry.Attempts is the total number of runs, so GitLab retry: N is Attempts N+1)"
+   },
+   "job.runner": {
+    "level": "native"
+   },
+   "job.services": {
+    "level": "native"
+   },
+   "job.timeout": {
+    "level": "native"
+   },
+   "pipeline.concurrency": {
+    "level": "native"
+   },
+   "pipeline.env": {
+    "level": "native"
+   },
+   "pipeline.finally": {
+    "level": "emulated",
+    "note": "job with if: always() that needs every other job"
+   },
+   "pipeline.inputs": {
+    "level": "native"
+   },
+   "pipeline.permissions": {
+    "level": "native"
+   },
+   "project.multi_pipeline": {
+    "level": "native"
+   },
+   "script.interpolation": {
+    "level": "native"
+   },
+   "step.action": {
+    "level": "native"
+   },
+   "step.continue_on_error": {
+    "level": "native"
+   },
+   "step.env": {
+    "level": "native"
+   },
+   "step.if": {
+    "level": "native"
+   },
+   "step.image": {
+    "level": "emulated",
+    "note": "uses: docker://<image> with entrypoint and args"
+   },
+   "step.script": {
+    "level": "native"
+   },
+   "step.shell": {
+    "level": "native"
+   },
+   "step.timeout": {
+    "level": "native"
+   },
+   "step.workdir": {
+    "level": "native"
+   },
+   "trigger.api": {
+    "level": "native"
+   },
+   "trigger.filter.branches": {
+    "level": "native"
+   },
+   "trigger.filter.paths": {
+    "level": "native"
+   },
+   "trigger.filter.tags": {
+    "level": "native"
+   },
+   "trigger.manual": {
+    "level": "native"
+   },
+   "trigger.pipeline_done": {
+    "level": "native",
+    "note": "workflow_run"
+   },
+   "trigger.pull_request": {
+    "level": "native",
+    "note": "(the ref is refs/pull/N/head, not the merge ref)"
+   },
+   "trigger.push": {
+    "level": "native"
+   },
+   "trigger.resource": {
+    "level": "lost",
+    "note": "(GitHub Actions has no resource triggers)"
+   },
+   "trigger.schedule": {
+    "level": "native"
+   },
+   "trigger.tag": {
+    "level": "native"
+   }
+  },
+  "gitlab": {
+   "config.name": {
+    "level": "native"
+   },
+   "display.name": {
+    "level": "lost",
+    "note": "(step and pipeline names have no GitLab field; a job name survives only as its key)"
+   },
+   "expr.opaque": {
+    "level": "native",
+    "note": "(only opaque expressions of the gitlab dialect; others are lost)"
+   },
+   "ext.passthrough": {
+    "level": "native"
+   },
+   "job.allow_failure": {
+    "level": "native"
+   },
+   "job.artifacts": {
+    "level": "native"
+   },
+   "job.cache": {
+    "level": "native"
+   },
+   "job.container": {
+    "level": "native"
+   },
+   "job.env": {
+    "level": "native"
+   },
+   "job.environment": {
+    "level": "native"
+   },
+   "job.environment.approval": {
+    "level": "external",
+    "note": "protected environment approval rules in project settings"
+   },
+   "job.if": {
+    "level": "native"
+   },
+   "job.manual": {
+    "level": "native"
+   },
+   "job.matrix": {
+    "level": "native",
+    "note": "parallel:matrix (include and exclude are expanded into explicit entries)"
+   },
+   "job.needs": {
+    "level": "native"
+   },
+   "job.needs.artifacts": {
+    "level": "native"
+   },
+   "job.outputs": {
+    "level": "emulated",
+    "note": "dotenv artifact report"
+   },
+   "job.retry": {
+    "level": "native"
+   },
+   "job.runner": {
+    "level": "native"
+   },
+   "job.services": {
+    "level": "native"
+   },
+   "job.timeout": {
+    "level": "native"
+   },
+   "pipeline.concurrency": {
+    "level": "emulated",
+    "note": "resource_group on every job (queues, does not cancel)"
+   },
+   "pipeline.env": {
+    "level": "native"
+   },
+   "pipeline.finally": {
+    "level": "native"
+   },
+   "pipeline.inputs": {
+    "level": "emulated",
+    "note": "variables with description (input types and required flags are not enforced)"
+   },
+   "pipeline.permissions": {
+    "level": "lost",
+    "note": "(job token scope is a project setting)"
+   },
+   "project.multi_pipeline": {
+    "level": "emulated",
+    "note": "jobs of every pipeline in one file under <pipeline>:<job> keys (each job carries its pipeline's trigger condition; stage names and inputs are not restored)"
+   },
+   "script.interpolation": {
+    "level": "native"
+   },
+   "step.action": {
+    "level": "native",
+    "note": "per actions.Lookup verdict (unknown actions are lost)"
+   },
+   "step.continue_on_error": {
+    "level": "emulated",
+    "note": "|| true after each line of the step"
+   },
+   "step.env": {
+    "level": "emulated",
+    "note": "export lines inside a subshell around the step"
+   },
+   "step.if": {
+    "level": "emulated",
+    "note": "shell guard around the step's lines (step reports success instead of skipped)"
+   },
+   "step.image": {
+    "level": "lost",
+    "note": "(GitLab sets the image per job, not per step)"
+   },
+   "step.script": {
+    "level": "native"
+   },
+   "step.shell": {
+    "level": "lost",
+    "note": "(GitLab runs scripts in the runner's configured shell)"
+   },
+   "step.timeout": {
+    "level": "lost",
+    "note": "(GitLab has only a job timeout)"
+   },
+   "step.workdir": {
+    "level": "emulated",
+    "note": "cd in a subshell around the step"
+   },
+   "trigger.api": {
+    "level": "external",
+    "note": "pipeline trigger token or API call"
+   },
+   "trigger.filter.branches": {
+    "level": "native"
+   },
+   "trigger.filter.paths": {
+    "level": "native"
+   },
+   "trigger.filter.tags": {
+    "level": "native"
+   },
+   "trigger.manual": {
+    "level": "native"
+   },
+   "trigger.pipeline_done": {
+    "level": "lost",
+    "note": "(a GitLab downstream pipeline starts from a trigger job in the upstream project)"
+   },
+   "trigger.pull_request": {
+    "level": "native"
+   },
+   "trigger.push": {
+    "level": "native"
+   },
+   "trigger.resource": {
+    "level": "lost",
+    "note": "(GitLab CI has no resource triggers)"
+   },
+   "trigger.schedule": {
+    "level": "external",
+    "note": "pipeline schedule in project settings (GitLab keeps the cron string outside the CI file)"
+   },
+   "trigger.tag": {
+    "level": "native"
+   }
+  },
+  "tekton": {
+   "config.name": {
+    "level": "emulated",
+    "note": "secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars (the Secret values and ConfigMap values are not written)"
+   },
+   "display.name": {
+    "level": "native"
+   },
+   "expr.opaque": {
+    "level": "native",
+    "note": "(only opaque expressions of the tekton dialect; a cel entry from a Tekton file is written back and needs enable-cel-in-whenexpression; others are lost)"
+   },
+   "ext.passthrough": {
+    "level": "native"
+   },
+   "job.allow_failure": {
+    "level": "native"
+   },
+   "job.artifacts": {
+    "level": "emulated",
+    "note": "workspace on a PVC from volumeClaimTemplate (tasks on different nodes need ReadWriteMany or the affinity assistant)"
+   },
+   "job.cache": {
+    "level": "emulated",
+    "note": "workspace on a PVC from volumeClaimTemplate (tasks on different nodes need ReadWriteMany or the affinity assistant)"
+   },
+   "job.container": {
+    "level": "native",
+    "note": "stepTemplate image"
+   },
+   "job.env": {
+    "level": "native"
+   },
+   "job.environment": {
+    "level": "lost",
+    "note": "(Tekton has no environment name or URL)"
+   },
+   "job.environment.approval": {
+    "level": "lost",
+    "note": "(Tekton has no approval gate)"
+   },
+   "job.if": {
+    "level": "native",
+    "note": "PipelineTask when (only the input/operator/values subset; any other condition is emulated or lost)"
+   },
+   "job.manual": {
+    "level": "lost",
+    "note": "(Tekton has no manual job gate)"
+   },
+   "job.matrix": {
+    "level": "native",
+    "note": "PipelineTask matrix (fail-fast and max-parallel are lost; axis values become strings)"
+   },
+   "job.needs": {
+    "level": "native"
+   },
+   "job.needs.artifacts": {
+    "level": "emulated",
+    "note": "workspace on a PVC from volumeClaimTemplate (tasks on different nodes need ReadWriteMany or the affinity assistant)"
+   },
+   "job.outputs": {
+    "level": "native",
+    "note": "Task results"
+   },
+   "job.retry": {
+    "level": "native"
+   },
+   "job.runner": {
+    "level": "lost",
+    "note": "(Tekton schedules pods, not runner labels)"
+   },
+   "job.services": {
+    "level": "emulated",
+    "note": "Task sidecars (the service is at localhost, not at its name)"
+   },
+   "job.timeout": {
+    "level": "native"
+   },
+   "pipeline.concurrency": {
+    "level": "lost",
+    "note": "(Tekton has no concurrency group or cancel-in-progress)"
+   },
+   "pipeline.env": {
+    "level": "emulated",
+    "note": "copied into the stepTemplate env of each Task (a step variable of the same name wins)"
+   },
+   "pipeline.finally": {
+    "level": "native",
+    "note": "Pipeline finally (finally tasks cannot be ordered among themselves, so a needs edge between them is lost)"
+   },
+   "pipeline.inputs": {
+    "level": "native",
+    "note": "Pipeline params"
+   },
+   "pipeline.permissions": {
+    "level": "lost",
+    "note": "(permissions come from the ServiceAccount of the run)"
+   },
+   "project.multi_pipeline": {
+    "level": "emulated",
+    "note": "one Pipeline document per IR pipeline (each pipeline gets its own trigger)"
+   },
+   "script.interpolation": {
+    "level": "native"
+   },
+   "step.action": {
+    "level": "emulated",
+    "note": "StepAction ref per actions.Lookup verdict (unknown actions are lost)"
+   },
+   "step.continue_on_error": {
+    "level": "native"
+   },
+   "step.env": {
+    "level": "native"
+   },
+   "step.if": {
+    "level": "native",
+    "note": "step when (only the input/operator/values subset; any other condition is emulated or lost)"
+   },
+   "step.image": {
+    "level": "native"
+   },
+   "step.script": {
+    "level": "native"
+   },
+   "step.shell": {
+    "level": "native",
+    "note": "shebang line of the script"
+   },
+   "step.timeout": {
+    "level": "native"
+   },
+   "step.workdir": {
+    "level": "native"
+   },
+   "trigger.api": {
+    "level": "emulated",
+    "note": "EventListener entry of the Tekton file (only an entry that a Tekton file held is written; any other API trigger is lost)"
+   },
+   "trigger.filter.branches": {
+    "level": "emulated",
+    "note": "CEL interceptor filter on the ref (the EventListener serves GitHub webhooks only)"
+   },
+   "trigger.filter.paths": {
+    "level": "emulated",
+    "note": "CEL interceptor filter on the changed files (the github interceptor needs addChangedFiles; the EventListener serves GitHub webhooks only)"
+   },
+   "trigger.filter.tags": {
+    "level": "emulated",
+    "note": "CEL interceptor filter on the ref (the EventListener serves GitHub webhooks only)"
+   },
+   "trigger.manual": {
+    "level": "external",
+    "note": "tkn pipeline start <name> (a person starts the run; the report names the command)"
+   },
+   "trigger.pipeline_done": {
+    "level": "lost",
+    "note": "(Tekton has no pipeline-completion trigger)"
+   },
+   "trigger.pull_request": {
+    "level": "emulated",
+    "note": "EventListener trigger with the github interceptor (the EventListener serves GitHub webhooks only; only pull requests from this repository start a run, because a fork would run its code with every secret)"
+   },
+   "trigger.push": {
+    "level": "emulated",
+    "note": "EventListener trigger with the github interceptor (the EventListener serves GitHub webhooks only)"
+   },
+   "trigger.resource": {
+    "level": "lost",
+    "note": "(Tekton has no resource trigger)"
+   },
+   "trigger.schedule": {
+    "level": "emulated",
+    "note": "CronJob that posts to the EventListener (the CronJob and the listener must run in the same cluster; the schedule listener has no signature check, so do not expose it)"
+   },
+   "trigger.tag": {
+    "level": "emulated",
+    "note": "EventListener trigger with the github interceptor (the EventListener serves GitHub webhooks only)"
+   }
+  },
+  "woodpecker": {
+   "config.name": {
+    "level": "native"
+   },
+   "display.name": {
+    "level": "native",
+    "note": "the step name (pipeline and job names that differ from the id are lost; the workflow name is the file name)"
+   },
+   "expr.opaque": {
+    "level": "native",
+    "note": "(only opaque expressions of the woodpecker dialect; others are lost)"
+   },
+   "ext.passthrough": {
+    "level": "native"
+   },
+   "job.allow_failure": {
+    "level": "emulated",
+    "note": "failure ignore on every step (later steps still run after a failed step)"
+   },
+   "job.artifacts": {
+    "level": "emulated",
+    "note": "shared workspace of the steps in one workflow (other workflows cannot read the files)"
+   },
+   "job.cache": {
+    "level": "emulated",
+    "note": "shared workspace of the steps in one workflow (nothing persists between runs)"
+   },
+   "job.container": {
+    "level": "native"
+   },
+   "job.env": {
+    "level": "emulated",
+    "note": "copied into the environment of every step (a step variable of the same name wins)"
+   },
+   "job.environment": {
+    "level": "lost",
+    "note": "(Woodpecker has no environment name or URL in the workflow)"
+   },
+   "job.environment.approval": {
+    "level": "external",
+    "note": "repo setting Require approval for"
+   },
+   "job.if": {
+    "level": "native",
+    "note": "workflow when (only the translatable expression subset; any other condition disables the workflow)"
+   },
+   "job.manual": {
+    "level": "emulated",
+    "note": "when event manual; a person starts the workflow from the UI or API (the workflow no longer runs on its normal events)"
+   },
+   "job.matrix": {
+    "level": "native"
+   },
+   "job.needs": {
+    "level": "native"
+   },
+   "job.needs.artifacts": {
+    "level": "lost",
+    "note": "(workflows do not share a workspace)"
+   },
+   "job.outputs": {
+    "level": "lost",
+    "note": "(Woodpecker steps cannot pass values to other workflows)"
+   },
+   "job.retry": {
+    "level": "lost",
+    "note": "(Woodpecker has no retry key; restarts are manual)"
+   },
+   "job.runner": {
+    "level": "lost",
+    "note": "(only a platform label has a Woodpecker form (labels.platform); other labels are lost)"
+   },
+   "job.services": {
+    "level": "native"
+   },
+   "job.timeout": {
+    "level": "external",
+    "note": "repo setting Timeout (Woodpecker limits the whole pipeline, not a workflow)"
+   },
+   "pipeline.concurrency": {
+    "level": "native",
+    "note": "workflow concurrency limit 1 with group (cancel-in-progress has no Woodpecker form)"
+   },
+   "pipeline.env": {
+    "level": "emulated",
+    "note": "copied into the environment of every step (a step variable of the same name wins)"
+   },
+   "pipeline.finally": {
+    "level": "emulated",
+    "note": "a workflow that depends on every other workflow and runs on status success or failure (a skipped dependency is optional, so the workflow still runs)"
+   },
+   "pipeline.inputs": {
+    "level": "lost",
+    "note": "(Woodpecker has no typed pipeline inputs)"
+   },
+   "pipeline.permissions": {
+    "level": "lost",
+    "note": "(token scopes are forge and repo settings)"
+   },
+   "project.multi_pipeline": {
+    "level": "emulated",
+    "note": "each job of each pipeline is a workflow named <pipeline>-<job> (each workflow carries its pipeline's trigger condition)"
+   },
+   "script.interpolation": {
+    "level": "native"
+   },
+   "step.action": {
+    "level": "native",
+    "note": "per actions.Lookup verdict; a plugin step is native (unknown actions are lost)"
+   },
+   "step.continue_on_error": {
+    "level": "native"
+   },
+   "step.env": {
+    "level": "native"
+   },
+   "step.if": {
+    "level": "native"
+   },
+   "step.image": {
+    "level": "native"
+   },
+   "step.script": {
+    "level": "native"
+   },
+   "step.shell": {
+    "level": "lost",
+    "note": "(Woodpecker runs commands in the image entrypoint shell)"
+   },
+   "step.timeout": {
+    "level": "lost",
+    "note": "(Woodpecker has only a pipeline timeout in the repo settings)"
+   },
+   "step.workdir": {
+    "level": "native"
+   },
+   "trigger.api": {
+    "level": "lost",
+    "note": "(Woodpecker starts API pipelines as manual events)"
+   },
+   "trigger.filter.branches": {
+    "level": "native",
+    "note": "branch filter (only exact globs are native; other patterns keep doublestar meaning)"
+   },
+   "trigger.filter.paths": {
+    "level": "native"
+   },
+   "trigger.filter.tags": {
+    "level": "emulated",
+    "note": "ref filter refs/tags/<pattern> on the tag event (the glob dialect is doublestar; the parser reads it back as the tag trigger filter)"
+   },
+   "trigger.manual": {
+    "level": "native"
+   },
+   "trigger.pipeline_done": {
+    "level": "lost",
+    "note": "(Woodpecker has no pipeline-completion trigger)"
+   },
+   "trigger.pull_request": {
+    "level": "native"
+   },
+   "trigger.push": {
+    "level": "native"
+   },
+   "trigger.resource": {
+    "level": "lost",
+    "note": "(Woodpecker CI has no resource triggers)"
+   },
+   "trigger.schedule": {
+    "level": "external",
+    "note": "when event cron; the schedule is a repo cron job (Woodpecker keeps the cron string in the repo settings (Cron), not in the workflow file)"
+   },
+   "trigger.tag": {
+    "level": "native"
+   }
+  }
+ },
+ "source": [
+  {
+   "path": ".github/workflows/ci.yml",
+   "text": "name: ci\non:\n  push:\n    branches: [main]\n  pull_request:\n    branches: [main]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    container: golang:1.27\n    strategy:\n      matrix:\n        arch: [amd64, arm64]\n    steps:\n      - uses: actions/checkout@v4\n      - run: go vet ./...\n      - run: GOARCH=${{ matrix.arch }} go test ./...\n  deploy:\n    needs: test\n    if: github.ref_name == 'main'\n    runs-on: ubuntu-latest\n    container: alpine:3.22\n    environment: production\n    steps:\n      - uses: actions/checkout@v4\n      - run: ./scripts/deploy.sh\n        env:\n          TOKEN: ${{ secrets.DEPLOY_TOKEN }}\n"
+  }
+ ],
+ "conversions": [
+  {
+   "id": "argo",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".argo/events/eventsource.yaml",
+     "text": "apiVersion: argoproj.io/v1alpha1\nkind: EventSource\nmetadata:\n  name: pipemaster-github\nspec:\n  github:\n    pull_request:\n      active: true\n      contentType: json\n      events:\n        - pull_request\n      repositories:\n        - names:\n            - REPO\n          owner: OWNER\n      webhook:\n        endpoint: /pull_request\n        method: POST\n        port: \"12000\"\n        url: \"\"\n      webhookSecret:\n        key: token\n        name: pipemaster-github-webhook\n    push:\n      active: true\n      contentType: json\n      events:\n        - push\n      repositories:\n        - names:\n            - REPO\n          owner: OWNER\n      webhook:\n        endpoint: /push\n        method: POST\n        port: \"12000\"\n        url: \"\"\n      webhookSecret:\n        key: token\n        name: pipemaster-github-webhook\n  service:\n    ports:\n      - port: 12000\n        targetPort: 12000\n"
+    },
+    {
+     "path": ".argo/events/sensor.yaml",
+     "text": "apiVersion: argoproj.io/v1alpha1\nkind: Sensor\nmetadata:\n  name: pipemaster\nspec:\n  dependencies:\n    - eventName: pull_request\n      eventSourceName: pipemaster-github\n      filters:\n        data:\n          - path: body.action\n            type: string\n            value:\n              - opened\n              - reopened\n              - synchronize\n          - path: body.pull_request.base.ref\n            type: string\n            value:\n              - ^main$\n        exprs:\n          - expr: head == base\n            fields:\n              - name: head\n                path: body.pull_request.head.repo.full_name\n              - name: base\n                path: body.repository.full_name\n      name: ci-pr\n    - eventName: push\n      eventSourceName: pipemaster-github\n      filters:\n        data:\n          - path: body.ref\n            type: string\n            value:\n              - ^refs/heads/main$\n      name: ci-push\n  template:\n    serviceAccountName: pipemaster-sensor\n  triggers:\n    - template:\n        conditions: ci-pr\n        k8s:\n          operation: create\n          parameters:\n            - dest: spec.arguments.parameters.0.value\n              src:\n                dataKey: body.pull_request.head.sha\n                dependencyName: ci-pr\n            - dest: spec.arguments.parameters.1.value\n              src:\n                dataKey: body.repository.full_name\n                dependencyName: ci-pr\n            - dest: spec.arguments.parameters.2.value\n              src:\n                dataKey: body.pull_request.head.ref\n                dependencyName: ci-pr\n          source:\n            resource:\n              apiVersion: argoproj.io/v1alpha1\n              kind: Workflow\n              metadata:\n                generateName: ci-\n              spec:\n                arguments:\n                  parameters:\n                    - name: ctx-sha\n                      value: \"\"\n                    - name: ctx-repo\n                      value: \"\"\n                    - name: ctx-ref-name\n                      value: \"\"\n                serviceAccountName: pipemaster-workflow\n                workflowTemplateRef:\n                  name: ci\n        name: ci-pr\n    - template:\n        conditions: ci-push\n        k8s:\n          operation: create\n          parameters:\n            - dest: spec.arguments.parameters.0.value\n              src:\n                dataKey: body.after\n                dependencyName: ci-push\n            - dest: spec.arguments.parameters.1.value\n              src:\n                dataKey: body.repository.full_name\n                dependencyName: ci-push\n            - dest: spec.arguments.parameters.2.value\n              src:\n                dataTemplate: '{{ trimPrefix \"refs/heads/\" .Input.body.ref }}'\n                dependencyName: ci-push\n          source:\n            resource:\n              apiVersion: argoproj.io/v1alpha1\n              kind: Workflow\n              metadata:\n                generateName: ci-\n              spec:\n                arguments:\n                  parameters:\n                    - name: ctx-sha\n                      value: \"\"\n                    - name: ctx-repo\n                      value: \"\"\n                    - name: ctx-ref-name\n                      value: \"\"\n                serviceAccountName: pipemaster-workflow\n                workflowTemplateRef:\n                  name: ci\n        name: ci-push\n"
+    },
+    {
+     "path": ".argo/rbac/sensor.yaml",
+     "text": "# pipemaster:rbac\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: pipemaster-sensor\n---\n# pipemaster:rbac\napiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  name: pipemaster-sensor\nrules:\n  - apiGroups:\n      - argoproj.io\n    resources:\n      - workflows\n    verbs:\n      - create\n---\n# pipemaster:rbac\napiVersion: rbac.authorization.k8s.io/v1\nkind: RoleBinding\nmetadata:\n  name: pipemaster-sensor\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: Role\n  name: pipemaster-sensor\nsubjects:\n  - kind: ServiceAccount\n    name: pipemaster-sensor\n"
+    },
+    {
+     "path": ".argo/rbac/workflow.yaml",
+     "text": "# pipemaster:rbac\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: pipemaster-workflow\n---\n# pipemaster:rbac\napiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  name: pipemaster-workflow\nrules:\n  - apiGroups:\n      - argoproj.io\n    resources:\n      - workflowtaskresults\n    verbs:\n      - create\n      - patch\n---\n# pipemaster:rbac\napiVersion: rbac.authorization.k8s.io/v1\nkind: RoleBinding\nmetadata:\n  name: pipemaster-workflow\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: Role\n  name: pipemaster-workflow\nsubjects:\n  - kind: ServiceAccount\n    name: pipemaster-workflow\n"
+    },
+    {
+     "path": ".argo/workflows/ci.yaml",
+     "text": "# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: deploy-step-1\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.ctx-sha}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.image pipeline/ci/job/deploy\n# pipemaster:arg {\"wrote\":{\"deploy-step-2\":\"alpine:3.22\"},\"job\":\"ref: alpine:3.22\\n\"}\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: test-step-1\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.ctx-sha}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated job.matrix pipeline/ci/job/test\n# pipemaster:arg {\"axes\":[{\"Name\":\"arch\",\"Values\":[\"amd64\",\"arm64\"]}]}\n# pipemaster:emulated config.name pipeline/ci/ref/secrets.DEPLOY_TOKEN\n# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0\n# pipemaster:emulated trigger.pull_request pipeline/ci/trigger/0\n# pipemaster:emulated trigger.push pipeline/ci/trigger/0\n# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1\n# pipemaster:emulated trigger.push pipeline/ci/trigger/1\napiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata:\n  name: ci\n  annotations:\n    workflows.argoproj.io/title: ci\nspec:\n  entrypoint: main\n  arguments:\n    parameters:\n      - name: ctx-sha\n        value: \"\"\n      - name: ctx-repo\n        value: \"\"\n      - name: ctx-ref-name\n        value: \"\"\n  templates:\n    - name: main\n      dag:\n        tasks:\n          - name: deploy\n            template: deploy\n            dependencies:\n              - test\n            when: '{{= workflow.parameters[''ctx-ref-name''] == ''main'' }}'\n          - name: test\n            template: test\n            withItems:\n              - arch: amd64\n              - arch: arm64\n            arguments:\n              parameters:\n                - name: arch\n                  value: '{{item.arch}}'\n    - name: deploy\n      containerSet:\n        containers:\n          - # pipemaster:id deploy-step-2\n            name: main\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - ./scripts/deploy.sh\n            workingDir: /workspace\n            env:\n              - name: TOKEN\n                valueFrom:\n                  secretKeyRef:\n                    name: ci-secrets\n                    key: DEPLOY_TOKEN\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.ctx-sha}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: test\n      containerSet:\n        containers:\n          - name: test-step-2\n            image: golang:1.27\n            command:\n              - sh\n              - -ec\n            args:\n              - go vet ./...\n            workingDir: /workspace\n          - # pipemaster:id test-step-3\n            name: main\n            image: golang:1.27\n            command:\n              - sh\n              - -ec\n            args:\n              - GOARCH={{inputs.parameters.arch}} go test ./...\n            workingDir: /workspace\n            dependencies:\n              - test-step-2\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        parameters:\n          - name: arch\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.ctx-sha}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.environment",
+     "level": "lost",
+     "detail": "Argo has no environment name or URL; they stay in a comment marker only"
+    },
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.runner",
+     "level": "lost",
+     "detail": "Argo schedules pods; a runner label has no form"
+    },
+    {
+     "path": "pipeline/ci/job/test",
+     "feature": "job.runner",
+     "level": "lost",
+     "detail": "Argo schedules pods; a runner label has no form"
+    },
+    {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-1",
+     "feature": "step.action",
+     "level": "external",
+     "strategy": "input git artifact at /workspace",
+     "detail": "the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; a private repository needs usernameSecret and passwordSecret, or sshPrivateKeySecret, on the git artifact; the file names none"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-1",
+     "feature": "step.action",
+     "level": "external",
+     "strategy": "input git artifact at /workspace",
+     "detail": "the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; a private repository needs usernameSecret and passwordSecret, or sshPrivateKeySecret, on the git artifact; the file names none"
+    },
+    {
+     "path": "pipeline/ci/trigger/0",
+     "feature": "trigger.push",
+     "level": "external",
+     "strategy": "EventSource webhook secret",
+     "detail": "Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource"
+    },
+    {
+     "path": "pipeline/ci/trigger/1",
+     "feature": "trigger.push",
+     "level": "external",
+     "strategy": "EventSource webhook secret",
+     "detail": "Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource"
+    },
+    {
+     "path": "pipeline/ci/job/test",
+     "feature": "job.matrix",
+     "level": "emulated",
+     "strategy": "withItems over the expanded cells",
+     "detail": "the cells run as withItems of one task"
+    },
+    {
+     "path": "pipeline/ci/ref/secrets.DEPLOY_TOKEN",
+     "feature": "config.name",
+     "level": "emulated",
+     "strategy": "secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars",
+     "detail": "the Secret values and ConfigMap values are not written"
+    },
+    {
+     "path": "pipeline/ci/trigger/0",
+     "feature": "trigger.filter.branches",
+     "level": "emulated"
+    },
+    {
+     "path": "pipeline/ci/trigger/0",
+     "feature": "trigger.pull_request",
+     "level": "emulated",
+     "detail": "the trigger accepts a pull request from the same repository only; a fork would run its code with every secret"
+    },
+    {
+     "path": "pipeline/ci/trigger/1",
+     "feature": "trigger.filter.branches",
+     "level": "emulated"
+    }
+   ]
+  },
+  {
+   "id": "concourse",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".concourse/ci.yml",
+     "text": "# pipemaster:emulated display.name pipeline/ci\n# pipemaster:arg {\"name\":\"ci\",\"id\":\"ci\",\"written\":\"ci\",\"kind\":\"pipeline\"}\n# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\next:\\n    gha:\\n        _derived_id: true\\nid: deploy-step-1\\nkind: action\\n\",\"get\":\"source\",\"params\":\"null\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/step/deploy-step-2/carry\n# pipemaster:arg {\"digest\":\"2ceaeed0db42f3b3820b20c00408727d73195a6650118388684a43515400a623\",\"carry\":\"id: deploy-step-2\\nkind: script\\nenv:\\n    - name: TOKEN\\n      value:\\n        secret: DEPLOY_TOKEN\\n\"}\n# pipemaster:emulated job.manual pipeline/ci/job/deploy\n# pipemaster:arg {\"environment\":{\"Name\":\"production\",\"URL\":\"\",\"Approval\":false},\"manual\":false,\"held\":true,\"cond\":true}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry\n# pipemaster:arg {\"digest\":\"7d9620106768faafbacbef6956a933cfa8748e9dbbf8d9b337820e69aa4ffde8\",\"carry\":\"if: ref_name == 'main'\\ncontainer:\\n    ref: alpine:3.22\\nenvironment:\\n    name: production\\nid: deploy\\nrunner:\\n    labels:\\n        - ubuntu-latest\\nneeds:\\n    - job: test\\n\"}\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\next:\\n    gha:\\n        _derived_id: true\\nid: test-step-1\\nkind: action\\n\",\"get\":\"source\",\"params\":\"null\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-2/carry\n# pipemaster:arg {\"digest\":\"f9b8b3b570c1acffd7e2e3e1fc645369c123be22aa40e90282fe78e2d91a2af4\",\"carry\":\"id: test-step-2\\nkind: script\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-3/carry\n# pipemaster:arg {\"digest\":\"04320a690f2d2cde29f1394a63028d21cdb41944b905279fd4a81ea32c83c3d5\",\"carry\":\"id: test-step-3\\nkind: script\\nscript:\\n    - GOARCH=$\\u007b{ matrix.arch }} go test ./...\\n\"}\n# pipemaster:emulated job.matrix pipeline/ci/job/test\n# pipemaster:arg {\"matrix\":\"axes:\\n    - name: arch\\n      values:\\n        - amd64\\n        - arm64\\n\",\"across\":\"[{\\\"max_in_flight\\\":\\\"all\\\",\\\"values\\\":[\\\"amd64\\\",\\\"arm64\\\"],\\\"var\\\":\\\"arch\\\"}]\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry\n# pipemaster:arg {\"digest\":\"5d9c97a0dc4c3c7fd9dd7b503f72b12e2146a9a5471fe900d1091af780623d65\",\"carry\":\"container:\\n    ref: golang:1.27\\nmatrix:\\n    axes:\\n        - name: arch\\n          values:\\n            - amd64\\n            - arm64\\nid: test\\nrunner:\\n    labels:\\n        - ubuntu-latest\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/carry\n# pipemaster:arg {\"digest\":\"7e65c0d6306019efcea48966df45f029402721064756678d11489339a02e833a\",\"carry\":\"id: ci\\nname: ci\\ntriggers:\\n    - kind: pr\\n      branches:\\n        include:\\n            - main\\n    - kind: push\\n      branches:\\n        include:\\n            - main\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/ci\n# pipemaster:emulated job.runner pipeline/ci/job/deploy\n# pipemaster:emulated job.runner pipeline/ci/job/test\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\n      branch: main\njobs:\n  - name: deploy\n    plan:\n      - get: source\n        passed:\n          - test\n      - task: deploy-step-2\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: alpine\n              tag: \"3.22\"\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          params:\n            TOKEN: ((DEPLOY_TOKEN))\n          run:\n            path: sh\n            args:\n              - -ec\n              - ./scripts/deploy.sh\n            dir: workspace\n        tags:\n          - ubuntu-latest\n  - name: test\n    plan:\n      - get: source\n        trigger: true\n      - do:\n          - task: test-step-2\n            input_mapping:\n              workspace: source\n            config:\n              platform: linux\n              image_resource:\n                type: registry-image\n                source:\n                  repository: golang\n                  tag: \"1.27\"\n              inputs:\n                - name: workspace\n              outputs:\n                - name: workspace\n              run:\n                path: sh\n                args:\n                  - -ec\n                  - go vet ./...\n                dir: workspace\n            tags:\n              - ubuntu-latest\n          - task: test-step-3\n            config:\n              platform: linux\n              image_resource:\n                type: registry-image\n                source:\n                  repository: golang\n                  tag: \"1.27\"\n              inputs:\n                - name: workspace\n              outputs:\n                - name: workspace\n              params:\n                PM_MATRIX_ARCH: ((.:arch))\n              run:\n                path: sh\n                args:\n                  - -ec\n                  - GOARCH=${PM_MATRIX_ARCH} go test ./...\n                dir: workspace\n            tags:\n              - ubuntu-latest\n        across:\n          - var: arch\n            values:\n              - amd64\n              - arm64\n            max_in_flight: all\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.environment",
+     "level": "lost",
+     "detail": "Concourse has no environment name or URL"
+    },
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "the reference ref_name has no spelling in a Concourse task; the job has no triggering get, so a person starts it"
+    },
+    {
+     "path": "pipeline/ci/trigger/0",
+     "feature": "trigger.pull_request",
+     "level": "lost"
+    },
+    {
+     "path": "pipeline/ci",
+     "feature": "ext.passthrough",
+     "level": "emulated",
+     "strategy": "git-uri variable",
+     "detail": "the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager"
+    },
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.runner",
+     "level": "emulated",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags ubuntu-latest; a build waits until a worker has them"
+    },
+    {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-1",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "task per actions.Lookup verdict",
+     "detail": "unknown actions are lost"
+    },
+    {
+     "path": "pipeline/ci/job/test",
+     "feature": "job.matrix",
+     "level": "emulated",
+     "strategy": "across over the axes",
+     "detail": "the tasks run once per cell inside one across step; the outputs of the cells are not visible after it"
+    },
+    {
+     "path": "pipeline/ci/job/test",
+     "feature": "job.runner",
+     "level": "emulated",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags ubuntu-latest; a build waits until a worker has them"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-1",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "task per actions.Lookup verdict",
+     "detail": "unknown actions are lost"
+    }
+   ]
+  },
+  {
+   "id": "drone",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".drone.yml",
+     "text": "# pipemaster:emulated job.if pipeline/ci/job/deploy\n# pipemaster:arg {\"if\":\"ref_name == 'main'\",\"back\":\"(((event == 'push') \\u0026\\u0026 (ref_type == 'branch')) || (event == 'pull_request')) \\u0026\\u0026 (branch == 'main') \\u0026\\u0026 ((ref == 'refs/heads/main') || (tag == 'main'))\",\"triggers\":\"- kind: pr\\n  branches:\\n    include:\\n        - main\\n- kind: push\\n  branches:\\n    include:\\n        - main\\n\"}\n# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: deploy-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/ci/job/deploy\n# pipemaster:arg {\"Ref\":\"alpine:3.22\",\"Entrypoint\":null,\"taken\":1}\nkind: pipeline\ntype: docker\nname: deploy\ntrigger:\n  event:\n    - push\n    - pull_request\n  branch:\n    - main\n  ref:\n    - refs/heads/main\n    - refs/tags/main\ndepends_on:\n  - test-amd64\n  - test-arm64\nsteps:\n  - name: deploy-step-2\n    image: alpine:3.22\n    commands:\n      - ./scripts/deploy.sh\n    environment:\n      TOKEN:\n        from_secret: DEPLOY_TOKEN\n---\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: test-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/ci/job/test\n# pipemaster:arg {\"Ref\":\"golang:1.27\",\"Entrypoint\":null,\"taken\":2}\n# pipemaster:emulated job.matrix pipeline/ci/job/test\n# pipemaster:arg {\"matrix\":{\"FailFast\":null,\"Axes\":[{\"Name\":\"arch\",\"Values\":[\"amd64\",\"arm64\"]}],\"Include\":null,\"Exclude\":null,\"MaxParallel\":0},\"job\":\"test\",\"cell\":[{\"Key\":\"arch\",\"Value\":\"amd64\"}],\"held\":[{\"script\":[\"GOARCH=$$\\u007b{ matrix.arch }} go test ./...\"],\"pos\":1}],\"index\":0}\nkind: pipeline\ntype: docker\nname: test-amd64\ntrigger:\n  event:\n    - push\n    - pull_request\n  branch:\n    - main\nsteps:\n  - name: test-step-2\n    image: golang:1.27\n    commands:\n      - go vet ./...\n  - name: test-step-3\n    image: golang:1.27\n    commands:\n      - GOARCH=amd64 go test ./...\n---\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: test-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/ci/job/test\n# pipemaster:arg {\"Ref\":\"golang:1.27\",\"Entrypoint\":null,\"taken\":2}\n# pipemaster:emulated job.matrix pipeline/ci/job/test\n# pipemaster:arg {\"job\":\"test\",\"cell\":[{\"Key\":\"arch\",\"Value\":\"arm64\"}],\"index\":1}\nkind: pipeline\ntype: docker\nname: test-arm64\ntrigger:\n  event:\n    - push\n    - pull_request\n  branch:\n    - main\nsteps:\n  - name: test-step-2\n    image: golang:1.27\n    commands:\n      - go vet ./...\n  - name: test-step-3\n    image: golang:1.27\n    commands:\n      - GOARCH=arm64 go test ./...\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/ci",
+     "feature": "display.name",
+     "level": "lost",
+     "detail": "the Drone pipeline name is its id; the display name is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.environment",
+     "level": "lost",
+     "detail": "Drone has no environment name or URL in the pipeline file"
+    },
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.runner",
+     "level": "lost",
+     "detail": "only the platform has a Drone form; other runner labels are lost"
+    },
+    {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "the action reference actions/checkout@v4 is not in the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/ci/job/test",
+     "feature": "job.runner",
+     "level": "lost",
+     "detail": "only the platform has a Drone form; other runner labels are lost"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "the action reference actions/checkout@v4 is not in the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "case-sensitive comparison",
+     "detail": "Drone compares case-sensitively; GHA ignores case"
+    },
+    {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-1",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "per actions.Lookup verdict; a plugin step with settings",
+     "detail": "unknown actions are lost"
+    },
+    {
+     "path": "pipeline/ci/job/test",
+     "feature": "job.matrix",
+     "level": "emulated",
+     "strategy": "one pipeline document per cell",
+     "detail": "fail-fast and max-parallel are lost; a failed sibling stops the others without order"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-1",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "per actions.Lookup verdict; a plugin step with settings",
+     "detail": "unknown actions are lost"
+    }
+   ]
+  },
+  {
+   "id": "forgejo",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".forgejo/workflows/ci.yml",
+     "text": "# pipemaster:emulated pipeline.concurrency pipeline/ci\nname: ci\non:\n  pull_request:\n    branches:\n      - main\n  push:\n    branches:\n      - main\nconcurrency:\n  group: ${{ github.run_id }}\n  cancel-in-progress: false\njobs:\n  deploy:\n    needs:\n      - test\n    if: github.ref_name == 'main'\n    runs-on: ubuntu-latest\n    container: alpine:3.22\n    environment: production\n    steps:\n      - uses: https://github.com/actions/checkout@v4\n      - run: ./scripts/deploy.sh\n        env:\n          TOKEN: ${{ secrets.DEPLOY_TOKEN }}\n  test:\n    runs-on: ubuntu-latest\n    container: golang:1.27\n    strategy:\n      matrix:\n        arch:\n          - amd64\n          - arm64\n    steps:\n      - uses: https://github.com/actions/checkout@v4\n      - run: go vet ./...\n      - run: GOARCH=${{ matrix.arch }} go test ./...\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.environment",
+     "level": "lost",
+     "detail": "Forgejo does not document environment"
+    },
+    {
+     "path": "pipeline/ci",
+     "feature": "pipeline.concurrency",
+     "level": "emulated",
+     "strategy": "concurrency group per run",
+     "detail": "Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group"
+    },
+    {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-1",
+     "feature": "step.action",
+     "level": "native",
+     "detail": "printed as an absolute URL; an instance that cannot reach https://github.com needs the URL edited"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-1",
+     "feature": "step.action",
+     "level": "native",
+     "detail": "printed as an absolute URL; an instance that cannot reach https://github.com needs the URL edited"
+    }
+   ]
+  },
+  {
+   "id": "gitea",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".gitea/workflows/ci.yml",
+     "text": "name: ci\non:\n  pull_request:\n    branches:\n      - main\n  push:\n    branches:\n      - main\njobs:\n  deploy:\n    needs:\n      - test\n    if: github.ref_name == 'main'\n    runs-on: ubuntu-latest\n    container: alpine:3.22\n    environment: production\n    steps:\n      - uses: actions/checkout@v4\n      - run: ./scripts/deploy.sh\n        env:\n          TOKEN: ${{ secrets.DEPLOY_TOKEN }}\n  test:\n    runs-on: ubuntu-latest\n    container: golang:1.27\n    strategy:\n      matrix:\n        arch:\n          - amd64\n          - arm64\n    steps:\n      - uses: actions/checkout@v4\n      - run: go vet ./...\n      - run: GOARCH=${{ matrix.arch }} go test ./...\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.environment",
+     "level": "lost",
+     "detail": "Gitea ignores jobs.<id>.environment"
+    },
+    {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-1",
+     "feature": "step.action",
+     "level": "native",
+     "detail": "resolves against DEFAULT_ACTIONS_URL; default github"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-1",
+     "feature": "step.action",
+     "level": "native",
+     "detail": "resolves against DEFAULT_ACTIONS_URL; default github"
+    },
+    {
+     "path": "pipeline/ci/trigger/0",
+     "feature": "trigger.pull_request",
+     "level": "native",
+     "detail": "the ref is refs/pull/N/head, not the merge ref"
+    }
+   ]
+  },
+  {
+   "id": "gitlab",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".gitlab-ci.yml",
+     "text": "# pipemaster:emulated trigger.pull_request pipeline/ci/trigger/0\n# pipemaster:arg {\"kind\":\"pr\",\"branches\":{\"Include\":[\"main\"],\"Exclude\":null}}\n# pipemaster:emulated trigger.push pipeline/ci/trigger/1\n# pipemaster:arg {\"kind\":\"push\",\"branches\":{\"Include\":[\"main\"],\"Exclude\":null}}\n# pipemaster:emulated script.interpolation pipeline/ci\n# pipemaster:arg [{\"k\":\"t\",\"p\":\"job/test/step/test-step-3/script/0\",\"g\":\"GOARCH=$arch go test ./...\",\"s\":\"GOARCH=$\\u007b{ matrix.arch }} go test ./...\"}]\nstages:\n  - stage-0\n  - stage-1\nworkflow:\n  rules:\n    - if: $CI_PIPELINE_SOURCE == \"merge_request_event\" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == \"main\"\n    - if: $CI_COMMIT_BRANCH == \"main\"\n# pipemaster:emulated job.if pipeline/ci/job/deploy\n# pipemaster:arg {\"src\":\"ref_name == 'main'\",\"from\":\"gha\"}\ndeploy:\n  stage: stage-1\n  image: alpine:3.22\n  tags:\n    - ubuntu-latest\n  needs:\n    - test\n  rules:\n    - if: $CI_COMMIT_REF_NAME =~ /^main$/i\n  script:\n    # pipemaster:step deploy-step-1\n    # pipemaster:step deploy-step-2\n    # pipemaster:emulated step.env pipeline/ci/job/deploy/step/deploy-step-2\n    - |\n      (\n      export TOKEN=\"$DEPLOY_TOKEN\"\n      ./scripts/deploy.sh\n      )\n  environment: production\ntest:\n  stage: stage-0\n  image: golang:1.27\n  tags:\n    - ubuntu-latest\n  needs: []\n  script:\n    # pipemaster:step test-step-1\n    # pipemaster:step test-step-2\n    - go vet ./...\n    # pipemaster:step test-step-3\n    - GOARCH=$arch go test ./...\n  parallel:\n    matrix:\n      - arch:\n          - amd64\n          - arm64\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/ci",
+     "feature": "display.name",
+     "level": "lost",
+     "detail": "GitLab CI has no display name here; the name is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "the action reference actions/checkout@v4 is not in the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-2",
+     "feature": "step.env",
+     "level": "lost",
+     "detail": "secret DEPLOY_TOKEN is written as the variable $DEPLOY_TOKEN; a GitLab file cannot mark it as a secret"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "the action reference actions/checkout@v4 is not in the GitLab file; it is kept in round-trip metadata"
+    }
+   ]
+  },
+  {
+   "id": "tekton",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".tekton/kustomization.yaml",
+     "text": "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n  - pipeline.yaml\n  - rbac/triggers.yaml\n  - tasks/ci-deploy.yaml\n  - tasks/ci-test.yaml\n  - triggers/eventlistener.yaml\n  - triggers/triggerbinding.yaml\n  - triggers/triggertemplate.yaml\n"
+    },
+    {
+     "path": ".tekton/pipeline.yaml",
+     "text": "# pipemaster:emulated config.name pipeline/ci/ref/secrets.DEPLOY_TOKEN\napiVersion: tekton.dev/v1\nkind: Pipeline\nmetadata:\n  name: ci\nspec:\n  displayName: ci\n  params:\n    - name: ctx-sha\n      default: \"\"\n    - name: ctx-repo\n      default: \"\"\n    - name: ctx-ref-name\n      default: \"\"\n  tasks:\n    - name: deploy\n      taskRef:\n        name: ci-deploy\n      params:\n        - name: ctx-repo\n          value: $(params.ctx-repo)\n        - name: ctx-sha\n          value: $(params.ctx-sha)\n      runAfter:\n        - test\n      when:\n        - input: $(params.ctx-ref-name)\n          operator: in\n          values:\n            - main\n    - name: test\n      taskRef:\n        name: ci-test\n      params:\n        - name: ctx-repo\n          value: $(params.ctx-repo)\n        - name: ctx-sha\n          value: $(params.ctx-sha)\n      matrix:\n        params:\n          - name: arch\n            value:\n              - amd64\n              - arm64\n"
+    },
+    {
+     "path": ".tekton/rbac/triggers.yaml",
+     "text": "# pipemaster:generated\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: pipemaster-triggers\n  namespace: default\n---\n# pipemaster:generated\napiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  name: pipemaster-triggers\n  namespace: default\nrules:\n  - apiGroups:\n      - triggers.tekton.dev\n    resources:\n      - eventlisteners\n      - triggerbindings\n      - triggertemplates\n      - triggers\n      - interceptors\n    verbs:\n      - get\n      - list\n      - watch\n  - apiGroups:\n      - \"\"\n    resources:\n      - configmaps\n      - secrets\n    verbs:\n      - get\n      - list\n      - watch\n  - apiGroups:\n      - tekton.dev\n    resources:\n      - pipelineruns\n      - taskruns\n    verbs:\n      - create\n---\n# pipemaster:generated\napiVersion: rbac.authorization.k8s.io/v1\nkind: RoleBinding\nmetadata:\n  name: pipemaster-triggers\n  namespace: default\nsubjects:\n  - kind: ServiceAccount\n    name: pipemaster-triggers\n    namespace: default\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: Role\n  name: pipemaster-triggers\n---\n# pipemaster:generated\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRole\nmetadata:\n  name: pipemaster-triggers\nrules:\n  - apiGroups:\n      - triggers.tekton.dev\n    resources:\n      - clustertriggerbindings\n      - clusterinterceptors\n      - interceptors\n    verbs:\n      - get\n      - list\n      - watch\n---\n# pipemaster:generated\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRoleBinding\nmetadata:\n  name: pipemaster-triggers\nsubjects:\n  - kind: ServiceAccount\n    name: pipemaster-triggers\n    namespace: default\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: ClusterRole\n  name: pipemaster-triggers\n"
+    },
+    {
+     "path": ".tekton/tasks/ci-deploy.yaml",
+     "text": "# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: deploy-step-1\\nkind: action\\n\",\"wrote\":\"{\\\"name\\\":\\\"deploy-step-1\\\",\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/$(params.ctx-repo).git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"$(params.ctx-sha)\\\"},{\\\"name\\\":\\\"output-path\\\",\\\"value\\\":\\\"/workspace\\\"}],\\\"ref\\\":{\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/tektoncd-catalog/git-clone.git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"v1.7.1\\\"},{\\\"name\\\":\\\"pathInRepo\\\",\\\"value\\\":\\\"stepaction/git-clone/git-clone.yaml\\\"}],\\\"resolver\\\":\\\"git\\\"}}\",\"at\":0}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: ci-deploy\nspec:\n  params:\n    - name: ctx-repo\n    - name: ctx-sha\n  stepTemplate:\n    image: alpine:3.22\n    workingDir: /workspace\n  steps:\n    - name: deploy-step-1\n      ref:\n        resolver: git\n        params:\n          - name: url\n            value: https://github.com/tektoncd-catalog/git-clone.git\n          - name: revision\n            value: v1.7.1\n          - name: pathInRepo\n            value: stepaction/git-clone/git-clone.yaml\n      params:\n        - name: url\n          value: https://github.com/$(params.ctx-repo).git\n        - name: revision\n          value: $(params.ctx-sha)\n        - name: output-path\n          value: /workspace\n    - name: deploy-step-2\n      script: ./scripts/deploy.sh\n      env:\n        - name: TOKEN\n          valueFrom:\n            secretKeyRef:\n              name: ci-secrets\n              key: DEPLOY_TOKEN\n"
+    },
+    {
+     "path": ".tekton/tasks/ci-test.yaml",
+     "text": "# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: test-step-1\\nkind: action\\n\",\"wrote\":\"{\\\"name\\\":\\\"test-step-1\\\",\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/$(params.ctx-repo).git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"$(params.ctx-sha)\\\"},{\\\"name\\\":\\\"output-path\\\",\\\"value\\\":\\\"/workspace\\\"}],\\\"ref\\\":{\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/tektoncd-catalog/git-clone.git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"v1.7.1\\\"},{\\\"name\\\":\\\"pathInRepo\\\",\\\"value\\\":\\\"stepaction/git-clone/git-clone.yaml\\\"}],\\\"resolver\\\":\\\"git\\\"}}\",\"at\":0}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: ci-test\nspec:\n  params:\n    - name: arch\n    - name: ctx-repo\n    - name: ctx-sha\n  stepTemplate:\n    image: golang:1.27\n    workingDir: /workspace\n  steps:\n    - name: test-step-1\n      ref:\n        resolver: git\n        params:\n          - name: url\n            value: https://github.com/tektoncd-catalog/git-clone.git\n          - name: revision\n            value: v1.7.1\n          - name: pathInRepo\n            value: stepaction/git-clone/git-clone.yaml\n      params:\n        - name: url\n          value: https://github.com/$(params.ctx-repo).git\n        - name: revision\n          value: $(params.ctx-sha)\n        - name: output-path\n          value: /workspace\n    - name: test-step-2\n      script: go vet ./...\n    - name: test-step-3\n      script: GOARCH=$(params.arch) go test ./...\n"
+    },
+    {
+     "path": ".tekton/triggers/eventlistener.yaml",
+     "text": "# pipemaster:emulated trigger.pull_request pipeline/ci/trigger/0\n# pipemaster:arg {\"kind\":\"pr\",\"name\":\"ci-pr-0\",\"branches\":{\"Include\":[\"main\"],\"Exclude\":null},\"tags\":{\"Include\":null,\"Exclude\":null},\"paths\":{\"Include\":null,\"Exclude\":null}}\n# pipemaster:emulated trigger.push pipeline/ci/trigger/1\n# pipemaster:arg {\"kind\":\"push\",\"name\":\"ci-push-1\",\"branches\":{\"Include\":[\"main\"],\"Exclude\":null},\"tags\":{\"Include\":null,\"Exclude\":null},\"paths\":{\"Include\":null,\"Exclude\":null}}\n# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0\n# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1\napiVersion: triggers.tekton.dev/v1beta1\nkind: EventListener\nmetadata:\n  name: pipemaster\nspec:\n  serviceAccountName: pipemaster-triggers\n  triggers:\n    - name: ci-pr-0\n      interceptors:\n        - ref:\n            name: github\n          params:\n            - name: eventTypes\n              value:\n                - pull_request\n            - name: secretRef\n              value:\n                secretName: pipemaster-github-webhook\n                secretKey: token\n        - ref:\n            name: cel\n          params:\n            - name: filter\n              value: body.action in ['opened','synchronize','reopened'] && body.pull_request.head.repo.full_name == body.repository.full_name && (body.pull_request.base.ref.matches(r'^main$'))\n            - name: overlays\n              value:\n                - key: ctx_sha\n                  expression: body.pull_request.head.sha\n                - key: ctx_repo\n                  expression: body.repository.full_name\n                - key: ctx_ref_name\n                  expression: string(int(body.number)) + '/merge'\n      bindings:\n        - ref: ci-github\n      template:\n        ref: ci-run\n    - name: ci-push-1\n      interceptors:\n        - ref:\n            name: github\n          params:\n            - name: eventTypes\n              value:\n                - push\n            - name: secretRef\n              value:\n                secretName: pipemaster-github-webhook\n                secretKey: token\n        - ref:\n            name: cel\n          params:\n            - name: filter\n              value: body.ref.startsWith('refs/heads/') && (body.ref.replace('refs/heads/','',1).matches(r'^main$'))\n            - name: overlays\n              value:\n                - key: ctx_sha\n                  expression: body.after\n                - key: ctx_repo\n                  expression: body.repository.full_name\n                - key: ctx_ref_name\n                  expression: body.ref.replace('refs/heads/','',1)\n      bindings:\n        - ref: ci-github\n      template:\n        ref: ci-run\n"
+    },
+    {
+     "path": ".tekton/triggers/triggerbinding.yaml",
+     "text": "# pipemaster:generated\napiVersion: triggers.tekton.dev/v1beta1\nkind: TriggerBinding\nmetadata:\n  name: ci-github\nspec:\n  params:\n    - name: ctx-sha\n      value: $(extensions.ctx_sha)\n    - name: ctx-repo\n      value: $(extensions.ctx_repo)\n    - name: ctx-ref-name\n      value: $(extensions.ctx_ref_name)\n"
+    },
+    {
+     "path": ".tekton/triggers/triggertemplate.yaml",
+     "text": "# pipemaster:generated\napiVersion: triggers.tekton.dev/v1beta1\nkind: TriggerTemplate\nmetadata:\n  name: ci-run\nspec:\n  params:\n    - name: ctx-sha\n      default: \"\"\n    - name: ctx-repo\n      default: \"\"\n    - name: ctx-ref-name\n      default: \"\"\n  resourcetemplates:\n    - apiVersion: tekton.dev/v1\n      kind: PipelineRun\n      metadata:\n        generateName: ci-run-\n      spec:\n        pipelineRef:\n          name: ci\n        params:\n          - name: ctx-sha\n            value: $(tt.params.ctx-sha)\n          - name: ctx-repo\n            value: $(tt.params.ctx-repo)\n          - name: ctx-ref-name\n            value: $(tt.params.ctx-ref-name)\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.environment",
+     "level": "lost",
+     "detail": "Tekton has no environment name or URL"
+    },
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.runner",
+     "level": "lost",
+     "detail": "Tekton schedules pods, not runner labels"
+    },
+    {
+     "path": "pipeline/ci/job/test",
+     "feature": "job.runner",
+     "level": "lost",
+     "detail": "Tekton schedules pods, not runner labels"
+    },
+    {
+     "path": "pipeline/ci/trigger/0",
+     "feature": "trigger.pull_request",
+     "level": "external",
+     "strategy": "same-repository pull requests only; Secret pipemaster-github-webhook",
+     "detail": "the filter admits only pull requests from this repository, because the code of a fork would run with every secret of the Task; GitHub Actions withholds secrets from fork runs. Remove the head.repo term of the filter to accept forks; create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign"
+    },
+    {
+     "path": "pipeline/ci/trigger/1",
+     "feature": "trigger.push",
+     "level": "external",
+     "strategy": "Secret pipemaster-github-webhook",
+     "detail": "create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign"
+    },
+    {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-1",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "StepAction ref to the tektoncd-catalog git-clone through the git resolver",
+     "detail": "the ctx-repo and ctx-sha params carry the repository and the commit"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-1",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "StepAction ref to the tektoncd-catalog git-clone through the git resolver",
+     "detail": "the ctx-repo and ctx-sha params carry the repository and the commit"
+    },
+    {
+     "path": "pipeline/ci/ref/secrets.DEPLOY_TOKEN",
+     "feature": "config.name",
+     "level": "emulated",
+     "strategy": "secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars",
+     "detail": "the Secret values and ConfigMap values are not written"
+    },
+    {
+     "path": "pipeline/ci/trigger/0",
+     "feature": "trigger.filter.branches",
+     "level": "emulated",
+     "strategy": "CEL interceptor filter on the ref",
+     "detail": "the EventListener serves GitHub webhooks only"
+    },
+    {
+     "path": "pipeline/ci/trigger/1",
+     "feature": "trigger.filter.branches",
+     "level": "emulated",
+     "strategy": "CEL interceptor filter on the ref",
+     "detail": "the EventListener serves GitHub webhooks only"
+    }
+   ]
+  },
+  {
+   "id": "woodpecker",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".woodpecker/deploy.yaml",
+     "text": "# pipemaster:emulated job.container pipeline/ci/job/deploy\n# pipemaster:arg {\"Ref\":\"alpine:3.22\",\"Entrypoint\":null}\n# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: deploy-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:lost job.if pipeline/ci/job/deploy: ref_name == 'main'\nwhen:\n  - event: pull_request\n    branch: main\n    evaluate: \"false\"\n  - event: push\n    branch: main\n    evaluate: \"false\"\ndepends_on:\n  - test\nsteps:\n  - image: alpine:3.22\n    commands:\n      - ./scripts/deploy.sh\n    environment:\n      TOKEN:\n        from_secret: DEPLOY_TOKEN\n"
+    },
+    {
+     "path": ".woodpecker/test.yaml",
+     "text": "# pipemaster:emulated job.container pipeline/ci/job/test\n# pipemaster:arg {\"Ref\":\"golang:1.27\",\"Entrypoint\":null}\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: test-step-1\\nkind: action\\n\",\"at\":0}\nwhen:\n  - event: pull_request\n    branch: main\n  - event: push\n    branch: main\nmatrix:\n  arch:\n    - amd64\n    - arm64\nsteps:\n  - image: golang:1.27\n    commands:\n      - go vet ./...\n  - image: golang:1.27\n    commands:\n      - GOARCH=${arch} go test ./...\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/ci",
+     "feature": "display.name",
+     "level": "lost",
+     "detail": "the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.environment",
+     "level": "lost",
+     "detail": "Woodpecker has no environment name or URL in the workflow"
+    },
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "condition not expressible in Woodpecker CI; the workflow disabled"
+    },
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.runner",
+     "level": "lost",
+     "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
+    },
+    {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "the action reference actions/checkout@v4 is not in the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/ci/job/test",
+     "feature": "job.runner",
+     "level": "lost",
+     "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "the action reference actions/checkout@v4 is not in the Woodpecker file; it is kept in round-trip metadata"
+    }
+   ]
+  }
+ ]
+}
