@@ -46,7 +46,7 @@ func (e *emitter) source(path string, f caps.Feature, x expr.Expr) (expr.Expr, b
 		r, rok := e.source(path, f, b.R)
 		return expr.Binary{Op: expr.OpAnd, L: l, R: r}, lok && rok
 	}
-	if t, ok := expr.Translate(x, *e.from, exprgha.Lang); ok {
+	if t, ok := expr.TranslateFacts(x, *e.from, exprgha.Lang, expr.Facts{}); ok {
 		// An exact translation can still change the shape, such as a tag test that GHA spells with ref_type.
 		if (f == caps.JobIf || f == caps.StepIf) && expr.String(t) != expr.String(x) {
 			if err := e.markArg(f, path, srcArg{Src: expr.String(x), From: markFrom(e.from)}); err != nil {

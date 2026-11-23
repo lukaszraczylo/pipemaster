@@ -417,7 +417,7 @@ func (e *emitter) condition(path string, f caps.Feature, x expr.Expr, what strin
 	t := x
 	if e.from != nil {
 		var ok bool
-		if t, ok = expr.Translate(x, *e.from, exprgitlab.Lang); !ok {
+		if t, ok = expr.TranslateFacts(x, *e.from, exprgitlab.Lang, expr.Facts{}); !ok {
 			e.disable(path, f, x, what)
 			return nil, false
 		}

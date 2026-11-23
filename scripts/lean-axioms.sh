@@ -37,6 +37,13 @@ required=(
   Pipemaster.TranslateFacts.tr_PRG
   Pipemaster.TranslateFacts.trFactsWp_sound
   Pipemaster.TranslateFacts.guard_pr_unsound
+  Pipemaster.TranslateFacts.glPr_eval
+  Pipemaster.TranslateFacts.glWp_sound
+  Pipemaster.TranslateFacts.glWp_plain_unsound
+  Pipemaster.TranslateFacts.ghaGl_neg_affix_unsound
+  Pipemaster.TranslateFacts.glGha_affix_unsound
+  Pipemaster.TranslateFacts.wpGl_neg_unsound
+  Pipemaster.TranslateFacts.wpGha_neg_unsound
   Pipemaster.TranslateClass.eval_congr
   Pipemaster.TranslateClass.rename_sound
   Pipemaster.TranslateClass.tr_sound_dialect

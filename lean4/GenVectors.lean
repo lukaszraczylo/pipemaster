@@ -436,6 +436,50 @@ def factCases : List (Json × Json) :=
   factExprs.map (factCase "gha-gitlab-facts" true) ++ factExprs.map (factCase "gha-gitlab-guard" false)
 
 
+/-- GitLab runs for the merge request vectors: a merge request pipeline has a branch ref type and no CI_COMMIT_BRANCH
+(glEnv), so `wpTarget` is what Woodpecker reports there. -/
+def glEnvs : List Expr.Env :=
+  [⟨some "main", some .branch, some .push, some "abc", none⟩,
+   ⟨some "dev", some .branch, some .push, some "abc", none⟩,
+   ⟨some "feature", some .branch, some .pullRequest, some "abc", none⟩,
+   ⟨some "main", some .branch, some .pullRequest, some "abc", none⟩,
+   ⟨some "v1", some .tag, some .push, some "abc", none⟩,
+   ⟨some "main", some .branch, some .schedule, some "abc", none⟩,
+   ⟨some "release/1", some .branch, some .workflowDispatch, some "abc", none⟩,
+   ⟨none, none, none, none, none⟩]
+
+def glEnvsJson : Json := Json.arr (glEnvs.map envJson).toArray
+
+open Expr TranslateFacts in
+def glPrCase (e : E) : Json × Json :=
+  let src := glEnvs.map fun env => holds .gitlab (glEnv env) e
+  let out := match glPr e with
+    | none => Json.mkObj [("tr", Json.null)]
+    | some t => Json.mkObj [("tr", exprJson t), ("src", Json.arr (src.map Json.bool).toArray),
+        ("wp", Json.arr (glEnvs.map (fun env => Json.bool (holds .gitlab (Woodpecker.wpView (wpMap env wpTarget)) t))).toArray),
+        ("plain", Json.arr (glEnvs.map (fun env => Json.bool (holds .gitlab (Woodpecker.wpView (wpMap env wpTarget)) e))).toArray)]
+  (Json.mkObj [("dir", "gitlab-woodpecker-pr"), ("expr", exprJson e)], out)
+
+open Expr in
+def glPrExprs : List E :=
+  let br := E.ref .branch
+  let ev := E.ref .event
+  let rxs := [Mode.exact, .prefix, .suffix, .sub].flatMap fun m =>
+    ["main", "rel", "1"].flatMap fun s => [E.rx br m s, E.nrx br m s]
+  let eqs := ["main", "", "Main", "release/1"].flatMap fun s => [E.eq br (E.str s), E.ne br (E.str s)]
+  let shapes := [E.eq (E.str "main") br, E.ref .branch, E.rx (E.str "x") .exact "main", E.rx br .exact "", E.opq,
+    E.lt br (E.str "m"), E.startsWith br (E.str "m")]
+  let others := [E.rx (E.ref .tag) .exact "v1", E.nrx (E.ref .tag) .exact "v1", E.rx ev .exact "merge_request_event",
+    E.nrx ev .exact "merge_request_event", E.eq ev (E.str "push"), E.ne ev (E.str "push")]
+  let p1 := rxs ++ eqs ++ shapes ++ others
+  let core := [E.rx br .exact "main", E.nrx br .exact "main", E.eq br (E.str "main"), E.ne br (E.str "main"),
+    E.rx br .prefix "rel", E.rx (E.ref .tag) .exact "v1", E.rx ev .exact "merge_request_event"]
+  p1 ++ p1.map E.not ++ (p1.map E.not).map E.not ++ joinAll core core
+
+open Expr in
+def glPrCases : List (Json × Json) :=
+  (glPrExprs.filter fun e => Woodpecker.GlSub e || true).map glPrCase
+
 /-! ## Adapter vectors (Task 23)
 
 Core pipelines are enumerated bounded-exhaustively and kept when they lie in the fragments:
@@ -1000,4 +1044,8 @@ def main (args : List String) : IO UInt32 := do
     IO.FS.writeFile s!"{dir}/expr-facts.json"
       (GenVectors.emit "Pipemaster.TranslateFacts.trFactsWp_sound" GenVectors.factCases (some GenVectors.factEnvsJson))
     IO.println s!"expr-facts: {GenVectors.factCases.length} cases"
+  if want "expr-glpr" then
+    IO.FS.writeFile s!"{dir}/expr-glpr.json"
+      (GenVectors.emit "Pipemaster.TranslateFacts.glWp_sound" GenVectors.glPrCases (some GenVectors.glEnvsJson))
+    IO.println s!"expr-glpr: {GenVectors.glPrCases.length} cases"
   return 0

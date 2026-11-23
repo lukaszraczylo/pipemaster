@@ -230,8 +230,8 @@ func (e *emitter) disable(path string, f caps.Feature, x expr.Expr, what string)
 // result that differs from the plain translation, or one that only exists with the facts.
 func (e *emitter) translate(x expr.Expr) (t expr.Expr, usedFacts, ok bool) {
 	t, ok = expr.TranslateFacts(x, *e.from, wpexpr.Lang, e.facts)
-	if !ok || !e.facts.Branch {
-		return t, false, ok
+	if !ok {
+		return t, false, false
 	}
 	plain, plainOK := expr.Translate(x, *e.from, wpexpr.Lang)
 	return t, !plainOK || expr.String(plain) != expr.String(t), true
@@ -247,7 +247,7 @@ func (e *emitter) sourceArg(x expr.Expr) (a srcArg, usedFacts, ok bool) {
 	if !ok || expr.String(t) == expr.String(x) {
 		return srcArg{}, false, false
 	}
-	return srcArg{Src: expr.String(x), From: e.from.ID, Branch: usedFacts}, usedFacts, true
+	return srcArg{Src: expr.String(x), From: e.from.ID, Branch: e.facts.Branch}, usedFacts, true
 }
 
 // jobSource carries a job condition in its source dialect only when the trigger facts shaped its translation:
@@ -257,13 +257,23 @@ func (e *emitter) jobSource(x expr.Expr) (srcArg, bool) {
 	return a, ok && usedFacts
 }
 
+// notePullRequestTest reports a condition whose translation differs from the plain one: Woodpecker holds the
+// target branch on a pull request, so the written condition carries a pull request test that the source does not
+// have. Without the round-trip metadata it comes back with that test.
+func (e *emitter) notePullRequestTest(path string, f caps.Feature, used bool) {
+	if used {
+		e.external(path, f, "pull request test", "Woodpecker holds the target branch in CI_COMMIT_BRANCH on a pull request, so the condition gains a pull request test; the source condition is kept in a marker")
+	}
+}
+
 // markSource records a condition in its source dialect when the translation changed its text, so a return
 // conversion restores it.
 func (e *emitter) markSource(path string, f caps.Feature, x expr.Expr) {
-	a, _, ok := e.sourceArg(x)
+	a, usedFacts, ok := e.sourceArg(x)
 	if !ok {
 		return
 	}
+	e.notePullRequestTest(path, f, usedFacts)
 	if err := e.markArg(f, path, a); err != nil {
 		e.comment("expression source not carried: " + err.Error())
 	}
@@ -622,6 +632,7 @@ func (e *emitter) mergeCond(jp string, orig expr.Expr, base []whenEntry, cond []
 		out[i].Evaluate = andText(out[i].Evaluate, text)
 	}
 	src, hasSrc := e.jobSource(orig)
+	e.notePullRequestTest(jp, caps.JobIf, hasSrc)
 	if len(out) == 1 || hasSrc {
 		if err := e.markArg(caps.JobIf, jp, gateArg{srcArg: src, Gate: len(out) == 1}); err != nil {
 			e.comment("job condition marker not carried: " + err.Error())

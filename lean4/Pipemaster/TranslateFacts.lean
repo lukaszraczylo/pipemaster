@@ -1,4 +1,6 @@
 import Pipemaster.Translate
+import Pipemaster.TranslateClass
+import Pipemaster.Woodpecker
 
 namespace Pipemaster
 namespace TranslateFacts
@@ -621,6 +623,338 @@ theorem guard_pr_unsound : ∃ (env : Env) (tgt : Option String), PrFact env ∧
   · intro _ r hr
     cases hr
     decide
+
+
+/-! ### A GitLab source
+
+In GitLab, CI_COMMIT_BRANCH and CI_COMMIT_TAG are not set in a merge request pipeline
+(https://docs.gitlab.com/ci/variables/predefined_variables/, rows CI_COMMIT_BRANCH: "Not available in merge request
+pipelines or tag pipelines", CI_COMMIT_TAG: "Available only in pipelines for tags"). `glEnv` is that environment.
+Woodpecker holds the target branch in CI_COMMIT_BRANCH there (`wpMap`). A test of the branch ref therefore needs the
+pull request test in front of it. -/
+
+/-- A GitLab run: no branch and no tag in a merge request pipeline. -/
+def glEnv (env : Env) : View
+  | .branch => if env.event = some .pullRequest then none else mapEnv env .branch
+  | .tag => if env.event = some .pullRequest then none else mapEnv env .tag
+  | r => mapEnv env r
+
+def evPrRx : E := .rx (.ref .event) .exact "merge_request_event"
+def evNotPrRx : E := .nrx (.ref .event) .exact "merge_request_event"
+
+/-- Mirrors expr.AssumeGitLab (expr/translate_facts.go): a test of the branch ref against a non-empty literal
+gains the pull request test. A positive test is false on a pull request, so it is guarded by `event !~ pr`;
+a negative one is true there, so it is joined by `event =~ pr`. A use of the branch ref in any other shape has
+no rewrite (`none`). -/
+def glPr : E → Option E
+  | .not x => (glPr x).map .not
+  | .and l r => (glPr l).bind fun a => (glPr r).map fun b => .and a b
+  | .or l r => (glPr l).bind fun a => (glPr r).map fun b => .or a b
+  | .rx (.ref .branch) m s => if s != "" then some (.and evNotPrRx (.rx (.ref .branch) m s)) else none
+  | .nrx (.ref .branch) m s => if s != "" then some (.or evPrRx (.nrx (.ref .branch) m s)) else none
+  | .eq (.ref .branch) (.str s) => if s != "" then some (.and evNotPrRx (.eq (.ref .branch) (.str s))) else none
+  | .ne (.ref .branch) (.str s) => if s != "" then some (.or evPrRx (.ne (.ref .branch) (.str s))) else none
+  | e => if (TranslateClass.refs e).all (fun r => r != .branch) then some e else none
+
+theorem glEnv_wpMap (env : Env) (tgt : Option String) {r : Ref} (h : r ≠ .branch) : glEnv env r = wpMap env tgt r := by
+  cases r <;> simp [glEnv, wpMap] at h ⊢
+
+theorem evNotPrRx_eval (V : View) (hV : V .event = (mapEnv env) .event) :
+    eval .gitlab V evNotPrRx = .bool (!decide (env.event = some .pullRequest)) := by
+  cases h : env.event with
+  | none => simp [evNotPrRx, eval, refV, hV, mapEnv, h, matchV, modeTest]
+  | some e => cases e <;> simp [evNotPrRx, eval, refV, hV, mapEnv, h, evGl, matchV, modeTest, lower]
+
+theorem evPrRx_eval (V : View) (hV : V .event = (mapEnv env) .event) :
+    eval .gitlab V evPrRx = .bool (decide (env.event = some .pullRequest)) := by
+  cases h : env.event with
+  | none => simp [evPrRx, eval, refV, hV, mapEnv, h, matchV, modeTest]
+  | some e => cases e <;> simp [evPrRx, eval, refV, hV, mapEnv, h, evGl, matchV, modeTest, lower]
+
+
+theorem glPr_free {e e' : E} (env : Env) (tgt : Option String)
+    (h : (TranslateClass.refs e).all (fun r => r != .branch) = true) (he : e' = e) :
+    eval .gitlab (wpMap env tgt) e' = eval .gitlab (glEnv env) e := by
+  subst he
+  apply TranslateClass.eval_congr
+  intro r hr
+  have : r ≠ .branch := by
+    have := List.all_eq_true.mp h r hr
+    simpa using this
+  exact (glEnv_wpMap env tgt this).symm
+
+theorem branch_pr {env : Env} (tgt : Option String) (V1 V2 : View) (hp : env.event = some .pullRequest)
+    (h1 : V1 .branch = tgt) (h2 : V2 .branch = none) (s : String) (hs : s ≠ "") (m : Mode) :
+    matchV m s (refV V2 .branch) = false := by
+  simp [refV, h2, matchV, lower_empty, Woodpecker.modeTest_empty m hs]
+
+theorem glPr_default {e e' : E} (env : Env) (tgt : Option String)
+    (h : (if (TranslateClass.refs e).all (fun r => r != .branch) = true then some e else none) = some e') :
+    eval .gitlab (wpMap env tgt) e' = eval .gitlab (glEnv env) e := by
+  split at h
+  · rename_i hf
+    cases h
+    exact glPr_free env tgt hf rfl
+  · simp at h
+
+/-- A positive test of the branch ref: false on a pull request in GitLab, so the pull request test in front of it
+keeps Woodpecker false there. -/
+theorem glPr_pos (env : Env) (tgt : Option String) (T : E)
+    (hT : ∀ hp : env.event = some .pullRequest, eval .gitlab (glEnv env) T = .bool false)
+    (hn : ∀ hp : env.event ≠ some .pullRequest, eval .gitlab (wpMap env tgt) T = eval .gitlab (glEnv env) T) :
+    eval .gitlab (wpMap env tgt) (.and evNotPrRx T) = eval .gitlab (glEnv env) T := by
+  by_cases hp : env.event = some .pullRequest
+  · have hl := evNotPrRx_eval (env := env) (wpMap env tgt) (by simp [wpMap, hp])
+    simp [eval, hl, hp, logicalTruthy, rubyTruthy, hT hp]
+  · have hl := evNotPrRx_eval (env := env) (wpMap env tgt) (by simp [wpMap, hp])
+    simp [eval, hl, hp, logicalTruthy, rubyTruthy, hn hp]
+
+theorem glPr_neg (env : Env) (tgt : Option String) (T : E)
+    (hT : ∀ hp : env.event = some .pullRequest, eval .gitlab (glEnv env) T = .bool true)
+    (hn : ∀ hp : env.event ≠ some .pullRequest, eval .gitlab (wpMap env tgt) T = eval .gitlab (glEnv env) T) :
+    eval .gitlab (wpMap env tgt) (.or evPrRx T) = eval .gitlab (glEnv env) T := by
+  by_cases hp : env.event = some .pullRequest
+  · have hl := evPrRx_eval (env := env) (wpMap env tgt) (by simp [wpMap, hp])
+    simp [eval, hl, hp, logicalTruthy, rubyTruthy, hT hp]
+  · have hl := evPrRx_eval (env := env) (wpMap env tgt) (by simp [wpMap, hp])
+    simp [eval, hl, hp, logicalTruthy, rubyTruthy, hn hp]
+
+theorem branch_agree {env : Env} (tgt : Option String) (hp : env.event ≠ some .pullRequest) :
+    wpMap env tgt .branch = glEnv env .branch := by simp [wpMap, glEnv, hp]
+
+theorem branch_none {env : Env} (tgt : Option String) (hp : env.event = some .pullRequest) : glEnv env .branch = none := by
+  simp [glEnv, hp]
+
+/-- On every environment, the rewritten condition read on Woodpecker's environment has the value of the source
+read on GitLab's: the pull request test replaces what the branch ref holds on a pull request. -/
+theorem glPr_eval (env : Env) (tgt : Option String) :
+    ∀ e e' : E, glPr e = some e' → eval .gitlab (wpMap env tgt) e' = eval .gitlab (glEnv env) e := by
+  intro e
+  induction e with
+  | not x ih =>
+    intro e' h
+    simp only [glPr] at h
+    obtain ⟨a, ha, rfl⟩ := Option.map_eq_some_iff.mp h
+    simp [eval, ih a ha]
+  | and l r ihl ihr =>
+    intro e' h
+    simp only [glPr] at h
+    obtain ⟨a, ha, h2⟩ := Option.bind_eq_some_iff.mp h
+    obtain ⟨b, hb, rfl⟩ := Option.map_eq_some_iff.mp h2
+    simp [eval, ihl a ha, ihr b hb]
+  | or l r ihl ihr =>
+    intro e' h
+    simp only [glPr] at h
+    obtain ⟨a, ha, h2⟩ := Option.bind_eq_some_iff.mp h
+    obtain ⟨b, hb, rfl⟩ := Option.map_eq_some_iff.mp h2
+    simp [eval, ihl a ha, ihr b hb]
+  | rx x m s _ =>
+    intro e' h
+    cases x
+    case ref r0 _ =>
+      cases r0
+      case branch =>
+        simp only [glPr] at h
+        split at h
+        · rename_i hs
+          have hs' : s ≠ "" := by simpa using hs
+          cases h
+          apply glPr_pos
+          · intro hp
+            simp [eval, refV, branch_none tgt hp, matchV, lower_empty, Woodpecker.modeTest_empty m hs']
+          · intro hp
+            simp [eval, refV, branch_agree tgt hp]
+        · simp at h
+      all_goals (simp only [glPr] at h; exact glPr_default env tgt h)
+    all_goals (simp only [glPr] at h; exact glPr_default env tgt h)
+  | nrx x m s _ =>
+    intro e' h
+    cases x
+    case ref r0 _ =>
+      cases r0
+      case branch =>
+        simp only [glPr] at h
+        split at h
+        · rename_i hs
+          have hs' : s ≠ "" := by simpa using hs
+          cases h
+          apply glPr_neg
+          · intro hp
+            simp [eval, refV, branch_none tgt hp, matchV, lower_empty, Woodpecker.modeTest_empty m hs']
+          · intro hp
+            simp [eval, refV, branch_agree tgt hp]
+        · simp at h
+      all_goals (simp only [glPr] at h; exact glPr_default env tgt h)
+    all_goals (simp only [glPr] at h; exact glPr_default env tgt h)
+  | eq l r _ _ =>
+    intro e' h
+    cases l
+    case ref x0 _ =>
+      cases x0
+      case branch =>
+        cases r
+        case str s _ =>
+          simp only [glPr] at h
+          split at h
+          · rename_i hs
+            have hs' : s ≠ "" := by simpa using hs
+            cases h
+            apply glPr_pos
+            · intro hp
+              simp [eval, refV, branch_none tgt hp, eqV]
+            · intro hp
+              simp [eval, refV, branch_agree tgt hp]
+          · simp at h
+        all_goals (simp only [glPr] at h; try exact glPr_default env tgt h)
+      all_goals (simp only [glPr] at h; exact glPr_default env tgt h)
+    all_goals (simp only [glPr] at h; exact glPr_default env tgt h)
+  | ne l r _ _ =>
+    intro e' h
+    cases l
+    case ref x0 _ =>
+      cases x0
+      case branch =>
+        cases r
+        case str s _ =>
+          simp only [glPr] at h
+          split at h
+          · rename_i hs
+            have hs' : s ≠ "" := by simpa using hs
+            cases h
+            apply glPr_neg
+            · intro hp
+              simp [eval, refV, branch_none tgt hp, eqV]
+            · intro hp
+              simp [eval, refV, branch_agree tgt hp]
+          · simp at h
+        all_goals (simp only [glPr] at h; try exact glPr_default env tgt h)
+      all_goals (simp only [glPr] at h; exact glPr_default env tgt h)
+    all_goals (simp only [glPr] at h; exact glPr_default env tgt h)
+  | _ =>
+    intro e' h
+    simp only [glPr] at h
+    exact glPr_default env tgt h
+
+
+theorem glSub_pr : Woodpecker.GlSub evPrRx = true ∧ Woodpecker.GlSub evNotPrRx = true := by
+  simp [evPrRx, evNotPrRx, Woodpecker.GlSub]
+
+/-- The rewrite stays in the subset Woodpecker evaluates as the GitLab class does. -/
+theorem glPr_glSub : ∀ e e' : E, Woodpecker.GlSub e = true → glPr e = some e' → Woodpecker.GlSub e' = true := by
+  intro e
+  induction e with
+  | not x ih =>
+    intro e' hg h
+    simp only [glPr] at h
+    obtain ⟨a, ha, rfl⟩ := Option.map_eq_some_iff.mp h
+    exact ih a (by simpa [Woodpecker.GlSub] using hg) ha
+  | and l r ihl ihr =>
+    intro e' hg h
+    simp only [Woodpecker.GlSub, Bool.and_eq_true] at hg
+    simp only [glPr] at h
+    obtain ⟨a, ha, h2⟩ := Option.bind_eq_some_iff.mp h
+    obtain ⟨b, hb, rfl⟩ := Option.map_eq_some_iff.mp h2
+    simp [Woodpecker.GlSub, ihl a hg.1 ha, ihr b hg.2 hb]
+  | or l r ihl ihr =>
+    intro e' hg h
+    simp only [Woodpecker.GlSub, Bool.and_eq_true] at hg
+    simp only [glPr] at h
+    obtain ⟨a, ha, h2⟩ := Option.bind_eq_some_iff.mp h
+    obtain ⟨b, hb, rfl⟩ := Option.map_eq_some_iff.mp h2
+    simp [Woodpecker.GlSub, ihl a hg.1 ha, ihr b hg.2 hb]
+  | rx x m s _ =>
+    intro e' hg h
+    have hs : s ≠ "" := by
+      cases x <;> simp [Woodpecker.GlSub] at hg <;> exact hg
+    cases x
+    case ref r0 _ =>
+      cases r0 <;> (simp only [glPr] at h; split at h <;> first | (cases h; simp [Woodpecker.GlSub, evNotPrRx, evPrRx, hs, hg]; done) | (cases h; exact hg) | simp at h)
+    all_goals (simp only [glPr] at h; split at h <;> first | (cases h; exact hg) | simp at h)
+  | nrx x m s _ =>
+    intro e' hg h
+    have hs : s ≠ "" := by
+      cases x <;> simp [Woodpecker.GlSub] at hg <;> exact hg
+    cases x
+    case ref r0 _ =>
+      cases r0 <;> (simp only [glPr] at h; split at h <;> first | (cases h; simp [Woodpecker.GlSub, evNotPrRx, evPrRx, hs, hg]; done) | (cases h; exact hg) | simp at h)
+    all_goals (simp only [glPr] at h; split at h <;> first | (cases h; exact hg) | simp at h)
+  | eq l r _ _ =>
+    intro e' hg h
+    cases l
+    case ref x0 _ =>
+      cases x0 <;> cases r <;> (simp only [glPr] at h; split at h <;> first | (cases h; simp [Woodpecker.GlSub, evNotPrRx, evPrRx] at hg ⊢; simp_all; done) | (cases h; exact hg) | simp at h)
+    all_goals (simp only [glPr] at h; split at h <;> first | (cases h; exact hg) | simp at h)
+  | ne l r _ _ =>
+    intro e' hg h
+    cases l
+    case ref x0 _ =>
+      cases x0 <;> cases r <;> (simp only [glPr] at h; split at h <;> first | (cases h; simp [Woodpecker.GlSub, evNotPrRx, evPrRx] at hg ⊢; simp_all; done) | (cases h; exact hg) | simp at h)
+    all_goals (simp only [glPr] at h; split at h <;> first | (cases h; exact hg) | simp at h)
+  | _ =>
+    intro e' hg h
+    simp only [glPr] at h
+    split at h <;> first | (cases h; exact hg) | simp at h
+
+
+/-- A GitLab condition in the subset, rewritten by `glPr`, has on Woodpecker (an unset name reads "") the
+truthiness it has in GitLab, on every run, including a pull request run where Woodpecker holds the target
+branch in CI_COMMIT_BRANCH. -/
+theorem glWp_sound (env : Env) (tgt : Option String) {e e' : E} (hg : Woodpecker.GlSub e = true)
+    (h : glPr e = some e') :
+    holds .gitlab (Woodpecker.wpView (wpMap env tgt)) e' = holds .gitlab (glEnv env) e := by
+  have hs := glPr_glSub e e' hg h
+  unfold holds
+  rw [Woodpecker.eval_woodpecker (wpMap env tgt) (Woodpecker.wpView (wpMap env tgt)) e' hs
+    (fun r _ => rfl), glPr_eval env tgt e e' h]
+
+/-- Why the pull request test exists: the plain translation of a branch test reads the target branch on a pull
+request, where GitLab has no branch. -/
+theorem glWp_plain_unsound : ∃ (env : Env) (tgt : Option String),
+    holds .gitlab (Woodpecker.wpView (wpMap env tgt)) (.rx (.ref .branch) .exact "main") ≠
+      holds .gitlab (glEnv env) (.rx (.ref .branch) .exact "main") := by
+  refine ⟨⟨some "feature", some .branch, some .pullRequest, none, none⟩, some "main", by decide +kernel⟩
+
+/-- The same for a negative test, which is true in GitLab on a pull request. -/
+theorem glWp_plain_unsound_neg : ∃ (env : Env) (tgt : Option String),
+    holds .gitlab (Woodpecker.wpView (wpMap env tgt)) (.nrx (.ref .branch) .exact "main") ≠
+      holds .gitlab (glEnv env) (.nrx (.ref .branch) .exact "main") := by
+  refine ⟨⟨some "feature", some .branch, some .pullRequest, none, none⟩, some "main", by decide +kernel⟩
+
+
+/-! ### The other pairs
+
+Each theorem is the run on which a plain translation of one pair holds where its source does not. The Go rules that
+refuse these shapes (expr/translate_facts.go: route) are checked by tests, not proved. -/
+
+/-- A merge request into main from `feature`, as Woodpecker and GHA report it. -/
+def prEnv : Env := ⟨some "7/merge", some .branch, some .pullRequest, some "abc", none⟩
+
+/-- GHA to GitLab: `!(ref_type == 'branch' && contains(ref_name, 'merge'))` becomes `!(branch =~ /merge/i)`, which is
+true in a merge request pipeline where GHA ref_name `7/merge` makes the source false. -/
+theorem ghaGl_neg_affix_unsound :
+    holds .gha (ghaView prEnv)
+      (.not (.and (.eq (.ref .refType) (.str "branch")) (.contains (.ref .refName) (.str "merge")))) = false ∧
+    holds .gitlab (glEnv prEnv) (.not (.rx (.ref .branch) .sub "merge")) = true := by
+  decide +kernel
+
+/-- GitLab to GHA: `branch =~ /merge/i` is false in a merge request pipeline and its GHA form is true on `7/merge`. -/
+theorem glGha_affix_unsound :
+    holds .gitlab (glEnv prEnv) (.rx (.ref .branch) .sub "merge") = false ∧
+    holds .gha (ghaView prEnv) (.and (.eq (.ref .refType) (.str "branch")) (.contains (.ref .refName) (.str "merge"))) = true := by
+  decide +kernel
+
+/-- Woodpecker to GitLab: `branch !~ /^main$/i` is false on a pull request into main and true in GitLab, where
+the branch is unset. -/
+theorem wpGl_neg_unsound :
+    holds .gitlab (Woodpecker.wpView (wpMap prEnv (some "main"))) (.nrx (.ref .branch) .exact "main") = false ∧
+    holds .gitlab (glEnv prEnv) (.nrx (.ref .branch) .exact "main") = true := by
+  decide +kernel
+
+/-- Woodpecker to GHA: the same condition becomes `!(ref_type == 'branch' && ref_name == 'main')`, true on `7/merge`. -/
+theorem wpGha_neg_unsound :
+    holds .gitlab (Woodpecker.wpView (wpMap prEnv (some "main"))) (.nrx (.ref .branch) .exact "main") = false ∧
+    holds .gha (ghaView prEnv) (.not (.and (.eq (.ref .refType) (.str "branch")) (.eq (.ref .refName) (.str "main")))) = true := by
+  decide +kernel
 
 end TranslateFacts
 end Pipemaster

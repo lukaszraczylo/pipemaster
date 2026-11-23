@@ -22,6 +22,9 @@ type Dialect struct {
 	Vocab  Vocab
 	Sem    Semantics
 	Class  Class
+	// BranchOnPR is true when the branch ref holds the target branch in a pull request run (Woodpecker, Drone).
+	// GitLab leaves it unset in a merge request pipeline.
+	BranchOnPR bool
 }
 
 // caseFlag is the inline flag every translator-made pattern starts with.
@@ -250,9 +253,9 @@ func native(t Expr, to Dialect) Expr {
 //
 // Environment assumptions of the model (the "related by the vocabulary mapping" relation):
 //   - Both sides see the same ref: GHA ref_name equals GitLab CI_COMMIT_REF_NAME.
-//   - Merge-request and pull_request pipelines are not modelled: GitLab leaves CI_COMMIT_BRANCH unset
-//     there, while GHA ref_name is N/merge. TranslateFacts states the pull request case for a target that
-//     has no ref_name, from the facts of the pipeline's triggers.
+//   - Merge-request and pull_request pipelines are not modelled here: GitLab leaves CI_COMMIT_BRANCH unset
+//     there, GHA ref_name is N/merge, and Woodpecker holds the target branch. TranslateFacts states them (it is
+//     Translate plus the rewrites and refusals of expr/translate_facts.go), and every emitter calls it.
 //   - Case folding is ASCII only.
 //   - Only the four modelled events (push, pull_request, schedule, workflow_dispatch) exist; an event
 //     literal without an entry in both dialects' Events tables is untranslatable.
@@ -674,6 +677,9 @@ func userRef(r Ref) bool {
 // by the Lean theorems: only Translate and Translatable are proved, and tests check this function in Go
 // alone. An exact translation returns no caveats.
 func TranslateApprox(e Expr, from, to Dialect) (Expr, []string, bool) {
+	if _, ok := rewriteFacts(e, from, to, Facts{}); !ok {
+		return nil, nil, false
+	}
 	if t, ok := Translate(e, from, to); ok {
 		return t, nil, true
 	}

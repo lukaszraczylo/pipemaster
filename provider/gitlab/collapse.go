@@ -655,7 +655,7 @@ func collapseJobIf(c *collapseCtx) bool {
 	if !ok || err != nil {
 		return false
 	}
-	t, ok := expr.Translate(src, *from, exprgitlab.Lang)
+	t, ok := expr.TranslateFacts(src, *from, exprgitlab.Lang, expr.Facts{})
 	if !ok || expr.String(t) != expr.String(j.If) {
 		return false
 	}

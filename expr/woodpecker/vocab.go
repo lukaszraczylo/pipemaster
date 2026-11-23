@@ -84,12 +84,13 @@ func init() { expr.RegisterLang(&Lang) }
 // Lang is the Woodpecker dialect. It shares the GitLab class only on the subset that eval_woodpecker proves
 // (see inSubset); Reads and Supports confine Translate to it in both directions.
 var Lang = expr.Dialect{
-	ID:       Dialect,
-	Class:    expr.ClassGitLab,
-	Vocab:    Vocab,
-	Sem:      Semantics,
-	Events:   Events,
-	Reads:    reads,
-	Supports: supports,
-	Native:   native,
+	ID:         Dialect,
+	Class:      expr.ClassGitLab,
+	BranchOnPR: true,
+	Vocab:      Vocab,
+	Sem:        Semantics,
+	Events:     Events,
+	Reads:      reads,
+	Supports:   supports,
+	Native:     native,
 }

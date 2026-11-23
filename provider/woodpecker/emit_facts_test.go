@@ -114,3 +114,44 @@ func TestNotEqualRefNameGainsPullRequestTest(t *testing.T) {
 		t.Errorf("!= must be true on a pull request:\n%s", text)
 	}
 }
+
+// glWorkflow is a GitLab job gated on a rule.
+func glWorkflow(cond string) map[string]string {
+	return map[string]string{".gitlab-ci.yml": "deploy:\n  script:\n    - make deploy\n  rules:\n    - if: '" + cond + "'\n"}
+}
+
+// GitLab leaves CI_COMMIT_BRANCH unset in a merge request pipeline; Woodpecker holds the target branch there.
+func TestGitLabBranchTestExcludesPullRequests(t *testing.T) {
+	for name, c := range map[string]struct{ cond, want string }{
+		"equals":     {`$CI_COMMIT_BRANCH == "main"`, prExclusion + ` && CI_COMMIT_BRANCH == "main"`},
+		"matches":    {`$CI_COMMIT_BRANCH =~ /^main$/i`, prExclusion + ` && ` + branchIsMain},
+		"not equals": {`$CI_COMMIT_BRANCH != "main"`, `CI_PIPELINE_EVENT matches "(?i)^pull_request$$" || CI_COMMIT_BRANCH != "main"`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := parseProject(t, "gitlab", glWorkflow(c.cond))
+			text, rep := one(t, p)
+			if reportHas(rep, caps.JobIf, caps.Lost) {
+				t.Fatalf("job.if lost:\n%v", rep.Entries)
+			}
+			if !strings.Contains(text, c.want) {
+				t.Errorf("want %q in:\n%s", c.want, text)
+			}
+			if !reportHas(rep, caps.JobIf, caps.External) {
+				t.Errorf("the added pull request test must be reported:\n%v", rep.Entries)
+			}
+			back := parseProject(t, "woodpecker", map[string]string{".woodpecker/deploy.yaml": text})
+			got, want := back.Pipelines[0].Jobs[0].If, p.Pipelines[0].Jobs[0].If
+			if got == nil || expr.String(got) != expr.String(want) {
+				t.Errorf("the source condition did not return: %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestGitLabTagTestKeepsItsShape(t *testing.T) {
+	p := parseProject(t, "gitlab", glWorkflow(`$CI_COMMIT_TAG =~ /^v1$/i`))
+	text, _ := one(t, p)
+	if strings.Contains(text, "pull_request") {
+		t.Errorf("a tag test is unset on both sides of a pull request and needs no exclusion:\n%s", text)
+	}
+}

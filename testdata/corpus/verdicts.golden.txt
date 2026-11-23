@@ -153,9 +153,9 @@
 20-gitlab-gitlab-runner gitlab->argo native= 470 emulated= 141 external=   2 lost= 394
 20-gitlab-gitlab-runner gitlab->concourse native= 297 emulated= 363 external=  43 lost= 304
 20-gitlab-gitlab-runner gitlab->drone native= 370 emulated= 110 external=  33 lost= 494
-20-gitlab-gitlab-runner gitlab->forgejo native= 942 emulated= 281 external=   0 lost= 199
-20-gitlab-gitlab-runner gitlab->gha native= 947 emulated= 280 external=   0 lost= 184
-20-gitlab-gitlab-runner gitlab->gitea native= 942 emulated= 280 external=   0 lost= 199
+20-gitlab-gitlab-runner gitlab->forgejo native= 942 emulated= 281 external=   0 lost= 204
+20-gitlab-gitlab-runner gitlab->gha native= 947 emulated= 280 external=   0 lost= 189
+20-gitlab-gitlab-runner gitlab->gitea native= 942 emulated= 280 external=   0 lost= 204
 20-gitlab-gitlab-runner gitlab->tekton native= 397 emulated= 150 external=   2 lost= 444
 20-gitlab-gitlab-runner gitlab->woodpecker native= 328 emulated= 157 external=  33 lost= 488
 21-gitlab-gitlab-shell gitlab->argo native= 100 emulated=  42 external=   2 lost=  63

@@ -2132,6 +2132,13 @@
      "feature": "job.runner",
      "level": "lost",
      "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
+    },
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.if",
+     "level": "external",
+     "strategy": "pull request test",
+     "detail": "Woodpecker holds the target branch in CI_COMMIT_BRANCH on a pull request, so the condition gains a pull request test; the source condition is kept in a marker"
     }
    ]
   }

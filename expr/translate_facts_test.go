@@ -24,7 +24,12 @@ var branchFacts = expr.Facts{Branch: true}
 
 func loadFactEnvs(t *testing.T) ([]canonEnv, []vectors.Case) {
 	t.Helper()
-	rawEnvs, cases := vectors.LoadWithEnvs(t, "expr-facts")
+	return loadEnvs(t, "expr-facts")
+}
+
+func loadEnvs(t *testing.T, name string) ([]canonEnv, []vectors.Case) {
+	t.Helper()
+	rawEnvs, cases := vectors.LoadWithEnvs(t, name)
 	var maps []map[string]*string
 	if err := json.Unmarshal(rawEnvs, &maps); err != nil || len(maps) < 4 {
 		t.Fatalf("envs: %v (%d)", err, len(maps))

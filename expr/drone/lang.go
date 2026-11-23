@@ -33,13 +33,14 @@ func langEvents() map[string]string {
 // It shares the GitLab class on the subset that inSubset names, where a ref equals a literal by exact string
 // comparison and an unset ref equals no literal.
 var Lang = expr.Dialect{
-	ID:       Dialect,
-	Class:    expr.ClassGitLab,
-	Vocab:    langVocab(),
-	Sem:      Semantics,
-	Events:   langEvents(),
-	Reads:    inSubset,
-	Supports: func(e expr.Expr) bool { _, ok := FromExpr(e, Semantics); return ok },
+	ID:         Dialect,
+	Class:      expr.ClassGitLab,
+	BranchOnPR: true,
+	Vocab:      langVocab(),
+	Sem:        Semantics,
+	Events:     langEvents(),
+	Reads:      inSubset,
+	Supports:   func(e expr.Expr) bool { _, ok := FromExpr(e, Semantics); return ok },
 }
 
 func init() { expr.RegisterLang(&Lang) }
