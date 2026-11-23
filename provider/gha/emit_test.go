@@ -498,3 +498,23 @@ func TestResultWriteLineIsNotWrittenInAnImageStep(t *testing.T) {
 		t.Fatalf("job.outputs not reported lost: %+v", rep.Entries)
 	}
 }
+
+func TestStepKindsWithNoGHAFormEmitAPlaceholderAndReportLoss(t *testing.T) {
+	for _, kind := range []ir.StepKind{ir.StepPlugin, ir.StepResource} {
+		t.Run(string(kind), func(t *testing.T) {
+			p := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "ci", Triggers: []ir.Trigger{{Kind: ir.TriggerPush}}, Jobs: []*ir.Job{{
+				ID: "b", Steps: []*ir.Step{{ID: "t", Kind: kind}},
+			}}}}}
+			files, rep, err := gha.New(gha.GHA).Emit(p)
+			if err != nil {
+				t.Fatalf("emit failed on valid input: %v", err)
+			}
+			if !strings.Contains(string(files[".github/workflows/ci.yml"]), "run: ") {
+				t.Fatalf("no placeholder step:\n%s", files[".github/workflows/ci.yml"])
+			}
+			if e := entry(rep, caps.StepAction); e == nil || e.Level != caps.Lost {
+				t.Fatalf("no lost entry: %v", rep.Entries)
+			}
+		})
+	}
+}

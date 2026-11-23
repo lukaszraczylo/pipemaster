@@ -187,7 +187,8 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 		e.lose(sp, caps.StepAction, "a task reference has no GHA form; the step runs "+noopScript)
 		m.set("run", str(noopScript))
 	default:
-		err = fmt.Errorf("%s: step of kind %q has nothing GHA can run", sp, st.Kind)
+		e.lose(sp, caps.StepAction, "a step of kind "+string(st.Kind)+" has no GHA form; the step runs "+noopScript)
+		m.set("run", str(noopScript))
 	}
 	if err != nil {
 		return nil, false, err
