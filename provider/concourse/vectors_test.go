@@ -20,11 +20,12 @@ import (
 // The abstract documents below mirror lean4/Pipemaster/Concourse.lean; their JSON keys are the ones GenVectors writes.
 type (
 	vTask struct {
-		Name   string        `json:"name"`
-		CID    string        `json:"cid"`
-		CName  string        `json:"cname"`
-		Script []string      `json:"script"`
-		CEnv   []vectors.Var `json:"cenv"`
+		Name    string        `json:"name"`
+		CID     string        `json:"cid"`
+		CName   string        `json:"cname"`
+		Script  []string      `json:"script"`
+		Carried []string      `json:"carried"`
+		CEnv    []vectors.Var `json:"cenv"`
 	}
 	vJob struct {
 		Name   string     `json:"name"`
@@ -133,7 +134,7 @@ func taskScript(es []vectors.Entry) ([]string, error) {
 	if err != nil || len(as) == 0 {
 		return nil, fmt.Errorf("task args: %v", err)
 	}
-	return strings.Split(as[len(as)-1], "\n"), nil
+	return strings.Split(strings.TrimSuffix(as[len(as)-1], "\n"), "\n"), nil
 }
 
 func coreOfJob(j *ir.Job) (ir.CoreJob, error) {
@@ -163,13 +164,13 @@ func decodeTask(n *yaml.Node, cs carries, jobPath string) (vTask, error) {
 	if err := yaml.Unmarshal([]byte(body), &st); err != nil {
 		return t, err
 	}
-	st.Script, st.Ext = nil, nil
+	st.Ext = nil
 	cj, err := coreOfJob(&ir.Job{ID: "x", Steps: []*ir.Step{&st}})
 	if err != nil {
 		return t, err
 	}
 	cst := cj.Steps[0]
-	t.CID, t.CName = cst.ID, cst.Name
+	t.CID, t.CName, t.Carried = cst.ID, cst.Name, cst.Script
 	for _, v := range cst.Env {
 		t.CEnv = append(t.CEnv, vectors.Var{Name: v.Name, Value: v.Value})
 	}

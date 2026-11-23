@@ -638,7 +638,7 @@ theorem tekton_keeps_argo : tekton.Keeps argo := by
 
 /-- A hop through Concourse returns the pipeline it received, so it keeps every fragment. -/
 theorem concourse_keeps (b : Adapter) : concourse.Keeps b :=
-  Adapter.keeps_of_id _ (fun q hq => Concourse.rawConcourse_toConcourse q hq.1) b
+  Adapter.keeps_of_id _ (fun q hq => Concourse.rawConcourse_toConcourse q hq.1 (Concourse.scripts_ne_nil q hq.2)) b
 
 theorem gitlab_keeps_concourse : gitlab.Keeps concourse := by
   intro q hq hc

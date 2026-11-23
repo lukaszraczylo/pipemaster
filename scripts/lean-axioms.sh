@@ -158,6 +158,8 @@ required=(
   Pipemaster.Concourse.uniqName_fresh
   Pipemaster.Concourse.uniqFrom_disjoint
   Pipemaster.Concourse.concourse_passed
+  Pipemaster.Concourse.readTask_cstep
+  Pipemaster.Concourse.scripts_ne_nil
   Pipemaster.Concourse.readJob_cjob
   Pipemaster.Concourse.rawConcourse_toConcourse
   Pipemaster.Concourse.concourse_from_to

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"slices"
+	"strings"
 
 	"go.yaml.in/yaml/v3"
 
@@ -53,7 +54,22 @@ func (jx *jobEmitter) carryStep(st *ir.Step, name string, node *yaml.Node, body 
 	if !slices.Equal(body, st.Script) {
 		s.Script = st.Script
 	}
+	if lossyScript(st.Script) {
+		s.Script = st.Script
+		if !jx.pe.e.own {
+			jx.pe.e.emulate(jx.sm(name), caps.StepScript, "script in the carry marker", "the args of a task cannot say an empty last line or a newline inside a line, so the carry marker holds the script")
+		}
+	}
 	jx.pe.e.carry(jx.sm(name), &s, nodeText(node))
+}
+
+// lossyScript is true for a script that the args of a task read back differently: the parser drops one trailing
+// newline, and it splits a line at a newline.
+func lossyScript(sc []string) bool {
+	if len(sc) > 1 && sc[len(sc)-1] == "" {
+		return true
+	}
+	return slices.ContainsFunc(sc, func(l string) bool { return strings.Contains(l, "\n") })
 }
 
 // carryPipeline writes the carry of a pipeline: every pipeline field but its jobs and Ext. The digest covers the

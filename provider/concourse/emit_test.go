@@ -552,3 +552,23 @@ func TestNeedAddedBesideANestedGetIsKept(t *testing.T) {
 		}
 	}
 }
+
+// The args of a task drop one trailing newline and split at a newline, so a script that has either must come back
+// from the carry marker unchanged, and the report must say so.
+func TestScriptTheArgsCannotSayComesBackExact(t *testing.T) {
+	for _, script := range [][]string{
+		{"echo two", ""},
+		{"echo a", "", ""},
+		{"echo a\necho b"},
+		{"echo a", "echo b\nsecond", ""},
+	} {
+		files, rep := emit(t, project(scriptJob("a", script...)))
+		back, _ := reparse(t, files)
+		if got := back.Pipelines[0].Jobs[0].Steps[0].Script; !slices.Equal(got, script) {
+			t.Fatalf("script %q came back as %q", script, got)
+		}
+		if !hasFeatureEntry(rep, string(caps.StepScript), "carry marker holds the script") {
+			t.Fatalf("no entry for script %q: %v", script, rep.Entries)
+		}
+	}
+}

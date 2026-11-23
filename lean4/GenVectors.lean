@@ -772,7 +772,7 @@ def argoAdapterCases : List (Json × Json) :=
 
 open Pipemaster.Concourse in
 def concTaskJson (t : Concourse.CTask) : Json :=
-  Json.mkObj [("name", t.name), ("script", strsJson t.script), ("cid", t.cid), ("cname", t.cname),
+  Json.mkObj [("name", t.name), ("script", strsJson t.script), ("carried", strsJson t.carried), ("cid", t.cid), ("cname", t.cname),
     ("cenv", varsJson t.cenv)]
 
 open Pipemaster.Concourse in
@@ -808,6 +808,9 @@ def concExtraPipes : List Core.Pipe :=
    pushAll [{ cj "a" with steps := [] }] [{ cj "f" with steps := two }],
    pushAll [{ cj "build-1" with steps := [cstep "unit_test" ["make"], cstep "e2e-2" ["make e2e"]] },
      { cj "deploy_2" with needs := needOn "build-1" false }] [],
+   pushAll [{ cj "a" with steps := [cstep "s1" ["echo two", ""]] }] [],
+   pushAll [{ cj "a" with steps := [cstep "s1" ["echo a", "", ""], cstep "s2" ["echo a\necho b"]] }] [cj "f"],
+   pushAll [cj "a"] [{ cj "f" with steps := [cstep "s1" ["echo f", ""]] }],
    pushAll [marker] [], pushAll [{ cj "a" with env := [⟨"K", "((v))"⟩, ⟨"L", "true"⟩, ⟨"M", ""⟩] }] []] ++ wpExtraPipes
 
 def concourseOk (p : Core.Pipe) : Bool := decide (Wf p ∧ Concourse.ConcourseOk p)

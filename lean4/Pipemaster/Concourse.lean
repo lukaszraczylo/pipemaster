@@ -18,10 +18,10 @@ matches (parse_marker.go carryOf), so a carry always applies to an unedited file
 holds each carry as the IR value it decodes to.
 
 What the parser takes from the file and what from the carry (parse_marker.go carryJob, carryStep, carryPipeline):
-- File: the pipeline ID (the file name), each job name, each need (the `passed` list), each script, the task names and
+- File: the pipeline ID (the file name), each job name, each need (the `passed` list), each script that the args can say, the task names and
   the ensure hook of the sink job.
 - Carry: the pipeline name, the triggers and the finally jobs (carryPipeline); for each job every field but its ID,
-  name, steps and need jobs (carryJob); for each task its ID, name and env (carryStep).
+  name, steps and need jobs (carryJob); for each task its ID, name and env, and its script when the args cannot say it (carryStep).
 - Display names: a job name comes from its `display.name` marker, so `disp` holds it.
 
 Not in the model, each on purpose:
@@ -44,11 +44,13 @@ section Adapter
 
 open Core
 
-/-- One written task: `name` is the task name in the file, `script` the lines of `run.args`, and the other three fields
-are the step carry (ID, display name and env). -/
+/-- One written task: `name` is the task name in the file, `script` the lines that the parser reads from `run.args`,
+`carried` the script lines of the step carry (empty when the carry holds none), and the other three fields are the
+step carry (ID, display name and env). -/
 structure CTask where
   name : String
   script : List String
+  carried : List String
   cid : String
   cname : String
   cenv : List Var
@@ -169,7 +171,19 @@ def hookNames (p : Pipe) : List String :=
   | some j => uniqFrom (j.steps.map (·.id)) ((finSteps p).map (·.id))
   | none => []
 
-def cstep (n : String) (s : Core.Step) : CTask := ⟨n, s.script, s.id, s.name, s.env⟩
+/-- A script that the args of a task read back differently: the parser drops one trailing newline and splits a line
+at a newline (parse_step.go command). The emitter then puts the script in the carry (emit_carry.go lossyScript). -/
+def lossy (sc : List String) : Bool :=
+  (decide (1 < sc.length) && sc.getLast? == some "") || sc.any fun l => decide ('\n' ∈ l.toList)
+
+/-- The lines that the parser reads from the args that hold `sc` joined by newlines. -/
+def argLines (sc : List String) : List String :=
+  let t := String.intercalate "\n" sc
+  (if t.endsWith "\n" then (t.dropEnd 1).toString else t).splitOn "\n"
+
+def cstep (n : String) (s : Core.Step) : CTask :=
+  ⟨n, if lossy s.script then argLines s.script else s.script, if lossy s.script then s.script else [],
+    s.id, s.name, s.env⟩
 
 def hookTasks (p : Pipe) : List CTask := ((finSteps p).zip (hookNames p)).map fun (s, n) => cstep n s
 
@@ -195,8 +209,8 @@ def toConcourse (p : Pipe) : CDoc where
 /-! ### Parsing -/
 
 /-- Mirrors concourse.jobBuilder.carryStep (provider/concourse/parse_marker.go): the ID, name and env come from the
-carry, the script from the file. -/
-def readTask (t : CTask) : Core.Step := ⟨t.cid, t.cname, t.script, t.cenv⟩
+carry, and the script from the carry when it holds one, else from the file. -/
+def readTask (t : CTask) : Core.Step := ⟨t.cid, t.cname, if t.carried = [] then t.script else t.carried, t.cenv⟩
 
 /-- Mirrors concourse.jobBuilder.needs and carryJob: the needs are the `passed` names in order, and the carry gives
 the artifacts flag of each when the carry holds as many needs. -/
@@ -254,11 +268,10 @@ def StepOk (s : Core.Step) : Prop := CcId s.id ∧ sourcePrefix.isPrefixOf s.id.
 
 instance (s : Core.Step) : Decidable (StepOk s) := by unfold StepOk; exact inferInstance
 
-/-- A script that the parser reads back as written: at least one line, no newline inside a line (the lines are joined
-by newlines), no empty last line (parse_step.go reads `run.args` with one trailing newline removed), and no `((` in a
-line (the emitter comments such a line out as a Concourse variable and carries the script instead). -/
+/-- A script that the emitter writes as given: at least one line (an empty script is written as `true`), and no `((`
+in a line (the emitter comments such a line out as a Concourse variable and carries the script instead). -/
 def ScriptOk (sc : List String) : Prop :=
-  sc ≠ [] ∧ (∀ l ∈ sc, '\n' ∉ l.toList ∧ ¬ (['(', '('] <:+: l.toList)) ∧ sc.getLast? ≠ some ""
+  sc ≠ [] ∧ ∀ l ∈ sc, ¬ (['(', '('] <:+: l.toList)
 
 instance (sc : List String) : Decidable (ScriptOk sc) := by unfold ScriptOk; exact inferInstance
 
@@ -292,8 +305,15 @@ theorem concourse_passed (p : Pipe) (j : Core.Job) :
   | nil => rfl
   | cons n t ih => simp [ih]
 
-theorem readTask_cstep (n : String) (s : Core.Step) : readTask (cstep n s) = s := by
-  cases s; rfl
+theorem readTask_cstep (n : String) (s : Core.Step) (h : s.script ≠ []) : readTask (cstep n s) = s := by
+  cases s with
+  | mk id name script env =>
+    by_cases hl : lossy script = true
+    · simp only [cstep, hl, ite_true, readTask]
+      have : script ≠ [] := h
+      simp [this]
+    · have hl' : lossy script = false := by simpa using hl
+      simp [cstep, hl', readTask]
 
 theorem sinkJob_mem (p : Pipe) (k : Core.Job) (h : sinkJob p = some k) : k ∈ p.jobs := by
   unfold sinkJob at h
@@ -365,30 +385,35 @@ theorem readSteps_cjob (p : Pipe) (hn : (jobIds p.all).Nodup) (j : Core.Job) (hj
         simp [cjob, hfj, hne]
       simp [hnm, hh]
 
-theorem readJob_cjob (p : Pipe) (hn : (jobIds p.all).Nodup) (j : Core.Job) (hj : j ∈ p.jobs) :
+theorem readJob_cjob (p : Pipe) (hn : (jobIds p.all).Nodup) (j : Core.Job) (hj : j ∈ p.jobs)
+    (hsc : ∀ s ∈ j.steps, s.script ≠ []) :
     readJob (toConcourse p) (cjob p j) = j := by
   have hs := readSteps_cjob p hn j hj
   have hneeds := (concourse_passed p j).2
   have hb : (j.steps.map (fun s => cstep s.id s)).map readTask = j.steps := by
-    simp [List.map_map, Function.comp_def, readTask_cstep]
+    rw [List.map_map]
+    exact map_self_mem _ _ fun s hs' => readTask_cstep s.id s (hsc s hs')
   unfold readJob
   rw [hs, hneeds]
   simp only [cjob, hb]
 
-theorem rawConcourse_toConcourse (p : Pipe) (hw : Wf p) : rawConcourse (toConcourse p) = p := by
+theorem rawConcourse_toConcourse (p : Pipe) (hw : Wf p) (hsc : ∀ j ∈ p.jobs, ∀ s ∈ j.steps, s.script ≠ []) : rawConcourse (toConcourse p) = p := by
   have hn : (jobIds p.all).Nodup := hw.2.1
   have e : (p.jobs.map (cjob p)).map (readJob (toConcourse p)) = p.jobs := by
     rw [List.map_map]
-    exact map_self_mem _ _ fun j hj => readJob_cjob p hn j hj
+    exact map_self_mem _ _ fun j hj => readJob_cjob p hn j hj (hsc j hj)
   have hr : rawConcourse (toConcourse p) = { p with jobs := (p.jobs.map (cjob p)).map (readJob (toConcourse p)) } := rfl
   rw [hr, e]
+
+theorem scripts_ne_nil (p : Pipe) (h : ConcourseOk p) : ∀ j ∈ p.jobs, ∀ s ∈ j.steps, s.script ≠ [] :=
+  fun j hj s hs => ((h.2.1 j hj).2 s hs).2.1
 
 /-- Theorem 1 of the Concourse adapter: parsing the emitted file and applying the metadata returns the pipeline, on
 the Concourse fragment. Proved about the model. -/
 theorem concourse_from_to (p : Pipe) (h : ConcourseFrag p) : fromConcourse (toConcourse p) (metaOf p) = p := by
-  obtain ⟨hw, _⟩ := h
+  obtain ⟨hw, ho⟩ := h
   unfold fromConcourse
-  rw [rawConcourse_toConcourse p hw]
+  rw [rawConcourse_toConcourse p hw (scripts_ne_nil p ho)]
   exact restore_metaOf_self p hw.2.1 fun j hj => (hw.2.2.2.2.2.2.2.1 j hj).2
 
 /-! ### The raw parse keeps the fragment, so a chain can run through Concourse
