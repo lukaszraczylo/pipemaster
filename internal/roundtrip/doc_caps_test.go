@@ -28,8 +28,8 @@ func checkCapsTables(t *testing.T, path, wantID string) int {
 			continue
 		}
 		found++
-		if wantID != "" && !strings.Contains(m[1], "--to "+wantID+" ") {
-			t.Errorf("%s line %d: the command `pipemaster %s` does not name --to %s", path, i+1, m[1], wantID)
+		if want := capsCommand(wantID); wantID != "" && m[1] != want {
+			t.Errorf("%s line %d: the command `pipemaster %s` is not `pipemaster %s`", path, i+1, m[1], want)
 		}
 		var table []string
 		for _, tl := range lines[min(i+2, len(lines)):] {
@@ -49,6 +49,9 @@ func checkCapsTables(t *testing.T, path, wantID string) int {
 	}
 	return found
 }
+
+// capsCommand is the exact command a provider page names for its table.
+func capsCommand(id string) string { return "caps --to " + id + " --format md" }
 
 // TestDocCapsTablesMatchTheCommand keeps each caps table of the README and of the provider docs equal to the command output.
 func TestDocCapsTablesMatchTheCommand(t *testing.T) {
