@@ -341,6 +341,9 @@ func (e *emitter) scriptKeys(m *omap, p *jobPrep, ext map[string]any) error {
 		p.marks = nil
 		p.add(secScript, str(noopLine))
 		p.marks = held
+		if len(p.j.Steps) == 0 {
+			e.lose(p.path+"/step/"+defaultStepID, caps.StepScript, "the job has no steps; a no-op script keeps the file valid")
+		}
 	}
 	if len(p.pending) > 0 || len(p.marks) > 0 {
 		if items := p.sections[secScript]; len(items) > 0 {
