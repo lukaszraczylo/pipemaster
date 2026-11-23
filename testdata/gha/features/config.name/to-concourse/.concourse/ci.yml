@@ -9,6 +9,7 @@
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated pipeline.env pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
+# pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:

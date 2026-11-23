@@ -14,6 +14,7 @@
 # pipemaster:emulated job.runner pipeline/ci/job/use
 # pipemaster:emulated step.image pipeline/ci/job/use/step/use-step-1
 # pipemaster:emulated job.runner pipeline/ci/job/version
+# pipemaster:emulated trigger.push pipeline/ci/job/version
 # pipemaster:emulated step.image pipeline/ci/job/version/step/tag
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:

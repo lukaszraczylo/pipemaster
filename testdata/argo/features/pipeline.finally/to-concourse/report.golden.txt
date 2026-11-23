@@ -7,6 +7,7 @@ Loss report: argo -> concourse
 [emulated] pipeline/gitlab-ci/job/alert job.if: shared shell guard on script tasks; a status function becomes a job hook (on_failure or ensure) (a condition with no guard form leaves the job with no triggering get, so a person starts it, and adds a lost entry)
 [emulated] pipeline/gitlab-ci/job/alert/step/script ext.passthrough: step name changed (the step ID script is not a Concourse identifier or collides with another step or resource name; the task is script-2)
 [emulated] pipeline/gitlab-ci/job/alert/step/script step.image: default image (the task names no image, so it runs ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/build trigger.push: workspace from the first triggering resource (the tasks run in the checkout of source, and every build uses the newest version of each resource, so a push to source-tags builds the newest commit of source)
 [emulated] pipeline/gitlab-ci/job/build/step/script step.image: default image (the task names no image, so it runs ubuntu:latest)
 [emulated] pipeline/gitlab-ci/job/report/step/script ext.passthrough: step name changed (the step ID script is not a Concourse identifier or collides with another step or resource name; the task is script-3)
 [emulated] pipeline/gitlab-ci/job/report/step/script step.image: default image (the task names no image, so it runs ubuntu:latest)

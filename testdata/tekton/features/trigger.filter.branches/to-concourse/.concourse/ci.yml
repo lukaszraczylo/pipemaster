@@ -7,6 +7,7 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"e289ae10a377c3613d98409cd7d69b62a719a30717076ff254bf9a2b7fc90bd3","carry":"id: ci\nname: branches\ntriggers:\n    - kind: pr\n      branches:\n        exclude:\n            - wip/**\n    - kind: push\n      branches:\n        include:\n            - main\n            - release/**\n            - '!release/old'\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.push pipeline/ci/trigger/1
 resources:

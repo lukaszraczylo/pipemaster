@@ -6,6 +6,7 @@
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nfinally:\n    - if: |\n        opaque(gitlab): - if: $PIPELINE_TYPE =~ /_MR_PIPELINE$/\n      id: cleanup\n      needs:\n        - job: compile\n      steps:\n        - id: script\n          kind: script\n          script:\n            - make clean\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/compile
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:

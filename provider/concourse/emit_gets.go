@@ -3,6 +3,7 @@ package concourse
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"go.yaml.in/yaml/v3"
 
@@ -69,6 +70,47 @@ func (jx *jobEmitter) jobTriggers(holders []string) map[string]bool {
 	return set
 }
 
+// workspaceSource is the git resource that fills the workspace of the tasks: the only git resource that starts
+// the job, the first of several, or the primary source when none does.
+func (jx *jobEmitter) workspaceSource() *source {
+	if jx.ws != nil {
+		return jx.ws
+	}
+	pe := jx.pe
+	jx.ws = pe.primary
+	trig := jx.jobTriggers([]string{pe.primary.name})
+	for _, s := range pe.sources {
+		if s.typ == typeGit && trig[s.name] {
+			jx.ws = s
+			break
+		}
+	}
+	return jx.ws
+}
+
+// noteWorkspace says which resource the workspace follows when several git resources start the job. Concourse
+// runs the job with the newest version of each resource, not the version that started the build.
+func (jx *jobEmitter) noteWorkspace() {
+	if jx.wsNoted {
+		return
+	}
+	jx.wsNoted = true
+	pe := jx.pe
+	trig := jx.jobTriggers([]string{pe.primary.name})
+	var others []string
+	for _, s := range pe.sources {
+		if s.typ == typeGit && trig[s.name] && s != jx.ws {
+			others = append(others, s.name)
+		}
+	}
+	if len(others) == 0 {
+		return
+	}
+	pe.e.emulate(jx.path, caps.TriggerPush, "workspace from the first triggering resource",
+		"the tasks run in the checkout of "+jx.ws.name+", and every build uses the newest version of each resource, so a push to "+
+			strings.Join(others, " or ")+" builds the newest commit of "+jx.ws.name)
+}
+
 // gated is true for a job that a person must approve, which no trigger set overrides.
 func (jx *jobEmitter) gated() bool {
 	return jx.j.Environment != nil && jx.j.Environment.Approval
@@ -80,6 +122,7 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 	if jx.j.Manual && jx.ext[ExtTriggers] != nil && !jx.gated() {
 		jx.manual = false
 	}
+	jx.workspaceSource()
 	own := jx.ownGets()
 	noGets := false
 	var fresh map[string][]any
@@ -171,7 +214,7 @@ func (jx *jobEmitter) gets() []*yaml.Node {
 		if trig[name] {
 			m["trigger"] = true
 		}
-		if p := jx.checkoutParams(); p != nil && name == pe.primary.name && m["params"] == nil {
+		if p := jx.checkoutParams(); p != nil && name == jx.ws.name && m["params"] == nil {
 			m["params"] = p
 		}
 		jx.taken[name] = true

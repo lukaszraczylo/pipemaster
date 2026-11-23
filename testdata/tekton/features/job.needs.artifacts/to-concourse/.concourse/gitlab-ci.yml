@@ -14,6 +14,7 @@
 # pipemaster:arg {"digest":"52022eb20a9d46380bf82027397ec0061a6888534d3356eab57ea7e117d6da6d","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/compile
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/docs/step/script
 # pipemaster:emulated job.needs.artifacts pipeline/gitlab-ci/job/unit

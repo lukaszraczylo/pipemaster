@@ -14,7 +14,9 @@
 # pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: SHARED\n      value:\n        lit: \"1\"\n"}
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/build
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/common
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/common
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/prod
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:

@@ -9,6 +9,7 @@
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: env\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: CGO_ENABLED\n      value:\n        lit: \"0\"\n    - name: VERSION\n      value:\n        lit: \"3.1\"\n    - name: TOKEN\n      value:\n        secret: DEPLOY_TOKEN\n    - name: LABEL\n      value:\n        expr: format('build-{0}', gha.github.run_number)\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated pipeline.env pipeline/ci
+# pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:

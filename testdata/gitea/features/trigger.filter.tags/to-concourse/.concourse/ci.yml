@@ -8,6 +8,7 @@
 # pipemaster:arg {"digest":"5515d18c32b9fbbc205193e4d8cfa920d10a1143906d2545d7bcc90d4b212bf4","carry":"id: ci\nname: tags\ntriggers:\n    - kind: tag\n      tags:\n        include:\n            - v[0-9]+.[0-9]+.[0-9]+\n            - '!v*-rc*'\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
+# pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/0
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/0

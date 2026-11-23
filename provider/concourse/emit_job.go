@@ -24,10 +24,12 @@ var hookOrder = []string{"on_success", "on_failure", "ensure"}
 
 // jobEmitter is the state of the job being written.
 type jobEmitter struct {
-	pe         *pipeEmitter
-	j          *ir.Job
-	mx         *matrixSpec
-	checkout   *checkoutInfo
+	pe       *pipeEmitter
+	j        *ir.Job
+	mx       *matrixSpec
+	checkout *checkoutInfo
+	// ws is the git resource whose checkout the tasks read as the workspace.
+	ws         *source
 	taken      map[string]bool
 	ext        map[string]any
 	uploads    map[string]bool
@@ -48,6 +50,8 @@ type jobEmitter struct {
 	held         bool
 	// condHeld is true when the job condition has no form in the file, so the carry holds it and the job has no trigger.
 	condHeld bool
+	// wsNoted is true once the entry for several triggering resources is written.
+	wsNoted bool
 }
 
 // jobs writes every job of the pipeline.

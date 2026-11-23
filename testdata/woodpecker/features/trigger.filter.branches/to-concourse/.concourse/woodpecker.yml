@@ -5,6 +5,7 @@
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
 # pipemaster:arg {"digest":"77585707a709079490d29076ae4634dea501301181d9cf627a8c13aea0585f3a","carry":"id: woodpecker\ntriggers:\n    - kind: push\n      branches:\n        include:\n            - main\n            - develop\n        exclude:\n            - wip\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker
+# pipemaster:emulated trigger.push pipeline/woodpecker/job/ci
 # pipemaster:emulated trigger.push pipeline/woodpecker/trigger/0
 resources:
   - name: source-main

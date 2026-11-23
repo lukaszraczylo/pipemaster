@@ -1,4 +1,5 @@
 Loss report: drone -> concourse
 [lost] pipeline/drone/trigger/0 trigger.filter.branches (the branch exclude list wip has no form: a git resource follows one exact branch)
 [emulated] pipeline/drone ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
+[emulated] pipeline/drone/job/ci trigger.push: workspace from the first triggering resource (the tasks run in the checkout of source-main, and every build uses the newest version of each resource, so a push to source-develop builds the newest commit of source-main)
 [emulated] pipeline/drone/trigger/0 trigger.push: one git resource per branch (the branches main, develop are 2 git resources, and the job runs once per branch event)

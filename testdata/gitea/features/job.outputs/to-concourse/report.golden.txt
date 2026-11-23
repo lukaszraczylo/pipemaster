@@ -6,5 +6,6 @@ Loss report: gitea -> concourse
 [emulated] pipeline/ci/job/use job.runner: worker tags of the task (the tasks carry the worker tags ubuntu-latest; a build waits until a worker has them)
 [emulated] pipeline/ci/job/use/step/use-step-1 step.image: default image (the task names no image, so it runs ubuntu:latest)
 [emulated] pipeline/ci/job/version job.runner: worker tags of the task (the tasks carry the worker tags ubuntu-latest; a build waits until a worker has them)
+[emulated] pipeline/ci/job/version trigger.push: workspace from the first triggering resource (the tasks run in the checkout of source, and every build uses the newest version of each resource, so a push to source-tags builds the newest commit of source)
 [emulated] pipeline/ci/job/version/step/tag step.image: default image (the task names no image, so it runs ubuntu:latest)
 [emulated] pipeline/ci/trigger/1 trigger.tag: git resource with source.tag_filter (a tag trigger that also has a branch filter is lost, because one git resource cannot hold both sets)

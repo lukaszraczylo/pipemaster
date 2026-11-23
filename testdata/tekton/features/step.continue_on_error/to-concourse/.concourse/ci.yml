@@ -7,6 +7,7 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: coe\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.continue_on_error pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1

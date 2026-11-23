@@ -9,6 +9,7 @@
 # pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: ci\nname: allow\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/flaky
+# pipemaster:emulated trigger.push pipeline/ci/job/flaky
 # pipemaster:emulated step.image pipeline/ci/job/flaky/step/flaky-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:

@@ -183,7 +183,7 @@ func (jx *jobEmitter) markCheckout(st *ir.Step, path string) {
 	if p := jx.checkout.params; len(p) > 0 {
 		params = p
 	}
-	jx.pe.e.markArg(caps.StepAction, jx.sm(adapter{}.SanitizeID(st.ID)), actionArg{Step: body, Get: jx.pe.primary.name, Params: canonJSON(params)})
+	jx.pe.e.markArg(caps.StepAction, jx.sm(adapter{}.SanitizeID(st.ID)), actionArg{Step: body, Get: jx.workspaceSource().name, Params: canonJSON(params)})
 }
 
 // placeholder writes the task that keeps the place of an action that Concourse does not run. The marker holds

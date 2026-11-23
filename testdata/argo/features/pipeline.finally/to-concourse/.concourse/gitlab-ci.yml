@@ -18,6 +18,7 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/alert
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/alert/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/alert/step/script
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/build
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/report/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/report/step/script

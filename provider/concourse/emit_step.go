@@ -121,10 +121,11 @@ func (c *chain) script(st *ir.Step, path string) *yaml.Node {
 	m.SetStr("task", name)
 	cfg := jx.config(sc, path, st, ext, script, dir)
 	if !jx.ownInputs(ext) {
-		if !c.mapped && jx.pe.primary.name != workspaceName {
+		if !c.mapped && jx.workspaceSource().name != workspaceName {
 			im := newMap()
-			im.SetStr(workspaceName, jx.pe.primary.name)
+			im.SetStr(workspaceName, jx.ws.name)
 			m.Set("input_mapping", im.N)
+			jx.noteWorkspace()
 		}
 		c.mapped = true
 	}

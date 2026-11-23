@@ -5,6 +5,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: TAG\n      value:\n        lit: $[[ inputs.image_tag ]]\ninputs:\n    - name: dry_run\n      type: boolean\n      default: \"false\"\n    - name: env\n      default: staging\n    - name: image_tag\n      type: string\n      default: latest\n      description: Image tag to deploy\n"}
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/deploy
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/deploy/step/script
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:

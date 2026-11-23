@@ -16,10 +16,12 @@
 # pipemaster:arg {"digest":"118728fcc00220d3b4f3c4532f56a42ecf11cec63d03c7fac4a3b80c66b8a9a1","carry":"id: ci\nname: needs\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/lint
+# pipemaster:emulated trigger.push pipeline/ci/job/lint
 # pipemaster:emulated step.image pipeline/ci/job/lint/step/lint-step-1
 # pipemaster:emulated job.runner pipeline/ci/job/ship
 # pipemaster:emulated step.image pipeline/ci/job/ship/step/ship-step-1
 # pipemaster:emulated job.runner pipeline/ci/job/test
+# pipemaster:emulated trigger.push pipeline/ci/job/test
 # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:

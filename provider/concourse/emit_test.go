@@ -746,3 +746,52 @@ func TestNeedBesideAGetNestedInAHookIsNotDropped(t *testing.T) {
 		t.Fatalf("b needs %v with no entry: %v", got, rep.Entries)
 	}
 }
+
+func workspaceSource(t *testing.T, files map[string]string, job string) string {
+	t.Helper()
+	plan := list(jobDoc(t, pipelineDoc(t, files), job)["plan"])
+	for _, s := range plan {
+		if im := dict(dict(s)["input_mapping"]); im != nil {
+			src, _ := im["workspace"].(string)
+			return src
+		}
+	}
+	t.Fatalf("no task maps the workspace in %v", plan)
+	return ""
+}
+
+func TestTagOnlyJobBuildsTheTag(t *testing.T) {
+	p := project(scriptJob("publish", "make publish"))
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{"v*"}}}}
+	files, rep := emit(t, p)
+	if got := workspaceSource(t, files, "publish"); got != "source-tags" {
+		t.Fatalf("the workspace comes from %q, want the tag resource", got)
+	}
+	if hasEntry(rep, "newest version of each resource") {
+		t.Fatalf("one triggering resource needs no multi-resource entry: %v", rep.Entries)
+	}
+}
+
+func TestTwoTriggeringResourcesUseTheFirstAndSayIt(t *testing.T) {
+	p := project(scriptJob("build", "make"))
+	p.Pipelines[0].Triggers = []ir.Trigger{pushOn("main", "release")}
+	files, rep := emit(t, p)
+	if got := workspaceSource(t, files, "build"); got != "source-main" {
+		t.Fatalf("the workspace comes from %q, want the first resource", got)
+	}
+	if !hasFeatureEntry(rep, "trigger.push", "source-main") || !hasFeatureEntry(rep, "trigger.push", "newest version of each resource") {
+		t.Fatalf("no entry names the workspace resource and the newest-version rule: %v", rep.Entries)
+	}
+}
+
+func TestBranchAndTagTriggersSayWhichResourceTheWorkspaceFollows(t *testing.T) {
+	p := project(scriptJob("publish", "make publish"))
+	p.Pipelines[0].Triggers = []ir.Trigger{pushOn("main"), {Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{"v*"}}}}
+	files, rep := emit(t, p)
+	if got := workspaceSource(t, files, "publish"); got != "source" {
+		t.Fatalf("the workspace comes from %q", got)
+	}
+	if !hasFeatureEntry(rep, "trigger.push", "a push to source-tags") {
+		t.Fatalf("no entry says that a tag push builds the first resource: %v", rep.Entries)
+	}
+}

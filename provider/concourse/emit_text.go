@@ -51,13 +51,13 @@ func (jx *jobEmitter) newScope(dir string) *scope {
 }
 
 // ctxOK reports whether the task can read a context file: the directory has a place, and a branch file exists
-// only when the primary source follows a branch.
+// only when the workspace source follows a branch.
 func (s *scope) ctxOK(file string) bool {
 	if !s.prefixOK || s.ps {
 		return false
 	}
 	if file == ctxFiles[expr.CtxBranch] {
-		_, tagged := srcOf(s.jx.pe.primary.def)["tag_filter"]
+		_, tagged := srcOf(s.jx.workspaceSource().def)["tag_filter"]
 		return !tagged
 	}
 	return true

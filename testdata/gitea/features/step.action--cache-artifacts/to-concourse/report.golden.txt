@@ -4,6 +4,7 @@ Loss report: gitea -> concourse
 [external] pipeline/ci/job/test/step/test-step-1 step.action: the workspace input of the task; s3 or registry-image resource (only an upload in the same job is visible; the download reads an artifact that no earlier step of the job wrote; the operator sets up a resource that carries it from the job that uploads it)
 [emulated] pipeline/ci ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
 [emulated] pipeline/ci/job/build job.runner: worker tags of the task (the tasks carry the worker tags ubuntu-latest; a build waits until a worker has them)
+[emulated] pipeline/ci/job/build trigger.push: workspace from the first triggering resource (the tasks run in the checkout of source, and every build uses the newest version of each resource, so a push to source-tags builds the newest commit of source)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.action: task per actions.Lookup verdict (unknown actions are lost)
 [emulated] pipeline/ci/job/build/step/build-step-3 step.image: default image (the task names no image, so it runs ubuntu:latest)
 [emulated] pipeline/ci/job/build/step/build-step-4 step.action: the workspace output of the task; placeholder task (later tasks of the same job read the files and other jobs cannot; Concourse does not run the action; a task that runs true keeps its place)

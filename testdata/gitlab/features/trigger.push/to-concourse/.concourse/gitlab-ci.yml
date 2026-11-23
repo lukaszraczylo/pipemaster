@@ -5,6 +5,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"4d1e03b86788b25855d4a83b18286a38a0e4ecca4e33fe6c916b43c7f2b731dd","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n      branches:\n        include:\n            - main\n            - release\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/build
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
