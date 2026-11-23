@@ -144,6 +144,20 @@ func targets(id string) []string {
 
 func isDialect(id string) bool { return provider.Family(id) != id }
 
+// dropsAnchorKeys is true when an emit left out top-level keys that only hold YAML anchors. The IR keeps them
+// and the metadata of that emit returns them.
+func dropsAnchorKeys(rep *report.Report) bool {
+	if rep == nil {
+		return false
+	}
+	for _, e := range rep.Entries {
+		if e.Feature == caps.ExtPassthrough && e.Level == caps.Lost && strings.Contains(e.Detail, "only holds YAML anchors") {
+			return true
+		}
+	}
+	return false
+}
+
 func prov(t *testing.T, id string) provider.Provider {
 	t.Helper()
 	p, err := provider.Get(id)
@@ -228,7 +242,7 @@ func hops(t *testing.T, fsA fs.FS, a, b provider.Provider, embed bool, withMeta 
 		t.Fatalf("parse %s back: %v", a.ID(), err)
 	}
 	// A dialect drops a key it cannot hold from the file and keeps it in the metadata of that emit.
-	if withMeta && isDialect(a.ID()) && rep2.Worst() >= caps.External {
+	if withMeta && (isDialect(a.ID()) || dropsAnchorKeys(rep2)) && rep2.Worst() >= caps.External {
 		roundtrip.Restore(r.back, roundtrip.NewMeta(a.ID(), r.src, a, rep2))
 	}
 	return r

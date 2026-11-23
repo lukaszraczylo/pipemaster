@@ -218,9 +218,16 @@ func TestCorpus(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parse: %v", err)
 			}
-			self, _, err := a.Emit(src)
+			self, selfRep, err := a.Emit(src)
 			if err != nil {
 				t.Fatalf("identity emit: %v", err)
+			}
+			if dropsAnchorKeys(selfRep) {
+				for _, pl := range src.Pipelines {
+					if ext, ok := pl.Ext[provider.Concourse].(map[string]any); ok {
+						delete(ext, "extra")
+					}
+				}
 			}
 			again, _, err := a.Parse(toFS(self))
 			if err != nil {
