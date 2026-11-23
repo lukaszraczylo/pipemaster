@@ -37,7 +37,7 @@ Not in the model, each on purpose:
 - `ir.Normalize` (jobs and finally jobs sorted by ID, needs and runner labels sorted): the Go parser applies it, as
   every adapter's parser does, and the theorems hold over normalised pipelines (see `Core.Wf`).
 - A job with no step still gets the shared source `get` (emit_gets.go gets), so a need on it orders the jobs.
-- A pipeline with no job: the emitter writes a placeholder job (emit_pipeline.go placeholder) and the parser drops it.
+- A pipeline with no job: the emitter writes a placeholder job (inline in `pipeEmitter`, emit_pipeline.go) and the parser drops it.
 - The digest: a carry applies when the digest matches, and the model has no edited file. -/
 
 section Adapter
@@ -155,7 +155,7 @@ theorem uniqFrom_disjoint (acc bs : List String) : ∀ n ∈ uniqFrom acc bs, n 
 
 /-! ### Emission -/
 
-/-- Mirrors concourse.jobEmitter.finallyFor (provider/concourse/emit_job.go): the finally steps are the hooks of the
+/-- Mirrors concourse.pipeEmitter.finallyFor (provider/concourse/emit_job.go): the finally steps are the hooks of the
 job that no other job needs, when there is exactly one. -/
 def sinkJob (p : Pipe) : Option Core.Job :=
   match p.jobs.filter (fun j => !(p.jobs.any fun k => k.needs.any fun n => n.job == j.id)) with
