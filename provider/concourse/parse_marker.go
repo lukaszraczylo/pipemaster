@@ -232,14 +232,19 @@ func (jb *jobBuilder) allowFailure(plan []any) []any {
 	return []any{inner}
 }
 
-// workdirMarker puts back the relative working directory that the emitter wrote under the workspace.
-func (jb *jobBuilder) workdirMarker(st *ir.Step) {
+// workdirMarker puts back the relative working directory that the emitter wrote under the workspace. With no
+// marker, a workspace task reads its dir relative to the workspace.
+func (jb *jobBuilder) workdirMarker(st *ir.Step, form bool) {
+	path := jb.path + "/step/" + st.ID
 	var a workdirArg
-	if !jb.b.arg(jb.path+"/step/"+st.ID, caps.StepWorkdir, &a) {
+	if !jb.b.arg(path, caps.StepWorkdir, &a) {
+		if form && !jb.b.marked(path, caps.StepWorkdir) {
+			st.WorkDir = strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(st.WorkDir, workspaceName), "/"), "./")
+		}
 		return
 	}
 	if st.WorkDir != a.Wrote {
-		jb.b.ignored(jb.path+"/step/"+st.ID, caps.StepWorkdir, "the run.dir was edited after pipemaster wrote it")
+		jb.b.ignored(path, caps.StepWorkdir, "the run.dir was edited after pipemaster wrote it")
 		return
 	}
 	st.WorkDir = a.WorkDir

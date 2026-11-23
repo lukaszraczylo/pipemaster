@@ -1,13 +1,13 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"runner","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"dc5dce71b3b5150b0c6ccc44f8f5ce79a1744a10ac545c68295dc4d0edbc6cc4","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"b9bc0b5edb845d2745463cf4440f183d164920ecf8a9ff5bd289141b26c5faca","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"5ab596e905edfd80a28e2006c6cce3e11c4ded5350e4e45db42f2d2261eb8b34","carry":"id: build\nrunner:\n    labels:\n        - linux\n        - self-hosted\n        - x64\n"}
+# pipemaster:arg {"digest":"0b66f1435e8266d5fd356cc027820f6cd18d4356c1b8c626729067a4c60c9f9f","carry":"id: build\nrunner:\n    labels:\n        - linux\n        - self-hosted\n        - x64\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/grouped/step/grouped-step-1/carry
-# pipemaster:arg {"digest":"e2f69b6f4d7f74aa4933c32e82cc59eb0fbcc2c89bf759a281d55b7df2c37a57","carry":"id: grouped-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"1a7e3a5b786f09fd079b9d903d5a98a72556989b339bfa7babf1d35ee71a322d","carry":"id: grouped-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/grouped/carry
-# pipemaster:arg {"digest":"a95ceca246d2adf8d9cca4541d700580cb3432e0048e4104b8ca6c36032fe9c2","carry":"id: grouped\nrunner:\n    selector:\n        group: big-runners\n    labels:\n        - linux\n"}
+# pipemaster:arg {"digest":"7f1a369dda03481e8eed1fd875362e7e7425acc0bbe9676192d50e3e796de214","carry":"id: grouped\nrunner:\n    selector:\n        group: big-runners\n    labels:\n        - linux\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"42516277b815005ac96966b3b0f0c44c8d2d03296ba9d6d69ba87d78b52281ef","carry":"id: ci\nname: runner\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -52,6 +52,7 @@ jobs:
             args:
               - -ec
               - echo ok
+            dir: workspace
         tags:
           - linux
           - self-hosted
@@ -81,5 +82,6 @@ jobs:
             args:
               - -ec
               - echo ok
+            dir: workspace
         tags:
           - linux

@@ -1,13 +1,13 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
-# pipemaster:arg {"digest":"19e824e1d53642ad317d42fcbe4647d4db5c3aafbdfcc982fb4fb19e81e7961b","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"7f126225b0947d89612ffca3cf4fbb0ae309918aa0399616e2dea3d3ff15bfc1","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"70fb28daac9b1ddbce714a2cbe7dc4db06091493430ad1336983fabf1ce15957","carry":"id: build\n"}
+# pipemaster:arg {"digest":"fe5b488f04005f7a46d579f6184b48b0d6d3f81c49e82a847cbde951cd5a3a45","carry":"id: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/step/script/carry
-# pipemaster:arg {"digest":"32ab9285b7d2b3ed87220176e8453de5f145ed6fa4ea5095b2bb2e0fc899ea59","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"6ac8bb717fb74619f0b0d413adf44cd17815a59a5d88fe285138520772bbb9dd","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/deploy
 # pipemaster:arg {"manual":false,"held":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/carry
-# pipemaster:arg {"digest":"94ddac65020c703a2bda6f8895dea2e3308db289ba113d2c44c45377ad3e105d","carry":"if: |\n    opaque(gitlab): - changes: '!reference [.remote-patterns]'\n      if: $CI_COMMIT_TAG\nid: deploy\nneeds:\n    - job: build\n"}
+# pipemaster:arg {"digest":"02cca936bdf5900f3864b171aa5fae581ac48e1dad825d2567db93cb38cef91f","carry":"if: |\n    opaque(gitlab): - changes: '!reference [.remote-patterns]'\n      if: $CI_COMMIT_TAG\nid: deploy\nneeds:\n    - job: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"93a840984bed14dcbe079def3a4b6d1c1e13b0c203ceaddca5a3c8612e91aebf","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
@@ -51,6 +51,7 @@ jobs:
               - |-
                 !reference [.remote-setup, script]
                 make
+            dir: workspace
   - name: deploy
     plan:
       - get: source
@@ -76,3 +77,4 @@ jobs:
             args:
               - -ec
               - make deploy
+            dir: workspace

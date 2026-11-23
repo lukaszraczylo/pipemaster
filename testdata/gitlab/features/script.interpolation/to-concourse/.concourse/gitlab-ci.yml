@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
-# pipemaster:arg {"digest":"6bc352a6e53ad99ea6c342a9159c45f0fbad0b1eacd2a6e29ced13216c875968","carry":"id: script\nkind: script\nscript:\n    - echo \"building $\u007b{ sha }} on $\u007b{ branch }} for $\u007b{ actor }}\"\n    - echo \"keeps $HOME and ${UNMAPPED}\"\n"}
+# pipemaster:arg {"digest":"85bd6f1531a5363865518b6c3a3b0c0d73d4dbd03663fb366dfe57320527bde0","carry":"id: script\nkind: script\nscript:\n    - echo \"building $\u007b{ sha }} on $\u007b{ branch }} for $\u007b{ actor }}\"\n    - echo \"keeps $HOME and ${UNMAPPED}\"\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"eb2bc0e04ba9d012cc2305424c1f8816870657721a9c47cd1b434acaeb28172a","carry":"id: build\n"}
+# pipemaster:arg {"digest":"f30b784540e6b2c3d6ddc3f1f9242cef1ab135ab7964db939ebc9bfe8b0f23fd","carry":"id: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -45,3 +45,4 @@ jobs:
               - |-
                 # pipemaster:lost echo "building {{ sha }} on {{ branch }} for {{ actor }}"
                 echo "keeps $HOME and ${UNMAPPED}"
+            dir: workspace

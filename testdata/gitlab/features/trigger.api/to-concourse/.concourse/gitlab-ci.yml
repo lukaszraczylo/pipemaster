@@ -1,9 +1,9 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/triggered/step/script/carry
-# pipemaster:arg {"digest":"dcf0a6e67f6f9b9193bcc68868b8dbefea90e26e3344b85fbb66a8fe145cf016","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"acc4254e1c67bde956c65d5e3ae69898ba2094ad844210faced342f11af644b0","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/triggered
 # pipemaster:arg {"manual":false,"held":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/triggered/carry
-# pipemaster:arg {"digest":"1484621a70d01e785a82e289ad767d9af9d7546857a2e3089f16a1de0d19b992","carry":"id: triggered\n"}
+# pipemaster:arg {"digest":"8fe6705b7100346167f5eb49c9b61d88a14076a9667764620f54465af6034dc9","carry":"id: triggered\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"23421ff0998514f47173ea5b7668acb70c8af5e253b5c3264a1655012e26476f","carry":"id: gitlab-ci\ntriggers:\n    - kind: api\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -37,3 +37,4 @@ jobs:
             args:
               - -ec
               - make triggered
+            dir: workspace

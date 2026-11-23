@@ -1,9 +1,9 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"interp","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"543d4078dd35c40d0d2ac3b486acc7aa4326f8253ef68bbedbf0e992b62c1cbe","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"sha $\u007b{ sha }} on $\u007b{ ref_name }}\"\n    - echo \"$\u007b{ gha.github.workspace }}\"\n"}
+# pipemaster:arg {"digest":"e3fc68ed0624d9d7c92b0fc44c387c040193b84f701171eaa97d786778dc7436","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"sha $\u007b{ sha }} on $\u007b{ ref_name }}\"\n    - echo \"$\u007b{ gha.github.workspace }}\"\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"f9a4def0063dccbedd863b9f556b6c333ac5c5e96bc194d5147837fa24802ac8","carry":"id: build\n"}
+# pipemaster:arg {"digest":"a6143b482c98ccca2c5d58737388bb134e1fddba7240ba50eb2ca1bde8fea348","carry":"id: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: interp\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -47,3 +47,4 @@ jobs:
               - |-
                 # pipemaster:lost echo "sha {{ sha }} on {{ ref_name }}"
                 # pipemaster:lost echo "{{ gha.github.workspace }}"
+            dir: workspace

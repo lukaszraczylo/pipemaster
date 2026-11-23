@@ -1,8 +1,8 @@
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/step/flaky/carry
-# pipemaster:arg {"digest":"95b22a26ce35ca68abc75ae4d9f30f96747a1f1146c73a3dcdaf564f242351e2","carry":"image:\n    ref: alpine:3.20\nid: flaky\nkind: script\n"}
+# pipemaster:arg {"digest":"d44e57e35af2ac48c2502278ef9c6322fac1556a7cc3e3a217b7c20edbde0037","carry":"image:\n    ref: alpine:3.20\nid: flaky\nkind: script\n"}
 # pipemaster:emulated job.allow_failure pipeline/drone/job/ci
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/carry
-# pipemaster:arg {"digest":"c8c5248d9406c51feaefe4a2a79924fd36708c1e220022077ba3eacaa6a6ac41","carry":"id: ci\nallow_failure: true\n"}
+# pipemaster:arg {"digest":"2ea7d354412692fd4cc2ba32721c4e36b438d5f94639552172f271af9a8c296a","carry":"id: ci\nallow_failure: true\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/carry
 # pipemaster:arg {"digest":"d4ea833bebabe36f6f0e50db004dd342e0d5c3824f45d4e79c63ed3526654a1d","carry":"id: drone\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone
@@ -37,3 +37,4 @@ jobs:
                   args:
                     - -ec
                     - ./flaky.sh
+                  dir: workspace

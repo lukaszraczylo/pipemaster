@@ -1,11 +1,11 @@
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/build/step/build/carry
-# pipemaster:arg {"digest":"99513467dac5c3188d98ab4528d7fb2f62c10e0bd5d5b366821a1e194cf137f7","carry":"image:\n    ref: golang:1.25\nid: build\nkind: script\n"}
+# pipemaster:arg {"digest":"aff55752408a94ea8e52e4642edb7ea910edbcfb6c72d530adaa7bd8dad8c2d8","carry":"image:\n    ref: golang:1.25\nid: build\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/build/step/notify/carry
-# pipemaster:arg {"digest":"4fe1164ebef6a552f0cc62d799cfe8c1b3667fb764e3e39e5f9234a15edf1d22","carry":"image:\n    ref: alpine:3.20\nid: notify\nkind: script\n"}
+# pipemaster:arg {"digest":"dbe5c4b9a0a498cfce5d607ba0e2a2b0c60bd8c0955f7f87e16740b10de66f56","carry":"image:\n    ref: alpine:3.20\nid: notify\nkind: script\n"}
 # pipemaster:emulated pipeline.finally pipeline/woodpecker
-# pipemaster:arg {"job":"build","digest":"56aafdb0c27c290a65ad1e8531800bfb57557001802fc9eb4971090a49c99b2e","tasks":["notify"]}
+# pipemaster:arg {"job":"build","digest":"64a38f7cc03127086b1480a1505b528068c677c73fe0e114815be2ded50584cc","tasks":["notify"]}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/build/carry
-# pipemaster:arg {"digest":"be85cf38d3c25f0924f301498bb9762f886ed4db317020bcb94f21a59175a002","carry":"id: build\n"}
+# pipemaster:arg {"digest":"c37d6e82cf85b0e1fd99f542720f67d6c82e09cd5507e6e6161e1538943e592f","carry":"id: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: woodpecker\ntriggers:\n    - kind: push\nfinally:\n    - id: notify\n      needs:\n        - job: build\n      steps:\n        - image:\n            ref: alpine:3.20\n          id: notify\n          kind: script\n          script:\n            - ./notify.sh\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker
@@ -38,6 +38,7 @@ jobs:
             args:
               - -ec
               - go build ./...
+            dir: workspace
     ensure:
       task: notify
       input_mapping:
@@ -58,3 +59,4 @@ jobs:
           args:
             - -ec
             - ./notify.sh
+          dir: workspace

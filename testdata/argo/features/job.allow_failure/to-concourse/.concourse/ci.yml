@@ -1,10 +1,10 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"allow","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/flaky/step/flaky-step-1/carry
-# pipemaster:arg {"digest":"63e302682f62cf30be76d51b17fd9db9b4404e71ddfa255fc517dfcb53be8055","carry":"id: flaky-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"115b0a2270bd2ba8ee288caa1572231b1bad091c449a82e045a0fc5ef3b09ae3","carry":"id: flaky-step-1\nkind: script\n"}
 # pipemaster:emulated job.allow_failure pipeline/ci/job/flaky
 # pipemaster:emulated ext.passthrough pipeline/ci/job/flaky/carry
-# pipemaster:arg {"digest":"4a318e2a222b64455f891f1574ac2447b0e81a02864a1b2e5d5af3502445c6c5","carry":"id: flaky\nallow_failure: true\n"}
+# pipemaster:arg {"digest":"d27c7c625578a72c405f23d867ca20e264b82a6d09bf2d84fd3b442b1c227d50","carry":"id: flaky\nallow_failure: true\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: ci\nname: allow\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -48,3 +48,4 @@ jobs:
                   args:
                     - -ec
                     - echo ok
+                  dir: workspace

@@ -3,11 +3,11 @@
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"if":"ref_name == 'main'","script":"# pipemaster:lost echo {{ ref_name }}"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"59b316e1ac2306c07842ac6d733d5e668e4f1a4f8ee5fac7692ec1da4a85282b","carry":"if: ref_name == 'main'\nid: build-step-1\nkind: script\nscript:\n    - echo $\u007b{ ref_name }}\n"}
+# pipemaster:arg {"digest":"b3a30613fe20c4479cc903947253ae7e3944d9e4b302573a1bc9a0de57554d00","carry":"if: ref_name == 'main'\nid: build-step-1\nkind: script\nscript:\n    - echo $\u007b{ ref_name }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-2/carry
-# pipemaster:arg {"digest":"2adf9588b6804a21c761c61cead4ca6a4e01f055859e12c247883d59bc94f0b5","carry":"if: sha != ''\nid: build-step-2\nkind: script\nscript:\n    - echo $\u007b{ sha }}\n"}
+# pipemaster:arg {"digest":"7bd34e45e8926682b006d4713a0076faba394334bb20345b6e62d3a19aec67fe","carry":"if: sha != ''\nid: build-step-2\nkind: script\nscript:\n    - echo $\u007b{ sha }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"2d1b7b9e9e8f5585245295defbba148bfc2893e51adbb37ff9e2b02ba89f83a3","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
+# pipemaster:arg {"digest":"b0eafee23377e399e70849ccf6b251f92da437c8338f3d6a8ff5410e91774f11","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: alias\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -54,6 +54,7 @@ jobs:
               - |-
                 exit 0 # pipemaster:guard the step condition has no shell form
                 # pipemaster:lost echo {{ ref_name }}
+            dir: workspace
         tags:
           - docker
       - task: build-step-2
@@ -73,8 +74,9 @@ jobs:
             args:
               - -ec
               - |-
-                PM_CTX_SHA="$(cat workspace/.git/commit)"; export PM_CTX_SHA # pipemaster:ctx
+                PM_CTX_SHA="$(cat ../workspace/.git/commit)"; export PM_CTX_SHA # pipemaster:ctx
                 if ! [ "$PM_CTX_SHA" != '' ]; then exit 0; fi # pipemaster:guard
                 echo ${PM_CTX_SHA}
+            dir: workspace
         tags:
           - docker

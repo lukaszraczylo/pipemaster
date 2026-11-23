@@ -51,10 +51,6 @@ pipelines:
               ext:
                 concourse:
                     config:
-                        inputs:
-                            - name: workspace
-                        outputs:
-                            - name: workspace
                         platform: linux
                     input_mapping:
                         workspace: source

@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
-# pipemaster:arg {"digest":"d26f3cf80a4b5a637efa590cd7487fb9480d42c4aa2d61948823317f8ef949ee","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"614688d955c08ff89bac2f7d1f6c9f1f64e48e7f4f368ccafc133c0df00f0a7b","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"b0c0ff82a4abf9c6a7628013b69651be5626358002d234e35debc80ab4dfadf0","carry":"id: build\n"}
+# pipemaster:arg {"digest":"065a320001b3da20ded58eba0d4d6f29b14f60d496fa094b3c43c9d11d31f150","carry":"id: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/downstream/carry
 # pipemaster:arg {"digest":"0a8831e321912a9d97ec7e04263dacd10fb4b75240e329306e6e8fc4e567a0ca","carry":"id: downstream\nneeds:\n    - job: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
@@ -45,6 +45,7 @@ jobs:
             args:
               - -ec
               - make build
+            dir: workspace
   - name: downstream
     plan:
       - get: source

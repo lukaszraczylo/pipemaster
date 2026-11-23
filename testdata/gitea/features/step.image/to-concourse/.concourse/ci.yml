@@ -1,13 +1,13 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"base","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"0ef1428e26b5424cc1b21300b993fabc853aabc202cbadfa2073d15dd769632c","carry":"image:\n    ref: alpine:3.20\n    entrypoint:\n        - \"\"\nid: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"57c93e57e1cb656ce9efb5f9e7d03914570dc8efec4859a673652f9ec7f67596","carry":"image:\n    ref: alpine:3.20\n    entrypoint:\n        - \"\"\nid: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"77aaa48f190018063cb13c604721a4d49632e1683aa2d7f94310735f905d6ea4","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"eb2a1bfd16365ba5d9a1f8713e4059485db0f969138adc2a1c1d62d9f6c16546","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/step/deploy-step-1/carry
-# pipemaster:arg {"digest":"ce96f45bf86e71a589863186993d1b930167b907ca5eefd82837f037f56fd41b","carry":"id: deploy-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"6411f2436f356f863f23dee6d59821e2f770999661b730597fccbb577850afb3","carry":"id: deploy-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry
-# pipemaster:arg {"digest":"cf86776493d37cadfd408d3abf36bb74e133280ed13ed3fe1f702d26548f9bcf","carry":"id: deploy\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: build\n"}
+# pipemaster:arg {"digest":"a84fb3417635e091cbd18f31b3506249daf45b8a0b5de91498936f67be1bf050","carry":"id: deploy\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"31077445882a502d3384a2cd30d749931d715d733c6d3bef3336333bf597ef4e","carry":"id: ci\nname: base\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -51,6 +51,7 @@ jobs:
             args:
               - -ec
               - make build
+            dir: workspace
         tags:
           - ubuntu-latest
   - name: deploy
@@ -79,5 +80,6 @@ jobs:
             args:
               - -ec
               - make deploy
+            dir: workspace
         tags:
           - ubuntu-latest

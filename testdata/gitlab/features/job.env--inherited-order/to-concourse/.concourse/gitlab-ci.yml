@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/lint/step/script/carry
-# pipemaster:arg {"digest":"dfc708a3e349b172519cb5be6167a55cfbfde448e1ac61f01574c05f761e25f2","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"6b854376ea9c6e148b048dcabd620a5ad44c240f2ec7285977ccee33b52fd1eb","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/lint/carry
-# pipemaster:arg {"digest":"2cfb515a609b4ac689f54c73de32aa0f9d7df2a8db5d5fe2b55432925381fccc","carry":"id: lint\nenv:\n    - name: GOCACHE\n      value:\n        lit: $CI_PROJECT_DIR/.cache/go-build\n    - name: GOMODCACHE\n      value:\n        lit: $CI_PROJECT_DIR/.cache/go-mod\n"}
+# pipemaster:arg {"digest":"c98e05d8dcecc8dc878e23fa3546e7e89f32ba3e81fee462ab57d8e1a1d04618","carry":"id: lint\nenv:\n    - name: GOCACHE\n      value:\n        lit: $CI_PROJECT_DIR/.cache/go-build\n    - name: GOMODCACHE\n      value:\n        lit: $CI_PROJECT_DIR/.cache/go-mod\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated job.env pipeline/gitlab-ci/job/lint
@@ -46,3 +46,4 @@ jobs:
             args:
               - -ec
               - make lint
+            dir: workspace

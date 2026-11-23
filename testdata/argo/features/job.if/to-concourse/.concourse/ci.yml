@@ -1,11 +1,11 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"cond","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/step/deploy-step-1/carry
-# pipemaster:arg {"digest":"2e23c8bcc96d5ccd72a54fa4d7d91102f6ebe59653e494774fa2d36651dcb31e","carry":"id: deploy-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"953f370b41a4f08708a33493a0dd491f8f92fc682f94cd9cab359e2bcad06aa9","carry":"id: deploy-step-1\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/ci/job/deploy
 # pipemaster:arg {"manual":false,"held":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry
-# pipemaster:arg {"digest":"d4feba776f4f2bfab43e05bad23fa49ddaf375ae149a75dd6aeaf58b8d436943","carry":"if: (ref == 'refs/heads/main') \u0026\u0026 (event == 'push')\nid: deploy\n"}
+# pipemaster:arg {"digest":"ddb08a7485442f1dbbf762f5ce7b44c88e2ed50b34b0dc926dc48dfd6876af5e","carry":"if: (ref == 'refs/heads/main') \u0026\u0026 (event == 'push')\nid: deploy\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: ci\nname: cond\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -45,3 +45,4 @@ jobs:
             args:
               - -ec
               - echo deploy
+            dir: workspace

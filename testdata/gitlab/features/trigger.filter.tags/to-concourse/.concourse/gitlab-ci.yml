@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/release/step/script/carry
-# pipemaster:arg {"digest":"895c1e22e8a97dc8332456fbc49bb6484d0f5f03bca133ed34dfdccab7226d22","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"bb64502e206c001d104f5433468e456e152054c4710a171ca14307539f37e674","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/release/carry
-# pipemaster:arg {"digest":"b6d3216f8e0511e714c44df0ef889c130b56d8fd3027e19b35e257d49b4f7a2f","carry":"id: release\n"}
+# pipemaster:arg {"digest":"9660dcb535238286a1db42c4553a419ed82753207637bd2d6bba6f6fd31dbf47","carry":"id: release\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"4e58d6484f8ec0d5e4260a5fb88107a486c701ec219051879c31501325493424","carry":"id: gitlab-ci\ntriggers:\n    - kind: tag\n      tags:\n        include:\n            - v**\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -38,3 +38,4 @@ jobs:
             args:
               - -ec
               - make release
+            dir: workspace

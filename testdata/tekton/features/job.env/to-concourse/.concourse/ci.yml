@@ -1,9 +1,9 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"jobenv","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"7fcb8631d70a7361fd8322711ab8557bcaff74ee45315a8d456712bfab45a423","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"be00b436d7621a2de651f9bb4d1ffef7d60464a0024d0d2912d1b1816a2be6f7","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"571bdfd8adbaa687c43f5027cf69d447900fca292bfa5fa3801ef52dd0890a28","carry":"id: build\nenv:\n    - name: GOFLAGS\n      value:\n        lit: -trimpath\n    - name: API\n      value:\n        secret: API_KEY\n"}
+# pipemaster:arg {"digest":"bdf59137e7be038ab3255f7ea793e0701c34a28d47b3f42b590c05dad35f5785","carry":"id: build\nenv:\n    - name: GOFLAGS\n      value:\n        lit: -trimpath\n    - name: API\n      value:\n        secret: API_KEY\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: jobenv\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -49,3 +49,4 @@ jobs:
             args:
               - -ec
               - echo ok
+            dir: workspace

@@ -1,19 +1,19 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"lost status","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"d0bac062c0d39a6964a4e65a1f581837f926fad4f1f4c771d266576bdb374853","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"e33ea249fb03fd0f927f5d1b5f71b1dcc6ea7591aaf0856da2edc221ea48d787","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
 # pipemaster:arg {"if":"failure()","script":"echo cleanup"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-2/carry
-# pipemaster:arg {"digest":"cb9ab85e8bca498401b4e8a41c906e741608a42904c492b56aef5da42f007ada","carry":"if: failure()\nid: build-step-2\nkind: script\n"}
+# pipemaster:arg {"digest":"289f33185476c99566c554cc027d4aded171b36d42c32fbd02fe9345861b6742","carry":"if: failure()\nid: build-step-2\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/config/carry
-# pipemaster:arg {"digest":"f5fe7d7060817af26e07546647815c31b8a88c3b63da4f4d81f067360ca06829","carry":"id: config\nkind: script\n"}
+# pipemaster:arg {"digest":"ce999cc189e8e9152ae8d44688c439178b7b07af17ad13ceadec7c596e7845d4","carry":"id: config\nkind: script\n"}
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-4
 # pipemaster:arg {"if":"steps.config.outputs.configured == 'true'","script":"echo configured"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-4/carry
-# pipemaster:arg {"digest":"7204fb776b9f6c5800d893f32c7e6ea53d9d12492ca2a5bdfbbe097f234818af","carry":"if: steps.config.outputs.configured == 'true'\nid: build-step-4\nkind: script\n"}
+# pipemaster:arg {"digest":"f783d9e2a819d88d5dd662a4099bcc2ed6203c94d3f4a49913f7db0c5465994c","carry":"if: steps.config.outputs.configured == 'true'\nid: build-step-4\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"f58534a25bde6055582e3485fffbb0e4c517c7f0641a4505b26b57bb936b8b75","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"ac7658892047eed735c333872cdcaf0d676cda732901943548d9d94e21cc52ea","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: lost status\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -59,6 +59,7 @@ jobs:
             args:
               - -ec
               - echo build
+            dir: workspace
         tags:
           - ubuntu-latest
       - task: build-step-2
@@ -80,6 +81,7 @@ jobs:
               - |-
                 exit 0 # pipemaster:guard the step condition has no shell form
                 echo cleanup
+            dir: workspace
         tags:
           - ubuntu-latest
       - task: config
@@ -99,6 +101,7 @@ jobs:
             args:
               - -ec
               - echo "configured=true" >> "$GITHUB_OUTPUT"
+            dir: workspace
         tags:
           - ubuntu-latest
       - task: build-step-4
@@ -120,5 +123,6 @@ jobs:
               - |-
                 exit 0 # pipemaster:guard the step condition has no shell form
                 echo configured
+            dir: workspace
         tags:
           - ubuntu-latest

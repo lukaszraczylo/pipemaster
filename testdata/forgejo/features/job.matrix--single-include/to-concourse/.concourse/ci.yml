@@ -1,11 +1,11 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"ci","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
-# pipemaster:arg {"digest":"cb315d1d32cc87c7461be2aa5c5c918e07f39b5781902e37c50ff80d51503582","carry":"id: test-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"ebe2753fe8e236853d47ac45c0c94ce9d7a951e7dc12defc5e0ad27b14b64e70","carry":"id: test-step-1\nkind: script\n"}
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"matrix":"include:\n    - - key: os\n        value: ubuntu-latest\n","across":"[{\"max_in_flight\":\"all\",\"values\":[{\"os\":\"ubuntu-latest\"}],\"var\":\"matrix\"}]"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
-# pipemaster:arg {"digest":"eb86e64845c9d8ac967762c862a4b3654b54840a98b0cf51293e39b0ff2088f5","carry":"matrix:\n    include:\n        - - key: os\n            value: ubuntu-latest\nid: test\nrunner:\n    labels:\n        - $\u007b{ matrix.os }}\n"}
+# pipemaster:arg {"digest":"28bc215f8d2b19136f4b029235fe521de98734c209a1b6d24fd44034b361925e","carry":"matrix:\n    include:\n        - - key: os\n            value: ubuntu-latest\nid: test\nrunner:\n    labels:\n        - $\u007b{ matrix.os }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -48,6 +48,7 @@ jobs:
                 args:
                   - -ec
                   - make test
+                dir: workspace
         across:
           - var: matrix
             values:

@@ -1,6 +1,9 @@
 package concourse_test
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -182,10 +185,54 @@ func TestWorkspaceHandOff(t *testing.T) {
 	if dict(one["input_mapping"])["workspace"] != "source" || dict(two["input_mapping"]) != nil {
 		t.Fatalf("input_mapping: first %v second %v", one["input_mapping"], two["input_mapping"])
 	}
+	build := t.TempDir()
+	if err := os.Mkdir(filepath.Join(build, "workspace"), 0o750); err != nil {
+		t.Fatal(err)
+	}
 	for _, task := range []map[string]any{one, two} {
 		cfg := dict(task["config"])
 		if len(list(cfg["inputs"])) != 1 || len(list(cfg["outputs"])) != 1 || dict(list(cfg["outputs"])[0])["name"] != "workspace" {
 			t.Fatalf("inputs/outputs of %v", task)
+		}
+		run := dict(cfg["run"])
+		args := list(run["args"])
+		dir, _ := run["dir"].(string)
+		if dir != "workspace" {
+			t.Fatalf("run.dir = %q, want the workspace checkout", dir)
+		}
+		cmd := exec.Command("sh", "-ec", args[len(args)-1].(string)) //nolint:gosec // emitter output under test
+		cmd.Dir = filepath.Join(build, dir)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("task %v failed: %v\n%s", task["task"], err, out)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(build, "workspace", "out.txt")); err != nil {
+		t.Fatalf("a file of step one is not in the workspace output: %v", err)
+	}
+}
+
+func TestStepWithoutWorkdirReadsBackWithoutOne(t *testing.T) {
+	files, _ := emit(t, project(scriptJob("build", "make")))
+	back, _ := reparse(t, files)
+	if got := back.Pipelines[0].Jobs[0].Steps[0].WorkDir; got != "" {
+		t.Fatalf("workdir came back as %q", got)
+	}
+}
+
+func TestWorkdirReadsBackWithoutMarkers(t *testing.T) {
+	for _, dir := range []string{"", "app"} {
+		j := scriptJob("build", "make")
+		j.Steps[0].WorkDir = dir
+		files, _ := emit(t, project(j))
+		var kept []string
+		for _, l := range strings.Split(files[".concourse/ci.yml"], "\n") {
+			if !strings.HasPrefix(l, "# pipemaster:") {
+				kept = append(kept, l)
+			}
+		}
+		back, _ := parseFiles(t, map[string]string{"ci.yml": strings.Join(kept, "\n")})
+		if got := back.Pipelines[0].Jobs[0].Steps[0].WorkDir; got != dir {
+			t.Fatalf("workdir %q came back as %q", dir, got)
 		}
 	}
 }

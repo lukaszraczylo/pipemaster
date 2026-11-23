@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/build/carry
-# pipemaster:arg {"digest":"99513467dac5c3188d98ab4528d7fb2f62c10e0bd5d5b366821a1e194cf137f7","carry":"image:\n    ref: golang:1.25\nid: build\nkind: script\n"}
+# pipemaster:arg {"digest":"aff55752408a94ea8e52e4642edb7ea910edbcfb6c72d530adaa7bd8dad8c2d8","carry":"image:\n    ref: golang:1.25\nid: build\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry
-# pipemaster:arg {"digest":"f93735d5740835706806791a40356c5602b63bc8b6f2b4b8e75328ea0efb4ead","carry":"id: ci\n"}
+# pipemaster:arg {"digest":"e63382c1a5bbd1d4414c896c90ba34771efd7ffb49e35fdb5b3116a773c184db","carry":"id: ci\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
 # pipemaster:arg {"digest":"68809f59248228d1d4f54b053a59a6a9f705219f2470901b4ae8528f355322f8","carry":"id: woodpecker\ntriggers:\n    - kind: push\n      paths:\n        include:\n            - src/main.go\n            - go.mod\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker
@@ -37,3 +37,4 @@ jobs:
             args:
               - -ec
               - go build ./...
+            dir: workspace

@@ -1,11 +1,11 @@
 # pipemaster:emulated ext.passthrough pipeline/drone/job/lint/step/lint/carry
-# pipemaster:arg {"digest":"ec27371dda860fe2d31ef240cc63d32c10047e6ac56d0ac050ee23801ba49e14","carry":"image:\n    ref: golangci/golangci-lint:v2\nid: lint\nkind: script\n"}
+# pipemaster:arg {"digest":"d9343073e0679f2165e7dcc280339636e4c3fe533ee67f607e640865375dc856","carry":"image:\n    ref: golangci/golangci-lint:v2\nid: lint\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/job/lint/carry
-# pipemaster:arg {"digest":"f7e1a0e5cd93c273eb52a48966ecccdc4a3c0aaa5f69adf963dd45fe13532915","carry":"id: lint\n"}
+# pipemaster:arg {"digest":"9b8376210d15101370a4f6884ab054a6d3acbce9081476b30953caac8dacae47","carry":"id: lint\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ship/step/ship/carry
-# pipemaster:arg {"digest":"ff80d301be1eeb0d2ee3b89741e6fd68d944b76e19c5f98c1d156a3fc5ad45af","carry":"image:\n    ref: alpine:3.20\nid: ship\nkind: script\n"}
+# pipemaster:arg {"digest":"c7a38701319941a64b78c8d93d92820e636c943f36356c1aa8632091901bd489","carry":"image:\n    ref: alpine:3.20\nid: ship\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ship/carry
-# pipemaster:arg {"digest":"b21d8ed710e57da879f45a60b2eeb46a197ce2c1c873be6b77171c0012942ffe","carry":"id: ship\nneeds:\n    - job: lint\n"}
+# pipemaster:arg {"digest":"a15494fc78d7df4721d3295af08701a4f7eddf5f3501db6d3e1de792c6508ebd","carry":"id: ship\nneeds:\n    - job: lint\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/carry
 # pipemaster:arg {"digest":"5a437d0d0db7cb0e44a455b9472ff964ab9dd879df98054eab0e2949d6fe5191","carry":"id: drone\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone
@@ -38,6 +38,7 @@ jobs:
             args:
               - -ec
               - golangci-lint run
+            dir: workspace
   - name: ship
     plan:
       - get: source
@@ -63,3 +64,4 @@ jobs:
             args:
               - -ec
               - ./ship.sh
+            dir: workspace

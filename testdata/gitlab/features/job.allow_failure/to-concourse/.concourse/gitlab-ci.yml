@@ -1,8 +1,8 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/experimental/step/script/carry
-# pipemaster:arg {"digest":"8b7ece51f8b1da59543c8219ce9d1df3e7725530d9eb889896556df0f77c468e","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"eb6636e8294b613ab4add962b868b868400b9d25f123394a4c5391b8709b9a37","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated job.allow_failure pipeline/gitlab-ci/job/experimental
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/experimental/carry
-# pipemaster:arg {"digest":"1ce89ac47112576bafab0e36dfd94822c2738caec0ca45154a5209ded8d584f8","carry":"id: experimental\nallow_failure: true\n"}
+# pipemaster:arg {"digest":"94ef898419690a4dcdd9890351f44e5bb9a86bf0980333bc683e108f6a43af68","carry":"id: experimental\nallow_failure: true\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -46,3 +46,4 @@ jobs:
                   args:
                     - -ec
                     - make experimental
+                  dir: workspace

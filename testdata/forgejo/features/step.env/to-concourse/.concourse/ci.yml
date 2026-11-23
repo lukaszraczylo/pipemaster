@@ -2,9 +2,9 @@
 # pipemaster:arg {"name":"stepenv","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:lost env GREETING: actor
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"e71a8faf8d5879b8aedc55d9671b5948174d6a783c4aaad5f86da32431b978af","carry":"id: build-step-1\nkind: script\nenv:\n    - name: GREETING\n      value:\n        expr: format('hello {0}', actor)\n    - name: KEY\n      value:\n        secret: KEY\n"}
+# pipemaster:arg {"digest":"7abe3abe802856d370debb7f74d2aeae2288747e87199ebfd310893e7d4a8622","carry":"id: build-step-1\nkind: script\nenv:\n    - name: GREETING\n      value:\n        expr: format('hello {0}', actor)\n    - name: KEY\n      value:\n        secret: KEY\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"64cd5b58efbe836cbbeb176f3d3ea33b81ebaaa9e98a153ad31ef4da906613cb","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"cc286b576f7832eac8fc7a6287914461899048e336962215720cffa01a0a98dd","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: stepenv\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -49,5 +49,6 @@ jobs:
             args:
               - -ec
               - echo "$GREETING"
+            dir: workspace
         tags:
           - ubuntu-latest

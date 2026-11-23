@@ -1,11 +1,11 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"matrix","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
-# pipemaster:arg {"digest":"0f3fb1a2cb7a1e7997e352641f3b178cb385edae84ec2c9337f37c3025247720","carry":"id: test-step-1\nkind: script\nscript:\n    - echo $\u007b{ matrix.go }}\n"}
+# pipemaster:arg {"digest":"a2c2288f10641ded42bc54f52b65bb79428f4dad369fd3fdedac045173a4349f","carry":"id: test-step-1\nkind: script\nscript:\n    - echo $\u007b{ matrix.go }}\n"}
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"matrix":"axes:\n    - name: os\n      values:\n        - ubuntu-latest\n        - macos-latest\n    - name: go\n      values:\n        - \"1.24\"\n        - \"1.25\"\ninclude:\n    - - key: experimental\n        value: \"true\"\n      - key: go\n        value: \"1.25\"\n      - key: os\n        value: ubuntu-latest\nexclude:\n    - - key: go\n        value: \"1.24\"\n      - key: os\n        value: macos-latest\n","across":"[{\"max_in_flight\":\"all\",\"values\":[{\"experimental\":\"\",\"go\":\"1.24\",\"os\":\"ubuntu-latest\"},{\"experimental\":\"true\",\"go\":\"1.25\",\"os\":\"ubuntu-latest\"},{\"experimental\":\"\",\"go\":\"1.25\",\"os\":\"macos-latest\"}],\"var\":\"matrix\"}]"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
-# pipemaster:arg {"digest":"08b2228fd57da2f54b10a9f7810eefbc2c4ac86221212a6602227c1de90dcab7","carry":"matrix:\n    axes:\n        - name: os\n          values:\n            - ubuntu-latest\n            - macos-latest\n        - name: go\n          values:\n            - \"1.24\"\n            - \"1.25\"\n    include:\n        - - key: experimental\n            value: \"true\"\n          - key: go\n            value: \"1.25\"\n          - key: os\n            value: ubuntu-latest\n    exclude:\n        - - key: go\n            value: \"1.24\"\n          - key: os\n            value: macos-latest\nid: test\n"}
+# pipemaster:arg {"digest":"d2b89bdf336ab83fc108300234e361a604a2b8e70c27ecb850b42aef0a5f5c28","carry":"matrix:\n    axes:\n        - name: os\n          values:\n            - ubuntu-latest\n            - macos-latest\n        - name: go\n          values:\n            - \"1.24\"\n            - \"1.25\"\n    include:\n        - - key: experimental\n            value: \"true\"\n          - key: go\n            value: \"1.25\"\n          - key: os\n            value: ubuntu-latest\n    exclude:\n        - - key: go\n            value: \"1.24\"\n          - key: os\n            value: macos-latest\nid: test\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: matrix\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -50,6 +50,7 @@ jobs:
                 args:
                   - -ec
                   - echo ${PM_MATRIX_GO}
+                dir: workspace
         across:
           - var: matrix
             values:

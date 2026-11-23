@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
-# pipemaster:arg {"digest":"010c65c50264251fc71670f893faa92ee2c057a286cfed1b5df3069d163cb77e","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"9ef29c25159ca79c9494a052633fddb6c998ab26249e20d5172ca09fc41f32fd","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"62f314ad604a43aeff38bf064c0469f6a51f442a8aa2bb601ee677beb61a0324","carry":"container:\n    ref: golang:1.22\n    entrypoint:\n        - \"\"\nid: build\n"}
+# pipemaster:arg {"digest":"0c735a8be0138d7fba1ee5a02bbe84b723a30ad14e32d766cb854ba0e7fb3220","carry":"container:\n    ref: golang:1.22\n    entrypoint:\n        - \"\"\nid: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -42,3 +42,4 @@ jobs:
             args:
               - -ec
               - make
+            dir: workspace

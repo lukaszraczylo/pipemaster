@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/unit/step/script/carry
-# pipemaster:arg {"digest":"ad179a31a0c137ad8c0b6dbf4a1159f896ef2fc927dadce86430a7ba09aba60a","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"bad5b3f823b19a4509be4f9badcc60f42b894b55badfe50b2bfbd3799fd9c48a","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/unit/carry
-# pipemaster:arg {"digest":"d16dd866b767776b023235a9cad38a386ac897252a57abf2bf5129737f24c145","carry":"id: unit\n"}
+# pipemaster:arg {"digest":"a63a511b6ff85ee4d8f5552dba948aba95d101099fb8f149b8a2171d013d8a32","carry":"id: unit\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/unit/step/script
@@ -42,3 +42,4 @@ jobs:
             args:
               - -ec
               - make test
+            dir: workspace

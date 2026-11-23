@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/build/carry
-# pipemaster:arg {"digest":"3ca172678480ff6b22f1029ebcdd4bc342c559c604a945b6a18944660f0bc5f9","carry":"image:\n    ref: alpine:3.20\nid: build\nkind: script\nscript:\n    - 'curl -H \"Authorization: Bearer $\u007b{ secrets.TOKEN }}\" \"https://$\u007b{ vars.REGION }}.example.org\"'\n"}
+# pipemaster:arg {"digest":"537927918a1d8501a3e0ded71b47d897f41ede91002ff8426e81544a536eecf8","carry":"image:\n    ref: alpine:3.20\nid: build\nkind: script\nscript:\n    - 'curl -H \"Authorization: Bearer $\u007b{ secrets.TOKEN }}\" \"https://$\u007b{ vars.REGION }}.example.org\"'\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry
-# pipemaster:arg {"digest":"cdc8f6994dcda7621492ecb8c1b31a161309a8cfb099a45f774b5f3f62f257b9","carry":"id: ci\n"}
+# pipemaster:arg {"digest":"5d8023b5afa19fd83e23c29a43b8369e8d96980913b4aca15cb11b2280ebe83d","carry":"id: ci\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: woodpecker\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker
@@ -37,3 +37,4 @@ jobs:
             args:
               - -ec
               - 'curl -H "Authorization: Bearer ${TOKEN}" "https://${REGION}.example.org"'
+            dir: workspace

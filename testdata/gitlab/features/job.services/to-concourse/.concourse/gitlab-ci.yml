@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/test/step/script/carry
-# pipemaster:arg {"digest":"114fa7664b55160e3f7bde5f3b21cc77ee26168b526ae7d6a555c219c1700ae0","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"e73fdb1383286f4eea10ed8eabb12113ef1e508a3d85e1d40e40c4df7bc79809","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/test/carry
-# pipemaster:arg {"digest":"ddb99381b0db5d160d73c7dadb7b18e92b591e696b1ba4f751a3986a3920e6d4","carry":"container:\n    ref: golang:1.22\nid: test\nservices:\n    - name: postgres\n      image:\n        ref: postgres:15\n    - name: cache\n      image:\n        ref: redis:7\n"}
+# pipemaster:arg {"digest":"847e6158a67c282e31c6e8223384c5ec52fb6a38882fc3d2fd987a2ff5601954","carry":"container:\n    ref: golang:1.22\nid: test\nservices:\n    - name: postgres\n      image:\n        ref: postgres:15\n    - name: cache\n      image:\n        ref: redis:7\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -42,3 +42,4 @@ jobs:
             args:
               - -ec
               - make test
+            dir: workspace

@@ -1,11 +1,11 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"expression label","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
-# pipemaster:arg {"digest":"fbce13fcc5fe25cb9d1bfa80f9ee464c3138eafb2a842349de963069b0f59dd7","carry":"id: test-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"e1ba9c3b3e1bf1a2f01c6fef58aa52889fff70241bfe03266553d7b53cc2577c","carry":"id: test-step-1\nkind: script\n"}
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"matrix":"include:\n    - - key: python\n        value: \"3.13\"\n    - - key: os\n        value: macos-latest\n      - key: python\n        value: \"3.14\"\n","across":"[{\"max_in_flight\":\"all\",\"values\":[{\"os\":\"\",\"python\":\"3.13\"},{\"os\":\"macos-latest\",\"python\":\"3.14\"}],\"var\":\"matrix\"}]"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
-# pipemaster:arg {"digest":"9509695e6c0447c87c1220a9072e1f9c0aacd269e247b669d1bf93376dac40ea","carry":"matrix:\n    include:\n        - - key: python\n            value: \"3.13\"\n        - - key: os\n            value: macos-latest\n          - key: python\n            value: \"3.14\"\nid: test\nrunner:\n    labels:\n        - $\u007b{ matrix.os || 'ubuntu-latest' }}\n"}
+# pipemaster:arg {"digest":"08e3c5a8af1011a4a259600a333211bc4ae760dd129967e1c574ca61cf608d7a","carry":"matrix:\n    include:\n        - - key: python\n            value: \"3.13\"\n        - - key: os\n            value: macos-latest\n          - key: python\n            value: \"3.14\"\nid: test\nrunner:\n    labels:\n        - $\u007b{ matrix.os || 'ubuntu-latest' }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: expression label\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -48,6 +48,7 @@ jobs:
                 args:
                   - -ec
                   - echo test
+                dir: workspace
         across:
           - var: matrix
             values:

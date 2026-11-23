@@ -168,6 +168,7 @@ func (jb *jobBuilder) taskStep(m *omap) *ir.Step {
 	k := newSink(jb.k.Rep, jb.b.file, jb.path+"/step/"+st.ID)
 	r := newReader(m)
 	r.Take("task")
+	form := hasCfg && jb.workspaceForm(m, cfg)
 	jb.timeout(st, r)
 	var cfgParams *omap
 	if hasFile {
@@ -178,24 +179,24 @@ func (jb *jobBuilder) taskStep(m *omap) *ir.Step {
 	} else {
 		r.Take("config")
 		st.Kind = ir.StepScript
-		cfgParams = jb.config(st, k, cfg, m.Lines["config"])
+		cfgParams = jb.config(st, k, cfg, m.Lines["config"], form)
 	}
 	jb.env(st, k, cfgParams, r)
 	k.KeepRest(r)
 	st.Ext = k.Ext()
 	st = jb.heldAction(m, written, st)
 	if st.Kind == ir.StepScript {
-		jb.applyMarkers(m, st, written)
+		jb.applyMarkers(m, st, written, form)
 	}
 	jb.written[st] = written
 	return st
 }
 
 // applyMarkers reads the markers of a task, which the emitter keyed by the written task name.
-func (jb *jobBuilder) applyMarkers(m *omap, st *ir.Step, written string) {
+func (jb *jobBuilder) applyMarkers(m *omap, st *ir.Step, written string, form bool) {
 	st.ID = written
 	jb.guardLines(st)
-	jb.workdirMarker(st)
+	jb.workdirMarker(st, form)
 	jb.secretMarker(st)
 	jb.nameMarker(st)
 	jb.matrixBack(st)
@@ -204,8 +205,12 @@ func (jb *jobBuilder) applyMarkers(m *omap, st *ir.Step, written string) {
 }
 
 // config reads an inline task config into the step. It returns the config params, which the step env reads.
-func (jb *jobBuilder) config(st *ir.Step, k *sink, cfg *omap, line int) *omap {
+func (jb *jobBuilder) config(st *ir.Step, k *sink, cfg *omap, line int, form bool) *omap {
 	r := newReader(cfg)
+	if form {
+		r.Take("inputs")
+		r.Take("outputs")
+	}
 	params, _ := asMap(takeVal(r, "params"))
 	if run, ok := asMap(takeVal(r, "run")); ok {
 		jb.run(st, k, run, line)
@@ -511,4 +516,41 @@ func isPowershell(cmd string) bool {
 		return true
 	}
 	return false
+}
+
+// workspaceForm is true for the task shape the emitter writes: one workspace input and output, a dir in the
+// workspace, and no mapping other than workspace from a git resource. The emitter writes all of it back.
+func (jb *jobBuilder) workspaceForm(m, cfg *omap) bool {
+	only := func(v any) bool {
+		l, ok := v.([]any)
+		if !ok || len(l) != 1 {
+			return false
+		}
+		item, ok := asMap(l[0])
+		if !ok || len(item.Order) != 1 {
+			return false
+		}
+		n, _ := text(item.Vals["name"])
+		return n == workspaceName
+	}
+	if !only(cfg.Vals["inputs"]) || !only(cfg.Vals["outputs"]) {
+		return false
+	}
+	run, ok := asMap(cfg.Vals["run"])
+	if !ok {
+		return false
+	}
+	if dir, _ := text(run.Vals["dir"]); dir != workspaceName && !strings.HasPrefix(dir, workspaceName+"/") {
+		return false
+	}
+	if v, has := m.Vals["input_mapping"]; has {
+		im, ok := asMap(v)
+		if !ok || len(im.Order) != 1 {
+			return false
+		}
+		src, _ := text(im.Vals[workspaceName])
+		rr := jb.b.res[src]
+		return rr != nil && rr.typ == "git"
+	}
+	return true
 }

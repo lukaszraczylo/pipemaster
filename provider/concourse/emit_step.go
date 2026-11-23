@@ -175,21 +175,27 @@ func (jx *jobEmitter) ownInputs(ext map[string]any) bool {
 	return in || out
 }
 
-// runDir moves a relative working directory under the workspace; a Concourse-origin task keeps its directory.
+// runDir puts the task in the checkout: the workspace, or a relative working directory under it. A
+// Concourse-origin task with its own inputs keeps its directory.
 func (jx *jobEmitter) runDir(st *ir.Step, path, name string, ext map[string]any) string {
+	own := jx.ownInputs(ext)
+	root := workspaceName
+	if own {
+		root = ""
+	}
 	if st.WorkDir == "" {
-		return ""
+		return root
 	}
 	e := jx.pe.e
 	if parts, err := expr.ParseScriptTemplate(st.WorkDir); err != nil || len(parts) != 1 || parts[0].Expr != nil {
-		e.lose(path, caps.StepWorkdir, "the working directory holds an expression, which a task dir cannot hold; the step runs in the task directory")
-		return ""
+		e.lose(path, caps.StepWorkdir, "the working directory holds an expression, which a task dir cannot hold; the step runs in the checkout")
+		return root
 	}
 	if strings.Contains(st.WorkDir, varOpen) {
-		e.lose(path, caps.StepWorkdir, "the working directory holds ((, which Concourse reads as a credential variable; the step runs in the task directory")
-		return ""
+		e.lose(path, caps.StepWorkdir, "the working directory holds ((, which Concourse reads as a credential variable; the step runs in the checkout")
+		return root
 	}
-	if strings.HasPrefix(st.WorkDir, "/") || jx.ownInputs(ext) {
+	if strings.HasPrefix(st.WorkDir, "/") || own {
 		return st.WorkDir
 	}
 	dir := workspaceName + "/" + strings.TrimPrefix(st.WorkDir, "./")

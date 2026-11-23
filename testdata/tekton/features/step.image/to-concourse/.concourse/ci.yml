@@ -1,13 +1,13 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"base","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"28d522aff418216679403f2028061b9d6fb2fe1f6f5176cb1493c2ed00ff0912","carry":"image:\n    ref: alpine:3.20\nid: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"7c2aa75c04d50ac58748cd235bdf418d0600ff43b4bf73f48af6d7c4bfdbe7d9","carry":"image:\n    ref: alpine:3.20\nid: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"04b69dcbd883f27e2aa71de5534f31b329ce40f0391a62111ceae48229c8440a","carry":"id: build\n"}
+# pipemaster:arg {"digest":"25a605c2ef82bbde17bb04b8b0d1c0c0370a33ba503a9dfad390af26f6afd2da","carry":"id: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/step/deploy-step-1/carry
-# pipemaster:arg {"digest":"f451e3e7aaf716675224cbae310cb724399edb5d4bfde62bc428dee426d64fe3","carry":"id: deploy-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"54b8b25afe523a1af6c747486885dc8a0442b8db5ab1d1c985aed50d5c13f5c8","carry":"id: deploy-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry
-# pipemaster:arg {"digest":"de1c45fe850df50d53eb03986ca3efe160e429dd2eb705339a497fe07023688a","carry":"id: deploy\nneeds:\n    - job: build\n"}
+# pipemaster:arg {"digest":"ba9ba07acb3643276f33011de8a8a89cf1906b65883a208b3e73f7984274c7d5","carry":"id: deploy\nneeds:\n    - job: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"31077445882a502d3384a2cd30d749931d715d733c6d3bef3336333bf597ef4e","carry":"id: ci\nname: base\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -49,6 +49,7 @@ jobs:
             args:
               - -ec
               - make build
+            dir: workspace
   - name: deploy
     plan:
       - get: source
@@ -75,3 +76,4 @@ jobs:
             args:
               - -ec
               - make deploy
+            dir: workspace

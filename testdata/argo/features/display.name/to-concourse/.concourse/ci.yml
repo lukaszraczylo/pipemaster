@@ -5,9 +5,9 @@
 # pipemaster:emulated display.name pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"name":"Compile","id":"build-step-1","written":"build-step-1","kind":"step"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"07d8a442d865db3b38eb2d6604b9e769cdc6d6ffa7490aa372e960b5f2a29f55","carry":"id: build-step-1\nname: Compile\nkind: script\n"}
+# pipemaster:arg {"digest":"4b4c5b4095a762c7d0a9924b68d9d0ee1b7a5f6efab7d4dec5e1d84b9d89f51f","carry":"id: build-step-1\nname: Compile\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"428a82e6c738206a1a0b1e9971899ee9a60cedcfc1ef27b81b0d95272ddb22a3","carry":"id: build\nname: Build the binary\n"}
+# pipemaster:arg {"digest":"4970a49c57df0479b271243544af1f1f23788adefc10894c8d4d0b22aaa1acb6","carry":"id: build\nname: Build the binary\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: Build and test\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -49,3 +49,4 @@ jobs:
             args:
               - -ec
               - go build ./...
+            dir: workspace

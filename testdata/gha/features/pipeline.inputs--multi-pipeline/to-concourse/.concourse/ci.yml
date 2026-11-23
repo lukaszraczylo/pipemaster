@@ -1,9 +1,9 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"CI","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
-# pipemaster:arg {"digest":"56a49103b4af83180829cbeed62d771a5030e85727af1def99328e6e9f7b1760","carry":"id: test-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"5cb48a6da83c3d585d4c296a66eaf1f7d9eecee1240c71030b5727605c463248","carry":"id: test-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
-# pipemaster:arg {"digest":"23b072fa415ae142e9083bd69d4a1779a2f1e23988457b513b33baf70899317d","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"64f76abf35b3cbfd14abd760b848f415a88ee3dbde2ac3e1869bb72dd051cf66","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: CI\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -46,5 +46,6 @@ jobs:
             args:
               - -ec
               - echo test
+            dir: workspace
         tags:
           - ubuntu-latest

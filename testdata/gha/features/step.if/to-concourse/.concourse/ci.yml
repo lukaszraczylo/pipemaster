@@ -1,13 +1,13 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"stepif","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"c898c5935df602a4bb929d30aa2a829ea8d50711834d937615ae5c6da8a0bb9b","carry":"if: always()\nid: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"4699c0bc800fe46c8a353453a0cb46057b77a96e3fce94c3383ab9cd88794581","carry":"if: always()\nid: build-step-1\nkind: script\n"}
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
 # pipemaster:arg {"if":"event == 'push'","script":"echo push"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-2/carry
-# pipemaster:arg {"digest":"00c727e04d7495cf99b1facf5af39446c893a2d0edd0a462c1ce485c28a311f6","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
+# pipemaster:arg {"digest":"e699e270f6557fab4d5689dac479f31a8178b40735d5a95005b93a81eb7aa007","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"39cf8588ab8bf496d7322e9c0bdf7bfa3c9e8adbe3389ee5281fcdfa25b74a9c","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"3237e06cbb820b08a059229f8f91bb9e0119ecd62e211c520aab8d0f1d964007","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: stepif\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -51,6 +51,7 @@ jobs:
             args:
               - -ec
               - echo cleanup
+            dir: workspace
         tags:
           - ubuntu-latest
       - task: build-step-2
@@ -72,5 +73,6 @@ jobs:
               - |-
                 exit 0 # pipemaster:guard the step condition has no shell form
                 echo push
+            dir: workspace
         tags:
           - ubuntu-latest

@@ -1,10 +1,10 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/step/script/carry
-# pipemaster:arg {"digest":"32ab9285b7d2b3ed87220176e8453de5f145ed6fa4ea5095b2bb2e0fc899ea59","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"6ac8bb717fb74619f0b0d413adf44cd17815a59a5d88fe285138520772bbb9dd","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated job.allow_failure pipeline/gitlab-ci/job/deploy
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/deploy
 # pipemaster:arg {"manual":true,"held":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/carry
-# pipemaster:arg {"digest":"69b052dc5e683ce6fcecda716a06b812cca6ac6cfc9fd2bd8573b8a572b0ed3c","carry":"id: deploy\nallow_failure: true\nmanual: true\n"}
+# pipemaster:arg {"digest":"994e361ae420d6a607ff0fada56c42f8ac7a09b601870fc3025d3de9a2ae29cf","carry":"id: deploy\nallow_failure: true\nmanual: true\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -46,3 +46,4 @@ jobs:
                   args:
                     - -ec
                     - make deploy
+                  dir: workspace

@@ -1,9 +1,9 @@
 # pipemaster:emulated ext.passthrough pipeline/deploy/job/ship/step/ship/carry
-# pipemaster:arg {"digest":"ff80d301be1eeb0d2ee3b89741e6fd68d944b76e19c5f98c1d156a3fc5ad45af","carry":"image:\n    ref: alpine:3.20\nid: ship\nkind: script\n"}
+# pipemaster:arg {"digest":"c7a38701319941a64b78c8d93d92820e636c943f36356c1aa8632091901bd489","carry":"image:\n    ref: alpine:3.20\nid: ship\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/deploy/job/ship
 # pipemaster:arg {"manual":false,"held":true}
 # pipemaster:emulated ext.passthrough pipeline/deploy/job/ship/carry
-# pipemaster:arg {"digest":"30dd0b68057443ee5658bd24b93f49f1929ce7917eb7dd8343ac7966dde21a56","carry":"id: ship\n"}
+# pipemaster:arg {"digest":"37eba3da399558aad6785c32d358ee5f9b4e5040bad6444e4652cb36f5180752","carry":"id: ship\n"}
 # pipemaster:emulated ext.passthrough pipeline/deploy/carry
 # pipemaster:arg {"digest":"23421ff0998514f47173ea5b7668acb70c8af5e253b5c3264a1655012e26476f","carry":"id: deploy\ntriggers:\n    - kind: manual\n"}
 # pipemaster:emulated ext.passthrough pipeline/deploy
@@ -37,3 +37,4 @@ jobs:
             args:
               - -ec
               - ./ship.sh
+            dir: workspace

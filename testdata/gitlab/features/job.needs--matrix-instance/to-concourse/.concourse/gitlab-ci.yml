@@ -1,17 +1,17 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/images/step/script/carry
-# pipemaster:arg {"digest":"e7a742ba897ea2656e0952b980ea16a7768ee3a1117ab105df16876f934ab50b","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"73656ff5cfd2a36f5d9c50d551c2300b22394659eb6f48109e62f955ebbc7e97","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated job.matrix pipeline/gitlab-ci/job/images
 # pipemaster:arg {"matrix":"axes:\n    - name: TARGET\n      values:\n        - alpine\n        - ubuntu\n","across":"[{\"max_in_flight\":\"all\",\"values\":[\"alpine\",\"ubuntu\"],\"var\":\"TARGET\"}]"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/images/carry
-# pipemaster:arg {"digest":"5f37eb493f4e2d30b7d2d0be797e69323a560807051886cca717a49b816de21c","carry":"matrix:\n    axes:\n        - name: TARGET\n          values:\n            - alpine\n            - ubuntu\nid: images\n"}
+# pipemaster:arg {"digest":"71d654d99dd6719ab879d172638870bf752132c452f99f2acc64491166590322","carry":"matrix:\n    axes:\n        - name: TARGET\n          values:\n            - alpine\n            - ubuntu\nid: images\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package/step/script/carry
-# pipemaster:arg {"digest":"52012c4f0770215a546273e000e2c62e0dfa5397ff09eb2e0d363b47dcb1cb32","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"5150123b9aea2e04a5c677c03bbcc22f67007c8279befe2977fb693338c0ab08","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package/carry
-# pipemaster:arg {"digest":"993ba3659e29c441d8dcf509a1f2827d571e4556e1afea5dbd99693bc0cf4873","carry":"id: package\nneeds:\n    - job: images\n"}
+# pipemaster:arg {"digest":"0608a0946faaa159341066fa732018750e0c6b360019685347f1ec6e24cb1d00","carry":"id: package\nneeds:\n    - job: images\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package-all/step/script/carry
-# pipemaster:arg {"digest":"88493d3d36774767445084948ddc8e6c6dd90530f9e18d66f61d33a477181253","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"fd52c002b957d8b82a114095027ef907628bd55b433196d0ff5ee82605077743","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package-all/carry
-# pipemaster:arg {"digest":"3517da78915e937afcb8d7ed345a3f40c1393aa21b96fe4987637bd6313c00c9","carry":"id: package-all\nneeds:\n    - job: images\n"}
+# pipemaster:arg {"digest":"78f97c5804072e3c281fc6227142eac5a0df6631be4363725e27f7493d822f3a","carry":"id: package-all\nneeds:\n    - job: images\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"b455d135cccade9524885acf666bd98751568c44b191c3cedd6410b2d71082f3","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -56,6 +56,7 @@ jobs:
                 args:
                   - -ec
                   - make images
+                dir: workspace
         across:
           - var: TARGET
             values:
@@ -88,6 +89,7 @@ jobs:
             args:
               - -ec
               - make package
+            dir: workspace
   - name: package-all
     plan:
       - get: source
@@ -114,3 +116,4 @@ jobs:
             args:
               - -ec
               - make package-all
+            dir: workspace

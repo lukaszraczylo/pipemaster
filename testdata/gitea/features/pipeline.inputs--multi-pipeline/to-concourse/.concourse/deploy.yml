@@ -1,11 +1,11 @@
 # pipemaster:emulated display.name pipeline/deploy
 # pipemaster:arg {"name":"Deploy","id":"deploy","written":"deploy","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/deploy/job/deploy/step/deploy-step-1/carry
-# pipemaster:arg {"digest":"7b5d01634cba214907386f9727c3ad41ed7020dd740428f54539932be71db11b","carry":"id: deploy-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"d7e254c72ff31179c9edddd6c2047f7ef98071f3a219dcbd2d7887d655afea41","carry":"id: deploy-step-1\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/deploy/job/deploy
 # pipemaster:arg {"manual":false,"held":true}
 # pipemaster:emulated ext.passthrough pipeline/deploy/job/deploy/carry
-# pipemaster:arg {"digest":"5a0d85c8d974eaa898def4273f4a70affca866af8f850d6b30311680ca2bc3ca","carry":"id: deploy\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"0ec180bda28b8afc91e1be89ce562d410fb0169ac53e9d040d70440ccf3c23dd","carry":"id: deploy\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/deploy/carry
 # pipemaster:arg {"digest":"23421ff0998514f47173ea5b7668acb70c8af5e253b5c3264a1655012e26476f","carry":"id: deploy\nname: Deploy\ntriggers:\n    - kind: manual\ninputs:\n    - name: target\n      type: choice\n      default: staging\n      description: Where to deploy\n      required: true\n"}
 # pipemaster:emulated ext.passthrough pipeline/deploy
@@ -41,5 +41,6 @@ jobs:
             args:
               - -ec
               - echo deploy
+            dir: workspace
         tags:
           - ubuntu-latest

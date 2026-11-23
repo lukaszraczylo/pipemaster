@@ -1,9 +1,9 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"config","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"ddc6f3df96db4ba47ce1b548f9d8fdb506651f6a53c7fb533ba68f5629abf23f","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.FORGEJO_REGION }} $\u007b{ vars.CI }}\"\nenv:\n    - name: KEY\n      value:\n        secret: DEPLOY_KEY\n"}
+# pipemaster:arg {"digest":"1f5b288f4dc0a48b25a6511739648bc26ecc66444dc292b3e2928a3814f99192","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.FORGEJO_REGION }} $\u007b{ vars.CI }}\"\nenv:\n    - name: KEY\n      value:\n        secret: DEPLOY_KEY\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"17d6f7d3dd704ea0ff1f091773a240f0747b959b33c9ae8fdebbc6261c97ba8e","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
+# pipemaster:arg {"digest":"c49b369714ef058fe90563d765931891a8b07eb40b35673d06ff787b308e11f2","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: config\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -50,5 +50,6 @@ jobs:
             args:
               - -ec
               - echo "${FORGEJO_REGION} ${CI}"
+            dir: workspace
         tags:
           - docker

@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/lint/carry
-# pipemaster:arg {"digest":"ec27371dda860fe2d31ef240cc63d32c10047e6ac56d0ac050ee23801ba49e14","carry":"image:\n    ref: golangci/golangci-lint:v2\nid: lint\nkind: script\ncontinue_on_error: true\n"}
+# pipemaster:arg {"digest":"d9343073e0679f2165e7dcc280339636e4c3fe533ee67f607e640865375dc856","carry":"image:\n    ref: golangci/golangci-lint:v2\nid: lint\nkind: script\ncontinue_on_error: true\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry
-# pipemaster:arg {"digest":"795def6bbb8659663da362a6ec92bc24008f1f0f6c1ead72a6541fe0472a47df","carry":"id: ci\n"}
+# pipemaster:arg {"digest":"ef7790a61e6f2e3605414c65ff998ccc5616d4e7685127c43c586634877e6db1","carry":"id: ci\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: woodpecker\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker
@@ -36,3 +36,4 @@ jobs:
               args:
                 - -ec
                 - golangci-lint run
+              dir: workspace

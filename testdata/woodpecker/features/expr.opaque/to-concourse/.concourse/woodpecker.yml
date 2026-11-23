@@ -1,9 +1,9 @@
 # pipemaster:emulated step.if pipeline/woodpecker/job/ci/step/release
 # pipemaster:arg {"if":"(event == 'tag') || @opaque('woodpecker', 'when.branch glob \"release/*\"')","script":"./release.sh"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/release/carry
-# pipemaster:arg {"digest":"4a6920f27ba655fe5fdbf8a15f6932ab256371f461148dd34ea5918752d5bec9","carry":"if: (event == 'tag') || @opaque('woodpecker', 'when.branch glob \"release/*\"')\nimage:\n    ref: alpine:3.20\nid: release\nkind: script\n"}
+# pipemaster:arg {"digest":"aaa311d815a570144fd95be7de58668e32e190604cf7f9aeded4ca310e978466","carry":"if: (event == 'tag') || @opaque('woodpecker', 'when.branch glob \"release/*\"')\nimage:\n    ref: alpine:3.20\nid: release\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry
-# pipemaster:arg {"digest":"3907daaf2cbc8d288058bf23b0dade061fb9c86745bf4a5854218457e079211a","carry":"id: ci\n"}
+# pipemaster:arg {"digest":"bb0e06680e6f1e0fa7f88aacb2d0c8f18d1b0ec5f419496169bb8e0d40131f8c","carry":"id: ci\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: woodpecker\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker
@@ -38,3 +38,4 @@ jobs:
               - |-
                 exit 0 # pipemaster:guard the step condition has no shell form
                 ./release.sh
+            dir: workspace

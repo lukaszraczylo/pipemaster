@@ -3,9 +3,9 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/job/call/carry
 # pipemaster:arg {"digest":"176ad586d40aa9296c62e380b4f8c7884cba86737229712a525c872a401ae90f","carry":"id: call\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/plain/step/plain-step-1/carry
-# pipemaster:arg {"digest":"20a69744fee66afc9d6f83fe356a639bebe7351ddcbe7af86d3aa78ceb94ef40","carry":"id: plain-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"cecde12ebf4ec278fd69ce9e06e57cfc0ab1106335bcd131b5941add45e46040","carry":"id: plain-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/plain/carry
-# pipemaster:arg {"digest":"b5c91c2e9d544de3323a748ddf78d1b6427f7ba9927f13a67280c9a250127b8a","carry":"id: plain\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"ff05728c34d874a9b5e8a7b398ed5110dd87d0322211645a078675ea9afd3d2e","carry":"id: plain\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"42516277b815005ac96966b3b0f0c44c8d2d03296ba9d6d69ba87d78b52281ef","carry":"id: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -67,5 +67,6 @@ jobs:
             args:
               - -ec
               - echo ok
+            dir: workspace
         tags:
           - ubuntu-latest

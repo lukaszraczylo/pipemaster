@@ -1,9 +1,9 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"config","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"5cc3234f78b28108c712bf30195dd78f0354f6673139f0554b7fcba4e93e087f","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.REGION }}\"\nenv:\n    - name: KEY\n      value:\n        secret: DEPLOY_KEY\n"}
+# pipemaster:arg {"digest":"2429130031893ffc9e2126b7fd46409e46fbe36fa751ace749a5742d762a8bde","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.REGION }}\"\nenv:\n    - name: KEY\n      value:\n        secret: DEPLOY_KEY\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"1fc960cc7736f1fadef27faad03a69298068c2951580defba6295b819beceb8f","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"d49675aa28b3dd7fbb8d07551222b6f3a66c8796c6f491851a2bd3437c57c198","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: config\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: API_TOKEN\n      value:\n        secret: API_TOKEN\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -51,5 +51,6 @@ jobs:
             args:
               - -ec
               - echo "${REGION}"
+            dir: workspace
         tags:
           - ubuntu-latest

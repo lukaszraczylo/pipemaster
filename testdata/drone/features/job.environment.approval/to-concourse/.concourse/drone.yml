@@ -1,9 +1,9 @@
 # pipemaster:emulated ext.passthrough pipeline/drone/job/deploy/step/deploy/carry
-# pipemaster:arg {"digest":"46ba71c662e58fa3158d204ecb5bd462a5ab69e1d119c7f6ca78c47923b4abe8","carry":"image:\n    ref: alpine:3.20\nid: deploy\nkind: script\n"}
+# pipemaster:arg {"digest":"8cd20ad237e021ddc0ea4d9dc8f0a31972c71ed02124d587761dbd6238cda5a4","carry":"image:\n    ref: alpine:3.20\nid: deploy\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/drone/job/deploy
 # pipemaster:arg {"environment":{"Name":"production","URL":"","Approval":true},"manual":false,"held":true}
 # pipemaster:emulated ext.passthrough pipeline/drone/job/deploy/carry
-# pipemaster:arg {"digest":"368cfba0d33b6370ad07a61c88cae356bd0904c8cc0984d56266f3b14a7f10b7","carry":"environment:\n    name: production\n    approval: true\nid: deploy\n"}
+# pipemaster:arg {"digest":"4c7ebbbc99acbc339d351a92e56cd0cd23468b4969e3511aacea33018f01d0c7","carry":"environment:\n    name: production\n    approval: true\nid: deploy\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/carry
 # pipemaster:arg {"digest":"23421ff0998514f47173ea5b7668acb70c8af5e253b5c3264a1655012e26476f","carry":"id: drone\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone
@@ -36,3 +36,4 @@ jobs:
             args:
               - -ec
               - ./deploy.sh
+            dir: workspace

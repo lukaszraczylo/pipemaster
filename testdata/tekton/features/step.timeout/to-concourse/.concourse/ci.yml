@@ -1,9 +1,9 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"stepto","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"dec443c573636744ec867fbf8fe476c7a1e257c88a91437bb137db3d39323c64","carry":"timeout: 2m0s\nid: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"0412921b5c3096d1177d516c5c430e2a1802b843f6483f4088a2d003f3775352","carry":"timeout: 2m0s\nid: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"debc0ef69aaaa6ea4776dd123d8c71b727d93c682a3f80813910f35abeae2b79","carry":"id: build\n"}
+# pipemaster:arg {"digest":"09af59fa7722f8db7c1f98401278f709c2f255b5c2302aea8f4c6dd1329a75d6","carry":"id: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: stepto\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -45,4 +45,5 @@ jobs:
             args:
               - -ec
               - sleep 1
+            dir: workspace
         timeout: 2m0s

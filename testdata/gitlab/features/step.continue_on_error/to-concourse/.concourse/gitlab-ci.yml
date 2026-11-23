@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"feefbddbf3fff87a7c116b3b50da6417a3e99cd111c34ae44d7453373aabe03c","carry":"id: build-step-1\nkind: script\ncontinue_on_error: true\n"}
+# pipemaster:arg {"digest":"7c3023c86c6bde6134267a7cb412fdb5e8066c4e4d6a336a8509bea6299f7804","carry":"id: build-step-1\nkind: script\ncontinue_on_error: true\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"f1218691ce38ccc976252d764220a1d4e62fa11a58cde2e6fce8a1598f9be443","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"249f8fbf888997730ab1a57318ce77fbd97549b42d44a8d28231de1f544734f3","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -38,5 +38,6 @@ jobs:
               args:
                 - -ec
                 - echo ok
+              dir: workspace
           tags:
             - ubuntu-latest

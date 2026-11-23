@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
-# pipemaster:arg {"digest":"77f3603b0ae262f2d08b447997745b72e13d041fed9c455ef35216dd38579e73","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"b994c212310de03503ba120958250223e42435221cd750c92e1dbed3bebaa411","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"a9d720eba6777fb5e61459196dbddc1d02385b8a48e9dff4ec77dd841aa33319","carry":"id: build\n"}
+# pipemaster:arg {"digest":"8d0614dde900b13218f4abc7e6f0b6a3aa29fa43d0f4157701dda71b426e2c28","carry":"id: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: GOFLAGS\n      value:\n        lit: -mod=readonly\n    - name: DEPLOY_ENV\n      value:\n        lit: staging\n"}
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
@@ -46,3 +46,4 @@ jobs:
             args:
               - -ec
               - make build
+            dir: workspace

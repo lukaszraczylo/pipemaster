@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"59b02dc381bde33cb5aee4f0677f8d4010c7bec0fd5c5319be6e8f2c94b8a21f","carry":"id: build-step-1\nkind: script\nenv:\n    - name: GREETING\n      value:\n        lit: hello\n    - name: MODE\n      value:\n        lit: fast\n"}
+# pipemaster:arg {"digest":"e378cef6d31245c5eb12f3f8ba5d6397d15a03eaa76cc2e98d1d9b4270ffb4d0","carry":"id: build-step-1\nkind: script\nenv:\n    - name: GREETING\n      value:\n        lit: hello\n    - name: MODE\n      value:\n        lit: fast\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"76bb4cd6ba7f1261f4f331f28a0132898e70010ef82cf80883f5cd7625ce082a","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"b7ef1d8be144a7b95c519bdf3a10ab8276a0a0c3b47a560c5daa78685a7370d3","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -39,5 +39,6 @@ jobs:
             args:
               - -ec
               - echo "$GREETING"
+            dir: workspace
         tags:
           - ubuntu-latest

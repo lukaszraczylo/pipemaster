@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/step/script/carry
-# pipemaster:arg {"digest":"ae560bbdb33b45c85bf24202f7c9a6dd9dd22c7cf5360542e88dd5152d2e14c9","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"57a171624b8a7e3d9aa08560b3d29b3b042d83aa9483806e96401e430aff48df","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/carry
-# pipemaster:arg {"digest":"3892cf79a7c78899fb1c1b897dc99f9a2a3a604c948b36f9d647a36b38622514","carry":"id: deploy\n"}
+# pipemaster:arg {"digest":"01ad336d9869ef57a0859d995ecc3d1221f91f2acf6b9fbcbaf0b04cd8d7af32","carry":"id: deploy\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: TAG\n      value:\n        lit: $[[ inputs.image_tag ]]\ninputs:\n    - name: dry_run\n      type: boolean\n      default: \"false\"\n    - name: env\n      default: staging\n    - name: image_tag\n      type: string\n      default: latest\n      description: Image tag to deploy\n"}
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
@@ -45,3 +45,4 @@ jobs:
             args:
               - -ec
               - echo deploy
+            dir: workspace

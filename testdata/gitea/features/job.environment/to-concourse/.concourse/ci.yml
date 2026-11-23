@@ -1,11 +1,11 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"env","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/step/deploy-step-1/carry
-# pipemaster:arg {"digest":"7b5d01634cba214907386f9727c3ad41ed7020dd740428f54539932be71db11b","carry":"id: deploy-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"d7e254c72ff31179c9edddd6c2047f7ef98071f3a219dcbd2d7887d655afea41","carry":"id: deploy-step-1\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/ci/job/deploy
 # pipemaster:arg {"environment":{"Name":"production","URL":"https://example.com","Approval":false},"manual":false,"held":false}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry
-# pipemaster:arg {"digest":"be2876a1e3ad0bd307d7f43ed920d116a473bd111c0bfe4d106372c1788b2756","carry":"environment:\n    name: production\n    url: https://example.com\nid: deploy\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"d983314a893f669b58a0879000e4b138aa20ed79c87ddd0fc4343269a43d4542","carry":"environment:\n    name: production\n    url: https://example.com\nid: deploy\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: env\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -48,5 +48,6 @@ jobs:
             args:
               - -ec
               - echo deploy
+            dir: workspace
         tags:
           - ubuntu-latest

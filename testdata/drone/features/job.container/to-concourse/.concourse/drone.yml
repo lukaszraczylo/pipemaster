@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/step/test/carry
-# pipemaster:arg {"digest":"fc704c5e0a6e7adaf12b29e75d5c8ffaab2a84fdacb4a33df96ad8d4d244566f","carry":"id: test\nkind: script\n"}
+# pipemaster:arg {"digest":"b3addac982ad0e15da30521f4b4d8d7354fd349364da7be12ea4535967803c6f","carry":"id: test\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/carry
-# pipemaster:arg {"digest":"22aae378a84658136567acf3b7702b6a04a616b2b023e1fea90a52396f7791b1","carry":"container:\n    ref: node:22\nid: ci\n"}
+# pipemaster:arg {"digest":"de0a4eec64c0139fe0deaaa63a9ef8c277d96d9387f4fc1e93aac32846446d03","carry":"container:\n    ref: node:22\nid: ci\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: drone\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone
@@ -34,3 +34,4 @@ jobs:
             args:
               - -ec
               - npm test
+            dir: workspace

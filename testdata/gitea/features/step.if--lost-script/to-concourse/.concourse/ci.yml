@@ -1,15 +1,15 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"ci","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/check/step/meta/carry
-# pipemaster:arg {"digest":"3038cdec378e45facb9cc11236db20e63fd1fd09fa0e92b194ee168efe283d40","carry":"id: meta\nkind: script\n"}
+# pipemaster:arg {"digest":"182131b97803d110fb51088e445454a0dfc4b09d262885777f19911672ec2fe8","carry":"id: meta\nkind: script\n"}
 # pipemaster:emulated display.name pipeline/ci/job/check/step/check-step-2
 # pipemaster:arg {"name":"Inspect","id":"check-step-2","written":"check-step-2","kind":"step"}
 # pipemaster:emulated step.if pipeline/ci/job/check/step/check-step-2
 # pipemaster:arg {"if":"event != 'pull_request'","script":"# pipemaster:lost docker inspect {{ steps.meta.outputs.version }}"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/check/step/check-step-2/carry
-# pipemaster:arg {"digest":"659b417d1bc4692d80803b6c8250161fd0f055de60c54b084704a6634068688b","carry":"if: event != 'pull_request'\nid: check-step-2\nname: Inspect\nkind: script\nscript:\n    - docker inspect $\u007b{ steps.meta.outputs.version }}\n"}
+# pipemaster:arg {"digest":"445c84f43e8c5fa1787512291518e55cdd923914e625c504262d06c7b36047f1","carry":"if: event != 'pull_request'\nid: check-step-2\nname: Inspect\nkind: script\nscript:\n    - docker inspect $\u007b{ steps.meta.outputs.version }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/check/carry
-# pipemaster:arg {"digest":"d38f67894ca2375a669c733230b45315258d5a37d0cc93f1f69087d6ae63e76d","carry":"id: check\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"27a277630726be90b25907b626e6673cc180029a23d67615b6011fcbf2f9da26","carry":"id: check\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -53,6 +53,7 @@ jobs:
             args:
               - -ec
               - echo "version=1" >> "$GITHUB_OUTPUT"
+            dir: workspace
         tags:
           - ubuntu-latest
       - task: check-step-2
@@ -74,5 +75,6 @@ jobs:
               - |-
                 exit 0 # pipemaster:guard the step condition has no shell form
                 # pipemaster:lost docker inspect {{ steps.meta.outputs.version }}
+            dir: workspace
         tags:
           - ubuntu-latest

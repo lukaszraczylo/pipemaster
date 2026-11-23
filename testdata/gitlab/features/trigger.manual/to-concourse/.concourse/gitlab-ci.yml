@@ -1,9 +1,9 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/adhoc/step/script/carry
-# pipemaster:arg {"digest":"e98eeedf7d03ca2aab1487599ea2395cf1302ca4c46d3d12cd1d0e87d03e603b","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"3c7e590186664164e4ed72b23891566d7e5a03256b738d4b20f6648fc89dd362","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/adhoc
 # pipemaster:arg {"manual":false,"held":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/adhoc/carry
-# pipemaster:arg {"digest":"170a3687bb8a959ea3e6da1d99f8b05a12c259122a44c539648fc63a429ee1fd","carry":"id: adhoc\n"}
+# pipemaster:arg {"digest":"e8faa45ea27552d317e5e2cfb17da21e7aacbc97f9dbd00b814988067117bc88","carry":"id: adhoc\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"23421ff0998514f47173ea5b7668acb70c8af5e253b5c3264a1655012e26476f","carry":"id: gitlab-ci\ntriggers:\n    - kind: manual\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -37,3 +37,4 @@ jobs:
             args:
               - -ec
               - make adhoc
+            dir: workspace

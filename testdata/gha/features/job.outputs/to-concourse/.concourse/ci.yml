@@ -1,13 +1,13 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"outputs","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/use/step/use-step-1/carry
-# pipemaster:arg {"digest":"6e14a2e3316553494b2b476854ba9cda8b869bf4f0e953dd024e29ba62db8fb5","carry":"id: use-step-1\nkind: script\nscript:\n    - echo $\u007b{ needs.version.outputs.tag }}\n"}
+# pipemaster:arg {"digest":"e3088189aeacc87726aa05854b8cd41687d810598b86b829267320f82ab62ec5","carry":"id: use-step-1\nkind: script\nscript:\n    - echo $\u007b{ needs.version.outputs.tag }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/use/carry
-# pipemaster:arg {"digest":"c9ba085f14eb361fb9b5ee4e6303d687e97f1de02ab0430e3f4d80e0b7e3d9e3","carry":"id: use\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: version\n"}
+# pipemaster:arg {"digest":"a44062ed0a53d2998156f0d77de31a1a5622d0f9f80858e828925e77d1702b90","carry":"id: use\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: version\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/version/step/tag/carry
-# pipemaster:arg {"digest":"d267ad0a05992cd4416f8f7817f03393b28d6ad5eaf2a82f0f407c2ca1681852","carry":"id: tag\nkind: script\n"}
+# pipemaster:arg {"digest":"5b6a50808e85d9ce9255782fd586d7f8a544a9dbd31cc896dd6b795bfa25d073","carry":"id: tag\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/version/carry
-# pipemaster:arg {"digest":"07dcc8c27e72344e28b031198ab4d1f9b3390749e3da370762194dcca848454d","carry":"id: version\nrunner:\n    labels:\n        - ubuntu-latest\noutputs:\n    - name: tag\n      value: $\u007b{ steps.tag.outputs.value }}\n"}
+# pipemaster:arg {"digest":"e341a7c09657bad9c6f4a854d856b290e3a34752dbab645b5944eb88830274a2","carry":"id: version\nrunner:\n    labels:\n        - ubuntu-latest\noutputs:\n    - name: tag\n      value: $\u007b{ steps.tag.outputs.value }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"460cb7f788627675abb4989267d447b54c68f62becb6f6e15e95e649c2453e3a","carry":"id: ci\nname: outputs\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -53,6 +53,7 @@ jobs:
             args:
               - -ec
               - '# pipemaster:lost echo {{ needs.version.outputs.tag }}'
+            dir: workspace
         tags:
           - ubuntu-latest
   - name: version
@@ -80,5 +81,6 @@ jobs:
             args:
               - -ec
               - echo "value=v1" >> "$GITHUB_OUTPUT"
+            dir: workspace
         tags:
           - ubuntu-latest

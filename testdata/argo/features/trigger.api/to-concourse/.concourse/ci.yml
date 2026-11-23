@@ -1,11 +1,11 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"api","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"6e5bd93d1202c0711215e1e35e8345fe93d7c9f9ddbadc90aa242cecabfa708c","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"7780e75b493f4b5918d1171abda8c2821999f4188749c6e3daa2ada43a60719c","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/ci/job/build
 # pipemaster:arg {"manual":false,"held":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"da11d50275b65243276eeab93f476f7938d245b49002ad8db9369d345f3be4b4","carry":"id: build\n"}
+# pipemaster:arg {"digest":"c1a42010b6d370574da350b60e7784b3ed227eab5a9a3f52fa561eadb8e79b6d","carry":"id: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"23421ff0998514f47173ea5b7668acb70c8af5e253b5c3264a1655012e26476f","carry":"id: ci\nname: api\ntriggers:\n    - kind: api\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -39,3 +39,4 @@ jobs:
             args:
               - -ec
               - echo ok
+            dir: workspace

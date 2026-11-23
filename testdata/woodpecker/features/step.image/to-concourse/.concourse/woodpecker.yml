@@ -1,9 +1,9 @@
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/build/carry
-# pipemaster:arg {"digest":"b83f0097f04b27288fca62833f8b6d1f78edb98713d983dbee003d3d00ccd40e","carry":"image:\n    ref: rust:1.85\nid: build\nkind: script\n"}
+# pipemaster:arg {"digest":"3bf514f95aaa56ba57108861bd66e3622a44856a51cfdc04334f227a432bb90c","carry":"image:\n    ref: rust:1.85\nid: build\nkind: script\n"}
 # pipemaster:emulated step.action pipeline/woodpecker/job/ci/step/publish
 # pipemaster:arg {"step":"image:\n    ref: woodpeckerci/plugin-docker-buildx\nwith:\n    repo:\n        lit: example/app\n    tags:\n        lit: latest\nid: publish\nkind: plugin\n","task":"publish","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"publish\"}"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry
-# pipemaster:arg {"digest":"a23040409d47557332af3f80f6a8f056b65c5227eaec7fa21302fb16e7008b0f","carry":"id: ci\n"}
+# pipemaster:arg {"digest":"a0725135012ca0617ca02ea5745e8c9e184fd7d495ad659ca1ab8efba802ed96","carry":"id: ci\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: woodpecker\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker
@@ -36,6 +36,7 @@ jobs:
             args:
               - -ec
               - cargo build --release
+            dir: workspace
       - task: publish
         config:
           platform: linux

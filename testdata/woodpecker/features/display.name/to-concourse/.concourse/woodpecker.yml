@@ -1,9 +1,9 @@
 # pipemaster:emulated display.name pipeline/woodpecker/job/ci/step/ci-step-1
 # pipemaster:arg {"name":"Compile","id":"ci-step-1","written":"ci-step-1","kind":"step"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/ci-step-1/carry
-# pipemaster:arg {"digest":"3aade86986a6f4de748207bad6bd7423ec66c9760bef1039ab40ff209e6a691c","carry":"image:\n    ref: golang:1.25\nid: ci-step-1\nname: Compile\nkind: script\n"}
+# pipemaster:arg {"digest":"982ce274d1f81647d424e17049d49f5b83d636aa4e7b5a5f99e8df9dc76938fe","carry":"image:\n    ref: golang:1.25\nid: ci-step-1\nname: Compile\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry
-# pipemaster:arg {"digest":"72c1b013fa33c8760b72777d7be5144ac7999609e78f2948ec94f9f5f08aa8be","carry":"id: ci\n"}
+# pipemaster:arg {"digest":"bb62a8b82a3ff18809f92e4e6f35aadedb42f0f785a14882849c7c937042396f","carry":"id: ci\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: woodpecker\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker
@@ -36,3 +36,4 @@ jobs:
             args:
               - -ec
               - go build ./...
+            dir: workspace

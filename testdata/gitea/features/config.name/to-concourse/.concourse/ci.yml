@@ -3,9 +3,9 @@
 # pipemaster:emulated config.name pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"secrets":["KEY"]}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"03116f343b2fe0dd334d69a060a4072ab9a31a08aed43ddf2eb32da8d84566f8","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.CI_MODE }}\"\nenv:\n    - name: KEY\n      value:\n        secret: GITEA_DEPLOY\n    - name: TOKEN\n      value:\n        secret: GITHUB_TOKEN\n"}
+# pipemaster:arg {"digest":"aad38893b2989c53a15278958667ecfb553749c83dc194f31080bc6b85249280","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.CI_MODE }}\"\nenv:\n    - name: KEY\n      value:\n        secret: GITEA_DEPLOY\n    - name: TOKEN\n      value:\n        secret: GITHUB_TOKEN\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"be18535f91f41faa8c3c4b8e91f6617b925e30452964c2c459bf20a5acf1b65f","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"da68e218cf0effa852e44315148b1c615917d7ccaf1e66596d67699ee85fedb1","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: config\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -52,5 +52,6 @@ jobs:
             args:
               - -ec
               - echo "${CI_MODE}"
+            dir: workspace
         tags:
           - ubuntu-latest

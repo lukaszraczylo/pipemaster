@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/step/build/carry
-# pipemaster:arg {"digest":"cfa55f46972636646dce0f054e7cdc377646dee4d0a512f08c3d62f557ee092b","carry":"image:\n    ref: golang:1.25\nid: build\nkind: script\n"}
+# pipemaster:arg {"digest":"541de6f915e230b26f2328c7ea54c75ec3d6d0fa5eefd204ce08a0e2ec0fc00b","carry":"image:\n    ref: golang:1.25\nid: build\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/carry
-# pipemaster:arg {"digest":"a6f4531879d8efba5f8dca0ead8df62506e35ef5d79353f26e54c2e74058db3b","carry":"id: ci\n"}
+# pipemaster:arg {"digest":"7ef2022803595f1d7f5b7dd0eed5762844f024a19e0f1b0134f73f73e70fb3a7","carry":"id: ci\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: drone\ntriggers:\n    - kind: push\nenv:\n    - name: CGO_ENABLED\n      value:\n        lit: \"0\"\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone
@@ -37,3 +37,4 @@ jobs:
             args:
               - -ec
               - go build ./...
+            dir: workspace

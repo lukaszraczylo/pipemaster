@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"feefbddbf3fff87a7c116b3b50da6417a3e99cd111c34ae44d7453373aabe03c","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"7c3023c86c6bde6134267a7cb412fdb5e8066c4e4d6a336a8509bea6299f7804","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"08d58c7f6589fe67818c9fab8492c513f96431a49c874957f17781b23687825d","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"453ddf98971a5751794b15313621867c09aca4510ba70e015b429516729bdf0b","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"34e31449a536fed76cd5dbd488fc41fffca29439fe29b700357bf781b7fdabc8","carry":"id: gitlab-ci\ntriggers:\n    - kind: pr\n      paths:\n        exclude:\n            - '**.md'\n    - kind: push\n      paths:\n        include:\n            - src/**\n            - '!src/docs/**'\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -39,5 +39,6 @@ jobs:
             args:
               - -ec
               - echo ok
+            dir: workspace
         tags:
           - ubuntu-latest

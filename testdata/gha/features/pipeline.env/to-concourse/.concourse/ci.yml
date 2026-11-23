@@ -2,9 +2,9 @@
 # pipemaster:arg {"name":"env","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:lost env LABEL: gha.github.run_number
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"952cb2abf0ed80ed41f408f8f30c324648f716947200fc59d3485bbda00165be","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"df5e2f1b03fd2dd99acf36ee9da97b6927187e25669768824709d4cd7f55a77f","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"638fea5214aa97ae75323f33fecd30524926d201cf6944616fc8be88157e07f8","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"67db72db41c5722b2d500f8e391106ef467ee1e41ea0104001eec16e1c991e6e","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: env\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: CGO_ENABLED\n      value:\n        lit: \"0\"\n    - name: VERSION\n      value:\n        lit: \"3.1\"\n    - name: TOKEN\n      value:\n        secret: DEPLOY_TOKEN\n    - name: LABEL\n      value:\n        expr: format('build-{0}', gha.github.run_number)\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -52,5 +52,6 @@ jobs:
             args:
               - -ec
               - echo ok
+            dir: workspace
         tags:
           - ubuntu-latest

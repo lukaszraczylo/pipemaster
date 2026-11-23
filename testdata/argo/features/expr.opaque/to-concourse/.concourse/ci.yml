@@ -1,11 +1,11 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"opaque","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"feb742dcc6094470ac54dea84d47552e0ec55da6deefb62eab33b446b3003fd2","carry":"id: build-step-1\nkind: script\nscript:\n    - 'echo $\u007b{ opaque(gha): env[github.job] }}'\n"}
+# pipemaster:arg {"digest":"a36fd8277fad7e82a974fe93a25311015607d14182cd2a457e56cd96427280c0","carry":"id: build-step-1\nkind: script\nscript:\n    - 'echo $\u007b{ opaque(gha): env[github.job] }}'\n"}
 # pipemaster:emulated job.manual pipeline/ci/job/build
 # pipemaster:arg {"manual":false,"held":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"b664a04fdf2d364ebd8295a76b270c8f65cb74ac3fa4cfa44dccda10f15c479b","carry":"if: 'opaque(gha): fromJSON(''{\"a\":1}'').a == 1'\nid: build\n"}
+# pipemaster:arg {"digest":"0a50755cdbf483e19338b0909149b9220040e8fdc6bccbbb981b15fc6ba3a14c","carry":"if: 'opaque(gha): fromJSON(''{\"a\":1}'').a == 1'\nid: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: ci\nname: opaque\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -45,3 +45,4 @@ jobs:
             args:
               - -ec
               - '# pipemaster:lost echo {{ opaque(gha): env[github.job] }}'
+            dir: workspace
