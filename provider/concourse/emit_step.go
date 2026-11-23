@@ -260,7 +260,7 @@ func guardable(e expr.Expr) bool { return exprconcourse.Guardable(e) }
 
 func guardRefs(e expr.Expr) ([]expr.Ref, bool) { return exprconcourse.GuardRefs(e) }
 
-// secretMarker writes the marker for params whose kind differs from what their name says.
+// secretMarker writes the marker for the params that are plain vars: the parser reads every ((name)) as a secret.
 func (jx *jobEmitter) secretMarker(sc *scope, name string) {
 	var a secretArg
 	for _, p := range sc.params {
@@ -268,13 +268,8 @@ func (jx *jobEmitter) secretMarker(sc *scope, name string) {
 		if m == nil {
 			continue
 		}
-		want, known := sc.intent[p.name]
-		if known && want != secretName(m[1]) {
-			if want {
-				a.Secrets = append(a.Secrets, p.name)
-			} else {
-				a.Vars = append(a.Vars, p.name)
-			}
+		if want, known := sc.intent[p.name]; known && !want {
+			a.Vars = append(a.Vars, p.name)
 		}
 	}
 	if len(a.Secrets)+len(a.Vars) > 0 {

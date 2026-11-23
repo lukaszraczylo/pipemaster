@@ -2,7 +2,7 @@
 # pipemaster:arg {"steps":{"build-step-1":"ref: ubuntu:latest\n"},"wrote":{"build-step-1":"ubuntu:latest"}}
 # pipemaster:emulated config.name pipeline/ci/ref/secrets.API_TOKEN
 # pipemaster:emulated config.name pipeline/ci/ref/secrets.DEPLOY_KEY
-# pipemaster:emulated config.name pipeline/ci/ref/vars.REGION
+# pipemaster:emulated config.name pipeline/ci/ref/secrets.REGION
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
@@ -47,8 +47,8 @@ spec:
                     key: API_TOKEN
               - name: REGION
                 valueFrom:
-                  configMapKeyRef:
-                    name: ci-vars
+                  secretKeyRef:
+                    name: ci-secrets
                     key: REGION
         volumeMounts:
           - name: workspace

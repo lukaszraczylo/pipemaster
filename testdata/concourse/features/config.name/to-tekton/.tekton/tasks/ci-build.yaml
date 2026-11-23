@@ -20,6 +20,6 @@ spec:
               key: API_TOKEN
         - name: REGION
           valueFrom:
-            configMapKeyRef:
-              name: ci-vars
+            secretKeyRef:
+              name: ci-secrets
               key: REGION

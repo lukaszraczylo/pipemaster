@@ -92,15 +92,29 @@ func TestDisabledStepEditIsKept(t *testing.T) {
 	wantIgnored(t, rep, caps.StepIf, "script")
 }
 
-func TestSecretMarkerEditIsKept(t *testing.T) {
+func TestVarMarkerEditIsKept(t *testing.T) {
 	j := scriptJob("build", "make")
-	j.Steps[0].Env = []ir.Var{{Name: "REGION", Value: ir.Value{Kind: ir.ValueSecret, Secret: "region"}}}
+	j.Steps[0].Env = []ir.Var{{Name: "REGION", Value: ir.Value{Kind: ir.ValueExpr, Expr: expr.Ref{Path: []string{expr.PrefixVars, "region"}}}}}
 	back, rep := editedParse(t, project(j), "REGION: ((region))", "REGION: literal")
 	env := back.Pipelines[0].Jobs[0].Steps[0].Env
-	if len(env) != 1 || env[0].Value.Kind == ir.ValueSecret {
+	if len(env) != 1 || env[0].Value.Kind != ir.ValueLit {
 		t.Fatalf("env = %+v", env)
 	}
 	wantIgnored(t, rep, caps.ConfigName, "REGION")
+}
+
+func TestVarComesBackAsVarFromItsMarker(t *testing.T) {
+	j := scriptJob("build", "make")
+	j.Steps[0].Env = []ir.Var{{Name: "REGION", Value: ir.Value{Kind: ir.ValueExpr, Expr: expr.Ref{Path: []string{expr.PrefixVars, "region"}}}}}
+	files, _ := emit(t, project(j))
+	back, rep := reparse(t, files)
+	env := back.Pipelines[0].Jobs[0].Steps[0].Env
+	if len(env) != 1 || env[0].Value.Kind != ir.ValueExpr || expr.String(env[0].Value.Expr) != "vars.region" {
+		t.Fatalf("env = %+v", env)
+	}
+	if hasFeatureEntry(rep, "config.name", "treated as secrets") {
+		t.Fatalf("a file with markers needs no secret note: %v", rep.Entries)
+	}
 }
 
 // expr2 is a condition with no shell test form.

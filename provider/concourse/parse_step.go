@@ -20,12 +20,7 @@ var kindKeys = []string{"get", "put", "task", "run", "set_pipeline", "load_var",
 var (
 	wholeVar = regexp.MustCompile(`^\(\(([A-Za-z_][A-Za-z0-9_-]*)\)\)$`)
 	identVar = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
-	// secretWords mark a secret when they appear anywhere in a name; secretSegments only as a whole segment, so
-	// that "path" and "author" stay plain.
-	secretWords    = []string{"secret", "password", "passwd", "passphrase", "token", "key", "credential", "private", "signing"}
-	secretSegments = map[string]bool{"pat": true, "pwd": true, "pass": true, "auth": true, "oauth": true, "cert": true, "creds": true, "cred": true}
-	camelBoundary  = regexp.MustCompile(`([a-z0-9])([A-Z])`)
-	shells         = map[string]bool{"sh": true, "bash": true, "dash": true, "ash": true, "zsh": true}
+	shells   = map[string]bool{"sh": true, "bash": true, "dash": true, "ash": true, "zsh": true}
 )
 
 // step reads one plan step. A step that the IR cannot model becomes one plugin step that keeps it verbatim.
@@ -428,7 +423,7 @@ func (jb *jobBuilder) env(st *ir.Step, k *sink, cfgParams *omap, r *reader) {
 			return
 		}
 		for _, name := range m.Order {
-			v, ok := paramValue(m.Vals[name])
+			v, ok := jb.paramValue(m.Vals[name])
 			if !ok {
 				unread[name] = plain(m.Vals[name])
 				continue
@@ -470,9 +465,10 @@ func dropVars(env []ir.Var, drop map[string]any) []ir.Var {
 	return out
 }
 
-// paramValue reads one task param. A whole ((name)) is a secret when the name says so and a vars reference
-// otherwise; text with a var in it, a local var and a var source have no Value form.
-func paramValue(v any) (ir.Value, bool) {
+// paramValue reads one task param. Concourse resolves every ((name)) from the credential manager and masks it,
+// so a whole ((name)) is a secret unless a set_pipeline step of the file passes the name in vars; a pipemaster
+// marker can still say that it was a var. Text with a var in it, a local var and a var source have no Value form.
+func (jb *jobBuilder) paramValue(v any) (ir.Value, bool) {
 	t, ok := text(v)
 	if !ok {
 		return ir.Value{}, false
@@ -485,29 +481,11 @@ func paramValue(v any) (ir.Value, bool) {
 		return ir.Value{}, false
 	}
 	name := mm[1]
-	if secretName(name) {
-		return ir.Value{Kind: ir.ValueSecret, Secret: name}, true
+	if jb.b.plainVars[name] && identVar.MatchString(name) {
+		return ir.Value{Kind: ir.ValueExpr, Expr: expr.Ref{Path: []string{expr.PrefixVars, name}}}, true
 	}
-	if !identVar.MatchString(name) {
-		return ir.Value{}, false
-	}
-	return ir.Value{Kind: ir.ValueExpr, Expr: expr.Ref{Path: []string{expr.PrefixVars, name}}}, true
-}
-
-func secretName(name string) bool {
-	l := strings.ToLower(name)
-	for _, w := range secretWords {
-		if strings.Contains(l, w) {
-			return true
-		}
-	}
-	split := camelBoundary.ReplaceAllString(name, "$1-$2")
-	for _, seg := range strings.FieldsFunc(strings.ToLower(split), func(r rune) bool { return r == '-' || r == '_' || r == '.' }) {
-		if secretSegments[seg] {
-			return true
-		}
-	}
-	return false
+	jb.b.defaulted[name] = true
+	return ir.Value{Kind: ir.ValueSecret, Secret: name}, true
 }
 
 func isPowershell(cmd string) bool {

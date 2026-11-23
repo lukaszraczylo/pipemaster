@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/concourse"
@@ -326,7 +327,7 @@ func TestInlineTaskMapping(t *testing.T) {
 	if env["TOKEN"].Kind != ir.ValueSecret || env["TOKEN"].Secret != "deploy-token" {
 		t.Errorf("TOKEN = %+v", env["TOKEN"])
 	}
-	if r := env["REGION"]; r.Kind != ir.ValueExpr || cond(r.Expr) != "vars.region" {
+	if r := env["REGION"]; r.Kind != ir.ValueSecret || r.Secret != "region" {
 		t.Errorf("REGION = %+v", r)
 	}
 	e := ext(s.Ext)
@@ -585,25 +586,51 @@ func TestVarInRunIsKeptNotScripted(t *testing.T) {
 	}
 }
 
-func TestSecretNameConvention(t *testing.T) {
-	secret := []string{"deploy-token", "DB_PASSWORD", "gh-pat", "ghPat", "aws_creds", "creds", "tls-cert", "oauth", "auth", "api_key",
-		"signing-key", "signing", "pwd", "db-pass", "pass", "private-thing", "my-credential", "client-secret", "passphrase", "sshKey"}
-	plainNames := []string{"region", "path", "patch", "author", "bypass", "passed", "environment", "cluster"}
+func TestEveryVarIsASecretByDefault(t *testing.T) {
+	names := []string{"deploy-token", "region", "gcp_service_account_json", "slack_webhook_url", "cluster"}
 	body := ""
-	for i, n := range append(append([]string{}, secret...), plainNames...) {
+	for i, n := range names {
 		body += fmt.Sprintf("      P%d: ((%s))\n", i, n)
 	}
-	pl, _ := parseYAML(t, oneJob("  - task: t\n    params:\n"+body+"    config: {platform: linux, run: {path: ls}}\n"))
+	pl, rep := parseYAML(t, oneJob("  - task: t\n    params:\n"+body+"    config: {platform: linux, run: {path: ls}}\n"))
+	s := step(t, job(t, pl, "build"), "t")
+	for i, n := range names {
+		var got ir.Value
+		for _, v := range s.Env {
+			if v.Name == fmt.Sprintf("P%d", i) {
+				got = v.Value
+			}
+		}
+		if got.Kind != ir.ValueSecret || got.Secret != n {
+			t.Errorf("%s read as %+v, want a secret", n, got)
+		}
+	}
+	notes := 0
+	for _, e := range rep.Entries {
+		if e.Feature == caps.ConfigName && strings.Contains(e.Detail, "treated as secrets") {
+			notes++
+			for _, n := range names {
+				if !strings.Contains(e.Detail, n) {
+					t.Errorf("the note does not name %s: %s", n, e.Detail)
+				}
+			}
+		}
+	}
+	if notes != 1 {
+		t.Fatalf("want one note per pipeline, got %d: %v", notes, rep.Entries)
+	}
+}
+
+func TestSetPipelineVarsStayPlain(t *testing.T) {
+	y := oneJob("  - set_pipeline: child\n    file: repo/ci.yml\n    vars: {region: eu}\n  - task: t\n    params: {R: ((region)), T: ((deploy-token))}\n    config: {platform: linux, run: {path: ls}}\n")
+	pl, _ := parseYAML(t, y)
 	s := step(t, job(t, pl, "build"), "t")
 	got := map[string]ir.Value{}
 	for _, v := range s.Env {
 		got[v.Name] = v.Value
 	}
-	for i, n := range append(append([]string{}, secret...), plainNames...) {
-		isSecret := got[fmt.Sprintf("P%d", i)].Kind == ir.ValueSecret
-		if want := i < len(secret); isSecret != want {
-			t.Errorf("%s: secret=%v, want %v", n, isSecret, want)
-		}
+	if got["R"].Kind != ir.ValueExpr || got["T"].Kind != ir.ValueSecret {
+		t.Fatalf("env = %+v", got)
 	}
 }
 

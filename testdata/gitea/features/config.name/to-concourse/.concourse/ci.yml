@@ -1,7 +1,7 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"config","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated config.name pipeline/ci/job/build/step/build-step-1
-# pipemaster:arg {"secrets":["KEY"]}
+# pipemaster:arg {"vars":["CI_MODE"]}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
 # pipemaster:arg {"digest":"aad38893b2989c53a15278958667ecfb553749c83dc194f31080bc6b85249280","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.CI_MODE }}\"\nenv:\n    - name: KEY\n      value:\n        secret: GITEA_DEPLOY\n    - name: TOKEN\n      value:\n        secret: GITHUB_TOKEN\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry

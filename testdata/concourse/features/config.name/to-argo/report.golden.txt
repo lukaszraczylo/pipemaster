@@ -8,7 +8,7 @@ Loss report: concourse -> argo
 [external] pipeline/ci/trigger/1 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/ci/ref/secrets.API_TOKEN config.name: secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars (the Secret values and ConfigMap values are not written)
 [emulated] pipeline/ci/ref/secrets.DEPLOY_KEY config.name: secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars (the Secret values and ConfigMap values are not written)
-[emulated] pipeline/ci/ref/vars.REGION config.name: secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars (the Secret values and ConfigMap values are not written)
+[emulated] pipeline/ci/ref/secrets.REGION config.name: secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars (the Secret values and ConfigMap values are not written)
 [emulated] pipeline/ci/trigger/0 trigger.filter.branches
 [emulated] pipeline/ci/trigger/1 trigger.filter.branches
 [emulated] pipeline/ci/trigger/1 trigger.filter.tags: Sensor data filter on body.ref (the EventSource is github and serves GitHub webhooks only; a glob becomes a regex and a glob with no exact regex is lost)

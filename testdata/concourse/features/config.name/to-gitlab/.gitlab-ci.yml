@@ -2,8 +2,6 @@
 # pipemaster:arg {"kind":"push","branches":{"Include":["main"],"Exclude":null}}
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 # pipemaster:arg {"kind":"tag","tags":{"Include":["*"],"Exclude":null}}
-# pipemaster:emulated script.interpolation pipeline/ci
-# pipemaster:arg [{"k":"x","p":"job/build/step/build-step-1/env/2","g":"$REGION","s":"vars.REGION"}]
 workflow:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"

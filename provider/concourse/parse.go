@@ -150,19 +150,23 @@ type pipeBuilder struct {
 	present map[string]bool
 	// anchorKeys holds the top-level keys whose value defines an anchor that the file aliases elsewhere.
 	anchorKeys map[string]bool
-	rep        *report.Report
-	res        map[string]*resource
-	types      map[string]bool
-	used       map[string]bool
-	jobSet     map[string]bool
-	file       string
-	id         string
-	resOrder   []*resource
-	jobNames   []string
+	// plainVars holds the names that a set_pipeline step passes in vars, so they are plain values.
+	plainVars map[string]bool
+	// defaulted holds the names of the params that were read as secrets with no marker or vars entry to say otherwise.
+	defaulted map[string]bool
+	rep       *report.Report
+	res       map[string]*resource
+	types     map[string]bool
+	used      map[string]bool
+	jobSet    map[string]bool
+	file      string
+	id        string
+	resOrder  []*resource
+	jobNames  []string
 }
 
 func newPipelineBuilder(rep *report.Report, file, id string) *pipeBuilder {
-	return &pipeBuilder{rep: rep, file: file, id: id, res: map[string]*resource{}, types: map[string]bool{}, used: map[string]bool{}, jobSet: map[string]bool{}, present: map[string]bool{}}
+	return &pipeBuilder{rep: rep, file: file, id: id, res: map[string]*resource{}, types: map[string]bool{}, used: map[string]bool{}, jobSet: map[string]bool{}, present: map[string]bool{}, plainVars: map[string]bool{}, defaulted: map[string]bool{}}
 }
 
 func (b *pipeBuilder) path() string { return "pipeline/" + b.id }
@@ -200,6 +204,7 @@ func (b *pipeBuilder) build(top *omap) (*ir.Pipeline, error) {
 		b.jobNames = append(b.jobNames, name)
 		b.jobSet[name] = true
 	}
+	collectSetPipelineVars(list, b.plainVars)
 	var built []*builtJob
 	for _, raw := range list {
 		bj := b.job(raw.(*omap))
@@ -212,6 +217,7 @@ func (b *pipeBuilder) build(top *omap) (*ir.Pipeline, error) {
 	b.carryPipeline(top, rawList, pl)
 	b.finallyHooks(pl, built)
 	b.orphanNames()
+	b.secretNote()
 	b.keepResources(k)
 	for _, key := range knownTop {
 		if v, ok := r.Take(key); ok {
@@ -239,4 +245,41 @@ func (b *pipeBuilder) build(top *omap) (*ir.Pipeline, error) {
 		pl.Ext = k.Ext()
 	}
 	return pl, nil
+}
+
+// collectSetPipelineVars adds the keys of every set_pipeline vars map in the plans to out.
+func collectSetPipelineVars(v any, out map[string]bool) {
+	switch t := v.(type) {
+	case []any:
+		for _, x := range t {
+			collectSetPipelineVars(x, out)
+		}
+	case *omap:
+		if _, has := t.Vals["set_pipeline"]; has {
+			if vars, ok := asMap(t.Vals["vars"]); ok {
+				for _, k := range vars.Order {
+					out[k] = true
+				}
+			}
+		}
+		for _, k := range t.Order {
+			collectSetPipelineVars(t.Vals[k], out)
+		}
+	}
+}
+
+// secretNote says once per pipeline that params were read as secrets. A file that pipemaster wrote has its
+// markers for the plain vars, so only a file with no markers can have lost that distinction.
+func (b *pipeBuilder) secretNote() {
+	if len(b.defaulted) == 0 || len(b.marks)+len(b.bare) > 0 {
+		return
+	}
+	names := make([]string, 0, len(b.defaulted))
+	for n := range b.defaulted {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	b.note(caps.ConfigName, caps.Emulated, b.path(), "every ((name)) is a secret",
+		"Concourse resolves every ((name)) from the credential manager, so the params "+strings.Join(names, ", ")+
+			" are treated as secrets, plain vars included; recreate a plain value as a plain variable in the target if it is no secret", 0)
 }

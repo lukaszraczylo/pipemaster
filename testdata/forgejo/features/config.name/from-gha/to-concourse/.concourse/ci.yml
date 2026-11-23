@@ -1,5 +1,7 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"config","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated config.name pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"vars":["REGION"]}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
 # pipemaster:arg {"digest":"2429130031893ffc9e2126b7fd46409e46fbe36fa751ace749a5742d762a8bde","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.REGION }}\"\nenv:\n    - name: KEY\n      value:\n        secret: DEPLOY_KEY\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry

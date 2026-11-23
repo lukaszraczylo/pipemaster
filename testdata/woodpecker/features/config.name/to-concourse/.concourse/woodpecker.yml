@@ -1,3 +1,5 @@
+# pipemaster:emulated config.name pipeline/woodpecker/job/ci/step/build
+# pipemaster:arg {"vars":["REGION"]}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/build/carry
 # pipemaster:arg {"digest":"537927918a1d8501a3e0ded71b47d897f41ede91002ff8426e81544a536eecf8","carry":"image:\n    ref: alpine:3.20\nid: build\nkind: script\nscript:\n    - 'curl -H \"Authorization: Bearer $\u007b{ secrets.TOKEN }}\" \"https://$\u007b{ vars.REGION }}.example.org\"'\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry

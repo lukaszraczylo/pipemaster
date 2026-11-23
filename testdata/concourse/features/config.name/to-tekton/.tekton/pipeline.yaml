@@ -1,6 +1,6 @@
 # pipemaster:emulated config.name pipeline/ci/ref/secrets.API_TOKEN
 # pipemaster:emulated config.name pipeline/ci/ref/secrets.DEPLOY_KEY
-# pipemaster:emulated config.name pipeline/ci/ref/vars.REGION
+# pipemaster:emulated config.name pipeline/ci/ref/secrets.REGION
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:

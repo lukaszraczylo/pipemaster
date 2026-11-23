@@ -1,6 +1,5 @@
 # pipemaster:emulated trigger.filter.branches pipeline/ci
 # pipemaster:arg "- ext:\n    concourse:\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
-# pipemaster:lost expr.opaque pipeline/ci/job/build/step/build-step-1: vars.REGION
 kind: pipeline
 type: docker
 name: build
@@ -21,3 +20,5 @@ steps:
         from_secret: DEPLOY_KEY
       API_TOKEN:
         from_secret: API_TOKEN
+      REGION:
+        from_secret: REGION
