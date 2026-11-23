@@ -17,6 +17,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
+	"github.com/lukaszraczylo/pipemaster/internal/linttool"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/ir/irtest"
 	"github.com/lukaszraczylo/pipemaster/provider/gha"
@@ -66,13 +67,7 @@ func lintFile(t testing.TB, name string, data []byte) { lintFileIgnoring(t, name
 // lintFileIgnoring drops findings that match ignore; a disabled construct is `if: false`, which actionlint flags as constant.
 func lintFileIgnoring(t testing.TB, name string, data []byte, ignore string) {
 	t.Helper()
-	bin, err := exec.LookPath("actionlint")
-	if err != nil {
-		if os.Getenv("PIPEMASTER_REQUIRE_LINTERS") == "1" {
-			t.Fatal("actionlint not on PATH and PIPEMASTER_REQUIRE_LINTERS=1")
-		}
-		t.Skip("actionlint not on PATH")
-	}
+	bin := linttool.RequireActionlint(t)
 	dir := filepath.Join(t.TempDir(), ".github", "workflows")
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		t.Fatal(err)
@@ -87,7 +82,7 @@ func lintFileIgnoring(t testing.TB, name string, data []byte, ignore string) {
 	if ignore != "" {
 		args = append(args, "-ignore", ignore)
 	}
-	out, err := exec.CommandContext(ctx, bin, append(args, path)...).CombinedOutput() //nolint:gosec // bin from LookPath, path in a test temp dir
+	out, err := exec.CommandContext(ctx, bin, append(args, path)...).CombinedOutput() //nolint:gosec // bin from linttool, path in a test temp dir
 	if err != nil {
 		t.Fatalf("actionlint %s: %v\n%s\n--- file ---\n%s", name, err, out, data)
 	}
