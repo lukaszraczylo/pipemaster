@@ -25,6 +25,7 @@ archives:
       - README.md
       - docs/versions.md
       - docs/providers/*.md
+      - actions/mappings.yaml
 
 checksum:
   name_template: checksums.txt
