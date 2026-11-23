@@ -351,3 +351,17 @@ func TestAlwaysOnAPlanStepIsReportedLost(t *testing.T) {
 	}
 	t.Fatalf("no lost step.if entry for the always() step: %v", rep.Entries)
 }
+
+func TestForeignPluginStepIsLostAsAnAction(t *testing.T) {
+	j := &ir.Job{ID: "build", Steps: []*ir.Step{
+		{ID: "build", Kind: ir.StepScript, Script: []string{"make"}},
+		{ID: "publish", Kind: ir.StepPlugin},
+	}}
+	_, rep := emit(t, project(j))
+	for _, e := range rep.Entries {
+		if e.Feature == caps.StepAction && e.Level == caps.Lost && e.IRPath == "pipeline/ci/job/build/step/publish" {
+			return
+		}
+	}
+	t.Fatalf("no lost step.action entry for the plugin step: %v", rep.Entries)
+}
