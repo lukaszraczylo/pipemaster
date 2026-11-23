@@ -293,7 +293,7 @@ footer .wrap { display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; justify-content:s
 <section class="hero" aria-labelledby="h-hero">
   <h1 id="h-hero">Move your CI to another provider. <em>See exactly what does not move.</em></h1>
   <p class="lede">pipemaster converts pipeline definitions between nine CI/CD providers, in every direction. For each feature your pipeline uses, it gives one verdict. A feature that the target cannot express is reported and kept for the trip back, never dropped silently.</p>
-  <p class="status">Pre-alpha. MIT licence. Written in Go, ships as one static binary.</p>
+  <p class="status">Pre-alpha. MIT licence. Written in Go, ships as one static binary: <code>brew install --cask lukaszraczylo/taps/pipemaster</code></p>
   <div class="cta">
     <a class="btn primary" href="#try">Convert the sample</a>
     <a class="btn ghost" href="https://github.com/lukaszraczylo/pipemaster">
@@ -416,18 +416,18 @@ footer .wrap { display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; justify-content:s
 </section>
 
 <section id="install" aria-labelledby="h-install">
-  <p class="kicker">$ go build ./cmd/pipemaster</p>
-  <h2 id="h-install">Build it, then convert</h2>
+  <p class="kicker">$ brew install --cask lukaszraczylo/taps/pipemaster</p>
+  <h2 id="h-install">Install it, then convert</h2>
   <div class="twocol">
     <div>
-      <p class="lede">No release is published yet. Build the binary from a checkout with Go 1.27.</p>
-      <div class="term"><pre><span class="p">$ </span>git clone https://github.com/lukaszraczylo/pipemaster
-<span class="p">$ </span>cd pipemaster &amp;&amp; go build -o pipemaster ./cmd/pipemaster
+      <p class="lede">Install with Homebrew on macOS or Linux, with <code>go install</code>, or from an archive on the <a href="https://github.com/lukaszraczylo/pipemaster/releases">releases page</a> (Linux, macOS and Windows, with a cosign-signed checksum file).</p>
+      <div class="term"><pre><span class="p">$ </span>brew install --cask lukaszraczylo/taps/pipemaster
+<span class="p">$ </span>go install github.com/lukaszraczylo/pipemaster/cmd/pipemaster@latest
 
-<span class="p">$ </span>./pipemaster convert ./repo --to gitlab -o ./out --report md
-<span class="p">$ </span>./pipemaster roundtrip ./repo --via gitlab
+<span class="p">$ </span>pipemaster convert ./repo --to gitlab -o ./out --report md
+<span class="p">$ </span>pipemaster roundtrip ./repo --via gitlab
 <span class="o">no differences</span>
-<span class="p">$ </span>./pipemaster roundtrip ./repo --from gha --via gitlab,gitea
+<span class="p">$ </span>pipemaster roundtrip ./repo --from gha --via gitlab,gitea
 <span class="o">no differences</span></pre></div>
       <div class="tablewrap">
       <table class="plain">

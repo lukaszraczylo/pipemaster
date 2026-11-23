@@ -26,13 +26,21 @@ The parser reads the first location of the list that exists. The pinned provider
 
 ## Installing
 
-No release is published yet. Build the command from a checkout. The module needs Go 1.27.
+With Homebrew on macOS or Linux:
 
 ```sh
-go build -o pipemaster ./cmd/pipemaster
+brew install --cask lukaszraczylo/taps/pipemaster
 ```
 
-After the first release, you can download an archive for Linux, macOS or Windows from the GitHub releases page, or run `go install github.com/lukaszraczylo/pipemaster/cmd/pipemaster@latest`.
+The [GitHub releases page](https://github.com/lukaszraczylo/pipemaster/releases) has archives for Linux, macOS and Windows on amd64 and arm64. `checksums.txt` lists the SHA-256 of each archive, and `checksums.txt.sigstore.json` is its keyless cosign signature.
+
+With Go 1.27:
+
+```sh
+go install github.com/lukaszraczylo/pipemaster/cmd/pipemaster@latest
+```
+
+To build from a checkout, run `go build -o pipemaster ./cmd/pipemaster`.
 
 ## Usage
 
