@@ -193,11 +193,22 @@ func (jx *jobEmitter) gateMarker() {
 	}
 }
 
+// isManualEvent tells the condition that other providers read from a job that only a person starts.
+func isManualEvent(x expr.Expr) bool {
+	b, ok := x.(expr.Binary)
+	if !ok || b.Op != expr.OpEq {
+		return false
+	}
+	r, rok := b.L.(expr.Ref)
+	l, lok := b.R.(expr.Lit)
+	return rok && lok && len(r.Path) == 1 && r.Path[0] == "event" && l.Kind == expr.LitStr && l.Str == "manual"
+}
+
 // condition decides how the job condition is written: a status function that always holds is dropped, a
 // condition with a shell form guards every script task, and any other condition leaves the job with no triggering get.
 func (jx *jobEmitter) condition() {
 	e, j := jx.pe.e, jx.j
-	if j.If == nil {
+	if j.If == nil || (j.Manual && isManualEvent(j.If)) {
 		return
 	}
 	if st, ok := statusOf(j.If); ok && (st == "always" || st == "success") {

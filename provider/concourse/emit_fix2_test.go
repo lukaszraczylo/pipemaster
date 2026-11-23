@@ -511,3 +511,15 @@ jobs:
 		t.Fatalf("resources = %v; want the file order other,src", order)
 	}
 }
+
+func TestManualJobWithItsEventConditionReportsNoLostCondition(t *testing.T) {
+	j := scriptJob("deploy", "make deploy")
+	j.Manual = true
+	j.If = eqRef("event", "manual")
+	_, rep := emit(t, project(j))
+	for _, e := range rep.Entries {
+		if e.Feature == caps.JobIf && e.Level == caps.Lost {
+			t.Fatalf("the manual condition of a manual job is reported lost: %+v", e)
+		}
+	}
+}
