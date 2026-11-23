@@ -4,10 +4,30 @@ package cli
 import (
 	"fmt"
 	"io"
+	"runtime/debug"
 )
 
+const devVersion = "dev"
+
 // Version is overridden at build time via -ldflags.
-var Version = "dev"
+var Version = devVersion
+
+// resolveVersion returns linked, or the module version of the build when linked is the dev default and
+// the build records a tagged version (go install pkg@v1.2.3).
+func resolveVersion(linked, module string) string {
+	if linked == devVersion && module != "" && module != "(devel)" {
+		return module
+	}
+	return linked
+}
+
+func buildVersion() string {
+	module := ""
+	if bi, ok := debug.ReadBuildInfo(); ok {
+		module = bi.Main.Version
+	}
+	return resolveVersion(Version, module)
+}
 
 // Exit codes; see the CLI section of the design.
 const (
@@ -49,7 +69,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return exitUsage
 	}
 	if args[0] == "version" {
-		_, _ = fmt.Fprintf(stdout, "pipemaster %s\n", Version)
+		_, _ = fmt.Fprintf(stdout, "pipemaster %s\n", buildVersion())
 		return exitOK
 	}
 	if c, ok := commands[args[0]]; ok {
