@@ -1,14 +1,15 @@
 # pipemaster:lost env TAG: tag
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
-# pipemaster:arg {"digest":"6c1fc0649b7b42a5f48e364ac903858addff16e90342c600669ef175012a915f","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"38144d832876da406aad3d7f25984d90f02abbad9e9a8c9a0317fd70a86271cd","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"4c607e023c553eb45ba1689ca6c7991b75869ee702976472c1f56c5e1d82c5dc","carry":"id: build\nenv:\n    - name: CGO_ENABLED\n      value:\n        lit: \"0\"\n    - name: TAG\n      value:\n        expr: tag\n"}
+# pipemaster:arg {"digest":"f1c8d5def85fa63d1f51a1afb40911ab1eb0b988f62d3d058870680707609105","carry":"id: build\nenv:\n    - name: CGO_ENABLED\n      value:\n        lit: \"0\"\n    - name: TAG\n      value:\n        expr: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated job.env pipeline/gitlab-ci/job/build
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/job/build
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
@@ -46,6 +47,8 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make
             dir: workspace

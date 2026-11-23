@@ -1,17 +1,18 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"ci","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
-# pipemaster:arg {"digest":"ed53e2487d91809e1e11baaecd451036fe3b37c9be5ab9ae01468d0e56a3b325","carry":"id: test-step-1\nkind: script\nscript:\n    - go test $\u007b{ matrix.go }}\n"}
+# pipemaster:arg {"digest":"7b27016f2b622377fe3b7e407c62b3b49cb8df5d521dff8c2b41fa1bfcdabb2c","carry":"id: test-step-1\nkind: script\nscript:\n    - go test $\u007b{ matrix.go }}\n"}
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"matrix":"axes:\n    - name: go\n      values:\n        - \"1.21\"\n        - \"1.22\"\ninclude:\n    - - key: experimental\n        value: \"true\"\n      - key: go\n        value: \"1.22\"\n","across":"[{\"max_in_flight\":\"all\",\"values\":[{\"experimental\":\"\",\"go\":\"1.21\"},{\"experimental\":\"true\",\"go\":\"1.22\"}],\"var\":\"matrix\"}]"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
-# pipemaster:arg {"digest":"d61030133801d26f027b9b82ded5c25ac1f34ed3c6dc20ec874d6b42e1cc1b7a","carry":"matrix:\n    axes:\n        - name: go\n          values:\n            - \"1.21\"\n            - \"1.22\"\n    include:\n        - - key: experimental\n            value: \"true\"\n          - key: go\n            value: \"1.22\"\nid: test\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"ec5b55a9415193e6ece016d07b753886ab759f38dc8cb64755ea18ffef126c5d","carry":"matrix:\n    axes:\n        - name: go\n          values:\n            - \"1.21\"\n            - \"1.22\"\n    include:\n        - - key: experimental\n            value: \"true\"\n          - key: go\n            value: \"1.22\"\nid: test\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/test
 # pipemaster:emulated trigger.push pipeline/ci/job/test
 # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
@@ -50,7 +51,9 @@ jobs:
               run:
                 path: sh
                 args:
-                  - -ec
+                  - -c
+                  - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+                  - pipemaster
                   - go test ${PM_MATRIX_GO}
                 dir: workspace
             tags:

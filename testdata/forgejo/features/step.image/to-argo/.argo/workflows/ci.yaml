@@ -1,5 +1,7 @@
 # pipemaster:emulated step.image pipeline/ci/job/build
 # pipemaster:arg {"steps":{"build-step-1":"ref: alpine:3.20\nentrypoint:\n    - \"\"\n"},"wrote":{"build-step-1":"alpine:3.20"}}
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/deploy/step/deploy-step-1
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
@@ -30,8 +32,10 @@ spec:
             image: alpine:3.20
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make build
             workingDir: /workspace
         volumeMounts:
@@ -47,8 +51,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make deploy
             workingDir: /workspace
         volumeMounts:

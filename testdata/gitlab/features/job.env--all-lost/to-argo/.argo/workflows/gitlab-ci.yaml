@@ -1,5 +1,6 @@
 # pipemaster:emulated job.env pipeline/gitlab-ci/job/test
 # pipemaster:arg {"vars":"- name: IMAGE\n  value:\n    expr: format('$CI_REGISTRY_IMAGE/tmp:{0}', sha)\n","names":["IMAGE"]}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/test/step/script
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
@@ -28,8 +29,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make test
             workingDir: /workspace
             env:

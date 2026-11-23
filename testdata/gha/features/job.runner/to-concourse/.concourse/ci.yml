@@ -1,22 +1,24 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"runner","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"b9bc0b5edb845d2745463cf4440f183d164920ecf8a9ff5bd289141b26c5faca","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"1c00f79a17463f329c81334e29c863ab2466240cd768bf80143810bc72cf7966","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"0b66f1435e8266d5fd356cc027820f6cd18d4356c1b8c626729067a4c60c9f9f","carry":"id: build\nrunner:\n    labels:\n        - linux\n        - self-hosted\n        - x64\n"}
+# pipemaster:arg {"digest":"902982c7ce2f8510f2db9af664f32680a45f599a0ddeeb462098cd29b51cac7f","carry":"id: build\nrunner:\n    labels:\n        - linux\n        - self-hosted\n        - x64\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/grouped/step/grouped-step-1/carry
-# pipemaster:arg {"digest":"1a7e3a5b786f09fd079b9d903d5a98a72556989b339bfa7babf1d35ee71a322d","carry":"id: grouped-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"51870da7a99c8c14bb5cea6ecbf28c15b43e495057d19ab8e9e7764f839c67fd","carry":"id: grouped-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/grouped/carry
-# pipemaster:arg {"digest":"7f1a369dda03481e8eed1fd875362e7e7425acc0bbe9676192d50e3e796de214","carry":"id: grouped\nrunner:\n    selector:\n        group: big-runners\n    labels:\n        - linux\n"}
+# pipemaster:arg {"digest":"db3e6672fff03fadd6f28413b260a0646a4e977720509a353a6d3afb47a22dc6","carry":"id: grouped\nrunner:\n    selector:\n        group: big-runners\n    labels:\n        - linux\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"42516277b815005ac96966b3b0f0c44c8d2d03296ba9d6d69ba87d78b52281ef","carry":"id: ci\nname: runner\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated job.runner pipeline/ci/job/grouped
 # pipemaster:emulated trigger.push pipeline/ci/job/grouped
 # pipemaster:emulated step.image pipeline/ci/job/grouped/step/grouped-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/grouped/step/grouped-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
@@ -52,7 +54,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo ok
             dir: workspace
         tags:
@@ -82,7 +86,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo ok
             dir: workspace
         tags:

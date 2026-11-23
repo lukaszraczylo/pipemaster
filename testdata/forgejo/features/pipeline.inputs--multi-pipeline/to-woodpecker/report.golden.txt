@@ -1,9 +1,11 @@
 Loss report: forgejo -> woodpecker
 [lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
 [lost] pipeline/ci/job/test job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
+[lost] pipeline/ci/job/test/step/test-step-1 step.shell (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [lost] pipeline/deploy display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
 [lost] pipeline/deploy pipeline.inputs (Woodpecker has no typed pipeline inputs)
 [lost] pipeline/deploy/job/deploy job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
+[lost] pipeline/deploy/job/deploy/step/deploy-step-1 step.shell (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [lost] pipeline/deploy/trigger/0 ext.passthrough (Ext of provider gha (inputs) is not written to the Woodpecker file; it is kept in round-trip metadata)
 [emulated] pipeline/ci/job/test job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/deploy project.multi_pipeline: each job of each pipeline is a workflow named <pipeline>-<job> (each workflow carries its pipeline's trigger condition)

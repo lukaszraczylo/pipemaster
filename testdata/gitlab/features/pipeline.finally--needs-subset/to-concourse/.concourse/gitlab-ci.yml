@@ -1,36 +1,41 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/step/script/carry
-# pipemaster:arg {"digest":"614688d955c08ff89bac2f7d1f6c9f1f64e48e7f4f368ccafc133c0df00f0a7b","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"b031fe97ca33ecbd3ab02ef7b3daed552051b278e3a390168ad1737b473f6423","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/carry
-# pipemaster:arg {"digest":"18f128dda2f5047bead1b33efcd04fc32aeabf5d459f99ef9e11900df39d4f3c","carry":"id: compile\n"}
+# pipemaster:arg {"digest":"ee4abe74686313acd28a1438ee7b31c7b69864639ba96b8c240485c3c3a56464","carry":"id: compile\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/lint/step/script/carry
-# pipemaster:arg {"digest":"4df8622e4b0e63af7c45789bde1db02db4188a273ea8ffb6a5271fd95a0e53d8","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"2b361671be300ae92bb4adb49b8fb23179f1533d6fa8b83c9ba43893542793f2","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/lint/carry
-# pipemaster:arg {"digest":"5ce640f171067335a830e61b6f42198b435f5d58e322ccfe3ecbc4ec21cff0b0","carry":"id: lint\n"}
+# pipemaster:arg {"digest":"7166a7300d5f49095ca548fa82069c2932e60e370ee84be967b94ccf1c72fa97","carry":"id: lint\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/summary/step/script/carry
-# pipemaster:arg {"digest":"68203eec45960687306ffbfabbe1aac82b55baa0ee232bb160adb5f0a35c1fb3","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"a286740e167e176f59384075afed5de6ce8cc9740fd2bea0c5539e4129068981","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated display.name pipeline/gitlab-ci/job/summary/step/script-2
 # pipemaster:arg {"id":"script","written":"script-2","kind":"step"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/summary/step/script-2/carry
-# pipemaster:arg {"digest":"59ed8b1c953e41d834bb78a7884e44583c3752bc1bae9faa53c1d421513cb891","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"fc71ffb2d049a41066f38cdf2de5ff79e32083ec1570b665768d3a7e533d0ea3","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
-# pipemaster:arg {"job":"summary","digest":"dd8f37d848f8240c0640776afa9dba45fdc2aa206262db788c589a383af91fce","tasks":["script-2"]}
+# pipemaster:arg {"job":"summary","digest":"98e19bce9076f1b9616033db6d5bf9cb124ee7a088f1569e0932451dc5c6c652","tasks":["script-2"]}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/summary/carry
-# pipemaster:arg {"digest":"fe96b19882e5c3a5613459dd90b2566a4e0c37df6127665640bf324134a6dc25","carry":"id: summary\nneeds:\n    - job: compile\n    - job: lint\n    - job: unit\n"}
+# pipemaster:arg {"digest":"d13233d5adcb696d48c3dd9e686a4ae4e766275842d8783c45ae0d632b41d0d0","carry":"id: summary\nneeds:\n    - job: compile\n    - job: lint\n    - job: unit\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/unit/step/script/carry
-# pipemaster:arg {"digest":"bad5b3f823b19a4509be4f9badcc60f42b894b55badfe50b2bfbd3799fd9c48a","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"08917fa4c36d150ee75feb747f4feb128af9ce77cea5a702efe3a5261a6d9667","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/unit/carry
-# pipemaster:arg {"digest":"9368848e6e2cbfb9827ac93836bcafdaf0582d368f9c7e9a78ff835e8db463f1","carry":"id: unit\nneeds:\n    - job: compile\n    - job: lint\n"}
+# pipemaster:arg {"digest":"4c23c791ff8dbda775780940d140244c50b2628402644ed9666036f3588e6401","carry":"id: unit\nneeds:\n    - job: compile\n    - job: lint\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"5b03eb3bbe0ef4b389553aa33337ffd761377aadd1e808c311391cd8919804c0","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nfinally:\n    - id: cleanup\n      needs:\n        - job: compile\n      steps:\n        - id: script\n          kind: script\n          script:\n            - make clean\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/cleanup/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/cleanup/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/cleanup/step/script
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/job/compile
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/compile/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/job/lint
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/lint/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/lint/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/summary/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/summary/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/unit/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/unit/step/script
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
@@ -66,7 +71,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make build
             dir: workspace
   - name: lint
@@ -92,7 +99,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make lint
             dir: workspace
   - name: summary
@@ -121,7 +130,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make report
             dir: workspace
     ensure:
@@ -142,7 +153,9 @@ jobs:
         run:
           path: sh
           args:
-            - -ec
+            - -c
+            - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+            - pipemaster
             - make clean
           dir: workspace
   - name: unit
@@ -170,6 +183,8 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make test
             dir: workspace

@@ -1,3 +1,4 @@
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.pull_request pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0
@@ -22,8 +23,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo ok
             workingDir: /workspace
         volumeMounts:

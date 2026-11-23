@@ -19,6 +19,8 @@ const (
 	ExtArgs = "args"
 	// ExtScriptLine is the step Ext key that holds the script line the parser built, to tell an edited step from an unedited one.
 	ExtScriptLine = "script_line"
+	// ExtBashDefault marks a script that holds the bash-if-present preamble, so the step has no IR shell.
+	ExtBashDefault = "bash_default"
 )
 
 type sink = ynode.Sink

@@ -12,6 +12,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	dexpr "github.com/lukaszraczylo/pipemaster/expr/drone"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
@@ -553,6 +554,9 @@ func (e *emitter) stepLosses(sp string, st *ir.Step) {
 	}
 	if st.Shell != "" {
 		e.lose(sp, caps.StepShell, "Drone compiles commands into its own script, not "+st.Shell)
+	}
+	if strings.TrimSpace(st.Shell) == "" && len(st.Script) > 0 && provider.BashDefault(e.origin) {
+		e.emulate(sp, caps.StepShell, "commands run under the image sh", "the source runs the step under bash when the image has it; Drone compiles commands into a script that its runner pipes to /bin/sh, and the entrypoint cannot change it, so bash-only syntax fails when the image sh is dash")
 	}
 }
 

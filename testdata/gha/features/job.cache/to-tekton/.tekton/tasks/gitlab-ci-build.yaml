@@ -2,6 +2,7 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated job.cache pipeline/gitlab-ci/job/build
 # pipemaster:arg {"workspace":"pipemaster-workspace","cache":[{"Key":"$\u007b{ hashFiles('go.sum') }}","Policy":"pull-push","Paths":[".cache/go-build"]}]}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -10,7 +11,11 @@ spec:
   steps:
     - name: script
       image: alpine:3.22
-      script: make
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        make
   workspaces:
     - name: pipemaster-workspace
       mountPath: /pipemaster

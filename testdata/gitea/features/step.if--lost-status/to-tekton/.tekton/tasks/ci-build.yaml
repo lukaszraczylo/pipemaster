@@ -6,6 +6,10 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-4
 # pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-2
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-4
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/config
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -14,10 +18,18 @@ spec:
   steps:
     - name: build-step-1
       image: alpine:3.22
-      script: echo build
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        echo build
     - name: build-step-2
       image: alpine:3.22
-      script: echo cleanup
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        echo cleanup
       when:
         - input: pipemaster-disabled
           operator: in
@@ -25,10 +37,18 @@ spec:
             - never
     - name: config
       image: alpine:3.22
-      script: echo "configured=true" >> "$GITHUB_OUTPUT"
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        echo "configured=true" >> "$GITHUB_OUTPUT"
     - name: build-step-4
       image: alpine:3.22
-      script: echo configured
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        echo configured
       when:
         - input: pipemaster-disabled
           operator: in

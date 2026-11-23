@@ -119,6 +119,9 @@ func (b *jobBuilder) restoreAt(h heldAction, st *ir.Step, rest []*ir.Step, fi in
 	case b.holds[h.step.ID] != h.arg.Hold:
 		return "the placeholder container was edited after pipemaster wrote the file; the file content is kept"
 	}
+	if extOf(rest[i].Ext)[ExtBashDefault] == true {
+		keepBashDefault(st)
+	}
 	rest[i] = st
 	return ""
 }
@@ -460,4 +463,19 @@ func (c *plCtx) staleNames(pl *ir.Pipeline) {
 			c.ignored(u.IRPath, caps.DisplayName, "the job or step was removed or renamed after pipemaster wrote the file; the name is not restored")
 		}
 	}
+}
+
+// keepBashDefault marks a step that the marker restored as one whose container holds the bash-if-present wrapper.
+func keepBashDefault(st *ir.Step) {
+	ext := ir.Ext{}
+	for k, v := range st.Ext {
+		ext[k] = v
+	}
+	own := map[string]any{}
+	for k, v := range extOf(st.Ext) {
+		own[k] = v
+	}
+	own[ExtBashDefault] = true
+	ext[dialect] = own
+	st.Ext = ext
 }

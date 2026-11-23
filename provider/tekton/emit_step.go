@@ -12,6 +12,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
@@ -100,6 +101,9 @@ func (tc *taskCtx) scriptStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 	}
 	if st.Shell != "" {
 		lines = append([]string{shebang + st.Shell}, lines...)
+	} else if len(lines) > 0 && tc.bashDefault(st) {
+		tc.e.emulate(sp, caps.StepShell, "bash-if-present preamble in the script", "the source runs the step under bash when the image has it; the script starts with a line that re-runs it under bash -e when the image has bash, else it runs under sh -e, so bash-only syntax fails under sh")
+		lines = append(bashPreamble(), lines...)
 	}
 	if len(lines) > 0 && !tc.commandForm(m, st, sp, guard) {
 		m.Set("script", block(strings.Join(lines, "\n")))
@@ -154,7 +158,7 @@ func (tc *taskCtx) stepExt(m *wmap, st *ir.Step) error {
 	if len(x) == 0 || !tc.e.own {
 		return nil
 	}
-	skip := map[string]bool{ExtCommand: true, ExtArgs: true, ExtScriptLine: true, "ref": true, "params": true, "taskRef": true, "timeout": true, "onError": true}
+	skip := map[string]bool{ExtCommand: true, ExtArgs: true, ExtScriptLine: true, ExtBashDefault: true, "ref": true, "params": true, "taskRef": true, "timeout": true, "onError": true}
 	for _, k := range sortedKeys(x) {
 		if skip[k] || m.Has(k) {
 			continue
@@ -247,6 +251,28 @@ func andGuard(a, b expr.Expr) expr.Expr {
 		return a
 	}
 	return expr.Binary{Op: expr.OpAnd, L: a, R: b}
+}
+
+// bashPreamble is the first lines of a script that runs under bash -e when the image has bash, else under sh -e.
+// The variable stops the second run from looping.
+func bashPreamble() []string {
+	return []string{
+		shebang + "/bin/sh",
+		`if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi`,
+		"set -e",
+	}
+}
+
+// bashDefault is true when a step with no shell runs under bash-if-present: the source default is bash, or a
+// Tekton file held the preamble.
+func (tc *taskCtx) bashDefault(st *ir.Step) bool {
+	if strings.TrimSpace(st.Shell) != "" {
+		return false
+	}
+	if b, _ := extOf(st.Ext)[ExtBashDefault].(bool); b {
+		return true
+	}
+	return !tc.e.own && provider.BashDefault(tc.e.origin)
 }
 
 // commandForm writes command and args back for a step that came as command and args, while its line is as

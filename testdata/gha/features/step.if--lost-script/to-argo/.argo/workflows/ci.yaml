@@ -2,8 +2,10 @@
 # pipemaster:arg {"name":"Inspect"}
 # pipemaster:lost script pipeline/ci/job/check/step/check-step-2: docker inspect {{ steps.meta.outputs.version }}
 # pipemaster:emulated step.action pipeline/ci/job/check/step/check-step-2
-# pipemaster:arg {"step":"if: event != 'pull_request'\nid: check-step-2\nname: Inspect\nkind: script\nscript:\n    - docker inspect $\u007b{ steps.meta.outputs.version }}\n","hold":"{\"args\":[\"if ! [ \\\"$PM_CTX_EVENT\\\" != 'pull_request' ]; then exit 0; fi # pipemaster:guard\"],\"command\":[\"sh\",\"-ec\"],\"env\":[{\"name\":\"PM_CTX_EVENT\",\"value\":\"{{workflow.parameters.ctx-event}}\"}],\"image\":\"alpine:3.22\",\"name\":\"check-step-2\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:arg {"step":"if: event != 'pull_request'\nid: check-step-2\nname: Inspect\nkind: script\nscript:\n    - docker inspect $\u007b{ steps.meta.outputs.version }}\n","hold":"{\"args\":[\"if command -v bash \\u003e/dev/null 2\\u003e\\u00261; then exec bash -e -c \\\"$1\\\"; fi; exec sh -e -c \\\"$1\\\"\",\"pipemaster\",\"if ! [ \\\"$PM_CTX_EVENT\\\" != 'pull_request' ]; then exit 0; fi # pipemaster:guard\"],\"command\":[\"sh\",\"-c\"],\"env\":[{\"name\":\"PM_CTX_EVENT\",\"value\":\"{{workflow.parameters.ctx-event}}\"}],\"image\":\"alpine:3.22\",\"name\":\"check-step-2\",\"workingDir\":\"/workspace\"}"}
 # pipemaster:emulated step.if pipeline/ci/job/check/step/check-step-2
+# pipemaster:emulated step.shell pipeline/ci/job/check/step/check-step-2
+# pipemaster:emulated step.shell pipeline/ci/job/check/step/meta
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
@@ -34,16 +36,20 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo "version=1" >> "$GITHUB_OUTPUT"
             workingDir: /workspace
           - name: check-step-2
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - 'if ! [ "$PM_CTX_EVENT" != ''pull_request'' ]; then exit 0; fi # pipemaster:guard'
             workingDir: /workspace
             env:

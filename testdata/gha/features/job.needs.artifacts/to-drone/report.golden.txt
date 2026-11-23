@@ -1,5 +1,8 @@
 Loss report: gha -> drone
+[lost] pipeline/gitlab-ci/job/compile/step/script step.shell (Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
+[lost] pipeline/gitlab-ci/job/docs/step/script step.shell (Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [lost] pipeline/gitlab-ci/job/unit job.needs.artifacts (documents share no workspace)
+[lost] pipeline/gitlab-ci/job/unit/step/script step.shell (Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [emulated] pipeline/gitlab-ci/job/compile job.artifacts: shared workspace of the steps in one document (other documents cannot read the files)
 [emulated] pipeline/gitlab-ci/job/compile job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/gitlab-ci/job/docs job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

@@ -1,5 +1,6 @@
 Loss report: gitlab -> drone
 [lost] pipeline/gitlab-ci/job/release job.if (condition not expressible in Drone CI; the document disabled)
+[lost] pipeline/gitlab-ci/job/release/step/script step.shell (Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [lost] pipeline/gitlab-ci/trigger/0 trigger.push (the document is disabled, so the trigger is not written)
 [lost] pipeline/gitlab-ci/trigger/1 trigger.tag (the document is disabled, so the trigger is not written)
 [emulated] pipeline/gitlab-ci/job/release job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

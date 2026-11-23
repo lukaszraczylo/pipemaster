@@ -135,7 +135,7 @@
    },
    "step.shell": {
     "level": "emulated",
-    "note": "container command <shell> -ec (only bash, dash, zsh, ash and sh run as the container command, and the image must provide the shell; any other shell is lost and the script runs under sh)"
+    "note": "container command <shell> -ec (only bash, dash, zsh, ash and sh run as the container command, and the image must provide the shell; any other shell is lost and the script runs under sh; a step with no shell from a GHA or GitLab source runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)"
    },
    "step.timeout": {
     "level": "lost",
@@ -326,7 +326,7 @@
    },
    "step.shell": {
     "level": "emulated",
-    "note": "run.path names the shell (the image must provide the shell)"
+    "note": "run.path names the shell (the image must provide the shell; a step with no shell from a GHA or GitLab source runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)"
    },
    "step.timeout": {
     "level": "native",
@@ -510,7 +510,7 @@
    },
    "step.shell": {
     "level": "lost",
-    "note": "(Drone compiles commands into its own set -e script)"
+    "note": "(Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)"
    },
    "step.timeout": {
     "level": "lost",
@@ -1332,7 +1332,7 @@
    },
    "step.shell": {
     "level": "native",
-    "note": "shebang line of the script"
+    "note": "shebang line of the script (a step with no shell from a GHA or GitLab source gets a preamble that re-runs the script under bash -e when the image has bash, else it runs under sh -e, so bash-only syntax fails under sh)"
    },
    "step.timeout": {
     "level": "native"
@@ -1512,7 +1512,7 @@
    },
    "step.shell": {
     "level": "lost",
-    "note": "(Woodpecker runs commands in the image entrypoint shell)"
+    "note": "(Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)"
    },
    "step.timeout": {
     "level": "lost",

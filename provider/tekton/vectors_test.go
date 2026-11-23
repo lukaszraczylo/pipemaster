@@ -3,6 +3,7 @@ package tekton_test
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -77,6 +78,7 @@ const (
 	featTag         = "trigger.tag"
 	featImage       = "step.image"
 	featNoop        = "step.script"
+	featShell       = "step.shell"
 	featNeeds       = "job.needs"
 	minutes         = time.Minute
 	triggerSegment  = "/trigger/"
@@ -151,6 +153,9 @@ func decodeStep(n *yaml.Node) (vStep, error) {
 			}
 		case "script":
 			s.Script = strings.Split(strings.TrimSuffix(e.Val.Value, "\n"), "\n")
+			if len(s.Script) >= len(bashPreamble) && slices.Equal(s.Script[:len(bashPreamble)], bashPreamble) {
+				s.Script = s.Script[len(bashPreamble):]
+			}
 		case "env":
 			s.Env, err = decodeEnv(e.Val)
 		default:
@@ -248,6 +253,8 @@ func applyTaskMarks(t *vTask, src []byte) error {
 				return err
 			}
 			t.Noop = true
+		case featShell:
+			// The note says a step from a bash-default source starts with the bash-if-present preamble, which the decoder strips.
 		case featNeeds:
 			var a needArg
 			if err := m.DecodeArg(&a); err != nil {

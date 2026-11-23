@@ -3,4 +3,5 @@ Loss report: forgejo -> argo
 [external] pipeline/ci/trigger/0 trigger.manual: argo submit --from workflowtemplate/ci (start a run with: argo submit --from workflowtemplate/ci; the Workflow object needs a ServiceAccount with the rights in .argo/rbac/)
 [emulated] pipeline/ci pipeline.env: copied into the env of every container (a step variable of the same name wins)
 [emulated] pipeline/ci/job/test job.matrix: withItems over the expanded cells (the cells run as withItems of one task)
+[emulated] pipeline/ci/job/test/step/test-step-1 step.shell: container command sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)
 [emulated] pipeline/ci/ref/vars.LEVEL config.name: secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars (the Secret values and ConfigMap values are not written)

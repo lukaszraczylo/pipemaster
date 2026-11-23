@@ -1,5 +1,6 @@
 # pipemaster:emulated step.image pipeline/ci/job/flaky/step/flaky-step-1
 # pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated step.shell pipeline/ci/job/flaky/step/flaky-step-1
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -8,4 +9,8 @@ spec:
   steps:
     - name: flaky-step-1
       image: alpine:3.22
-      script: echo ok
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        echo ok

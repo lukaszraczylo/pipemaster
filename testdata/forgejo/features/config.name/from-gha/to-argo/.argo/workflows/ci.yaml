@@ -2,6 +2,7 @@
 # pipemaster:arg {"vars":{"REGION":"vars.REGION"}}
 # pipemaster:emulated pipeline.env pipeline/ci
 # pipemaster:arg {"vars":"- name: API_TOKEN\n  value:\n    secret: API_TOKEN\n","names":["API_TOKEN"]}
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated config.name pipeline/ci/ref/secrets.API_TOKEN
 # pipemaster:emulated config.name pipeline/ci/ref/secrets.DEPLOY_KEY
 # pipemaster:emulated config.name pipeline/ci/ref/vars.REGION
@@ -31,8 +32,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo "${REGION}"
             workingDir: /workspace
             env:

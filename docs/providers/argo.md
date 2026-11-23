@@ -63,7 +63,7 @@ The following table comes from `pipemaster caps --to argo --format md`.
 | step.if | emulated | guard in the script that reads context values from env (containerSet has no when, so every step condition runs as a shell guard that reads context values from env; a condition with no guard form disables the script and the container still starts; a containerSet starts every container at once and each waits for its dependencies, and a container that exits non-zero stops its dependents) |
 | step.image | native | container image |
 | step.script | native | container args |
-| step.shell | emulated | container command <shell> -ec (only bash, dash, zsh, ash and sh run as the container command, and the image must provide the shell; any other shell is lost and the script runs under sh) |
+| step.shell | emulated | container command <shell> -ec (only bash, dash, zsh, ash and sh run as the container command, and the image must provide the shell; any other shell is lost and the script runs under sh; a step with no shell from a GHA or GitLab source runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh) |
 | step.timeout | lost | (containerSet has no timeout per container; the template timeout covers the whole job) |
 | step.workdir | native | container workingDir |
 | trigger.api | emulated | Sensor trigger kept in the Ext data, or a suspended CronWorkflow (only a trigger that an Argo file held is written back; any other API trigger is lost, and the schedule of a suspended CronWorkflow is not in the IR) |

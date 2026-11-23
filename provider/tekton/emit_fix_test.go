@@ -247,12 +247,12 @@ func scheduleProject() *ir.Project {
 }
 
 func TestUneditedScheduleReparsesCleanAndReemitsIdentically(t *testing.T) {
-	files, _ := emit(t, scheduleProject())
+	files, _ := emitRaw(t, scheduleProject())
 	p2, prep := reparse(t, files)
 	if e := entry(prep, caps.ExprOpaque, "marker ignored"); e != nil {
 		t.Fatalf("marker ignored on an unedited file: %v", e)
 	}
-	again, _ := emit(t, p2)
+	again, _ := emitRaw(t, p2)
 	if joinFiles(again) != joinFiles(files) {
 		t.Fatalf("re-emit differs:\n%s\n---\n%s", joinFiles(files), joinFiles(again))
 	}

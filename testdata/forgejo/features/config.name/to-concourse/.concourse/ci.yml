@@ -3,15 +3,16 @@
 # pipemaster:emulated config.name pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"vars":["FORGEJO_REGION","CI"]}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"1f5b288f4dc0a48b25a6511739648bc26ecc66444dc292b3e2928a3814f99192","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.FORGEJO_REGION }} $\u007b{ vars.CI }}\"\nenv:\n    - name: KEY\n      value:\n        secret: DEPLOY_KEY\n"}
+# pipemaster:arg {"digest":"53e02ec3a2ed894ac97e563c8ad4a9e249282bce90c7f01388d1e0e8973b7903","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.FORGEJO_REGION }} $\u007b{ vars.CI }}\"\nenv:\n    - name: KEY\n      value:\n        secret: DEPLOY_KEY\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"c49b369714ef058fe90563d765931891a8b07eb40b35673d06ff787b308e11f2","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
+# pipemaster:arg {"digest":"bf168946f423419814abeb4b0f3ce9b9ab89faea6db422d8c5799a5bc56997a2","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: config\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
@@ -51,7 +52,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo "${FORGEJO_REGION} ${CI}"
             dir: workspace
         tags:

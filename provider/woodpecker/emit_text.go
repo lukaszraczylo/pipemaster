@@ -32,8 +32,10 @@ const (
 
 // emitter carries the state of one Emit call: the ledger and the comment lines of the file being written.
 type emitter struct {
-	led  *emitkit.Ledger
-	from *expr.Dialect
+	led *emitkit.Ledger
+	// origin is the provider ID the project was parsed from.
+	origin string
+	from   *expr.Dialect
 	// stepIDs maps the path of each step under the ID a reader derives for it to the ID in the IR.
 	stepIDs map[string]string
 	// inexact is the first trigger filter feature of the workflow being written whose globs changed meaning.

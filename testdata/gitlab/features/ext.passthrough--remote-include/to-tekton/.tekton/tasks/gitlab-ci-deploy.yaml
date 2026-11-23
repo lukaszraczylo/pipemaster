@@ -1,5 +1,6 @@
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/deploy/step/script
 # pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/deploy/step/script
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -8,4 +9,8 @@ spec:
   steps:
     - name: script
       image: alpine:3.22
-      script: make deploy
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        make deploy

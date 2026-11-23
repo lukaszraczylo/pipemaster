@@ -87,6 +87,12 @@
      "detail": "the action reference actions/checkout@v4 is not in the Woodpecker file; it is kept in round-trip metadata"
     },
     {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-2",
+     "feature": "step.shell",
+     "level": "lost",
+     "detail": "Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash"
+    },
+    {
      "path": "pipeline/ci/job/test",
      "feature": "job.runner",
      "level": "lost",
@@ -97,6 +103,18 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "the action reference actions/checkout@v4 is not in the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-2",
+     "feature": "step.shell",
+     "level": "lost",
+     "detail": "Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-3",
+     "feature": "step.shell",
+     "level": "lost",
+     "detail": "Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash"
     }
    ]
   },
@@ -135,6 +153,12 @@
      "detail": "the action reference actions/checkout@v4 is not in the Drone file; it is kept in round-trip metadata"
     },
     {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-2",
+     "feature": "step.shell",
+     "level": "lost",
+     "detail": "Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash"
+    },
+    {
      "path": "pipeline/ci/job/test",
      "feature": "job.runner",
      "level": "lost",
@@ -145,6 +169,18 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "the action reference actions/checkout@v4 is not in the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-2",
+     "feature": "step.shell",
+     "level": "lost",
+     "detail": "Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-3",
+     "feature": "step.shell",
+     "level": "lost",
+     "detail": "Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash"
     },
     {
      "path": "pipeline/ci/job/deploy",
@@ -194,11 +230,11 @@
     },
     {
      "path": ".tekton/tasks/ci-deploy.yaml",
-     "text": "# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: deploy-step-1\\nkind: action\\n\",\"wrote\":\"{\\\"name\\\":\\\"deploy-step-1\\\",\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/$(params.ctx-repo).git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"$(params.ctx-sha)\\\"},{\\\"name\\\":\\\"output-path\\\",\\\"value\\\":\\\"/workspace\\\"}],\\\"ref\\\":{\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/tektoncd-catalog/git-clone.git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"v1.7.1\\\"},{\\\"name\\\":\\\"pathInRepo\\\",\\\"value\\\":\\\"stepaction/git-clone/git-clone.yaml\\\"}],\\\"resolver\\\":\\\"git\\\"}}\",\"at\":0}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: ci-deploy\nspec:\n  params:\n    - name: ctx-repo\n    - name: ctx-sha\n  stepTemplate:\n    image: alpine:3.22\n    workingDir: /workspace\n  steps:\n    - name: deploy-step-1\n      ref:\n        resolver: git\n        params:\n          - name: url\n            value: https://github.com/tektoncd-catalog/git-clone.git\n          - name: revision\n            value: v1.7.1\n          - name: pathInRepo\n            value: stepaction/git-clone/git-clone.yaml\n      params:\n        - name: url\n          value: https://github.com/$(params.ctx-repo).git\n        - name: revision\n          value: $(params.ctx-sha)\n        - name: output-path\n          value: /workspace\n    - name: deploy-step-2\n      script: ./scripts/deploy.sh\n      env:\n        - name: TOKEN\n          valueFrom:\n            secretKeyRef:\n              name: ci-secrets\n              key: DEPLOY_TOKEN\n"
+     "text": "# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: deploy-step-1\\nkind: action\\n\",\"wrote\":\"{\\\"name\\\":\\\"deploy-step-1\\\",\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/$(params.ctx-repo).git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"$(params.ctx-sha)\\\"},{\\\"name\\\":\\\"output-path\\\",\\\"value\\\":\\\"/workspace\\\"}],\\\"ref\\\":{\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/tektoncd-catalog/git-clone.git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"v1.7.1\\\"},{\\\"name\\\":\\\"pathInRepo\\\",\\\"value\\\":\\\"stepaction/git-clone/git-clone.yaml\\\"}],\\\"resolver\\\":\\\"git\\\"}}\",\"at\":0}\n# pipemaster:emulated step.shell pipeline/ci/job/deploy/step/deploy-step-2\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: ci-deploy\nspec:\n  params:\n    - name: ctx-repo\n    - name: ctx-sha\n  stepTemplate:\n    image: alpine:3.22\n    workingDir: /workspace\n  steps:\n    - name: deploy-step-1\n      ref:\n        resolver: git\n        params:\n          - name: url\n            value: https://github.com/tektoncd-catalog/git-clone.git\n          - name: revision\n            value: v1.7.1\n          - name: pathInRepo\n            value: stepaction/git-clone/git-clone.yaml\n      params:\n        - name: url\n          value: https://github.com/$(params.ctx-repo).git\n        - name: revision\n          value: $(params.ctx-sha)\n        - name: output-path\n          value: /workspace\n    - name: deploy-step-2\n      script: |-\n        #!/bin/sh\n        if [ -z \"${PIPEMASTER_BASH:-}\" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e \"$0\"; fi\n        set -e\n        ./scripts/deploy.sh\n      env:\n        - name: TOKEN\n          valueFrom:\n            secretKeyRef:\n              name: ci-secrets\n              key: DEPLOY_TOKEN\n"
     },
     {
      "path": ".tekton/tasks/ci-test.yaml",
-     "text": "# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: test-step-1\\nkind: action\\n\",\"wrote\":\"{\\\"name\\\":\\\"test-step-1\\\",\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/$(params.ctx-repo).git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"$(params.ctx-sha)\\\"},{\\\"name\\\":\\\"output-path\\\",\\\"value\\\":\\\"/workspace\\\"}],\\\"ref\\\":{\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/tektoncd-catalog/git-clone.git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"v1.7.1\\\"},{\\\"name\\\":\\\"pathInRepo\\\",\\\"value\\\":\\\"stepaction/git-clone/git-clone.yaml\\\"}],\\\"resolver\\\":\\\"git\\\"}}\",\"at\":0}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: ci-test\nspec:\n  params:\n    - name: arch\n    - name: ctx-repo\n    - name: ctx-sha\n  stepTemplate:\n    image: golang:1.27\n    workingDir: /workspace\n  steps:\n    - name: test-step-1\n      ref:\n        resolver: git\n        params:\n          - name: url\n            value: https://github.com/tektoncd-catalog/git-clone.git\n          - name: revision\n            value: v1.7.1\n          - name: pathInRepo\n            value: stepaction/git-clone/git-clone.yaml\n      params:\n        - name: url\n          value: https://github.com/$(params.ctx-repo).git\n        - name: revision\n          value: $(params.ctx-sha)\n        - name: output-path\n          value: /workspace\n    - name: test-step-2\n      script: go vet ./...\n    - name: test-step-3\n      script: GOARCH=$(params.arch) go test ./...\n"
+     "text": "# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: test-step-1\\nkind: action\\n\",\"wrote\":\"{\\\"name\\\":\\\"test-step-1\\\",\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/$(params.ctx-repo).git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"$(params.ctx-sha)\\\"},{\\\"name\\\":\\\"output-path\\\",\\\"value\\\":\\\"/workspace\\\"}],\\\"ref\\\":{\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/tektoncd-catalog/git-clone.git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"v1.7.1\\\"},{\\\"name\\\":\\\"pathInRepo\\\",\\\"value\\\":\\\"stepaction/git-clone/git-clone.yaml\\\"}],\\\"resolver\\\":\\\"git\\\"}}\",\"at\":0}\n# pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-2\n# pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-3\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: ci-test\nspec:\n  params:\n    - name: arch\n    - name: ctx-repo\n    - name: ctx-sha\n  stepTemplate:\n    image: golang:1.27\n    workingDir: /workspace\n  steps:\n    - name: test-step-1\n      ref:\n        resolver: git\n        params:\n          - name: url\n            value: https://github.com/tektoncd-catalog/git-clone.git\n          - name: revision\n            value: v1.7.1\n          - name: pathInRepo\n            value: stepaction/git-clone/git-clone.yaml\n      params:\n        - name: url\n          value: https://github.com/$(params.ctx-repo).git\n        - name: revision\n          value: $(params.ctx-sha)\n        - name: output-path\n          value: /workspace\n    - name: test-step-2\n      script: |-\n        #!/bin/sh\n        if [ -z \"${PIPEMASTER_BASH:-}\" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e \"$0\"; fi\n        set -e\n        go vet ./...\n    - name: test-step-3\n      script: |-\n        #!/bin/sh\n        if [ -z \"${PIPEMASTER_BASH:-}\" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e \"$0\"; fi\n        set -e\n        GOARCH=$(params.arch) go test ./...\n"
     },
     {
      "path": ".tekton/triggers/eventlistener.yaml",
@@ -254,11 +290,32 @@
      "detail": "the ctx-repo and ctx-sha params carry the repository and the commit"
     },
     {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-2",
+     "feature": "step.shell",
+     "level": "emulated",
+     "strategy": "bash-if-present preamble in the script",
+     "detail": "the source runs the step under bash when the image has it; the script starts with a line that re-runs it under bash -e when the image has bash, else it runs under sh -e, so bash-only syntax fails under sh"
+    },
+    {
      "path": "pipeline/ci/job/test/step/test-step-1",
      "feature": "step.action",
      "level": "emulated",
      "strategy": "StepAction ref to the tektoncd-catalog git-clone through the git resolver",
      "detail": "the ctx-repo and ctx-sha params carry the repository and the commit"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-2",
+     "feature": "step.shell",
+     "level": "emulated",
+     "strategy": "bash-if-present preamble in the script",
+     "detail": "the source runs the step under bash when the image has it; the script starts with a line that re-runs it under bash -e when the image has bash, else it runs under sh -e, so bash-only syntax fails under sh"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-3",
+     "feature": "step.shell",
+     "level": "emulated",
+     "strategy": "bash-if-present preamble in the script",
+     "detail": "the source runs the step under bash when the image has it; the script starts with a line that re-runs it under bash -e when the image has bash, else it runs under sh -e, so bash-only syntax fails under sh"
     },
     {
      "path": "pipeline/ci/ref/secrets.DEPLOY_TOKEN",
@@ -305,7 +362,7 @@
     },
     {
      "path": ".argo/workflows/ci.yaml",
-     "text": "# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: deploy-step-1\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.ctx-sha}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.image pipeline/ci/job/deploy\n# pipemaster:arg {\"wrote\":{\"deploy-step-2\":\"alpine:3.22\"},\"job\":\"ref: alpine:3.22\\n\"}\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: test-step-1\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.ctx-sha}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated job.matrix pipeline/ci/job/test\n# pipemaster:arg {\"axes\":[{\"Name\":\"arch\",\"Values\":[\"amd64\",\"arm64\"]}]}\n# pipemaster:emulated config.name pipeline/ci/ref/secrets.DEPLOY_TOKEN\n# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0\n# pipemaster:emulated trigger.pull_request pipeline/ci/trigger/0\n# pipemaster:emulated trigger.push pipeline/ci/trigger/0\n# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1\n# pipemaster:emulated trigger.push pipeline/ci/trigger/1\napiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata:\n  name: ci\n  annotations:\n    workflows.argoproj.io/title: ci\nspec:\n  entrypoint: main\n  arguments:\n    parameters:\n      - name: ctx-sha\n        value: \"\"\n      - name: ctx-repo\n        value: \"\"\n      - name: ctx-ref-name\n        value: \"\"\n  templates:\n    - name: main\n      dag:\n        tasks:\n          - name: deploy\n            template: deploy\n            dependencies:\n              - test\n            when: '{{= workflow.parameters[''ctx-ref-name''] == ''main'' }}'\n          - name: test\n            template: test\n            withItems:\n              - arch: amd64\n              - arch: arm64\n            arguments:\n              parameters:\n                - name: arch\n                  value: '{{item.arch}}'\n    - name: deploy\n      containerSet:\n        containers:\n          - # pipemaster:id deploy-step-2\n            name: main\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - ./scripts/deploy.sh\n            workingDir: /workspace\n            env:\n              - name: TOKEN\n                valueFrom:\n                  secretKeyRef:\n                    name: ci-secrets\n                    key: DEPLOY_TOKEN\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.ctx-sha}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: test\n      containerSet:\n        containers:\n          - name: test-step-2\n            image: golang:1.27\n            command:\n              - sh\n              - -ec\n            args:\n              - go vet ./...\n            workingDir: /workspace\n          - # pipemaster:id test-step-3\n            name: main\n            image: golang:1.27\n            command:\n              - sh\n              - -ec\n            args:\n              - GOARCH={{inputs.parameters.arch}} go test ./...\n            workingDir: /workspace\n            dependencies:\n              - test-step-2\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        parameters:\n          - name: arch\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.ctx-sha}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n"
+     "text": "# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: deploy-step-1\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.ctx-sha}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.image pipeline/ci/job/deploy\n# pipemaster:arg {\"wrote\":{\"deploy-step-2\":\"alpine:3.22\"},\"job\":\"ref: alpine:3.22\\n\"}\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: test-step-1\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.ctx-sha}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated job.matrix pipeline/ci/job/test\n# pipemaster:arg {\"axes\":[{\"Name\":\"arch\",\"Values\":[\"amd64\",\"arm64\"]}]}\n# pipemaster:emulated step.shell pipeline/ci/job/deploy/step/deploy-step-2\n# pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-2\n# pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-3\n# pipemaster:emulated config.name pipeline/ci/ref/secrets.DEPLOY_TOKEN\n# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0\n# pipemaster:emulated trigger.pull_request pipeline/ci/trigger/0\n# pipemaster:emulated trigger.push pipeline/ci/trigger/0\n# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1\n# pipemaster:emulated trigger.push pipeline/ci/trigger/1\napiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata:\n  name: ci\n  annotations:\n    workflows.argoproj.io/title: ci\nspec:\n  entrypoint: main\n  arguments:\n    parameters:\n      - name: ctx-sha\n        value: \"\"\n      - name: ctx-repo\n        value: \"\"\n      - name: ctx-ref-name\n        value: \"\"\n  templates:\n    - name: main\n      dag:\n        tasks:\n          - name: deploy\n            template: deploy\n            dependencies:\n              - test\n            when: '{{= workflow.parameters[''ctx-ref-name''] == ''main'' }}'\n          - name: test\n            template: test\n            withItems:\n              - arch: amd64\n              - arch: arm64\n            arguments:\n              parameters:\n                - name: arch\n                  value: '{{item.arch}}'\n    - name: deploy\n      containerSet:\n        containers:\n          - # pipemaster:id deploy-step-2\n            name: main\n            image: alpine:3.22\n            command:\n              - sh\n              - -c\n            args:\n              - if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$1\"; fi; exec sh -e -c \"$1\"\n              - pipemaster\n              - ./scripts/deploy.sh\n            workingDir: /workspace\n            env:\n              - name: TOKEN\n                valueFrom:\n                  secretKeyRef:\n                    name: ci-secrets\n                    key: DEPLOY_TOKEN\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.ctx-sha}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: test\n      containerSet:\n        containers:\n          - name: test-step-2\n            image: golang:1.27\n            command:\n              - sh\n              - -c\n            args:\n              - if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$1\"; fi; exec sh -e -c \"$1\"\n              - pipemaster\n              - go vet ./...\n            workingDir: /workspace\n          - # pipemaster:id test-step-3\n            name: main\n            image: golang:1.27\n            command:\n              - sh\n              - -c\n            args:\n              - if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$1\"; fi; exec sh -e -c \"$1\"\n              - pipemaster\n              - GOARCH={{inputs.parameters.arch}} go test ./...\n            workingDir: /workspace\n            dependencies:\n              - test-step-2\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        parameters:\n          - name: arch\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.ctx-sha}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n"
     }
    ],
    "report": [
@@ -356,11 +413,32 @@
      "detail": "Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource"
     },
     {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-2",
+     "feature": "step.shell",
+     "level": "emulated",
+     "strategy": "container command sh with a bash-if-present wrapper",
+     "detail": "the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh"
+    },
+    {
      "path": "pipeline/ci/job/test",
      "feature": "job.matrix",
      "level": "emulated",
      "strategy": "withItems over the expanded cells",
      "detail": "the cells run as withItems of one task"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-2",
+     "feature": "step.shell",
+     "level": "emulated",
+     "strategy": "container command sh with a bash-if-present wrapper",
+     "detail": "the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-3",
+     "feature": "step.shell",
+     "level": "emulated",
+     "strategy": "container command sh with a bash-if-present wrapper",
+     "detail": "the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh"
     },
     {
      "path": "pipeline/ci/ref/secrets.DEPLOY_TOKEN",
@@ -393,7 +471,7 @@
    "files": [
     {
      "path": ".concourse/ci.yml",
-     "text": "# pipemaster:emulated display.name pipeline/ci\n# pipemaster:arg {\"name\":\"ci\",\"id\":\"ci\",\"written\":\"ci\",\"kind\":\"pipeline\"}\n# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\next:\\n    gha:\\n        _derived_id: true\\nid: deploy-step-1\\nkind: action\\n\",\"get\":\"source\",\"params\":\"null\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/step/deploy-step-2/carry\n# pipemaster:arg {\"digest\":\"2ceaeed0db42f3b3820b20c00408727d73195a6650118388684a43515400a623\",\"carry\":\"id: deploy-step-2\\nkind: script\\nenv:\\n    - name: TOKEN\\n      value:\\n        secret: DEPLOY_TOKEN\\n\"}\n# pipemaster:emulated job.manual pipeline/ci/job/deploy\n# pipemaster:arg {\"environment\":{\"Name\":\"production\",\"URL\":\"\",\"Approval\":false},\"manual\":false,\"held\":true,\"cond\":true}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry\n# pipemaster:arg {\"digest\":\"7d9620106768faafbacbef6956a933cfa8748e9dbbf8d9b337820e69aa4ffde8\",\"carry\":\"if: ref_name == 'main'\\ncontainer:\\n    ref: alpine:3.22\\nenvironment:\\n    name: production\\nid: deploy\\nrunner:\\n    labels:\\n        - ubuntu-latest\\nneeds:\\n    - job: test\\n\"}\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\next:\\n    gha:\\n        _derived_id: true\\nid: test-step-1\\nkind: action\\n\",\"get\":\"source\",\"params\":\"null\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-2/carry\n# pipemaster:arg {\"digest\":\"f9b8b3b570c1acffd7e2e3e1fc645369c123be22aa40e90282fe78e2d91a2af4\",\"carry\":\"id: test-step-2\\nkind: script\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-3/carry\n# pipemaster:arg {\"digest\":\"04320a690f2d2cde29f1394a63028d21cdb41944b905279fd4a81ea32c83c3d5\",\"carry\":\"id: test-step-3\\nkind: script\\nscript:\\n    - GOARCH=$\\u007b{ matrix.arch }} go test ./...\\n\"}\n# pipemaster:emulated job.matrix pipeline/ci/job/test\n# pipemaster:arg {\"matrix\":\"axes:\\n    - name: arch\\n      values:\\n        - amd64\\n        - arm64\\n\",\"across\":\"[{\\\"max_in_flight\\\":\\\"all\\\",\\\"values\\\":[\\\"amd64\\\",\\\"arm64\\\"],\\\"var\\\":\\\"arch\\\"}]\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry\n# pipemaster:arg {\"digest\":\"5d9c97a0dc4c3c7fd9dd7b503f72b12e2146a9a5471fe900d1091af780623d65\",\"carry\":\"container:\\n    ref: golang:1.27\\nmatrix:\\n    axes:\\n        - name: arch\\n          values:\\n            - amd64\\n            - arm64\\nid: test\\nrunner:\\n    labels:\\n        - ubuntu-latest\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/carry\n# pipemaster:arg {\"digest\":\"7e65c0d6306019efcea48966df45f029402721064756678d11489339a02e833a\",\"carry\":\"id: ci\\nname: ci\\ntriggers:\\n    - kind: pr\\n      branches:\\n        include:\\n            - main\\n    - kind: push\\n      branches:\\n        include:\\n            - main\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/ci\n# pipemaster:emulated job.runner pipeline/ci/job/deploy\n# pipemaster:emulated job.runner pipeline/ci/job/test\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\n      branch: main\njobs:\n  - name: deploy\n    plan:\n      - get: source\n        passed:\n          - test\n      - task: deploy-step-2\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: alpine\n              tag: \"3.22\"\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          params:\n            TOKEN: ((DEPLOY_TOKEN))\n          run:\n            path: sh\n            args:\n              - -ec\n              - ./scripts/deploy.sh\n            dir: workspace\n        tags:\n          - ubuntu-latest\n  - name: test\n    plan:\n      - get: source\n        trigger: true\n      - do:\n          - task: test-step-2\n            input_mapping:\n              workspace: source\n            config:\n              platform: linux\n              image_resource:\n                type: registry-image\n                source:\n                  repository: golang\n                  tag: \"1.27\"\n              inputs:\n                - name: workspace\n              outputs:\n                - name: workspace\n              run:\n                path: sh\n                args:\n                  - -ec\n                  - go vet ./...\n                dir: workspace\n            tags:\n              - ubuntu-latest\n          - task: test-step-3\n            config:\n              platform: linux\n              image_resource:\n                type: registry-image\n                source:\n                  repository: golang\n                  tag: \"1.27\"\n              inputs:\n                - name: workspace\n              outputs:\n                - name: workspace\n              params:\n                PM_MATRIX_ARCH: ((.:arch))\n              run:\n                path: sh\n                args:\n                  - -ec\n                  - GOARCH=${PM_MATRIX_ARCH} go test ./...\n                dir: workspace\n            tags:\n              - ubuntu-latest\n        across:\n          - var: arch\n            values:\n              - amd64\n              - arm64\n            max_in_flight: all\n"
+     "text": "# pipemaster:emulated display.name pipeline/ci\n# pipemaster:arg {\"name\":\"ci\",\"id\":\"ci\",\"written\":\"ci\",\"kind\":\"pipeline\"}\n# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\next:\\n    gha:\\n        _derived_id: true\\nid: deploy-step-1\\nkind: action\\n\",\"get\":\"source\",\"params\":\"null\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/step/deploy-step-2/carry\n# pipemaster:arg {\"digest\":\"242295e2a1e69dc539292d193b3af78f4d944ebc31fa8c3739be1173460703e0\",\"carry\":\"id: deploy-step-2\\nkind: script\\nenv:\\n    - name: TOKEN\\n      value:\\n        secret: DEPLOY_TOKEN\\n\"}\n# pipemaster:emulated job.manual pipeline/ci/job/deploy\n# pipemaster:arg {\"environment\":{\"Name\":\"production\",\"URL\":\"\",\"Approval\":false},\"manual\":false,\"held\":true,\"cond\":true}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry\n# pipemaster:arg {\"digest\":\"76a3c36d58dc16969501fcf4024b401f5ee3fd4eb9f8bd98281d09427f5351f0\",\"carry\":\"if: ref_name == 'main'\\ncontainer:\\n    ref: alpine:3.22\\nenvironment:\\n    name: production\\nid: deploy\\nrunner:\\n    labels:\\n        - ubuntu-latest\\nneeds:\\n    - job: test\\n\"}\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\next:\\n    gha:\\n        _derived_id: true\\nid: test-step-1\\nkind: action\\n\",\"get\":\"source\",\"params\":\"null\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-2/carry\n# pipemaster:arg {\"digest\":\"4ab96f96fdc1144a86bd176570501c1fc3a39dd9e166a394fc1d211419376e27\",\"carry\":\"id: test-step-2\\nkind: script\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-3/carry\n# pipemaster:arg {\"digest\":\"dbb04fb6f47b67f7808644f8a187a9c47374acf6e7deec9ff1b474c8a8b08997\",\"carry\":\"id: test-step-3\\nkind: script\\nscript:\\n    - GOARCH=$\\u007b{ matrix.arch }} go test ./...\\n\"}\n# pipemaster:emulated job.matrix pipeline/ci/job/test\n# pipemaster:arg {\"matrix\":\"axes:\\n    - name: arch\\n      values:\\n        - amd64\\n        - arm64\\n\",\"across\":\"[{\\\"max_in_flight\\\":\\\"all\\\",\\\"values\\\":[\\\"amd64\\\",\\\"arm64\\\"],\\\"var\\\":\\\"arch\\\"}]\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry\n# pipemaster:arg {\"digest\":\"a8e2f157c723c67aeae52705ef9248265a564d02105c943e39a8dd14e5c63b6d\",\"carry\":\"container:\\n    ref: golang:1.27\\nmatrix:\\n    axes:\\n        - name: arch\\n          values:\\n            - amd64\\n            - arm64\\nid: test\\nrunner:\\n    labels:\\n        - ubuntu-latest\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/carry\n# pipemaster:arg {\"digest\":\"7e65c0d6306019efcea48966df45f029402721064756678d11489339a02e833a\",\"carry\":\"id: ci\\nname: ci\\ntriggers:\\n    - kind: pr\\n      branches:\\n        include:\\n            - main\\n    - kind: push\\n      branches:\\n        include:\\n            - main\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/ci\n# pipemaster:emulated job.runner pipeline/ci/job/deploy\n# pipemaster:emulated step.shell pipeline/ci/job/deploy/step/deploy-step-2\n# pipemaster:emulated job.runner pipeline/ci/job/test\n# pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-2\n# pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-3\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\n      branch: main\njobs:\n  - name: deploy\n    plan:\n      - get: source\n        passed:\n          - test\n      - task: deploy-step-2\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: alpine\n              tag: \"3.22\"\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          params:\n            TOKEN: ((DEPLOY_TOKEN))\n          run:\n            path: sh\n            args:\n              - -c\n              - if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$1\"; fi; exec sh -e -c \"$1\"\n              - pipemaster\n              - ./scripts/deploy.sh\n            dir: workspace\n        tags:\n          - ubuntu-latest\n  - name: test\n    plan:\n      - get: source\n        trigger: true\n      - do:\n          - task: test-step-2\n            input_mapping:\n              workspace: source\n            config:\n              platform: linux\n              image_resource:\n                type: registry-image\n                source:\n                  repository: golang\n                  tag: \"1.27\"\n              inputs:\n                - name: workspace\n              outputs:\n                - name: workspace\n              run:\n                path: sh\n                args:\n                  - -c\n                  - if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$1\"; fi; exec sh -e -c \"$1\"\n                  - pipemaster\n                  - go vet ./...\n                dir: workspace\n            tags:\n              - ubuntu-latest\n          - task: test-step-3\n            config:\n              platform: linux\n              image_resource:\n                type: registry-image\n                source:\n                  repository: golang\n                  tag: \"1.27\"\n              inputs:\n                - name: workspace\n              outputs:\n                - name: workspace\n              params:\n                PM_MATRIX_ARCH: ((.:arch))\n              run:\n                path: sh\n                args:\n                  - -c\n                  - if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$1\"; fi; exec sh -e -c \"$1\"\n                  - pipemaster\n                  - GOARCH=${PM_MATRIX_ARCH} go test ./...\n                dir: workspace\n            tags:\n              - ubuntu-latest\n        across:\n          - var: arch\n            values:\n              - amd64\n              - arm64\n            max_in_flight: all\n"
     }
    ],
    "report": [
@@ -436,6 +514,13 @@
      "detail": "unknown actions are lost"
     },
     {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-2",
+     "feature": "step.shell",
+     "level": "emulated",
+     "strategy": "run.path sh with a bash-if-present wrapper",
+     "detail": "the source runs the step under bash when the image has it; the task runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh"
+    },
+    {
      "path": "pipeline/ci/job/test",
      "feature": "job.matrix",
      "level": "emulated",
@@ -455,6 +540,20 @@
      "level": "emulated",
      "strategy": "task per actions.Lookup verdict",
      "detail": "unknown actions are lost"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-2",
+     "feature": "step.shell",
+     "level": "emulated",
+     "strategy": "run.path sh with a bash-if-present wrapper",
+     "detail": "the source runs the step under bash when the image has it; the task runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-3",
+     "feature": "step.shell",
+     "level": "emulated",
+     "strategy": "run.path sh with a bash-if-present wrapper",
+     "detail": "the source runs the step under bash when the image has it; the task runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh"
     }
    ]
   }

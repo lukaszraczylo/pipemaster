@@ -11,6 +11,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
@@ -299,6 +300,13 @@ func (jb *jobBuilder) command(st *ir.Step, k *sink, cmd string, argv []string, l
 		}
 		k.Out[ExtShellFlags] = plainStrings(argv[:len(argv)-1])
 		k.Note(caps.StepShell, fmt.Sprintf("shell flags %v are kept in Ext; the IR holds the shell and the script", argv[:len(argv)-1]), line)
+		return
+	}
+	if cmd == shellCommand && len(argv) == 4 && argv[0] == "-c" && argv[1] == provider.BashOrShScript && argv[2] == provider.BashOrShArgv0 {
+		for _, l := range strings.Split(strings.TrimSuffix(argv[3], "\n"), "\n") {
+			st.Script = append(st.Script, escapeLine(l))
+		}
+		k.Out[ExtBashDefault] = true
 		return
 	}
 	if shells[path.Base(cmd)] && len(argv) > 1 {

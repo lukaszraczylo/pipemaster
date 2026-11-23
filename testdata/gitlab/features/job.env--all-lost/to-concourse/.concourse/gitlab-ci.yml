@@ -1,14 +1,15 @@
 # pipemaster:lost env IMAGE: sha
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/test/step/script/carry
-# pipemaster:arg {"digest":"bad5b3f823b19a4509be4f9badcc60f42b894b55badfe50b2bfbd3799fd9c48a","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"08917fa4c36d150ee75feb747f4feb128af9ce77cea5a702efe3a5261a6d9667","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/test/carry
-# pipemaster:arg {"digest":"d0665c0b8ecc7770baa815edf2625c20dcc1df922f91b7b8e11f4f3437d61185","carry":"id: test\nenv:\n    - name: IMAGE\n      value:\n        expr: format('$CI_REGISTRY_IMAGE/tmp:{0}', sha)\n"}
+# pipemaster:arg {"digest":"57740b0d8c1c80c7b7bbdaa12a9bc2bda28710c8e7b650a85b4cd325585ba6d7","carry":"id: test\nenv:\n    - name: IMAGE\n      value:\n        expr: format('$CI_REGISTRY_IMAGE/tmp:{0}', sha)\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated job.env pipeline/gitlab-ci/job/test
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/job/test
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/test/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/test/step/script
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
@@ -44,6 +45,8 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make test
             dir: workspace

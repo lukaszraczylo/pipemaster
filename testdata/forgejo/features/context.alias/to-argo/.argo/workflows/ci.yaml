@@ -1,7 +1,9 @@
 # pipemaster:emulated script.interpolation pipeline/ci/job/build
 # pipemaster:arg {"vars":{"PM_CTX_REF_NAME":"ref_name","PM_CTX_SHA":"sha"}}
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-2
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
@@ -34,8 +36,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - |-
                 if ! [ "$PM_CTX_REF_NAME" = 'main' ]; then exit 0; fi # pipemaster:guard
                 echo ${PM_CTX_REF_NAME}
@@ -47,8 +51,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - |-
                 if ! [ "$PM_CTX_SHA" != '' ]; then exit 0; fi # pipemaster:guard
                 echo ${PM_CTX_SHA}

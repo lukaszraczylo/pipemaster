@@ -65,7 +65,7 @@ The following table comes from `pipemaster caps --to concourse --format md`.
 | step.if | emulated | shared shell guard in the script of the task (a condition with no guard form runs as a task whose first script line is exit 0, with a lost entry) |
 | step.image | native | task config image_resource |
 | step.script | native | task config run.path and run.args |
-| step.shell | emulated | run.path names the shell (the image must provide the shell) |
+| step.shell | emulated | run.path names the shell (the image must provide the shell; a step with no shell from a GHA or GitLab source runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh) |
 | step.timeout | native | task timeout |
 | step.workdir | native | task config run.dir |
 | trigger.api | lost | (Concourse has no resource, listener or Ext entry that the emitter can restore for an API trigger, so it is lost; a webhook_token on a resource is kept in Ext only) |

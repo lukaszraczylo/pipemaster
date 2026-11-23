@@ -1,12 +1,13 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/version/step/version-step-1/carry
-# pipemaster:arg {"digest":"70fd7947329bc98ce75bf0c8cd25f8e588620e4c5fe4c42b41bc3cb13c5684bc","carry":"id: version-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"45baeb53eeb216106310110e5e75f4cdc67815949ce192473718a35fafcfc56c","carry":"id: version-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/version/carry
-# pipemaster:arg {"digest":"519042cc7de963af414af7d61260cfd264b7bdbaa16aa8102ee07188fc3946f2","carry":"id: version\nrunner:\n    labels:\n        - ubuntu-latest\noutputs:\n    - name: tag\n      value: v1-$\u007b{ sha }}\n"}
+# pipemaster:arg {"digest":"6373891e4235c4942da03992d193dd44478ec2fede625b2be4c232df4ae96ee4","carry":"id: version\nrunner:\n    labels:\n        - ubuntu-latest\noutputs:\n    - name: tag\n      value: v1-$\u007b{ sha }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/version
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/version/step/version-step-1
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/version/step/version-step-1
 resources:
   - name: source
     type: git
@@ -34,7 +35,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make version
             dir: workspace
         tags:

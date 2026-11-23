@@ -3,19 +3,21 @@
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"if":"ref_name == 'main'","script":"# pipemaster:lost echo {{ ref_name }}"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"b3a30613fe20c4479cc903947253ae7e3944d9e4b302573a1bc9a0de57554d00","carry":"if: ref_name == 'main'\nid: build-step-1\nkind: script\nscript:\n    - echo $\u007b{ ref_name }}\n"}
+# pipemaster:arg {"digest":"9a615e9313cb38cbbbf4f7614ffb402bc6e0ba81f93f74c6769f6fdbe9058342","carry":"if: ref_name == 'main'\nid: build-step-1\nkind: script\nscript:\n    - echo $\u007b{ ref_name }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-2/carry
-# pipemaster:arg {"digest":"7bd34e45e8926682b006d4713a0076faba394334bb20345b6e62d3a19aec67fe","carry":"if: sha != ''\nid: build-step-2\nkind: script\nscript:\n    - echo $\u007b{ sha }}\n"}
+# pipemaster:arg {"digest":"14e70d730b4920e91de46811d6be38ee5c74ee689d24938466a41441ef8993e2","carry":"if: sha != ''\nid: build-step-2\nkind: script\nscript:\n    - echo $\u007b{ sha }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"b0eafee23377e399e70849ccf6b251f92da437c8338f3d6a8ff5410e91774f11","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
+# pipemaster:arg {"digest":"0f374e8f5564c271c0672859ba5f472352d4b3673ac97935fb4249ae31982473","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: alias\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-2
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-2
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
@@ -51,7 +53,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - |-
                 exit 0 # pipemaster:guard the step condition has no shell form
                 # pipemaster:lost echo {{ ref_name }}
@@ -73,7 +77,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - |-
                 PM_CTX_SHA="$(cat ../workspace/.git/commit)"; export PM_CTX_SHA # pipemaster:ctx
                 if ! [ "$PM_CTX_SHA" != '' ]; then exit 0; fi # pipemaster:guard

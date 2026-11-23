@@ -45,7 +45,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.PipelineConcurrency:    {Level: caps.Emulated, Strategy: "serial_groups on the jobs", Caveat: "cancel-in-progress is lost; a second build waits"},
 		caps.JobEnv:                 {Level: caps.Emulated, Strategy: "copied into the params of every task", Caveat: "a step variable of the same name wins"},
 		caps.PipelineEnv:            {Level: caps.Emulated, Strategy: "copied into the params of every task", Caveat: "a step variable of the same name wins"},
-		caps.StepShell:              {Level: caps.Emulated, Strategy: "run.path names the shell", Caveat: "the image must provide the shell"},
+		caps.StepShell:              {Level: caps.Emulated, Strategy: "run.path names the shell", Caveat: "the image must provide the shell; a step with no shell from a GHA or GitLab source runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh"},
 		caps.StepAction:             {Level: caps.Emulated, Strategy: "task per actions.Lookup verdict", Caveat: "unknown actions are lost"},
 		caps.JobRunner:              {Level: caps.Emulated, Strategy: "worker tags of the task", Caveat: "tags name workers, not hosted runner labels"},
 		caps.ProjectMultiPipeline:   {Level: caps.Emulated, Strategy: "one pipeline file per IR pipeline under .concourse/", Caveat: "each pipeline needs its own fly set-pipeline and gets its own triggers"},

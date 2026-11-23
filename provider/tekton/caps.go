@@ -18,7 +18,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.JobOutputs:             {Level: caps.Native, Strategy: "Task results"},
 		caps.PipelineInputs:         {Level: caps.Native, Strategy: "Pipeline params"},
 		caps.PipelineFinally:        {Level: caps.Native, Strategy: "Pipeline finally", Caveat: "finally tasks cannot be ordered among themselves, so a needs edge between them is lost"},
-		caps.StepShell:              {Level: caps.Native, Strategy: "shebang line of the script"},
+		caps.StepShell:              {Level: caps.Native, Strategy: "shebang line of the script", Caveat: "a step with no shell from a GHA or GitLab source gets a preamble that re-runs the script under bash -e when the image has bash, else it runs under sh -e, so bash-only syntax fails under sh"},
 		caps.TriggerPush:            {Level: caps.Emulated, Strategy: "EventListener trigger with the github interceptor", Caveat: ghOnly},
 		caps.TriggerPullRequest:     {Level: caps.Emulated, Strategy: "EventListener trigger with the github interceptor", Caveat: ghOnly + "; only pull requests from this repository start a run, because a fork would run its code with every secret"},
 		caps.TriggerTag:             {Level: caps.Emulated, Strategy: "EventListener trigger with the github interceptor", Caveat: ghOnly},

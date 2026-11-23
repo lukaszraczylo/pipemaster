@@ -1,22 +1,25 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/check/step/script/carry
-# pipemaster:arg {"digest":"b211c4787001123c37f379aa11f1a6bf05b9356863f6a7b34a31dae46ffa3aa6","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"00efbd3d548fb9268d350d068671aabb237ccc674864a213674de668e68ce78c","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/check/carry
-# pipemaster:arg {"digest":"e9d3179e0014ea92ce6863926aab70b30f2541720213298518759a981d6e47cc","carry":"id: check\nneeds:\n    - job: compile\n    - job: package\n"}
+# pipemaster:arg {"digest":"a1ebd1ed6cae6786ac4d372af7890a0e144a1ff26eec3756ecfbdb7c6e395cbf","carry":"id: check\nneeds:\n    - job: compile\n    - job: package\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/step/script/carry
-# pipemaster:arg {"digest":"b0e924f4b7b2833db1bb42b8f0e6cc3e910d73d555c1d2bb26d58fba25ab1e21","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"d6b00335c10e9dfe660276086fa724ea2de0d77ff8171b69ad5727ea74e35a77","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/carry
-# pipemaster:arg {"digest":"0c39f7d59a538aed334f39464fe30043c995829657d544528af4ca060974b893","carry":"id: compile\n"}
+# pipemaster:arg {"digest":"5468b80d8134687f1d163628eb0b9b7c4dbdc0e7c1e822866453ff24588c5109","carry":"id: compile\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package/step/script/carry
-# pipemaster:arg {"digest":"5150123b9aea2e04a5c677c03bbcc22f67007c8279befe2977fb693338c0ab08","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"7a97e027ba38e9ba6ba41e14dc1b27f8652c0b2ef34c7574e2682fcf29d02a44","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package/carry
-# pipemaster:arg {"digest":"3ae443cac05a64e7e59939ce76f224a8a4d5e206a753eb65e2a82132a2e14398","carry":"id: package\nneeds:\n    - job: compile\n"}
+# pipemaster:arg {"digest":"3a08a2541fc85c546e5ce62a1707ca6aea754c78205857be5057a8096a2c9994","carry":"id: package\nneeds:\n    - job: compile\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"add971fd9586cfd52d8452aa85abfd6191adbbc1fad8c596312d2c5a4d5ff3ca","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/check/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/check/step/script
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/job/compile
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/compile/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/package/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/package/step/script
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
@@ -54,7 +57,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make check
             dir: workspace
   - name: compile
@@ -80,7 +85,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make compile
             dir: workspace
   - name: package
@@ -107,6 +114,8 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make package
             dir: workspace

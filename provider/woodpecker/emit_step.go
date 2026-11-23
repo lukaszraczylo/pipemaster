@@ -10,6 +10,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
@@ -433,6 +434,9 @@ func (e *emitter) stepLosses(sp string, st *ir.Step) {
 	}
 	if st.Shell != "" {
 		e.lose(sp, caps.StepShell, "Woodpecker runs commands in the image shell, not "+st.Shell)
+	}
+	if strings.TrimSpace(st.Shell) == "" && len(st.Script) > 0 && provider.BashDefault(e.origin) {
+		e.emulate(sp, caps.StepShell, "commands run under the image sh", "the source runs the step under bash when the image has it; Woodpecker runs commands through /bin/sh -e of the image, and no key picks bash, so bash-only syntax fails when the image sh is dash")
 	}
 }
 

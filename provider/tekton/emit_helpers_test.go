@@ -19,6 +19,16 @@ import (
 // emit runs Emit on p, which must be a valid project, and returns the files as text.
 func emit(t *testing.T, p *ir.Project) (map[string]string, *report.Report) {
 	t.Helper()
+	files, rep := emitRaw(t, p)
+	for n, src := range files {
+		files[n] = withoutPreamble(src)
+	}
+	return files, rep
+}
+
+// emitRaw emits the project and keeps the bash-if-present preamble.
+func emitRaw(t *testing.T, p *ir.Project) (map[string]string, *report.Report) {
+	t.Helper()
 	ir.Normalize(p)
 	raw, rep, err := tekton.New().Emit(p)
 	if err != nil {
@@ -29,6 +39,29 @@ func emit(t *testing.T, p *ir.Project) (map[string]string, *report.Report) {
 		out[n] = string(b)
 	}
 	return out, rep
+}
+
+// bashPreamble is the first lines of the script of a step that runs under bash when the image has it.
+var bashPreamble = []string{
+	"#!/bin/sh",
+	`if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi`,
+	"set -e",
+}
+
+// withoutPreamble removes the bash-if-present preamble from every script of the files, so a test of another
+// property reads the script as the IR holds it. TestBashDefaultPreamble checks the preamble itself.
+func withoutPreamble(src string) string {
+	lines := strings.Split(src, "\n")
+	var out []string
+	for i := 0; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) == bashPreamble[0] && i+2 < len(lines) &&
+			strings.TrimSpace(lines[i+1]) == bashPreamble[1] && strings.TrimSpace(lines[i+2]) == bashPreamble[2] {
+			i += 2
+			continue
+		}
+		out = append(out, lines[i])
+	}
+	return strings.Join(out, "\n")
 }
 
 // project makes a one-pipeline project from a foreign origin.

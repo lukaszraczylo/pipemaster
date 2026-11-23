@@ -3,9 +3,9 @@
 # pipemaster:emulated config.name pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"vars":["REGION"]}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"2429130031893ffc9e2126b7fd46409e46fbe36fa751ace749a5742d762a8bde","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.REGION }}\"\nenv:\n    - name: KEY\n      value:\n        secret: DEPLOY_KEY\n"}
+# pipemaster:arg {"digest":"55ba24af219d39262893dbce9ba720d2833a0150581ac5cdb174294848c3b5eb","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.REGION }}\"\nenv:\n    - name: KEY\n      value:\n        secret: DEPLOY_KEY\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"d49675aa28b3dd7fbb8d07551222b6f3a66c8796c6f491851a2bd3437c57c198","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"a3d8bbf7857b62ffe740d0c049b1efb5006847289f5c3bf84a61ad65e231b658","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: config\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: API_TOKEN\n      value:\n        secret: API_TOKEN\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -13,6 +13,7 @@
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
@@ -52,7 +53,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo "${REGION}"
             dir: workspace
         tags:

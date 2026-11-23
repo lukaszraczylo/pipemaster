@@ -5,15 +5,16 @@
 # pipemaster:emulated display.name pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"name":"Compile","id":"build-step-1","written":"build-step-1","kind":"step"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"1c0a614625a2e59b3f358b6de85a67c1376ce681fc2f56a4563f5f0435784130","carry":"id: build-step-1\nname: Compile\nkind: script\n"}
+# pipemaster:arg {"digest":"3f43510555741b63c405c7a2d159c2d70af7895d5b0c0237260ab045325ceeed","carry":"id: build-step-1\nname: Compile\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"2adf2c1847f87cd0aad7efcc4d990920d6c4a613260918627a28487edfbab00e","carry":"id: build\nname: Build the binary\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"43c268818897ccff4cedfe2c3bdaebc4d1067a537f4957f5cff964c8c2be435b","carry":"id: build\nname: Build the binary\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: Build and test\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
@@ -49,7 +50,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - go build ./...
             dir: workspace
         tags:

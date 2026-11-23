@@ -6,7 +6,21 @@ import (
 	"testing"
 
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 )
+
+// scriptOf is the script in the args of a container: the only arg, or the last of the bash-if-present wrapper.
+func scriptOf(args []any) (string, bool) {
+	switch {
+	case len(args) == 1:
+		s, ok := args[0].(string)
+		return s, ok
+	case len(args) == 3 && args[0] == provider.BashOrShScript:
+		s, ok := args[2].(string)
+		return s, ok
+	}
+	return "", false
+}
 
 // scripts lists every container script of the workflow files.
 func scripts(t *testing.T, files map[string]string) []string {
@@ -17,8 +31,10 @@ func scripts(t *testing.T, files map[string]string) []string {
 		switch x := v.(type) {
 		case doc:
 			if args, ok := x["args"].([]any); ok {
-				if cmd, _ := x["command"].([]any); len(cmd) == 2 && len(args) == 1 {
-					out = append(out, args[0].(string))
+				if cmd, _ := x["command"].([]any); len(cmd) == 2 {
+					if script, ok := scriptOf(args); ok {
+						out = append(out, script)
+					}
 				}
 			}
 			for _, c := range x {
@@ -42,7 +58,12 @@ func scripts(t *testing.T, files map[string]string) []string {
 
 func shellOK(t *testing.T, script string) {
 	t.Helper()
-	cmd := exec.Command("sh", "-n")
+	// dash is /bin/sh on Debian and Ubuntu images, and it rejects bash-only syntax that the sh of macOS accepts.
+	shell, err := exec.LookPath("dash")
+	if err != nil {
+		shell = "sh"
+	}
+	cmd := exec.Command(shell, "-n") // #nosec G204 -- fixed binary
 	cmd.Stdin = strings.NewReader(script)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Errorf("sh -n rejects the script: %v\n%s\n%s", err, out, script)
@@ -69,6 +90,7 @@ func TestEveryScriptPassesShellSyntaxCheck(t *testing.T) {
 	for _, s := range list {
 		shellOK(t, s)
 	}
+	shellOK(t, provider.BashOrShScript)
 }
 
 func TestContextIsReadFromEnvNeverSubstituted(t *testing.T) {

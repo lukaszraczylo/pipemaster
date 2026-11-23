@@ -10,7 +10,7 @@ import (
 
 // BookkeepingExt names the Ext keys a parser sets only to remember layout it can rebuild: stage lists,
 // script sections, derived ids. Losing one changes no behaviour, so no emitter reports it.
-var BookkeepingExt = map[string]bool{"stages": true, "stage": true, "section": true, "before_lines": true, "workflow": true}
+var BookkeepingExt = map[string]bool{"stages": true, "stage": true, "section": true, "before_lines": true, "workflow": true, "bash_default": true}
 
 // Meaningful reports whether x holds Ext data of a provider other than own that carries behaviour.
 func Meaningful(x ir.Ext, own string) []string {

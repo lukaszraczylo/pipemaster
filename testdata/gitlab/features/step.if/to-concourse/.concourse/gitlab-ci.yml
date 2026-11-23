@@ -1,17 +1,19 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"4699c0bc800fe46c8a353453a0cb46057b77a96e3fce94c3383ab9cd88794581","carry":"if: always()\nid: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"e58f980d1d5955fce2672992c195ad99ab1cc39e68be591affa16b4b8eb10d68","carry":"if: always()\nid: build-step-1\nkind: script\n"}
 # pipemaster:emulated step.if pipeline/gitlab-ci/job/build/step/build-step-2
 # pipemaster:arg {"if":"event == 'push'","script":"echo push"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/build-step-2/carry
-# pipemaster:arg {"digest":"e699e270f6557fab4d5689dac479f31a8178b40735d5a95005b93a81eb7aa007","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
+# pipemaster:arg {"digest":"ed5025e47b1d807880f2685ca40a549afd337272ed35883604524e0a6fd1a9d7","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"2fd8feec9934a9d6304ae6c7b951930f9425b1fa1df85b298f37b7c04dd24fa2","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"aed6c1034e831f9fb493c27a5c4067bb707c428b64c78f53615e50eac2be74f3","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/build-step-1
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/build-step-2
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/build-step-2
 resources:
   - name: source
     type: git
@@ -39,7 +41,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo cleanup
             dir: workspace
         tags:
@@ -59,7 +63,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - |-
                 exit 0 # pipemaster:guard the step condition has no shell form
                 echo push

@@ -4,3 +4,4 @@ Loss report: forgejo -> argo
 [lost] pipeline/ci/trigger/0 trigger.api (an api trigger that no Argo file held has no Argo form; no Sensor trigger is written)
 [lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider gha (event, inputs, secrets) is not written to the Argo file; it is kept in round-trip metadata)
 [lost] pipeline/ci/trigger/1 trigger.api (an api trigger that no Argo file held has no Argo form; no Sensor trigger is written)
+[emulated] pipeline/ci/job/build/step/build-step-1 step.shell: container command sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)

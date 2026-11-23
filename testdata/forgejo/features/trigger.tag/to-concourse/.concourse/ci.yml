@@ -1,14 +1,15 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"tag","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"80f36d282fd6cb1bea5cea4c6248be6ac7a8df35d4e47c894abb79f43da1202e","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"0f7d98445af92aaa8af510f09e502c78a3c0978de3e194c44b6d1b1a6a60f15b","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"069ebec339e34978df46ae2db9d9f929657e84c2bc7b1bd39bda31890a2c1f19","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"8696b8f02d49d278b853b497dace360a6d8d3dfc0100e12f7c6e380938571c63","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"4deb87a88e284e8d085e211a822fad3863c77665bb688b65befcc6fbbbe051d5","carry":"id: ci\nname: tag\ntriggers:\n    - kind: tag\n      tags:\n        include:\n            - v*\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/0
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/0
 resources:
@@ -39,7 +40,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo ok
             dir: workspace
         tags:

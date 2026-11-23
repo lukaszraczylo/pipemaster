@@ -5,14 +5,15 @@
 # pipemaster:emulated trigger.schedule pipeline/ci/trigger/1
 # pipemaster:arg {"cron":"30 5 * * 1-5","resource":"schedule-2","source":"{\"days\":[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"],\"start\":\"05:30\",\"stop\":\"05:35\"}"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"7c3023c86c6bde6134267a7cb412fdb5e8066c4e4d6a336a8509bea6299f7804","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"aca61d8f33873242bda7aea3433c48d7cdd689abc7380a408d47efbad948d46d","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"c0727fdccce023dd7e15c7dfa417c3df5d00d49a08ea4d65392bae0694e139e5","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"27c180b2776657b86d7102f7c8863a2c822ff4fed8c99d591b8961ab6473b661","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"0c57d0563eb6c31d4b7bae1f2cf1f081e301cedc8e89f9bb84d3b97b38dcfe43","carry":"id: ci\nname: nightly\ntriggers:\n    - kind: schedule\n      cron: 0 0 * * 0\n    - kind: schedule\n      cron: 30 5 * * 1-5\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 resources:
   - name: source
     type: git
@@ -61,7 +62,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo ok
             dir: workspace
         tags:

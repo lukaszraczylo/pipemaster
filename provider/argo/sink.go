@@ -21,6 +21,8 @@ const (
 	ExtArgs = "args"
 	// ExtScriptLine is the step Ext key that holds the script line the parser built, to tell an edited step from an unedited one.
 	ExtScriptLine = "script_line"
+	// ExtBashDefault marks a step whose container holds the bash-if-present wrapper, so the step has no IR shell.
+	ExtBashDefault = "bash_default"
 	// ExtArguments is the job Ext key that holds the task arguments that no template text reads.
 	ExtArguments = "arguments"
 )

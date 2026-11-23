@@ -1,4 +1,7 @@
 Loss report: gha -> woodpecker
+[lost] pipeline/gitlab-ci/job/alert/step/script step.shell (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
+[lost] pipeline/gitlab-ci/job/build/step/script step.shell (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
+[lost] pipeline/gitlab-ci/job/report/step/script step.shell (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [emulated] pipeline/gitlab-ci pipeline.finally: a workflow that depends on every other workflow and runs on status success or failure (a skipped dependency is optional, so the workflow still runs)
 [emulated] pipeline/gitlab-ci/job/alert job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/gitlab-ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

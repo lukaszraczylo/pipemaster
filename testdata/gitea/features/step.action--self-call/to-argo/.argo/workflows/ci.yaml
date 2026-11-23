@@ -1,5 +1,6 @@
 # pipemaster:emulated step.action pipeline/ci/job/call/step/call-step-1
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'self:'\n    owner: org\n    repo: shared\n    path: .gitea/workflows/build.yml\n    ref: main\nid: call-step-1\nkind: pipeline_call\n","hold":"{\"args\":[\"true\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"call-step-1\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:emulated step.shell pipeline/ci/job/plain/step/plain-step-1
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
@@ -43,8 +44,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo ok
             workingDir: /workspace
         volumeMounts:

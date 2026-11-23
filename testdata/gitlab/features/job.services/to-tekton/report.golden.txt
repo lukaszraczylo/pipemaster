@@ -2,3 +2,4 @@ Loss report: gitlab -> tekton
 [external] pipeline/gitlab-ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [external] pipeline/gitlab-ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [emulated] pipeline/gitlab-ci/job/test job.services: Task sidecars (the service is at localhost, not at its name)
+[emulated] pipeline/gitlab-ci/job/test/step/script step.shell: bash-if-present preamble in the script (the source runs the step under bash when the image has it; the script starts with a line that re-runs it under bash -e when the image has bash, else it runs under sh -e, so bash-only syntax fails under sh)

@@ -1,5 +1,6 @@
 # pipemaster:emulated script.interpolation pipeline/ci/job/build
 # pipemaster:arg {"vars":{"CI_MODE":"vars.CI_MODE"}}
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated config.name pipeline/ci/ref/secrets.GITEA_DEPLOY
 # pipemaster:emulated config.name pipeline/ci/ref/secrets.GITHUB_TOKEN
 # pipemaster:emulated config.name pipeline/ci/ref/vars.CI_MODE
@@ -29,8 +30,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo "${CI_MODE}"
             workingDir: /workspace
             env:

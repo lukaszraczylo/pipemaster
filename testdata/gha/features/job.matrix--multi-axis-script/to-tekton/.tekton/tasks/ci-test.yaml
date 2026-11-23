@@ -2,6 +2,7 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"axes":[{"Name":"os","Values":["linux","mac"]},{"Name":"go","Values":["1.24","1.25"]}],"exclude":[[{"Key":"go","Value":"1.24"},{"Key":"os","Value":"mac"}]]}
+# pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-1
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -14,4 +15,8 @@ spec:
   steps:
     - name: test-step-1
       image: alpine:3.22
-      script: echo $(params.os) $(params.go) $(params.needs-prod-ver)
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        echo $(params.os) $(params.go) $(params.needs-prod-ver)

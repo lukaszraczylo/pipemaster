@@ -5,6 +5,7 @@ Loss report: forgejo -> drone
 [lost] pipeline/ci/job/build job.runner (only the platform has a Drone form; other runner labels are lost)
 [lost] pipeline/ci/job/build/step/build-step-1 script.interpolation (no Drone spelling for expression opaque(gha): env[github.job]; the line is commented out)
 [lost] pipeline/ci/job/build/step/build-step-1 step.script (no command of the step has a Drone spelling; the step is not written)
+[lost] pipeline/ci/job/build/step/build-step-1 step.shell (Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [lost] pipeline/ci/job/build/step/script step.script (the job has no steps; a no-op step keeps the document valid)
 [lost] pipeline/ci/trigger/0 trigger.push (the document is disabled, so the trigger is not written)
 [lost] pipeline/ci/trigger/1 trigger.tag (the document is disabled, so the trigger is not written)

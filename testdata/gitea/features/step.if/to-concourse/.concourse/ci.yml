@@ -1,20 +1,22 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"stepif","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"4699c0bc800fe46c8a353453a0cb46057b77a96e3fce94c3383ab9cd88794581","carry":"if: always()\nid: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"e58f980d1d5955fce2672992c195ad99ab1cc39e68be591affa16b4b8eb10d68","carry":"if: always()\nid: build-step-1\nkind: script\n"}
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
 # pipemaster:arg {"if":"event == 'push'","script":"echo push"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-2/carry
-# pipemaster:arg {"digest":"e699e270f6557fab4d5689dac479f31a8178b40735d5a95005b93a81eb7aa007","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
+# pipemaster:arg {"digest":"ed5025e47b1d807880f2685ca40a549afd337272ed35883604524e0a6fd1a9d7","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"3237e06cbb820b08a059229f8f91bb9e0119ecd62e211c520aab8d0f1d964007","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"318523772085c39aabd65e0b803d07305c9ba08787ee07becefc12bf0bf1345c","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: stepif\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-2
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-2
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
@@ -50,7 +52,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo cleanup
             dir: workspace
         tags:
@@ -70,7 +74,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - |-
                 exit 0 # pipemaster:guard the step condition has no shell form
                 echo push

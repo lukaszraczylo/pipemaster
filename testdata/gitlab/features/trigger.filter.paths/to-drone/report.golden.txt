@@ -1,5 +1,6 @@
 Loss report: gitlab -> drone
 [lost] pipeline/gitlab-ci/job/build job.runner (only the platform has a Drone form; other runner labels are lost)
+[lost] pipeline/gitlab-ci/job/build/step/build-step-1 step.shell (Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [lost] pipeline/gitlab-ci/trigger/0 trigger.filter.paths (the Drone OSS server does not evaluate trigger.paths, so no path filter is written)
 [lost] pipeline/gitlab-ci/trigger/1 trigger.filter.paths (the Drone OSS server does not evaluate trigger.paths, so no path filter is written)
 [emulated] pipeline/gitlab-ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

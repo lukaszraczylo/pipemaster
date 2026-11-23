@@ -1,5 +1,6 @@
 Loss report: gitlab -> woodpecker
 [lost] pipeline/gitlab-ci ext.passthrough (Ext of provider gitlab (hidden) is not written to the Woodpecker file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci/job/lint ext.passthrough (Ext of provider gitlab (extends) is not written to the Woodpecker file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/job/lint/step/script step.shell (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [emulated] pipeline/gitlab-ci/job/lint job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/gitlab-ci/job/lint job.env: copied into the environment of every step (a step variable of the same name wins)

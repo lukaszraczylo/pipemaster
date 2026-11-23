@@ -36,7 +36,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.JobOutputs:             {Level: caps.Lost, Caveat: "Woodpecker steps cannot pass values to other workflows"},
 		caps.StepAction:             {Level: caps.Native, Strategy: "per actions.Lookup verdict; a plugin step is native", Caveat: "unknown actions are lost"},
 		caps.StepTimeout:            {Level: caps.Lost, Caveat: "Woodpecker has only a pipeline timeout in the repo settings"},
-		caps.StepShell:              {Level: caps.Lost, Caveat: "Woodpecker runs commands in the image entrypoint shell"},
+		caps.StepShell:              {Level: caps.Lost, Caveat: "Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash"},
 		caps.ProjectMultiPipeline:   {Level: caps.Emulated, Strategy: "each job of each pipeline is a workflow named <pipeline>-<job>", Caveat: "each workflow carries its pipeline's trigger condition"},
 		caps.ExprOpaque:             {Level: caps.Native, Caveat: "only opaque expressions of the woodpecker dialect; others are lost"},
 		caps.DisplayName:            {Level: caps.Native, Strategy: "the step name", Caveat: "pipeline and job names that differ from the id are lost; the workflow name is the file name"},

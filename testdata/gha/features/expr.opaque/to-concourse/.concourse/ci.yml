@@ -1,16 +1,17 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"opaque","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"4281de54e46cde38fa0458a7445b8a5e2f6f67c30a48661b00c4b8bd65c07409","carry":"id: build-step-1\nkind: script\nscript:\n    - 'echo $\u007b{ opaque(gha): env[github.job] }}'\n"}
+# pipemaster:arg {"digest":"60e2dfa91b409514e3fe728d05a0905ddc1fad70c182a1843d049498d35252d7","carry":"id: build-step-1\nkind: script\nscript:\n    - 'echo $\u007b{ opaque(gha): env[github.job] }}'\n"}
 # pipemaster:emulated job.manual pipeline/ci/job/build
 # pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"8f9522636fceaa7c4428258f3ffc56f59165c91e6d399385548509bafe410561","carry":"if: 'opaque(gha): fromJSON(''{\"a\":1}'').a == 1'\nid: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"60e2c7bfc1f362beec18c47324438a5a20d2ff68132df42df70506a6c2f6edab","carry":"if: 'opaque(gha): fromJSON(''{\"a\":1}'').a == 1'\nid: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: ci\nname: opaque\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
@@ -44,7 +45,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - '# pipemaster:lost echo {{ opaque(gha): env[github.job] }}'
             dir: workspace
         tags:

@@ -1,12 +1,13 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"7c3023c86c6bde6134267a7cb412fdb5e8066c4e4d6a336a8509bea6299f7804","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"aca61d8f33873242bda7aea3433c48d7cdd689abc7380a408d47efbad948d46d","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"453ddf98971a5751794b15313621867c09aca4510ba70e015b429516729bdf0b","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"33f59594136e8412ee6451f036bad219c4d58d7a6a93bf5078dcda418d2174f0","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"34e31449a536fed76cd5dbd488fc41fffca29439fe29b700357bf781b7fdabc8","carry":"id: gitlab-ci\ntriggers:\n    - kind: pr\n      paths:\n        exclude:\n            - '**.md'\n    - kind: push\n      paths:\n        include:\n            - src/**\n            - '!src/docs/**'\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/build-step-1
 resources:
   - name: source
     type: git
@@ -37,7 +38,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo ok
             dir: workspace
         tags:
