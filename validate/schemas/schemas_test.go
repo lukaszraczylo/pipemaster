@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/lukaszraczylo/pipemaster/validate/schemas"
 )
@@ -102,5 +103,26 @@ func TestSchemaFSListsJSONNames(t *testing.T) {
 		if len(got) != want {
 			t.Errorf("%s lists %d names, want %d", dir.name, len(got), want)
 		}
+	}
+}
+
+func TestSchemaFSContract(t *testing.T) {
+	for _, dir := range []struct {
+		fsys fs.FS
+		name string
+	}{{schemas.Argo, "argo"}, {schemas.Tekton, "tekton"}} {
+		t.Run(dir.name, func(t *testing.T) {
+			entries, err := fs.ReadDir(dir.fsys, dir.name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			names := make([]string, len(entries))
+			for i, e := range entries {
+				names[i] = dir.name + "/" + e.Name()
+			}
+			if err := fstest.TestFS(dir.fsys, names...); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
