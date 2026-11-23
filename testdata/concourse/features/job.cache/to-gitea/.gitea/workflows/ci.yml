@@ -1,0 +1,34 @@
+# pipemaster:emulated job.runner pipeline/ci/job/build
+# pipemaster:emulated step.image pipeline/ci/job/build/step/compile
+# pipemaster:arg {"kind":"script","image":{"Ref":"golang:latest","Entrypoint":null},"script":["go build ./..."]}
+# pipemaster:emulated step.image pipeline/ci/job/build/step/test
+# pipemaster:arg {"kind":"script","image":{"Ref":"golang:latest","Entrypoint":null},"script":["go test ./..."]}
+# pipemaster:emulated job.cache pipeline/ci/job/build
+# pipemaster:arg {"cache":[{"Key":"","Policy":"","Paths":[".cache/go","vendor"]}],"pre":1,"post":0}
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # pipemaster:emulated job.cache pipeline/ci/job/build
+      - uses: actions/cache@v6
+        with:
+          path: |
+            .cache/go
+            vendor
+          key: build-cache
+      # pipemaster:emulated step.image pipeline/ci/job/build/step/compile
+      - id: compile
+        uses: docker://golang:latest
+        with:
+          entrypoint: /bin/sh
+          args: -ec 'go build ./...'
+      # pipemaster:emulated step.image pipeline/ci/job/build/step/test
+      - id: test
+        uses: docker://golang:latest
+        with:
+          entrypoint: /bin/sh
+          args: -ec 'go test ./...'

@@ -1,0 +1,16 @@
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:arg {"kind":"push","branches":{"Include":["main"],"Exclude":null}}
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+build:
+  needs: []
+  script:
+    # pipemaster:step compile
+    - go build ./...
+    # pipemaster:step test
+    - go test ./...
+  cache:
+    - paths:
+        - .cache/go
+        - vendor

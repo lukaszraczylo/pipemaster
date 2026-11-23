@@ -51,6 +51,8 @@ type jobBuilder struct {
 	// tried holds the steps whose carry said continue_on_error; a try in the file must still say it.
 	tried map[*ir.Step]string
 	path  string
+	// caches holds the paths that every inline task of the plan caches; the job reads them as its cache.
+	caches []string
 }
 
 func (b *pipeBuilder) job(m *omap) *builtJob {
@@ -71,6 +73,7 @@ func (b *pipeBuilder) job(m *omap) *builtJob {
 	bj.hookDigest = digestOf(hookText)
 	plan, _ := r.Take(keyPlan)
 	steps, _ := plan.([]any)
+	jb.caches = commonCaches(steps)
 	steps = jb.allowFailure(steps)
 	steps = jb.unwrap(steps)
 	gets := jb.leadingGets(&steps)
@@ -82,6 +85,9 @@ func (b *pipeBuilder) job(m *omap) *builtJob {
 		j.Steps = append(j.Steps, jb.step(s)...)
 	}
 	jb.ifMarker()
+	if len(jb.caches) > 0 {
+		j.Cache = []ir.Cache{{Paths: jb.caches}}
+	}
 	jb.hooks(r)
 	b.collect(bj, plan, m)
 	jb.serial(r, bj)
@@ -430,4 +436,58 @@ func (jb *jobBuilder) emulated(f caps.Feature, strategy, detail string, line int
 // entry builds a report entry for the job.
 func (jb *jobBuilder) entry(f caps.Feature, level caps.Level, strategy, detail string, line int) report.Entry {
 	return report.Entry{IRPath: jb.path, Feature: f, Level: level, Strategy: strategy, Detail: detail, SourceLoc: jb.k.Loc(line)}
+}
+
+// commonCaches returns the cache paths that every inline task of the plan lists, in the same order. The emitter
+// writes the job cache into each task, so a plan whose tasks differ keeps its caches in the tasks.
+func commonCaches(plan []any) []string {
+	var common []string
+	seen := false
+	same := true
+	var walk func(v any)
+	walk = func(v any) {
+		switch x := v.(type) {
+		case []any:
+			for _, e := range x {
+				walk(e)
+			}
+		case *omap:
+			if cfg, ok := asMap(x.Vals["config"]); ok && x.Vals["task"] != nil {
+				paths, _ := cachePaths(cfg.Vals["caches"])
+				if seen && !slices.Equal(paths, common) {
+					same = false
+				}
+				common, seen = paths, true
+			}
+			for _, key := range x.Order {
+				walk(x.Vals[key])
+			}
+		}
+	}
+	walk(plan)
+	if !same {
+		return nil
+	}
+	return common
+}
+
+// cachePaths reads a task caches list that has only path keys.
+func cachePaths(v any) ([]string, bool) {
+	list, ok := v.([]any)
+	if !ok {
+		return nil, false
+	}
+	var out []string
+	for _, e := range list {
+		m, ok := asMap(e)
+		if !ok || len(m.Order) != 1 || m.Order[0] != "path" {
+			return nil, false
+		}
+		p, ok := text(m.Vals["path"])
+		if !ok || p == "" {
+			return nil, false
+		}
+		out = append(out, p)
+	}
+	return out, true
 }

@@ -1,0 +1,60 @@
+origin:
+    provider: concourse
+    dialect: concourse
+    files:
+        - .concourse/ci.yml
+pipelines:
+    - ext:
+        concourse:
+            resources:
+                - name: source
+                  source:
+                    branch: main
+                    uri: ((git-uri))
+                  type: git
+      id: ci
+      triggers:
+        - ext:
+            concourse:
+                resources:
+                    - source
+          kind: push
+          branches:
+            include:
+                - main
+      jobs:
+        - ext:
+            concourse:
+                gets:
+                    - get: source
+                      trigger: true
+          id: build
+          steps:
+            - image:
+                ref: golang:latest
+              ext:
+                concourse:
+                    config:
+                        inputs:
+                            - name: source
+                        platform: linux
+              id: compile
+              kind: script
+              script:
+                - go build ./...
+            - image:
+                ref: golang:latest
+              ext:
+                concourse:
+                    config:
+                        inputs:
+                            - name: source
+                        platform: linux
+              id: test
+              kind: script
+              script:
+                - go test ./...
+          cache:
+            - paths:
+                - .cache/go
+                - vendor

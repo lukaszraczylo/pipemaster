@@ -1,0 +1,17 @@
+# pipemaster:emulated job.cache pipeline/ci/job/build
+# pipemaster:arg {"workspace":"pipemaster-workspace","cache":[{"Key":"","Policy":"","Paths":[".cache/go","vendor"]}]}
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-build
+spec:
+  steps:
+    - name: compile
+      image: golang:latest
+      script: go build ./...
+    - name: test
+      image: golang:latest
+      script: go test ./...
+  workspaces:
+    - name: pipemaster-workspace
+      mountPath: /pipemaster

@@ -713,3 +713,82 @@ func TestRunnerLabelWithAnExpressionIsNoWorkerTag(t *testing.T) {
 	}
 	t.Fatalf("no lost job.runner entry: %v", rep.Entries)
 }
+
+const cachedFile = `resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+      branch: main
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - task: compile
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+              tag: latest
+          inputs:
+            - name: source
+          caches:
+            - path: .cache/go
+            - path: vendor
+          run:
+            path: sh
+            args:
+              - -ec
+              - go build ./...
+      - task: test
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+              tag: latest
+          inputs:
+            - name: source
+          caches:
+            - path: .cache/go
+            - path: vendor
+          run:
+            path: sh
+            args:
+              - -ec
+              - go test ./...
+`
+
+func TestTaskCachesReadAsTheJobCache(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"ci.yml": cachedFile})
+	c := p.Pipelines[0].Jobs[0].Cache
+	if len(c) != 1 || !slices.Equal(c[0].Paths, []string{".cache/go", "vendor"}) {
+		t.Fatalf("job cache = %+v", c)
+	}
+}
+
+func TestJobCacheSurvivesEmitAndParse(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"ci.yml": cachedFile})
+	files, _ := emit(t, p)
+	back, _ := reparse(t, files)
+	c := back.Pipelines[0].Jobs[0].Cache
+	if len(c) != 1 || !slices.Equal(c[0].Paths, []string{".cache/go", "vendor"}) {
+		t.Fatalf("job cache after the round trip = %+v", c)
+	}
+}
+
+func TestCachesThatDifferPerTaskStayInTheTask(t *testing.T) {
+	edited := strings.Replace(cachedFile, "- path: vendor", "- path: other", 1)
+	p, _ := parseFiles(t, map[string]string{"ci.yml": edited})
+	if c := p.Pipelines[0].Jobs[0].Cache; len(c) != 0 {
+		t.Fatalf("tasks with different caches gave the job cache %+v", c)
+	}
+	files, _ := emit(t, p)
+	if got := strings.Count(files[".concourse/ci.yml"], "path: other"); got != 1 {
+		t.Fatalf("the cache of one task was written %d times:\n%s", got, files[".concourse/ci.yml"])
+	}
+}

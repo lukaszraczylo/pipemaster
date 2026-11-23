@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -213,6 +214,9 @@ func (jb *jobBuilder) config(st *ir.Step, k *sink, cfg *omap, line int) *omap {
 	}
 	if v, ok := r.Take("image_resource"); ok {
 		jb.image(st, k, v, r.Line("image_resource"))
+	}
+	if paths, ok := cachePaths(cfg.Vals["caches"]); ok && len(paths) > 0 && slices.Equal(paths, jb.caches) {
+		r.Take("caches")
 	}
 	rest := omapNew()
 	for _, key := range r.Rest() {

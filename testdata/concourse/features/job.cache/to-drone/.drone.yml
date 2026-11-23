@@ -1,0 +1,19 @@
+# pipemaster:emulated job.cache pipeline/ci/job/build
+# pipemaster:arg [{"Key":"","Policy":"","Paths":[".cache/go","vendor"]}]
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+  branch:
+    - main
+steps:
+  - name: compile
+    image: golang:latest
+    commands:
+      - go build ./...
+  - name: test
+    image: golang:latest
+    commands:
+      - go test ./...

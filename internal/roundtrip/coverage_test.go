@@ -22,7 +22,6 @@ var noSourceForm = map[string]string{
 	provider.Drone + "/" + string(caps.DisplayName):                 "a Drone pipeline or step name is its id, so no drone source holds a separate display name",
 	provider.Drone + "/" + string(caps.JobTimeout):                  "Drone limits a build with a repo setting, which no pipeline file holds",
 	provider.Concourse + "/" + string(caps.JobArtifacts):            "a Concourse task passes files through inputs and outputs, which the parser keeps in Ext, so no Concourse source yields an IR artifact",
-	provider.Concourse + "/" + string(caps.JobCache):                "a Concourse task cache is a key of the task config that the parser keeps in Ext, so no Concourse source yields an IR cache",
 	provider.Concourse + "/" + string(caps.JobContainer):            "the parser reads a task image_resource as a step image, never as a job container",
 	provider.Concourse + "/" + string(caps.JobEnv):                  "a Concourse job has no env, so no Concourse source yields a job env",
 	provider.Concourse + "/" + string(caps.JobNeedsArtifacts):       "a Concourse need is a passed constraint with no artifact flag, so no Concourse source yields an artifact need",

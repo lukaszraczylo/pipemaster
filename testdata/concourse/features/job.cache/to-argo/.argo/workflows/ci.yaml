@@ -1,0 +1,60 @@
+# pipemaster:emulated job.cache pipeline/ci/job/build
+# pipemaster:arg {"caches":"- paths:\n    - .cache/go\n    - vendor\n"}
+# pipemaster:emulated step.image pipeline/ci/job/build
+# pipemaster:arg {"steps":{"compile":"ref: golang:latest\n","test":"ref: golang:latest\n"},"wrote":{"compile":"golang:latest","test":"golang:latest"}}
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+spec:
+  entrypoint: main
+  volumeClaimTemplates:
+    - metadata:
+        name: cache-build-1
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+    - name: build
+      containerSet:
+        containers:
+          - name: compile
+            image: golang:latest
+            command:
+              - sh
+              - -ec
+            args:
+              - go build ./...
+            workingDir: /workspace
+          - name: test
+            image: golang:latest
+            command:
+              - sh
+              - -ec
+            args:
+              - go test ./...
+            workingDir: /workspace
+            dependencies:
+              - compile
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+          - name: cache-build-1
+            mountPath: /workspace/.cache/go
+            subPath: p1
+          - name: cache-build-1
+            mountPath: /workspace/vendor
+            subPath: p2
+      volumes:
+        - emptyDir: {}
+          name: workspace
