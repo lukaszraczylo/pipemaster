@@ -630,6 +630,9 @@ func (g *group) build(rep *report.Report) (*ir.Pipeline, error) {
 			return nil, fmt.Errorf("%s: %w", files[i], err)
 		}
 	}
+	for _, w := range g.wfs {
+		restoreJobIf(rep, w)
+	}
 	collapsePipeline(rep, pl, g.wfs)
 	for _, w := range g.wfs {
 		if _, empty := w.marks.markedWith(caps.StepScript, pipelinePth); empty {
@@ -686,15 +689,61 @@ func collapseStepIf(c *collapseCtx) bool {
 	if !ok || err != nil {
 		return false
 	}
-	t, ok := expr.Translate(src, *from, wpexpr.Lang)
+	t, ok := expr.TranslateFacts(src, *from, wpexpr.Lang, expr.Facts{Branch: a.Branch})
 	if !ok {
 		return false
 	}
 	for _, st := range c.j.Steps {
-		if st.ID == id && st.If != nil && expr.String(st.If) == expr.String(t) {
+		if st.ID == id && st.If != nil && sameCondition(st.If, t) {
 			st.If = src
 			return true
 		}
 	}
 	return false
+}
+
+// restoreJobIf runs after the job condition is read from the when, which the job collapsers run too early for.
+func restoreJobIf(rep *report.Report, w *workflow) {
+	for _, u := range w.marks.uses {
+		if u.Feature != caps.JobIf {
+			continue
+		}
+		if !collapseJobIf(&collapseCtx{rep: rep, j: w.job, use: u, args: w.marks.args[u]}) {
+			reportUncollapsed(rep, u, "no parser rule restores "+string(u.Feature)+" at this path")
+		}
+	}
+}
+
+// collapseJobIf restores the job condition in its source dialect when the parsed one is still its translation.
+// A marker that holds no source only says where the condition sits, so there is nothing to restore.
+func collapseJobIf(c *collapseCtx) bool {
+	var a gateArg
+	if !decodeArg(c.args, &a) {
+		return false
+	}
+	if a.Src == "" {
+		return true
+	}
+	from, ok := expr.LangOf(a.From)
+	src, err := expr.ParseCanonical(a.Src)
+	if !ok || err != nil || c.j.If == nil {
+		return false
+	}
+	t, ok := expr.TranslateFacts(src, *from, wpexpr.Lang, expr.Facts{Branch: a.Branch})
+	if !ok || !sameCondition(c.j.If, t) {
+		return false
+	}
+	c.j.If = src
+	return true
+}
+
+// sameCondition reports whether two conditions print as the same Woodpecker text: a !~ test is written, and read
+// back, as the negation of a match.
+func sameCondition(a, b expr.Expr) bool {
+	ta, errA := wpexpr.Print(a)
+	tb, errB := wpexpr.Print(b)
+	if errA != nil || errB != nil {
+		return expr.String(a) == expr.String(b)
+	}
+	return ta == tb
 }

@@ -29,6 +29,8 @@ type posArg struct {
 type srcArg struct {
 	Src  string `json:"src"`
 	From string `json:"from"`
+	// Branch is true when the translation used the trigger facts (expr.Facts), so the return trip must too.
+	Branch bool `json:"branch,omitempty"`
 }
 
 // axesArg names matrix variables that a file reads and does not declare, because the matrix has no Woodpecker form.

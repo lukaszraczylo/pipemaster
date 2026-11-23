@@ -2101,7 +2101,7 @@
    "files": [
     {
      "path": ".woodpecker/deploy.yaml",
-     "text": "# pipemaster:emulated job.container pipeline/ci/job/deploy\n# pipemaster:arg {\"Ref\":\"alpine:3.22\",\"Entrypoint\":null}\n# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: deploy-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:lost job.if pipeline/ci/job/deploy: ref_name == 'main'\nwhen:\n  - event: pull_request\n    branch: main\n    evaluate: \"false\"\n  - event: push\n    branch: main\n    evaluate: \"false\"\ndepends_on:\n  - test\nsteps:\n  - image: alpine:3.22\n    commands:\n      - ./scripts/deploy.sh\n    environment:\n      TOKEN:\n        from_secret: DEPLOY_TOKEN\n"
+     "text": "# pipemaster:emulated job.container pipeline/ci/job/deploy\n# pipemaster:arg {\"Ref\":\"alpine:3.22\",\"Entrypoint\":null}\n# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: deploy-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.if pipeline/ci/job/deploy\n# pipemaster:arg {\"src\":\"ref_name == 'main'\",\"from\":\"gha\",\"branch\":true,\"gate\":false}\nwhen:\n  - event: pull_request\n    branch: main\n    evaluate: '!(CI_PIPELINE_EVENT matches \"(?i)^pull_request$$\") && CI_COMMIT_BRANCH matches \"(?i)^main$$\"'\n  - event: push\n    branch: main\n    evaluate: '!(CI_PIPELINE_EVENT matches \"(?i)^pull_request$$\") && CI_COMMIT_BRANCH matches \"(?i)^main$$\"'\ndepends_on:\n  - test\nsteps:\n  - image: alpine:3.22\n    commands:\n      - ./scripts/deploy.sh\n    environment:\n      TOKEN:\n        from_secret: DEPLOY_TOKEN\n"
     },
     {
      "path": ".woodpecker/test.yaml",
@@ -2120,12 +2120,6 @@
      "feature": "job.environment",
      "level": "lost",
      "detail": "Woodpecker has no environment name or URL in the workflow"
-    },
-    {
-     "path": "pipeline/ci/job/deploy",
-     "feature": "job.if",
-     "level": "lost",
-     "detail": "condition not expressible in Woodpecker CI; the workflow disabled"
     },
     {
      "path": "pipeline/ci/job/deploy",

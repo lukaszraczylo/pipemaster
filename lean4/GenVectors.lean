@@ -374,6 +374,50 @@ def exprCases : List (Json × Json) := ghaCases ++ gitlabCases
 
 def exprEnvsJson : Json := Json.arr (exprEnvs.map envJson).toArray
 
+/-- Environments a trigger set without tag triggers allows (BranchFact): every run that is not a pull request has a
+branch ref, and a pull request names its ref `<number>/merge`. -/
+def factEnvs : List Expr.Env :=
+  [⟨some "main", some .branch, some .push, some "abc", some "x"⟩,
+   ⟨some "MAIN", some .branch, some .push, some "ABC", none⟩,
+   ⟨some "dev", some .branch, some .schedule, none, none⟩,
+   ⟨some "", some .branch, some .workflowDispatch, some "", some ""⟩,
+   ⟨none, some .branch, none, none, none⟩,
+   ⟨some "12/merge", some .branch, some .pullRequest, some "abc", none⟩,
+   ⟨some "7/merge", some .branch, some .pullRequest, none, none⟩,
+   ⟨none, none, some .pullRequest, none, none⟩]
+
+def factEnvsJson : Json := Json.arr (factEnvs.map envJson).toArray
+
+open Expr Translate TranslateFacts in
+def factCase (e : E) : Json × Json :=
+  let out := match tr (assumeBranch e) with
+    | none => Json.mkObj [("tr", Json.null)]
+    | some t => Json.mkObj [("tr", exprJson t),
+        ("src", boolsJson (factEnvs.map fun env => holds .gha (ghaView env) e)),
+        ("tgt", boolsJson (factEnvs.map fun env => holds .gitlab (mapEnv env) t))]
+  (Json.mkObj [("dir", "gha-gitlab-facts"), ("expr", exprJson e)], out)
+
+open Expr in
+def factExprs : List E :=
+  let rn := E.ref .refName
+  let rt := E.ref .refType
+  let ev := E.ref .event
+  let guard := E.eq rt (E.str "branch")
+  let names := ["main", "MAIN", "", "0", "-1", "12/merge", "release/1", "a\\"]
+  let atoms := names.flatMap fun s =>
+    [E.eq rn (E.str s), E.eq (E.str s) rn, E.ne rn (E.str s), E.ne (E.str s) rn]
+  let others := [E.eq ev (E.str "pull_request"), E.eq ev (E.str "push"), guard, E.eq rt (E.str "tag"),
+    E.ref .sha, E.startsWith rn (E.str "rel"), E.eq rn (E.ref .sha), E.eq rn E.null, E.opq]
+  let guarded := [E.and guard (E.eq rn (E.str "main")), E.and guard (E.startsWith rn (E.str "rel")),
+    E.and guard (E.ne rn (E.str "main")), E.and (E.eq rt (E.str "tag")) (E.eq rn (E.str "main"))]
+  let core := [E.eq rn (E.str "main"), E.ne rn (E.str "main"), E.eq (E.str "MAIN") rn, E.eq rn (E.str "0"),
+    E.eq ev (E.str "pull_request"), E.ne ev (E.str "pull_request"), guard, E.eq rt (E.str "tag"),
+    E.and guard (E.eq rn (E.str "main")), E.startsWith rn (E.str "rel"), E.ref .sha]
+  let p1 := atoms ++ others ++ guarded
+  p1 ++ p1.map E.not ++ joinAll core core
+
+def factCases : List (Json × Json) := factExprs.map factCase
+
 
 /-! ## Adapter vectors (Task 23)
 
@@ -935,4 +979,8 @@ def main (args : List String) : IO UInt32 := do
     IO.FS.writeFile s!"{dir}/expr.json"
       (GenVectors.emit "Pipemaster.Translate.tr_sound" GenVectors.exprCases (some GenVectors.exprEnvsJson))
     IO.println s!"expr: {GenVectors.exprCases.length} cases"
+  if want "expr-facts" then
+    IO.FS.writeFile s!"{dir}/expr-facts.json"
+      (GenVectors.emit "Pipemaster.TranslateFacts.trFacts_sound" GenVectors.factCases (some GenVectors.factEnvsJson))
+    IO.println s!"expr-facts: {GenVectors.factCases.length} cases"
   return 0

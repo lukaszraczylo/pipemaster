@@ -10,6 +10,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
@@ -77,6 +78,7 @@ func (e *emitter) loseName(path, name string) {
 // workflow writes one job as a workflow file body.
 func (e *emitter) workflow(c *wfCtx) (*yaml.Node, error) {
 	j := c.j
+	e.facts = expr.Facts{Branch: c.pl.RulesOutTags()}
 	e.foreignExt(c.jp, j.Ext)
 	e.loseName(c.jp, j.Name)
 	ext := extOf(j.Ext)

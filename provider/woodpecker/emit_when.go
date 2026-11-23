@@ -205,7 +205,7 @@ func (e *emitter) condition(path string, f caps.Feature, x expr.Expr, what strin
 		return nil, nil, false
 	}
 	if e.from != nil {
-		if t, ok = expr.Translate(rest, *e.from, wpexpr.Lang); !ok {
+		if t, ok = expr.TranslateFacts(rest, *e.from, wpexpr.Lang, e.facts); !ok {
 			e.disable(path, f, x, what)
 			return nil, nil, false
 		}
@@ -226,17 +226,45 @@ func (e *emitter) disable(path string, f caps.Feature, x expr.Expr, what string)
 	e.comment(string(f) + " " + path + ": " + expr.String(x))
 }
 
+// translate is the translation of a condition that the file carries, and whether the trigger facts shaped it: a
+// result that differs from the plain translation, or one that only exists with the facts.
+func (e *emitter) translate(x expr.Expr) (t expr.Expr, usedFacts, ok bool) {
+	t, ok = expr.TranslateFacts(x, *e.from, wpexpr.Lang, e.facts)
+	if !ok || !e.facts.Branch {
+		return t, false, ok
+	}
+	plain, plainOK := expr.Translate(x, *e.from, wpexpr.Lang)
+	return t, !plainOK || expr.String(plain) != expr.String(t), true
+}
+
+// sourceArg is the marker argument that carries a condition in its source dialect; ok is false when the
+// translation kept the text, so a return conversion needs no help.
+func (e *emitter) sourceArg(x expr.Expr) (a srcArg, usedFacts, ok bool) {
+	if e.from == nil || hasStatusCall(x) {
+		return srcArg{}, false, false
+	}
+	t, usedFacts, ok := e.translate(x)
+	if !ok || expr.String(t) == expr.String(x) {
+		return srcArg{}, false, false
+	}
+	return srcArg{Src: expr.String(x), From: e.from.ID, Branch: usedFacts}, usedFacts, true
+}
+
+// jobSource carries a job condition in its source dialect only when the trigger facts shaped its translation:
+// without them the translation reads back as written.
+func (e *emitter) jobSource(x expr.Expr) (srcArg, bool) {
+	a, usedFacts, ok := e.sourceArg(x)
+	return a, ok && usedFacts
+}
+
 // markSource records a condition in its source dialect when the translation changed its text, so a return
 // conversion restores it.
 func (e *emitter) markSource(path string, f caps.Feature, x expr.Expr) {
-	if e.from == nil || hasStatusCall(x) {
+	a, _, ok := e.sourceArg(x)
+	if !ok {
 		return
 	}
-	t, ok := expr.Translate(x, *e.from, wpexpr.Lang)
-	if !ok || expr.String(t) == expr.String(x) {
-		return
-	}
-	if err := e.markArg(f, path, srcArg{Src: expr.String(x), From: e.from.ID}); err != nil {
+	if err := e.markArg(f, path, a); err != nil {
 		e.comment("expression source not carried: " + err.Error())
 	}
 }
@@ -384,8 +412,10 @@ func regexTest(ref string, f ir.Filter) (string, bool) {
 	return text, err == nil
 }
 
-// gateArg says that the evaluate text of the one when entry is the job condition, not part of a trigger.
+// gateArg says that the evaluate text of the one when entry is the job condition, not part of a trigger. It also
+// carries the condition in its source dialect when the translation changed its text.
 type gateArg struct {
+	srcArg
 	Gate bool `json:"gate"`
 }
 
@@ -591,8 +621,9 @@ func (e *emitter) mergeCond(jp string, orig expr.Expr, base []whenEntry, cond []
 	for i := range out {
 		out[i].Evaluate = andText(out[i].Evaluate, text)
 	}
-	if len(out) == 1 {
-		if err := e.markArg(caps.JobIf, jp, gateArg{Gate: true}); err != nil {
+	src, hasSrc := e.jobSource(orig)
+	if len(out) == 1 || hasSrc {
+		if err := e.markArg(caps.JobIf, jp, gateArg{srcArg: src, Gate: len(out) == 1}); err != nil {
 			e.comment("job condition marker not carried: " + err.Error())
 		}
 	}

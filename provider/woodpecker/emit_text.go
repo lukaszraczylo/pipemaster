@@ -48,6 +48,8 @@ type emitter struct {
 	// own is true when the project came from Woodpecker, where a name that is not a built-in is a
 	// substitution of the global environment.
 	own bool
+	// facts is what the triggers of the pipeline being written guarantee about its conditions.
+	facts expr.Facts
 }
 
 // sourceDialect is the expression dialect of a project's origin; nil means Woodpecker semantics already hold.

@@ -251,7 +251,8 @@ func native(t Expr, to Dialect) Expr {
 // Environment assumptions of the model (the "related by the vocabulary mapping" relation):
 //   - Both sides see the same ref: GHA ref_name equals GitLab CI_COMMIT_REF_NAME.
 //   - Merge-request and pull_request pipelines are not modelled: GitLab leaves CI_COMMIT_BRANCH unset
-//     there, while GHA ref_name is N/merge.
+//     there, while GHA ref_name is N/merge. TranslateFacts states the pull request case for a target that
+//     has no ref_name, from the facts of the pipeline's triggers.
 //   - Case folding is ASCII only.
 //   - Only the four modelled events (push, pull_request, schedule, workflow_dispatch) exist; an event
 //     literal without an entry in both dialects' Events tables is untranslatable.
