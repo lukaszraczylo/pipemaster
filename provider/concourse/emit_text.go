@@ -37,6 +37,8 @@ type scope struct {
 	ctxSeen map[string]bool
 	params  []param
 	prelude []string
+	// ps is true when the task runs PowerShell, so a reference is $env:NAME and no sh text may be written.
+	ps bool
 	// prefixOK is true when the task directory has a fixed place, so a relative path reaches the workspace.
 	prefixOK bool
 }
@@ -51,7 +53,7 @@ func (jx *jobEmitter) newScope(dir string) *scope {
 // ctxOK reports whether the task can read a context file: the directory has a place, and a branch file exists
 // only when the primary source follows a branch.
 func (s *scope) ctxOK(file string) bool {
-	if !s.prefixOK {
+	if !s.prefixOK || s.ps {
 		return false
 	}
 	if file == ctxFiles[expr.CtxBranch] {
@@ -183,7 +185,9 @@ func (s *scope) convert(parts []expr.Part) (out string, lost []string) {
 		case expr.Lit:
 			sb.WriteString(litText(x))
 		case expr.Ref:
-			if v, ok := s.refVar(x); ok {
+			if v, ok := s.refVar(x); ok && s.ps {
+				sb.WriteString("$env:" + v)
+			} else if ok {
 				sb.WriteString("${" + v + "}")
 			} else {
 				lost = append(lost, expr.String(x))

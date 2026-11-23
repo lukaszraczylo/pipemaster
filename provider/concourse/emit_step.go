@@ -1,6 +1,7 @@
 package concourse
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 
@@ -96,6 +97,7 @@ func (c *chain) script(st *ir.Step, path string) *yaml.Node {
 	name := jx.stepName(st, path)
 	dir := jx.runDir(st, path, name, ext)
 	sc := jx.newScope(dir)
+	sc.ps = jx.powershell(st)
 	sc.envParams(path, st.Env)
 	sc.envParams(path, jx.j.Env)
 	sc.envParams(path, jx.pe.pl.Env)
@@ -206,6 +208,11 @@ func (jx *jobEmitter) guarded(sc *scope, path, name string, st *ir.Step, body []
 	if cond == nil {
 		return body, false
 	}
+	if sc.ps && cond != nil {
+		e.lose(path, caps.StepIf, "the condition has no PowerShell guard form; the step runs exit 0 first and does nothing")
+		e.markArg(caps.StepIf, jx.sm(name), disabledArg{If: expr.String(cond), Script: strings.Join(body, "\n")})
+		return append([]string{disabledScript}, body...), true
+	}
 	fail := func(why string) ([]string, bool) {
 		e.lose(path, caps.StepIf, why+"; the step runs exit 0 first and does nothing")
 		e.markArg(caps.StepIf, jx.sm(name), disabledArg{If: expr.String(cond), Script: strings.Join(body, "\n")})
@@ -264,7 +271,9 @@ func (jx *jobEmitter) config(sc *scope, path string, st *ir.Step, ext map[string
 	cfg := newMap()
 	platform := jx.platform(cfgExt)
 	cfg.SetStr("platform", platform)
-	cfg.Set("image_resource", jx.image(sc, path, st, ext))
+	if platform != "windows" {
+		cfg.Set("image_resource", jx.image(sc, path, st, ext))
+	}
 	if !jx.ownInputs(ext) {
 		ws := func() *yaml.Node {
 			m := newMap()
@@ -314,6 +323,9 @@ func (jx *jobEmitter) platform(cfgExt map[string]any) string {
 	case "linux", "windows", "darwin":
 		return p
 	}
+	if jx.windows() || jx.psJob() {
+		return "windows"
+	}
 	return defaultPlatform
 }
 
@@ -337,8 +349,19 @@ func (jx *jobEmitter) run(sc *scope, path string, st *ir.Step, ext map[string]an
 				flags = append(flags, strOf(f))
 			}
 		}
-		run.SetStr("path", jx.shellOf(st, path))
-		run.Set("args", strSeq(append(flags, strings.Join(script, "\n"))))
+		if sc.ps {
+			shell := jx.psShell(st)
+			why := "the task runs " + shell + " -Command, so the worker must provide " + shell
+			if strings.TrimSpace(st.Shell) == "" {
+				why = "the IR names no shell and the script reads as PowerShell (inferred); " + why
+			}
+			jx.pe.e.emulate(path, caps.StepShell, "run.path "+shell, why)
+			run.SetStr("path", shell)
+			run.Set("args", strSeq(append(psFlags(ext), strings.Join(script, "\n"))))
+		} else {
+			run.SetStr("path", jx.shellOf(st, path))
+			run.Set("args", strSeq(append(flags, strings.Join(script, "\n"))))
+		}
 	}
 	if dir != "" {
 		run.SetStr("dir", dir)
@@ -457,4 +480,81 @@ func imageNode(repo, digest, tag string) *yaml.Node {
 	m.SetStr("type", "registry-image")
 	m.Set("source", src.N)
 	return m.N
+}
+
+// psShells are the shells that run a script with -Command.
+var psShells = []string{"pwsh", "powershell", "pwsh.exe", "powershell.exe"}
+
+func baseShell(sh string) string {
+	sh = strings.TrimSpace(sh)
+	if i := strings.LastIndexAny(sh, "/\\"); i >= 0 {
+		return sh[i+1:]
+	}
+	return sh
+}
+
+// windows is true when the job names a Windows worker; a task there has no sh.
+func (jx *jobEmitter) windows() bool {
+	r := jx.j.Runner
+	if r.Platform == "windows" {
+		return true
+	}
+	for _, l := range r.Labels {
+		if strings.Contains(strings.ToLower(l), "windows") {
+			return true
+		}
+	}
+	return false
+}
+
+// powershell is true when the step runs PowerShell: it names the shell, or it names no shell and the job is on Windows.
+func (jx *jobEmitter) powershell(st *ir.Step) bool {
+	if sh := strings.TrimSpace(st.Shell); sh != "" {
+		return slices.Contains(psShells, strings.ToLower(baseShell(sh)))
+	}
+	return jx.windows() || looksPowershell(st.Script)
+}
+
+// psLineRE matches the lines that only PowerShell or choco reads: a $var or $env:var assignment, a Verb-Noun
+// cmdlet at the start of a line, or choco.
+var psLineRE = regexp.MustCompile(`^\s*(\$[A-Za-z_][\w:]*\s*[+-]?=|[A-Z][a-z]+-[A-Z][A-Za-z]+\b|choco\s)`)
+
+// looksPowershell infers PowerShell from the script text when the IR names no shell.
+func looksPowershell(script []string) bool {
+	for _, l := range script {
+		if psLineRE.MatchString(l) {
+			return true
+		}
+	}
+	return false
+}
+
+// psShell is run.path of a PowerShell task.
+func (jx *jobEmitter) psShell(st *ir.Step) string {
+	if sh := strings.TrimSpace(st.Shell); sh != "" {
+		return sh
+	}
+	return "powershell"
+}
+
+// psFlags are the flags before the script of a PowerShell task: the flags a Concourse file kept, or the default.
+func psFlags(ext map[string]any) []string {
+	if raw, ok := ext[ExtShellFlags].([]any); ok && len(raw) > 0 {
+		out := make([]string, len(raw))
+		for i, f := range raw {
+			out[i] = strOf(f)
+		}
+		return out
+	}
+	return []string{"-NoProfile", "-NonInteractive", "-Command"}
+}
+
+// psJob is true when a step of the job runs PowerShell; the task then needs a worker that has it.
+func (jx *jobEmitter) psJob() bool {
+	for _, st := range jx.j.Steps {
+		if st.Kind == ir.StepScript && jx.powershell(st) {
+			return true
+		}
+	}
+	return false
 }

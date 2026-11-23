@@ -257,3 +257,32 @@ func TestDroppedCarryNamesEachFieldItHeld(t *testing.T) {
 		}
 	}
 }
+
+func TestPowershellScriptRunsUnderPowershellWithAnEntry(t *testing.T) {
+	j := scriptJob("win", "$env:GOCACHE = (Resolve-Path $env:GOCACHE).Path", "choco install -y make")
+	files, rep := emit(t, project(j))
+	src := files[".concourse/ci.yml"]
+	if strings.Contains(bodyOf(src), "path: sh") {
+		t.Fatalf("a PowerShell script runs under sh:\n%s", src)
+	}
+	if !strings.Contains(bodyOf(src), "path: powershell") || !hasFeatureEntry(rep, string(caps.StepShell), "PowerShell") {
+		t.Fatalf("no powershell task or entry: %v\n%s", rep.Entries, src)
+	}
+	back, _ := parseFiles(t, files)
+	if back.Pipelines[0].Jobs[0].Steps[0].Shell != "" {
+		t.Fatalf("shell added by the round trip: %q", back.Pipelines[0].Jobs[0].Steps[0].Shell)
+	}
+}
+
+func TestNamedPowershellShellIsHonoured(t *testing.T) {
+	j := scriptJob("win", "Write-Host hi")
+	j.Steps[0].Shell = "pwsh"
+	files, _ := emit(t, project(j))
+	if !strings.Contains(bodyOf(files[".concourse/ci.yml"]), "path: pwsh") {
+		t.Fatalf("shell pwsh not honoured:\n%s", files[".concourse/ci.yml"])
+	}
+	back, _ := parseFiles(t, files)
+	if back.Pipelines[0].Jobs[0].Steps[0].Shell != "pwsh" {
+		t.Fatalf("shell lost: %q", back.Pipelines[0].Jobs[0].Steps[0].Shell)
+	}
+}

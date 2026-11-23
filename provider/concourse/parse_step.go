@@ -272,6 +272,15 @@ func runHasVar(run *omap) bool {
 }
 
 func (jb *jobBuilder) command(st *ir.Step, k *sink, cmd string, argv []string, line int) {
+	if isPowershell(cmd) && len(argv) > 1 && argv[len(argv)-2] == "-Command" {
+		st.Shell = cmd
+		for _, l := range strings.Split(strings.TrimSuffix(argv[len(argv)-1], "\n"), "\n") {
+			st.Script = append(st.Script, escapeLine(l))
+		}
+		k.Out[ExtShellFlags] = plainStrings(argv[:len(argv)-1])
+		k.Note(caps.StepShell, fmt.Sprintf("shell flags %v are kept in Ext; the IR holds the shell and the script", argv[:len(argv)-1]), line)
+		return
+	}
 	if shells[path.Base(cmd)] && len(argv) > 1 {
 		flags, script := argv[:len(argv)-1], argv[len(argv)-1]
 		if shellFlags(flags) {
@@ -472,6 +481,14 @@ func secretName(name string) bool {
 		if secretSegments[seg] {
 			return true
 		}
+	}
+	return false
+}
+
+func isPowershell(cmd string) bool {
+	switch strings.ToLower(path.Base(strings.ReplaceAll(cmd, "\\", "/"))) {
+	case "pwsh", "powershell", "pwsh.exe", "powershell.exe":
+		return true
 	}
 	return false
 }

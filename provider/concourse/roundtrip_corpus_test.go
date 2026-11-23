@@ -79,3 +79,38 @@ func TestUneditedCorpusOutputReportsNoIgnoredMarker(t *testing.T) {
 		})
 	}
 }
+
+// TestShellTasksOfTheCorpusPassTheirShellSyntaxCheck runs sh -n or bash -n on every script that a task runs under
+// that shell; a task of another shell, such as PowerShell, is not an sh script.
+func TestShellTasksOfTheCorpusPassTheirShellSyntaxCheck(t *testing.T) {
+	ents, err := os.ReadDir(corpusRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range ents {
+		parts := strings.SplitN(e.Name(), "-", 3)
+		if !e.IsDir() || len(parts) != 3 || (parts[1] != "gha" && parts[1] != "gitlab") {
+			continue
+		}
+		if testing.Short() && !shortCorpus[parts[0]] {
+			continue
+		}
+		dir, from := filepath.Join(corpusRoot, e.Name()), parts[1]
+		t.Run(e.Name(), func(t *testing.T) {
+			t.Parallel()
+			out := t.TempDir()
+			var so, se bytes.Buffer
+			if code := cli.Run([]string{"convert", dir, "--from", from, "--to", "concourse", "-o", out}, &so, &se); code != 0 {
+				t.Fatalf("convert = %d\n%s", code, se.String())
+			}
+			files, _ := filepath.Glob(filepath.Join(out, ".concourse", "*.yml"))
+			for _, f := range files {
+				b, err := os.ReadFile(f) // #nosec G304 -- file written by this test
+				if err != nil {
+					t.Fatal(err)
+				}
+				checkShellTasks(t, string(b))
+			}
+		})
+	}
+}

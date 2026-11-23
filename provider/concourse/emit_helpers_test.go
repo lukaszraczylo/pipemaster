@@ -59,10 +59,8 @@ func checkScripts(t *testing.T, src string) {
 					if strings.Contains(script, "((") {
 						t.Errorf("a ((var)) is in a script:\n%s", script)
 					}
-					cmd := exec.Command("sh", "-n")
-					cmd.Stdin = strings.NewReader(script)
-					if out, err := cmd.CombinedOutput(); err != nil {
-						t.Errorf("sh -n: %v %s\n%s", err, out, script)
+					if shell, _ := run["path"].(string); shell == "sh" || shell == "bash" {
+						syntaxCheck(t, shell, script)
 					}
 				}
 			}
@@ -165,4 +163,50 @@ func callOf(name string) expr.Expr { return expr.Call{Name: name} }
 
 func eqRef(ref, lit string) expr.Expr {
 	return expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: strings.Split(ref, ".")}, R: expr.Lit{Kind: expr.LitStr, Str: lit}}
+}
+
+// checkShellTasks runs the syntax check of each task's own shell on its script.
+func checkShellTasks(t *testing.T, src string) {
+	t.Helper()
+	var doc map[string]any
+	if err := yaml.Unmarshal([]byte(src), &doc); err != nil {
+		t.Fatal(err)
+	}
+	var walk func(v any)
+	walk = func(v any) {
+		switch x := v.(type) {
+		case []any:
+			for _, e := range x {
+				walk(e)
+			}
+		case map[string]any:
+			if run, ok := x["run"].(map[string]any); ok {
+				shell, _ := run["path"].(string)
+				args, _ := run["args"].([]any)
+				if (shell == "sh" || shell == "bash") && len(args) > 0 {
+					script, _ := args[len(args)-1].(string)
+					syntaxCheck(t, shell, script)
+				}
+			}
+			for _, e := range x {
+				walk(e)
+			}
+		}
+	}
+	walk(doc)
+}
+
+// syntaxCheck runs sh -n or bash -n on the script.
+func syntaxCheck(t *testing.T, shell, script string) {
+	t.Helper()
+	var cmd *exec.Cmd
+	if shell == "bash" {
+		cmd = exec.Command("bash", "-n")
+	} else {
+		cmd = exec.Command("sh", "-n")
+	}
+	cmd.Stdin = strings.NewReader(script)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Errorf("%s -n: %v %s\n%s", shell, err, out, script)
+	}
 }
