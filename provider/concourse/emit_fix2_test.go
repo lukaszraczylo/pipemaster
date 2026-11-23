@@ -414,3 +414,43 @@ func TestCarryDropsTheExtOfFinallyJobs(t *testing.T) {
 		}
 	}
 }
+
+const resourceOrderFile = `resources:
+  - name: tick
+    type: time
+    source: {interval: 1h}
+  - name: src
+    type: git
+    source:
+      uri: https://example.com/x.git
+      branch: main
+jobs:
+  - name: build
+    plan:
+      - get: tick
+        trigger: true
+      - get: src
+        trigger: true
+      - task: t
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: alpine}
+          run:
+            path: sh
+            args: [-ec, make]
+`
+
+func TestOwnResourcesKeepTheirOrder(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"ci.yml": resourceOrderFile})
+	files, _ := emit(t, p)
+	back, _ := reparse(t, files)
+	var names []string
+	for _, r := range back.Pipelines[0].Ext["concourse"].(map[string]any)["resources"].([]any) {
+		names = append(names, r.(map[string]any)["name"].(string))
+	}
+	if len(names) != 2 || names[0] != "tick" || names[1] != "src" {
+		t.Fatalf("resource order = %v; want [tick src]", names)
+	}
+}

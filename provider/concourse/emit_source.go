@@ -108,7 +108,26 @@ func (pe *pipeEmitter) buildSources() {
 		gits = pe.sourcesOf(typeGit)
 	}
 	pe.primary = gits[0]
-	sort.SliceStable(pe.sources, func(i, j int) bool { return pe.sources[i].typ == typeGit && pe.sources[j].typ != typeGit })
+	sort.SliceStable(pe.sources, pe.sourceLess)
+}
+
+// sourceLess orders the resources: those of a Concourse file keep the order they had, and the rest list git first.
+func (pe *pipeEmitter) sourceLess(i, j int) bool {
+	ra, rb := pe.sourceRank(pe.sources[i]), pe.sourceRank(pe.sources[j])
+	if ra[0] != rb[0] {
+		return ra[0] < rb[0]
+	}
+	return ra[1] < rb[1]
+}
+
+func (pe *pipeEmitter) sourceRank(s *source) [2]int {
+	if idx, ok := pe.extOrder[s.name]; ok {
+		return [2]int{0, idx}
+	}
+	if s.typ == typeGit {
+		return [2]int{1, 0}
+	}
+	return [2]int{1, 1}
 }
 
 func (pe *pipeEmitter) nameSet() map[string]bool {

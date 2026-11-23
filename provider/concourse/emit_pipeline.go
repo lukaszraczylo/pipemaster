@@ -20,11 +20,13 @@ type pipeEmitter struct {
 	doc     *outDoc
 	primary *source
 	extRes  map[string]map[string]any
-	byName  map[string]*source
-	jobName map[string]string
-	ext     map[string]any
-	path    string
-	file    string
+	// extOrder is the position of each resource name in the Concourse file the IR came from.
+	extOrder map[string]int
+	byName   map[string]*source
+	jobName  map[string]string
+	ext      map[string]any
+	path     string
+	file     string
 	// mpath is the path of the pipeline in a marker: it holds the file name, which the parser reads as the ID.
 	mpath   string
 	sources []*source
@@ -45,7 +47,8 @@ func (e *emitter) pipeline(pl *ir.Pipeline, first bool) {
 	}
 	pe := &pipeEmitter{
 		e: e, pl: pl, path: pp, doc: &outDoc{}, byName: map[string]*source{}, jobName: map[string]string{},
-		extRes: map[string]map[string]any{},
+		extRes:   map[string]map[string]any{},
+		extOrder: map[string]int{},
 	}
 	if e.own {
 		pe.ext = extOf(pl.Ext)
@@ -125,6 +128,7 @@ func (pe *pipeEmitter) loadExt(first bool) {
 		if name, _ := m["name"].(string); name != "" {
 			if _, dup := pe.extRes[name]; !dup {
 				pe.extRes[name] = m
+				pe.extOrder[name] = len(pe.extOrder)
 			}
 		}
 	}
