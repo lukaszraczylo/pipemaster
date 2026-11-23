@@ -21,7 +21,7 @@ These versions were verified on 2026-11-19. The Tekton Pipelines, Tekton Trigger
 | kubeconform | v0.8.0 | 2026-06-04 |
 | Concourse | v8.3.3 | 2026-11-03 |
 | fly | v8.3.3 | 2026-11-03 |
-| concourse/time-resource | v1.11.6 | |
+| concourse/time-resource | v1.11.6 | 2026-11-02 |
 
 ## Sources
 
