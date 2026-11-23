@@ -10,7 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/report"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -210,4 +212,80 @@ func shellFailures(t *testing.T, id string, files map[string][]byte) []string {
 		}
 	}
 	return out
+}
+
+// concourseTask is a task of a job plan that runs a shell script.
+type concourseTask struct {
+	job, name, shell, script string
+}
+
+// concourseTasks lists the shell tasks of the jobs of a Concourse file, each with its job and task name.
+func concourseTasks(data []byte) ([]concourseTask, error) {
+	var out []concourseTask
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	for {
+		var root map[string]any
+		err := dec.Decode(&root)
+		if errors.Is(err, io.EOF) {
+			return out, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		jobs, _ := root["jobs"].([]any)
+		for _, j := range jobs {
+			jm, _ := j.(map[string]any)
+			job, _ := jm["name"].(string)
+			var walk func(v any)
+			walk = func(v any) {
+				switch x := v.(type) {
+				case []any:
+					for _, e := range x {
+						walk(e)
+					}
+				case map[string]any:
+					if name, ok := x["task"].(string); ok {
+						cfg, _ := x["config"].(map[string]any)
+						run, _ := cfg["run"].(map[string]any)
+						if script, isShell, _ := concourseRun(run); isShell {
+							shell := "sh"
+							if p, _ := run["path"].(string); p == "bash" || strings.HasSuffix(p, "/bash") {
+								shell = "bash"
+							}
+							out = append(out, concourseTask{job: job, name: name, shell: shell, script: script})
+						}
+					}
+					for _, e := range x {
+						walk(e)
+					}
+				}
+			}
+			walk(jm["plan"])
+		}
+	}
+}
+
+// syntaxError runs shell -n on the script and returns its complaint, or an empty string.
+func syntaxError(shell, script string) string {
+	cmd := exec.Command(shell, "-n") // #nosec G204 -- fixed binary
+	cmd.Stdin = strings.NewReader(exprRE.ReplaceAllString(script, "X"))
+	if b, err := cmd.CombinedOutput(); err != nil {
+		return strings.TrimSpace(string(b))
+	}
+	return ""
+}
+
+func TestPowershellReportCoversOnlyItsOwnTask(t *testing.T) {
+	rep := &report.Report{Entries: []report.Entry{{
+		IRPath: "pipeline/ci/job/Win 21H2/step/script", Feature: caps.StepShell, Level: caps.Lost,
+		Detail: "the script may be PowerShell, but the IR names no shell",
+	}}}
+	if !reportedPowershell(rep, concourseTask{job: "win-21h2", name: "script"}) {
+		t.Fatal("the reported task is not covered")
+	}
+	for _, other := range []concourseTask{{job: "win-1809", name: "script"}, {job: "win-21h2", name: "other"}} {
+		if reportedPowershell(rep, other) {
+			t.Fatalf("%+v is covered by the entry of another task", other)
+		}
+	}
 }

@@ -299,18 +299,44 @@ func checkPowershellReported(t *testing.T, files map[string][]byte, rep *report.
 	}
 }
 
-// checkConcourseShells runs the syntax check on every Concourse shell task. A script that fails is allowed only
-// when the report says that it may be PowerShell, which the emitter cannot tell from the IR.
+// checkConcourseShells runs the syntax check on every Concourse shell task. A task that fails is allowed only
+// when the report has a lost step.shell entry for that exact task that says the script may be PowerShell.
 func checkConcourseShells(t *testing.T, files map[string][]byte, rep *report.Report) {
 	t.Helper()
-	reported := 0
-	for _, e := range rep.Entries {
-		if e.Feature == caps.StepShell && e.Level == caps.Lost && strings.Contains(e.Detail, "may be PowerShell") {
-			reported++
+	for _, name := range names(files) {
+		tasks, err := concourseTasks(files[name])
+		if err != nil {
+			t.Errorf("%s: cannot read the emitted file: %v", name, err)
+			continue
+		}
+		for _, tk := range tasks {
+			msg := syntaxError(tk.shell, tk.script)
+			if msg == "" || reportedPowershell(rep, tk) {
+				continue
+			}
+			t.Errorf("%s: job %s task %s: %s -n rejects the script and the report does not say it may be PowerShell: %s\n%s", name, tk.job, tk.name, tk.shell, msg, tk.script)
 		}
 	}
-	failed := shellFailures(t, provider.Concourse, files)
-	if len(failed) > reported {
-		t.Errorf("%d scripts fail the syntax check and %d are reported as possible PowerShell:\n%s", len(failed), reported, strings.Join(failed, "\n"))
+}
+
+// reportedPowershell is true when the report has a lost step.shell entry for the task that names PowerShell.
+// The emitter renames IDs that Concourse does not accept, so both sides are compared in their written form.
+func reportedPowershell(rep *report.Report, tk concourseTask) bool {
+	for _, e := range rep.Entries {
+		if e.Feature != caps.StepShell || e.Level != caps.Lost || !strings.Contains(e.Detail, "may be PowerShell") {
+			continue
+		}
+		job, step, ok := strings.Cut(strings.TrimPrefix(e.IRPath[strings.Index(e.IRPath, "/job/")+1:], "job/"), "/step/")
+		if ok && writtenName(job) == tk.job && writtenName(step) == tk.name {
+			return true
+		}
 	}
+	return false
+}
+
+var unwrittenRE = regexp.MustCompile(`[^A-Za-z0-9_.-]+`)
+
+// writtenName is an ID as the Concourse emitter writes it.
+func writtenName(id string) string {
+	return strings.ToLower(strings.Trim(unwrittenRE.ReplaceAllString(id, "-"), "-"))
 }
