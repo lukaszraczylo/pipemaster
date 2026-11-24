@@ -2,9 +2,11 @@ package tekton
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
@@ -334,6 +336,8 @@ func (b *jobBuilder) finish() {
 	if len(list) > 0 {
 		b.k.Out[ExtImplicitNeeds] = list
 	}
+	b.legacyParams()
+	b.boundParams()
 	seen := map[string]bool{}
 	for _, t := range []*texts{b.px, b.tx} {
 		for _, f := range t.kept {
@@ -351,4 +355,43 @@ func (b *jobBuilder) finish() {
 		b.restoreWorkspace()
 	}
 	b.job.Ext = b.k.Ext()
+}
+
+// legacyParams keeps the names of the Task params that the text reads only as $(inputs.params.x), so the Tekton
+// file gets that spelling back. A param read in both spellings is written as $(params.x).
+func (b *jobBuilder) legacyParams() {
+	var only []any
+	for _, name := range slices.Sorted(maps.Keys(b.tx.legacy)) {
+		if b.tx.modern[name] {
+			b.k.Note(caps.ScriptInterpolation, "param "+name+" is read as $(inputs.params."+name+") and as $(params."+name+"); the Tekton file writes $(params."+name+")", 0)
+			continue
+		}
+		only = append(only, name)
+	}
+	if len(only) > 0 {
+		b.k.Out[ExtLegacyParams] = only
+	}
+}
+
+// boundParams keeps the PipelineTask value of each Task param that the Task text reads under another name than
+// the pipeline param, which is the name the emitter picks without it.
+func (b *jobBuilder) boundParams() {
+	if _, catalog := b.k.Out[ExtCatalogRef]; catalog {
+		return
+	}
+	bound := map[string]any{}
+	for name := range b.tx.used {
+		if raw, ok := b.raw[name]; ok && isPipelineParam(raw) && raw != paramPrefix+name+paramClose {
+			bound[name] = raw
+		}
+	}
+	if len(bound) > 0 {
+		b.k.Out[ExtBoundParams] = bound
+	}
+}
+
+// isPipelineParam tells a value that is exactly one pipeline param variable.
+func isPipelineParam(v string) bool {
+	rest, ok := strings.CutPrefix(v, paramPrefix)
+	return ok && strings.HasSuffix(rest, paramClose) && !strings.ContainsAny(strings.TrimSuffix(rest, paramClose), "()$")
 }

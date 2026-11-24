@@ -1,6 +1,7 @@
 package tekton_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -191,9 +192,13 @@ func TestCatalogReportsWhatTheFileCannotSet(t *testing.T) {
 	}
 }
 
-func TestLegacyInputsParamsAreReported(t *testing.T) {
-	pl, rep := parseYAML(t, pipelineWith(`  tasks:
+func TestLegacyInputsParamsAreTranslated(t *testing.T) {
+	pl, rep := parseYAML(t, pipelineWith(`  params:
+  - {name: img, type: string}
+  tasks:
   - name: t
+    params:
+    - {name: image, value: "$(params.img)"}
     taskSpec:
       params:
       - {name: image}
@@ -202,11 +207,45 @@ func TestLegacyInputsParamsAreReported(t *testing.T) {
         image: alpine
         script: echo $(inputs.params.image)
 `))
-	s := step(t, job(t, pl, "t"), "s")
-	if len(s.Script) != 1 || !strings.Contains(s.Script[0], "$(inputs.params.image)") {
+	j := job(t, pl, "t")
+	s := step(t, j, "s")
+	if len(s.Script) != 1 || strings.Contains(s.Script[0], "inputs.params") || !strings.Contains(s.Script[0], "img") {
 		t.Fatalf("script = %q", s.Script)
 	}
-	if !hasEntry(rep, "$(inputs.params.image) is a Tekton variable with no IR reference") {
-		t.Fatalf("the untranslated reference needs an entry: %+v", rep.Entries)
+	if got := ext(j.Ext)[tekton.ExtLegacyParams]; !reflect.DeepEqual(got, []any{"image"}) {
+		t.Fatalf("legacy params = %v", got)
+	}
+	if hasEntry(rep, "is a Tekton variable with no IR reference") {
+		t.Fatalf("a translated reference needs no entry: %+v", rep.Entries)
+	}
+}
+
+func TestLegacySpellingAndParamNamesSurviveTheTektonTrip(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"p.yaml": pipelineWith(`  params:
+  - {name: img, type: string}
+  tasks:
+  - name: t
+    params:
+    - {name: image, value: "$(params.img)"}
+    taskSpec:
+      params:
+      - {name: image}
+      steps:
+      - name: s
+        image: alpine
+        script: echo $(inputs.params.image)
+`)})
+	files, _, err := tekton.New().Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var all strings.Builder
+	for _, b := range files {
+		all.Write(b)
+	}
+	for _, want := range []string{"echo $(inputs.params.image)", "- name: image\n          value: $(params.img)"} {
+		if !strings.Contains(all.String(), want) {
+			t.Errorf("output lacks %q:\n%s", want, all.String())
+		}
 	}
 }

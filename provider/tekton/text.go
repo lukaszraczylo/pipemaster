@@ -11,14 +11,16 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
+// legacyParamPrefix starts the deprecated spelling of a param variable, which Tekton reads like params.x.
+const legacyParamPrefix = "inputs.params."
+
 const (
 	varOpen  = "$("
 	varClose = ")"
 )
 
 var (
-	// tektonVar is the first segment of every variable that Tekton substitutes, `inputs.params` being the deprecated
-	// spelling of `params` that stays as written and is reported; `$(date)` and the like are shell.
+	// tektonVar is the first segment of every variable that Tekton substitutes; `$(date)` and the like are shell.
 	tektonVar = regexp.MustCompile(`^(inputs\.params|params|tasks|results|workspaces|context|steps|credentials|artifacts)\.`)
 	// paramVar reads the three spellings of a param variable.
 	paramVar = regexp.MustCompile(`^params(?:\.([A-Za-z_][A-Za-z0-9_-]*)|\['([^']+)'\]|\["([^"]+)"\])$`)
@@ -40,6 +42,8 @@ type texts struct {
 	needs map[string]bool
 	// taskID maps a Tekton task name to the job ID; ok is false for a name that is no task of the pipeline.
 	taskID func(name string) (string, bool)
+	// legacy and modern name the Task params that a text reads as $(inputs.params.x) and as $(params.x).
+	legacy, modern map[string]bool
 	// kept lists the variables left as written.
 	kept []string
 	// task is true in a Task body, where a param name resolves through bind.
@@ -50,6 +54,7 @@ func newTexts(taskID func(string) (string, bool), task bool) *texts {
 	return &texts{
 		bind: map[string][]expr.Part{}, defaults: map[string]string{}, matrix: map[string]bool{},
 		used: map[string]bool{}, needs: map[string]bool{}, taskID: taskID, task: task,
+		legacy: map[string]bool{}, modern: map[string]bool{},
 	}
 }
 
@@ -86,6 +91,17 @@ func (x *texts) ref(word string) (expr.Ref, bool) {
 
 // variable reads the inside of one $(...) as parts; ok is false when the form stays text.
 func (x *texts) variable(inner string) ([]expr.Part, bool) {
+	if rest, ok := strings.CutPrefix(inner, legacyParamPrefix); ok {
+		if !x.task {
+			return nil, false
+		}
+		inner = "params." + rest
+		if m := paramVar.FindStringSubmatch(inner); m != nil {
+			x.legacy[m[1]+m[2]+m[3]] = true
+		}
+	} else if m := paramVar.FindStringSubmatch(inner); m != nil && x.task {
+		x.modern[m[1]+m[2]+m[3]] = true
+	}
 	if m := paramVar.FindStringSubmatch(inner); m != nil {
 		name := m[1] + m[2] + m[3]
 		if !x.task {

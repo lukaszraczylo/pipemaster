@@ -149,7 +149,10 @@ func (tc *taskCtx) inputParam(in string) (string, bool) {
 		return "", false
 	}
 	want := pname
-	if tc.matrix[pname] {
+	if n, ok := tc.boundName(pname); ok {
+		want = n
+	}
+	if tc.matrix[want] {
 		want = "input-" + pname
 	}
 	return tc.param(expr.PrefixInputs+"."+in, want, paramPrefix+pname+paramClose), true
@@ -383,4 +386,46 @@ func (tc *taskCtx) envList(sc *stepScope, path string, vs []ir.Var) ([]*yaml.Nod
 		}
 	}
 	return out, nil
+}
+
+// legacySpelling writes $(inputs.params.x) back for the params that the parsed Task spelled that way.
+func legacySpelling(nodes []*yaml.Node, names any) {
+	list, _ := names.([]any)
+	if len(list) == 0 {
+		return
+	}
+	var pairs []string
+	for _, n := range list {
+		if s, ok := n.(string); ok {
+			pairs = append(pairs, paramPrefix+s+paramClose, varOpen+legacyParamPrefix+s+paramClose)
+		}
+	}
+	r := strings.NewReplacer(pairs...)
+	var walk func(n *yaml.Node)
+	walk = func(n *yaml.Node) {
+		if n.Kind == yaml.ScalarNode {
+			n.Value = r.Replace(n.Value)
+		}
+		for _, c := range n.Content {
+			walk(c)
+		}
+	}
+	for _, n := range nodes {
+		walk(n)
+	}
+}
+
+// boundName finds the Task param that the parsed PipelineTask bound to the pipeline param, so the Task keeps its
+// own param name.
+func (tc *taskCtx) boundName(pname string) (string, bool) {
+	if !tc.e.own {
+		return "", false
+	}
+	bound, _ := extOf(tc.jp.j.Ext)[ExtBoundParams].(map[string]any)
+	for _, name := range sortedKeys(bound) {
+		if v, _ := bound[name].(string); v == paramPrefix+pname+paramClose {
+			return name, true
+		}
+	}
+	return "", false
 }

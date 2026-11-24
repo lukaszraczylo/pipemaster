@@ -519,13 +519,13 @@
 68-tekton-build-definitions tekton->gitlab native=   2 emulated=   1 external=   0 lost=   6
 68-tekton-build-definitions tekton->woodpecker native=   1 emulated=   4 external=   1 lost=   9
 69-tekton-pipelines-tutorial tekton->argo native=  16 emulated=   3 external=   2 lost=  12
-69-tekton-pipelines-tutorial tekton->concourse native=  12 emulated=   7 external=   0 lost=  15
-69-tekton-pipelines-tutorial tekton->drone native=  14 emulated=   7 external=   0 lost=  17
+69-tekton-pipelines-tutorial tekton->concourse native=  12 emulated=   7 external=   0 lost=  16
+69-tekton-pipelines-tutorial tekton->drone native=  13 emulated=   9 external=   0 lost=  20
 69-tekton-pipelines-tutorial tekton->forgejo native=  12 emulated=  11 external=   0 lost=  10
 69-tekton-pipelines-tutorial tekton->gha native=  16 emulated=  11 external=   0 lost=  10
 69-tekton-pipelines-tutorial tekton->gitea native=  12 emulated=  11 external=   0 lost=  10
-69-tekton-pipelines-tutorial tekton->gitlab native=  12 emulated=   4 external=   0 lost=  21
-69-tekton-pipelines-tutorial tekton->woodpecker native=  16 emulated=   5 external=   0 lost=  17
+69-tekton-pipelines-tutorial tekton->gitlab native=  12 emulated=   4 external=   0 lost=  22
+69-tekton-pipelines-tutorial tekton->woodpecker native=  15 emulated=   7 external=   0 lost=  20
 70-tekton-git-clone tekton->argo native=   2 emulated=   1 external=   0 lost=   2
 70-tekton-git-clone tekton->concourse native=   2 emulated=   2 external=   0 lost=   3
 70-tekton-git-clone tekton->drone native=   2 emulated=   1 external=   0 lost=   2

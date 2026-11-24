@@ -41,7 +41,7 @@ func TestCorpus69CatalogTasksHaveNoPlaceholder(t *testing.T) {
 			"uses: actions/checkout@",
 			"id: build-image-checkout",
 			"id: yaml-lint-checkout",
-			"oc patch deployment $(inputs.params.deployment)",
+			"oc patch deployment ${{ inputs.deployment-name }}",
 			"ref: ${{ inputs.git-revision }}",
 			"container: quay.io/buildah/stable:v1",
 			"PARAM_IMAGE: ${{ inputs.IMAGE }}",
@@ -53,6 +53,7 @@ func TestCorpus69CatalogTasksHaveNoPlaceholder(t *testing.T) {
 		}},
 		{provider.GitLab, []string{
 			"image: quay.io/buildah/stable:v1",
+			"oc apply -f k8s",
 			"GIT_SUBMODULE_STRATEGY: normal",
 			"buildah ",
 			"oc patch deployment",
@@ -67,12 +68,12 @@ func TestCorpus69CatalogTasksHaveNoPlaceholder(t *testing.T) {
 					t.Errorf("%s output lacks %q\n%s", c.to, w, files)
 				}
 			}
-			for _, bad := range []string{"a task reference has no", `run: "true"`} {
+			for _, bad := range []string{"a task reference has no", `run: "true"`, "$(inputs.params.", "$(params."} {
 				if strings.Contains(files, bad) || strings.Contains(rep, bad) {
 					t.Errorf("%s output holds the placeholder %q", c.to, bad)
 				}
 			}
-			for _, w := range []string{"needs a privileged runner", "pushing the image needs registry credentials", "the job clones the pipeline repository itself", "$(inputs.params.deployment) is a Tekton variable with no IR reference"} {
+			for _, w := range []string{"needs a privileged runner", "pushing the image needs registry credentials", "the job clones the pipeline repository itself"} {
 				if !strings.Contains(rep, w) {
 					t.Errorf("report lacks %q", w)
 				}

@@ -325,6 +325,9 @@ func (tc *taskCtx) taskDoc(b *stepBook) (*outDoc, error) {
 	_, body := tc.jobExt()
 	spec.Set("params", tc.paramNodes(x))
 	spec.Set("stepTemplate", tpl)
+	if tc.e.own {
+		legacySpelling(b.nodes, x[ExtLegacyParams])
+	}
 	spec.Set("steps", seqOf(b.nodes...))
 	spec.Set("sidecars", sidecars)
 	spec.Set("results", tc.resultNodes(x))
@@ -338,7 +341,20 @@ func (tc *taskCtx) taskDoc(b *stepBook) (*outDoc, error) {
 
 func (tc *taskCtx) paramNodes(x map[string]any) *yaml.Node {
 	out := seqOf()
+	keptNames := map[string]bool{}
+	if kept, ok := x["task_params"].([]any); ok {
+		for _, k := range kept {
+			if km, isMap := k.(map[string]any); isMap {
+				if n, isName := km["name"].(string); isName {
+					keptNames[n] = true
+				}
+			}
+		}
+	}
 	for _, p := range tc.params {
+		if keptNames[p] {
+			continue
+		}
 		m := newMap()
 		m.SetStr("name", p)
 		out.Content = append(out.Content, m.N)
@@ -514,7 +530,7 @@ func (tc *taskCtx) ports(sp string, ps []string) *yaml.Node {
 
 // jobHandled lists the job Ext keys that the emitter writes in a place of its own.
 var jobHandled = map[string]bool{
-	ExtImplicitNeeds: true, ExtCatalogRef: true, "task_name": true, "matrix_include_names": true, "array_params": true, "unused_params": true,
+	ExtImplicitNeeds: true, ExtCatalogRef: true, ExtLegacyParams: true, ExtBoundParams: true, "task_name": true, "matrix_include_names": true, "array_params": true, "unused_params": true,
 	"params": true, "stepTemplate": true, "results": true, "task_metadata": true, "task_params": true, "task_workspaces": true,
 	"task_description": true, "workspaces": true, "description": true,
 }
