@@ -34,7 +34,7 @@ const (
 type emitter struct {
 	// gated holds the action steps that a later step reads, which no target may drop.
 	gated map[*ir.Step]bool
-	led *emitkit.Ledger
+	led   *emitkit.Ledger
 	// origin is the provider ID the project was parsed from.
 	origin string
 	from   *expr.Dialect

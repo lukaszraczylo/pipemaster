@@ -314,6 +314,9 @@ func collapseRefs(c *collapseCtx) bool {
 			cur = *st.text
 		case st.val.Kind == ir.ValueLit:
 			cur = st.val.Lit
+		case st.val.Kind == ir.ValueExpr:
+			// A step that a marker restored holds the source expression already.
+			continue
 		}
 		if cur == p.S {
 			continue

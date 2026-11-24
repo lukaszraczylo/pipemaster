@@ -399,9 +399,8 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool, at int) *cont
 	case actions.KindDownload:
 		sx.download(path, t)
 	case actions.KindScript:
-		cp := *st
-		cp.Script, cp.Kind, cp.Action = t.Script, ir.StepScript, nil
-		c := sx.containerFor(&cp, name, last)
+		cp := emitkit.ScriptStep(st, t, path, sx.image == "" && tc.jp.j.Container == nil)
+		c := sx.containerFor(cp, name, last)
 		if c != nil {
 			sx.act.Hold = nodeCanon(c.m.N)
 		}

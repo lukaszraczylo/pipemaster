@@ -2,7 +2,7 @@ package tekton
 
 import (
 	"encoding/json"
-	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
+	"path"
 	"regexp"
 	"strings"
 
@@ -11,6 +11,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/actions"
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
+	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
@@ -281,7 +282,7 @@ func (tc *taskCtx) applyTarget(b *stepBook, st *ir.Step, sp, name string, t acti
 		dest, _ := t.With["path"].(string)
 		return tc.copyStep(st, sp, name, downloadScript(artifactName(an), dest)), "", nil
 	case actions.KindScript:
-		m, err := tc.scriptStep(b, &ir.Step{ID: st.ID, Kind: ir.StepScript, Script: t.Script, Env: st.Env, WorkDir: st.WorkDir, If: st.If, Timeout: st.Timeout, ContinueOnError: st.ContinueOnError}, sp, name)
+		m, err := tc.scriptStep(b, emitkit.ScriptStep(st, t, sp, tc.image == "" && (tc.jp.j.Container == nil || tc.containerRef == "")), sp, name)
 		return m, "", err
 	}
 	tc.e.lose(sp, caps.StepAction, "action kind "+t.Kind+" has no Tekton form")
@@ -320,23 +321,55 @@ func (tc *taskCtx) useWorkspace() {
 // cloneStep writes the StepAction ref to git-clone through the git resolver, at a pinned tag.
 func (tc *taskCtx) cloneStep(st *ir.Step, sp, name string, t actions.Target) *wmap {
 	tc.checkout, tc.pp.checkout = true, true
-	repoParam := tc.ctxParam("ctx-repo")
-	shaParam := tc.ctxParam("ctx-sha")
-	ref := newMap()
-	ref.SetStr("resolver", "git")
-	ref.Set("params", seqOf(
+	url, revision, outPath := "", "", workspaceDir
+	// The repository, the ref and the path of the checkout go to the clone parameters.
+	given := func(in string) (string, bool, bool) {
+		v, ok := t.With[in].(string)
+		if !ok || v == "" {
+			return "", false, true
+		}
+		out, good, err := tc.text(newScope(), sp, caps.StepAction, valueText, v)
+		return out, true, good && err == nil
+	}
+	repo, hasRepo, good := given("repository")
+	if !good {
+		return nil
+	}
+	if hasRepo {
+		url = cloneHost + repo + ".git"
+	} else {
+		url = cloneHost + param(tc.ctxParam("ctx-repo")) + ".git"
+	}
+	ref, hasRef, good := given("ref")
+	if !good {
+		return nil
+	}
+	switch {
+	case hasRef:
+		revision = ref
+	case !hasRepo:
+		revision = param(tc.ctxParam("ctx-sha"))
+	}
+	if p, hasPath, good := given("path"); !good {
+		return nil
+	} else if hasPath {
+		outPath = path.Join(workspaceDir, p)
+	}
+	stepRef := newMap()
+	stepRef.SetStr("resolver", "git")
+	stepRef.Set("params", seqOf(
 		nameValue("url", gitCloneURL), nameValue("revision", gitCloneRevision), nameValue("pathInRepo", gitClonePath)))
-	params := seqOf(
-		nameValue("url", cloneHost+param(repoParam)+".git"),
-		nameValue("revision", param(shaParam)),
-		nameValue("output-path", workspaceDir),
-	)
+	params := seqOf(nameValue("url", url))
+	if revision != "" {
+		params.Content = append(params.Content, nameValue("revision", revision))
+	}
+	params.Content = append(params.Content, nameValue("output-path", outPath))
 	if d, ok := t.With["depth"].(string); ok {
 		params.Content = append(params.Content, nameValue("depth", d))
 	}
 	m := newMap()
 	m.SetStr("name", name)
-	m.Set("ref", ref.N)
+	m.Set("ref", stepRef.N)
 	m.Set("params", params)
 	tc.unapplied(st, sp, "the clone step takes no env or working directory")
 	tc.stepTail(m, st, tc.cond(sp, caps.StepIf, st.If, taskScope))

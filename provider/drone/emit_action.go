@@ -91,9 +91,9 @@ type globArg struct {
 type actionArg struct {
 	Step  string `json:"step"`
 	Image string `json:"image,omitempty"`
+	Stand string `json:"stand,omitempty"`
 	At    int    `json:"at"`
-	// Fail is true when a failing step stands in the file at At for the held step.
-	Fail bool `json:"fail,omitempty"`
+	Fail  bool   `json:"fail,omitempty"`
 }
 
 // markTriggers writes a marker whose argument holds the pipeline triggers as the IR had them, because a file
@@ -143,6 +143,9 @@ func (e *emitter) actionStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
 	}
 	if lost != "" {
 		return e.failingStep(c, sp, st, caps.StepAction, lost)
+	}
+	if c.emul != nil {
+		return e.standStep(c, sp, st, c.pos)
 	}
 	return nil, e.markAction(sp, st, c.pos, image, false)
 }
@@ -196,7 +199,7 @@ func (e *emitter) mapAction(c *docCtx, sp string, st *ir.Step) (image, lost stri
 		e.lose(sp, caps.ExtPassthrough, detail)
 	}
 	e.unapplied(sp, st)
-	return e.applyTarget(c, sp, t)
+	return e.applyTarget(c, sp, st, t)
 }
 
 // markAction writes the marker that holds a step the file does not have. The step keeps no condition: the IR
@@ -272,7 +275,7 @@ func (e *emitter) unapplied(sp string, st *ir.Step) {
 }
 
 // applyTarget applies a mapped action to the document and returns the image it selected, if any.
-func (e *emitter) applyTarget(c *docCtx, sp string, t actions.Target) (image, lost string, err error) {
+func (e *emitter) applyTarget(c *docCtx, sp string, st *ir.Step, t actions.Target) (image, lost string, err error) {
 	switch t.Kind {
 	case actions.KindImplicit:
 		if d, ok := t.With["depth"].(string); ok {
@@ -285,6 +288,11 @@ func (e *emitter) applyTarget(c *docCtx, sp string, t actions.Target) (image, lo
 		}
 		c.image = img
 		return img, "", nil
+	case actions.KindScript:
+		if d, ok := t.With["depth"].(string); ok {
+			c.depth = d
+		}
+		c.emul = emitkit.ScriptStep(st, t, sp, c.image == "")
 	case actions.KindCache:
 	case actions.KindUpload:
 		name, _ := t.With["name"].(string)
@@ -302,4 +310,28 @@ func (e *emitter) applyTarget(c *docCtx, sp string, t actions.Target) (image, lo
 		return "", why, nil
 	}
 	return "", "", nil
+}
+
+// standStep writes the script step that stands for an action whose inputs a script carries. The marker holds
+// the action step and the script, so the parser puts the action back when the file still has the script.
+func (e *emitter) standStep(c *docCtx, sp string, st *ir.Step, idx int) (*ymap, error) {
+	cp := c.emul
+	c.emul = nil
+	m, err := e.scriptStep(c, sp, cp)
+	if err != nil {
+		return nil, err
+	}
+	return m, e.markStand(sp, st, idx, strings.Join(cp.Script, "\n"))
+}
+
+// markStand is markAction for a step that a script stands for.
+func (e *emitter) markStand(sp string, st *ir.Step, at int, script string) error {
+	held := *st
+	held.If = nil
+	held.Ext = withoutBookkeeping(st.Ext)
+	body, err := carryYAML(&held)
+	if err != nil {
+		return err
+	}
+	return e.markArg(caps.StepAction, sp, actionArg{Step: body, At: at, Stand: script})
 }

@@ -523,6 +523,15 @@ func collapseActions(d *doc) {
 	for _, am := range found {
 		st := am.st
 		at := min(am.arg.At+inserted, len(j.Steps))
+		if am.arg.Stand != "" {
+			if at >= len(j.Steps) || !sameScript(strings.Join(j.Steps[at].Script, "\n"), am.arg.Stand) {
+				reportIgnored(d.rep, am.use, "the script step was edited after pipemaster wrote it")
+				continue
+			}
+			st.If = j.Steps[at].If
+			j.Steps[at] = &st
+			continue
+		}
 		if am.arg.Fail {
 			if at >= len(j.Steps) || !emitkit.IsFailLoud(j.Steps[at].Script) {
 				reportIgnored(d.rep, am.use, "the failing step was edited after pipemaster wrote it")
@@ -543,4 +552,10 @@ func collapseActions(d *doc) {
 		}
 		j.Steps = slices.Insert(j.Steps, at, &st)
 	}
+}
+
+// sameScript compares script text apart from the dollar escape and the final newline the file adds.
+func sameScript(a, b string) bool {
+	norm := func(s string) string { return strings.TrimRight(strings.ReplaceAll(s, "$$", "$"), "\n") }
+	return norm(a) == norm(b)
 }

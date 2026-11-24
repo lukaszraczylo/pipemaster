@@ -188,7 +188,18 @@ func (e *emitter) unappliedEnvFields(sp string, st *ir.Step, why string) {
 func (e *emitter) applyTarget(p *jobPrep, sp string, st *ir.Step, t actions.Target) error {
 	switch t.Kind {
 	case actions.KindScript:
-		return e.placeLines(p, st, t.Script)
+		cp := emitkit.ScriptStep(st, t, sp, false)
+		if err := e.placeLines(p, cp, cp.Script); err != nil {
+			return err
+		}
+		var names []string
+		for _, k := range []string{"GIT_DEPTH", "GIT_SUBMODULE_STRATEGY"} {
+			if v, ok := t.With[k].(string); ok {
+				p.vars = append(p.vars, ir.Var{Name: k, Value: ir.Value{Lit: v}})
+				names = append(names, k)
+			}
+		}
+		return e.markActionStep(p, sp, st, actionStepArg{Kind: actScript, Script: strings.Join(cp.Script, "\n"), Vars: names})
 	case actions.KindUpload:
 		e.unappliedEnvFields(sp, st, "the upload becomes the job's artifacts block")
 		art, err := e.uploadAction(p, sp, st, t)

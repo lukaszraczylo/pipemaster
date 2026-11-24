@@ -82,6 +82,8 @@ func countBudget(target string, files []siteFile) budget {
 				}
 				continue
 			}
+			// A guard such as ${VAR?pipemaster: lost: ...} stops the step only when its variable is unset: not a lost step.
+			line = strings.ReplaceAll(line, "?"+failLoudMark, "?")
 			lostLines += strings.Count(line, lostLineMark)
 			steps += strings.Count(line, failLoudMark) - strings.Count(line, lostLineMark)
 			if strings.Contains(line, failLoudMark) {

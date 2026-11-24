@@ -21,8 +21,8 @@ var identRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 type emitter struct {
 	// gated holds the action steps that a later step reads, which no target may drop.
 	gated map[*ir.Step]bool
-	led *emitkit.Ledger
-	pl  *ir.Pipeline
+	led   *emitkit.Ledger
+	pl    *ir.Pipeline
 	// wfGuard is the workflow condition that Parse ANDed into every job; the written workflow block already says it.
 	wfGuard expr.Expr
 	from    *expr.Dialect

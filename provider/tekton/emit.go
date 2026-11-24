@@ -87,7 +87,7 @@ func livePipelines(p *ir.Project) []*ir.Pipeline {
 // emitter carries the state of one Emit call.
 type emitter struct {
 	// gated holds the action steps that a later step reads, which no target may drop.
-	gated map[*ir.Step]bool
+	gated  map[*ir.Step]bool
 	led    *emitkit.Ledger
 	said   map[ir.FeatureUse][2]string
 	files  map[string][]*outDoc

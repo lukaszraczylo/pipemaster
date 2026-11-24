@@ -390,3 +390,223 @@ func TestDownloadWithNoUploadFailsLoudly(t *testing.T) {
 		})
 	}
 }
+
+func checkoutWith(with map[string]ir.Value) *ir.Step {
+	return gatingAction("co", "checkout", with)
+}
+
+// A checkout with ref, repository, path or sparse-checkout is not a plain clone. Targets that clone before the
+// step get a script step that runs git; Tekton and Argo carry ref, repository and path in the clone itself.
+func TestCheckoutInputsAreCarried(t *testing.T) {
+	with := map[string]ir.Value{"ref": litv("dev"), "path": litv("sub"), "sparse-checkout": litv("src\ndocs"), "fetch-depth": litv("0")}
+	for _, to := range failLoudTargets {
+		if to == provider.GHA {
+			continue
+		}
+		t.Run(to, func(t *testing.T) {
+			files, _, err := prov(t, to).Emit(oneJob(checkoutWith(with)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var script string
+			for _, s := range scriptCandidates(t, files) {
+				if strings.Contains(s, "PIPEMASTER_CHECKOUT_PATH") && strings.Contains(s, "git ") {
+					script = s
+				}
+			}
+			switch to {
+			case "tekton", "argo":
+				if !slices.ContainsFunc(scriptCandidates(t, files), hasFailLoud) {
+					t.Errorf("sparse-checkout has no form here: want a failing script, files %v", names(files))
+				}
+			default:
+				if script == "" {
+					t.Fatalf("no git script in %v", names(files))
+				}
+			}
+		})
+	}
+}
+
+// The git script puts the working tree on the ref, in the path, with the sparse directories.
+func TestCheckoutScriptRunsGit(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	origin := t.TempDir()
+	git := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...) // #nosec G204 -- fixed binary, test arguments
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null", "GIT_ALLOW_PROTOCOL=file")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	write := func(dir, name, text string) {
+		t.Helper()
+		p := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git(origin, "init", "-q", "-b", "main")
+	write(origin, "src/a.txt", "main")
+	write(origin, "docs/b.txt", "main")
+	write(origin, "other/c.txt", "main")
+	git(origin, "add", ".")
+	git(origin, "commit", "-q", "-m", "main")
+	git(origin, "checkout", "-q", "-b", "dev")
+	write(origin, "src/a.txt", "dev")
+	git(origin, "commit", "-q", "-am", "dev")
+	git(origin, "checkout", "-q", "main")
+	git(origin, "config", "uploadpack.allowAnySHA1InWant", "true")
+
+	files, _, err := prov(t, "drone").Emit(oneJob(checkoutWith(map[string]ir.Value{"ref": litv("dev"), "path": litv("sub"), "sparse-checkout": litv("src\ndocs\n"), "fetch-depth": litv("0")})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var script string
+	for _, s := range scriptCandidates(t, files) {
+		if strings.Contains(s, "PIPEMASTER_CHECKOUT_PATH") && strings.Contains(s, "git ") {
+			script = s
+		}
+	}
+	if script == "" {
+		t.Fatalf("no git script in %v", names(files))
+	}
+	work := t.TempDir()
+	git(work, "clone", "-q", origin, ".")
+	file := filepath.Join(t.TempDir(), "step.sh")
+	// Drone writes every dollar sign twice and unescapes it before the shell runs the commands.
+	if err := os.WriteFile(file, []byte(strings.ReplaceAll(script, "$$", "$")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("sh", file) // #nosec G204 -- fixed binary, generated script
+	cmd.Dir = work
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null", "GIT_ALLOW_PROTOCOL=file",
+		"PIPEMASTER_CHECKOUT_REF=dev", "PIPEMASTER_CHECKOUT_PATH=sub", "PIPEMASTER_CHECKOUT_SPARSE=src\ndocs\n", "PIPEMASTER_CHECKOUT_DEPTH=0")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("script: %v\n%s", err, out)
+	}
+	got, err := os.ReadFile(filepath.Join(work, "sub", "src", "a.txt")) // #nosec G304 -- test path
+	if err != nil || string(got) != "dev" {
+		t.Errorf("sub/src/a.txt = %q, %v; want dev", got, err)
+	}
+	if _, err := os.Stat(filepath.Join(work, "sub", "other", "c.txt")); err == nil {
+		t.Errorf("sparse-checkout left other/c.txt")
+	}
+}
+
+// A ref that the target cannot spell must stop the step: the script fails when its variable is unset.
+func TestUntranslatableRefStopsTheStep(t *testing.T) {
+	ref, err := expr.ParseCanonical("gha.github.event.pull_request.head.sha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, to := range []string{"gitlab", "woodpecker", "drone", "concourse"} {
+		t.Run(to, func(t *testing.T) {
+			files, _, err := prov(t, to).Emit(oneJob(checkoutWith(map[string]ir.Value{"ref": {Kind: ir.ValueExpr, Expr: ref}})))
+			if err != nil {
+				t.Fatal(err)
+			}
+			ran := false
+			for _, s := range scriptCandidates(t, files) {
+				if !strings.Contains(s, "PIPEMASTER_CHECKOUT_PATH") {
+					continue
+				}
+				ran = true
+				_, stderr, code := runScript(t, strings.ReplaceAll(s, "$$", "$"))
+				if code == 0 || !strings.Contains(stderr, "pipemaster: lost: ") {
+					t.Errorf("code=%d stderr=%q", code, stderr)
+				}
+			}
+			if !ran {
+				t.Errorf("no git script in %v", names(files))
+			}
+		})
+	}
+}
+
+// The checkout step comes back from every target as it went, with and without the stored metadata.
+func TestCheckoutInputsRoundTrip(t *testing.T) {
+	mk := func(with map[string]ir.Value) func() *ir.Project {
+		return func() *ir.Project { return oneJob(checkoutWith(with), shStep("run", "make")) }
+	}
+	plain := mk(map[string]ir.Value{"fetch-depth": litv("0")})
+	extras := mk(map[string]ir.Value{"ref": litv("dev"), "path": litv("sub"), "fetch-depth": litv("0")})
+	trip := func(t *testing.T, to string, mk func() *ir.Project) []irDiff {
+		src, target := mk(), prov(t, to)
+		files, _, err := target.Emit(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		back, _, err := target.Parse(toFS(files))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return diffNodes(mk(), back)
+	}
+	for _, to := range failLoudTargets {
+		if to == provider.GHA {
+			continue
+		}
+		t.Run(to, func(t *testing.T) {
+			// What the parser cannot read back from the file alone is the same with and without the inputs.
+			base := map[string]bool{}
+			for _, d := range trip(t, to, plain) {
+				base[d.Field+" "+d.Path] = true
+			}
+			for _, d := range trip(t, to, extras) {
+				if !base[d.Field+" "+d.Path] {
+					t.Errorf("the inputs changed the trip: %s differs at %s", d.Field, d.Path)
+				}
+			}
+		})
+	}
+}
+
+// A download from another run or repository has no equivalent outside GHA, and a pattern selects artifacts that
+// no target's mechanism can match: the step fails loudly.
+func TestCrossRunDownloadFailsLoudly(t *testing.T) {
+	for _, in := range []string{"run-id", "repository", "pattern"} {
+		for _, to := range failLoudTargets {
+			if to == provider.GHA {
+				continue
+			}
+			t.Run(in+"/"+to, func(t *testing.T) {
+				files, _, err := prov(t, to).Emit(oneJob(gatingAction("d", "download-artifact", map[string]ir.Value{"name": litv("bin"), in: litv("x")})))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !slices.ContainsFunc(scriptCandidates(t, files), hasFailLoud) {
+					t.Errorf("no failing script in %v", names(files))
+				}
+			})
+		}
+	}
+}
+
+// The report lists every input that a target has no equivalent for, not the last one.
+func TestUnmappedInputsAreAllListed(t *testing.T) {
+	for _, to := range []string{"woodpecker", "drone"} {
+		t.Run(to, func(t *testing.T) {
+			_, rep, err := prov(t, to).Emit(oneJob(checkoutWith(map[string]ir.Value{"lfs": litv("true"), "clean": litv("false"), "token": litv("x")})))
+			if err != nil {
+				t.Fatal(err)
+			}
+			detail := ""
+			for _, e := range rep.Entries {
+				detail += e.Detail + "\n"
+			}
+			for _, in := range []string{"lfs", "clean", "token"} {
+				if !strings.Contains(detail, "input "+in+" has no") {
+					t.Errorf("the report does not name input %s:\n%s", in, detail)
+				}
+			}
+		})
+	}
+}

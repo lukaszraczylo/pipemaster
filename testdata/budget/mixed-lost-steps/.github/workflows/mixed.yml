@@ -29,3 +29,7 @@ jobs:
           name: bin
           path: out
           if-no-files-found: error
+      - uses: actions/download-artifact@v4
+        with:
+          name: bin
+          run-id: 42

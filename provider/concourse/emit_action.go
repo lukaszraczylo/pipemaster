@@ -149,9 +149,8 @@ func (c *chain) action(st *ir.Step, path string, at int) []*yaml.Node {
 			e.external(path, caps.StepAction, "s3 or registry-image resource", "the download reads an artifact that no earlier step of the job wrote; the operator sets up a resource that carries it from the job that uploads it")
 		}
 	case actions.KindScript:
-		cp := *st
-		cp.Script, cp.Kind, cp.Action = t.Script, ir.StepScript, nil
-		return []*yaml.Node{c.script(&cp, path)}
+		cp := emitkit.ScriptStep(st, t, path, jx.img == "" && jx.j.Container == nil)
+		return c.standIn(st, path, c.script(cp, path))
 	}
 	return c.placeholder(st, path, arg, false)
 }
@@ -367,4 +366,25 @@ func refSuffix(st *ir.Step) string {
 		return ""
 	}
 	return " " + actionRef(st.Action)
+}
+
+// standIn keeps the task that a script writes for an action, with a marker that holds the action step, so the
+// parser puts the action back when the task is still the one pipemaster wrote.
+func (c *chain) standIn(st *ir.Step, path string, n *yaml.Node) []*yaml.Node {
+	jx := c.jx
+	name := ""
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		if n.Content[i].Value == "task" {
+			name = n.Content[i+1].Value
+		}
+	}
+	held := *st
+	held.Ext = withoutBookkeeping(st.Ext)
+	body, err := carryYAML(&held)
+	if err != nil || name == "" {
+		jx.pe.e.lose(path, caps.StepAction, "the action marker cannot be written")
+		return []*yaml.Node{n}
+	}
+	jx.pe.e.markArg(caps.StepAction, jx.sm(name), actionArg{Step: body, Task: name, Hold: nodeCanon(n)})
+	return []*yaml.Node{n}
 }

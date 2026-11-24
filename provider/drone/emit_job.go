@@ -28,28 +28,22 @@ var platformRE = regexp.MustCompile(`^[a-z0-9]+/[a-z0-9]+(/v[0-9]+)?$`)
 
 // docCtx is the state of one pipeline document while it is written.
 type docCtx struct {
-	pl      *ir.Pipeline
-	j       *ir.Job
-	plan    *docPlan
-	uploads map[string]bool
-	// written maps the IR ID of each written step to its name.
-	written map[string]string
-	guard   expr.Expr
-	// image is what a step without its own image runs in; a setup action replaces it for the steps after it.
-	image string
-	name  string
-	// depth is the clone depth that an actions/checkout step asked for; empty means the default clone.
-	depth string
-	jp    string
-	// secretVars are the variables that a document-level environment cannot hold; every step gets them.
+	guard      expr.Expr
+	pl         *ir.Pipeline
+	j          *ir.Job
+	plan       *docPlan
+	uploads    map[string]bool
+	written    map[string]string
+	emul       *ir.Step
+	depth      string
+	name       string
+	jp         string
+	image      string
 	secretVars []ir.Var
-	// held is the text of the written steps that read a matrix name.
-	held []heldText
-	// pos is the place the step being written takes in the document.
-	pos int
-	// took counts the steps that ran in the job container image.
-	took   int
-	defImg bool
+	held       []heldText
+	pos        int
+	took       int
+	defImg     bool
 }
 
 // loseName reports a display name: the Drone pipeline name is its id.

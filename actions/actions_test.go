@@ -415,3 +415,49 @@ func TestActionsPassthroughFamily(t *testing.T) {
 		}
 	}
 }
+
+func TestEmulatedCheckoutInputsBecomeAScript(t *testing.T) {
+	ref := ir.ActionRef{Kind: ir.ActionRepo, Host: "https://git.example", Owner: "actions", Repo: "checkout", Ref: "v4"}
+	got, ok := Lookup(ref, "drone", map[string]string{"ref": "dev", "fetch-depth": "0"})
+	if !ok || got.Kind != KindScript || got.Env["PIPEMASTER_CHECKOUT_REF"] != "ref" || got.Env["PIPEMASTER_CHECKOUT_DEPTH"] != "fetch-depth" {
+		t.Fatalf("ref: %+v", got)
+	}
+	if got.EnvLit["PIPEMASTER_CHECKOUT_HOST"] != "https://git.example" || got.Support.Level != caps.Emulated {
+		t.Errorf("host or level: %+v", got)
+	}
+	got, _ = Lookup(ref, "drone", map[string]string{"repository": "o/r"})
+	if got.Support.Level != caps.External {
+		t.Errorf("repository: level %v, want external", got.Support.Level)
+	}
+	if got, _ := Lookup(ref, "drone", map[string]string{"fetch-depth": "0"}); got.Kind != KindImplicit {
+		t.Errorf("fetch-depth alone: kind %q, want implicit", got.Kind)
+	}
+	if got, _ := Lookup(ref, provider.GHA, map[string]string{"ref": "dev"}); got.Kind != KindPassthrough {
+		t.Errorf("gha: kind %q, want passthrough", got.Kind)
+	}
+}
+
+func TestDownloadAcrossRunsHasNoMapping(t *testing.T) {
+	ref := ir.ActionRef{Kind: ir.ActionRepo, Owner: "actions", Repo: "download-artifact", Ref: "v4"}
+	for _, in := range []string{"run-id", "repository", "pattern"} {
+		if _, ok := Lookup(ref, "drone", map[string]string{in: "x"}); ok {
+			t.Errorf("%s: mapped", in)
+		}
+	}
+	if _, ok := Lookup(ref, "drone", map[string]string{"name": "x"}); !ok {
+		t.Errorf("plain download: not mapped")
+	}
+}
+
+func TestBadGatingEntryFailsLoad(t *testing.T) {
+	for name, src := range map[string]string{
+		"typo name":   "gating:\n      if no files: [error]",
+		"empty value": "gating:\n      fail-on-cache-miss: []",
+		"no name":     "gating:\n      \"\": [x]",
+	} {
+		doc := "reverse: {checkout: a/b@v1, cache: a/b@v1, upload: a/b@v1, download: a/b@v1}\nactions:\n  - match: a/b\n    " + src + "\n    targets:\n      gha: {kind: passthrough, support: {level: native}}\n"
+		if _, err := parse([]byte(doc)); err == nil {
+			t.Errorf("%s: loaded", name)
+		}
+	}
+}

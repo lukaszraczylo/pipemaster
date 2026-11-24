@@ -18,6 +18,7 @@ const (
 	actCache    = "cache"
 	actUpload   = "upload"
 	actDownload = "download"
+	actScript   = "script"
 )
 
 type wireValue struct {
@@ -136,7 +137,10 @@ type actionStepArg struct {
 	Step  *wireStep `json:"step,omitempty"`
 	Kind  string    `json:"kind"`
 	Jobs  []downJob `json:"jobs,omitempty"`
-	Pos   int       `json:"pos"`
+	// Script is the text of the script lines that stand for the step.
+	Script string   `json:"script,omitempty"`
+	Vars   []string `json:"vars,omitempty"`
+	Pos    int      `json:"pos"`
 }
 
 // markActionStep carries the original step beside the keyword it became.
@@ -165,6 +169,11 @@ func collapseActionStep(c *collapseCtx, a actionStepArg) bool {
 		return false
 	}
 	at := slices.IndexFunc(j.Steps, func(o *ir.Step) bool { return o.ID == st.ID })
+	if a.Kind == actScript && at >= 0 && strings.Join(j.Steps[at].Script, "\n") == a.Script {
+		j.Env = slices.DeleteFunc(slices.Clone(j.Env), func(v ir.Var) bool { return slices.Contains(a.Vars, v.Name) })
+		j.Steps[at] = st
+		return true
+	}
 	if at >= 0 && len(j.Steps[at].Script) > 0 {
 		c.ignore(editedNote(st.ID, "script"))
 		return false

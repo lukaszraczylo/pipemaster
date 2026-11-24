@@ -40,19 +40,15 @@ type wfCtx struct {
 	j       *ir.Job
 	names   map[string]string
 	uploads map[string]bool
-	// multi is set when several pipelines share the directory.
-	multi *multiArg
-	// image is what a step without its own image runs in; a setup action replaces it for the steps after it.
-	image string
-	name  string
-	// depth is the clone depth that an actions/checkout step asked for; empty means the default clone.
-	depth string
-	jp    string
-	// pos is the place the step being written takes in the file, which the parser reads steps by.
+	multi   *multiArg
+	emul    *ir.Step
+	name    string
+	depth   string
+	jp      string
+	image   string
 	pos     int
 	finally bool
 	defImg  bool
-	// mapForm is true when the steps are written as a map keyed by name.
 	mapForm bool
 }
 

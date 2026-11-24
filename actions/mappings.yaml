@@ -27,6 +27,11 @@
 #             Target.Templated for the emitter to translate.
 #         support: {level: native|emulated|external|lost, strategy: "", caveat: ""}
 #
+# emulate: (entry level) inputs that no keyword carries. A step that sets one of them becomes a script step on
+#   every target but GHA. env maps script variables to inputs; the emitter sets them from the step's own values.
+#   host_env names the variable for the host of the action reference; external lists inputs that need
+#   something the operator creates (the level is then external).
+#
 # gating: (entry level, beside targets) input: [values]. A step whose input holds one of the values has no
 #   mapping on any target but GHA, because the input makes the step fail or branch and no other target keeps it.
 #   "*" stands for any value but empty and false.
@@ -40,6 +45,47 @@
 
 actions:
   - match: actions/checkout
+    emulate:
+      inputs: [ref, repository, path, sparse-checkout]
+      targets: [gitlab, woodpecker, drone, concourse]
+      env:
+        PIPEMASTER_CHECKOUT_REF: ref
+        PIPEMASTER_CHECKOUT_REPOSITORY: repository
+        PIPEMASTER_CHECKOUT_PATH: path
+        PIPEMASTER_CHECKOUT_SPARSE: sparse-checkout
+        PIPEMASTER_CHECKOUT_DEPTH: fetch-depth
+      defaults: {path: "."}
+      host_env: PIPEMASTER_CHECKOUT_HOST
+      external: [repository]
+      image: alpine/git:latest
+      strategy: a script step after the clone of the runner runs git for ref, repository, path and sparse-checkout
+      caveat: the step needs git in its image; a repository other than the source needs a token or secret that the operator creates, and the host is github.com unless the action names another
+      script: |
+        set -e
+        dir="${PIPEMASTER_CHECKOUT_PATH:-.}"
+        depth="${PIPEMASTER_CHECKOUT_DEPTH:-1}"
+        if [ -n "${PIPEMASTER_CHECKOUT_REPOSITORY:-}" ]; then
+          git clone "${PIPEMASTER_CHECKOUT_HOST:-https://github.com}/${PIPEMASTER_CHECKOUT_REPOSITORY}.git" "$dir"
+        elif [ "$dir" != . ]; then
+          git worktree add --detach "$dir" HEAD
+        fi
+        if [ -n "${PIPEMASTER_CHECKOUT_REF:-}" ]; then
+          if [ "$depth" = 0 ]; then
+            git -C "$dir" fetch origin "$PIPEMASTER_CHECKOUT_REF"
+          else
+            git -C "$dir" fetch --depth="$depth" origin "$PIPEMASTER_CHECKOUT_REF"
+          fi
+          git -C "$dir" checkout --force FETCH_HEAD
+        fi
+        if [ -n "${PIPEMASTER_CHECKOUT_SPARSE:-}" ]; then
+          set -f
+          old="$IFS"
+          IFS='
+        '
+          set -- $PIPEMASTER_CHECKOUT_SPARSE
+          IFS="$old"
+          git -C "$dir" sparse-checkout set -- "$@"
+        fi
     targets:
       gha: {kind: passthrough, support: {level: native}}
       gitlab:
@@ -60,13 +106,23 @@ actions:
         support: {level: native, strategy: the default clone step runs before the steps}
       tekton:
         kind: implicit
+        gating:
+          sparse-checkout: ["*"]
         with:
           fetch-depth: {to: depth, transform: depth}
+          ref: ref
+          repository: repository
+          path: path
         support: {level: emulated, strategy: StepAction ref to the tektoncd-catalog git-clone through the git resolver, caveat: the ctx-repo and ctx-sha params carry the repository and the commit}
       argo:
         kind: implicit
+        gating:
+          sparse-checkout: ["*"]
         with:
           fetch-depth: {to: depth, transform: depth}
+          ref: ref
+          repository: repository
+          path: path
         support: {level: emulated, strategy: input git artifact at /workspace, caveat: "the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set"}
       concourse:
         kind: implicit
@@ -161,6 +217,10 @@ actions:
         support: {level: emulated, strategy: the workspace output of the task, caveat: later tasks of the same job read the files and other jobs cannot}
 
   - match: actions/download-artifact
+    gating:
+      run-id: ["*"]
+      repository: ["*"]
+      pattern: ["*"]
     targets:
       gha: {kind: passthrough, support: {level: native}}
       gitlab:

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -35,13 +36,15 @@ const versionFileCaveat = "version read from file at runtime"
 
 // Target is how one provider expresses an action.
 type Target struct {
-	With      map[string]any // string, or []string for list-valued keys
+	With      map[string]any
+	Env       map[string]string
+	EnvLit    map[string]string
 	Kind      string
 	Image     string
 	Support   caps.Support
 	Script    []string
-	Unmapped  []string // `with` keys the entry does not map; the emitter must report them
-	Templated []string // sorted With keys whose value still holds `${{ }}` for the emitter to translate
+	Unmapped  []string
+	Templated []string
 }
 
 // WritesEquivalent is true when the target file holds the real equivalent of the action, so the action
@@ -57,6 +60,9 @@ var embedded []byte
 var reverseKinds = []string{"checkout", "cache", "upload", "download"}
 
 var dockerTag = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$`)
+
+// inputName is the shape of an action input name.
+var inputName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
 
 var templateVar = regexp.MustCompile(`\{\{\s*([A-Za-z0-9_-]+)\s*\}\}`)
 
@@ -98,21 +104,39 @@ func (w *withDoc) UnmarshalYAML(n *yaml.Node) error {
 	return nil
 }
 
+// emulateDoc describes the script step that stands in for inputs with no keyword on a target.
+type emulateDoc struct {
+	Env      map[string]string `yaml:"env"`
+	Defaults map[string]string `yaml:"defaults"`
+	HostEnv  string            `yaml:"host_env"`
+	Image    string            `yaml:"image"`
+	Script   string            `yaml:"script"`
+	Strategy string            `yaml:"strategy"`
+	Caveat   string            `yaml:"caveat"`
+	Inputs   []string          `yaml:"inputs"`
+	Targets  []string          `yaml:"targets"`
+	External []string          `yaml:"external"`
+}
+
 type targetDoc struct {
-	With     map[string]withDoc `yaml:"with"`
-	Defaults map[string]string  `yaml:"defaults"`
-	Support  supportDoc         `yaml:"support"`
-	Kind     string             `yaml:"kind"`
-	Image    string             `yaml:"image"`
-	Script   []string           `yaml:"script"`
+	With map[string]withDoc `yaml:"with"`
+	// Gating names inputs that make the step lost on this target alone.
+	Gating   map[string][]string `yaml:"gating"`
+	Defaults map[string]string   `yaml:"defaults"`
+	Support  supportDoc          `yaml:"support"`
+	Kind     string              `yaml:"kind"`
+	Image    string              `yaml:"image"`
+	Script   []string            `yaml:"script"`
 }
 
 type entryDoc struct {
 	Targets map[string]targetDoc `yaml:"targets"`
 	// Gating names inputs whose value makes the step fail or branch, which a target without that input cannot keep.
 	Gating map[string][]string `yaml:"gating"`
-	Match   string               `yaml:"match"`
-	Path    string               `yaml:"path"`
+	// Emulate turns a step with inputs that no keyword carries into a script step on every target but GHA.
+	Emulate *emulateDoc `yaml:"emulate"`
+	Match   string      `yaml:"match"`
+	Path    string      `yaml:"path"`
 }
 
 type fileDoc struct {
@@ -123,6 +147,7 @@ type fileDoc struct {
 type entry struct {
 	targets map[string]compiled
 	gating  map[string][]string
+	emulate *emulateDoc
 	owner   string
 	repo    string
 	path    string
@@ -175,11 +200,36 @@ func parse(src []byte) (*registry, error) {
 				return nil, fmt.Errorf("actions[%d]: gating %q needs at least one value", i, in)
 			}
 		}
-		ent := entry{owner: owner, repo: name, path: e.Path, gating: e.Gating, targets: map[string]compiled{}}
+		for in := range e.Gating {
+			if !inputName.MatchString(in) {
+				return nil, fmt.Errorf("actions[%d]: gating input %q is not an input name", i, in)
+			}
+		}
+		if em := e.Emulate; em != nil {
+			if len(em.Inputs) == 0 || em.Script == "" || len(em.Targets) == 0 {
+				return nil, fmt.Errorf("actions[%d]: emulate needs inputs and a script", i)
+			}
+			for _, in := range append(slices.Clone(em.Inputs), em.External...) {
+				if !inputName.MatchString(in) {
+					return nil, fmt.Errorf("actions[%d]: emulate input %q is not an input name", i, in)
+				}
+			}
+			for v, in := range em.Env {
+				if !inputName.MatchString(in) || v == "" {
+					return nil, fmt.Errorf("actions[%d]: emulate env %q maps to %q, which is not an input name", i, v, in)
+				}
+			}
+		}
+		ent := entry{owner: owner, repo: name, path: e.Path, gating: e.Gating, emulate: e.Emulate, targets: map[string]compiled{}}
 		for id, t := range e.Targets {
 			lvl, err := caps.ParseLevel(t.Support.Level)
 			if err != nil {
 				return nil, fmt.Errorf("actions[%d] %s: %w", i, id, err)
+			}
+			for in, vals := range t.Gating {
+				if !inputName.MatchString(in) || len(vals) == 0 {
+					return nil, fmt.Errorf("actions[%d] %s: gating %q is not an input name with values", i, id, in)
+				}
 			}
 			for in, w := range t.With {
 				if _, ok := transforms[w.Transform]; !ok {
@@ -248,12 +298,68 @@ func (r *registry) lookup(ref ir.ActionRef, target string, with map[string]strin
 		if !ok {
 			return Target{}, false
 		}
-		if provider.Family(target) != provider.GHA && gates(e.gating, with) {
+		if provider.Family(target) != provider.GHA && (gates(e.gating, with) || gates(c.doc.Gating, with)) {
 			return Target{}, false
+		}
+		if provider.Family(target) != provider.GHA && e.emulate != nil && slices.Contains(e.emulate.Targets, provider.Family(target)) && sets(withoutDefaults(with, e.emulate.Defaults), e.emulate.Inputs) {
+			return emulated(*e.emulate, ref, withoutDefaults(with, e.emulate.Defaults), resolve(c, target, with)), true
 		}
 		return resolve(c, target, with), true
 	}
 	return Target{}, false
+}
+
+// withoutDefaults drops the inputs that hold their default.
+func withoutDefaults(with, defaults map[string]string) map[string]string {
+	out := make(map[string]string, len(with))
+	for k, v := range with {
+		if d, ok := defaults[k]; !ok || strings.TrimSpace(v) != d {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+// sets is true when the step gives a non-empty value to one of the inputs.
+func sets(with map[string]string, inputs []string) bool {
+	for _, in := range inputs {
+		if strings.TrimSpace(with[in]) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// emulated builds the script target for a step whose inputs have no keyword.
+// The inputs that the target maps itself stay mapped, and the script carries only the ones it does not.
+func emulated(em emulateDoc, ref ir.ActionRef, with map[string]string, native Target) Target {
+	t := Target{Kind: KindScript, Script: []string{em.Script}, Image: em.Image, With: native.With, Env: map[string]string{}}
+	if t.With == nil {
+		t.With = map[string]any{}
+	}
+	for _, u := range native.Unmapped {
+		if !slices.Contains(em.Inputs, u) {
+			t.Unmapped = append(t.Unmapped, u)
+		}
+	}
+	for v, in := range em.Env {
+		if strings.TrimSpace(with[in]) != "" {
+			t.Env[v] = in
+		}
+	}
+	if em.HostEnv != "" {
+		host := ref.Host
+		if host == "" {
+			host = githubHost
+		}
+		t.EnvLit = map[string]string{em.HostEnv: host}
+	}
+	level := caps.Emulated
+	if sets(with, em.External) {
+		level = caps.External
+	}
+	t.Support = caps.Support{Level: level, Strategy: em.Strategy, Caveat: em.Caveat}
+	return t
 }
 
 // gatingAny in a gating list stands for every value except an empty one and false.
