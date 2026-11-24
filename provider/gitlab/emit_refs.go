@@ -49,6 +49,22 @@ func refSites(pl *ir.Pipeline) []refSite {
 			str(pos+"/"+strconv.Itoa(i), &l[i])
 		}
 	}
+	// lines positions a script by line, as Parse reads it back: an element of several lines is a block item that
+	// Parse splits. The sites of such an element point at copies, because only Emit reads a multi-line element.
+	lines := func(pos string, l []string) {
+		n := 0
+		for i := range l {
+			if !strings.Contains(l[i], "\n") {
+				str(pos+"/"+strconv.Itoa(n), &l[i])
+				n++
+				continue
+			}
+			for _, part := range strings.Split(strings.TrimRight(l[i], "\n"), "\n") {
+				str(pos+"/"+strconv.Itoa(n), &part)
+				n++
+			}
+		}
+	}
 	vars := func(pos string, vs []ir.Var) {
 		for i := range vs {
 			out = append(out, refSite{pos: pos + "/" + strconv.Itoa(i), val: &vs[i].Value})
@@ -98,7 +114,7 @@ func refSites(pl *ir.Pipeline) []refSite {
 		for _, st := range j.Steps {
 			sp := jp + "/step/" + st.ID
 			vars(sp+"/env", st.Env)
-			strs(sp+"/script", st.Script)
+			lines(sp+"/script", st.Script)
 			str(sp+"/workdir", &st.WorkDir)
 			if st.Image != nil {
 				str(sp+"/image", &st.Image.Ref)

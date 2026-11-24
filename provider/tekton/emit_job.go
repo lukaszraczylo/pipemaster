@@ -38,6 +38,12 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 	j := jp.j
 	e.foreignExt(jp.path, j.Ext)
 	if pt, ok := e.remoteTask(pp, jp); ok {
+		for _, st := range j.Steps {
+			// The parser adds this checkout step to the job of a catalog task; the taskRef written back stands for it.
+			if st != nil && e.own && st.Kind == ir.StepAction && st.ID == j.ID+"-checkout" {
+				e.skipped[jp.path+"/step/"+st.ID] = true
+			}
+		}
 		return pt, nil
 	}
 	tc := e.newTaskCtx(pp, jp)
@@ -68,6 +74,7 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 			continue
 		}
 		if tc.e.own && extOf(st.Ext)[ExtSourceCheckout] == true {
+			tc.e.skipped[jp.path+"/step/"+st.ID] = true
 			continue
 		}
 		m, err := tc.step(b, st, jp.path+"/step/"+st.ID)

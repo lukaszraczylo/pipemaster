@@ -195,6 +195,8 @@ func (b *jobBuilder) script(st *ir.Step, k *sink, t string) ([]exprtekton.EnvVar
 	defer func() { b.tx.markWS = false }()
 	var undone []string
 	for _, l := range lines {
+		l, n := b.markWorkspaceLiterals(l)
+		b.tx.wsHits += n
 		tl, err := b.tx.template(l)
 		if err != nil {
 			return nil, err
@@ -231,7 +233,7 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, cmd, args any) error {
 		}
 	}
 	line := strings.Join(words, " ")
-	st.Script = strings.Split(line, "\n")
+	st.Script = []string{line}
 	k.Out[ExtScriptLine] = line
 	k.Out[ExtCommand] = plain(cmd)
 	k.Out[ExtArgs] = plain(args)
@@ -488,19 +490,48 @@ func anyStrings(ss []string) []any {
 	return out
 }
 
+// markWorkspaceLiterals brackets each literal path under a source workspace in a script line, so that the IR
+// gets the checkout directory and the file text keeps the path. It returns the number of paths it marked.
+func (b *jobBuilder) markWorkspaceLiterals(l string) (string, int) {
+	n := 0
+	out := workspaceLiteral.ReplaceAllStringFunc(l, func(m string) string {
+		ws := strings.TrimPrefix(m, workspaceDir+"/")
+		if !b.tx.srcWS[ws] {
+			return m
+		}
+		n++
+		return litMark + ws + litMark
+	})
+	return out, n
+}
+
 // splitWorkspaceMarks resolves the marks of a template into the IR text, where a workspace path is the checkout
 // directory, and the text that keeps the workspace path as the file wrote it.
 func splitWorkspaceMarks(t string) (ir, file string) {
-	parts := strings.Split(t, wsMark)
 	var a, f strings.Builder
-	for i, p := range parts {
-		if i%2 == 0 {
-			a.WriteString(p)
-			f.WriteString(p)
-			continue
+	for len(t) > 0 {
+		i := strings.IndexAny(t, wsMark+litMark)
+		if i < 0 {
+			a.WriteString(t)
+			f.WriteString(t)
+			break
+		}
+		a.WriteString(t[:i])
+		f.WriteString(t[:i])
+		mark := t[i : i+1]
+		name, rest, ok := strings.Cut(t[i+1:], mark)
+		if !ok {
+			a.WriteString(t[i:])
+			f.WriteString(t[i:])
+			break
 		}
 		a.WriteString(checkoutDir)
-		f.WriteString(varOpen + "workspaces." + p + ".path" + varClose)
+		if mark == wsMark {
+			f.WriteString(varOpen + "workspaces." + name + ".path" + varClose)
+		} else {
+			f.WriteString(workspaceDir + "/" + name)
+		}
+		t = rest
 	}
 	return a.String(), f.String()
 }

@@ -19,11 +19,13 @@ var identRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // emitter carries the state of one Emit call: the ledger and the lost-text comments waiting for a node.
 type emitter struct {
-	led      *emitkit.Ledger
-	pl       *ir.Pipeline
-	from     *expr.Dialect
-	fold     *folded
-	deadOut  map[string]bool
+	led     *emitkit.Ledger
+	pl      *ir.Pipeline
+	from    *expr.Dialect
+	fold    *folded
+	deadOut map[string]bool
+	// noVar holds the inputs that got no variable, because another input owns the name.
+	noVar    map[string]bool
 	secrets  map[ir.FeatureUse][]string
 	comments []string
 }
@@ -250,6 +252,7 @@ func (e *emitter) field(path string, f caps.Feature, s string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	lost = append(lost, e.noVarRefs(s)...)
 	for _, l := range lost {
 		e.lose(path, f, "no GitLab variable for expression "+l)
 		e.comment(string(f) + " " + path + ": {{ " + l + " }}")
@@ -268,9 +271,8 @@ func (e *emitter) scriptLine(s string) (out, why string, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	if dead := e.deadOutputRefs(s); len(dead) > 0 {
-		lost = append(lost, dead...)
-	}
+	lost = append(lost, e.deadOutputRefs(s)...)
+	lost = append(lost, e.noVarRefs(s)...)
 	if len(lost) == 0 && strings.Contains(out, rawExprOpen) {
 		return "", "the text holds a literal " + rawExprOpen + " that GitLab never expands", nil
 	}
@@ -501,6 +503,33 @@ func (e *emitter) markDeadOutputs(pl *ir.Pipeline) error {
 		}
 	}
 	return nil
+}
+
+// dropInput records an input that got no variable.
+func (e *emitter) dropInput(name string) {
+	if e.noVar == nil {
+		e.noVar = map[string]bool{}
+	}
+	e.noVar[name] = true
+}
+
+// noVarRefs lists the references in s to an input that has no variable of its own. The shared variable name
+// would read another input.
+func (e *emitter) noVarRefs(s string) []string {
+	if len(e.noVar) == 0 {
+		return nil
+	}
+	parts, err := expr.ParseScriptTemplate(s)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, p := range parts {
+		if r, ok := p.Expr.(expr.Ref); ok && len(r.Path) == 2 && r.Path[0] == expr.PrefixInputs && e.noVar[r.Path[1]] {
+			out = append(out, expr.String(r))
+		}
+	}
+	return out
 }
 
 // deadOutputRefs lists the needs.<job>.outputs.<name> references in s whose producer cannot write them.

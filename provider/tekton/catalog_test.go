@@ -282,6 +282,7 @@ spec:
     workingDir: /workspace/src/sub
     script: |
       ls $(workspaces.src.path)/x
+      cp /workspace/src/conf /workspace/src2/conf
   - name: b
     image: alpine
     workingDir: $(workspaces.src.path)
@@ -296,7 +297,7 @@ func TestSourceWorkspaceMapsToTheCheckoutAndReturnsExactly(t *testing.T) {
 		t.Fatalf("steps = %+v", j.Steps)
 	}
 	a, b := step(t, j, "a"), step(t, j, "b")
-	if a.WorkDir != "sub" || b.WorkDir != "" || strings.Join(a.Script, "\n") != "ls ./x" {
+	if a.WorkDir != "sub" || b.WorkDir != "" || strings.Join(a.Script, "\n") != "ls ./x\ncp ./conf /workspace/src2/conf" {
 		t.Fatalf("a = %+v, b = %+v", a, b)
 	}
 	files, _, err := tekton.New().Emit(p)
@@ -307,13 +308,16 @@ func TestSourceWorkspaceMapsToTheCheckoutAndReturnsExactly(t *testing.T) {
 	for _, f := range files {
 		all.Write(f)
 	}
-	for _, want := range []string{"workingDir: /workspace/src/sub", "ls $(workspaces.src.path)/x", "workingDir: $(workspaces.src.path)"} {
+	for _, want := range []string{"workingDir: /workspace/src/sub", "ls $(workspaces.src.path)/x", "cp /workspace/src/conf /workspace/src2/conf", "workingDir: $(workspaces.src.path)"} {
 		if !strings.Contains(all.String(), want) {
 			t.Errorf("Tekton output lacks %q:\n%s", want, all.String())
 		}
 	}
 	if strings.Contains(all.String(), "name: use-checkout") {
 		t.Errorf("the synthetic checkout step reached the Tekton file:\n%s", all.String())
+	}
+	if strings.Contains(all.String(), "use-checkout") {
+		t.Errorf("the file names the checkout step that it does not write:\n%s", all.String())
 	}
 }
 

@@ -100,6 +100,7 @@ func (e *emitter) document(pl *ir.Pipeline) (*yaml.Node, error) {
 	if err := e.markDeadOutputs(pl); err != nil {
 		return nil, err
 	}
+	e.markUnownedInputs(pl)
 	e.foreignExt("pipeline/"+pl.ID, pl.Ext)
 	if !pipelineName(pl.Name) {
 		e.loseName("pipeline/"+pl.ID, pl.Name, "")
@@ -244,6 +245,23 @@ func (e *emitter) headerKeys(m *omap, pl *ir.Pipeline, ext map[string]any, c *pi
 		return nil, err
 	}
 	return append(marks, rm...), nil
+}
+
+// markUnownedInputs records the inputs of pl that pipelineVars leaves without a variable, before any script
+// that reads them is converted.
+func (e *emitter) markUnownedInputs(pl *ir.Pipeline) {
+	if _, header := extOf(pl.Ext)[extSpec]; header {
+		return
+	}
+	vars := append([]ir.Var{}, pl.Env...)
+	for _, in := range pl.Inputs {
+		name := inputVar(in.Name)
+		if name == "" || hasVar(vars, name) {
+			e.dropInput(in.Name)
+			continue
+		}
+		vars = append(vars, ir.Var{Name: name})
+	}
 }
 
 // pipelineVars joins pipeline env with the inputs, which GitLab can only carry as variables with a description.

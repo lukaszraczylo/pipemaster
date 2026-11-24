@@ -1,9 +1,16 @@
 package roundtrip_test
 
 import (
+	"bytes"
+	"errors"
+	"io"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
+	"testing/fstest"
+
+	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/provider"
 )
@@ -124,10 +131,145 @@ func TestCorpus69LocalTaskJobsWork(t *testing.T) {
 			t.Errorf("%s lacks its command:\n%s", name, b)
 		}
 	}
+	items := commandItems(t, emitCorpus69Files(t, provider.GitLab))
+	assertOneCommandItem(t, items, "Applying manifests in k8s directory")
+	assertOneCommandItem(t, items, "oc patch deployment")
 	if !strings.Contains(jobs["gha apply-manifests"], "uses: actions/checkout@") {
 		t.Error("the GHA apply-manifests job needs its own checkout")
 	}
 	if !strings.Contains(jobs["gitlab update"], "$deployment_name") || !strings.Contains(jobs["gha update-deployment"], "${{ inputs.deployment-name }}") {
 		t.Error("update-deployment must read the hyphenated input in both targets")
+	}
+}
+
+// emitCorpus69Files converts corpus entry 69 and returns the emitted files by name.
+func emitCorpus69Files(t *testing.T, to string) map[string][]byte {
+	t.Helper()
+	proj, _, err := prov(t, provider.Tekton).Parse(os.DirFS(catalogCorpus))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, _, err := prov(t, to).Emit(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// commandItems returns every string item of a script or commands list in the emitted files.
+func commandItems(t *testing.T, files map[string][]byte) []string {
+	t.Helper()
+	var items []string
+	var walk func(n any)
+	walk = func(n any) {
+		switch v := n.(type) {
+		case map[string]any:
+			for k, c := range v {
+				if l, ok := c.([]any); ok && (k == "script" || k == "commands") {
+					for _, it := range l {
+						if s, ok := it.(string); ok {
+							items = append(items, s)
+						}
+					}
+				}
+				walk(c)
+			}
+		case []any:
+			for _, c := range v {
+				walk(c)
+			}
+		}
+	}
+	for name, data := range files {
+		dec := yaml.NewDecoder(bytes.NewReader(data))
+		for {
+			var doc any
+			if err := dec.Decode(&doc); err != nil {
+				if !errors.Is(err, io.EOF) {
+					t.Fatalf("%s is not valid YAML: %v", name, err)
+				}
+				break
+			}
+			walk(doc)
+		}
+	}
+	return items
+}
+
+// assertOneCommandItem requires that the item holding marker is one command that bash accepts whole: an item
+// that a runner executes by itself cannot leave a quote open for the next item.
+func assertOneCommandItem(t *testing.T, items []string, marker string) string {
+	t.Helper()
+	var found []string
+	for _, it := range items {
+		if strings.Contains(it, marker) {
+			found = append(found, it)
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("%q is in %d script items, want 1:\n%q", marker, len(found), items)
+	}
+	syntax := exec.Command("bash", "-n")
+	syntax.Stdin = strings.NewReader(found[0])
+	if out, err := syntax.CombinedOutput(); err != nil {
+		t.Errorf("the item holding %q is not valid shell on its own: %v\n%s\n%s", marker, err, out, found[0])
+	}
+	if !strings.Contains(found[0], "bash -c") {
+		t.Errorf("the item holding %q lost its bash -c command:\n%s", marker, found[0])
+	}
+	return found[0]
+}
+
+func TestCorpus69BashCommandIsOneBalancedItem(t *testing.T) {
+	for _, to := range []string{provider.GitLab, provider.Drone, provider.Woodpecker} {
+		t.Run(to, func(t *testing.T) {
+			items := commandItems(t, emitCorpus69Files(t, to))
+			assertOneCommandItem(t, items, "Applying manifests in k8s directory")
+			if to != provider.GitLab {
+				// Drone and Woodpecker have no pipeline inputs: the step that reads one is reported lost.
+				return
+			}
+			it := assertOneCommandItem(t, items, "oc patch deployment")
+			if !strings.Contains(it, "$deployment_name") || strings.Contains(it, "inputs.") {
+				t.Errorf("the input reference is not translated:\n%s", it)
+			}
+		})
+	}
+}
+
+func TestCorpus69GitLabReturnsTheInputReference(t *testing.T) {
+	out := emitCorpus69Files(t, provider.GitLab)
+	fs := fstest.MapFS{}
+	for n, d := range out {
+		fs[n] = &fstest.MapFile{Data: d}
+	}
+	proj, rep, err := prov(t, provider.GitLab).Parse(fs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range rep.Entries {
+		if strings.Contains(e.Detail, "marker ignored") {
+			t.Errorf("a marker was ignored: %s %s", e.IRPath, e.Detail)
+		}
+	}
+	back, _, err := prov(t, provider.Tekton).Emit(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var all strings.Builder
+	for _, d := range back {
+		all.Write(d)
+	}
+	if !strings.Contains(all.String(), "$(params.deployment-name)") || strings.Contains(all.String(), "$deployment_name") {
+		t.Errorf("the return trip lost the input reference:\n%s", all.String())
+	}
+}
+
+func TestCorpus69TektonReportNamesNoUnwrittenCheckout(t *testing.T) {
+	files, rep := emitCorpus69(t, provider.Tekton)
+	for _, l := range strings.Split(files+"\n"+rep, "\n") {
+		if strings.Contains(l, "-checkout") && strings.Contains(l, "step.action") {
+			t.Errorf("an entry names a checkout step that the file does not write: %s", l)
+		}
 	}
 }

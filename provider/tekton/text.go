@@ -20,6 +20,12 @@ const checkoutDir = "."
 // wsMark brackets the name of a workspace in a template while script() splits the text into its two spellings.
 const wsMark = "\x00"
 
+// litMark brackets the name of a workspace in a literal /workspace/<name> path of a script line.
+const litMark = "\x01"
+
+// workspaceLiteral matches the path of a workspace as a script writes it by hand.
+var workspaceLiteral = regexp.MustCompile(`/workspace/[A-Za-z0-9_.-]+`)
+
 const (
 	varOpen  = "$("
 	varClose = ")"

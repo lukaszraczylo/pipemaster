@@ -2,6 +2,7 @@ package tekton
 
 import (
 	"go.yaml.in/yaml/v3"
+	"slices"
 
 	"fmt"
 	"sort"
@@ -44,7 +45,7 @@ func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) 
 	e := &emitter{
 		led: emitkit.NewLedger("ir", dialect, a.Caps()), origin: origin, own: origin == dialect,
 		files: map[string][]*outDoc{}, owners: map[string]*outDoc{}, marked: map[ir.FeatureUse]bool{},
-		taken: map[string]bool{}, made: map[string]bool{},
+		taken: map[string]bool{}, made: map[string]bool{}, skipped: map[string]bool{},
 	}
 	uses := ir.Features(p)
 	for _, u := range uses {
@@ -57,6 +58,9 @@ func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) 
 	if err != nil {
 		return nil, rep, fmt.Errorf("%s: %w", dialect, err)
 	}
+	rep.Entries = slices.DeleteFunc(rep.Entries, func(en report.Entry) bool {
+		return en.Feature == caps.StepAction && e.skipped[en.IRPath]
+	})
 	e.markEmulations(rep)
 	files, err := e.render()
 	if err != nil {
@@ -95,6 +99,8 @@ type emitter struct {
 	// keptEntries holds the names of EventListener entries that a Tekton file kept, so a generated one is not written twice.
 	keptEntries map[string]bool
 	plans       []*plan
+	// skipped holds the paths of the parser-added checkout steps that the file does not write.
+	skipped map[string]bool
 	// listeners are the EventListeners in order of first use.
 	listeners []*listener
 	// own is true when the project came from Tekton, so its Ext keys are ours to write back.

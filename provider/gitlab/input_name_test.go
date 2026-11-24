@@ -41,3 +41,26 @@ func TestInputNamesThatShareAVariableAreReported(t *testing.T) {
 		t.Errorf("no collision entry: %+v", rep.Entries)
 	}
 }
+
+func TestMultiLineScriptElementKeepsItsInputReferences(t *testing.T) {
+	p := inputProject("dep-name")
+	p.Pipelines[0].Jobs[0].Steps[0].Script = []string{"bash -c 'echo a\necho ${{ inputs.dep-name }}\necho b'"}
+	doc := emitDoc(t, p)
+	got, _ := parseFiles(t, map[string]string{rootFile: doc})
+	want := []string{"bash -c 'echo a", "echo ${{ inputs.dep-name }}", "echo b'"}
+	if s := got.Pipelines[0].Jobs[0].Steps[0].Script; strings.Join(s, "|") != strings.Join(want, "|") {
+		t.Errorf("script = %q, want %q\n%s", s, want, doc)
+	}
+}
+
+func TestReferenceToAnInputWithoutAVariableIsReported(t *testing.T) {
+	p := inputProject("a-b", "a_b")
+	p.Pipelines[0].Jobs[0].Steps[0].Script = []string{"echo ${{ inputs.a_b }}"}
+	doc, rep, err := gitlab.New().Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(doc[rootFile]), "- echo $a_b") || !hasEntry(rep, "no GitLab variable for expression inputs.a_b") {
+		t.Errorf("the reference to the second input aliases the first:\n%s\n%+v", doc[rootFile], rep.Entries)
+	}
+}

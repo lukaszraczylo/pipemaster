@@ -186,6 +186,7 @@ func (e *emitter) foldShared(pp string, pl *ir.Pipeline) (vars []ir.Var, group s
 		name := inputVar(in.Name)
 		if name == "" || hasVar(vars, name) {
 			e.lose(pp, caps.PipelineInputs, "input "+in.Name+" is not a unique variable name; the variable "+name+" is taken")
+			e.dropInput(in.Name)
 			continue
 		}
 		vars = append(vars, ir.Var{Name: name, Value: ir.Value{Lit: in.Default}})
