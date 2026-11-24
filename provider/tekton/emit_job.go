@@ -54,7 +54,10 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 	tc := e.newTaskCtx(pp, jp)
 	tc.doc = &outDoc{}
 	e.owners[jp.path] = tc.doc
-	jc := tc.cond(jp.path, caps.JobIf, j.If, pipelineScope)
+	jc, viaChanges := tc.changesCond(jp.path, j.If)
+	if !viaChanges {
+		jc = tc.cond(jp.path, caps.JobIf, j.If, pipelineScope)
+	}
 	b := &stepBook{guard: jc.guard, names: map[string]bool{}}
 	if jc.guard != nil {
 		if err := tc.markJobGuard(jp.path, j.If, jc.guard); err != nil {

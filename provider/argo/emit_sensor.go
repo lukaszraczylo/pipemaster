@@ -49,6 +49,14 @@ func ctxSource(name, event string, tag bool) (eventSrc, bool) {
 			return eventSrc{key: "body.after"}, true
 		}
 		return eventSrc{key: "body.pull_request.head.sha"}, true
+	case "ctx-before-sha":
+		if push {
+			return eventSrc{key: "body.before"}, true
+		}
+	case "ctx-pr-base-sha":
+		if !push {
+			return eventSrc{key: "body.pull_request.base.sha"}, true
+		}
 	case "ctx-repo":
 		return eventSrc{key: pathRepo}, true
 	case "ctx-actor":

@@ -7,6 +7,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 // ctxOrder lists the canonical context names in the order the pipeline declares their params.
@@ -28,10 +29,12 @@ type plan struct {
 	// renamed maps a Pipeline param that an input was renamed to back to the IR input name.
 	renamed map[string]string
 	// ctx names the reserved ctx-* params that some task reads.
-	ctx  map[string]bool
-	name string
-	path string
-	jobs []*jobPlan
+	ctx map[string]bool
+	// changes holds the path plans that the generated task pipemaster-changes computes.
+	changes []emitkit.ChangesPlan
+	name    string
+	path    string
+	jobs    []*jobPlan
 	// ws is true when a task mounts the shared workspace; checkout is true when one clones the repository.
 	ws, checkout bool
 }

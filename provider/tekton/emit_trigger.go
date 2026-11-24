@@ -239,6 +239,14 @@ func ctxOverlay(kind ir.TriggerKind, ctx string) string {
 		if pr {
 			return "body.pull_request.head.ref"
 		}
+	case expr.CtxBeforeSHA:
+		if push || tag {
+			return "body.before"
+		}
+	case expr.CtxPRBaseSHA:
+		if pr {
+			return "body.pull_request.base.sha"
+		}
 	case expr.CtxPRBaseRef:
 		if pr {
 			return "body.pull_request.base.ref"

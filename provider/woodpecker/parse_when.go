@@ -103,17 +103,29 @@ func (s *whenSpec) stripChanges(a *changesArg) {
 		return
 	}
 	src, err := expr.ParseCanonical(a.Src)
-	globs, ok := expr.ChangesGlobs(src)
-	if err != nil || !ok {
+	if err != nil || !expr.HasChanges(src) {
 		return
+	}
+	var globs [][]string
+	for _, at := range expr.ChangesAtoms(src) {
+		g, _ := expr.ChangesGlobs(at)
+		globs = append(globs, g)
 	}
 	if a.Synth {
 		s.items = nil
 		return
 	}
 	for i := range s.items {
-		if slices.Equal(s.items[i].path.Include, globs) && len(s.items[i].path.Exclude) == 0 {
+		if slices.ContainsFunc(globs, func(g []string) bool { return slices.Equal(s.items[i].path.Include, g) }) && len(s.items[i].path.Exclude) == 0 {
 			s.items[i].path, s.items[i].pathNoEmpty = wpexpr.Filter{}, false
+		}
+		if a.Evaluate != "" {
+			ev := s.items[i].item.Evaluate
+			if rest, ok := strings.CutSuffix(ev, ") && ("+a.Evaluate+")"); ok && strings.HasPrefix(rest, "(") {
+				s.items[i].item.Evaluate = strings.TrimPrefix(rest, "(")
+			} else if ev == a.Evaluate {
+				s.items[i].item.Evaluate = ""
+			}
 		}
 	}
 }

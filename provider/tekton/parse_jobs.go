@@ -25,6 +25,7 @@ func (c *plCtx) jobs(pl *ir.Pipeline, tasks, finally any) error {
 	if err != nil {
 		return err
 	}
+	regular = withoutChangesTask(regular)
 	c.srcWS = c.sourceWorkspaces(append(append([]*omap{}, regular...), fin...))
 	for _, m := range append(append([]*omap{}, regular...), fin...) {
 		name, ok := text(m.Vals["name"])

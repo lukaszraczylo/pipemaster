@@ -92,6 +92,9 @@ func (e *emitter) pipeline(pp *plan) error {
 			tasks = append(tasks, pt.N)
 		}
 	}
+	if len(pp.changes) > 0 {
+		tasks = append([]*yaml.Node{e.changesPipelineTask(pp)}, tasks...)
+	}
 	spec := newMap()
 	if v, ok := x["description"]; ok {
 		spec.Set("description", e.node(pp.path, "description", v))

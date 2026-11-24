@@ -106,6 +106,7 @@ func (b *jobBuilder) collapse() {
 	if b.marks == nil {
 		return
 	}
+	b.collapseChanges()
 	b.collapseJobGuard()
 	b.collapseNoop()
 	b.collapseImages()

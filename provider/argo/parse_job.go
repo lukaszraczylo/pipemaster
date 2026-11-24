@@ -109,6 +109,9 @@ func (b *jobBuilder) header(r *reader) error {
 			return fmt.Errorf("dependencies must be a list of task names")
 		}
 		for _, n := range names {
+			if n == changesTask {
+				continue
+			}
 			if err := b.need(n); err != nil {
 				return fmt.Errorf("dependencies %w", err)
 			}
@@ -125,7 +128,12 @@ func (b *jobBuilder) header(r *reader) error {
 		if !isText {
 			return fmt.Errorf("when must be a string")
 		}
-		if w != disabledWhen() || !b.disabledMarker() {
+		var ch changesArg
+		if w != "" && markerArg(b.c.src.doc.Head, b.path, caps.JobIf, &ch) && ch.When == w {
+			if src, err := expr.ParseCanonical(ch.Src); err == nil {
+				b.job.If = andExpr(b.job.If, src)
+			}
+		} else if w != disabledWhen() || !b.disabledMarker() {
 			b.job.If = andExpr(b.job.If, b.when(w, r.Line("when")))
 		} else {
 			restoredIf = true

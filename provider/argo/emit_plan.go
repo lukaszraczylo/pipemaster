@@ -7,6 +7,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -26,9 +27,11 @@ var ctxOrder = ctxparam.Names()
 
 // plan is the names and shared state of one pipeline.
 type plan struct {
-	pl   *ir.Pipeline
-	doc  *outDoc
-	byID map[string]*jobPlan
+	// changes holds the path plans that the generated task pipemaster-changes computes.
+	changes []emitkit.ChangesPlan
+	pl      *ir.Pipeline
+	doc     *outDoc
+	byID    map[string]*jobPlan
 	// inputs maps an IR input name to its parameter name.
 	inputs map[string]string
 	// renamed maps a parameter that an input was renamed to back to the IR input name.

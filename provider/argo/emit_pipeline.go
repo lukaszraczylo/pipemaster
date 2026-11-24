@@ -76,6 +76,10 @@ func (e *emitter) pipelineDoc(pp *plan) error {
 		}
 		tmpls = append(tmpls, out.tmpls...)
 	}
+	if len(pp.changes) > 0 {
+		task, tmpl := e.changesTemplate(pp)
+		tasks, tmpls = append([]*yaml.Node{task}, tasks...), append([]*yaml.Node{tmpl}, tmpls...)
+	}
 	e.markPipelineEnv(pl, pp.path)
 	if len(tasks) == 0 {
 		tasks, tmpls = e.placeholder(pp, tasks, tmpls)

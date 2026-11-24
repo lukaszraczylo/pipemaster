@@ -13,6 +13,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
 	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
+	wpexpr "github.com/lukaszraczylo/pipemaster/expr/woodpecker"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -531,7 +532,7 @@ func wpEvent(s scenario) string {
 // other event passes it, as the Woodpecker workflow syntax documents.
 func wpRuns(w wpWhen, s scenario, changed bool) bool {
 	for _, e := range w {
-		if e.Evaluate == "false" {
+		if e.Evaluate == "false" || e.Evaluate != "" && !wpEvaluate(e.Evaluate, s) {
 			continue
 		}
 		if ev := anyList(e.Event); len(ev) > 0 && !slices.Contains(ev, wpEvent(s)) {
@@ -546,6 +547,30 @@ func wpRuns(w wpWhen, s scenario, changed bool) bool {
 		return true
 	}
 	return false
+}
+
+// wpEvaluate evaluates the evaluate text of an entry against the scenario: Woodpecker holds the branch of the run,
+// and the target branch (main) on a pull request.
+func wpEvaluate(text string, s scenario) bool {
+	x, err := wpexpr.Parse(text)
+	if err != nil {
+		panic(err)
+	}
+	env := glRun{"event": wpEvent(s), "branch": "main"}
+	if name, ok := s.gh["ref_name"].(string); ok && s.push && !s.tag {
+		env["branch"] = name
+	}
+	if s.tag {
+		// The model follows the facts of the existing emitter: a tag run has no branch.
+		delete(env, "branch")
+		env["tag"] = s.gh["ref_name"].(string)
+	}
+	v, err := expr.Eval(x, wpexpr.UnsetEnv{Env: env}, wpexpr.Semantics)
+	if err != nil {
+		panic(err)
+	}
+	b, _ := v.(bool)
+	return b
 }
 
 // wpListsEvent is true when some entry names the scenario's event; an event no entry names is a trigger difference,
@@ -573,8 +598,8 @@ func TestGitlabChangesRunOnWoodpeckerNeverWhereGitLabSkips(t *testing.T) {
 	}{
 		{name: "changes only", rules: []arm{{Changes: goGlobs}}, native: true},
 		{name: "changes under workflow triggers", workflow: mrOrMain, rules: []arm{{Changes: goGlobs}}, native: true},
-		{name: "changes and if", rules: []arm{{If: onMain, Changes: goGlobs}}},
-		{name: "two changes arms", rules: []arm{{Changes: []string{"**/*.go"}}, {Changes: []string{"Makefile"}}}},
+		{name: "changes and if", rules: []arm{{If: onMain, Changes: goGlobs}}, native: true},
+		{name: "two changes arms", rules: []arm{{Changes: []string{"**/*.go"}}, {Changes: []string{"Makefile"}}}, native: true},
 		{name: "glob with a class", rules: []arm{{Changes: []string{"src/[ab].go"}}}},
 	}
 	for _, c := range cases {

@@ -191,6 +191,9 @@ func (tc *jobCtx) condition() taskCond {
 	if j.If == nil {
 		return c
 	}
+	if cc, ok := tc.changesCond(c); ok {
+		return cc
+	}
 	fail := func(detail string) taskCond {
 		tc.e.lose(path, caps.JobIf, detail)
 		c.disabled = true

@@ -796,7 +796,7 @@ func restoreChanges(rep *report.Report, w *workflow) {
 			continue
 		}
 		src, err := expr.ParseCanonical(a.Paths.Src)
-		if _, ok := expr.ChangesGlobs(src); err != nil || !ok || w.job.If != nil {
+		if err != nil || !expr.HasChanges(src) || w.job.If != nil {
 			reportUncollapsed(rep, u, "the file edit changed the path filter, so the parsed one stands")
 			continue
 		}

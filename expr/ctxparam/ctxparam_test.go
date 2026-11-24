@@ -41,7 +41,7 @@ func TestParam(t *testing.T) {
 func TestNamesCoverTheCanonicalContext(t *testing.T) {
 	want := []string{
 		expr.CtxBranch, expr.CtxTag, expr.CtxEvent, expr.CtxSHA, expr.CtxRepo, expr.CtxActor, expr.CtxPRNumber,
-		expr.CtxRefName, expr.CtxRefType, expr.CtxRef, expr.CtxPRHeadRef, expr.CtxPRBaseRef,
+		expr.CtxRefName, expr.CtxRefType, expr.CtxRef, expr.CtxPRHeadRef, expr.CtxPRBaseRef, expr.CtxBeforeSHA, expr.CtxPRBaseSHA,
 	}
 	if got := ctxparam.Names(); !reflect.DeepEqual(got, want) {
 		t.Errorf("Names() = %v; want %v", got, want)

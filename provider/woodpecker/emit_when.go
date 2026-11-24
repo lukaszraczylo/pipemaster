@@ -13,6 +13,7 @@ import (
 	wpexpr "github.com/lukaszraczylo/pipemaster/expr/woodpecker"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -704,9 +705,11 @@ func completeEvents(entries []whenEntry) []whenEntry {
 // changesArg marks a workflow whose job condition is a path predicate that the file states as a path filter on its
 // push and pull request entries. Synth is true when the emitter made the entries, so the pipeline had no triggers.
 type changesArg struct {
-	Src   string `json:"src"`
-	From  string `json:"from,omitempty"`
-	Synth bool   `json:"synth,omitempty"`
+	Src  string `json:"src"`
+	From string `json:"from,omitempty"`
+	// Evaluate is the text of the rest of the condition, which the entries carry beside the path filter.
+	Evaluate string `json:"evaluate,omitempty"`
+	Synth    bool   `json:"synth,omitempty"`
 }
 
 // fnmatchExact is true for a GitLab glob (Ruby fnmatch with FNM_PATHNAME) that doublestar reads the same: literal
@@ -724,13 +727,16 @@ func fnmatchExact(g string) bool {
 	return !strings.HasSuffix(g, "**")
 }
 
-// changesWhen states a job condition that is one path predicate as a path filter. Woodpecker applies a path filter
-// to push and pull request events only and treats any other event as a match, as GitLab does for changes. A push
-// that creates a branch is compared with its own commits, where GitLab counts every path as changed, so the filter
-// can skip a run GitLab makes; it never runs one GitLab skips. Any other condition shape is disabled and reported.
+// changesWhen states a job condition that holds path predicates. Woodpecker applies a path filter to push and pull
+// request events only and treats any other event as a match, as GitLab does for changes. A when list is an OR of
+// entries, and the keys of one entry are an AND, so the condition must read as "one of these predicates, and the
+// rest": each predicate gets an entry with its path filter, and the rest of the condition goes into the evaluate
+// text of the same entry. A push that creates a branch is compared with its own commits, where GitLab counts every
+// path as changed, so the filter can skip a run GitLab makes; it never runs one GitLab skips. Any other condition
+// shape is disabled and reported.
 func (e *emitter) changesWhen(j *ir.Job, jp string, finally bool, base []whenEntry) ([]whenEntry, error) {
-	globs, ok := expr.ChangesGlobs(j.If)
-	if !ok || !slices.ContainsFunc(globs, func(string) bool { return true }) || slices.ContainsFunc(globs, func(g string) bool { return !fnmatchExact(g) }) || e.from == nil || e.from.ID != provider.GitLab {
+	atoms, rest, ok := e.pathAtoms(jp, j.If)
+	if !ok {
 		e.disable(jp, caps.JobIf, j.If, "the workflow")
 		if j.Manual {
 			e.lose(jp, caps.JobManual, "a workflow that never runs has no manual start")
@@ -763,19 +769,27 @@ func (e *emitter) changesWhen(j *ir.Job, jp string, finally bool, base []whenEnt
 			}
 		}
 		if len(with) > 0 {
-			w := ent
-			w.Event.Include = with
-			w.path, w.pathNoEmpty = wpexpr.Filter{Include: slices.Clone(globs)}, true
-			out = append(out, w)
+			for _, globs := range atoms {
+				w := ent
+				w.Event.Include = with
+				w.path, w.pathNoEmpty = wpexpr.Filter{Include: slices.Clone(globs)}, true
+				w.Evaluate = andText(w.Evaluate, rest)
+				out = append(out, w)
+			}
 		}
 		if len(without) > 0 {
 			w := ent
 			w.Event.Include = without
+			w.Evaluate = andText(w.Evaluate, rest)
 			out = append(out, w)
 		}
 	}
-	e.emulate(jp, caps.JobIf, "when path", "the path filter applies to push and pull request events and every other event runs, as GitLab rules:changes does; a push that creates a branch is compared with its own commits; on_empty: false skips a push with no changed paths, as GitLab does; a project setting ignore_message can skip path conditions altogether")
-	if err := e.markArg(caps.JobIf, jp, gateArg{Paths: &changesArg{Src: expr.String(j.If), From: e.from.ID, Synth: synth}}); err != nil {
+	detail := "the path filter applies to push and pull request events and every other event runs, as GitLab rules:changes does; a push that creates a branch is compared with its own commits; on_empty: false skips a push with no changed paths, as GitLab does; a project setting ignore_message can skip path conditions altogether"
+	if rest != "" {
+		detail += "; the rest of the condition is the evaluate text of the same entries"
+	}
+	e.emulate(jp, caps.JobIf, "when path", detail)
+	if err := e.markArg(caps.JobIf, jp, gateArg{Paths: &changesArg{Src: expr.String(j.If), From: e.from.ID, Synth: synth, Evaluate: rest}}); err != nil {
 		e.comment("job condition marker not carried: " + err.Error())
 	}
 	var status []string
@@ -783,4 +797,75 @@ func (e *emitter) changesWhen(j *ir.Job, jp string, finally bool, base []whenEnt
 		status = []string{statusOK, statusFail}
 	}
 	return withStatus(out, status), nil
+}
+
+// pathAtoms splits a condition into the globs of the predicates that any one of them satisfies and the evaluate
+// text of the rest. ok is false when the condition is not "one of these predicates and the rest".
+func (e *emitter) pathAtoms(jp string, x expr.Expr) (atoms [][]string, rest string, ok bool) {
+	plan, ok := emitkit.DecomposeChanges(x)
+	if !ok || e.from == nil || e.from.ID != provider.GitLab {
+		return nil, "", false
+	}
+	for _, a := range plan.Atoms {
+		if slices.ContainsFunc(a.Globs, func(g string) bool { return !fnmatchExact(g) }) {
+			return nil, "", false
+		}
+	}
+	// The terms must be exactly the assignments in which some chosen predicate holds.
+	var pick int
+	for i := range plan.Atoms {
+		if slices.ContainsFunc(plan.Terms, func(t []bool) bool { return onlyBit(t, i) }) {
+			pick |= 1 << i
+		}
+	}
+	want := 0
+	for m := 1; m < 1<<len(plan.Atoms); m++ {
+		if m&pick != 0 {
+			want++
+		}
+	}
+	if pick == 0 || len(plan.Terms) != want {
+		return nil, "", false
+	}
+	for _, t := range plan.Terms {
+		m := 0
+		for i, v := range t {
+			if v {
+				m |= 1 << i
+			}
+		}
+		if m&pick == 0 {
+			return nil, "", false
+		}
+	}
+	for i, a := range plan.Atoms {
+		if pick&(1<<i) != 0 {
+			atoms = append(atoms, a.Globs)
+		}
+	}
+	if plan.Residual == nil {
+		return atoms, "", true
+	}
+	items, status, good := e.condition(jp, caps.JobIf, plan.Residual, "the workflow")
+	if !good || status != nil {
+		return nil, "", false
+	}
+	we, err := wpexpr.WhenExpr(items)
+	if err != nil || we == nil {
+		return nil, "", false
+	}
+	text, err := wpexpr.Print(we)
+	if err != nil {
+		return nil, "", false
+	}
+	return atoms, text, true
+}
+
+func onlyBit(t []bool, i int) bool {
+	for j, v := range t {
+		if v != (j == i) {
+			return false
+		}
+	}
+	return true
 }
