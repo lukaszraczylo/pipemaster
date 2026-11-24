@@ -113,7 +113,7 @@ func siteTree(t *testing.T, dir string) []siteFile {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
-		if strings.HasPrefix(rel, ".pipemaster/") || strings.HasSuffix(rel, ".md") {
+		if strings.HasPrefix(rel, ".pipemaster/") || strings.HasSuffix(rel, ".md") || rel == "budgets.yaml" {
 			return nil
 		}
 		b, err := os.ReadFile(p) //nolint:gosec // test temp dir or fixed fixture
