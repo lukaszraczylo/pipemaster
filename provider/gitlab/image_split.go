@@ -17,12 +17,15 @@ const (
 	splitExpire   = "1 day"
 	workspacePath = "."
 	gitExclude    = ".git/**/*"
+	guardStepID   = "pipemaster-split-guard"
+	markStepID    = "pipemaster-split-ok"
+	markDir       = ".pipemaster-split"
 	splitStrategy = "one job per run of steps that share an image, chained by needs; the workspace passes on as artifacts"
 	liftStrategy  = "the shared image of the steps is the job image"
 	splitCaveat   = "GitLab sets the image per job, so the job is split into %d jobs (%s) chained by needs; each job hands the project directory minus .git to the next as artifacts that expire in " + splitExpire +
 		", so the artifact size limit of the instance applies, files outside the project directory do not carry over, a file that an earlier job deletes comes back from the checkout in the next job, and every job repeats the services and variables of the source job. " +
 		"Timeout and retry apply to each job, so the total time can reach the timeout times the job count and a retry reruns only the failed job. " +
-		"An allow_failure setting applies to every job, so a job after a tolerated failure still starts, without the artifacts of the failed job"
+		"An allow_failure setting applies to every job, and each later job first checks a marker file of the job before it and ends with success when the marker is missing"
 )
 
 // imageSplitArg is the marker argument of one job that came from a job whose steps ran in several images.
@@ -285,6 +288,14 @@ func (e *emitter) buildParts(jp string, j *ir.Job, runs []imageRun, ids []string
 			cp.Container = nil
 		}
 		isLast := i == len(runs)-1
+		if j.AllowFailure && len(runs) > 1 {
+			if i > 0 {
+				cp.Steps = append([]*ir.Step{e.guardStep(ids[i-1])}, cp.Steps...)
+			}
+			if !isLast {
+				cp.Steps = append(cp.Steps, markStep(ids[i]))
+			}
+		}
 		if i > 0 {
 			cp.Needs = []ir.Need{{JobID: ids[i-1]}}
 			cp.Manual = false
@@ -304,6 +315,26 @@ func (e *emitter) buildParts(jp string, j *ir.Job, runs []imageRun, ids []string
 		e.splits[&cp] = sp
 	}
 	return out
+}
+
+func singleQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
+
+func markFile(id string) string { return markDir + "/" + id + ".ok" }
+
+// markStep records that every step of a part ran. Its line runs only if the lines before it succeeded.
+func markStep(id string) *ir.Step {
+	return &ir.Step{ID: markStepID, Kind: ir.StepScript, Script: []string{"mkdir -p " + markDir + " && touch " + markFile(id)}}
+}
+
+// guardStep ends a part early, with success, when the part before it left no marker. A job that is allowed to
+// fail would otherwise let the later parts run after a failure, which the source never does.
+func (e *emitter) guardStep(prev string) *ir.Step {
+	from := e.origin
+	if from == "" {
+		from = "the source provider"
+	}
+	line := "[ -f " + markFile(prev) + " ] || { echo " + singleQuote("pipemaster: "+prev+" failed; skipping the steps after it, as "+from+" does") + "; exit 0; }"
+	return &ir.Step{ID: guardStepID, Kind: ir.StepScript, Script: []string{line}}
 }
 
 // splitExt copies the Ext of a source job for one part. A part that hands the workspace on writes that
@@ -400,7 +431,11 @@ func (s *state) joinChain(pl *ir.Pipeline, args map[ir.FeatureUse][]string, ref 
 	var steps []*ir.Step
 	for i, pj := range parts {
 		own := group[ref.Parts[i]].Own
-		steps = append(steps, pj.Steps...)
+		for _, st := range pj.Steps {
+			if st.ID != guardStepID && st.ID != markStepID {
+				steps = append(steps, st)
+			}
+		}
 		if pj.Container != nil {
 			for _, id := range own {
 				if s.splitImg[base] == nil {

@@ -1,10 +1,16 @@
 package gitlab_test
 
 import (
+	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
@@ -79,6 +85,9 @@ func TestImageSplitChainsJobsAndJoinsThemBack(t *testing.T) {
 	if strings.Count(doc, "allow_failure: true") != 3 || strings.Contains(doc, "when: on_failure") || strings.Contains(doc, "when: always") {
 		t.Errorf("allow_failure must be on every split job, with the default when so a failed job stops its needs chain:\n%s", doc)
 	}
+	if strings.Count(doc, "skipping the steps after it") != 2 || strings.Count(doc, "touch .pipemaster-split/") != 2 {
+		t.Errorf("an allowed failure needs a guard in jobs 2 and 3 and a marker in jobs 1 and 2:\n%s", doc)
+	}
 	if got := splitJobIDs(pl); !slices.Equal(got, []string{"build", "deploy"}) {
 		t.Fatalf("jobs after the return = %v", got)
 	}
@@ -111,7 +120,7 @@ func TestImageSplitReportsEmulationOnEveryStep(t *testing.T) {
 	if len(details) != 2 {
 		t.Fatalf("want 2 emulated entries, got %v", details)
 	}
-	for _, w := range []string{"artifact size limit", "outside the project directory", "services and variables", "deletes comes back", "timeout times the job count", "retry reruns only the failed job", "still starts"} {
+	for _, w := range []string{"artifact size limit", "outside the project directory", "services and variables", "deletes comes back", "timeout times the job count", "retry reruns only the failed job", "marker file"} {
 		if !strings.Contains(details[0], w) {
 			t.Errorf("caveat lacks %q: %s", w, details[0])
 		}
@@ -199,5 +208,88 @@ func TestImageSplitEditedChainStaysSeparate(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("no report entry for the unjoined chain: %+v", rep.Entries)
+	}
+}
+
+// runParts runs the script lines of the named jobs in order in one directory, as bash -e, and returns the exit codes.
+func runParts(t *testing.T, doc string, ids ...string) ([]int, string) {
+	t.Helper()
+	var jobs map[string]any
+	if err := yaml.Unmarshal([]byte(doc), &jobs); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	var codes []int
+	for _, id := range ids {
+		var lines []string
+		for _, l := range jobs[id].(map[string]any)["script"].([]any) {
+			lines = append(lines, l.(string))
+		}
+		cmd := exec.Command("bash", "-e", "-c", strings.Join(lines, "\n")) //nolint:gosec // the script is emitted by the test
+		cmd.Dir = dir
+		code := 0
+		if err := cmd.Run(); err != nil {
+			var ee *exec.ExitError
+			if !errors.As(err, &ee) {
+				t.Fatal(err)
+			}
+			code = ee.ExitCode()
+		}
+		codes = append(codes, code)
+	}
+	log, _ := os.ReadFile(filepath.Join(dir, "log")) //nolint:gosec // a path in the test temp dir; no log means no step ran
+	return codes, string(log)
+}
+
+func failingChain(allow bool) *ir.Project {
+	j := glJob("build", imgStep("a", "go:1", "echo a >> log"), imgStep("b", "node:20", "false", "echo b >> log"), imgStep("c", "go:1", "echo c >> log"))
+	j.AllowFailure = allow
+	return glProject("drone", j)
+}
+
+func TestImageSplitFailedMiddleJobSkipsLaterJobs(t *testing.T) {
+	doc := emitDoc(t, failingChain(true))
+	if !strings.Contains(doc, "pipemaster: build-2 failed; skipping the steps after it, as drone does") {
+		t.Fatalf("no guard message:\n%s", doc)
+	}
+	codes, log := runParts(t, doc, "build-1", "build-2", "build-3")
+	if log != "a\n" {
+		t.Errorf("steps after the failed job ran, log = %q", log)
+	}
+	if codes[0] != 0 || codes[1] == 0 || codes[2] != 0 {
+		t.Fatalf("exit codes = %v, want the failed middle job to fail and the last to end with success", codes)
+	}
+}
+
+func TestImageSplitGuardSkipsOnlyAfterAFailure(t *testing.T) {
+	ok := glProject("drone", func() *ir.Job {
+		j := glJob("build", imgStep("a", "go:1", "echo a >> log"), imgStep("b", "node:20", "echo b >> log"), imgStep("c", "go:1", "test \"$(cat log)\" = \"$(printf 'a\\nb')\" && echo c >> log"))
+		j.AllowFailure = true
+		return j
+	}())
+	doc := emitDoc(t, ok)
+	if codes, _ := runParts(t, doc, "build-1", "build-2", "build-3"); slices.Max(codes) != 0 {
+		t.Errorf("a chain without a failure must run every step in order: %v", codes)
+	}
+}
+
+func TestImageSplitSkippedJobSkipsTheNext(t *testing.T) {
+	j := glJob("build", imgStep("a", "go:1", "false"), imgStep("b", "node:20", "echo b >> log"), imgStep("c", "go:1", "echo c >> log"))
+	j.AllowFailure = true
+	doc := emitDoc(t, glProject("drone", j))
+	if codes, log := runParts(t, doc, "build-1", "build-2", "build-3"); codes[0] == 0 || codes[1] != 0 || codes[2] != 0 || log != "" {
+		t.Errorf("exit codes = %v, log = %q", codes, log)
+	}
+}
+
+func TestImageSplitNeedsNoGuardWithoutAllowFailure(t *testing.T) {
+	doc := emitDoc(t, failingChain(false))
+	for _, w := range []string{"skipping the steps", ".pipemaster-split", "allow_failure"} {
+		if strings.Contains(doc, w) {
+			t.Errorf("a job that must succeed needs no %q:\n%s", w, doc)
+		}
+	}
+	if !strings.Contains(doc, "- build-2") {
+		t.Errorf("the chain must keep its needs:\n%s", doc)
 	}
 }

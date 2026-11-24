@@ -24,6 +24,7 @@ type emitter struct {
 	// wfGuard is the workflow condition that Parse ANDed into every job; the written workflow block already says it.
 	wfGuard expr.Expr
 	from    *expr.Dialect
+	origin  string
 	fold    *folded
 	splits  map[*ir.Job]splitPart
 	noSplit map[string]string
