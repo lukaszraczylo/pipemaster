@@ -47,6 +47,7 @@ func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) 
 		files: map[string][]*outDoc{}, owners: map[string]*outDoc{}, marked: map[ir.FeatureUse]bool{},
 		taken: map[string]bool{}, made: map[string]bool{}, skipped: map[string]bool{},
 	}
+	e.gated = emitkit.GatedSteps(p)
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)
@@ -85,6 +86,8 @@ func livePipelines(p *ir.Project) []*ir.Pipeline {
 
 // emitter carries the state of one Emit call.
 type emitter struct {
+	// gated holds the action steps that a later step reads, which no target may drop.
+	gated map[*ir.Step]bool
 	led    *emitkit.Ledger
 	said   map[ir.FeatureUse][2]string
 	files  map[string][]*outDoc
@@ -116,7 +119,7 @@ type emitter struct {
 func use(path string, f caps.Feature) ir.FeatureUse { return ir.FeatureUse{IRPath: path, Feature: f} }
 
 func (e *emitter) lose(path string, f caps.Feature, detail string) {
-	if strings.Contains(path, "/step/") && (f == caps.StepScript || f == caps.StepAction || f == caps.StepImage) {
+	if strings.Contains(path, "/step/") && (f == caps.StepScript || f == caps.StepImage) {
 		e.lostWork = append(e.lostWork, path)
 	}
 	e.note(path, f, caps.Lost, "", detail)

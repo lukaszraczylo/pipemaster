@@ -27,6 +27,7 @@ func (a adapter) emit(p *ir.Project) (map[string][]byte, *report.Report, map[str
 		origin: origin, from: sourceDialect(origin), own: origin == dialect, led: emitkit.NewLedger("ir", dialect, a.Caps()),
 		stepIDs: map[string]string{},
 	}
+	e.gated = emitkit.GatedSteps(p)
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)

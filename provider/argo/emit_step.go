@@ -365,6 +365,7 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool, at int) *cont
 		with[k] = s
 	}
 	t, ok := actions.Lookup(*st.Action, dialect, with)
+	ok = ok && !e.gated[st]
 	if !ok {
 		e.lose(path, caps.StepAction, "the action "+actionRef(st.Action)+" has no Argo mapping; Argo does not run the step, and the marker and a comment keep the reference")
 		e.comment(path, "uses: "+actionRef(st.Action))
@@ -429,7 +430,7 @@ func (sx *stepCtx) placeholder(st *ir.Step, lost bool) *container {
 	c.m.Set("command", strSeq([]string{shellCommand, shellFlags}))
 	script := placeholderScript
 	if lost {
-		script = emitkit.FailLoud(caps.StepAction, path, "Argo does not run the action")
+		script = emitkit.FailLoud(caps.StepAction, path, "Argo does not run the action"+refSuffix(st))
 	}
 	c.m.Set("args", seqOf(block(script)))
 	c.m.SetStr("workingDir", workspaceMount)
@@ -526,4 +527,12 @@ func (sx *stepCtx) shellOf(st *ir.Step, path string) string {
 	}
 	sx.tc.e.lose(path, caps.StepShell, "the shell "+sh+" has no container command form; the script runs under "+shellCommand+" -ec")
 	return shellCommand
+}
+
+// refSuffix names the action of a lost step in the failing line.
+func refSuffix(st *ir.Step) string {
+	if st.Action == nil {
+		return ""
+	}
+	return " " + actionRef(st.Action)
 }

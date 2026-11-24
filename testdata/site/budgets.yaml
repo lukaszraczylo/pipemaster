@@ -37,19 +37,19 @@ gitlab:
   tekton: {placeholder: 0, lost_line: 0, disabled: 12}
   woodpecker: {placeholder: 0, lost_line: 0, disabled: 15}
 mixed-lost-steps:
-  argo: {placeholder: 4, lost_line: 0, disabled: 0}
-  concourse: {placeholder: 4, lost_line: 0, disabled: 0}
-  drone: {placeholder: 4, lost_line: 0, disabled: 0}
-  gitlab: {placeholder: 4, lost_line: 0, disabled: 0}
-  tekton: {placeholder: 4, lost_line: 0, disabled: 0}
-  woodpecker: {placeholder: 4, lost_line: 0, disabled: 0}
+  argo: {placeholder: 6, lost_line: 0, disabled: 2}
+  concourse: {placeholder: 6, lost_line: 0, disabled: 1}
+  drone: {placeholder: 6, lost_line: 0, disabled: 1}
+  gitlab: {placeholder: 6, lost_line: 0, disabled: 0}
+  tekton: {placeholder: 6, lost_line: 0, disabled: 1}
+  woodpecker: {placeholder: 6, lost_line: 0, disabled: 1}
 tekton:
   argo: {placeholder: 0, lost_line: 0, disabled: 0}
   concourse: {placeholder: 0, lost_line: 1, disabled: 0}
-  drone: {placeholder: 2, lost_line: 1, disabled: 0}
+  drone: {placeholder: 0, lost_line: 1, disabled: 0}
   gha: {placeholder: 0, lost_line: 0, disabled: 0}
   gitlab: {placeholder: 0, lost_line: 0, disabled: 7}
-  woodpecker: {placeholder: 2, lost_line: 1, disabled: 0}
+  woodpecker: {placeholder: 0, lost_line: 1, disabled: 0}
 woodpecker:
   argo: {placeholder: 4, lost_line: 0, disabled: 0}
   concourse: {placeholder: 4, lost_line: 0, disabled: 0}

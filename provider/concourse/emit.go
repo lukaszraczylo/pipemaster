@@ -61,6 +61,7 @@ func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) 
 		led: emitkit.NewLedger("ir", dialect, a.Caps()), origin: origin, own: origin == dialect,
 		owners: map[string]*outDoc{}, marked: map[ir.FeatureUse]bool{}, fileTaken: map[string]bool{},
 	}
+	e.gated = emitkit.GatedSteps(p)
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)
@@ -96,6 +97,8 @@ func livePipelines(p *ir.Project) []*ir.Pipeline {
 
 // emitter carries the state of one Emit call.
 type emitter struct {
+	// gated holds the action steps that a later step reads, which no target may drop.
+	gated map[*ir.Step]bool
 	led       *emitkit.Ledger
 	said      map[ir.FeatureUse][2]string
 	owners    map[string]*outDoc

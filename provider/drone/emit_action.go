@@ -176,6 +176,7 @@ func (e *emitter) mapAction(c *docCtx, sp string, st *ir.Step) (image, lost stri
 		with[k] = s
 	}
 	t, ok := actions.Lookup(*st.Action, dialect, with)
+	ok = ok && !e.gated[st]
 	if !ok {
 		why := "no Drone mapping for action " + actionRef(st.Action)
 		e.dropAction(sp, st, why)

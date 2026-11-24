@@ -23,9 +23,22 @@ const (
 	lostLineMark = failLoudMark + "script.interpolation "
 )
 
-// lostStepComment matches the comment that keeps the source of a step with no target form; a disabled step has
-// a comment of its own.
-var lostStepComment = regexp.MustCompile(`^# pipemaster:lost step \S+ (uses|kind|has kind|downloads)\b`)
+// lostStepComment matches the comment that keeps the source of a step with no target form, in the shape of every
+// target: "step <path or id> uses|kind|has kind|downloads ..." (GitLab, Drone, Woodpecker, Tekton) and "uses: <ref>"
+// (Argo, Concourse). A disabled step has a comment of its own. Group 1 is the step, group 2 the reference.
+var lostStepComment = regexp.MustCompile(`^# pipemaster:lost (?:step (\S+) (?:uses|kind|has kind|downloads)\b|uses: (\S+))`)
+
+// failingLineFor names what a failing line must hold to answer a lost-step comment: the step path (or its id),
+// or the action reference when the comment carries only that.
+func failingLineFor(m []string) string {
+	switch {
+	case strings.Contains(m[1], "/step/"):
+		return m[1] + ":"
+	case m[1] != "":
+		return "/step/" + m[1] + ":"
+	}
+	return m[2]
+}
 
 // budgetSamples are fixtures that only the budget test converts, beside the site samples.
 var budgetSamples = []siteSample{
@@ -59,21 +72,33 @@ var disabledMarks = map[string]*regexp.Regexp{
 func countBudget(target string, files []siteFile) budget {
 	var b budget
 	for _, f := range files {
-		lostLines, steps, comments := 0, 0, 0
+		lostLines, steps := 0, 0
+		var needles, failing []string
 		for _, line := range strings.Split(f.Text, "\n") {
 			// A marker copy in a comment holds the same text as the line it describes: count what runs.
 			if text := strings.TrimSpace(line); strings.HasPrefix(text, "#") {
-				if lostStepComment.MatchString(text) {
-					comments++
+				if m := lostStepComment.FindStringSubmatch(text); m != nil {
+					needles = append(needles, failingLineFor(m))
 				}
 				continue
 			}
 			lostLines += strings.Count(line, lostLineMark)
 			steps += strings.Count(line, failLoudMark) - strings.Count(line, lostLineMark)
+			if strings.Contains(line, failLoudMark) {
+				failing = append(failing, line)
+			}
+		}
+		// Each comment needs its own failing line for the same step, so an unrelated failing step cannot answer it.
+		for _, n := range needles {
+			i := slices.IndexFunc(failing, func(l string) bool { return strings.Contains(l, n) })
+			if i < 0 {
+				b.Silent++
+				continue
+			}
+			failing = slices.Delete(failing, i, i+1)
 		}
 		b.LostLine += lostLines
 		b.Placeholder += steps
-		b.Silent += max(0, comments-steps)
 		b.Disabled += len(disabledMarks[target].FindAllStringIndex(f.Text, -1))
 	}
 	return b

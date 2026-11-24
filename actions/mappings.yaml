@@ -27,6 +27,10 @@
 #             Target.Templated for the emitter to translate.
 #         support: {level: native|emulated|external|lost, strategy: "", caveat: ""}
 #
+# gating: (entry level, beside targets) input: [values]. A step whose input holds one of the values has no
+#   mapping on any target but GHA, because the input makes the step fail or branch and no other target keeps it.
+#   "*" stands for any value but empty and false.
+#
 # A missing image input (or only <input>-file) makes Lookup return level lost,
 # as does an image input that is an expression or not a plain Docker tag.
 # gha targets use kind passthrough: every input is kept verbatim.
@@ -71,6 +75,9 @@ actions:
         support: {level: native, strategy: the source get of the job clones the repository before the tasks, caveat: submodules and other get params are not mapped}
 
   - match: actions/cache
+    gating:
+      fail-on-cache-miss: ["*"]
+      lookup-only: ["*"]
     targets:
       gha: {kind: passthrough, support: {level: native}}
       gitlab:
@@ -111,6 +118,8 @@ actions:
         support: {level: emulated, strategy: task caches, caveat: a cache lives on the worker that ran the task and the key is not used}
 
   - match: actions/upload-artifact
+    gating:
+      if-no-files-found: [error]
     targets:
       gha: {kind: passthrough, support: {level: native}}
       gitlab:

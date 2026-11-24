@@ -1,10 +1,10 @@
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: checkout\n    ref: v4\nid: build-step-1\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: setup-go\n    ref: v5\nid: build-step-2\nkind: action\n","hold":"{\"args\":[\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: Argo does not run the action' \\u003e\\u00262; exit 1\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-2\",\"workingDir\":\"/workspace\"}","seq":1}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: setup-go\n    ref: v5\nid: build-step-2\nkind: action\n","hold":"{\"args\":[\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: Argo does not run the action actions/setup-go@v5' \\u003e\\u00262; exit 1\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-2\",\"workingDir\":\"/workspace\"}","seq":1}
 # pipemaster:lost uses: org/tool/sub@v2
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-3
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://codeberg.org\n    owner: org\n    repo: tool\n    path: sub\n    ref: v2\nid: build-step-3\nkind: action\n","hold":"{\"args\":[\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: Argo does not run the action' \\u003e\\u00262; exit 1\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-3\",\"workingDir\":\"/workspace\"}","seq":2}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://codeberg.org\n    owner: org\n    repo: tool\n    path: sub\n    ref: v2\nid: build-step-3\nkind: action\n","hold":"{\"args\":[\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: Argo does not run the action org/tool/sub@v2' \\u003e\\u00262; exit 1\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-3\",\"workingDir\":\"/workspace\"}","seq":2}
 # pipemaster:emulated step.script pipeline/ci/job/build
 # pipemaster:arg {}
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
@@ -39,7 +39,7 @@ spec:
               - sh
               - -ec
             args:
-              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: Argo does not run the action'' >&2; exit 1'
+              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: Argo does not run the action actions/setup-go@v5'' >&2; exit 1'
             workingDir: /workspace
           - name: build-step-3
             image: alpine:3.22
@@ -47,7 +47,7 @@ spec:
               - sh
               - -ec
             args:
-              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: Argo does not run the action'' >&2; exit 1'
+              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: Argo does not run the action org/tool/sub@v2'' >&2; exit 1'
             workingDir: /workspace
             dependencies:
               - build-step-2

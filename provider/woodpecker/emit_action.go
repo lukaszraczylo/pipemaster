@@ -70,6 +70,7 @@ func (e *emitter) mapAction(c *wfCtx, sp string, st *ir.Step) (image, lost strin
 		with[k] = s
 	}
 	t, ok := actions.Lookup(*st.Action, dialect, with)
+	ok = ok && !e.gated[st]
 	if !ok {
 		why := "no Woodpecker mapping for action " + actionRef(st.Action)
 		e.dropAction(sp, st, why)

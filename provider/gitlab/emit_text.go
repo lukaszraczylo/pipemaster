@@ -19,6 +19,8 @@ var identRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // emitter carries the state of one Emit call: the ledger and the lost-text comments waiting for a node.
 type emitter struct {
+	// gated holds the action steps that a later step reads, which no target may drop.
+	gated map[*ir.Step]bool
 	led *emitkit.Ledger
 	pl  *ir.Pipeline
 	// wfGuard is the workflow condition that Parse ANDed into every job; the written workflow block already says it.

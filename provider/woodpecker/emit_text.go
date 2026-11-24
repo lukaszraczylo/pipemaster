@@ -32,6 +32,8 @@ const (
 
 // emitter carries the state of one Emit call: the ledger and the comment lines of the file being written.
 type emitter struct {
+	// gated holds the action steps that a later step reads, which no target may drop.
+	gated map[*ir.Step]bool
 	led *emitkit.Ledger
 	// origin is the provider ID the project was parsed from.
 	origin string
@@ -72,7 +74,7 @@ func (e *emitter) noteLost(path string, f caps.Feature, detail string) {
 
 // noteLostWork remembers a step whose work has no Woodpecker form, so an empty job can tell it from one with no work.
 func (e *emitter) noteLostWork(path string, f caps.Feature) {
-	if strings.Contains(path, "/step/") && (f == caps.StepScript || f == caps.StepAction || f == caps.StepImage) {
+	if strings.Contains(path, "/step/") && (f == caps.StepScript || f == caps.StepImage) {
 		e.lostWork = append(e.lostWork, path)
 	}
 }

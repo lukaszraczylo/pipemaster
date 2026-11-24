@@ -138,6 +138,7 @@ func (e *emitter) actionStep(p *jobPrep, st *ir.Step) error {
 		with[k] = s
 	}
 	t, ok := actions.Lookup(*st.Action, "gitlab", with)
+	ok = ok && !e.gated[st]
 	if !ok {
 		e.lose(sp, caps.StepAction, "no GitLab mapping for action "+ghaRef(st.Action))
 		e.unappliedFields(sp, st, "the step is lost")

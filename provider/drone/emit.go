@@ -74,6 +74,7 @@ func (a adapter) emit(p *ir.Project) (map[string][]byte, *report.Report, map[str
 			e.from = from
 		}
 	}
+	e.gated = emitkit.GatedSteps(p)
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)

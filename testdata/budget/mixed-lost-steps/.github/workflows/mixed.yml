@@ -17,3 +17,15 @@ jobs:
           path: ~/.cache
           key: k-${{ hashFiles('go.sum') }}
           fail-on-cache-miss: true
+      - id: warm
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: m2
+      - run: make deps
+        if: steps.warm.outputs.cache-hit != 'true'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bin
+          path: out
+          if-no-files-found: error

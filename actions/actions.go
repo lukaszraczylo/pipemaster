@@ -109,6 +109,8 @@ type targetDoc struct {
 
 type entryDoc struct {
 	Targets map[string]targetDoc `yaml:"targets"`
+	// Gating names inputs whose value makes the step fail or branch, which a target without that input cannot keep.
+	Gating map[string][]string `yaml:"gating"`
 	Match   string               `yaml:"match"`
 	Path    string               `yaml:"path"`
 }
@@ -120,6 +122,7 @@ type fileDoc struct {
 
 type entry struct {
 	targets map[string]compiled
+	gating  map[string][]string
 	owner   string
 	repo    string
 	path    string
@@ -167,7 +170,12 @@ func parse(src []byte) (*registry, error) {
 		if !ok || owner == "" || name == "" || strings.Contains(name, "/") {
 			return nil, fmt.Errorf("actions[%d]: match %q must be owner/repo", i, e.Match)
 		}
-		ent := entry{owner: owner, repo: name, path: e.Path, targets: map[string]compiled{}}
+		for in, vals := range e.Gating {
+			if len(vals) == 0 {
+				return nil, fmt.Errorf("actions[%d]: gating %q needs at least one value", i, in)
+			}
+		}
+		ent := entry{owner: owner, repo: name, path: e.Path, gating: e.Gating, targets: map[string]compiled{}}
 		for id, t := range e.Targets {
 			lvl, err := caps.ParseLevel(t.Support.Level)
 			if err != nil {
@@ -240,7 +248,7 @@ func (r *registry) lookup(ref ir.ActionRef, target string, with map[string]strin
 		if !ok {
 			return Target{}, false
 		}
-		if c.doc.Kind == KindCache && provider.Family(target) != provider.GHA && gatesBehaviour(with) {
+		if provider.Family(target) != provider.GHA && gates(e.gating, with) {
 			return Target{}, false
 		}
 		return resolve(c, target, with), true
@@ -248,12 +256,22 @@ func (r *registry) lookup(ref ir.ActionRef, target string, with map[string]strin
 	return Target{}, false
 }
 
-// gatesBehaviour is true when a cache input makes the step fail or branch on a miss, which no other target's
-// cache keyword can do; the step then has no mapping and the emitters write a failing step.
-func gatesBehaviour(with map[string]string) bool {
-	for _, k := range []string{"fail-on-cache-miss", "lookup-only"} {
-		if v, ok := with[k]; ok && !strings.EqualFold(strings.TrimSpace(v), "false") && strings.TrimSpace(v) != "" {
-			return true
+// gatingAny in a gating list stands for every value except an empty one and false.
+const gatingAny = "*"
+
+// gates is true when an input of the step holds a value that makes the step fail or branch, which no other
+// target can keep; the step then has no mapping and the emitters write a failing step.
+func gates(gating map[string][]string, with map[string]string) bool {
+	for in, vals := range gating {
+		v, ok := with[in]
+		if !ok {
+			continue
+		}
+		v = strings.TrimSpace(v)
+		for _, want := range vals {
+			if want == gatingAny && v != "" && !strings.EqualFold(v, "false") || strings.EqualFold(v, want) {
+				return true
+			}
 		}
 	}
 	return false

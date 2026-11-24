@@ -307,3 +307,86 @@ func TestGatingCacheFailsLoudly(t *testing.T) {
 		})
 	}
 }
+
+func gatingAction(id, repo string, with map[string]ir.Value) *ir.Step {
+	return &ir.Step{ID: id, Kind: ir.StepAction, With: with, Action: &ir.ActionRef{Kind: ir.ActionRepo, Host: "https://github.com", Owner: "actions", Repo: repo, Ref: "v4"}}
+}
+
+func litv(s string) ir.Value { return ir.Value{Kind: ir.ValueLit, Lit: s} }
+
+// An action whose output a later step reads is not droppable: a target that drops it also disables the reader.
+func TestReadOutputOfAnActionFailsLoudly(t *testing.T) {
+	cond, err := expr.ParseCanonical("steps.c.outputs.cache-hit != 'true'")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cache := gatingAction("c", "cache", map[string]ir.Value{"path": litv("~/.cache"), "key": litv("k")})
+	deps := &ir.Step{ID: "deps", Kind: ir.StepScript, Script: []string{"make deps"}, If: cond}
+	for _, to := range failLoudTargets {
+		if to == provider.GHA {
+			continue
+		}
+		t.Run(to, func(t *testing.T) {
+			files, _, err := prov(t, to).Emit(oneJob(cache, deps))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.ContainsFunc(scriptCandidates(t, files), hasFailLoud) {
+				t.Errorf("no failing script in %v", names(files))
+			}
+			alone, _, err := prov(t, to).Emit(oneJob(cache))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if slices.ContainsFunc(scriptCandidates(t, alone), hasFailLoud) {
+				t.Errorf("a cache that nothing reads fails")
+			}
+		})
+	}
+}
+
+// An input that makes the action fail on GHA has no spelling elsewhere, so the step fails loudly there.
+func TestGatingInputFailsLoudly(t *testing.T) {
+	up := func(with map[string]ir.Value) *ir.Step {
+		with["name"], with["path"] = litv("bin"), litv("out")
+		return gatingAction("u", "upload-artifact", with)
+	}
+	for _, to := range failLoudTargets {
+		if to == provider.GHA {
+			continue
+		}
+		t.Run(to, func(t *testing.T) {
+			gated, _, err := prov(t, to).Emit(oneJob(up(map[string]ir.Value{"if-no-files-found": litv("error")})))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.ContainsFunc(scriptCandidates(t, gated), hasFailLoud) {
+				t.Errorf("if-no-files-found: error: no failing script in %v", names(gated))
+			}
+			plain, _, err := prov(t, to).Emit(oneJob(up(map[string]ir.Value{"if-no-files-found": litv("warn")})))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if slices.ContainsFunc(scriptCandidates(t, plain), hasFailLoud) {
+				t.Errorf("if-no-files-found: warn fails")
+			}
+		})
+	}
+}
+
+// A download with no upload anywhere in the pipeline reads an artifact that does not exist: GHA fails there.
+func TestDownloadWithNoUploadFailsLoudly(t *testing.T) {
+	down := gatingAction("d", "download-artifact", map[string]ir.Value{"name": litv("bin")})
+	// GitLab, Tekton and Argo read the artifact at run time and fail there when it is missing.
+	for _, to := range []string{"woodpecker", "drone", "concourse"} {
+		t.Run(to, func(t *testing.T) {
+			files, _, err := prov(t, to).Emit(oneJob(down))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.ContainsFunc(scriptCandidates(t, files), hasFailLoud) {
+				t.Errorf("no failing script in %v", names(files))
+			}
+		})
+	}
+}

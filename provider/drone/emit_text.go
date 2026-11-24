@@ -32,6 +32,8 @@ const (
 
 // emitter carries the state of one Emit call: the ledger and the comment lines of the document being written.
 type emitter struct {
+	// gated holds the action steps that a later step reads, which no target may drop.
+	gated map[*ir.Step]bool
 	led *emitkit.Ledger
 	// origin is the provider ID the project was parsed from.
 	origin string
@@ -47,7 +49,7 @@ type emitter struct {
 	// from is the source dialect of a condition that shares the Drone class, so its event names map to Drone's.
 	from *expr.Dialect
 	head []string
-	// lostWork holds the path of every step that lost script, action or image work.
+	// lostWork holds the path of every step that lost script or image work; a lost action is a failing step.
 	lostWork []string
 	// cut is set when an image or workdir lost an expression; the step or service being written owns it.
 	cut bool
@@ -64,7 +66,7 @@ func (e *emitter) lose(path string, f caps.Feature, detail string) {
 
 // noteLostWork remembers a step whose work has no Drone form, so an empty job can tell it from one with no work.
 func (e *emitter) noteLostWork(path string, f caps.Feature) {
-	if strings.Contains(path, "/step/") && (f == caps.StepScript || f == caps.StepAction || f == caps.StepImage) {
+	if strings.Contains(path, "/step/") && (f == caps.StepScript || f == caps.StepImage) {
 		e.lostWork = append(e.lostWork, path)
 	}
 }

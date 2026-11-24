@@ -161,6 +161,7 @@ func (tc *taskCtx) actionStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 		with[k] = s
 	}
 	t, ok := actions.Lookup(*st.Action, dialect, with)
+	ok = ok && !tc.e.gated[st]
 	if !ok {
 		why := "no Tekton mapping for action " + actionRef(st.Action)
 		tc.dropAction(st, sp, why)

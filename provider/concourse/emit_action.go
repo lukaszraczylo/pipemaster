@@ -107,6 +107,7 @@ func (c *chain) action(st *ir.Step, path string, at int) []*yaml.Node {
 		return c.placeholder(st, path, arg, true)
 	}
 	t, ok := lookupAction(st)
+	ok = ok && !e.gated[st]
 	if !ok {
 		e.lose(path, caps.StepAction, "the action "+actionRef(st.Action)+" has no Concourse mapping; a placeholder task keeps its place, and the marker and a comment keep the reference")
 		e.comment(path, "uses: "+actionRef(st.Action))
@@ -140,6 +141,10 @@ func (c *chain) action(st *ir.Step, path string, at int) []*yaml.Node {
 		jx.uploads[strOf(t.With["name"])] = true
 		jx.uploads[""] = true
 	case actions.KindDownload:
+		if !jx.uploads[""] && !uploadsAnywhere(jx.pe.pl) {
+			e.lose(path, caps.StepAction, "no step of the pipeline uploads an artifact, so the download reads nothing")
+			return c.placeholder(st, path, arg, true)
+		}
 		if !jx.uploads[""] {
 			e.external(path, caps.StepAction, "s3 or registry-image resource", "the download reads an artifact that no earlier step of the job wrote; the operator sets up a resource that carries it from the job that uploads it")
 		}
@@ -200,7 +205,7 @@ func (c *chain) placeholder(st *ir.Step, path string, arg actionArg, lost bool) 
 	run.SetStr("path", shellCommand)
 	script := placeholderCmd
 	if lost {
-		script = emitkit.FailLoud(caps.StepAction, path, "Concourse does not run the action")
+		script = emitkit.FailLoud(caps.StepAction, path, "Concourse does not run the action"+refSuffix(st))
 	}
 	run.Set("args", strSeq([]string{defaultFlags, script}))
 	cfg.Set("run", run.N)
@@ -342,4 +347,24 @@ func (jx *jobEmitter) useResources(v any) {
 			}
 		}
 	}
+}
+
+// uploadsAnywhere is true when some job of the pipeline has an upload step that a download can read.
+func uploadsAnywhere(pl *ir.Pipeline) bool {
+	for _, j := range pl.Jobs {
+		for _, st := range j.Steps {
+			if t, ok := lookupAction(st); ok && t.Kind == actions.KindUpload {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// refSuffix names the action of a lost step in the failing line.
+func refSuffix(st *ir.Step) string {
+	if st.Action == nil {
+		return ""
+	}
+	return " " + actionRef(st.Action)
 }
