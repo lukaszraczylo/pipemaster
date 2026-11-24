@@ -13,7 +13,7 @@ steps:
   - name: use-step-1
     image: ubuntu:latest
     commands:
-      - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/use/step/use-step-1: no Drone spelling for expression needs.version.outputs.tag; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'
+      - 'sh -c ''if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"'' pipemaster ''printf ''\''''%s\n''\'''' ''\''''pipemaster: lost: script.interpolation pipeline/ci/job/use/step/use-step-1: no Drone spelling for expression needs.version.outputs.tag; the line is replaced by a line that prints the loss and exits 1''\'''' >&2; exit 1'''
 ---
 # pipemaster:emulated job.container pipeline/ci/job/version
 kind: pipeline
@@ -27,4 +27,4 @@ steps:
   - name: tag
     image: ubuntu:latest
     commands:
-      - echo "value=v1" >> "$$GITHUB_OUTPUT"
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo "value=v1" >> "$$GITHUB_OUTPUT"'

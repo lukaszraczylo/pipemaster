@@ -8,6 +8,6 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make test
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make test'
     environment:
       IMAGE: $$CI_REGISTRY_IMAGE/tmp:${CI_COMMIT_SHA}

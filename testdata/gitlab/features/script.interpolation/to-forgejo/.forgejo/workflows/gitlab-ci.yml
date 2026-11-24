@@ -2,6 +2,7 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/build
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"pre":1,"post":0}
 on:
@@ -19,3 +20,4 @@ jobs:
         run: |
           echo "building ${{ github.sha }} on ${{ github.ref_type == 'branch' && github.ref_name || '' }} for ${{ github.actor }}"
           echo "keeps $HOME and ${UNMAPPED}"
+        shell: bash

@@ -509,8 +509,8 @@
     "level": "native"
    },
    "step.shell": {
-    "level": "lost",
-    "note": "(Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)"
+    "level": "emulated",
+    "note": "bash-if-present wrapper command (Drone pipes commands to /bin/sh; a step that runs under bash at the source becomes one command that re-runs the script under bash -e when the image has bash, else under sh -e, so bash-only syntax fails under sh; any other shell is lost)"
    },
    "step.timeout": {
     "level": "lost",
@@ -1511,8 +1511,8 @@
     "level": "native"
    },
    "step.shell": {
-    "level": "lost",
-    "note": "(Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)"
+    "level": "emulated",
+    "note": "bash-if-present wrapper command (Woodpecker runs commands through /bin/sh -e of the image; a step that runs under bash at the source becomes one command that re-runs the script under bash -e when the image has bash, else under sh -e, so bash-only syntax fails under sh; any other shell is lost)"
    },
    "step.timeout": {
     "level": "lost",

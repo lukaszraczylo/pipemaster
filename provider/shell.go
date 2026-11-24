@@ -1,5 +1,7 @@
 package provider
 
+import "strings"
+
 // BashDefault reports whether a step with no explicit shell runs under bash on id when the image has bash: the
 // GHA family always uses bash, and the GitLab runner detects it.
 func BashDefault(id string) bool {
@@ -16,3 +18,30 @@ const BashOrShScript = `if command -v bash >/dev/null 2>&1; then exec bash -e -c
 
 // BashOrShArgv0 is $0 of the BashOrShScript wrapper.
 const BashOrShArgv0 = "pipemaster"
+
+const wrapQuote = `'`
+
+func singleQuote(s string) string {
+	return wrapQuote + strings.ReplaceAll(s, wrapQuote, `'\''`) + wrapQuote
+}
+
+// BashWrapCommand writes script as one command that a plain sh runner starts: sh runs the BashOrShScript text
+// with the script as $1. wrapper is BashOrShScript as the target writes it, so a target that doubles dollars
+// passes the doubled text.
+func BashWrapCommand(wrapper, script string) string {
+	return "sh -c " + singleQuote(wrapper) + " " + BashOrShArgv0 + " " + singleQuote(script)
+}
+
+// BashUnwrapCommand reads the script back from a BashWrapCommand. ok is false when cmd is any other command.
+func BashUnwrapCommand(wrapper, cmd string) (script string, ok bool) {
+	head := "sh -c " + singleQuote(wrapper) + " " + BashOrShArgv0 + " " + wrapQuote
+	rest, found := strings.CutPrefix(strings.TrimSuffix(cmd, "\n"), head)
+	if !found {
+		return "", false
+	}
+	rest, found = strings.CutSuffix(rest, wrapQuote)
+	if !found {
+		return "", false
+	}
+	return strings.ReplaceAll(rest, `'\''`, wrapQuote), true
+}

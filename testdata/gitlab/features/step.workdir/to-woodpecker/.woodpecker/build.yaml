@@ -5,5 +5,5 @@ steps:
   - name: build-step-1
     image: ubuntu:latest
     commands:
-      - ls
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'ls'
     directory: ./cmd/app

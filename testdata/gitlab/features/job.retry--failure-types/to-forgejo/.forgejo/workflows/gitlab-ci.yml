@@ -2,6 +2,7 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/build
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
 # pipemaster:arg {"On":["script_failure","runner_external_dependency_failure","runner_interrupted"],"Attempts":3}
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
@@ -32,3 +33,4 @@ jobs:
             [ "$pipemaster_rc" -eq 0 ] && exit 0
           done
           exit "$pipemaster_rc"
+        shell: bash

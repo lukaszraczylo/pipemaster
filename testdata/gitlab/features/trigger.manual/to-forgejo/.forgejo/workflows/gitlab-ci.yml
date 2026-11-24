@@ -1,4 +1,5 @@
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/adhoc
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/adhoc/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/adhoc
 # pipemaster:arg {"pre":1,"post":0}
 on:
@@ -10,3 +11,4 @@ jobs:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make adhoc
+        shell: bash

@@ -8,6 +8,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
@@ -24,6 +25,12 @@ const (
 
 // Parse reads .drone.yml into one pipeline, drone, with one job per kind: pipeline document.
 func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
+	proj, rep, err := adapter{}.parseSource(fsys)
+	vars.Strip(proj)
+	return proj, rep, err
+}
+
+func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	rep := &report.Report{Source: dialect}
 	for _, f := range scripted {
 		if regular(fsys, f) {

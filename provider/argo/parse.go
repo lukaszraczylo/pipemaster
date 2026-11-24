@@ -11,6 +11,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 // pipeSrc is a pipeline definition: a workflow template, a Workflow with inline templates, or the workflowSpec of a CronWorkflow.
@@ -43,6 +44,12 @@ type project struct {
 
 // Parse reads the YAML files under .argo/ into one pipeline per workflow definition.
 func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
+	proj, rep, err := adapter{}.parseSource(fsys)
+	vars.Strip(proj)
+	return proj, rep, err
+}
+
+func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	rep := &report.Report{Source: dialect}
 	files, err := yamlFiles(fsys)
 	if err != nil {

@@ -1,2 +1,2 @@
 Loss report: gitlab -> drone
-[lost] pipeline/gitlab-ci/job/test/step/script step.shell (Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
+[emulated] pipeline/gitlab-ci/job/test/step/script step.shell: bash-if-present wrapper command (the source runs the step under bash when the image has it; Drone pipes commands to /bin/sh, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh)

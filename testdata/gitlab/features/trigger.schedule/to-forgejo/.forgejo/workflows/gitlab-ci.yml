@@ -1,4 +1,5 @@
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/nightly
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/nightly/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/nightly
 # pipemaster:arg {"pre":1,"post":0}
 on:
@@ -11,3 +12,4 @@ jobs:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make nightly
+        shell: bash

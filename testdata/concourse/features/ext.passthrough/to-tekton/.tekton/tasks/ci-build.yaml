@@ -7,6 +7,6 @@ spec:
     - name: build-step-1
       image: ubuntu:latest
       script: |-
-        #!bash
+        #!/usr/bin/env bash
         echo ok
       workingDir: app

@@ -1,6 +1,7 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/build
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"artifacts":[{"Name":"bin","Expire":"1 week","Paths":["bin/"]}],"pre":1,"post":1}
 on:
@@ -13,6 +14,7 @@ jobs:
       - uses: actions/checkout@v7
       - id: script
         run: make
+        shell: bash
       # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
       - uses: actions/upload-artifact@v7
         with:

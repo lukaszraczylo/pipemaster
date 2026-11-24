@@ -14,7 +14,7 @@ steps:
   - name: build-step-1
     image: ubuntu:latest
     commands:
-      - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Drone spelling for expression ref_name; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'
+      - 'sh -c ''if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"'' pipemaster ''printf ''\''''%s\n''\'''' ''\''''pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Drone spelling for expression ref_name; the line is replaced by a line that prints the loss and exits 1''\'''' >&2; exit 1'''
     when:
       ref:
         - refs/heads/main
@@ -23,4 +23,4 @@ steps:
     image: ubuntu:latest
     commands:
       - 'if ! [ "$$DRONE_COMMIT_SHA" != '''' ]; then exit 0; fi # pipemaster:guard'
-      - echo $${DRONE_COMMIT_SHA}
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo $${DRONE_COMMIT_SHA}'

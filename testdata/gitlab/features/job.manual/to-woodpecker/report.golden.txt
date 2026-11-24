@@ -1,5 +1,5 @@
 Loss report: gitlab -> woodpecker
-[lost] pipeline/gitlab-ci/job/deploy/step/script step.shell (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [emulated] pipeline/gitlab-ci/job/deploy job.allow_failure: failure ignore on every step (later steps still run after a failed step)
 [emulated] pipeline/gitlab-ci/job/deploy job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/gitlab-ci/job/deploy job.manual: when event manual (the workflow runs only when a person starts it from the UI or API)
+[emulated] pipeline/gitlab-ci/job/deploy/step/script step.shell: bash-if-present wrapper command (the source runs the step under bash when the image has it; Woodpecker runs commands through /bin/sh -e of the image, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh)

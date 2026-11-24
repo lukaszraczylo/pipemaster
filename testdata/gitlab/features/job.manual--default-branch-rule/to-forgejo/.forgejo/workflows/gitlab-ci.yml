@@ -3,6 +3,7 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/publish
 # pipemaster:arg {"src":"branch == default_branch"}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/publish
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/publish/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/publish
 # pipemaster:arg {"pre":1,"post":0}
 on:
@@ -21,3 +22,4 @@ jobs:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make publish
+        shell: bash

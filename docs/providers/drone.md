@@ -14,6 +14,8 @@ The caps table gives the verdict external for two features:
 - Drone replaces `${NAME}` in the raw YAML before it parses the file. The literal `$` escape is `$$`.
 - A matrix becomes one pipeline document per cell. Each document carries a marker, so a return conversion can fold the cells into one matrix job.
 - The Drone OSS server does not evaluate `paths` filters. The converter reports them as lost and never emits them.
+- A script from a bash source (GHA, GitLab) becomes one command that runs the script under bash when the image has bash. The image `sh` can be dash, which fails on `[[ ]]` and arrays. The report marks the wrapper as emulated, and the return conversion removes it.
+- A script that reads a predefined variable of another provider, such as `$CI_PROJECT_DIR`, starts with a prelude that defines the name from the Drone value. A variable with no Drone source stops the step with a message. The table is `vars/vars.yaml`.
 
 ## Feature support
 
@@ -55,7 +57,7 @@ The following table comes from `pipemaster caps --to drone --format md`.
 | step.if | native | step when (only the translatable expression subset; any other condition is emulated or lost) |
 | step.image | native |  |
 | step.script | native |  |
-| step.shell | lost | (Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash) |
+| step.shell | emulated | bash-if-present wrapper command (Drone pipes commands to /bin/sh; a step that runs under bash at the source becomes one command that re-runs the script under bash -e when the image has bash, else under sh -e, so bash-only syntax fails under sh; any other shell is lost) |
 | step.timeout | lost | (the docker runner ignores a step timeout) |
 | step.workdir | native |  |
 | trigger.api | lost | (Drone starts API builds as event custom) |

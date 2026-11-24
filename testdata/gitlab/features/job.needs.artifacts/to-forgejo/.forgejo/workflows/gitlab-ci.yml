@@ -2,16 +2,19 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/compile
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/compile
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
 # pipemaster:arg {"artifacts":[{"Name":"","Expire":"","Paths":["bin/"]}],"pre":1,"post":1}
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/docs
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/docs
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/docs/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/docs
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/unit
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/unit
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/unit/step/script
 # pipemaster:emulated job.needs.artifacts pipeline/gitlab-ci/job/unit
 # pipemaster:arg {"needs":["compile"],"pre":2,"post":0}
 on:
@@ -27,6 +30,7 @@ jobs:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make
+        shell: bash
       # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
       - uses: https://github.com/actions/upload-artifact@v7
         with:
@@ -41,6 +45,7 @@ jobs:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make docs
+        shell: bash
   unit:
     needs:
       - compile
@@ -54,3 +59,4 @@ jobs:
           name: compile
       - id: script
         run: make test
+        shell: bash

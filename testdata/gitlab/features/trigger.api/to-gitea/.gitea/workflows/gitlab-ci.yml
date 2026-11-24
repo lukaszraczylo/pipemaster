@@ -1,5 +1,6 @@
 # pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/triggered
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/triggered/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/triggered
 # pipemaster:arg {"pre":1,"post":0}
 on:
@@ -12,3 +13,4 @@ jobs:
       - uses: actions/checkout@v7
       - id: script
         run: make triggered
+        shell: bash

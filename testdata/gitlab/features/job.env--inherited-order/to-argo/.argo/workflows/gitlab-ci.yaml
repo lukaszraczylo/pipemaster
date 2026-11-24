@@ -29,7 +29,7 @@ spec:
             args:
               - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
               - pipemaster
-              - make lint
+              - 'export PIPEMASTER_VARS=3; : "${CI_PROJECT_DIR:?pipemaster: lost: variable CI_PROJECT_DIR has no argo source}"; export GOCACHE="$CI_PROJECT_DIR/.cache/go-build"; export GOMODCACHE="$CI_PROJECT_DIR/.cache/go-mod"; : pipemaster-end; make lint'
             workingDir: /workspace
             env:
               - name: GOCACHE

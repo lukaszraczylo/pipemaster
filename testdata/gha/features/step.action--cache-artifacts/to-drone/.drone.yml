@@ -16,7 +16,7 @@ steps:
   - name: build-step-3
     image: ubuntu:latest
     commands:
-      - make build
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make build'
 ---
 # pipemaster:lost step pipeline/ci/job/test/step/test-step-1 downloads dist
 # pipemaster:emulated job.container pipeline/ci/job/test
@@ -39,4 +39,4 @@ steps:
   - name: test-step-2
     image: ubuntu:latest
     commands:
-      - make test
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make test'

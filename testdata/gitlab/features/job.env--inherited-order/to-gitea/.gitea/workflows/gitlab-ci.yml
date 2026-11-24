@@ -1,6 +1,7 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/lint
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/lint
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/lint/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/lint
 # pipemaster:arg {"pre":1,"post":0}
 on:
@@ -15,4 +16,5 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - id: script
-        run: make lint
+        run: 'export PIPEMASTER_VARS=3; export CI_PROJECT_DIR="${GITHUB_WORKSPACE}"; export GOCACHE="$CI_PROJECT_DIR/.cache/go-build"; export GOMODCACHE="$CI_PROJECT_DIR/.cache/go-mod"; : pipemaster-end; make lint'
+        shell: bash

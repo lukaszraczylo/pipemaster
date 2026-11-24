@@ -9,6 +9,6 @@ steps:
   - name: script
     image: alpine:3
     commands:
-      - echo common
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo common'
     environment:
       SHARED: "1"

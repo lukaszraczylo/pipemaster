@@ -10,5 +10,6 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - echo "building $${DRONE_COMMIT_SHA} on $${DRONE_BRANCH} for $${DRONE_COMMIT_AUTHOR}"
-      - echo "keeps $$HOME and $${UNMAPPED}"
+      - |-
+        sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo "building $${DRONE_COMMIT_SHA} on $${DRONE_BRANCH} for $${DRONE_COMMIT_AUTHOR}"
+        echo "keeps $$HOME and $${UNMAPPED}"'

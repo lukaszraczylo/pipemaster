@@ -184,6 +184,9 @@ func (b *jobBuilder) script(st *ir.Step, k *sink, t string) ([]exprtekton.EnvVar
 		k.Out[ExtBashDefault] = true
 	} else if len(lines) > 0 && strings.HasPrefix(lines[0], shebang) {
 		st.Shell = strings.TrimSpace(strings.TrimPrefix(lines[0], shebang))
+		if name, viaEnv := strings.CutPrefix(st.Shell, envShebang); viaEnv && name != shellSh {
+			st.Shell = name
+		}
 		lines = lines[1:]
 	}
 	var guardEnv []exprtekton.EnvVar

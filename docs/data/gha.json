@@ -31,11 +31,11 @@
    "files": [
     {
      "path": ".woodpecker/deploy.yaml",
-     "text": "# pipemaster:emulated job.container pipeline/ci/job/deploy\n# pipemaster:arg {\"Ref\":\"alpine:3.22\",\"Entrypoint\":null}\n# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: deploy-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.if pipeline/ci/job/deploy\n# pipemaster:arg {\"src\":\"ref_name == 'main'\",\"from\":\"gha\",\"branch\":true,\"gate\":false}\nwhen:\n  - event: pull_request\n    branch: main\n    evaluate: '!(CI_PIPELINE_EVENT matches \"(?i)^pull_request\") && CI_COMMIT_BRANCH matches \"(?i)^main$$\"'\n  - event: push\n    branch: main\n    evaluate: '!(CI_PIPELINE_EVENT matches \"(?i)^pull_request\") && CI_COMMIT_BRANCH matches \"(?i)^main$$\"'\ndepends_on:\n  - test\nsteps:\n  - image: alpine:3.22\n    commands:\n      - ./scripts/deploy.sh\n    environment:\n      TOKEN:\n        from_secret: DEPLOY_TOKEN\n"
+     "text": "# pipemaster:emulated job.container pipeline/ci/job/deploy\n# pipemaster:arg {\"Ref\":\"alpine:3.22\",\"Entrypoint\":null}\n# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: deploy-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.if pipeline/ci/job/deploy\n# pipemaster:arg {\"src\":\"ref_name == 'main'\",\"from\":\"gha\",\"branch\":true,\"gate\":false}\nwhen:\n  - event: pull_request\n    branch: main\n    evaluate: '!(CI_PIPELINE_EVENT matches \"(?i)^pull_request\") && CI_COMMIT_BRANCH matches \"(?i)^main$$\"'\n  - event: push\n    branch: main\n    evaluate: '!(CI_PIPELINE_EVENT matches \"(?i)^pull_request\") && CI_COMMIT_BRANCH matches \"(?i)^main$$\"'\ndepends_on:\n  - test\nsteps:\n  - image: alpine:3.22\n    commands:\n      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$$1\"; fi; exec sh -e -c \"$$1\"' pipemaster './scripts/deploy.sh'\n    environment:\n      TOKEN:\n        from_secret: DEPLOY_TOKEN\n"
     },
     {
      "path": ".woodpecker/test.yaml",
-     "text": "# pipemaster:emulated job.container pipeline/ci/job/test\n# pipemaster:arg {\"Ref\":\"golang:1.27\",\"Entrypoint\":null}\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: test-step-1\\nkind: action\\n\",\"at\":0}\nwhen:\n  - event: pull_request\n    branch: main\n  - event: push\n    branch: main\nmatrix:\n  arch:\n    - amd64\n    - arm64\nsteps:\n  - image: golang:1.27\n    commands:\n      - go vet ./...\n  - image: golang:1.27\n    commands:\n      - GOARCH=${arch} go test ./...\n"
+     "text": "# pipemaster:emulated job.container pipeline/ci/job/test\n# pipemaster:arg {\"Ref\":\"golang:1.27\",\"Entrypoint\":null}\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: test-step-1\\nkind: action\\n\",\"at\":0}\nwhen:\n  - event: pull_request\n    branch: main\n  - event: push\n    branch: main\nmatrix:\n  arch:\n    - amd64\n    - arm64\nsteps:\n  - image: golang:1.27\n    commands:\n      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$$1\"; fi; exec sh -e -c \"$$1\"' pipemaster 'go vet ./...'\n  - image: golang:1.27\n    commands:\n      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$$1\"; fi; exec sh -e -c \"$$1\"' pipemaster 'GOARCH=${arch} go test ./...'\n"
     }
    ],
    "report": [
@@ -58,28 +58,10 @@
      "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
     },
     {
-     "path": "pipeline/ci/job/deploy/step/deploy-step-2",
-     "feature": "step.shell",
-     "level": "lost",
-     "detail": "Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash"
-    },
-    {
      "path": "pipeline/ci/job/test",
      "feature": "job.runner",
      "level": "lost",
      "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
-    },
-    {
-     "path": "pipeline/ci/job/test/step/test-step-2",
-     "feature": "step.shell",
-     "level": "lost",
-     "detail": "Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash"
-    },
-    {
-     "path": "pipeline/ci/job/test/step/test-step-3",
-     "feature": "step.shell",
-     "level": "lost",
-     "detail": "Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash"
     },
     {
      "path": "pipeline/ci/job/deploy",
@@ -87,6 +69,27 @@
      "level": "external",
      "strategy": "pull request test",
      "detail": "Woodpecker holds the target branch in CI_COMMIT_BRANCH on a pull request, so the condition gains a pull request test; the source condition is kept in a marker"
+    },
+    {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-2",
+     "feature": "step.shell",
+     "level": "emulated",
+     "strategy": "bash-if-present wrapper command",
+     "detail": "the source runs the step under bash when the image has it; Woodpecker runs commands through /bin/sh -e of the image, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-2",
+     "feature": "step.shell",
+     "level": "emulated",
+     "strategy": "bash-if-present wrapper command",
+     "detail": "the source runs the step under bash when the image has it; Woodpecker runs commands through /bin/sh -e of the image, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-3",
+     "feature": "step.shell",
+     "level": "emulated",
+     "strategy": "bash-if-present wrapper command",
+     "detail": "the source runs the step under bash when the image has it; Woodpecker runs commands through /bin/sh -e of the image, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh"
     }
    ]
   },
@@ -96,7 +99,7 @@
    "files": [
     {
      "path": ".drone.yml",
-     "text": "# pipemaster:emulated job.if pipeline/ci/job/deploy\n# pipemaster:arg {\"if\":\"ref_name == 'main'\",\"back\":\"(((event == 'push') \\u0026\\u0026 (ref_type == 'branch')) || (event == 'pull_request')) \\u0026\\u0026 (branch == 'main') \\u0026\\u0026 ((ref == 'refs/heads/main') || (tag == 'main'))\",\"triggers\":\"- kind: pr\\n  branches:\\n    include:\\n        - main\\n- kind: push\\n  branches:\\n    include:\\n        - main\\n\"}\n# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: deploy-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/ci/job/deploy\n# pipemaster:arg {\"Ref\":\"alpine:3.22\",\"Entrypoint\":null,\"taken\":1}\nkind: pipeline\ntype: docker\nname: deploy\ntrigger:\n  event:\n    - push\n    - pull_request\n  branch:\n    - main\n  ref:\n    - refs/heads/main\n    - refs/tags/main\ndepends_on:\n  - test-amd64\n  - test-arm64\nsteps:\n  - name: deploy-step-2\n    image: alpine:3.22\n    commands:\n      - ./scripts/deploy.sh\n    environment:\n      TOKEN:\n        from_secret: DEPLOY_TOKEN\n---\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: test-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/ci/job/test\n# pipemaster:arg {\"Ref\":\"golang:1.27\",\"Entrypoint\":null,\"taken\":2}\n# pipemaster:emulated job.matrix pipeline/ci/job/test\n# pipemaster:arg {\"matrix\":{\"FailFast\":null,\"Axes\":[{\"Name\":\"arch\",\"Values\":[\"amd64\",\"arm64\"]}],\"Include\":null,\"Exclude\":null,\"MaxParallel\":0},\"job\":\"test\",\"cell\":[{\"Key\":\"arch\",\"Value\":\"amd64\"}],\"held\":[{\"script\":[\"GOARCH=$$\\u007b{ matrix.arch }} go test ./...\"],\"pos\":1}],\"index\":0}\nkind: pipeline\ntype: docker\nname: test-amd64\ntrigger:\n  event:\n    - push\n    - pull_request\n  branch:\n    - main\nsteps:\n  - name: test-step-2\n    image: golang:1.27\n    commands:\n      - go vet ./...\n  - name: test-step-3\n    image: golang:1.27\n    commands:\n      - GOARCH=amd64 go test ./...\n---\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: test-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/ci/job/test\n# pipemaster:arg {\"Ref\":\"golang:1.27\",\"Entrypoint\":null,\"taken\":2}\n# pipemaster:emulated job.matrix pipeline/ci/job/test\n# pipemaster:arg {\"job\":\"test\",\"cell\":[{\"Key\":\"arch\",\"Value\":\"arm64\"}],\"index\":1}\nkind: pipeline\ntype: docker\nname: test-arm64\ntrigger:\n  event:\n    - push\n    - pull_request\n  branch:\n    - main\nsteps:\n  - name: test-step-2\n    image: golang:1.27\n    commands:\n      - go vet ./...\n  - name: test-step-3\n    image: golang:1.27\n    commands:\n      - GOARCH=arm64 go test ./...\n"
+     "text": "# pipemaster:emulated job.if pipeline/ci/job/deploy\n# pipemaster:arg {\"if\":\"ref_name == 'main'\",\"back\":\"(((event == 'push') \\u0026\\u0026 (ref_type == 'branch')) || (event == 'pull_request')) \\u0026\\u0026 (branch == 'main') \\u0026\\u0026 ((ref == 'refs/heads/main') || (tag == 'main'))\",\"triggers\":\"- kind: pr\\n  branches:\\n    include:\\n        - main\\n- kind: push\\n  branches:\\n    include:\\n        - main\\n\"}\n# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: deploy-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/ci/job/deploy\n# pipemaster:arg {\"Ref\":\"alpine:3.22\",\"Entrypoint\":null,\"taken\":1}\nkind: pipeline\ntype: docker\nname: deploy\ntrigger:\n  event:\n    - push\n    - pull_request\n  branch:\n    - main\n  ref:\n    - refs/heads/main\n    - refs/tags/main\ndepends_on:\n  - test-amd64\n  - test-arm64\nsteps:\n  - name: deploy-step-2\n    image: alpine:3.22\n    commands:\n      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$$1\"; fi; exec sh -e -c \"$$1\"' pipemaster './scripts/deploy.sh'\n    environment:\n      TOKEN:\n        from_secret: DEPLOY_TOKEN\n---\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: test-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/ci/job/test\n# pipemaster:arg {\"Ref\":\"golang:1.27\",\"Entrypoint\":null,\"taken\":2}\n# pipemaster:emulated job.matrix pipeline/ci/job/test\n# pipemaster:arg {\"matrix\":{\"FailFast\":null,\"Axes\":[{\"Name\":\"arch\",\"Values\":[\"amd64\",\"arm64\"]}],\"Include\":null,\"Exclude\":null,\"MaxParallel\":0},\"job\":\"test\",\"cell\":[{\"Key\":\"arch\",\"Value\":\"amd64\"}],\"held\":[{\"script\":[\"GOARCH=$$\\u007b{ matrix.arch }} go test ./...\"],\"pos\":1}],\"index\":0}\nkind: pipeline\ntype: docker\nname: test-amd64\ntrigger:\n  event:\n    - push\n    - pull_request\n  branch:\n    - main\nsteps:\n  - name: test-step-2\n    image: golang:1.27\n    commands:\n      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$$1\"; fi; exec sh -e -c \"$$1\"' pipemaster 'go vet ./...'\n  - name: test-step-3\n    image: golang:1.27\n    commands:\n      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$$1\"; fi; exec sh -e -c \"$$1\"' pipemaster 'GOARCH=amd64 go test ./...'\n---\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\nid: test-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/ci/job/test\n# pipemaster:arg {\"Ref\":\"golang:1.27\",\"Entrypoint\":null,\"taken\":2}\n# pipemaster:emulated job.matrix pipeline/ci/job/test\n# pipemaster:arg {\"job\":\"test\",\"cell\":[{\"Key\":\"arch\",\"Value\":\"arm64\"}],\"index\":1}\nkind: pipeline\ntype: docker\nname: test-arm64\ntrigger:\n  event:\n    - push\n    - pull_request\n  branch:\n    - main\nsteps:\n  - name: test-step-2\n    image: golang:1.27\n    commands:\n      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$$1\"; fi; exec sh -e -c \"$$1\"' pipemaster 'go vet ./...'\n  - name: test-step-3\n    image: golang:1.27\n    commands:\n      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$$1\"; fi; exec sh -e -c \"$$1\"' pipemaster 'GOARCH=arm64 go test ./...'\n"
     }
    ],
    "report": [
@@ -119,28 +122,10 @@
      "detail": "only the platform has a Drone form; other runner labels are lost"
     },
     {
-     "path": "pipeline/ci/job/deploy/step/deploy-step-2",
-     "feature": "step.shell",
-     "level": "lost",
-     "detail": "Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash"
-    },
-    {
      "path": "pipeline/ci/job/test",
      "feature": "job.runner",
      "level": "lost",
      "detail": "only the platform has a Drone form; other runner labels are lost"
-    },
-    {
-     "path": "pipeline/ci/job/test/step/test-step-2",
-     "feature": "step.shell",
-     "level": "lost",
-     "detail": "Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash"
-    },
-    {
-     "path": "pipeline/ci/job/test/step/test-step-3",
-     "feature": "step.shell",
-     "level": "lost",
-     "detail": "Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash"
     },
     {
      "path": "pipeline/ci/job/deploy",
@@ -157,6 +142,13 @@
      "detail": "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"
     },
     {
+     "path": "pipeline/ci/job/deploy/step/deploy-step-2",
+     "feature": "step.shell",
+     "level": "emulated",
+     "strategy": "bash-if-present wrapper command",
+     "detail": "the source runs the step under bash when the image has it; Drone pipes commands to /bin/sh, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh"
+    },
+    {
      "path": "pipeline/ci/job/test",
      "feature": "job.matrix",
      "level": "emulated",
@@ -169,6 +161,20 @@
      "level": "emulated",
      "strategy": "per actions.Lookup verdict; a plugin step with settings",
      "detail": "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-2",
+     "feature": "step.shell",
+     "level": "emulated",
+     "strategy": "bash-if-present wrapper command",
+     "detail": "the source runs the step under bash when the image has it; Drone pipes commands to /bin/sh, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh"
+    },
+    {
+     "path": "pipeline/ci/job/test/step/test-step-3",
+     "feature": "step.shell",
+     "level": "emulated",
+     "strategy": "bash-if-present wrapper command",
+     "detail": "the source runs the step under bash when the image has it; Drone pipes commands to /bin/sh, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh"
     }
    ]
   },

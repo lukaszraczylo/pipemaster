@@ -13,4 +13,4 @@ steps:
       - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/test/step/test-step-1: no upload of the artifact in this workflow'' >&2; exit 1'
   - image: ubuntu:latest
     commands:
-      - make test
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make test'

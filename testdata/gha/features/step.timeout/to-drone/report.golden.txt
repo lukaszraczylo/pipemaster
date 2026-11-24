@@ -1,6 +1,6 @@
 Loss report: gha -> drone
 [lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
 [lost] pipeline/ci/job/build job.runner (only the platform has a Drone form; other runner labels are lost)
-[lost] pipeline/ci/job/build/step/build-step-1 step.shell (Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [lost] pipeline/ci/job/build/step/build-step-1 step.timeout (the Drone docker runner ignores a step timeout)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/ci/job/build/step/build-step-1 step.shell: bash-if-present wrapper command (the source runs the step under bash when the image has it; Drone pipes commands to /bin/sh, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh)

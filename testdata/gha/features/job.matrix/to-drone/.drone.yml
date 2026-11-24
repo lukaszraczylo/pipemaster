@@ -12,7 +12,7 @@ steps:
   - name: test-step-1
     image: ubuntu:latest
     commands:
-      - echo 1.24
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo 1.24'
 ---
 # pipemaster:emulated job.container pipeline/ci/job/test
 # pipemaster:emulated job.matrix pipeline/ci/job/test
@@ -28,7 +28,7 @@ steps:
   - name: test-step-1
     image: ubuntu:latest
     commands:
-      - echo 1.25
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo 1.25'
 ---
 # pipemaster:emulated job.container pipeline/ci/job/test
 # pipemaster:emulated job.matrix pipeline/ci/job/test
@@ -44,4 +44,4 @@ steps:
   - name: test-step-1
     image: ubuntu:latest
     commands:
-      - echo 1.25
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo 1.25'

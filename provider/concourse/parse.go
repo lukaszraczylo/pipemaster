@@ -12,6 +12,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 // knownTop lists the top-level keys that have an Ext key of their own.
@@ -25,6 +26,12 @@ type srcFile struct {
 
 // Parse reads the YAML files under .concourse/ into one pipeline per file that has a jobs list.
 func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
+	proj, rep, err := adapter{}.parseSource(fsys)
+	vars.Strip(proj)
+	return proj, rep, err
+}
+
+func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	rep := &report.Report{Source: dialect}
 	files, err := yamlFiles(fsys)
 	if err != nil {

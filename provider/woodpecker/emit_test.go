@@ -600,7 +600,7 @@ var capCases = map[caps.Feature]func(*ir.Project){
 		d := ir.Duration(time.Minute)
 		p.Pipelines[0].Jobs[0].Steps[0].Timeout = &d
 	},
-	caps.StepShell:      func(p *ir.Project) { p.Pipelines[0].Jobs[0].Steps[0].Shell = "bash" },
+	caps.StepShell:      func(p *ir.Project) { p.Pipelines[0].Jobs[0].Steps[0].Shell = "" },
 	caps.JobEnvironment: func(p *ir.Project) { p.Pipelines[0].Jobs[0].Environment = &ir.Environment{Name: "prod"} },
 	caps.JobNeedsArtifacts: func(p *ir.Project) {
 		p.Pipelines[0].Jobs = append(p.Pipelines[0].Jobs, wpJob("b", wpStep("s", "y")))

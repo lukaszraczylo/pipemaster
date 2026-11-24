@@ -2,6 +2,8 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/build
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/after_script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"pre":1,"post":0}
 on:
@@ -20,7 +22,9 @@ jobs:
           echo prepare
           make build
           make test
+        shell: bash
       - id: after_script
         if: always()
         run: echo cleanup
+        shell: bash
         continue-on-error: true

@@ -101,7 +101,7 @@ func (tc *taskCtx) scriptStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 		guardEnv(sc, guard)
 	}
 	if st.Shell != "" {
-		lines = append([]string{shebang + st.Shell}, lines...)
+		lines = append([]string{shebang + shebangShell(st.Shell)}, lines...)
 	} else if len(lines) > 0 && tc.bashDefault(st) {
 		tc.e.emulate(sp, caps.StepShell, "bash-if-present preamble in the script", "the source runs the step under bash when the image has it; the script starts with a line that re-runs it under bash -e when the image has bash, else it runs under sh -e, so bash-only syntax fails under sh")
 		lines = append(bashPreamble(), lines...)
@@ -403,4 +403,19 @@ func (tc *taskCtx) sourceWorkDir(st *ir.Step) (string, bool) {
 	orig, ok := x[ExtWorkspaceDir].(string)
 	rel, _ := x[ExtWorkspaceDirIR].(string)
 	return orig, tc.e.own && ok && rel == st.WorkDir
+}
+
+const (
+	envShebang = "/usr/bin/env "
+	// shellSh keeps its env form in the IR: Argo runs sh as its default command, so a bare sh would not come back.
+	shellSh = "sh"
+)
+
+// shebangShell names the interpreter of a script. The kernel needs a path, so a bare shell name such as bash
+// goes through env.
+func shebangShell(shell string) string {
+	if strings.HasPrefix(shell, "/") || strings.ContainsAny(shell, " \t") {
+		return shell
+	}
+	return envShebang + shell
 }

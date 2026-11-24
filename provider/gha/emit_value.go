@@ -21,6 +21,7 @@ const (
 
 // emitter carries the state of one Emit call: the ledger, and the lost-text comments waiting for a node.
 type emitter struct {
+	origin         string
 	jobGuards      map[string]bool
 	from           *expr.Dialect
 	led            *emitkit.Ledger

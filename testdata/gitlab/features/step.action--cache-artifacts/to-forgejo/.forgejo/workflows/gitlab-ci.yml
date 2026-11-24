@@ -2,10 +2,12 @@
 # pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/build
 # pipemaster:arg {"guard":true}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/build-step-2
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/test
 # pipemaster:arg {"guard":true}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/test/step/test-step-2
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/test
 # pipemaster:arg {"pre":1,"post":0}
 on:
@@ -28,6 +30,7 @@ jobs:
           path: ~/go/pkg/mod
       - id: build-step-2
         run: make build
+        shell: bash
       - id: build-step-3
         uses: https://github.com/actions/upload-artifact@v4
         with:
@@ -46,3 +49,4 @@ jobs:
           name: dist
       - id: test-step-2
         run: make test
+        shell: bash

@@ -10,7 +10,7 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make build
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make build'
 ---
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/alert
 # pipemaster:arg {"if":"failure()","back":"(event == 'push') \u0026\u0026 failure()","triggers":"- kind: push\n- kind: tag\n"}
@@ -32,7 +32,7 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - ./page.sh
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster './page.sh'
 ---
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/report
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
@@ -53,4 +53,4 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - ./notify.sh
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster './notify.sh'

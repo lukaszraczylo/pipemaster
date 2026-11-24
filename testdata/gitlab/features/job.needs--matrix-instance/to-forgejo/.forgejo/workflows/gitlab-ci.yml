@@ -2,16 +2,19 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/images
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/images
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/images/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/images
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/package
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/package
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/package/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/package
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/package-all
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/package-all
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/package-all/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/package-all
 # pipemaster:arg {"pre":1,"post":0}
 on:
@@ -32,6 +35,7 @@ jobs:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make images
+        shell: bash
   package:
     needs:
       - images
@@ -41,6 +45,7 @@ jobs:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make package
+        shell: bash
   package-all:
     needs:
       - images
@@ -50,3 +55,4 @@ jobs:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make package-all
+        shell: bash

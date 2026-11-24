@@ -10,7 +10,7 @@ steps:
   - name: prod-step-1
     image: ubuntu:latest
     commands:
-      - make
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make'
 ---
 # pipemaster:lost script.interpolation pipeline/ci/job/test/step/test-step-1: echo {{ matrix.os }} {{ matrix.go }} {{ needs.prod.outputs.ver }}
 # pipemaster:emulated job.container pipeline/ci/job/test
@@ -29,7 +29,7 @@ steps:
   - name: test-step-1
     image: ubuntu:latest
     commands:
-      - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/test/step/test-step-1: no Drone spelling for expression needs.prod.outputs.ver; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'
+      - 'sh -c ''if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"'' pipemaster ''printf ''\''''%s\n''\'''' ''\''''pipemaster: lost: script.interpolation pipeline/ci/job/test/step/test-step-1: no Drone spelling for expression needs.prod.outputs.ver; the line is replaced by a line that prints the loss and exits 1''\'''' >&2; exit 1'''
 ---
 # pipemaster:lost script.interpolation pipeline/ci/job/test/step/test-step-1: echo {{ matrix.os }} {{ matrix.go }} {{ needs.prod.outputs.ver }}
 # pipemaster:emulated job.container pipeline/ci/job/test
@@ -48,7 +48,7 @@ steps:
   - name: test-step-1
     image: ubuntu:latest
     commands:
-      - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/test/step/test-step-1: no Drone spelling for expression needs.prod.outputs.ver; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'
+      - 'sh -c ''if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"'' pipemaster ''printf ''\''''%s\n''\'''' ''\''''pipemaster: lost: script.interpolation pipeline/ci/job/test/step/test-step-1: no Drone spelling for expression needs.prod.outputs.ver; the line is replaced by a line that prints the loss and exits 1''\'''' >&2; exit 1'''
 ---
 # pipemaster:lost script.interpolation pipeline/ci/job/test/step/test-step-1: echo {{ matrix.os }} {{ matrix.go }} {{ needs.prod.outputs.ver }}
 # pipemaster:emulated job.container pipeline/ci/job/test
@@ -67,4 +67,4 @@ steps:
   - name: test-step-1
     image: ubuntu:latest
     commands:
-      - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/test/step/test-step-1: no Drone spelling for expression needs.prod.outputs.ver; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'
+      - 'sh -c ''if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"'' pipemaster ''printf ''\''''%s\n''\'''' ''\''''pipemaster: lost: script.interpolation pipeline/ci/job/test/step/test-step-1: no Drone spelling for expression needs.prod.outputs.ver; the line is replaced by a line that prints the loss and exits 1''\'''' >&2; exit 1'''

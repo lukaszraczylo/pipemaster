@@ -1,3 +1,4 @@
+# pipemaster:emulated step.shell pipeline/.shared/job/run/step/run-step-1
 # pipemaster:emulated job.artifacts pipeline/.shared/job/run
 # pipemaster:arg {"pre":1,"post":0}
 name: shared
@@ -10,3 +11,4 @@ jobs:
       - uses: https://github.com/actions/checkout@v7
       - id: run-step-1
         run: echo run
+        shell: bash

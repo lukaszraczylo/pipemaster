@@ -1,16 +1,19 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/check
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/check
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/check/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/check
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/compile
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/compile
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/package
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/package
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/package/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/package
 # pipemaster:arg {"pre":1,"post":0}
 on:
@@ -26,6 +29,7 @@ jobs:
       - uses: actions/checkout@v7
       - id: script
         run: make check
+        shell: bash
   compile:
     if: '!github.event.deleted'
     runs-on: ubuntu-latest
@@ -33,6 +37,7 @@ jobs:
       - uses: actions/checkout@v7
       - id: script
         run: make compile
+        shell: bash
   package:
     needs:
       - compile
@@ -42,3 +47,4 @@ jobs:
       - uses: actions/checkout@v7
       - id: script
         run: make package
+        shell: bash

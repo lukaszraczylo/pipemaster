@@ -13,6 +13,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/internal/vectors"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/drone"
 )
 
@@ -166,7 +167,7 @@ func decodeStep(n *yaml.Node) (vStep, error) {
 			}
 		case "commands":
 			if s.Cmds, err = vectors.Strings(kv.Val); err == nil {
-				s.Cmds = unescapeAll(s.Cmds)
+				s.Cmds = unescapeAll(unwrapBash(s.Cmds))
 			}
 		case "environment":
 			var vs []vectors.Var
@@ -411,4 +412,18 @@ func TestDroneVectors(t *testing.T) {
 			return
 		}
 	}
+}
+
+// unwrapBash reads the script back from the bash-if-present wrapper that a step of a bash source gets, one
+// command per script line.
+func unwrapBash(cmds []string) []string {
+	var out []string
+	for _, c := range cmds {
+		if inner, ok := provider.BashUnwrapCommand(strings.ReplaceAll(provider.BashOrShScript, "$", "$$"), c); ok {
+			out = append(out, strings.Split(inner, "\n")...)
+			continue
+		}
+		out = append(out, c)
+	}
+	return out
 }

@@ -12,6 +12,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 // Ext keys the parser writes under Ext[gitlab]. The underscore keys are derived, not source keys.
@@ -43,6 +44,12 @@ var (
 
 // Parse reads .gitlab-ci.yml and every local include into one pipeline with ID gitlab-ci.
 func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
+	proj, rep, err := adapter{}.parseSource(fsys)
+	vars.Strip(proj)
+	return proj, rep, err
+}
+
+func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	rep := &report.Report{Source: dialect}
 	s := newState(rep)
 	ld := newLoader(fsys, s)

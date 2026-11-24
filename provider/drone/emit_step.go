@@ -471,10 +471,13 @@ func (e *emitter) scriptStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
 		}
 		why[i] = noSpelling(lost)
 	}
+	var outs []string
 	for _, p := range e.commentSpans(sp, texts, why) {
 		if p.Lost {
 			e.scriptLost = true
-			lines = append(lines, block(emitkit.FailLoud(caps.ScriptInterpolation, sp, p.Detail)))
+			fl := emitkit.FailLoud(caps.ScriptInterpolation, sp, p.Detail)
+			outs = append(outs, fl)
+			lines = append(lines, block(fl))
 			continue
 		}
 		b.hits = nil
@@ -482,10 +485,14 @@ func (e *emitter) scriptStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
 		if err != nil {
 			return nil, err
 		}
+		outs = append(outs, out)
 		lines = append(lines, block(out))
 		b.place(out, seen)
 	}
 	b.total(seen)
+	if len(lines) > 0 && e.bashWrap(st) {
+		lines = []*yaml.Node{block(provider.BashWrapCommand(esc(provider.BashOrShScript), joinCommands(outs)))}
+	}
 	if len(lines) == 0 {
 		e.comment("step.script " + sp + ": the step has no command left")
 		e.lose(sp, caps.StepScript, "no command of the step has a Drone spelling; the step is not written")
@@ -563,11 +570,11 @@ func (e *emitter) stepLosses(sp string, st *ir.Step) {
 	if st.Timeout != nil {
 		e.lose(sp, caps.StepTimeout, "the Drone docker runner ignores a step timeout")
 	}
-	if st.Shell != "" {
+	if st.Shell != "" && !e.bashWrap(st) {
 		e.lose(sp, caps.StepShell, "Drone compiles commands into its own script, not "+st.Shell)
 	}
-	if strings.TrimSpace(st.Shell) == "" && len(st.Script) > 0 && provider.BashDefault(e.origin) {
-		e.emulate(sp, caps.StepShell, "commands run under the image sh", "the source runs the step under bash when the image has it; Drone compiles commands into a script that its runner pipes to /bin/sh, and the entrypoint cannot change it, so bash-only syntax fails when the image sh is dash")
+	if e.bashWrap(st) {
+		e.emulate(sp, caps.StepShell, "bash-if-present wrapper command", "the source runs the step under bash when the image has it; Drone pipes commands to /bin/sh, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh")
 	}
 }
 
@@ -672,4 +679,29 @@ func uniqueNames(bases []string, valid func(string) bool) []string {
 		out[i], taken[cand] = cand, true
 	}
 	return out
+}
+
+// bashWrap is true when a step with no shell runs under bash-if-present: the source default is bash, or a Drone
+// file held the wrapper.
+func (e *emitter) bashWrap(st *ir.Step) bool {
+	if len(st.Script) == 0 || emitkit.IsFailLoud(st.Script) {
+		return false
+	}
+	if strings.TrimSpace(st.Shell) != "" {
+		return false
+	}
+	if b, _ := extOf(st.Ext)[ExtBashDefault].(bool); b {
+		return true
+	}
+	return !provider.SameFamily(e.origin, dialect) && provider.BashDefault(e.origin)
+}
+
+// joinCommands makes one script of the commands: each command ends with one newline, and a trailing newline of a
+// command text is not doubled.
+func joinCommands(cmds []string) string {
+	lines := make([]string, len(cmds))
+	for i, c := range cmds {
+		lines[i] = strings.TrimSuffix(c, "\n")
+	}
+	return strings.Join(lines, "\n")
 }

@@ -19,4 +19,4 @@ spec:
         #!/bin/sh
         if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
         set -e
-        make lint
+        export PIPEMASTER_VARS=3; : "${CI_PROJECT_DIR:?pipemaster: lost: variable CI_PROJECT_DIR has no tekton source}"; export GOCACHE="$CI_PROJECT_DIR/.cache/go-build"; export GOMODCACHE="$CI_PROJECT_DIR/.cache/go-mod"; : pipemaster-end; make lint

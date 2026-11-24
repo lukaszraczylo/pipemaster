@@ -13,6 +13,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
@@ -28,7 +29,8 @@ const (
 // through the ledger; Finish fails the call when one was never accounted for.
 func (a *adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
 	p, idRenames := withValidJobIDs(p)
-	e := &emitter{d: a.d, from: sourceDialect(originProvider(p)), led: emitkit.NewLedger("ir", a.d.ID, a.Caps()),
+	p, vres := vars.Prepare(p, a.d.ID)
+	e := &emitter{origin: originProvider(p), d: a.d, from: sourceDialect(originProvider(p)), led: emitkit.NewLedger("ir", a.d.ID, a.Caps()),
 		jobGuards: p.Origin.Guarded}
 	uses := ir.Features(p)
 	for _, u := range uses {
@@ -59,6 +61,7 @@ func (a *adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error)
 	if err != nil {
 		return nil, rep, fmt.Errorf("%s: %w", a.d.ID, err)
 	}
+	vres.Report(rep)
 	return files, rep, nil
 }
 

@@ -10,7 +10,7 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make build
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make build'
 ---
 # pipemaster:lost job.if pipeline/gitlab-ci/job/cleanup: opaque(gitlab): - if: $$PIPELINE_TYPE =~ /_MR_PIPELINE$$/\n
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/cleanup
@@ -29,4 +29,4 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make clean
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make clean'

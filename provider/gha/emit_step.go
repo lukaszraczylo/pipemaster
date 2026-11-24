@@ -11,6 +11,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
@@ -279,6 +280,11 @@ func (e *emitter) shellName(sp, shell string) string {
 }
 
 func (e *emitter) stepTail(m *omap, sp string, st *ir.Step, ext map[string]any) error {
+	if st.Shell == "" && st.Image == nil && len(st.Script) > 0 && m.has("run") && provider.BashDefault(e.origin) && !provider.SameFamily(e.origin, e.d.ID) {
+		// A runner without a shell setting may pick sh, and the source ran the script under bash.
+		m.set("shell", str(shellBash))
+		e.mark(caps.StepShell, sp)
+	}
 	if st.Shell != "" {
 		if st.Image == nil {
 			m.set("shell", str(e.shellName(sp, st.Shell)))

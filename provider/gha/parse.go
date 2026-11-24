@@ -18,6 +18,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 var (
@@ -27,6 +28,12 @@ var (
 
 // Parse reads every workflow file in the dialect's first existing directory into one pipeline each; the pipeline ID is the file stem.
 func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
+	proj, rep, err := a.parseSource(fsys)
+	vars.Strip(proj)
+	return proj, rep, err
+}
+
+func (a *adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	files, err := a.readDir(fsys)
 	if err != nil {
 		return nil, nil, err

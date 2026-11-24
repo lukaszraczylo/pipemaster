@@ -1,9 +1,11 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/compile
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/compile
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/cleanup
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/cleanup/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/cleanup
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/cleanup
@@ -18,6 +20,7 @@ jobs:
       - uses: actions/checkout@v7
       - id: script
         run: make build
+        shell: bash
   # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
   cleanup:
     needs:
@@ -29,3 +32,4 @@ jobs:
       # pipemaster:lost job.if pipeline/gitlab-ci/job/cleanup: opaque(gitlab): - if: $PIPELINE_TYPE =~ /_MR_PIPELINE$/\n
       - id: script
         run: make clean
+        shell: bash

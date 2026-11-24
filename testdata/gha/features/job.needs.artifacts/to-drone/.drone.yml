@@ -12,7 +12,7 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make'
 ---
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/docs
 kind: pipeline
@@ -28,7 +28,7 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make docs
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make docs'
 ---
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/unit
 kind: pipeline
@@ -44,4 +44,4 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make test
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make test'

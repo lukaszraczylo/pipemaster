@@ -13,6 +13,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/dnsid"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 // Output paths. The parser reads every YAML file under .argo/, so the split is for people.
@@ -38,6 +39,7 @@ var fit = dnsid.Fit
 // Emit writes the project as Argo files under .argo/. Every feature use goes through the ledger; Finish fails
 // the call when one was never accounted for.
 func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	p, vres := vars.Prepare(p, dialect)
 	origin := ""
 	if p != nil {
 		origin = p.Origin.Provider
@@ -64,6 +66,7 @@ func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) 
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", dialect, err)
 	}
+	vres.Report(rep)
 	return files, rep, nil
 }
 

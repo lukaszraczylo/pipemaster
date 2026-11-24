@@ -10,7 +10,7 @@ steps:
   - name: lint-step-1
     image: ubuntu:latest
     commands:
-      - echo lint
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo lint'
 ---
 # pipemaster:emulated job.container pipeline/ci/job/ship
 kind: pipeline
@@ -27,7 +27,7 @@ steps:
   - name: ship-step-1
     image: ubuntu:latest
     commands:
-      - echo ship
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo ship'
 ---
 # pipemaster:emulated job.container pipeline/ci/job/test
 kind: pipeline
@@ -41,4 +41,4 @@ steps:
   - name: test-step-1
     image: ubuntu:latest
     commands:
-      - echo test
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo test'

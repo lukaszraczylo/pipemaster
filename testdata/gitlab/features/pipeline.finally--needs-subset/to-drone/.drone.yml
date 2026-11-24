@@ -10,7 +10,7 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make build
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make build'
 ---
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/lint
 kind: pipeline
@@ -24,7 +24,7 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make lint
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make lint'
 ---
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/summary
 kind: pipeline
@@ -42,7 +42,7 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make report
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make report'
 ---
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/unit
 kind: pipeline
@@ -59,7 +59,7 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make test
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make test'
 ---
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/cleanup
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
@@ -83,4 +83,4 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make clean
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make clean'

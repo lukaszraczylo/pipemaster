@@ -9,6 +9,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const fallbackPipelineID = "tekton"
@@ -41,6 +42,12 @@ type project struct {
 
 // Parse reads the YAML files under .tekton/ into one pipeline per Pipeline or embedded PipelineRun.
 func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
+	proj, rep, err := adapter{}.parseSource(fsys)
+	vars.Strip(proj)
+	return proj, rep, err
+}
+
+func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	rep := &report.Report{Source: dialect}
 	files, err := yamlFiles(fsys)
 	if err != nil {

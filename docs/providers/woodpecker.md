@@ -17,6 +17,8 @@ The caps table gives the verdict external for three features. Set each one in th
 - Woodpecker substitutes `${NAME}` in the raw YAML and turns `$$` into a literal `$`. Thus the emitter writes `$` in script and environment text as `$$`. The parser reverses this.
 - Woodpecker filters use doublestar globs. If a GHA filter uses `+` or `?`, doublestar cannot express it. The emitter then writes an anchored regular expression in `evaluate`.
 - The runner is lost. Only a platform label becomes `labels.platform`.
+- A script from a bash source (GHA, GitLab) becomes one command that runs the script under bash when the image has bash. The image `sh` can be dash, which fails on `[[ ]]` and arrays. The report marks the wrapper as emulated, and the return conversion removes it.
+- A script that reads a predefined variable of another provider, such as `$CI_PROJECT_DIR`, starts with a prelude that defines the name from the Woodpecker value. A variable with no Woodpecker source stops the step with a message. The table is `vars/vars.yaml`.
 
 ## Feature support
 
@@ -58,7 +60,7 @@ The following table comes from `pipemaster caps --to woodpecker --format md`.
 | step.if | native |  |
 | step.image | native |  |
 | step.script | native |  |
-| step.shell | lost | (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash) |
+| step.shell | emulated | bash-if-present wrapper command (Woodpecker runs commands through /bin/sh -e of the image; a step that runs under bash at the source becomes one command that re-runs the script under bash -e when the image has bash, else under sh -e, so bash-only syntax fails under sh; any other shell is lost) |
 | step.timeout | lost | (Woodpecker has only a pipeline timeout in the repo settings) |
 | step.workdir | native |  |
 | trigger.api | lost | (Woodpecker starts API pipelines as manual events) |

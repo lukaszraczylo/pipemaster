@@ -1,21 +1,25 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/compile
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/compile
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/lint
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/lint
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/lint/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/lint
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/ship
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/ship
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/ship/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/ship
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/unit
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/unit
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/unit/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/unit
 # pipemaster:arg {"pre":1,"post":0}
 on:
@@ -28,6 +32,7 @@ jobs:
       - uses: actions/checkout@v7
       - id: script
         run: make
+        shell: bash
   lint:
     if: '!github.event.deleted'
     runs-on: ubuntu-latest
@@ -35,6 +40,7 @@ jobs:
       - uses: actions/checkout@v7
       - id: script
         run: make lint
+        shell: bash
   ship:
     needs:
       - compile
@@ -46,6 +52,7 @@ jobs:
       - uses: actions/checkout@v7
       - id: script
         run: make ship
+        shell: bash
   unit:
     needs:
       - compile
@@ -55,3 +62,4 @@ jobs:
       - uses: actions/checkout@v7
       - id: script
         run: make test
+        shell: bash

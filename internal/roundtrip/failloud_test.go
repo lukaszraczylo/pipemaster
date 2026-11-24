@@ -150,6 +150,7 @@ func TestLostCommandStopsTheScript(t *testing.T) {
 			}
 			found := false
 			for _, s := range scriptCandidates(t, files) {
+				s = unwrapBashCommand(s)
 				if !hasFailLoud(s) || !strings.Contains(s, "echo first") {
 					continue
 				}

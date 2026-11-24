@@ -2,9 +2,11 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/build
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/deploy
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/deploy/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/deploy
 # pipemaster:arg {"pre":1,"post":0}
 on:
@@ -20,6 +22,7 @@ jobs:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make
+        shell: bash
   deploy:
     needs:
       - build
@@ -30,3 +33,4 @@ jobs:
       # pipemaster:lost job.if pipeline/gitlab-ci/job/deploy: opaque(gitlab): - changes: '!reference [.remote-patterns]'\n  if: $CI_COMMIT_TAG\n
       - id: script
         run: make deploy
+        shell: bash

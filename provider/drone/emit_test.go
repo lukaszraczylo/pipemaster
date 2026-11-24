@@ -121,7 +121,7 @@ func TestMatrixCells(t *testing.T) {
 		}
 	}
 	cmd := stepsOf(docNamed(t, docs, "test-1.21-a-b"))[0]["commands"].([]any)[0].(string)
-	if !strings.HasPrefix(cmd, "go test 1.21 a") {
+	if !strings.Contains(cmd, "go test 1.21 a") {
 		t.Fatalf("cell values are not substituted: %q", cmd)
 	}
 	if n := countLines(out, "# pipemaster:emulated job.matrix pipeline/drone/job/test"); n != 4 {

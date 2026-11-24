@@ -11,6 +11,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
@@ -25,6 +26,7 @@ const (
 // fails the call when one was never accounted for. Local include files are not re-emitted: Parse
 // merged them into the jobs, so the emitted file stands alone.
 func (adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	p, vres := vars.Prepare(p, dialect)
 	origin := ""
 	if p != nil {
 		origin = p.Origin.Provider
@@ -58,6 +60,7 @@ func (adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
 	if err != nil {
 		return nil, rep, fmt.Errorf("%s: %w", dialect, err)
 	}
+	vres.Report(rep)
 	return files, rep, nil
 }
 

@@ -1,4 +1,5 @@
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"pre":1,"post":0}
 on:
@@ -12,3 +13,4 @@ jobs:
       # pipemaster:lost job.if pipeline/gitlab-ci/job/build: opaque(gitlab): - exists:\n    - Makefile\n  if: $CI_COMMIT_BRANCH == "main"\n
       - id: script
         run: make
+        shell: bash

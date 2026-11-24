@@ -20,6 +20,8 @@ var noSourceForm = map[string]string{
 	provider.GitLab + "/" + string(caps.StepImage):                  "GitLab sets the image per job, so no gitlab source yields a step image",
 	provider.GitLab + "/" + string(caps.ConfigName):                 "GitLab variables parse as plain script text, so no gitlab source yields a secrets or vars reference",
 	provider.Woodpecker + "/" + string(caps.JobEnvironmentApproval): "approval rules live in repo settings and no parser sets Environment.Approval",
+	provider.Drone + "/" + string(caps.StepShell):                   "no Drone file sets a step shell, and the bash wrapper that the emitter writes is removed on parse",
+	provider.Woodpecker + "/" + string(caps.StepShell):              "no Woodpecker file sets a step shell, and the bash wrapper that the emitter writes is removed on parse",
 	provider.Drone + "/" + string(caps.DisplayName):                 "a Drone pipeline or step name is its id, so no drone source holds a separate display name",
 	provider.Drone + "/" + string(caps.JobTimeout):                  "Drone limits a build with a repo setting, which no pipeline file holds",
 	provider.Concourse + "/" + string(caps.JobArtifacts):            "a Concourse task passes files through inputs and outputs, which the parser keeps in Ext, so no Concourse source yields an IR artifact",

@@ -36,7 +36,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.JobOutputs:             {Level: caps.Lost, Caveat: "Woodpecker steps cannot pass values to other workflows"},
 		caps.StepAction:             {Level: caps.Native, Strategy: "per actions.Lookup verdict; a plugin step is native", Caveat: "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"},
 		caps.StepTimeout:            {Level: caps.Lost, Caveat: "Woodpecker has only a pipeline timeout in the repo settings"},
-		caps.StepShell:              {Level: caps.Lost, Caveat: "Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash"},
+		caps.StepShell:              {Level: caps.Emulated, Strategy: "bash-if-present wrapper command", Caveat: "Woodpecker runs commands through /bin/sh -e of the image; a step that runs under bash at the source becomes one command that re-runs the script under bash -e when the image has bash, else under sh -e, so bash-only syntax fails under sh; any other shell is lost"},
 		caps.ProjectMultiPipeline:   {Level: caps.Emulated, Strategy: "each job of each pipeline is a workflow named <pipeline>-<job>", Caveat: "each workflow carries its pipeline's trigger condition"},
 		caps.ExprOpaque:             {Level: caps.Native, Caveat: "only opaque expressions of the woodpecker dialect; others are lost"},
 		caps.DisplayName:            {Level: caps.Native, Strategy: "the step name", Caveat: "pipeline and job names that differ from the id are lost; the workflow name is the file name"},

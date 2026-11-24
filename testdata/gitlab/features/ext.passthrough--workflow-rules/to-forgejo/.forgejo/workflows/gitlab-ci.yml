@@ -2,6 +2,7 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/build
 # pipemaster:arg {"src":"((event == 'merge_request_event') \u0026\u0026 !tag) || ((branch == default_branch) \u0026\u0026 !tag \u0026\u0026 !(event == 'merge_request_event'))","guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"pre":1,"post":0}
 on:
@@ -17,3 +18,4 @@ jobs:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make build
+        shell: bash

@@ -1,11 +1,13 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/build
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/alert
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/alert
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/alert/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/alert
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/alert
@@ -13,6 +15,7 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/report
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/report
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/report/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/report
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/report
@@ -27,6 +30,7 @@ jobs:
       - uses: actions/checkout@v7
       - id: script
         run: make build
+        shell: bash
   # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
   alert:
     needs:
@@ -37,6 +41,7 @@ jobs:
       - uses: actions/checkout@v7
       - id: script
         run: ./page.sh
+        shell: bash
   # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
   report:
     needs:
@@ -47,3 +52,4 @@ jobs:
       - uses: actions/checkout@v7
       - id: script
         run: ./notify.sh
+        shell: bash
