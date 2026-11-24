@@ -6,7 +6,7 @@ import "github.com/lukaszraczylo/pipemaster/expr"
 // the git resources of the job, so the AST holds canonical refs and each maps to itself.
 var Vocab = func() expr.Vocab {
 	v := expr.Vocab{ToCanon: map[string][]string{}, FromCanon: map[string][]string{}}
-	for _, n := range []string{expr.CtxBranch, expr.CtxTag, expr.CtxEvent, expr.CtxSHA, expr.CtxRepo, expr.CtxDefaultBranch} {
+	for _, n := range []string{expr.CtxBranch, expr.CtxTag, expr.CtxEvent, expr.CtxSHA, expr.CtxRepo, expr.CtxDefaultBranch, expr.CtxBeforeSHA} {
 		v.ToCanon[n], v.FromCanon[n] = []string{n}, []string{n}
 	}
 	for _, fam := range []string{expr.PrefixInputs, expr.PrefixMatrix, expr.PrefixNeeds, expr.PrefixEnv, expr.PrefixVars, expr.PrefixSecrets} {

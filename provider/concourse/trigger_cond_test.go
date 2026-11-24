@@ -62,23 +62,34 @@ func TestJobsKeepTheEventsOfTheirOwnGets(t *testing.T) {
 func TestNoJobRunsOnAnEventItsResourcesDoNotWatch(t *testing.T) {
 	pl, _ := parseYAML(t, multiBranch)
 	set, test, build := job(t, pl, "set-feature"), job(t, pl, "test"), job(t, pl, "build")
-	const def = "main"
+	const def, zero, old = "main", "0000000000000000000000000000000000000000", "1111111111111111111111111111111111111111"
+	push := func(branch, before string) condEnv {
+		return condEnv{"event": "push", "branch": branch, "before_sha": before, "default_branch": def}
+	}
 	for _, c := range []struct {
 		env       condEnv
 		name      string
 		set, test bool
 	}{
-		{condEnv{"event": "push", "branch": "main", "default_branch": def}, "push to the default branch", false, true},
-		{condEnv{"event": "push", "branch": "feat/x", "default_branch": def}, "push to feat/x", true, false},
-		{condEnv{"event": "push", "branch": "feature/y", "default_branch": def}, "push to feature/y", true, false},
-		{condEnv{"event": "push", "branch": "dev", "default_branch": def}, "push to another branch", false, false},
-		{condEnv{"event": "push", "branch": "feature", "default_branch": def}, "push to a branch that only starts like a filter", false, false},
-		{condEnv{"event": "push", "tag": "v1", "default_branch": def}, "tag push", false, false},
-		{condEnv{"event": "push", "tag": "main", "default_branch": def}, "tag named like the default branch", false, false},
-		{condEnv{"event": "pull_request", "branch": "main", "default_branch": def}, "pull request on the default branch", false, false},
-		{condEnv{"event": "pull_request", "branch": "feat/x", "default_branch": def}, "pull request on feat/x", false, false},
-		{condEnv{"event": "schedule", "branch": "main", "default_branch": def}, "schedule on the default branch", false, false},
-		{condEnv{"event": "workflow_dispatch", "branch": "main", "default_branch": def}, "manual start on the default branch", false, false},
+		{push("main", old), "push to the default branch", false, true},
+		{push("main", zero), "push that creates the default branch", false, true},
+		{push("feat/x", zero), "push that creates feat/x", true, false},
+		{push("feature/y", zero), "push that creates feature/y", true, false},
+		{push("feat/a/b", zero), "push that creates feat/a/b: * also matches /", true, false},
+		{push("feat/x", old), "push to the existing branch feat/x: the branch set does not change", false, false},
+		{push("feature/y", old), "push to the existing branch feature/y", false, false},
+		{push("Feat/x", zero), "creation of Feat/x: the filter is case-sensitive", false, false},
+		{push("dev", zero), "creation of another branch", false, false},
+		{push("feature", zero), "creation of a branch that only starts like a filter", false, false},
+		{condEnv{"event": "push", "tag": "feat/x", "before_sha": zero, "default_branch": def}, "creation of a tag named like a branch", false, false},
+		{condEnv{"event": "delete", "branch": "feat/x", "default_branch": def}, "deletion of feat/x has no push event", false, false},
+		{condEnv{"event": "create", "branch": "feat/x", "default_branch": def}, "create event of feat/x", false, false},
+		{condEnv{"event": "push", "tag": "v1", "before_sha": old, "default_branch": def}, "tag push", false, false},
+		{condEnv{"event": "push", "tag": "main", "before_sha": zero, "default_branch": def}, "tag named like the default branch", false, false},
+		{condEnv{"event": "pull_request", "branch": "main", "before_sha": zero, "default_branch": def}, "pull request on the default branch", false, false},
+		{condEnv{"event": "pull_request", "branch": "feat/x", "before_sha": zero, "default_branch": def}, "pull request on feat/x", false, false},
+		{condEnv{"event": "schedule", "branch": "main", "before_sha": zero, "default_branch": def}, "schedule on the default branch", false, false},
+		{condEnv{"event": "workflow_dispatch", "branch": "feat/x", "before_sha": zero, "default_branch": def}, "manual start on feat/x", false, false},
 	} {
 		if got := runs(t, set, c.env); got != c.set {
 			t.Errorf("%s: set-feature runs=%v, want %v (if %s)", c.name, got, c.set, cond(set.If))
@@ -111,7 +122,7 @@ func TestConditionReachesGitLabRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := string(out[".gitlab-ci.yml"])
-	for _, want := range []string{"$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH", `feat\/`, `feature\/`} {
+	for _, want := range []string{"$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH", `$CI_COMMIT_BEFORE_SHA == "0000000000000000000000000000000000000000"`, `=~ /^feat\//`, `=~ /^feature\//`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("GitLab output lacks %q:\n%s", want, body)
 		}
@@ -133,13 +144,17 @@ func TestConditionReachesGHAIf(t *testing.T) {
 			body += string(b)
 		}
 	}
-	for _, want := range []string{"github.event.repository.default_branch", "github.ref_type == 'branch'", "startsWith(github.ref_name, 'feat/')"} {
+	for _, want := range []string{"github.event.repository.default_branch", "github.ref_type == 'branch'"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("GHA output lacks %q:\n%s", want, body)
 		}
 	}
 	if strings.Contains(body, "workflow_dispatch'") {
 		t.Errorf("no job is manual:\n%s", body)
+	}
+	// GHA has no case-sensitive prefix test, so the branch-set job is disabled rather than run on more events.
+	if strings.Contains(body, "startsWith") || !strings.Contains(body, "if: false") || !strings.Contains(body, "lost job.if") {
+		t.Errorf("the branch-set job must be disabled with a lost entry:\n%s", body)
 	}
 }
 

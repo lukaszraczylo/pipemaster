@@ -49,6 +49,7 @@ var Vocab = expr.Vocab{
 		"GITLAB_USER_LOGIN":                   {expr.CtxActor},
 		"CI_MERGE_REQUEST_IID":                {"pr", "number"},
 		"CI_DEFAULT_BRANCH":                   {expr.CtxDefaultBranch},
+		"CI_COMMIT_BEFORE_SHA":                {expr.CtxBeforeSHA},
 		"CI_MERGE_REQUEST_SOURCE_BRANCH_NAME": {"pr", "head_ref"},
 		"CI_MERGE_REQUEST_TARGET_BRANCH_NAME": {"pr", "base_ref"},
 	},
@@ -64,6 +65,7 @@ var Vocab = expr.Vocab{
 		expr.CtxPRHeadRef:     {"CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"},
 		expr.CtxPRBaseRef:     {"CI_MERGE_REQUEST_TARGET_BRANCH_NAME"},
 		expr.CtxDefaultBranch: {"CI_DEFAULT_BRANCH"},
+		expr.CtxBeforeSHA:     {"CI_COMMIT_BEFORE_SHA"},
 	},
 }
 

@@ -18,7 +18,9 @@ const (
 	CtxPRHeadRef = "pr.head_ref"
 	// CtxDefaultBranch is the default branch of the repository; a dialect without a variable for it cannot name it.
 	CtxDefaultBranch = "default_branch"
-	CtxPRBaseRef     = "pr.base_ref"
+	// CtxBeforeSHA is the commit a push replaced: all zeros when the push creates the ref.
+	CtxBeforeSHA = "before_sha"
+	CtxPRBaseRef = "pr.base_ref"
 )
 
 // Canonical prefix families; the tail after the prefix is user-defined.

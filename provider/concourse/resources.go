@@ -2,6 +2,7 @@ package concourse
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -473,42 +474,55 @@ func (b *pipeBuilder) branchSetTrigger(r *resource, t ir.Trigger, uri, versionTy
 		return b.failSafe(r, r.name, "version_type: branches with paths has no IR form")
 	}
 	var cond expr.Expr
-	for _, f := range filters {
+	globs := make([]string, len(filters))
+	for i, f := range filters {
 		c := branchGlob(f)
 		if cond == nil {
 			cond = c
 		} else {
 			cond = expr.Binary{Op: expr.OpOr, L: cond, R: c}
 		}
+		// The check script matches a filter with bash [[ == ]], where * also matches /; a GHA glob spells that **.
+		globs[i] = strings.Replace(f, "*", "**", 1)
 	}
-	t.Branches.Include = slices.Clone(filters)
+	t.Branches.Include = globs
 	b.watched(r, caps.TriggerPush, uri, "branch_filters "+strings.Join(filters, ", ")+
-		"; Concourse emits a version when the set of matching branches changes, the push trigger fires on every push to one of them")
-	return sourceTrigger{trig: t, uri: "uri:" + uri, cond: pushTo(cond)}
+		"; Concourse emits a version when a matching branch is created or deleted (assets/check_branches.sh of git-resource v1.24.1), "+
+		"so the job runs only on a push that creates a matching branch: a deleted branch has no push event, and a push to an existing branch starts nothing")
+	created := expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{expr.CtxBeforeSHA}}, R: expr.Lit{Kind: expr.LitStr, Str: zeroSHA}}
+	return sourceTrigger{trig: t, uri: "uri:" + uri, cond: pushTo(created, cond)}
 }
+
+// zeroSHA is the commit a push replaces when it creates the ref.
+const zeroSHA = "0000000000000000000000000000000000000000"
 
 const (
 	versionCommits  = "commits"
 	versionBranches = "branches"
 )
 
-// pushTo is the condition of a push event whose ref satisfies c.
-func pushTo(c expr.Expr) expr.Expr {
-	push := expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{expr.CtxEvent}}, R: expr.Lit{Kind: expr.LitStr, Str: "push"}}
-	return expr.Binary{Op: expr.OpAnd, L: push, R: c}
+// pushTo is the condition of a push event that also satisfies each of tests. The tests nest to the left, as the
+// parsers of the other providers read a chain of &&.
+func pushTo(tests ...expr.Expr) expr.Expr {
+	var out expr.Expr = expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{expr.CtxEvent}}, R: expr.Lit{Kind: expr.LitStr, Str: "push"}}
+	for _, c := range tests {
+		out = expr.Binary{Op: expr.OpAnd, L: out, R: c}
+	}
+	return out
 }
 
 func branchIs(name string) expr.Expr {
 	return expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{expr.CtxBranch}}, R: expr.Lit{Kind: expr.LitStr, Str: name}}
 }
 
-// branchGlob is the test of a branch against one filter: a literal name, or a prefix that ends in *.
+// branchGlob is the test of a branch against one filter: a literal name, or a prefix that ends in *. The pattern
+// has no case flag, because the check script compares case-sensitively and * there also matches /.
 func branchGlob(f string) expr.Expr {
 	prefix, star := strings.CutSuffix(f, "*")
 	if !star {
 		return branchIs(f)
 	}
-	return expr.Binary{Op: expr.OpMatch, L: expr.Ref{Path: []string{expr.CtxBranch}}, R: expr.Lit{Kind: expr.LitStr, Str: expr.Pattern(expr.ModePrefix, prefix)}}
+	return expr.Binary{Op: expr.OpMatch, L: expr.Ref{Path: []string{expr.CtxBranch}}, R: expr.Lit{Kind: expr.LitStr, Str: "^" + regexp.QuoteMeta(prefix)}}
 }
 
 // filterOK is true for a literal name, or a name followed by one * at the end.

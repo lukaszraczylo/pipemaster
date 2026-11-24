@@ -798,7 +798,7 @@ func approxCmp(b Binary, from Dialect, cav *caveats) (Expr, bool) {
 		}
 		cav.add(ciCaveat)
 		return Binary{Op: b.Op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: canon}}, true
-	case CtxRefName, CtxSHA:
+	case CtxRefName, CtxSHA, CtxBeforeSHA:
 		addAll(cav, litCaveats(lit))
 		return Binary{Op: b.Op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: lit}}, true
 	case CtxBranch, CtxTag:
