@@ -2,6 +2,7 @@ package gitlab_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -85,7 +86,7 @@ func TestImageSplitChainsJobsAndJoinsThemBack(t *testing.T) {
 	if strings.Count(doc, "allow_failure: true") != 3 || strings.Contains(doc, "when: on_failure") || strings.Contains(doc, "when: always") {
 		t.Errorf("allow_failure must be on every split job, with the default when so a failed job stops its needs chain:\n%s", doc)
 	}
-	if strings.Count(doc, "skipping the steps after it") != 2 || strings.Count(doc, "touch .pipemaster-split/") != 2 {
+	if strings.Count(doc, "the later steps are skipped") != 2 || strings.Count(doc, "touch \"$CI_PROJECT_DIR\"/'.pipemaster-split/") != 2 {
 		t.Errorf("an allowed failure needs a guard in jobs 2 and 3 and a marker in jobs 1 and 2:\n%s", doc)
 	}
 	if got := splitJobIDs(pl); !slices.Equal(got, []string{"build", "deploy"}) {
@@ -214,11 +215,15 @@ func TestImageSplitEditedChainStaysSeparate(t *testing.T) {
 // runParts runs the script lines of the named jobs in order in one directory, as bash -e, and returns the exit codes.
 func runParts(t *testing.T, doc string, ids ...string) ([]int, string) {
 	t.Helper()
+	return runPartsIn(t, t.TempDir(), doc, ids...)
+}
+
+func runPartsIn(t *testing.T, dir, doc string, ids ...string) ([]int, string) {
+	t.Helper()
 	var jobs map[string]any
 	if err := yaml.Unmarshal([]byte(doc), &jobs); err != nil {
 		t.Fatal(err)
 	}
-	dir := t.TempDir()
 	var codes []int
 	for _, id := range ids {
 		var lines []string
@@ -227,6 +232,7 @@ func runParts(t *testing.T, doc string, ids ...string) ([]int, string) {
 		}
 		cmd := exec.Command("bash", "-e", "-c", strings.Join(lines, "\n")) //nolint:gosec // the script is emitted by the test
 		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), "CI_PROJECT_DIR="+dir)
 		code := 0
 		if err := cmd.Run(); err != nil {
 			var ee *exec.ExitError
@@ -249,7 +255,7 @@ func failingChain(allow bool) *ir.Project {
 
 func TestImageSplitFailedMiddleJobSkipsLaterJobs(t *testing.T) {
 	doc := emitDoc(t, failingChain(true))
-	if !strings.Contains(doc, "pipemaster: build-2 failed; skipping the steps after it, as drone does") {
+	if !strings.Contains(doc, "pipemaster: build-2 failed; the source job stops here, so the later steps are skipped") {
 		t.Fatalf("no guard message:\n%s", doc)
 	}
 	codes, log := runParts(t, doc, "build-1", "build-2", "build-3")
@@ -284,12 +290,49 @@ func TestImageSplitSkippedJobSkipsTheNext(t *testing.T) {
 
 func TestImageSplitNeedsNoGuardWithoutAllowFailure(t *testing.T) {
 	doc := emitDoc(t, failingChain(false))
-	for _, w := range []string{"skipping the steps", ".pipemaster-split", "allow_failure"} {
+	for _, w := range []string{"the later steps are skipped", ".pipemaster-split", "allow_failure"} {
 		if strings.Contains(doc, w) {
 			t.Errorf("a job that must succeed needs no %q:\n%s", w, doc)
 		}
 	}
 	if !strings.Contains(doc, "- build-2") {
 		t.Errorf("the chain must keep its needs:\n%s", doc)
+	}
+}
+
+func TestImageSplitMarkerSurvivesAStepThatChangesDirectory(t *testing.T) {
+	j := glJob("build", imgStep("a", "go:1", "mkdir sub", "cd sub", "echo a >> ../log"), imgStep("b", "node:20", "echo b >> log"), imgStep("c", "go:1", "echo c >> log"))
+	j.AllowFailure = true
+	doc := emitDoc(t, glProject("drone", j))
+	if codes, log := runParts(t, doc, "build-1", "build-2", "build-3"); slices.Max(codes) != 0 || log != "a\nb\nc\n" {
+		t.Errorf("a cd in one job must not hide its marker: codes %v, log %q", codes, log)
+	}
+}
+
+func TestImageSplitStaleMarkerDoesNotLetALaterJobRun(t *testing.T) {
+	doc := emitDoc(t, failingChain(true))
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".pipemaster-split"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".pipemaster-split", "build-2.ok"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	codes, log := runPartsIn(t, dir, doc, "build-1", "build-2", "build-3")
+	if log != "a\n" || codes[1] == 0 || codes[2] != 0 {
+		t.Errorf("an old marker let the last job run: codes %v, log %q", codes, log)
+	}
+}
+
+func TestImageSplitHidesMarkersFromTheSourceArtifacts(t *testing.T) {
+	j := glJob("build", imgStep("a", "go:1", "x"), imgStep("b", "node:20", "y"))
+	j.AllowFailure = true
+	j.Artifacts = []ir.Artifact{{Name: "out", Paths: []string{"bin/"}}}
+	pl, _, doc := splitEmitParse(t, glProject("drone", j))
+	if !strings.Contains(doc, ".pipemaster-split/**/*") {
+		t.Errorf("the last job must exclude the marker directory:\n%s", doc)
+	}
+	if b := job(t, pl, "build"); len(b.Artifacts) != 1 || b.Ext["gitlab"] != nil && strings.Contains(fmt.Sprint(b.Ext["gitlab"]), "pipemaster-split") {
+		t.Errorf("the exclude leaked into the joined job: %+v", b.Ext)
 	}
 }

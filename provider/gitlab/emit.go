@@ -29,7 +29,7 @@ func (adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
 	if p != nil {
 		origin = p.Origin.Provider
 	}
-	e := &emitter{origin: origin, splits: map[*ir.Job]splitPart{}, noSplit: map[string]string{}, from: sourceDialect(origin), led: emitkit.NewLedger("ir", dialect, adapter{}.Caps())}
+	e := &emitter{splits: map[*ir.Job]splitPart{}, noSplit: map[string]string{}, from: sourceDialect(origin), led: emitkit.NewLedger("ir", dialect, adapter{}.Caps())}
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)

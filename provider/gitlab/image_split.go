@@ -20,6 +20,7 @@ const (
 	guardStepID   = "pipemaster-split-guard"
 	markStepID    = "pipemaster-split-ok"
 	markDir       = ".pipemaster-split"
+	markExclude   = markDir + "/**/*"
 	splitStrategy = "one job per run of steps that share an image, chained by needs; the workspace passes on as artifacts"
 	liftStrategy  = "the shared image of the steps is the job image"
 	splitCaveat   = "GitLab sets the image per job, so the job is split into %d jobs (%s) chained by needs; each job hands the project directory minus .git to the next as artifacts that expire in " + splitExpire +
@@ -289,9 +290,11 @@ func (e *emitter) buildParts(jp string, j *ir.Job, runs []imageRun, ids []string
 		}
 		isLast := i == len(runs)-1
 		if j.AllowFailure && len(runs) > 1 {
+			prev := ""
 			if i > 0 {
-				cp.Steps = append([]*ir.Step{e.guardStep(ids[i-1])}, cp.Steps...)
+				prev = ids[i-1]
 			}
+			cp.Steps = append([]*ir.Step{startStep(ids[i], prev, isLast)}, cp.Steps...)
 			if !isLast {
 				cp.Steps = append(cp.Steps, markStep(ids[i]))
 			}
@@ -303,7 +306,7 @@ func (e *emitter) buildParts(jp string, j *ir.Job, runs []imageRun, ids []string
 		if !isLast {
 			cp.Artifacts = nil
 		}
-		cp.Ext = splitExt(j.Ext, isLast, sameImage(cp.Container, j.Container))
+		cp.Ext = splitExt(j.Ext, isLast, sameImage(cp.Container, j.Container), j.AllowFailure && len(runs) > 1 && hasArtifacts(j))
 		out = append(out, &cp)
 		sp := splitPart{arg: arg, path: jp}
 		for _, st := range r.steps {
@@ -319,30 +322,69 @@ func (e *emitter) buildParts(jp string, j *ir.Job, runs []imageRun, ids []string
 
 func singleQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
 
-func markFile(id string) string { return markDir + "/" + id + ".ok" }
+// markPath is the marker file of a part, anchored at the project directory so a step that changes directory cannot move it.
+func markPath(id string) string {
+	return `"$` + "CI_PROJECT_DIR" + `"/` + singleQuote(markDir+"/"+id+".ok")
+}
 
 // markStep records that every step of a part ran. Its line runs only if the lines before it succeeded.
 func markStep(id string) *ir.Step {
-	return &ir.Step{ID: markStepID, Kind: ir.StepScript, Script: []string{"mkdir -p " + markDir + " && touch " + markFile(id)}}
+	return &ir.Step{ID: markStepID, Kind: ir.StepScript, Script: []string{`mkdir -p "$` + "CI_PROJECT_DIR" + `"/` + singleQuote(markDir) + " && touch " + markPath(id)}}
 }
 
-// guardStep ends a part early, with success, when the part before it left no marker. A job that is allowed to
-// fail would otherwise let the later parts run after a failure, which the source never does.
-func (e *emitter) guardStep(prev string) *ir.Step {
-	from := e.origin
-	if from == "" {
-		from = "the source provider"
+// startStep opens a part. It removes the marker of the part, so a runner that keeps its build directory cannot
+// reuse an old one. Then, when a part comes before it, it ends the job with success if that part left no marker:
+// a job that is allowed to fail would otherwise run its later parts after a failure, which the source never does.
+func startStep(id, prev string, last bool) *ir.Step {
+	var lines []string
+	if !last {
+		lines = append(lines, "rm -f "+markPath(id))
 	}
-	line := "[ -f " + markFile(prev) + " ] || { echo " + singleQuote("pipemaster: "+prev+" failed; skipping the steps after it, as "+from+" does") + "; exit 0; }"
-	return &ir.Step{ID: guardStepID, Kind: ir.StepScript, Script: []string{line}}
+	if prev != "" {
+		lines = append(lines, "[ -f "+markPath(prev)+" ] || { echo "+singleQuote("pipemaster: "+prev+" failed; the source job stops here, so the later steps are skipped")+"; exit 0; }")
+	}
+	return &ir.Step{ID: guardStepID, Kind: ir.StepScript, Script: lines}
+}
+
+func hasArtifacts(j *ir.Job) bool { return len(j.Artifacts) > 0 || extOf(j.Ext)[extArtifacts] != nil }
+
+// withExclude returns a copy of an artifacts block with one more exclude pattern.
+func withExclude(block any, pattern string) map[string]any {
+	out := map[string]any{}
+	if m, ok := block.(map[string]any); ok {
+		out = maps.Clone(m)
+	}
+	list, _ := out["exclude"].([]any)
+	out["exclude"] = append(slices.Clone(list), any(pattern))
+	return out
+}
+
+// withoutExclude undoes withExclude. It returns nil when nothing else is left in the block.
+func withoutExclude(block any, pattern string) any {
+	m, ok := block.(map[string]any)
+	if !ok {
+		return block
+	}
+	out := maps.Clone(m)
+	list, _ := out["exclude"].([]any)
+	list = slices.DeleteFunc(slices.Clone(list), func(v any) bool { return v == pattern })
+	if len(list) > 0 {
+		out["exclude"] = list
+	} else {
+		delete(out, "exclude")
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // splitExt copies the Ext of a source job for one part. A part that hands the workspace on writes that
 // artifacts block, and the image extras stay with the part that has the source job image.
-func splitExt(x ir.Ext, last, keepImage bool) ir.Ext {
+func splitExt(x ir.Ext, last, keepImage, hideMarks bool) ir.Ext {
 	out := maps.Clone(x)
 	own := maps.Clone(extOf(x))
-	if own == nil && last {
+	if own == nil && last && !hideMarks {
 		return out
 	}
 	if own == nil {
@@ -350,6 +392,9 @@ func splitExt(x ir.Ext, last, keepImage bool) ir.Ext {
 	}
 	if !keepImage {
 		delete(own, extImage)
+	}
+	if last && hideMarks {
+		own[extArtifacts] = withExclude(own[extArtifacts], markExclude)
 	}
 	if !last {
 		own[extArtifacts] = map[string]any{"paths": []any{workspacePath}, "exclude": []any{gitExclude}, "expire_in": splitExpire}
@@ -450,7 +495,9 @@ func (s *state) joinChain(pl *ir.Pipeline, args map[ir.FeatureUse][]string, ref 
 	if lastJob != base {
 		dropExt(&base.Ext, extArtifacts)
 		if a, ok := extOf(lastJob.Ext)[extArtifacts]; ok {
-			setExt(&base.Ext, extArtifacts, a)
+			if a = withoutExclude(a, markExclude); a != nil {
+				setExt(&base.Ext, extArtifacts, a)
+			}
 		}
 	}
 	base.Container = nil
