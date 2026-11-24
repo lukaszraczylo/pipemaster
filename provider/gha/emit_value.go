@@ -21,23 +21,20 @@ const (
 
 // emitter carries the state of one Emit call: the ledger, and the lost-text comments waiting for a node.
 type emitter struct {
-	led      *emitkit.Ledger
-	from     *expr.Dialect
-	comments []string
-	marks    []string
-	// stepIDs maps the step IDs of the job being written to the IDs written.
-	stepIDs map[string]string
-	// pluginVars holds the PLUGIN_ variables of the plugin step being written, for stepTail to add to its env.
-	pluginVars *yaml.Node
-	// guarded holds the pipelines whose deletion guard the report already names.
-	guarded map[string]bool
-	// jobGuards is the Origin.Guarded of the project.
-	jobGuards map[string]bool
-	// guardJob is the job path whose condition gets the deletion guard.
-	guardJob string
-	d        Dialect
-	// guardMarked is true once the marker of the guarded job is written.
-	guardMarked bool
+	jobGuards      map[string]bool
+	from           *expr.Dialect
+	led            *emitkit.Ledger
+	stepIDs        map[string]string
+	pluginVars     *yaml.Node
+	guarded        map[string]bool
+	guardJob       string
+	marks          []string
+	comments       []string
+	changeAtoms    []changeAtom
+	d              Dialect
+	guardMarked    bool
+	changesNeeded  bool
+	changesBlocked bool
 }
 
 // sourceDialect is the expression dialect of a project's origin; nil means GHA semantics already hold.
@@ -48,6 +45,9 @@ func sourceDialect(origin string) *expr.Dialect { return expr.SourceFor(origin, 
 func (e *emitter) source(path string, f caps.Feature, x expr.Expr) (expr.Expr, bool) {
 	if e.from == nil || isStatus(x) {
 		return x, true
+	}
+	if expr.HasChanges(x) {
+		return e.sourceChanges(path, f, x)
 	}
 	if b, ok := x.(expr.Binary); ok && b.Op == expr.OpAnd && (isStatus(b.L) || isStatus(b.R)) {
 		l, lok := e.source(path, f, b.L)

@@ -3,7 +3,7 @@
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/build
 # pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"2eb2c274a45a1ab6700dcfe868b3698bb2fd62a967845d8cc195e71c3512fcdd","carry":"if: |\n    opaque(gitlab): - changes:\n        - src/**/*\n      if: $CI_COMMIT_BRANCH == \"main\"\nid: build\n"}
+# pipemaster:arg {"digest":"2eb2c274a45a1ab6700dcfe868b3698bb2fd62a967845d8cc195e71c3512fcdd","carry":"if: |\n    opaque(gitlab): - exists:\n        - Makefile\n      if: $CI_COMMIT_BRANCH == \"main\"\nid: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci

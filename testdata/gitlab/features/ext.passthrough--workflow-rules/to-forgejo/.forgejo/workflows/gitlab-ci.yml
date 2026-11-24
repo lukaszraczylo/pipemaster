@@ -1,4 +1,6 @@
 # pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:arg {"src":"((event == 'merge_request_event') \u0026\u0026 !tag) || ((branch == default_branch) \u0026\u0026 !tag \u0026\u0026 !(event == 'merge_request_event'))","guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"pre":1,"post":0}
@@ -9,10 +11,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
-    if: false
+    if: (github.event_name == 'pull_request' && !(github.ref_type == 'tag' && github.ref_name) || github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch && !(github.ref_type == 'tag' && github.ref_name) && !(github.event_name == 'pull_request')) && !github.event.deleted
     runs-on: ubuntu-latest
     steps:
       - uses: https://github.com/actions/checkout@v7
-      # pipemaster:lost job.if pipeline/gitlab-ci/job/build: opaque(gitlab): workflow:\n    name: $PIPELINE_NAME\n    rules:\n        - if: $CI_COMMIT_TAG\n          when: never\n        - if: $CI_PIPELINE_SOURCE == "merge_request_event"\n          variables:\n            PIPELINE_NAME: MR pipeline\n        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH\n          variables:\n            PIPELINE_NAME: Default branch pipeline\n
       - id: script
         run: make build

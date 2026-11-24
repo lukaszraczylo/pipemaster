@@ -10,14 +10,14 @@ pipelines:
         - kind: tag
       jobs:
         - if: |
-            opaque(gitlab): - changes:
-                - src/**/*
+            opaque(gitlab): - exists:
+                - Makefile
               if: $CI_COMMIT_BRANCH == "main"
           ext:
             gitlab:
                 rules:
-                    - changes:
-                        - src/**/*
+                    - exists:
+                        - Makefile
                       if: $CI_COMMIT_BRANCH == "main"
           id: build
           steps:

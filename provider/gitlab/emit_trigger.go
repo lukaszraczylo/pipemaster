@@ -208,6 +208,10 @@ func (e *emitter) workflowRules(pl *ir.Pipeline) (*yaml.Node, error) {
 		ts, ok, _ := s.workflowTriggers(n)
 		// Parse gives the default triggers to a block it cannot model, so the block is still the source.
 		if (ok && sameTriggers(ts, pl.Triggers)) || (!ok && sameTriggers(pl.Triggers, defaultTriggers())) {
+			e.wfGuard = nil
+			if c, cok := s.workflowCond(n); cok && !ok {
+				e.wfGuard = c
+			}
 			return n, nil
 		}
 	}

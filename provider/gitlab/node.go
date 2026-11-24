@@ -21,11 +21,13 @@ const (
 
 // state is shared by one Parse call; org records the file each resolved node came from so errors name it.
 type state struct {
-	org      map[*yaml.Node]string
-	rep      *report.Report
-	lines    map[string]position
-	spec     *yaml.Node
-	guard    expr.Expr
+	org   map[*yaml.Node]string
+	rep   *report.Report
+	lines map[string]position
+	spec  *yaml.Node
+	guard expr.Expr
+	// wfCond is workflow:rules as one condition; nil when they do not compile.
+	wfCond   expr.Expr
 	queue    map[*ir.Job][]lineRewrite
 	remote   []string
 	nodes    int

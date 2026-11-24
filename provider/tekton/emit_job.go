@@ -497,6 +497,11 @@ func (tc *taskCtx) sidecars() (*yaml.Node, error) {
 		m := newMap()
 		m.SetStr("name", sv.Name)
 		m.SetStr("image", img)
+		if cmd, ok, err := tc.commandText(sc, sp, sv.Image.Entrypoint); err != nil {
+			return nil, err
+		} else if ok {
+			m.Set("command", strSeq(cmd))
+		}
 		env, err := tc.envList(sc, sp, sv.Env)
 		if err != nil {
 			return nil, err
@@ -513,6 +518,18 @@ func (tc *taskCtx) sidecars() (*yaml.Node, error) {
 		return nil, nil
 	}
 	return out, nil
+}
+
+// commandText converts each entrypoint item; ok is false when there is none or an item has no Tekton form.
+func (tc *taskCtx) commandText(sc *stepScope, sp string, items []string) (out []string, ok bool, err error) {
+	for _, a := range items {
+		t, tok, err := tc.text(sc, sp, caps.JobServices, valueText, a)
+		if err != nil || !tok {
+			return nil, false, err
+		}
+		out = append(out, t)
+	}
+	return out, len(out) > 0, nil
 }
 
 // ports writes the container ports of a service; a port text with a host part keeps the container part.

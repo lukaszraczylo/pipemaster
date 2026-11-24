@@ -4,7 +4,13 @@ kind: TriggerTemplate
 metadata:
   name: gitlab-ci-run
 spec:
-  params: []
+  params:
+    - name: ctx-branch
+      default: ""
+    - name: ctx-tag
+      default: ""
+    - name: ctx-event
+      default: ""
   resourcetemplates:
     - apiVersion: tekton.dev/v1
       kind: PipelineRun
@@ -13,4 +19,10 @@ spec:
       spec:
         pipelineRef:
           name: gitlab-ci
-        params: []
+        params:
+          - name: ctx-branch
+            value: $(tt.params.ctx-branch)
+          - name: ctx-tag
+            value: $(tt.params.ctx-tag)
+          - name: ctx-event
+            value: $(tt.params.ctx-event)

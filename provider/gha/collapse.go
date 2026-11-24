@@ -44,6 +44,10 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 				})
 				break
 			}
+			if u.IRPath == "pipeline/"+pl.ID+"/job/"+changesJobID {
+				dropChangesJob(pl)
+				break
+			}
 			if j := markedJob(pl, u.IRPath); j != nil && len(j.Steps) == 1 && slices.Equal(j.Steps[0].Script, []string{noopScript}) {
 				j.Steps = nil
 			}
@@ -322,6 +326,9 @@ func restoreCond(src, parsed expr.Expr, from expr.Dialect) (expr.Expr, bool) {
 // rederives is true when the emitter would write src as the condition parsed.
 func rederives(src, parsed expr.Expr, from expr.Dialect) bool {
 	t, _, ok := expr.TranslateApprox(src, from, exprgha.Lang)
+	if expr.HasChanges(src) {
+		t, _, _, ok = translateChanges(src, from)
+	}
 	if !ok {
 		return false
 	}
@@ -526,6 +533,21 @@ func collapseFilter(pl *ir.Pipeline, f caps.Feature, args []string) {
 		if sameFilter(*got, written) {
 			*got = want
 			return
+		}
+	}
+}
+
+// dropChangesJob removes the generated changed-paths job and the needs that name it.
+func dropChangesJob(pl *ir.Pipeline) {
+	isGen := func(j *ir.Job) bool { return j != nil && j.ID == changesJobID }
+	pl.Jobs = slices.DeleteFunc(pl.Jobs, isGen)
+	for _, j := range append(slices.Clone(pl.Jobs), pl.Finally...) {
+		if j == nil {
+			continue
+		}
+		j.Needs = slices.DeleteFunc(j.Needs, func(n ir.Need) bool { return n.JobID == changesJobID })
+		if len(j.Needs) == 0 {
+			j.Needs = nil
 		}
 	}
 }

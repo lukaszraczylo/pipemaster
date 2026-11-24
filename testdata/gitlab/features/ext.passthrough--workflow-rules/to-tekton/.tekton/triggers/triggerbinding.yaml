@@ -4,4 +4,10 @@ kind: TriggerBinding
 metadata:
   name: gitlab-ci-github
 spec:
-  params: []
+  params:
+    - name: ctx-branch
+      value: $(extensions.ctx_branch)
+    - name: ctx-tag
+      value: $(extensions.ctx_tag)
+    - name: ctx-event
+      value: $(extensions.ctx_event)

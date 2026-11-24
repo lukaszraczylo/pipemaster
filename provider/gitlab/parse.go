@@ -20,6 +20,10 @@ const (
 	ExtSection      = "section"
 	ExtNoScript     = "_no_script"
 	ExtRulesAlways  = "_rules_always"
+	// ExtRulesFP names the condition the kept rules compiled to; the emitter restores the text only while it still holds.
+	ExtRulesFP = "_rules_fp"
+	// ExtRulesWhen is the job-level when that the kept rules take as their default.
+	ExtRulesWhen = "_rules_when"
 
 	extHidden    = "hidden"
 	extInclude   = "include"

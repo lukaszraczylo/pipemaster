@@ -1,0 +1,17 @@
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/release
+# pipemaster:arg {"if":"branch == 'dev'","back":"(event == 'push') \u0026\u0026 (branch == 'dev')","triggers":"- kind: push\n- kind: tag\n"}
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/release
+kind: pipeline
+type: docker
+name: release
+trigger:
+  event:
+    - push
+    - tag
+  branch:
+    - dev
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make release

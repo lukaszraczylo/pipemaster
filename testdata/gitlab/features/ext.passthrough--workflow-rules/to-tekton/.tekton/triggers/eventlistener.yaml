@@ -26,6 +26,14 @@ spec:
           params:
             - name: filter
               value: body.ref.startsWith('refs/heads/')
+            - name: overlays
+              value:
+                - key: ctx_branch
+                  expression: body.ref.replace('refs/heads/','',1)
+                - key: ctx_tag
+                  expression: ''''''
+                - key: ctx_event
+                  expression: '''push'''
       bindings:
         - ref: gitlab-ci-github
       template:
@@ -47,6 +55,14 @@ spec:
           params:
             - name: filter
               value: body.ref.startsWith('refs/tags/')
+            - name: overlays
+              value:
+                - key: ctx_branch
+                  expression: ''''''
+                - key: ctx_tag
+                  expression: body.ref.replace('refs/tags/','',1)
+                - key: ctx_event
+                  expression: '''push'''
       bindings:
         - ref: gitlab-ci-github
       template:

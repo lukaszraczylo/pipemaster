@@ -1,5 +1,5 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/build
-# pipemaster:lost job.if pipeline/gitlab-ci/job/build: opaque(gitlab): - changes:\n    - src/**/*\n  if: $$CI_COMMIT_BRANCH == "main"\n
+# pipemaster:lost job.if pipeline/gitlab-ci/job/build: opaque(gitlab): - exists:\n    - Makefile\n  if: $$CI_COMMIT_BRANCH == "main"\n
 when:
   - event: push
     evaluate: "false"

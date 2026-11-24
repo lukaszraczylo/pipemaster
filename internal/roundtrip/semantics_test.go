@@ -82,7 +82,7 @@ deploy:
 	}
 }
 
-func TestGitlabWorkflowRulesWithoutTriggerFormDisableGHAJobs(t *testing.T) {
+func TestGitlabWorkflowRulesWithoutTriggerFormGuardGHAJobs(t *testing.T) {
 	const src = `workflow:
   rules:
     - if: $CI_COMMIT_TAG
@@ -92,8 +92,9 @@ deploy:
   script: [./deploy.sh]
 `
 	doc, _ := convert(t, provider.GitLab, provider.GHA, gitlabCI, src)
-	if !strings.Contains(jobBlock(doc, "deploy"), "if: false") {
-		t.Errorf("deploy runs unguarded:\n%s", doc)
+	block := jobBlock(doc, "deploy")
+	if !strings.Contains(block, "github.ref_type == ''tag''") || strings.Contains(block, "if: false") {
+		t.Errorf("deploy is not guarded by the workflow rules:\n%s", doc)
 	}
 }
 

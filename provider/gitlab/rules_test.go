@@ -138,12 +138,12 @@ func TestRulesShape(t *testing.T) {
 
 func TestRulesFallbackOpaque(t *testing.T) {
 	for name, rules := range map[string]string{
-		"changes":     "- changes: [Dockerfile]",
-		"exists":      "- exists: [Makefile]",
-		"variables":   "- if: $X\n    variables: {A: b}",
-		"mixed whens": "- if: $A\n    when: manual\n  - if: $B",
-		"always":      "- if: $A\n    when: always",
-		"allow":       "- if: $A\n    allow_failure: true",
+		"changes cmp":  "- changes:\n        paths: [Dockerfile]\n        compare_to: refs/heads/main",
+		"exists":       "- exists: [Makefile]",
+		"variables":    "- if: $X\n    variables: {A: b}",
+		"manual allow": "- if: $A\n    when: manual\n    allow_failure: true",
+		"always":       "- if: $A\n    when: always",
+		"allow":        "- if: $A\n    allow_failure: true",
 	} {
 		t.Run(name, func(t *testing.T) {
 			pl, rep := pipeline(t, "j:\n  script: [x]\n  rules:\n  "+rules+"\n")

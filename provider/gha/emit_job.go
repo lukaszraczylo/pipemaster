@@ -53,6 +53,7 @@ func minutesNode(d ir.Duration) *yaml.Node {
 
 func (e *emitter) jobNode(c jobCtx, j *ir.Job) (*yaml.Node, []string, error) {
 	jp := jobPath(c.pl.ID, j.ID)
+	e.changesNeeded = false
 	ext := e.ext(j.Ext)
 	e.foreignExt(jp, j.Ext)
 	consumed := map[string]bool{}
@@ -131,6 +132,9 @@ func (e *emitter) jobNode(c jobCtx, j *ir.Job) (*yaml.Node, []string, error) {
 	}
 	if err := e.outputsKey(m, jp, j); err != nil {
 		return nil, nil, err
+	}
+	if e.changesNeeded {
+		needChanges(m)
 	}
 	if c.finally {
 		markers = append(markers, emitkit.Marker(caps.PipelineFinally, "pipeline/"+c.pl.ID))

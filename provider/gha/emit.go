@@ -171,10 +171,14 @@ func (e *emitter) workflow(pl *ir.Pipeline) (*yaml.Node, error) {
 func (e *emitter) jobs(pl *ir.Pipeline) (*yaml.Node, error) {
 	jm := newMap()
 	c := jobCtx{pl: pl}
+	e.changeAtoms, e.changesBlocked = nil, false
 	for _, j := range pl.Jobs {
 		if j != nil {
 			c.mainIDs = append(c.mainIDs, j.ID)
 		}
+	}
+	for _, j := range append(slices.Clone(pl.Jobs), pl.Finally...) {
+		e.changesBlocked = e.changesBlocked || (j != nil && j.ID == changesJobID)
 	}
 	for _, group := range []struct {
 		jobs    []*ir.Job
@@ -194,6 +198,14 @@ func (e *emitter) jobs(pl *ir.Pipeline) (*yaml.Node, error) {
 			}
 			jm.setComment(j.ID, n, comments)
 		}
+	}
+	if len(e.changeAtoms) > 0 {
+		n, err := e.changesJob(pl)
+		if err != nil {
+			return nil, err
+		}
+		jm.n.Content = append([]*yaml.Node{str(changesJobID), n}, jm.n.Content...)
+		jm.keys[changesJobID] = true
 	}
 	if jm.empty() {
 		e.placeholderJob(jm, pl)

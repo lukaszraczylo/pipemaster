@@ -9,6 +9,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # pipemaster:lost job.if pipeline/gitlab-ci/job/build: opaque(gitlab): - changes:\n    - src/**/*\n  if: $CI_COMMIT_BRANCH == "main"\n
+      # pipemaster:lost job.if pipeline/gitlab-ci/job/build: opaque(gitlab): - exists:\n    - Makefile\n  if: $CI_COMMIT_BRANCH == "main"\n
       - id: script
         run: make

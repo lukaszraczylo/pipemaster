@@ -35,20 +35,24 @@ func (s *state) workflow(pl *ir.Pipeline, r *reader) (guard expr.Expr, err error
 	w := r.peek("workflow")
 	var named bool
 	trigs, ok, why := s.workflowTriggers(w)
+	if w != nil {
+		if c, cok := s.workflowCond(w); cok {
+			s.wfCond = c
+		}
+	}
 	if w != nil && !ok {
-		v, err := s.plain(w)
+		guard, err = s.workflowGuard(w)
 		if err != nil {
 			return nil, err
 		}
-		b, err := yaml.Marshal(map[string]any{"workflow": v})
-		if err != nil {
-			return nil, s.errf(w, "%v", err)
+		detail := "workflow:rules cannot be expressed as triggers: " + why
+		if _, opaque := guard.(expr.Opaque); !opaque {
+			detail += "; the rules are ANDed into every job condition"
 		}
-		guard = expr.Opaque{Dialect: dialect, Text: string(b)}
 		s.rep.Add(report.Entry{
 			IRPath: "pipeline/" + pipelineID, Feature: caps.ExtPassthrough, Level: caps.Lost,
 			Strategy: "kept in Ext[gitlab][workflow]; default push and tag triggers used",
-			Detail:   "workflow:rules cannot be expressed as triggers: " + why, SourceLoc: s.loc(w),
+			Detail:   detail, SourceLoc: s.loc(w),
 		})
 	}
 	if !ok {
@@ -71,6 +75,26 @@ func (s *state) workflow(pl *ir.Pipeline, r *reader) (guard expr.Expr, err error
 	s.noteWorkflowKeys(w, named)
 	pl.Triggers = trigs
 	return guard, nil
+}
+
+// workflowGuard is the condition every job gets when the workflow rules have no trigger form: their canonical
+// condition, or the block as an opaque condition when it does not compile. A nil condition admits every pipeline.
+func (s *state) workflowGuard(w *yaml.Node) (expr.Expr, error) {
+	if s.wfCond != nil {
+		return s.wfCond, nil
+	}
+	if c, ok := s.workflowCond(w); ok {
+		return c, nil
+	}
+	v, err := s.plain(w)
+	if err != nil {
+		return nil, err
+	}
+	b, err := yaml.Marshal(map[string]any{"workflow": v})
+	if err != nil {
+		return nil, s.errf(w, "%v", err)
+	}
+	return expr.Opaque{Dialect: dialect, Text: string(b)}, nil
 }
 
 func (s *state) workflowTriggers(w *yaml.Node) ([]ir.Trigger, bool, string) {
@@ -147,6 +171,9 @@ func condTriggers(e expr.Expr) ([]ir.Trigger, bool) {
 			return compareTrigger(v)
 		}
 	case expr.Ref:
+		if strings.Join(v.Path, ".") == expr.CtxPRNumber {
+			return []ir.Trigger{{Kind: ir.TriggerPR}}, true
+		}
 		switch v.Path[0] {
 		case expr.CtxBranch:
 			return []ir.Trigger{{Kind: ir.TriggerPush}}, len(v.Path) == 1

@@ -6,6 +6,10 @@ kind: Task
 metadata:
   name: gitlab-ci-build
 spec:
+  params:
+    - name: ctx-event
+    - name: ctx-tag
+    - name: ctx-branch
   steps:
     - name: script
       image: alpine:3.22

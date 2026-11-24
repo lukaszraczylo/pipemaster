@@ -1,0 +1,28 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - if: branch == 'dev'
+          ext:
+            gitlab:
+                _rules_fp: branch == 'dev'|false
+                rules:
+                    - if: $CI_COMMIT_BRANCH == "dev"
+                    - if: $CI_COMMIT_BRANCH == "main"
+                      when: manual
+          id: release
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make release

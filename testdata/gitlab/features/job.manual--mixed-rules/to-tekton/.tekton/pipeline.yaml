@@ -1,0 +1,17 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  params:
+    - name: ctx-branch
+      default: ""
+  tasks:
+    - name: release
+      taskRef:
+        name: gitlab-ci-release
+      when:
+        - input: $(params.ctx-branch)
+          operator: in
+          values:
+            - dev

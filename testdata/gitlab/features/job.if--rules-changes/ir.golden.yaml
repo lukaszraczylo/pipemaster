@@ -1,0 +1,32 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - if: ((branch == 'main') && changes('src/**/*', 'go.mod')) || ((event == 'merge_request_event') && changes('go.sum') && !((branch == 'main') && changes('src/**/*', 'go.mod')))
+          ext:
+            gitlab:
+                _rules_fp: ((branch == 'main') && changes('src/**/*', 'go.mod')) || ((event == 'merge_request_event') && changes('go.sum') && !((branch == 'main') && changes('src/**/*', 'go.mod')))|false
+                rules:
+                    - changes:
+                        - src/**/*
+                        - go.mod
+                      if: $CI_COMMIT_BRANCH == "main"
+                    - changes:
+                        - go.sum
+                      if: $CI_PIPELINE_SOURCE == "merge_request_event"
+          id: build
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make

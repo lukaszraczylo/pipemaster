@@ -378,6 +378,16 @@ func (b *jobBuilder) sidecars(v any) error {
 			}
 			sv.Image.Ref = ref
 		}
+		if cv, ok := r.Take("command"); ok {
+			cmd, whole, err := b.sidecarCommand(cv)
+			if err != nil {
+				return err
+			}
+			sv.Image.Entrypoint = cmd
+			if !whole {
+				r.Release("command")
+			}
+		}
 		if ev, ok := r.Take("env"); ok {
 			vars, from, err := b.envList(ev, nil)
 			if err != nil {
@@ -405,6 +415,26 @@ func (b *jobBuilder) sidecars(v any) error {
 		b.k.Out["sidecars"] = plain(extra)
 	}
 	return nil
+}
+
+// sidecarCommand reads a sidecar command as the service entrypoint; whole is false when an item is not text.
+func (b *jobBuilder) sidecarCommand(v any) (cmd []string, whole bool, err error) {
+	list, ok := v.([]any)
+	if !ok {
+		return nil, false, nil
+	}
+	for _, it := range list {
+		t, tok := text(it)
+		if !tok {
+			return nil, false, nil
+		}
+		x, err := b.tx.template(t)
+		if err != nil {
+			return nil, false, err
+		}
+		cmd = append(cmd, x)
+	}
+	return cmd, true, nil
 }
 
 // results maps the Task results to outputs. The other result keys stay in Ext.

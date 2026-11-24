@@ -23,11 +23,16 @@ type jobTiming struct {
 // disables the job, so a translation gap never widens what runs.
 func (e *emitter) timing(jp string, j *ir.Job, finally bool) (jobTiming, error) {
 	var t jobTiming
+	if n, ok := e.keptRules(j, finally); ok {
+		t.rules = n
+		t.when, _ = extOf(j.Ext)[ExtRulesWhen].(string)
+		return t, nil
+	}
 	disabled := false
 	var cond expr.Expr
 	status := ""
 	var srcIf, translated expr.Expr
-	if ifx := withoutNative(j.If); ifx != nil {
+	if ifx := e.withoutGuard(withoutNative(j.If)); ifx != nil {
 		rest, st, ok := splitStatus(ifx)
 		status = st
 		switch {
@@ -122,6 +127,43 @@ func (e *emitter) timing(jp string, j *ir.Job, finally bool) (jobTiming, error) 
 		t.rules = seqOf(r.n)
 	}
 	return t, nil
+}
+
+// keptRules is the rules text of a job that still has the condition and manual flag it compiled to. The text is
+// then the exact source, with the changes lists and the manual arms the condition cannot print.
+func (e *emitter) keptRules(j *ir.Job, finally bool) (*yaml.Node, bool) {
+	ext := extOf(j.Ext)
+	fp, _ := ext[ExtRulesFP].(string)
+	raw := ext["rules"]
+	if finally || fp == "" || raw == nil {
+		return nil, false
+	}
+	if fj := e.foldJob(j); fj.disabled || fj.cond != nil || len(fj.parts) > 0 {
+		return nil, false
+	}
+	if rulesFP(e.withoutGuard(withoutNative(j.If)), j.Manual) != fp {
+		return nil, false
+	}
+	n, err := plainNode(raw)
+	if err != nil || n.Kind != yaml.SequenceNode {
+		return nil, false
+	}
+	return n, true
+}
+
+// withoutGuard drops the workflow condition that Parse ANDed into the job: the workflow block is written back whole.
+func (e *emitter) withoutGuard(x expr.Expr) expr.Expr {
+	if e.wfGuard == nil || x == nil {
+		return x
+	}
+	g := expr.String(e.wfGuard)
+	if expr.String(x) == g {
+		return nil
+	}
+	if b, ok := x.(expr.Binary); ok && b.Op == expr.OpAnd && expr.String(b.R) == g {
+		return b.L
+	}
+	return x
 }
 
 func ruleNever() *yaml.Node {

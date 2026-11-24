@@ -1,5 +1,5 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/build
-# pipemaster:arg {"job":"if: |\n    opaque(gitlab): workflow:\n        name: $PIPELINE_NAME\n        rules:\n            - if: $CI_COMMIT_TAG\n              when: never\n            - if: $CI_PIPELINE_SOURCE == \"merge_request_event\"\n              variables:\n                PIPELINE_NAME: MR pipeline\n            - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH\n              variables:\n                PIPELINE_NAME: Default branch pipeline\nid: \"\"\n"}
+# pipemaster:arg {"job":"if: ((event == 'merge_request_event') \u0026\u0026 !tag) || ((branch == default_branch) \u0026\u0026 !tag \u0026\u0026 !(event == 'merge_request_event'))\nid: \"\"\n"}
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
@@ -12,6 +12,14 @@ metadata:
   name: gitlab-ci
 spec:
   entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-branch
+        value: ""
+      - name: ctx-tag
+        value: ""
+      - name: ctx-event
+        value: ""
   templates:
     - name: main
       dag:

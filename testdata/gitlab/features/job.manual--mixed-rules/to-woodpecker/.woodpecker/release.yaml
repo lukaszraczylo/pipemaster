@@ -1,0 +1,13 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/release
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/release
+# pipemaster:arg {"src":"branch == 'dev'","from":"gitlab","gate":false}
+when:
+  - event: push
+    evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "dev"'
+  - event: tag
+    evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "dev"'
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - make release

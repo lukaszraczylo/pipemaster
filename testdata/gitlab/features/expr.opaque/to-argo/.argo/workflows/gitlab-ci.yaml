@@ -1,5 +1,5 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/build
-# pipemaster:arg {"job":"if: |\n    opaque(gitlab): - changes:\n        - src/**/*\n      if: $CI_COMMIT_BRANCH == \"main\"\nid: \"\"\n"}
+# pipemaster:arg {"job":"if: |\n    opaque(gitlab): - exists:\n        - Makefile\n      if: $CI_COMMIT_BRANCH == \"main\"\nid: \"\"\n"}
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
