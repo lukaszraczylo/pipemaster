@@ -612,6 +612,12 @@ func (e *emitter) mergeCond(jp string, orig expr.Expr, base []whenEntry, cond []
 		for i, it := range cond {
 			out[i] = whenEntry{Item: it}
 		}
+		if src, hasSrc := e.jobSource(orig); hasSrc {
+			e.notePullRequestTest(jp, caps.JobIf, true)
+			if err := e.markArg(caps.JobIf, jp, gateArg{srcArg: src}); err != nil {
+				e.comment("job condition marker not carried: " + err.Error())
+			}
+		}
 		return out
 	}
 	x, err := wpexpr.WhenExpr(cond)
