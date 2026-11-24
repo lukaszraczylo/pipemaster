@@ -272,7 +272,7 @@ func (e *emitter) stepEnv(c *wfCtx, sp string, st *ir.Step, b *bindings, ext map
 		e.external(sp, caps.ScriptInterpolation, "environment variable for input", "input "+name+" is read as the variable "+name+", which nothing sets; define it in the Woodpecker environment")
 	}
 	if len(b.refs) > 0 {
-		if err := e.markArg(caps.ScriptInterpolation, sp, posArg{Pos: c.pos, Refs: b.refs, Broken: b.broken}); err != nil {
+		if err := e.markArg(caps.ScriptInterpolation, sp, posArg{Pos: c.pos, Refs: b.refs, Q: b.quoted}); err != nil {
 			return nil, err
 		}
 	}
@@ -332,6 +332,7 @@ func (e *emitter) common(c *wfCtx, sp string, st *ir.Step, m *wmap) error {
 
 func (e *emitter) scriptStep(c *wfCtx, sp string, st *ir.Step) (*wmap, error) {
 	b := &bindings{}
+	seen := map[string]int{}
 	var lines []*yaml.Node
 	texts := slices.Clone(commandTexts(st))
 	why := make([]string, len(texts))
@@ -359,12 +360,14 @@ func (e *emitter) scriptStep(c *wfCtx, sp string, st *ir.Step) (*wmap, error) {
 			lines = append(lines, block(fl))
 			continue
 		}
+		b.hits = nil
 		out, _, err := e.command(b, texts[p.Index], ctxs[p.Index])
 		if err != nil {
 			return nil, err
 		}
 		outs = append(outs, out)
 		lines = append(lines, block(out))
+		b.place(out, seen)
 	}
 	if len(lines) > 0 && e.bashWrap(st) {
 		lines = []*yaml.Node{block(provider.BashWrapCommand(esc(provider.BashOrShScript), joinCommands(outs)))}

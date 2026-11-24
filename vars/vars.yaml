@@ -56,12 +56,17 @@ vars:
   # event the hook sets Target from the tag ref (drone v2.25.0 service/hook/parser/parse.go, scm.TagHook:
   # Target v.Ref.Name) or from the push hook's BaseRef, which may be empty (same file, tag push: Target
   # scm.TrimRef(v.BaseRef)). So the value on a tag event is a tag name or a base branch, by SCM driver, and no
-  # target form can match it. A field spelling holds only where every trigger admits push (with no tag filter)
-  # or pull request events; any other event set loses the field.
+  # target form can match it. A field spelling holds on the kinds in field_events; the step stops on a tag event
+  # with a message. A run with no branch (a tag run) fails a branch filter, and Drone matches the filter against
+  # Target (drone v2.25.0 trigger/skip.go:24-26), so a branch-filtered pipeline admits push and pull request only.
+  # A pipeline with no event filter admits every event (drone-yaml yaml/cond.go:42-53, trigger/skip.go:32-34).
+  # (inferred from the same Target source) a schedule or manual run keeps the branch of the run in Target, and
+  # GitLab and GHA carry the branch of those runs too. Tekton and Argo give the context params no value on a
+  # schedule or manual run, so those kinds stay unlisted there.
   branch_or_target:
     script_text: true
     push_canon: branch
-    field_events: [push, pr]
+    field_events: {default: [push, pr], gitlab: [push, pr, schedule, manual], gha: [push, pr, schedule, manual]}
     field:
       gha: "${{ event == 'pull_request' && pr.base_ref || ref_name }}"
       gitlab: '${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}${CI_COMMIT_BRANCH}'

@@ -145,17 +145,31 @@ func collapseRefs(c *collapseCtx) bool {
 		return false
 	}
 	st := c.j.Steps[a.Pos]
+	seen := map[string]int{}
 	for _, ref := range a.Refs {
 		ns, name, ok := strings.Cut(ref, ".")
 		if !ok {
 			return false
 		}
+		held := "${" + name + "}"
 		for i, l := range st.Script {
-			l = strings.ReplaceAll(l, "${"+name+"}", "${{ "+ref+" }}")
-			if slices.Contains(a.Broken, ref) {
-				l = strings.ReplaceAll(l, vars.QuoteBreakOpen+"${{ "+ref+" }}"+vars.QuoteBreakClose, "${{ "+ref+" }}")
+			var sb strings.Builder
+			for {
+				k := strings.Index(l, held)
+				if k < 0 {
+					break
+				}
+				start, end := k, k+len(held)
+				if slices.Contains(a.Q[name], seen[name]) && strings.HasSuffix(l[:start], vars.QuoteBreakOpen) && strings.HasPrefix(l[end:], vars.QuoteBreakClose) {
+					start -= len(vars.QuoteBreakOpen)
+					end += len(vars.QuoteBreakClose)
+				}
+				seen[name]++
+				sb.WriteString(l[:start] + "${{ " + ref + " }}")
+				l = l[end:]
 			}
-			st.Script[i] = l
+			sb.WriteString(l)
+			st.Script[i] = sb.String()
 		}
 		if ns == expr.PrefixSecrets || ns == expr.PrefixVars {
 			st.Env = slices.DeleteFunc(st.Env, func(v ir.Var) bool {

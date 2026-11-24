@@ -1,6 +1,7 @@
 package woodpecker
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 
@@ -150,9 +151,38 @@ func esc(s string) string { return container.Escape(s, dollarEsc) }
 // bindings are the references a step's text reads as run-time variables. The step must map each secret from a
 // secret; refs lists every converted reference as "<namespace>.<name>" so the parser can restore the text.
 type bindings struct {
-	// broken lists the references that the conversion wrote inside a quote break.
-	broken                      []string
+	// quoted holds, for each name, the ordinals among the ${NAME} of the script that the conversion wrote inside a
+	// quote break.
+	quoted map[string][]int
+	// hits lists the references that the command being written converted, with their place in its text.
+	hits                        []refHit
 	secrets, vars, inputs, refs []string
+}
+
+// refHit is one converted reference and the offset of its variable in the written command.
+type refHit struct {
+	name   string
+	off    int
+	broken bool
+}
+
+var escVarUseRE = regexp.MustCompile(`\$\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+
+// place numbers the ${NAME} of a written command among those of the script and records the ones that the
+// conversion wrote inside a quote break. seen counts the occurrences of each name so far.
+func (b *bindings) place(out string, seen map[string]int) {
+	for _, m := range escVarUseRE.FindAllStringSubmatchIndex(out, -1) {
+		name := out[m[2]:m[3]]
+		for _, h := range b.hits {
+			if h.off == m[0] && h.name == name && h.broken {
+				if b.quoted == nil {
+					b.quoted = map[string][]int{}
+				}
+				b.quoted[name] = append(b.quoted[name], seen[name])
+			}
+		}
+		seen[name]++
+	}
 }
 
 func (b *bindings) add(ns, name string) {
@@ -232,11 +262,15 @@ func (e *emitter) convertParts(b *bindings, mode textMode, parts []expr.Part, ct
 		case expr.Ref:
 			if t, ok := e.refText(b, mode, x.Path); ok {
 				if mode == commandText && strings.HasPrefix(t, "$$") {
+					hit := refHit{off: sb.Len()}
 					if broken := vars.BreakOut(ctx, sb.String(), t); broken != t {
 						t = broken
-						if len(x.Path) == 2 && b != nil {
-							b.broken = appendNew(b.broken, x.Path[0]+"."+x.Path[1])
-						}
+						hit.off += len(vars.QuoteBreakOpen)
+						hit.broken = true
+					}
+					if b != nil && len(x.Path) == 2 && x.Path[0] != dialect && x.Path[0] != expr.PrefixMatrix {
+						hit.name = x.Path[1]
+						b.hits = append(b.hits, hit)
 					}
 				}
 				sb.WriteString(t)

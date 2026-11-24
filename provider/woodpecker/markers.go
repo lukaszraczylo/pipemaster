@@ -18,13 +18,14 @@ func carryYAML(v any) (string, error) {
 
 // posArg points a marker at a step by its place in the file, because a made-up step ID differs in the parsed IR.
 type posArg struct {
-	Name string `json:"name,omitempty"`
+	// Q holds, for each name, the ordinals among the ${NAME} of the script that the conversion wrote inside a quote
+	// break.
+	Q    map[string][]int `json:"q,omitempty"`
+	Name string           `json:"name,omitempty"`
 	// Wrote is the name as written when it differs from Name, which keeps the source text.
 	Wrote string   `json:"wrote,omitempty"`
 	Refs  []string `json:"refs,omitempty"`
-	// Broken lists the references that the conversion wrote inside a quote break.
-	Broken []string `json:"broken,omitempty"`
-	Pos    int      `json:"pos"`
+	Pos   int      `json:"pos"`
 }
 
 // srcArg carries a condition in the dialect it came from, which the translated when entries only approximate.

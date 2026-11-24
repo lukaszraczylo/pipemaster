@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
@@ -74,9 +75,9 @@ type preparer struct {
 	stepLost map[*ir.Step][]string
 	paths    map[*ir.Step]string
 	jobPaths map[*ir.Job]string
+	kinds    map[string]bool
 	target   string
 	origin   string
-	triggers []ir.Trigger
 	pushOnly bool
 }
 
@@ -95,12 +96,12 @@ func (pr *preparer) jobs(pl *ir.Pipeline, jobs []*ir.Job) []*ir.Job {
 		return nil
 	}
 	out := make([]*ir.Job, len(jobs))
-	pr.pushOnly = pushOnly(pl)
-	pr.triggers = pl.Triggers
 	for i, j := range jobs {
 		if j == nil {
 			continue
 		}
+		pr.kinds = admitted(pl, j)
+		pr.pushOnly = len(pr.kinds) == 1 && pr.kinds[kindPush]
 		cp := *j
 		jobLost := pr.jobFields(j, &cp)
 		cp.Steps = make([]*ir.Step, len(j.Steps))
@@ -150,7 +151,12 @@ func (pr *preparer) step(st *ir.Step, outer []ir.Var, fieldLost []string) *ir.St
 			reexport = append(reexport, name)
 		}
 	}
-	var guards, defs, defined, lost []string
+	tagName := ""
+	if slices.ContainsFunc(fieldLost, func(l string) bool { return strings.HasPrefix(l, armMark+kindTag+"|") }) {
+		tagName = pr.originName("tag")
+		names = appendNew(names, tagName)
+	}
+	var guards, defs, defined, lost, after []string
 	for _, n := range names {
 		if _, user := env[n]; user || pr.t.skip[n] || pr.t.Native(n, pr.origin, pr.target) {
 			continue
@@ -176,8 +182,15 @@ func (pr *preparer) step(st *ir.Step, outer []ir.Var, fieldLost []string) *ir.St
 		defs = append(defs, fmt.Sprintf("export %s=\"%s\"", name, quoteValue(env[name].Lit)))
 	}
 	for _, l := range fieldLost {
+		if arm, isArm := strings.CutPrefix(l, armMark); isArm {
+			if g, ok := pr.armGuard(arm, tagName); ok {
+				after = append(after, g)
+			}
+			continue
+		}
 		guards = append(guards, fmt.Sprintf("printf '%%s\\n' 'pipemaster: lost: %s' >&2; exit 1", l))
 	}
+	defs = append(defs, after...)
 	if len(guards)+len(defs) == 0 {
 		return st
 	}
@@ -351,6 +364,25 @@ func stripEntry(entry string) string {
 	return strings.Join(lines, "\n")
 }
 
+// originName is the first name that the origin gives to the entry id.
+func (pr *preparer) originName(id string) string {
+	if ns := pr.t.raw.Vars[id].Names[provider.Family(pr.origin)]; len(ns) > 0 {
+		return ns[0]
+	}
+	return ""
+}
+
+// armGuard gives the run-time guard for the tag arm of a field spelling: the step stops on a tag event with a
+// message. arm is "<kind>|<name>".
+func (pr *preparer) armGuard(arm, tagName string) (string, bool) {
+	kind, name, _ := strings.Cut(arm, "|")
+	if kind != kindTag || tagName == "" {
+		return "", false
+	}
+	msg := fmt.Sprintf("printf '%%s\\n' 'pipemaster: lost: variable %s in a field has another value on tag events on %s' >&2; exit 1", name, pr.target)
+	return fmt.Sprintf("if [ -n \"${%s}\" ]; then %s; fi", tagName, msg), true
+}
+
 // prGuard gives the run-time guard for a name whose value on a pull request has no equal on the target: the
 // step stops on that event with a message.
 func (pr *preparer) prGuard(name string) (string, bool) {
@@ -382,87 +414,161 @@ func (pr *preparer) prGuard(name string) (string, bool) {
 		ev, strings.Join(vals, "|"), name, pr.target), true
 }
 
-// pushOnly reports whether the triggers of pl admit push events on branches only, where the target branch and the
-// branch are one value.
-func pushOnly(pl *ir.Pipeline) bool {
+const (
+	kindPush     = "push"
+	kindPR       = "pr"
+	kindTag      = "tag"
+	kindSchedule = "schedule"
+	kindManual   = "manual"
+	kindOther    = "other"
+	armMark      = "\x00arm|"
+)
+
+// defaultKinds are the events of a pipeline that has no trigger. Drone runs a pipeline with no event filter on
+// every event: drone-yaml yaml/cond.go Condition.Match (lines 42-53) accepts any value when Include is empty, and
+// drone v2.25.0 trigger/skip.go skipEvent (lines 32-34) asks only that.
+var defaultKinds = []string{kindPush, kindPR, kindTag, kindSchedule, kindManual}
+
+// admitted lists the event kinds on which job j of pl can run. The triggers give the base set, and a job
+// condition that needs a branch removes the other kinds: a tag run has no branch, and Drone matches a branch
+// filter against the target of the run (drone v2.25.0 trigger/skip.go:24-26).
+func admitted(pl *ir.Pipeline, j *ir.Job) map[string]bool {
+	kinds := map[string]bool{}
 	if pl == nil || len(pl.Triggers) == 0 {
-		return false
-	}
-	for _, tr := range pl.Triggers {
-		if tr.Kind != ir.TriggerPush || len(tr.Tags.Include) > 0 || len(tr.Tags.Exclude) > 0 {
-			return false
+		for _, k := range defaultKinds {
+			kinds[k] = true
+		}
+	} else {
+		for _, tr := range pl.Triggers {
+			switch tr.Kind {
+			case ir.TriggerPush:
+				kinds[kindPush] = true
+				if len(tr.Tags.Include) > 0 || len(tr.Tags.Exclude) > 0 {
+					kinds[kindTag] = true
+				}
+			case ir.TriggerPR:
+				kinds[kindPR] = true
+			case ir.TriggerTag:
+				kinds[kindTag] = true
+			case ir.TriggerSchedule:
+				kinds[kindSchedule] = true
+			case ir.TriggerManual:
+				kinds[kindManual] = true
+			default:
+				kinds[kindOther] = true
+			}
 		}
 	}
-	return true
+	if j != nil && j.If != nil && requiresBranch(j.If) {
+		for k := range kinds {
+			if k != kindPush && k != kindPR {
+				delete(kinds, k)
+			}
+		}
+	}
+	return kinds
+}
+
+// requiresBranch reports whether e is false on every run that has no branch.
+func requiresBranch(e expr.Expr) bool {
+	switch v := e.(type) {
+	case expr.Binary:
+		switch v.Op {
+		case expr.OpAnd:
+			return requiresBranch(v.L) || requiresBranch(v.R)
+		case expr.OpOr:
+			return requiresBranch(v.L) && requiresBranch(v.R)
+		case expr.OpEq, expr.OpMatch:
+			return isBranchRef(v.L) || isBranchRef(v.R)
+		}
+	case expr.Call:
+		return len(v.Args) > 0 && isBranchRef(v.Args[0])
+	case expr.Opaque:
+		return strings.HasPrefix(v.Text, "when.branch")
+	}
+	return false
+}
+
+func isBranchRef(e expr.Expr) bool {
+	r, ok := e.(expr.Ref)
+	return ok && len(r.Path) == 1 && r.Path[0] == expr.CtxBranch
 }
 
 // fieldRefs rewrites the variable references of a field that no script runs in, such as an image or a cache
 // key. A name that has the same meaning on the target is spelled in the target's own syntax. A name whose value
 // depends on the event gets the target's event-keyed spelling where the table has one. Any other predefined name
 // of another provider has no source in a field, so it is returned.
-func (pr *preparer) fieldRefs(text string) (string, []string) {
-	var lost []string
+func (pr *preparer) fieldRefs(text string) (string, []string, []string) {
+	var lost, arms []string
 	for _, n := range Refs(text, false) {
 		if !pr.t.foreign(n, pr.origin, pr.target) {
 			continue
 		}
-		spelling, ok := pr.fieldSpelling(n)
+		spelling, kinds, ok := pr.fieldSpelling(n)
 		if !ok {
 			lost = append(lost, n)
 			continue
 		}
+		for _, k := range kinds {
+			arms = append(arms, k+"|"+n)
+		}
 		re := regexp.MustCompile(`\$\{` + regexp.QuoteMeta(n) + `\}|\$` + regexp.QuoteMeta(n) + `\b`)
 		text = re.ReplaceAllLiteralString(text, spelling)
 	}
-	return text, lost
+	return text, lost, arms
 }
 
-// fieldSpelling is the text that stands for the name n in a field of the target.
-func (pr *preparer) fieldSpelling(n string) (string, bool) {
-	o, ok := pr.t.ownerFor(n, pr.origin)
-	if !ok {
-		return "", false
+// fieldSpelling is the text that stands for the name n in a field of the target. kinds lists the admitted events
+// on which that text has another value than the name has at the source; the step stops on those events. The
+// field is lost when an event outside the guarded kinds differs.
+func (pr *preparer) fieldSpelling(n string) (spelling string, kinds []string, ok bool) {
+	o, found := pr.t.ownerFor(n, pr.origin)
+	if !found {
+		return "", nil, false
 	}
 	e := pr.t.raw.Vars[o.id]
 	family := provider.Family(pr.target)
 	if ns := e.Names[family]; len(ns) > 0 && (family == provider.Drone || family == provider.Woodpecker) {
-		return "${{ " + family + "." + ns[0] + " }}", true
+		return "${{ " + family + "." + ns[0] + " }}", nil, true
 	}
 	if f := e.Field[family]; f != "" {
-		return f, pr.admits(e.FieldEvents)
+		listed, limited := e.FieldEvents[family]
+		if !limited {
+			listed, limited = e.FieldEvents["default"]
+		}
+		for _, k := range []string{kindTag, kindOther, kindPush, kindPR, kindSchedule, kindManual} {
+			if pr.kinds[k] && limited && !slices.Contains(listed, k) {
+				if k != kindTag {
+					return "", nil, false
+				}
+				kinds = append(kinds, k)
+			}
+		}
+		return f, kinds, true
 	}
 	canon := e.Canon
 	if e.PushCanon != "" && pr.pushOnly {
 		canon = e.PushCanon
 	}
 	if canon == "" || len(e.LostOnPR) > 0 || (e.ScriptText && !pr.pushOnly) {
-		return "", false
+		return "", nil, false
 	}
-	return "${{ " + canon + " }}", true
-}
-
-// admits reports whether every trigger of the pipeline is of a kind in kinds, with no tag filter on a push
-// trigger. An empty list admits all; a pipeline with no trigger runs on every event.
-func (pr *preparer) admits(kinds []string) bool {
-	if len(kinds) == 0 {
-		return true
-	}
-	if len(pr.triggers) == 0 {
-		return false
-	}
-	for _, tr := range pr.triggers {
-		if !slices.Contains(kinds, string(tr.Kind)) || len(tr.Tags.Include) > 0 || len(tr.Tags.Exclude) > 0 {
-			return false
-		}
-	}
-	return true
+	return "${{ " + canon + " }}", nil, true
 }
 
 // field applies fieldRefs to one text and reports what is lost at path. A rewritten text is kept in the metadata, so
 // the return trip reads the source text again.
 func (pr *preparer) field(text, path string, f caps.Feature) (string, []string) {
-	out, lost := pr.fieldRefs(text)
+	out, lost, arms := pr.fieldRefs(text)
 	var msgs []string
+	for _, a := range arms {
+		k, n, _ := strings.Cut(a, "|")
+		msgs = append(msgs, armMark+a)
+		pr.res.entries = append(pr.res.entries, report.Entry{
+			IRPath: path, Feature: f, Level: caps.Lost,
+			Detail: "the field reads " + n + ", which has another value on " + k + " events on " + pr.target + "; the steps that use it stop on those events with a message",
+		})
+	}
 	for _, n := range lost {
 		msg := fmt.Sprintf("%s variable %s has no %s source", f, n, pr.target)
 		msgs = append(msgs, msg)

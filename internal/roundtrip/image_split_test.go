@@ -90,13 +90,12 @@ func TestDroneCorpusSplitsGitLabJobsByImage(t *testing.T) {
 	jobs := gitlabJobs(t, files)
 
 	for _, p := range lostImagePaths(rep) {
-		// The corpus pipeline has no event filter, so it runs on tag events, where DRONE_BRANCH has no target form.
-		if !strings.Contains(p, "Docker") && !strings.Contains(p, "Code analysis") && !strings.HasSuffix(p, "/Build API") && !strings.HasSuffix(p, "/Tests") {
+		if !strings.Contains(p, "Docker") && !strings.Contains(p, "Code analysis") {
 			t.Errorf("a script step still loses its image: %s", p)
 		}
 	}
 	want := map[string]string{
-		"API-1": "alpine:latest", "API-2": "axarev/parsr-base:${DRONE_BRANCH}", "API-3": "busybox",
+		"API-1": "alpine:latest", "API-2": "axarev/parsr-base:${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}${CI_COMMIT_BRANCH}", "API-3": "busybox",
 		"UI-1": "alpine:latest", "UI-2": "registry.access.redhat.com/ubi8/nodejs-10", "UI-3": "busybox",
 		"baseimage": "busybox", "Sonarqube": "slallemand/slack-webhook:latest",
 	}

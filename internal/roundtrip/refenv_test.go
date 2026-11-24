@@ -306,23 +306,79 @@ func TestArgoSensorFillsTheBranchParamsPerEvent(t *testing.T) {
 }
 
 // DRONE_BRANCH on a tag event is the tag name or the base branch of the tag (drone v2.25.0 hook parser), so a
-// pipeline that runs on tags has no target form for it.
-func TestTagEventsLoseTheBranchField(t *testing.T) {
+// pipeline that runs on tags stops on a tag event only. The field keeps its spelling for the other events.
+func TestTagEventsStopTheStepOnlyOnTags(t *testing.T) {
 	const doc = "kind: pipeline\nname: ci\ntrigger:\n  event:\n    - push\n    - tag\nsteps:\n  - name: build\n    image: alpine:${DRONE_BRANCH}\n    commands:\n      - echo hi\n"
-	for _, to := range []string{provider.GitLab, provider.GHA, provider.Tekton, provider.Argo} {
+	const noTrigger = "kind: pipeline\nname: ci\nsteps:\n  - name: build\n    image: alpine:${DRONE_BRANCH}\n    commands:\n      - echo hi\n"
+	for name, src := range map[string]string{"tag trigger": doc, "no trigger": noTrigger} {
+		for _, to := range []string{provider.GitLab, provider.GHA} {
+			t.Run(name+"/"+to, func(t *testing.T) {
+				files, rep := emitFiles(t, "drone", to, map[string]string{".drone.yml": src})
+				all := joined(files, always)
+				if !strings.Contains(all, "pipemaster: lost: variable DRONE_BRANCH in a field has another value on tag events on "+to) {
+					t.Errorf("no guard for the tag event:\n%s", all)
+				}
+				if strings.Contains(all, "step.image variable DRONE_BRANCH has no") {
+					t.Errorf("the step stops on every event:\n%s", all)
+				}
+				var lost bool
+				for _, e := range rep.Entries {
+					lost = lost || e.Feature == caps.StepImage && e.Level == caps.Lost && strings.Contains(e.Detail, "tag events")
+				}
+				if !lost {
+					t.Errorf("no lost step.image entry names the tag events: %v", rep.Entries)
+				}
+			})
+		}
+	}
+}
+
+// The guard stops a tag run and lets a push run through.
+func TestTagGuardRunsOnlyOnTags(t *testing.T) {
+	const doc = "kind: pipeline\nname: ci\ntrigger:\n  event:\n    - push\n    - tag\nsteps:\n  - name: build\n    image: alpine:${DRONE_BRANCH}\n    commands:\n      - echo hi\n"
+	files, _ := emitFiles(t, "drone", provider.GitLab, map[string]string{".drone.yml": doc})
+	var spec struct {
+		Ci struct {
+			Script []string `yaml:"script"`
+		} `yaml:"ci"`
+	}
+	if err := yaml.Unmarshal(files[".gitlab-ci.yml"], &spec); err != nil || len(spec.Ci.Script) == 0 {
+		t.Fatalf("gitlab file: %v\n%s", err, files[".gitlab-ci.yml"])
+	}
+	script := spec.Ci.Script[0]
+	if out, errOut, code := runWithEnv(t, script, []string{"CI_COMMIT_TAG=v1"}); code == 0 || !strings.Contains(errOut, "another value on tag events") {
+		t.Errorf("the tag run is not stopped: %q %q %d", out, errOut, code)
+	}
+	if out, errOut, code := runWithEnv(t, script, nil); code != 0 || out != "hi\n" {
+		t.Errorf("the push run does not reach the command: %q %q %d", out, errOut, code)
+	}
+}
+
+// A pipeline that a branch filter guards runs on push and pull request only, so no event stops it (corpus 51).
+func TestBranchFilteredPipelineKeepsTheBranchField(t *testing.T) {
+	src := corpusFile(t, "51-drone-parsr", ".drone.yml")
+	for _, to := range []string{provider.GitLab, provider.GHA} {
 		t.Run(to, func(t *testing.T) {
-			files, rep := emitFiles(t, "drone", to, map[string]string{".drone.yml": doc})
-			if all := joined(files, always); !strings.Contains(all, "pipemaster: lost: step.image variable DRONE_BRANCH has no "+to+" source") {
-				t.Errorf("the step does not stop with a message:\n%s", all)
+			files, rep := emitFiles(t, "drone", to, map[string]string{".drone.yml": src})
+			all := joined(files, always)
+			if strings.Contains(all, "DRONE_BRANCH in a field") || strings.Contains(all, "variable DRONE_BRANCH has no") {
+				t.Errorf("a step stops on a branch run:\n%s", all)
 			}
-			var lost bool
 			for _, e := range rep.Entries {
-				lost = lost || e.Feature == caps.StepImage && e.Level == caps.Lost && strings.Contains(e.Detail, "DRONE_BRANCH")
-			}
-			if !lost {
-				t.Errorf("no lost step.image entry names DRONE_BRANCH: %v", rep.Entries)
+				if e.Feature == caps.StepImage && e.Level == caps.Lost && strings.Contains(e.Detail, "DRONE_BRANCH") {
+					t.Errorf("the image variable is lost: %+v", e)
+				}
 			}
 		})
+	}
+}
+
+// A step that holds a quote break of the author and a quote break of the conversion for the same reference.
+func TestWoodpeckerFoldsOnlyTheReferencesItBrokeOut(t *testing.T) {
+	const wf = "name: ci\non: [push]\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          echo 'q ${{ secrets.TOK }}'\n          echo 'a'\"${{ secrets.TOK }}\"'b'\n"
+	r := hops(t, toFS(map[string][]byte{".github/workflows/ci.yml": []byte(wf)}), prov(t, provider.GHA), prov(t, provider.Woodpecker), false, true)
+	if same, diff := ir.Equal(r.src, r.back); !same {
+		t.Fatalf("not exact:\n%s", diff)
 	}
 }
 
