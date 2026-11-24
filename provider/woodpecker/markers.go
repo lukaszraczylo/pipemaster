@@ -22,7 +22,9 @@ type posArg struct {
 	// Wrote is the name as written when it differs from Name, which keeps the source text.
 	Wrote string   `json:"wrote,omitempty"`
 	Refs  []string `json:"refs,omitempty"`
-	Pos   int      `json:"pos"`
+	// Broken lists the references that the conversion wrote inside a quote break.
+	Broken []string `json:"broken,omitempty"`
+	Pos    int      `json:"pos"`
 }
 
 // srcArg carries a condition in the dialect it came from, which the translated when entries only approximate.

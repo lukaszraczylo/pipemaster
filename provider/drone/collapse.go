@@ -15,6 +15,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const stepSep = "/step/"
@@ -271,6 +272,7 @@ func collapseRefs(c *collapseCtx) bool {
 	}
 	st := c.j.Steps[a.Pos]
 	targets := map[string]map[int]string{}
+	broken := map[string]map[int]bool{}
 	var whole []string
 	for _, ref := range a.Refs {
 		ns, name, ok := strings.Cut(ref, ".")
@@ -293,6 +295,12 @@ func collapseRefs(c *collapseCtx) bool {
 			for _, n := range at.At {
 				targets[name][n] = ref
 			}
+			if len(at.Q) > 0 {
+				broken[name] = map[int]bool{}
+				for _, n := range at.Q {
+					broken[name][n] = true
+				}
+			}
 		} else {
 			whole = append(whole, ref)
 		}
@@ -304,22 +312,43 @@ func collapseRefs(c *collapseCtx) bool {
 	}
 	seen := map[string]int{}
 	for i, l := range st.Script {
-		st.Script[i] = varUseRE.ReplaceAllStringFunc(l, func(m string) string {
-			name := m[2 : len(m)-1]
-			n := seen[name]
-			seen[name]++
-			if ref, ok := targets[name][n]; ok {
-				return "${{ " + ref + " }}"
-			}
-			for _, ref := range whole {
-				if strings.HasSuffix(ref, "."+name) {
-					return "${{ " + ref + " }}"
-				}
-			}
-			return m
-		})
+		st.Script[i] = restoreRefs(l, seen, targets, broken, whole)
 	}
 	return true
+}
+
+// restoreRefs rewrites the ${NAME} of one script line. A reference that the conversion wrote inside a quote break
+// takes the break away again.
+func restoreRefs(l string, seen map[string]int, targets map[string]map[int]string, broken map[string]map[int]bool, whole []string) string {
+	var sb strings.Builder
+	last := 0
+	for _, m := range varUseRE.FindAllStringSubmatchIndex(l, -1) {
+		name := l[m[2]:m[3]]
+		n := seen[name]
+		seen[name]++
+		ref, ok := targets[name][n]
+		if !ok {
+			for _, w := range whole {
+				if strings.HasSuffix(w, "."+name) {
+					ref, ok = w, true
+					break
+				}
+			}
+		}
+		if !ok {
+			continue
+		}
+		start, end := m[0], m[1]
+		if broken[name][n] && strings.HasSuffix(l[:start], vars.QuoteBreakOpen) && strings.HasPrefix(l[end:], vars.QuoteBreakClose) {
+			start -= len(vars.QuoteBreakOpen)
+			end += len(vars.QuoteBreakClose)
+		}
+		sb.WriteString(l[last:start])
+		sb.WriteString("${{ " + ref + " }}")
+		last = end
+	}
+	sb.WriteString(l[last:])
+	return sb.String()
 }
 
 // countUses counts the ${name} of a script.

@@ -41,6 +41,8 @@ type entry struct {
 	// PushCanon is the canonical ref that has the entry's meaning when the pipeline runs on push events only.
 	PushCanon string `yaml:"push_canon"`
 	Values    string `yaml:"values"`
+	// FieldEvents lists the trigger kinds on which the field spellings of the entry hold. Empty means every kind.
+	FieldEvents []string `yaml:"field_events"`
 	// LostOnPR lists the providers whose value differs on a pull request from every other provider.
 	LostOnPR []string `yaml:"lost_on_pr"`
 	// ScriptText keeps the name as text in a script, so the prelude spells it, because the canonical ref

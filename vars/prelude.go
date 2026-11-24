@@ -76,6 +76,7 @@ type preparer struct {
 	jobPaths map[*ir.Job]string
 	target   string
 	origin   string
+	triggers []ir.Trigger
 	pushOnly bool
 }
 
@@ -95,6 +96,7 @@ func (pr *preparer) jobs(pl *ir.Pipeline, jobs []*ir.Job) []*ir.Job {
 	}
 	out := make([]*ir.Job, len(jobs))
 	pr.pushOnly = pushOnly(pl)
+	pr.triggers = pl.Triggers
 	for i, j := range jobs {
 		if j == nil {
 			continue
@@ -427,7 +429,7 @@ func (pr *preparer) fieldSpelling(n string) (string, bool) {
 		return "${{ " + family + "." + ns[0] + " }}", true
 	}
 	if f := e.Field[family]; f != "" {
-		return f, true
+		return f, pr.admits(e.FieldEvents)
 	}
 	canon := e.Canon
 	if e.PushCanon != "" && pr.pushOnly {
@@ -437,6 +439,23 @@ func (pr *preparer) fieldSpelling(n string) (string, bool) {
 		return "", false
 	}
 	return "${{ " + canon + " }}", true
+}
+
+// admits reports whether every trigger of the pipeline is of a kind in kinds, with no tag filter on a push
+// trigger. An empty list admits all; a pipeline with no trigger runs on every event.
+func (pr *preparer) admits(kinds []string) bool {
+	if len(kinds) == 0 {
+		return true
+	}
+	if len(pr.triggers) == 0 {
+		return false
+	}
+	for _, tr := range pr.triggers {
+		if !slices.Contains(kinds, string(tr.Kind)) || len(tr.Tags.Include) > 0 || len(tr.Tags.Exclude) > 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // field applies fieldRefs to one text and reports what is lost at path. A rewritten text is kept in the metadata, so

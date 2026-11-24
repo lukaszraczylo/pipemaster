@@ -8,6 +8,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 )
@@ -182,7 +183,7 @@ func TestGHAReferenceInMultiLineQuoteIsExpandedOnGitLab(t *testing.T) {
 	}
 }
 
-const droneBranchImage = "kind: pipeline\nname: ci\nsteps:\n  - name: build\n    image: alpine:${DRONE_BRANCH}\n    commands:\n      - echo hi\n"
+const droneBranchImage = "kind: pipeline\nname: ci\ntrigger:\n  event:\n    - push\n    - pull_request\nsteps:\n  - name: build\n    image: alpine:${DRONE_BRANCH}\n    commands:\n      - echo hi\n"
 
 // DRONE_BRANCH is the target branch on a pull request. Each target spells that value in its own field syntax.
 func TestFieldVariableUsesTheTargetFieldSyntax(t *testing.T) {
@@ -226,5 +227,155 @@ func TestPushOnlyPipelineMapsEventKeyedFieldsToTheBranch(t *testing.T) {
 	}
 	if strings.Contains(all.String(), "pipemaster: lost") {
 		t.Errorf("a push-only pipeline still loses the image variable:\n%s", all.String())
+	}
+}
+
+func joined(files map[string][]byte, keep func(string) bool) string {
+	var all strings.Builder
+	for n, b := range files {
+		if strings.HasPrefix(n, ".pipemaster/") || !keep(n) {
+			continue
+		}
+		all.WriteString("## " + n + "\n")
+		all.Write(b)
+	}
+	return all.String()
+}
+
+func always(string) bool { return true }
+
+// Tekton and Argo carry the branch of a push and the base branch of a pull request in two context params, and
+// the image joins them. Each event fills one param and leaves the other empty, so the join is the target branch.
+func TestTektonAndArgoFieldUsesTheEventParams(t *testing.T) {
+	for _, c := range []struct{ to, image string }{
+		{provider.Tekton, "image: alpine:$(params.ctx-branch)$(params.ctx-pr-base-ref)"},
+		{provider.Argo, "image: alpine:{{workflow.parameters.ctx-branch}}{{workflow.parameters.ctx-pr-base-ref}}"},
+	} {
+		t.Run(c.to, func(t *testing.T) {
+			files, rep := emitFiles(t, "drone", c.to, map[string]string{".drone.yml": droneBranchImage})
+			all := joined(files, always)
+			if !strings.Contains(all, c.image) {
+				t.Errorf("missing %q in\n%s", c.image, all)
+			}
+			if strings.Contains(all, "pipemaster: lost") {
+				t.Errorf("a step stops although the value maps:\n%s", all)
+			}
+			for _, e := range rep.Entries {
+				if e.Level.String() == "lost" && strings.Contains(e.Detail, "DRONE_BRANCH") {
+					t.Errorf("reported as lost: %+v", e)
+				}
+			}
+		})
+	}
+}
+
+// The push trigger fills the branch param and empties the base ref; the pull request trigger does the reverse.
+func TestTektonEventOverlaysFillTheBranchParamsPerEvent(t *testing.T) {
+	files, _ := emitFiles(t, "drone", provider.Tekton, map[string]string{".drone.yml": droneBranchImage})
+	el := string(files[".tekton/triggers/eventlistener.yaml"])
+	pull, push, ok := strings.Cut(el, "- name: drone-push-")
+	if !ok {
+		t.Fatalf("no push trigger in\n%s", el)
+	}
+	for _, w := range []string{"key: ctx_branch\n                  expression: ''''''", "key: ctx_pr_base_ref\n                  expression: body.pull_request.base.ref"} {
+		if !strings.Contains(pull, w) {
+			t.Errorf("the pull request trigger lacks %q:\n%s", w, pull)
+		}
+	}
+	for _, w := range []string{"key: ctx_branch\n                  expression: body.ref.replace('refs/heads/','',1)", "key: ctx_pr_base_ref\n                  expression: ''''''"} {
+		if !strings.Contains(push, w) {
+			t.Errorf("the push trigger lacks %q:\n%s", w, push)
+		}
+	}
+}
+
+func TestArgoSensorFillsTheBranchParamsPerEvent(t *testing.T) {
+	files, _ := emitFiles(t, "drone", provider.Argo, map[string]string{".drone.yml": droneBranchImage})
+	sensor := string(files[".argo/events/sensor.yaml"])
+	for _, w := range []string{
+		"dest: spec.arguments.parameters.1.value\n              src:\n                dataKey: body.pull_request.base.ref\n                dependencyName: drone-pr",
+		`dest: spec.arguments.parameters.0.value
+              src:
+                dataTemplate: '{{ trimPrefix "refs/heads/" .Input.body.ref }}'
+                dependencyName: drone-push`,
+	} {
+		if !strings.Contains(sensor, w) {
+			t.Errorf("sensor lacks\n%s\nin\n%s", w, sensor)
+		}
+	}
+}
+
+// DRONE_BRANCH on a tag event is the tag name or the base branch of the tag (drone v2.25.0 hook parser), so a
+// pipeline that runs on tags has no target form for it.
+func TestTagEventsLoseTheBranchField(t *testing.T) {
+	const doc = "kind: pipeline\nname: ci\ntrigger:\n  event:\n    - push\n    - tag\nsteps:\n  - name: build\n    image: alpine:${DRONE_BRANCH}\n    commands:\n      - echo hi\n"
+	for _, to := range []string{provider.GitLab, provider.GHA, provider.Tekton, provider.Argo} {
+		t.Run(to, func(t *testing.T) {
+			files, rep := emitFiles(t, "drone", to, map[string]string{".drone.yml": doc})
+			if all := joined(files, always); !strings.Contains(all, "pipemaster: lost: step.image variable DRONE_BRANCH has no "+to+" source") {
+				t.Errorf("the step does not stop with a message:\n%s", all)
+			}
+			var lost bool
+			for _, e := range rep.Entries {
+				lost = lost || e.Feature == caps.StepImage && e.Level == caps.Lost && strings.Contains(e.Detail, "DRONE_BRANCH")
+			}
+			if !lost {
+				t.Errorf("no lost step.image entry names DRONE_BRANCH: %v", rep.Entries)
+			}
+		})
+	}
+}
+
+func TestTektonAndArgoFieldReturnsExactly(t *testing.T) {
+	for _, via := range []string{provider.Tekton, provider.Argo} {
+		t.Run(via, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, ".drone.yml"), []byte(droneBranchImage), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			code, out, msg := runOut("roundtrip", dir, "--via", via)
+			if code != 0 || !strings.Contains(out+msg, "no differences") {
+				t.Fatalf("exit %d\n%.3000s\n%.1500s", code, out, msg)
+			}
+		})
+	}
+}
+
+// GHA expands ${{ }} before the shell runs, so a secret or variable inside single quotes keeps its value on
+// Drone and Woodpecker too, where the reference leaves the quote.
+func TestGHAExpressionInSingleQuotesIsExpandedOnDroneAndWoodpecker(t *testing.T) {
+	const wf = "name: ci\non: [push]\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          echo '${{ secrets.TOK }}' 'v=${{ vars.V }}' 'lit $HOME'\n"
+	for _, to := range []string{provider.Drone, provider.Woodpecker} {
+		t.Run(to, func(t *testing.T) {
+			files, _ := emitFiles(t, provider.GHA, to, map[string]string{".github/workflows/ci.yml": wf})
+			doc := joined(files, always)
+			_, line, ok := strings.Cut(doc, "- sh -c ")
+			if !ok {
+				t.Fatalf("no wrapped command in\n%s", doc)
+			}
+			line, _, _ = strings.Cut(line, "\n")
+			cmd := "sh -c " + strings.ReplaceAll(line, "$$", "$")
+			out, errOut, code := runWithEnv(t, cmd, []string{"TOK=s3cret value", "V=x y", "HOME=/h"})
+			if code != 0 || out != "s3cret value v=x y lit $HOME\n" {
+				t.Errorf("output %q err %q code %d for %s", out, errOut, code, cmd)
+			}
+			r := hops(t, toFS(map[string][]byte{".github/workflows/ci.yml": []byte(wf)}), prov(t, provider.GHA), prov(t, to), false, true)
+			if same, diff := ir.Equal(r.src, r.back); !same {
+				t.Fatalf("not exact via %s:\n%s", to, diff)
+			}
+		})
+	}
+}
+
+// A quote break that the author wrote around a reference is not one that the conversion wrote, so it stays.
+func TestAuthorQuoteBreakAroundReferenceSurvivesTheRoundTrip(t *testing.T) {
+	const wf = "name: ci\non: [push]\nenv:\n  X: v\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          echo 'a'\"${{ env.X }}\"'b'\n"
+	for _, via := range []string{provider.Drone, provider.Woodpecker} {
+		t.Run(via, func(t *testing.T) {
+			r := hops(t, toFS(map[string][]byte{".github/workflows/ci.yml": []byte(wf)}), prov(t, provider.GHA), prov(t, via), false, true)
+			if same, diff := ir.Equal(r.src, r.back); !same {
+				t.Fatalf("not exact via %s:\n%s", via, diff)
+			}
+		})
 	}
 }

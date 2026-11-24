@@ -51,12 +51,22 @@ vars:
   # CI_COMMIT_BRANCH is "Not available in merge request pipelines", so exactly one of the two is set on a branch
   # or merge request pipeline. gitlab doc (variables, where they can be used): `image` expands variables in the
   # runner, https://docs.gitlab.com/ci/variables/where_variables_can_be_used/.
+  #
+  # Drone DRONE_BRANCH is build.Target (drone/runner-go environ.Build, DRONE_BRANCH: build.Target). On a tag
+  # event the hook sets Target from the tag ref (drone v2.25.0 service/hook/parser/parse.go, scm.TagHook:
+  # Target v.Ref.Name) or from the push hook's BaseRef, which may be empty (same file, tag push: Target
+  # scm.TrimRef(v.BaseRef)). So the value on a tag event is a tag name or a base branch, by SCM driver, and no
+  # target form can match it. A field spelling holds only where every trigger admits push (with no tag filter)
+  # or pull request events; any other event set loses the field.
   branch_or_target:
     script_text: true
     push_canon: branch
+    field_events: [push, pr]
     field:
       gha: "${{ event == 'pull_request' && pr.base_ref || ref_name }}"
       gitlab: '${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}${CI_COMMIT_BRANCH}'
+      tekton: '${{ branch }}${{ pr.base_ref }}'
+      argo: '${{ branch }}${{ pr.base_ref }}'
     names: {drone: [DRONE_COMMIT_BRANCH, DRONE_BRANCH], woodpecker: CI_COMMIT_BRANCH}
     derive:
       gitlab: '`if [ "${CI_PIPELINE_SOURCE}" = merge_request_event ]; then printf %s "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"; else printf %s "${CI_COMMIT_BRANCH}"; fi`'

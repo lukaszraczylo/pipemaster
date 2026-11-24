@@ -149,7 +149,11 @@ func esc(s string) string { return container.Escape(s, dollarEsc) }
 
 // bindings are the references a step's text reads as run-time variables. The step must map each secret from a
 // secret; refs lists every converted reference as "<namespace>.<name>" so the parser can restore the text.
-type bindings struct{ secrets, vars, inputs, refs []string }
+type bindings struct {
+	// broken lists the references that the conversion wrote inside a quote break.
+	broken                      []string
+	secrets, vars, inputs, refs []string
+}
 
 func (b *bindings) add(ns, name string) {
 	if b == nil {
@@ -227,8 +231,13 @@ func (e *emitter) convertParts(b *bindings, mode textMode, parts []expr.Part, ct
 			sb.WriteString(esc(litText(x)))
 		case expr.Ref:
 			if t, ok := e.refText(b, mode, x.Path); ok {
-				if mode == commandText && strings.HasPrefix(t, "$$") && !boundRef(x.Path) {
-					t = vars.BreakOut(ctx, sb.String(), t)
+				if mode == commandText && strings.HasPrefix(t, "$$") {
+					if broken := vars.BreakOut(ctx, sb.String(), t); broken != t {
+						t = broken
+						if len(x.Path) == 2 && b != nil {
+							b.broken = appendNew(b.broken, x.Path[0]+"."+x.Path[1])
+						}
+					}
 				}
 				sb.WriteString(t)
 			} else {
@@ -342,13 +351,4 @@ func noSpelling(lost []string) string {
 		return ""
 	}
 	return "no Woodpecker spelling for expression " + strings.Join(lost, ", ")
-}
-
-// boundRef reports whether path names a variable of the pipeline that a binding carries, not a predefined variable.
-func boundRef(path []string) bool {
-	switch path[0] {
-	case expr.PrefixEnv, expr.PrefixSecrets, expr.PrefixVars, expr.PrefixInputs, expr.PrefixMatrix:
-		return true
-	}
-	return false
 }

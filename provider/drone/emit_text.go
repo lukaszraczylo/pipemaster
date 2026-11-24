@@ -158,15 +158,18 @@ type bindings struct {
 
 // refHit is one converted reference and the offset of its variable in the written command.
 type refHit struct {
-	ref  string
-	name string
-	off  int
+	ref    string
+	name   string
+	off    int
+	broken bool
 }
 
 // refAt says which ${NAME} of a step script the conversion wrote for a reference, and how many there are of that
 // name, so the parser can tell them from a ${NAME} that the author wrote.
 type refAt struct {
 	At []int `json:"at"`
+	// Q lists the ordinals that the conversion wrote inside a quote break.
+	Q  []int `json:"q,omitempty"`
 	Of int   `json:"of"`
 }
 
@@ -201,6 +204,9 @@ func (b *bindings) place(out string, seen map[string]int) {
 				}
 				a := b.at[h.ref]
 				a.At = append(a.At, seen[name])
+				if h.broken {
+					a.Q = append(a.Q, seen[name])
+				}
 				b.at[h.ref] = a
 			}
 		}
@@ -281,8 +287,14 @@ func (e *emitter) convertParts(b *bindings, mode textMode, parts []expr.Part, ct
 			sb.WriteString(esc(litText(x)))
 		case expr.Ref:
 			if t, ok := e.refText(b, mode, x.Path, sb.Len()); ok {
-				if mode == commandText && strings.HasPrefix(t, dollarEsc) && !boundRef(x.Path) {
-					t = vars.BreakOut(ctx, sb.String(), t)
+				if mode == commandText && strings.HasPrefix(t, dollarEsc) {
+					if broken := vars.BreakOut(ctx, sb.String(), t); broken != t {
+						t = broken
+						if b != nil && len(b.hits) > 0 && b.hits[len(b.hits)-1].off == sb.Len() {
+							b.hits[len(b.hits)-1].off += len(vars.QuoteBreakOpen)
+							b.hits[len(b.hits)-1].broken = true
+						}
+					}
 				}
 				sb.WriteString(t)
 			} else {
@@ -396,13 +408,4 @@ func (e *emitter) envNode(path string, vs []ir.Var, m *ymap) error {
 		m.set(v.Name, n)
 	}
 	return nil
-}
-
-// boundRef reports whether path names a variable of the pipeline that a binding carries, not a predefined variable.
-func boundRef(path []string) bool {
-	switch path[0] {
-	case expr.PrefixEnv, expr.PrefixSecrets, expr.PrefixVars, expr.PrefixInputs, expr.PrefixMatrix:
-		return true
-	}
-	return false
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
@@ -150,7 +151,11 @@ func collapseRefs(c *collapseCtx) bool {
 			return false
 		}
 		for i, l := range st.Script {
-			st.Script[i] = strings.ReplaceAll(l, "${"+name+"}", "${{ "+ref+" }}")
+			l = strings.ReplaceAll(l, "${"+name+"}", "${{ "+ref+" }}")
+			if slices.Contains(a.Broken, ref) {
+				l = strings.ReplaceAll(l, vars.QuoteBreakOpen+"${{ "+ref+" }}"+vars.QuoteBreakClose, "${{ "+ref+" }}")
+			}
+			st.Script[i] = l
 		}
 		if ns == expr.PrefixSecrets || ns == expr.PrefixVars {
 			st.Env = slices.DeleteFunc(st.Env, func(v ir.Var) bool {

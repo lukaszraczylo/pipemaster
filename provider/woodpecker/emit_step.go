@@ -272,7 +272,7 @@ func (e *emitter) stepEnv(c *wfCtx, sp string, st *ir.Step, b *bindings, ext map
 		e.external(sp, caps.ScriptInterpolation, "environment variable for input", "input "+name+" is read as the variable "+name+", which nothing sets; define it in the Woodpecker environment")
 	}
 	if len(b.refs) > 0 {
-		if err := e.markArg(caps.ScriptInterpolation, sp, posArg{Pos: c.pos, Refs: b.refs}); err != nil {
+		if err := e.markArg(caps.ScriptInterpolation, sp, posArg{Pos: c.pos, Refs: b.refs, Broken: b.broken}); err != nil {
 			return nil, err
 		}
 	}
