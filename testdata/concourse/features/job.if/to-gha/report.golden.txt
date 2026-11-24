@@ -1,8 +1,8 @@
 Loss report: concourse -> gha
 [lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build ext.passthrough (Ext of provider concourse (gets) is not written to the GHA file; it is kept in round-trip metadata)
-[lost] pipeline/ci/job/build job.if (condition not expressible in GitHub Actions; job disabled)
 [lost] pipeline/ci/job/build/step/build-run ext.passthrough (Ext of provider concourse (config, input_mapping) is not written to the GHA file; it is kept in round-trip metadata)
 [lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata)
+[emulated] pipeline/ci/job/build job.if: approximate expression translation (GitHub compares strings case-insensitively)
 [emulated] pipeline/ci/job/build job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/ci/job/build/step/build-run step.image: uses: docker://<image> with entrypoint and args

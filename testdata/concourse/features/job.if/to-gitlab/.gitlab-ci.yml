@@ -3,11 +3,10 @@
 workflow:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
-# pipemaster:lost job.if pipeline/ci/job/build: branch == 'main'
 build:
   needs: []
   rules:
-    - when: never
+    - if: $CI_COMMIT_BRANCH == "main"
   script:
     # pipemaster:step build-run
     - make

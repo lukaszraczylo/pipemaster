@@ -189,6 +189,10 @@ func srcOf(def map[string]any) map[string]any {
 // push writes one git resource for each exact branch. A glob has no resource, because a git resource follows one branch.
 func (pe *pipeEmitter) push(t *ir.Trigger, tp string) {
 	e := pe.e
+	if names := pe.ownNames(t); len(names) > 0 && pe.allBranchSets(names) {
+		pe.restore(t, tp)
+		return
+	}
 	var exact []string
 	for _, b := range t.Branches.Include {
 		if isGlob(b) || strings.Contains(b, varOpen) {
@@ -243,6 +247,17 @@ func (pe *pipeEmitter) push(t *ir.Trigger, tp string) {
 			fmt.Sprintf("the branches %s are %d git resources, and the job runs once per branch event", strings.Join(exact, ", "), len(exact)))
 		e.emulate(tp, caps.TriggerFilterBranch, "one git resource per branch", "the job runs once per branch event of the listed branches")
 	}
+}
+
+// allBranchSets is true when every named resource of the file is a git resource of version_type branches.
+func (pe *pipeEmitter) allBranchSets(names []string) bool {
+	for _, n := range names {
+		src, _ := pe.extDef(n)[keySource].(map[string]any)
+		if src == nil || src["version_type"] != versionBranches {
+			return false
+		}
+	}
+	return true
 }
 
 // sanitize makes text a resource name part.

@@ -14,9 +14,8 @@ build:
     - echo cleanup
     # pipemaster:step build-step-2
     # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
-    # pipemaster:arg "false"
-    # pipemaster:lost step.if pipeline/ci/job/build/step/build-step-2: event == 'push'
+    # pipemaster:arg "event == 'push'"
     - |
-      if false; then
+      if [ "$CI_PIPELINE_SOURCE" = "push" ]; then
       echo push
       fi

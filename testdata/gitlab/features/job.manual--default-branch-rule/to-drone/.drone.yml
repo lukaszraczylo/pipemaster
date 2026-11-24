@@ -1,6 +1,6 @@
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/publish
 # pipemaster:arg "- kind: push\n- kind: tag\n"
-# pipemaster:lost job.if pipeline/gitlab-ci/job/publish: branch == gitlab.CI_DEFAULT_BRANCH
+# pipemaster:lost job.if pipeline/gitlab-ci/job/publish: branch == default_branch
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/publish
 kind: pipeline
 type: docker

@@ -27,6 +27,8 @@ const (
 	ExtGets = "gets"
 	// ExtTriggers is the job Ext key of the trigger resource names of a job that the pipeline union is wider than.
 	ExtTriggers = "triggers"
+	// ExtTriggerIf is the job Ext key of the condition that the parser built from the triggers of the job.
+	ExtTriggerIf = "trigger_if"
 	// ExtGetsParallel is the job Ext key that says the source gets sat in one in_parallel step.
 	ExtGetsParallel = "gets_in_parallel"
 	// ExtResourcesRef is the trigger Ext key that lists the resource names the trigger came from.

@@ -1,5 +1,5 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/publish
-# pipemaster:arg {"job":"if: branch == gitlab.CI_DEFAULT_BRANCH\nid: \"\"\n"}
+# pipemaster:arg {"job":"if: branch == default_branch\nid: \"\"\n"}
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/publish
 # pipemaster:arg {"manual":true}
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/publish/step/script

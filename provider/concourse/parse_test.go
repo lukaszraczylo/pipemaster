@@ -128,7 +128,6 @@ func TestUnreadableTriggersFailSafe(t *testing.T) {
 		"git tag_regex":      "type: git\n  source: {uri: u, branch: main, tag_regex: 'v.*'}",
 		"git version_type":   "type: git\n  source: {uri: u, branch: main, version_type: branches}",
 		"git unknown key":    "type: git\n  source: {uri: u, branch: main, future_filter: x}",
-		"git no branch":      "type: git\n  source: {uri: u}",
 		"git var branch":     "type: git\n  source: {uri: u, branch: ((branch))}",
 		"git var paths":      "type: git\n  source: {uri: u, branch: main, paths: [((p))]}",
 		"git paths not list": "type: git\n  source: {uri: u, branch: main, paths: src}",

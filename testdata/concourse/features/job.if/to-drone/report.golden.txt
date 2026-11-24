@@ -3,4 +3,4 @@ Loss report: concourse -> drone
 [lost] pipeline/ci/job/build ext.passthrough (Ext of provider concourse (gets) is not written to the Drone file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-run ext.passthrough (Ext of provider concourse (config, input_mapping) is not written to the Drone file; it is kept in round-trip metadata)
 [lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the Drone file; it is kept in round-trip metadata)
-[native] pipeline/ci/job/build job.if: pipeline trigger conditions (on a pull request Drone matches the branch filter against the target branch, so the condition also holds on a pull request that targets the branch; the source may not)
+[native] pipeline/ci/job/build job.if: pipeline trigger conditions (on a pull request Drone matches the branch filter against the target branch, so the condition leaves pull requests out, as a branch test of a GitLab merge request pipeline does)

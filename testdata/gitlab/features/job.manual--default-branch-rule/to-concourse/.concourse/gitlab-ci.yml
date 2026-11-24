@@ -3,7 +3,7 @@
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/publish
 # pipemaster:arg {"manual":true,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/publish/carry
-# pipemaster:arg {"digest":"868dd324f79c885d49d825be8fbae5a075c5f91b99dbb175a5b90e9307db3d7e","carry":"if: branch == gitlab.CI_DEFAULT_BRANCH\nid: publish\nmanual: true\n"}
+# pipemaster:arg {"digest":"868dd324f79c885d49d825be8fbae5a075c5f91b99dbb175a5b90e9307db3d7e","carry":"if: branch == default_branch\nid: publish\nmanual: true\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci

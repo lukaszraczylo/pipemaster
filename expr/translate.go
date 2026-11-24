@@ -762,7 +762,22 @@ func approxToGHA(e Expr, from, to Dialect, cav *caveats) (Expr, bool) {
 	return nil, false
 }
 
+// defaultBranchCmp recognises a comparison of the branch with the default branch, in either order.
+func defaultBranchCmp(b Binary) bool {
+	l, lok := b.L.(Ref)
+	r, rok := b.R.(Ref)
+	if !lok || !rok {
+		return false
+	}
+	return pathName(l) == CtxBranch && pathName(r) == CtxDefaultBranch || pathName(l) == CtxDefaultBranch && pathName(r) == CtxBranch
+}
+
 func approxCmp(b Binary, from Dialect, cav *caveats) (Expr, bool) {
+	if defaultBranchCmp(b) {
+		cav.add(ciCaveat)
+		cmp := guardE(CtxBranch, Binary{Op: OpEq, L: ctxRef(CtxRefName), R: ctxRef(CtxDefaultBranch)})
+		return negE(b.Op == OpNe, cmp), true
+	}
 	ref, lit, ok := refSide(b.L, b.R)
 	if !ok {
 		return nil, false

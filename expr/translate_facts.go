@@ -268,6 +268,9 @@ func toGHARisk(from Dialect) func(effPos bool, m Mode, lit string) bool {
 // may hold the target branch and not.
 func branchToGLRisk(effPos bool, _ Mode, _ string) bool { return !effPos }
 
+// defaultBranchProbe stands for the default branch name in riskyBranch: a literal that no pull request ref <number>/merge equals.
+const defaultBranchProbe = "default-branch"
+
 // riskyBranch walks e and reports a branch test for which risk(effPos, mode, literal) is true. effPos is true
 // when the condition rises with the test: a match or equality under an even number of negations, or a negated
 // one under an odd number. Any other use of the branch ref is risky.
@@ -284,6 +287,10 @@ func riskyBranch(e Expr, odd bool, risk func(effPos bool, m Mode, lit string) bo
 		case OpMatch, OpNoMatch, OpEq, OpNe:
 			if m, lit, ok := branchLeaf(v); ok {
 				return risk((v.Op == OpMatch || v.Op == OpEq) != odd, m, lit)
+			}
+			if defaultBranchCmp(v) && (v.Op == OpEq || v.Op == OpNe) {
+				// A default branch is never named <number>/merge, so the test misses a GHA pull request ref like a literal that does.
+				return risk((v.Op == OpEq) != odd, ModeExact, defaultBranchProbe)
 			}
 		}
 	}

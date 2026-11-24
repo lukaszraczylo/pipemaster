@@ -548,7 +548,7 @@ func (jb *jobBuilder) carryJob(m *omap) bool {
 }
 
 // carryPipeline puts back the pipeline fields that the resources and gets cannot say.
-func (b *pipeBuilder) carryPipeline(top *omap, list []any, pl *ir.Pipeline) {
+func (b *pipeBuilder) carryPipeline(top *omap, list []any, pl *ir.Pipeline) bool {
 	var res any
 	if v := top.Vals["resources"]; v != nil {
 		res = plainValue(v)
@@ -568,10 +568,11 @@ func (b *pipeBuilder) carryPipeline(top *omap, list []any, pl *ir.Pipeline) {
 	}
 	var c ir.Pipeline
 	if !b.carryOf(b.path(), digestOf([]any{res, gets}), &c) {
-		return
+		return false
 	}
 	c.ID, c.Jobs, c.Ext = pl.ID, pl.Jobs, pl.Ext
 	*pl = c
+	return true
 }
 
 // refsBack drops the context prelude lines and writes each ${PM_CTX_*} use in the body as the reference it stands for.

@@ -1,5 +1,5 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/publish
-# pipemaster:lost job.if pipeline/gitlab-ci/job/publish: branch == gitlab.CI_DEFAULT_BRANCH
+# pipemaster:lost job.if pipeline/gitlab-ci/job/publish: branch == default_branch
 when:
   - event: push
     evaluate: "false"

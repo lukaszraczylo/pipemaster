@@ -2,6 +2,8 @@
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo cleanup"]}
+# pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
+# pipemaster:arg {"src":"event == 'push'","from":"concourse"}
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-2
 # pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo push"]}
 name: stepif
@@ -25,9 +27,8 @@ jobs:
           entrypoint: /bin/sh
           args: -ec 'echo cleanup'
       # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-2
-      # pipemaster:lost step.if pipeline/ci/job/build/step/build-step-2: event == 'push'
       - id: build-step-2
-        if: false
+        if: github.event_name == 'push'
         uses: docker://ubuntu:latest
         with:
           entrypoint: /bin/sh

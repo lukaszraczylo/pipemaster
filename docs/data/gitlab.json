@@ -403,13 +403,6 @@
      "detail": "value references $CI_SERVER_HOST, which GitLab sets or expands; other targets leave it empty or unexpanded"
     },
     {
-     "path": "pipeline/gitlab-ci/job/release:prepare",
-     "feature": "script.interpolation",
-     "level": "lost",
-     "strategy": "kept as GitLab text",
-     "detail": "value references $CI_DEFAULT_BRANCH, which GitLab sets or expands; other targets leave it empty or unexpanded"
-    },
-    {
      "path": "pipeline/gitlab-ci/job/release:tag",
      "feature": "expr.opaque",
      "level": "lost",
@@ -436,13 +429,6 @@
      "level": "lost",
      "strategy": "kept as GitLab text",
      "detail": "value references $CI_SERVER_HOST, which GitLab sets or expands; other targets leave it empty or unexpanded"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/release:tag",
-     "feature": "script.interpolation",
-     "level": "lost",
-     "strategy": "kept as GitLab text",
-     "detail": "value references $CI_DEFAULT_BRANCH, which GitLab sets or expands; other targets leave it empty or unexpanded"
     },
     {
      "path": "pipeline/gitlab-ci/job/secret_detection",
@@ -1495,13 +1481,6 @@
      "detail": "value references $CI_SERVER_HOST, which GitLab sets or expands; other targets leave it empty or unexpanded"
     },
     {
-     "path": "pipeline/gitlab-ci/job/release:prepare",
-     "feature": "script.interpolation",
-     "level": "lost",
-     "strategy": "kept as GitLab text",
-     "detail": "value references $CI_DEFAULT_BRANCH, which GitLab sets or expands; other targets leave it empty or unexpanded"
-    },
-    {
      "path": "pipeline/gitlab-ci/job/release:prepare/step/script",
      "feature": "step.shell",
      "level": "lost",
@@ -1558,13 +1537,6 @@
      "level": "lost",
      "strategy": "kept as GitLab text",
      "detail": "value references $CI_SERVER_HOST, which GitLab sets or expands; other targets leave it empty or unexpanded"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/release:tag",
-     "feature": "script.interpolation",
-     "level": "lost",
-     "strategy": "kept as GitLab text",
-     "detail": "value references $CI_DEFAULT_BRANCH, which GitLab sets or expands; other targets leave it empty or unexpanded"
     },
     {
      "path": "pipeline/gitlab-ci/job/release:tag/step/script",
@@ -2666,13 +2638,6 @@
      "detail": "value references $CI_SERVER_HOST, which GitLab sets or expands; other targets leave it empty or unexpanded"
     },
     {
-     "path": "pipeline/gitlab-ci/job/release:prepare",
-     "feature": "script.interpolation",
-     "level": "lost",
-     "strategy": "kept as GitLab text",
-     "detail": "value references $CI_DEFAULT_BRANCH, which GitLab sets or expands; other targets leave it empty or unexpanded"
-    },
-    {
      "path": "pipeline/gitlab-ci/job/release:prepare/step/script",
      "feature": "step.shell",
      "level": "lost",
@@ -2729,13 +2694,6 @@
      "level": "lost",
      "strategy": "kept as GitLab text",
      "detail": "value references $CI_SERVER_HOST, which GitLab sets or expands; other targets leave it empty or unexpanded"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/release:tag",
-     "feature": "script.interpolation",
-     "level": "lost",
-     "strategy": "kept as GitLab text",
-     "detail": "value references $CI_DEFAULT_BRANCH, which GitLab sets or expands; other targets leave it empty or unexpanded"
     },
     {
      "path": "pipeline/gitlab-ci/job/release:tag/step/script",
@@ -3858,13 +3816,6 @@
      "detail": "value references $CI_SERVER_HOST, which GitLab sets or expands; other targets leave it empty or unexpanded"
     },
     {
-     "path": "pipeline/gitlab-ci/job/release:prepare",
-     "feature": "script.interpolation",
-     "level": "lost",
-     "strategy": "kept as GitLab text",
-     "detail": "value references $CI_DEFAULT_BRANCH, which GitLab sets or expands; other targets leave it empty or unexpanded"
-    },
-    {
      "path": "pipeline/gitlab-ci/job/release:tag",
      "feature": "expr.opaque",
      "level": "lost",
@@ -3915,13 +3866,6 @@
      "level": "lost",
      "strategy": "kept as GitLab text",
      "detail": "value references $CI_SERVER_HOST, which GitLab sets or expands; other targets leave it empty or unexpanded"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/release:tag",
-     "feature": "script.interpolation",
-     "level": "lost",
-     "strategy": "kept as GitLab text",
-     "detail": "value references $CI_DEFAULT_BRANCH, which GitLab sets or expands; other targets leave it empty or unexpanded"
     },
     {
      "path": "pipeline/gitlab-ci/job/secret_detection",
@@ -4984,13 +4928,6 @@
      "detail": "value references $CI_SERVER_HOST, which GitLab sets or expands; other targets leave it empty or unexpanded"
     },
     {
-     "path": "pipeline/gitlab-ci/job/release:prepare",
-     "feature": "script.interpolation",
-     "level": "lost",
-     "strategy": "kept as GitLab text",
-     "detail": "value references $CI_DEFAULT_BRANCH, which GitLab sets or expands; other targets leave it empty or unexpanded"
-    },
-    {
      "path": "pipeline/gitlab-ci/job/release:tag",
      "feature": "expr.opaque",
      "level": "lost",
@@ -5035,13 +4972,6 @@
      "level": "lost",
      "strategy": "kept as GitLab text",
      "detail": "value references $CI_SERVER_HOST, which GitLab sets or expands; other targets leave it empty or unexpanded"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/release:tag",
-     "feature": "script.interpolation",
-     "level": "lost",
-     "strategy": "kept as GitLab text",
-     "detail": "value references $CI_DEFAULT_BRANCH, which GitLab sets or expands; other targets leave it empty or unexpanded"
     },
     {
      "path": "pipeline/gitlab-ci/job/secret_detection",
@@ -6142,13 +6072,6 @@
      "detail": "value references $CI_SERVER_HOST, which GitLab sets or expands; other targets leave it empty or unexpanded"
     },
     {
-     "path": "pipeline/gitlab-ci/job/release:prepare",
-     "feature": "script.interpolation",
-     "level": "lost",
-     "strategy": "kept as GitLab text",
-     "detail": "value references $CI_DEFAULT_BRANCH, which GitLab sets or expands; other targets leave it empty or unexpanded"
-    },
-    {
      "path": "pipeline/gitlab-ci/job/release:tag",
      "feature": "expr.opaque",
      "level": "lost",
@@ -6193,13 +6116,6 @@
      "level": "lost",
      "strategy": "kept as GitLab text",
      "detail": "value references $CI_SERVER_HOST, which GitLab sets or expands; other targets leave it empty or unexpanded"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/release:tag",
-     "feature": "script.interpolation",
-     "level": "lost",
-     "strategy": "kept as GitLab text",
-     "detail": "value references $CI_DEFAULT_BRANCH, which GitLab sets or expands; other targets leave it empty or unexpanded"
     },
     {
      "path": "pipeline/gitlab-ci/job/secret_detection",

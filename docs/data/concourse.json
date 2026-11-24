@@ -24,7 +24,7 @@
    "files": [
     {
      "path": ".github/workflows/parent.yml",
-     "text": "# pipemaster:emulated trigger.api pipeline/parent/trigger/0\n# pipemaster:emulated trigger.api pipeline/parent/trigger/1\n# pipemaster:emulated trigger.manual pipeline/parent\n# pipemaster:emulated job.runner pipeline/parent/job/build\n# pipemaster:emulated job.runner pipeline/parent/job/set-feature-pipelines\n# pipemaster:emulated job.runner pipeline/parent/job/test\non:\n  repository_dispatch:\n  # pipemaster:emulated job.manual pipeline/parent/job/set-feature-pipelines\n  workflow_dispatch:\njobs:\n  build:\n    needs:\n      - test\n    runs-on: ubuntu-latest\n    container: golang:latest\n    steps:\n      - id: checkout\n        uses: actions/checkout@v7\n      - id: build\n        run: |\n          (\n          set -e\n          set -x\n          [ -e repo ] || ln -s \"$PWD\" repo\n          mkdir -p binary\n          root=$(pwd)\n          cd \"repo/${MODULE}\"\n          go build -o \"${root}/binary/${BINARY_NAME}\"\n\n          timestamp=$(date '+%Y%m%d%H%M%S')\n          tar czf \"$root/binary/$BINARY_NAME-$timestamp.tgz\" \"${root}/binary/${BINARY_NAME}\"\n          )\n        env:\n          MODULE: apps/golang\n          BINARY_NAME: ascii-banner\n      - id: run-binary\n        run: |\n          (\n          set -e\n          set -x\n          ./binary/ascii-banner -list\n          ./binary/ascii-banner concourse\n          ./binary/ascii-banner plane\n          ./binary/ascii-banner pilot\n          )\n  # pipemaster:emulated job.manual pipeline/parent/job/set-feature-pipelines\n  set-feature-pipelines:\n    if: github.event_name == 'workflow_dispatch'\n    runs-on: ubuntu-latest\n    steps:\n      - id: branches\n        run: \"true\"\n      - id: across\n        run: \"true\"\n  # pipemaster:emulated job.manual pipeline/parent/job/test\n  test:\n    if: github.event_name == 'workflow_dispatch'\n    runs-on: ubuntu-latest\n    container: golang:latest\n    steps:\n      - id: checkout\n        uses: actions/checkout@v7\n      - id: tests\n        run: |\n          (\n          set -e\n          [ -e repo ] || ln -s \"$PWD\" repo\n          cd \"repo/${MODULE}\"\n          go test -v ./...\n          )\n        env:\n          MODULE: apps/golang\n"
+     "text": "# pipemaster:emulated trigger.push pipeline/parent/trigger/0\n# pipemaster:emulated job.if pipeline/parent/job/build\n# pipemaster:arg {\"src\":\"(event == 'push') \\u0026\\u0026 (branch == default_branch)\",\"from\":\"concourse\"}\n# pipemaster:emulated job.runner pipeline/parent/job/build\n# pipemaster:emulated job.if pipeline/parent/job/set-feature-pipelines\n# pipemaster:arg {\"src\":\"(event == 'push') \\u0026\\u0026 ((branch =~ '(?i)^feat/') || (branch =~ '(?i)^feature/'))\",\"from\":\"concourse\"}\n# pipemaster:emulated job.runner pipeline/parent/job/set-feature-pipelines\n# pipemaster:emulated job.if pipeline/parent/job/test\n# pipemaster:arg {\"src\":\"(event == 'push') \\u0026\\u0026 (branch == default_branch)\",\"from\":\"concourse\"}\n# pipemaster:emulated job.runner pipeline/parent/job/test\non:\n  push:\n    branches:\n      - '**'\njobs:\n  build:\n    needs:\n      - test\n    if: github.event_name == 'push' && (github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch)\n    runs-on: ubuntu-latest\n    container: golang:latest\n    steps:\n      - id: checkout\n        uses: actions/checkout@v7\n      - id: build\n        run: |\n          (\n          set -e\n          set -x\n          [ -e repo ] || ln -s \"$PWD\" repo\n          mkdir -p binary\n          root=$(pwd)\n          cd \"repo/${MODULE}\"\n          go build -o \"${root}/binary/${BINARY_NAME}\"\n\n          timestamp=$(date '+%Y%m%d%H%M%S')\n          tar czf \"$root/binary/$BINARY_NAME-$timestamp.tgz\" \"${root}/binary/${BINARY_NAME}\"\n          )\n        env:\n          MODULE: apps/golang\n          BINARY_NAME: ascii-banner\n      - id: run-binary\n        run: |\n          (\n          set -e\n          set -x\n          ./binary/ascii-banner -list\n          ./binary/ascii-banner concourse\n          ./binary/ascii-banner plane\n          ./binary/ascii-banner pilot\n          )\n  set-feature-pipelines:\n    if: github.event_name == 'push' && (github.ref_type == 'branch' && startsWith(github.ref_name, 'feat/') || github.ref_type == 'branch' && startsWith(github.ref_name, 'feature/'))\n    runs-on: ubuntu-latest\n    steps:\n      - id: branches\n        run: \"true\"\n      - id: across\n        run: \"true\"\n  test:\n    if: github.event_name == 'push' && (github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch)\n    runs-on: ubuntu-latest\n    container: golang:latest\n    steps:\n      - id: checkout\n        uses: actions/checkout@v7\n      - id: tests\n        run: |\n          (\n          set -e\n          [ -e repo ] || ln -s \"$PWD\" repo\n          cd \"repo/${MODULE}\"\n          go test -v ./...\n          )\n        env:\n          MODULE: apps/golang\n"
     }
    ],
    "report": [
@@ -56,20 +56,6 @@
      "detail": "Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent",
-     "feature": "trigger.api",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "the trigger of resource branches is unreadable (source.branch_filters may filter versions and has no IR form); it becomes an api trigger that never fires, and the resource is kept in Ext"
-    },
-    {
-     "path": "pipeline/parent",
-     "feature": "trigger.api",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "the trigger of resource repo is unreadable (source.branch is not set and Concourse follows the default branch); it becomes an api trigger that never fires, and the resource is kept in Ext"
-    },
-    {
      "path": "pipeline/parent/job/build",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -80,7 +66,7 @@
      "path": "pipeline/parent/job/build",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, public) is not written to the GHA file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (gets, public, trigger_if) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/job/build/step/build",
@@ -146,7 +132,7 @@
      "path": "pipeline/parent/job/set-feature-pipelines",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, gets_in_parallel, public, triggers) is not written to the GHA file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (gets, gets_in_parallel, public, trigger_if, triggers) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -154,13 +140,6 @@
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
      "detail": "step across: across is a matrix over a step; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/set-feature-pipelines",
-     "feature": "trigger.resource",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "job set-feature-pipelines triggers on branches only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines/step/across",
@@ -197,14 +176,7 @@
      "path": "pipeline/parent/job/test",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, public, triggers) is not written to the GHA file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/parent/job/test",
-     "feature": "trigger.resource",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "job test triggers on repo only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
+     "detail": "Ext of provider concourse (gets, public, trigger_if, triggers) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/job/test/step/checkout",
@@ -229,19 +201,47 @@
      "path": "pipeline/parent/trigger/0",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the GHA file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/trigger/1",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the GHA file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/trigger/1",
-     "feature": "trigger.api",
+     "feature": "trigger.push",
      "level": "lost",
-     "detail": "event repository_dispatch already has a trigger; GHA allows one filter set per event"
+     "detail": "event push already has a trigger; GHA allows one filter set per event"
+    },
+    {
+     "path": "pipeline/parent",
+     "feature": "trigger.push",
+     "level": "emulated",
+     "strategy": "trigger of the converted repository",
+     "detail": "the git resource branches watches https://github.com/concourse/examples (branch_filters feat/*, feature/*; Concourse emits a version when the set of matching branches changes, the push trigger fires on every push to one of them); the trigger fires on pushes to the repository that holds the converted pipeline"
+    },
+    {
+     "path": "pipeline/parent",
+     "feature": "trigger.push",
+     "level": "emulated",
+     "strategy": "trigger of the converted repository",
+     "detail": "the git resource repo watches https://github.com/concourse/examples (the default branch); the trigger fires on pushes to the repository that holds the converted pipeline"
+    },
+    {
+     "path": "pipeline/parent/job/build",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "job condition of the passed jobs",
+     "detail": "job build follows jobs that run only when (event == 'push') && (branch == default_branch); it takes their condition, so that it never waits for a job that does not run"
+    },
+    {
+     "path": "pipeline/parent/job/build",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "approximate expression translation",
+     "detail": "GitHub compares strings case-insensitively"
     },
     {
      "path": "pipeline/parent/job/build",
@@ -266,9 +266,17 @@
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
-     "feature": "job.manual",
+     "feature": "job.if",
      "level": "emulated",
-     "strategy": "workflow_dispatch trigger"
+     "strategy": "job condition on the pushes its gets watch",
+     "detail": "job set-feature-pipelines triggers on branches; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && ((branch =~ '(?i)^feat/') || (branch =~ '(?i)^feature/')); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
+    },
+    {
+     "path": "pipeline/parent/job/set-feature-pipelines",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "approximate expression translation",
+     "detail": "GitHub compares strings case-insensitively"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -279,9 +287,17 @@
     },
     {
      "path": "pipeline/parent/job/test",
-     "feature": "job.manual",
+     "feature": "job.if",
      "level": "emulated",
-     "strategy": "workflow_dispatch trigger"
+     "strategy": "job condition on the pushes its gets watch",
+     "detail": "job test triggers on repo; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && (branch == default_branch); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
+    },
+    {
+     "path": "pipeline/parent/job/test",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "approximate expression translation",
+     "detail": "GitHub compares strings case-insensitively"
     },
     {
      "path": "pipeline/parent/job/test",
@@ -306,10 +322,10 @@
     },
     {
      "path": "pipeline/parent/trigger/0",
-     "feature": "trigger.api",
+     "feature": "trigger.push",
      "level": "emulated",
-     "strategy": "repository_dispatch",
-     "detail": "the API trigger names no event; repository_dispatch is used"
+     "strategy": "branches: '**'",
+     "detail": "GHA fires a push without filters for branches and tags; branches are named explicitly to leave tags out or beside a tag filter"
     }
    ]
   },
@@ -319,7 +335,7 @@
    "files": [
     {
      "path": ".gitlab-ci.yml",
-     "text": "# pipemaster:emulated trigger.api pipeline/parent/trigger/0\n# pipemaster:arg {\"kind\":\"api\"}\n# pipemaster:emulated trigger.api pipeline/parent/trigger/1\n# pipemaster:arg {\"kind\":\"api\"}\nstages:\n  - stage-0\n  - stage-1\nworkflow:\n  rules:\n    - if: $CI_PIPELINE_SOURCE == \"api\"\n    - if: $CI_PIPELINE_SOURCE == \"api\"\nbuild:\n  stage: stage-1\n  image: golang:latest\n  needs:\n    - test\n  script:\n    # pipemaster:step checkout\n    # pipemaster:step build\n    # pipemaster:emulated step.env pipeline/parent/job/build/step/build\n    - |\n      (\n      export MODULE=\"apps/golang\"\n      export BINARY_NAME=\"ascii-banner\"\n      (\n      set -e\n      set -x\n      [ -e repo ] || ln -s \"$PWD\" repo\n      mkdir -p binary\n      root=$(pwd)\n      cd \"repo/${MODULE}\"\n      go build -o \"${root}/binary/${BINARY_NAME}\"\n\n      timestamp=$(date '+%Y%m%d%H%M%S')\n      tar czf \"$root/binary/$BINARY_NAME-$timestamp.tgz\" \"${root}/binary/${BINARY_NAME}\"\n      )\n      )\n    # pipemaster:step run-binary\n    - |\n      (\n      set -e\n      set -x\n      ./binary/ascii-banner -list\n      ./binary/ascii-banner concourse\n      ./binary/ascii-banner plane\n      ./binary/ascii-banner pilot\n      )\nset-feature-pipelines:\n  stage: stage-0\n  needs: []\n  script:\n    # pipemaster:lost step branches kind plugin\n    # pipemaster:lost step across kind plugin\n    - \"true\"\n    # pipemaster:step branches\n    # pipemaster:step across\n  allow_failure: false\n  when: manual\ntest:\n  stage: stage-0\n  image: golang:latest\n  needs: []\n  script:\n    # pipemaster:step checkout\n    # pipemaster:step tests\n    # pipemaster:emulated step.env pipeline/parent/job/test/step/tests\n    - |\n      (\n      export MODULE=\"apps/golang\"\n      (\n      set -e\n      [ -e repo ] || ln -s \"$PWD\" repo\n      cd \"repo/${MODULE}\"\n      go test -v ./...\n      )\n      )\n  allow_failure: false\n  when: manual\n"
+     "text": "# pipemaster:emulated trigger.push pipeline/parent/trigger/0\n# pipemaster:arg {\"kind\":\"push\"}\n# pipemaster:emulated trigger.push pipeline/parent/trigger/1\n# pipemaster:arg {\"kind\":\"push\",\"branches\":{\"Include\":[\"feat/*\",\"feature/*\"],\"Exclude\":null}}\nstages:\n  - stage-0\n  - stage-1\nworkflow:\n  rules:\n    - if: $CI_COMMIT_BRANCH\n    - if: $CI_COMMIT_BRANCH =~ /^feat\\/[^\\/]*$/ || $CI_COMMIT_BRANCH =~ /^feature\\/[^\\/]*$/\nbuild:\n  stage: stage-1\n  image: golang:latest\n  needs:\n    - test\n  rules:\n    - if: $CI_PIPELINE_SOURCE == \"push\" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH\n  script:\n    # pipemaster:step checkout\n    # pipemaster:step build\n    # pipemaster:emulated step.env pipeline/parent/job/build/step/build\n    - |\n      (\n      export MODULE=\"apps/golang\"\n      export BINARY_NAME=\"ascii-banner\"\n      (\n      set -e\n      set -x\n      [ -e repo ] || ln -s \"$PWD\" repo\n      mkdir -p binary\n      root=$(pwd)\n      cd \"repo/${MODULE}\"\n      go build -o \"${root}/binary/${BINARY_NAME}\"\n\n      timestamp=$(date '+%Y%m%d%H%M%S')\n      tar czf \"$root/binary/$BINARY_NAME-$timestamp.tgz\" \"${root}/binary/${BINARY_NAME}\"\n      )\n      )\n    # pipemaster:step run-binary\n    - |\n      (\n      set -e\n      set -x\n      ./binary/ascii-banner -list\n      ./binary/ascii-banner concourse\n      ./binary/ascii-banner plane\n      ./binary/ascii-banner pilot\n      )\nset-feature-pipelines:\n  stage: stage-0\n  needs: []\n  rules:\n    - if: $CI_PIPELINE_SOURCE == \"push\" && ($CI_COMMIT_BRANCH =~ /^feat\\//i || $CI_COMMIT_BRANCH =~ /^feature\\//i)\n  script:\n    # pipemaster:lost step branches kind plugin\n    # pipemaster:lost step across kind plugin\n    - \"true\"\n    # pipemaster:step branches\n    # pipemaster:step across\ntest:\n  stage: stage-0\n  image: golang:latest\n  needs: []\n  rules:\n    - if: $CI_PIPELINE_SOURCE == \"push\" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH\n  script:\n    # pipemaster:step checkout\n    # pipemaster:step tests\n    # pipemaster:emulated step.env pipeline/parent/job/test/step/tests\n    - |\n      (\n      export MODULE=\"apps/golang\"\n      (\n      set -e\n      [ -e repo ] || ln -s \"$PWD\" repo\n      cd \"repo/${MODULE}\"\n      go test -v ./...\n      )\n      )\n"
     }
    ],
    "report": [
@@ -351,20 +367,6 @@
      "detail": "Ext of provider concourse (resources) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent",
-     "feature": "trigger.api",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "the trigger of resource branches is unreadable (source.branch_filters may filter versions and has no IR form); it becomes an api trigger that never fires, and the resource is kept in Ext"
-    },
-    {
-     "path": "pipeline/parent",
-     "feature": "trigger.api",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "the trigger of resource repo is unreadable (source.branch is not set and Concourse follows the default branch); it becomes an api trigger that never fires, and the resource is kept in Ext"
-    },
-    {
      "path": "pipeline/parent/job/build",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -375,7 +377,7 @@
      "path": "pipeline/parent/job/build",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, public) is not written to the GitLab file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (gets, public, trigger_if) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/job/build/step/build",
@@ -441,7 +443,7 @@
      "path": "pipeline/parent/job/set-feature-pipelines",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, gets_in_parallel, public, triggers) is not written to the GitLab file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (gets, gets_in_parallel, public, trigger_if, triggers) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -449,13 +451,6 @@
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
      "detail": "step across: across is a matrix over a step; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/set-feature-pipelines",
-     "feature": "trigger.resource",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "job set-feature-pipelines triggers on branches only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines/step/across",
@@ -492,14 +487,7 @@
      "path": "pipeline/parent/job/test",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, public, triggers) is not written to the GitLab file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/parent/job/test",
-     "feature": "trigger.resource",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "job test triggers on repo only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
+     "detail": "Ext of provider concourse (gets, public, trigger_if, triggers) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/job/test/step/checkout",
@@ -524,27 +512,34 @@
      "path": "pipeline/parent/trigger/0",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the GitLab file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (resources) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/trigger/1",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the GitLab file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (resources) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/trigger/0",
-     "feature": "trigger.api",
-     "level": "external",
-     "strategy": "pipeline trigger token or API call",
-     "detail": "create a pipeline trigger token (Settings > CI/CD > Pipeline trigger tokens) or call the pipelines API"
+     "path": "pipeline/parent",
+     "feature": "trigger.push",
+     "level": "emulated",
+     "strategy": "trigger of the converted repository",
+     "detail": "the git resource branches watches https://github.com/concourse/examples (branch_filters feat/*, feature/*; Concourse emits a version when the set of matching branches changes, the push trigger fires on every push to one of them); the trigger fires on pushes to the repository that holds the converted pipeline"
     },
     {
-     "path": "pipeline/parent/trigger/1",
-     "feature": "trigger.api",
-     "level": "external",
-     "strategy": "pipeline trigger token or API call",
-     "detail": "create a pipeline trigger token (Settings > CI/CD > Pipeline trigger tokens) or call the pipelines API"
+     "path": "pipeline/parent",
+     "feature": "trigger.push",
+     "level": "emulated",
+     "strategy": "trigger of the converted repository",
+     "detail": "the git resource repo watches https://github.com/concourse/examples (the default branch); the trigger fires on pushes to the repository that holds the converted pipeline"
+    },
+    {
+     "path": "pipeline/parent/job/build",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "job condition of the passed jobs",
+     "detail": "job build follows jobs that run only when (event == 'push') && (branch == default_branch); it takes their condition, so that it never waits for a job that does not run"
     },
     {
      "path": "pipeline/parent/job/build/step/build",
@@ -565,6 +560,20 @@
      "level": "emulated",
      "strategy": "checkout step",
      "detail": "the get of the repository resource is the checkout step; the other gets of the step give the image of the tasks"
+    },
+    {
+     "path": "pipeline/parent/job/set-feature-pipelines",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "job condition on the pushes its gets watch",
+     "detail": "job set-feature-pipelines triggers on branches; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && ((branch =~ '(?i)^feat/') || (branch =~ '(?i)^feature/')); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
+    },
+    {
+     "path": "pipeline/parent/job/test",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "job condition on the pushes its gets watch",
+     "detail": "job test triggers on repo; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && (branch == default_branch); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
     },
     {
      "path": "pipeline/parent/job/test/step/checkout",
@@ -594,15 +603,15 @@
    "files": [
     {
      "path": ".woodpecker/build.yaml",
-     "text": "# pipemaster:emulated job.container pipeline/parent/job/build\n# pipemaster:arg {\"Ref\":\"golang:latest\",\"Entrypoint\":null}\n# pipemaster:emulated step.action pipeline/parent/job/build/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:lost trigger.* pipeline/parent/job/build: no trigger of the pipeline has a Woodpecker event\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\n    evaluate: \"false\"\ndepends_on:\n  - test\nsteps:\n  - name: build\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - set -x\n      - '[ -e repo ] || ln -s \"$$PWD\" repo'\n      - mkdir -p binary\n      - root=$$(pwd)\n      - cd \"repo/$${MODULE}\"\n      - go build -o \"$${root}/binary/$${BINARY_NAME}\"\n      - \"\"\n      - timestamp=$$(date '+%Y%m%d%H%M%S')\n      - tar czf \"$$root/binary/$$BINARY_NAME-$$timestamp.tgz\" \"$${root}/binary/$${BINARY_NAME}\"\n      - )\n    environment:\n      MODULE: apps/golang\n      BINARY_NAME: ascii-banner\n  - name: run-binary\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - set -x\n      - ./binary/ascii-banner -list\n      - ./binary/ascii-banner concourse\n      - ./binary/ascii-banner plane\n      - ./binary/ascii-banner pilot\n      - )\n"
+     "text": "# pipemaster:emulated job.container pipeline/parent/job/build\n# pipemaster:arg {\"Ref\":\"golang:latest\",\"Entrypoint\":null}\n# pipemaster:emulated step.action pipeline/parent/job/build/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:lost job.if pipeline/parent/job/build: (event == 'push') && (branch == default_branch)\nwhen:\n  - event: push\n    evaluate: \"false\"\n  - event: push\n    branch:\n      - feat/*\n      - feature/*\n    evaluate: \"false\"\ndepends_on:\n  - test\nsteps:\n  - name: build\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - set -x\n      - '[ -e repo ] || ln -s \"$$PWD\" repo'\n      - mkdir -p binary\n      - root=$$(pwd)\n      - cd \"repo/$${MODULE}\"\n      - go build -o \"$${root}/binary/$${BINARY_NAME}\"\n      - \"\"\n      - timestamp=$$(date '+%Y%m%d%H%M%S')\n      - tar czf \"$$root/binary/$$BINARY_NAME-$$timestamp.tgz\" \"$${root}/binary/$${BINARY_NAME}\"\n      - )\n    environment:\n      MODULE: apps/golang\n      BINARY_NAME: ascii-banner\n  - name: run-binary\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - set -x\n      - ./binary/ascii-banner -list\n      - ./binary/ascii-banner concourse\n      - ./binary/ascii-banner plane\n      - ./binary/ascii-banner pilot\n      - )\n"
     },
     {
      "path": ".woodpecker/set-feature-pipelines.yaml",
-     "text": "# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/branches: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/across: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"at\":1}\n# pipemaster:emulated step.script pipeline/parent/job/set-feature-pipelines\n# pipemaster:emulated job.container pipeline/parent/job/set-feature-pipelines\n# pipemaster:lost trigger.* pipeline/parent/job/set-feature-pipelines: no trigger of the pipeline has a Woodpecker event\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\n    evaluate: \"false\"\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n"
+     "text": "# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/branches: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/across: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"at\":1}\n# pipemaster:emulated step.script pipeline/parent/job/set-feature-pipelines\n# pipemaster:emulated job.container pipeline/parent/job/set-feature-pipelines\n# pipemaster:lost job.if pipeline/parent/job/set-feature-pipelines: (event == 'push') && ((branch =~ '(?i)^feat/') || (branch =~ '(?i)^feature/'))\nwhen:\n  - event: push\n    evaluate: \"false\"\n  - event: push\n    branch:\n      - feat/*\n      - feature/*\n    evaluate: \"false\"\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n"
     },
     {
      "path": ".woodpecker/test.yaml",
-     "text": "# pipemaster:emulated job.container pipeline/parent/job/test\n# pipemaster:arg {\"Ref\":\"golang:latest\",\"Entrypoint\":null}\n# pipemaster:emulated step.action pipeline/parent/job/test/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:lost trigger.* pipeline/parent/job/test: no trigger of the pipeline has a Woodpecker event\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\n    evaluate: \"false\"\nsteps:\n  - name: tests\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - '[ -e repo ] || ln -s \"$$PWD\" repo'\n      - cd \"repo/$${MODULE}\"\n      - go test -v ./...\n      - )\n    environment:\n      MODULE: apps/golang\n"
+     "text": "# pipemaster:emulated job.container pipeline/parent/job/test\n# pipemaster:arg {\"Ref\":\"golang:latest\",\"Entrypoint\":null}\n# pipemaster:emulated step.action pipeline/parent/job/test/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:lost job.if pipeline/parent/job/test: (event == 'push') && (branch == default_branch)\nwhen:\n  - event: push\n    evaluate: \"false\"\n  - event: push\n    branch:\n      - feat/*\n      - feature/*\n    evaluate: \"false\"\nsteps:\n  - name: tests\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - '[ -e repo ] || ln -s \"$$PWD\" repo'\n      - cd \"repo/$${MODULE}\"\n      - go test -v ./...\n      - )\n    environment:\n      MODULE: apps/golang\n"
     }
    ],
    "report": [
@@ -634,20 +643,6 @@
      "detail": "Ext of provider concourse (resources) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent",
-     "feature": "trigger.api",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "the trigger of resource branches is unreadable (source.branch_filters may filter versions and has no IR form); it becomes an api trigger that never fires, and the resource is kept in Ext"
-    },
-    {
-     "path": "pipeline/parent",
-     "feature": "trigger.api",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "the trigger of resource repo is unreadable (source.branch is not set and Concourse follows the default branch); it becomes an api trigger that never fires, and the resource is kept in Ext"
-    },
-    {
      "path": "pipeline/parent/job/build",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -658,13 +653,13 @@
      "path": "pipeline/parent/job/build",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, public) is not written to the Woodpecker file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (gets, public, trigger_if) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/job/build",
      "feature": "job.if",
      "level": "lost",
-     "detail": "no trigger of the pipeline has a Woodpecker event; the workflow never runs"
+     "detail": "condition not expressible in Woodpecker CI; the workflow disabled"
     },
     {
      "path": "pipeline/parent/job/build/step/build",
@@ -730,13 +725,13 @@
      "path": "pipeline/parent/job/set-feature-pipelines",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, gets_in_parallel, public, triggers) is not written to the Woodpecker file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (gets, gets_in_parallel, public, trigger_if, triggers) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
      "feature": "job.if",
      "level": "lost",
-     "detail": "no trigger of the pipeline has a Woodpecker event; the workflow never runs"
+     "detail": "condition not expressible in Woodpecker CI; the workflow disabled"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -744,13 +739,6 @@
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
      "detail": "step across: across is a matrix over a step; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/set-feature-pipelines",
-     "feature": "trigger.resource",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "job set-feature-pipelines triggers on branches only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines/step/across",
@@ -793,20 +781,13 @@
      "path": "pipeline/parent/job/test",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, public, triggers) is not written to the Woodpecker file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (gets, public, trigger_if, triggers) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/job/test",
      "feature": "job.if",
      "level": "lost",
-     "detail": "no trigger of the pipeline has a Woodpecker event; the workflow never runs"
-    },
-    {
-     "path": "pipeline/parent/job/test",
-     "feature": "trigger.resource",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "job test triggers on repo only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
+     "detail": "condition not expressible in Woodpecker CI; the workflow disabled"
     },
     {
      "path": "pipeline/parent/job/test/step/checkout",
@@ -831,25 +812,34 @@
      "path": "pipeline/parent/trigger/0",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Woodpecker file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/parent/trigger/0",
-     "feature": "trigger.api",
-     "level": "lost",
-     "detail": "Woodpecker starts API pipelines as manual events"
+     "detail": "Ext of provider concourse (resources) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/trigger/1",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Woodpecker file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (resources) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/trigger/1",
-     "feature": "trigger.api",
-     "level": "lost",
-     "detail": "Woodpecker starts API pipelines as manual events"
+     "path": "pipeline/parent",
+     "feature": "trigger.push",
+     "level": "emulated",
+     "strategy": "trigger of the converted repository",
+     "detail": "the git resource branches watches https://github.com/concourse/examples (branch_filters feat/*, feature/*; Concourse emits a version when the set of matching branches changes, the push trigger fires on every push to one of them); the trigger fires on pushes to the repository that holds the converted pipeline"
+    },
+    {
+     "path": "pipeline/parent",
+     "feature": "trigger.push",
+     "level": "emulated",
+     "strategy": "trigger of the converted repository",
+     "detail": "the git resource repo watches https://github.com/concourse/examples (the default branch); the trigger fires on pushes to the repository that holds the converted pipeline"
+    },
+    {
+     "path": "pipeline/parent/job/build",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "job condition of the passed jobs",
+     "detail": "job build follows jobs that run only when (event == 'push') && (branch == default_branch); it takes their condition, so that it never waits for a job that does not run"
     },
     {
      "path": "pipeline/parent/job/build/step/build",
@@ -874,10 +864,10 @@
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
-     "feature": "job.manual",
+     "feature": "job.if",
      "level": "emulated",
-     "strategy": "when event manual; a person starts the workflow from the UI or API",
-     "detail": "the workflow no longer runs on its normal events"
+     "strategy": "job condition on the pushes its gets watch",
+     "detail": "job set-feature-pipelines triggers on branches; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && ((branch =~ '(?i)^feat/') || (branch =~ '(?i)^feature/')); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -888,10 +878,10 @@
     },
     {
      "path": "pipeline/parent/job/test",
-     "feature": "job.manual",
+     "feature": "job.if",
      "level": "emulated",
-     "strategy": "when event manual; a person starts the workflow from the UI or API",
-     "detail": "the workflow no longer runs on its normal events"
+     "strategy": "job condition on the pushes its gets watch",
+     "detail": "job test triggers on repo; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && (branch == default_branch); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
     },
     {
      "path": "pipeline/parent/job/test/step/checkout",
@@ -915,7 +905,7 @@
    "files": [
     {
      "path": ".drone.yml",
-     "text": "# pipemaster:lost trigger.* pipeline/parent/job/build: the triggers of the pipeline have no single Drone condition\n# pipemaster:emulated step.action pipeline/parent/job/build/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/parent/job/build\n# pipemaster:arg {\"Ref\":\"golang:latest\",\"Entrypoint\":null,\"taken\":2}\nkind: pipeline\ntype: docker\nname: build\ntrigger:\n  event:\n    exclude:\n      - '**'\ndepends_on:\n  - test\nsteps:\n  - name: build\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - set -x\n      - '[ -e repo ] || ln -s \"$$PWD\" repo'\n      - mkdir -p binary\n      - root=$$(pwd)\n      - cd \"repo/$${MODULE}\"\n      - |+\n        go build -o \"$${root}/binary/$${BINARY_NAME}\"\n\n      - timestamp=$$(date '+%Y%m%d%H%M%S')\n      - tar czf \"$$root/binary/$$BINARY_NAME-$$timestamp.tgz\" \"$${root}/binary/$${BINARY_NAME}\"\n      - )\n    environment:\n      MODULE: apps/golang\n      BINARY_NAME: ascii-banner\n  - name: run-binary\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - set -x\n      - ./binary/ascii-banner -list\n      - ./binary/ascii-banner concourse\n      - ./binary/ascii-banner plane\n      - ./binary/ascii-banner pilot\n      - )\n---\n# pipemaster:lost trigger.* pipeline/parent/job/set-feature-pipelines: the triggers of the pipeline have no single Drone condition\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/branches: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/across: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/parent/job/set-feature-pipelines\n# pipemaster:emulated job.container pipeline/parent/job/set-feature-pipelines\nkind: pipeline\ntype: docker\nname: set-feature-pipelines\ntrigger:\n  event:\n    exclude:\n      - '**'\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n---\n# pipemaster:lost trigger.* pipeline/parent/job/test: the triggers of the pipeline have no single Drone condition\n# pipemaster:emulated step.action pipeline/parent/job/test/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/parent/job/test\n# pipemaster:arg {\"Ref\":\"golang:latest\",\"Entrypoint\":null,\"taken\":1}\nkind: pipeline\ntype: docker\nname: test\ntrigger:\n  event:\n    exclude:\n      - '**'\nsteps:\n  - name: tests\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - '[ -e repo ] || ln -s \"$$PWD\" repo'\n      - cd \"repo/$${MODULE}\"\n      - go test -v ./...\n      - )\n    environment:\n      MODULE: apps/golang\n"
+     "text": "# pipemaster:emulated trigger.filter.branches pipeline/parent\n# pipemaster:arg \"- ext:\\n    concourse:\\n        resources:\\n            - repo\\n  kind: push\\n- ext:\\n    concourse:\\n        resources:\\n            - branches\\n  kind: push\\n  branches:\\n    include:\\n        - feat/*\\n        - feature/*\\n\"\n# pipemaster:lost job.if pipeline/parent/job/build: (event == 'push') && (branch == default_branch)\n# pipemaster:emulated step.action pipeline/parent/job/build/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/parent/job/build\n# pipemaster:arg {\"Ref\":\"golang:latest\",\"Entrypoint\":null,\"taken\":2}\nkind: pipeline\ntype: docker\nname: build\ntrigger:\n  event:\n    exclude:\n      - '**'\ndepends_on:\n  - test\nsteps:\n  - name: build\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - set -x\n      - '[ -e repo ] || ln -s \"$$PWD\" repo'\n      - mkdir -p binary\n      - root=$$(pwd)\n      - cd \"repo/$${MODULE}\"\n      - |+\n        go build -o \"$${root}/binary/$${BINARY_NAME}\"\n\n      - timestamp=$$(date '+%Y%m%d%H%M%S')\n      - tar czf \"$$root/binary/$$BINARY_NAME-$$timestamp.tgz\" \"$${root}/binary/$${BINARY_NAME}\"\n      - )\n    environment:\n      MODULE: apps/golang\n      BINARY_NAME: ascii-banner\n  - name: run-binary\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - set -x\n      - ./binary/ascii-banner -list\n      - ./binary/ascii-banner concourse\n      - ./binary/ascii-banner plane\n      - ./binary/ascii-banner pilot\n      - )\n---\n# pipemaster:emulated trigger.filter.branches pipeline/parent\n# pipemaster:arg \"- ext:\\n    concourse:\\n        resources:\\n            - repo\\n  kind: push\\n- ext:\\n    concourse:\\n        resources:\\n            - branches\\n  kind: push\\n  branches:\\n    include:\\n        - feat/*\\n        - feature/*\\n\"\n# pipemaster:lost job.if pipeline/parent/job/set-feature-pipelines: (event == 'push') && ((branch =~ '(?i)^feat/') || (branch =~ '(?i)^feature/'))\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/branches: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/across: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/parent/job/set-feature-pipelines\n# pipemaster:emulated job.container pipeline/parent/job/set-feature-pipelines\nkind: pipeline\ntype: docker\nname: set-feature-pipelines\ntrigger:\n  event:\n    exclude:\n      - '**'\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n---\n# pipemaster:emulated trigger.filter.branches pipeline/parent\n# pipemaster:arg \"- ext:\\n    concourse:\\n        resources:\\n            - repo\\n  kind: push\\n- ext:\\n    concourse:\\n        resources:\\n            - branches\\n  kind: push\\n  branches:\\n    include:\\n        - feat/*\\n        - feature/*\\n\"\n# pipemaster:lost job.if pipeline/parent/job/test: (event == 'push') && (branch == default_branch)\n# pipemaster:emulated step.action pipeline/parent/job/test/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/parent/job/test\n# pipemaster:arg {\"Ref\":\"golang:latest\",\"Entrypoint\":null,\"taken\":1}\nkind: pipeline\ntype: docker\nname: test\ntrigger:\n  event:\n    exclude:\n      - '**'\nsteps:\n  - name: tests\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - '[ -e repo ] || ln -s \"$$PWD\" repo'\n      - cd \"repo/$${MODULE}\"\n      - go test -v ./...\n      - )\n    environment:\n      MODULE: apps/golang\n"
     }
    ],
    "report": [
@@ -947,20 +937,6 @@
      "detail": "Ext of provider concourse (resources) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent",
-     "feature": "trigger.api",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "the trigger of resource branches is unreadable (source.branch_filters may filter versions and has no IR form); it becomes an api trigger that never fires, and the resource is kept in Ext"
-    },
-    {
-     "path": "pipeline/parent",
-     "feature": "trigger.api",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "the trigger of resource repo is unreadable (source.branch is not set and Concourse follows the default branch); it becomes an api trigger that never fires, and the resource is kept in Ext"
-    },
-    {
      "path": "pipeline/parent/job/build",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -971,13 +947,13 @@
      "path": "pipeline/parent/job/build",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, public) is not written to the Drone file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (gets, public, trigger_if) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/job/build",
      "feature": "job.if",
      "level": "lost",
-     "detail": "the triggers of the pipeline have no single Drone condition; the document never runs"
+     "detail": "condition not expressible in Drone CI; the document disabled"
     },
     {
      "path": "pipeline/parent/job/build/step/build",
@@ -1043,13 +1019,13 @@
      "path": "pipeline/parent/job/set-feature-pipelines",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, gets_in_parallel, public, triggers) is not written to the Drone file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (gets, gets_in_parallel, public, trigger_if, triggers) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
      "feature": "job.if",
      "level": "lost",
-     "detail": "the triggers of the pipeline have no single Drone condition; the document never runs"
+     "detail": "condition not expressible in Drone CI; the document disabled"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -1057,13 +1033,6 @@
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
      "detail": "step across: across is a matrix over a step; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/set-feature-pipelines",
-     "feature": "trigger.resource",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "job set-feature-pipelines triggers on branches only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines/step/across",
@@ -1106,20 +1075,13 @@
      "path": "pipeline/parent/job/test",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, public, triggers) is not written to the Drone file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (gets, public, trigger_if, triggers) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/job/test",
      "feature": "job.if",
      "level": "lost",
-     "detail": "the triggers of the pipeline have no single Drone condition; the document never runs"
-    },
-    {
-     "path": "pipeline/parent/job/test",
-     "feature": "trigger.resource",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "job test triggers on repo only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
+     "detail": "condition not expressible in Drone CI; the document disabled"
     },
     {
      "path": "pipeline/parent/job/test/step/checkout",
@@ -1144,11 +1106,11 @@
      "path": "pipeline/parent/trigger/0",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Drone file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (resources) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/trigger/0",
-     "feature": "trigger.api",
+     "feature": "trigger.push",
      "level": "lost",
      "detail": "the document is disabled, so the trigger is not written"
     },
@@ -1156,13 +1118,34 @@
      "path": "pipeline/parent/trigger/1",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Drone file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (resources) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/trigger/1",
-     "feature": "trigger.api",
+     "feature": "trigger.filter.branches",
      "level": "lost",
      "detail": "the document is disabled, so the trigger is not written"
+    },
+    {
+     "path": "pipeline/parent",
+     "feature": "trigger.push",
+     "level": "emulated",
+     "strategy": "trigger of the converted repository",
+     "detail": "the git resource branches watches https://github.com/concourse/examples (branch_filters feat/*, feature/*; Concourse emits a version when the set of matching branches changes, the push trigger fires on every push to one of them); the trigger fires on pushes to the repository that holds the converted pipeline"
+    },
+    {
+     "path": "pipeline/parent",
+     "feature": "trigger.push",
+     "level": "emulated",
+     "strategy": "trigger of the converted repository",
+     "detail": "the git resource repo watches https://github.com/concourse/examples (the default branch); the trigger fires on pushes to the repository that holds the converted pipeline"
+    },
+    {
+     "path": "pipeline/parent/job/build",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "job condition of the passed jobs",
+     "detail": "job build follows jobs that run only when (event == 'push') && (branch == default_branch); it takes their condition, so that it never waits for a job that does not run"
     },
     {
      "path": "pipeline/parent/job/build/step/build",
@@ -1194,10 +1177,10 @@
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
-     "feature": "job.manual",
+     "feature": "job.if",
      "level": "emulated",
-     "strategy": "trigger event custom",
-     "detail": "a person starts the build through the API or drone build create; the pipeline no longer runs on its normal events"
+     "strategy": "job condition on the pushes its gets watch",
+     "detail": "job set-feature-pipelines triggers on branches; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && ((branch =~ '(?i)^feat/') || (branch =~ '(?i)^feature/')); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -1208,10 +1191,10 @@
     },
     {
      "path": "pipeline/parent/job/test",
-     "feature": "job.manual",
+     "feature": "job.if",
      "level": "emulated",
-     "strategy": "trigger event custom",
-     "detail": "a person starts the build through the API or drone build create; the pipeline no longer runs on its normal events"
+     "strategy": "job condition on the pushes its gets watch",
+     "detail": "job test triggers on repo; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && (branch == default_branch); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
     },
     {
      "path": "pipeline/parent/job/test/step/checkout",
@@ -1233,6 +1216,13 @@
      "level": "emulated",
      "strategy": "directories made by script lines",
      "detail": "task file repo/tasks/go-test.yml: the first script lines link repo to the checkout (artifact repo). A link to the checkout is an untracked entry in the working tree, which tools that walk the tree also see"
+    },
+    {
+     "path": "pipeline/parent/trigger/0",
+     "feature": "trigger.filter.branches",
+     "level": "emulated",
+     "strategy": "ref filter",
+     "detail": "the filters of the triggers differ, so each is written as a ref: refs/heads/<pattern>, refs/tags/<pattern>, refs/pull/*/head for a pull request on GitHub"
     }
    ]
   },
@@ -1242,11 +1232,11 @@
    "files": [
     {
      "path": ".tekton/kustomization.yaml",
-     "text": "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n  - pipeline.yaml\n  - rbac/triggers.yaml\n  - tasks/parent-build.yaml\n  - tasks/parent-set-feature-pipelines.yaml\n  - tasks/parent-test.yaml\n  - triggers/eventlistener.yaml\n"
+     "text": "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n  - pipeline.yaml\n  - rbac/triggers.yaml\n  - tasks/parent-build.yaml\n  - tasks/parent-set-feature-pipelines.yaml\n  - tasks/parent-test.yaml\n  - triggers/eventlistener.yaml\n  - triggers/triggerbinding.yaml\n  - triggers/triggertemplate.yaml\n"
     },
     {
      "path": ".tekton/pipeline.yaml",
-     "text": "apiVersion: tekton.dev/v1\nkind: Pipeline\nmetadata:\n  name: parent\nspec:\n  params:\n    - name: ctx-sha\n      default: \"\"\n    - name: ctx-repo\n      default: \"\"\n  tasks:\n    - name: build\n      taskRef:\n        name: parent-build\n      params:\n        - name: ctx-repo\n          value: $(params.ctx-repo)\n        - name: ctx-sha\n          value: $(params.ctx-sha)\n      runAfter:\n        - test\n    - name: set-feature-pipelines\n      taskRef:\n        name: parent-set-feature-pipelines\n    - name: test\n      taskRef:\n        name: parent-test\n      params:\n        - name: ctx-repo\n          value: $(params.ctx-repo)\n        - name: ctx-sha\n          value: $(params.ctx-sha)\n"
+     "text": "apiVersion: tekton.dev/v1\nkind: Pipeline\nmetadata:\n  name: parent\nspec:\n  params:\n    - name: ctx-branch\n      default: \"\"\n    - name: ctx-event\n      default: \"\"\n    - name: ctx-sha\n      default: \"\"\n    - name: ctx-repo\n      default: \"\"\n  tasks:\n    - name: build\n      taskRef:\n        name: parent-build\n      params:\n        - name: ctx-event\n          value: $(params.ctx-event)\n        - name: ctx-branch\n          value: $(params.ctx-branch)\n        - name: ctx-repo\n          value: $(params.ctx-repo)\n        - name: ctx-sha\n          value: $(params.ctx-sha)\n      runAfter:\n        - test\n      when:\n        - input: pipemaster-disabled\n          operator: in\n          values:\n            - never\n    - name: set-feature-pipelines\n      taskRef:\n        name: parent-set-feature-pipelines\n      params:\n        - name: ctx-event\n          value: $(params.ctx-event)\n        - name: ctx-branch\n          value: $(params.ctx-branch)\n      when:\n        - input: pipemaster-disabled\n          operator: in\n          values:\n            - never\n    - name: test\n      taskRef:\n        name: parent-test\n      params:\n        - name: ctx-event\n          value: $(params.ctx-event)\n        - name: ctx-branch\n          value: $(params.ctx-branch)\n        - name: ctx-repo\n          value: $(params.ctx-repo)\n        - name: ctx-sha\n          value: $(params.ctx-sha)\n      when:\n        - input: pipemaster-disabled\n          operator: in\n          values:\n            - never\n"
     },
     {
      "path": ".tekton/rbac/triggers.yaml",
@@ -1254,19 +1244,27 @@
     },
     {
      "path": ".tekton/tasks/parent-build.yaml",
-     "text": "# pipemaster:emulated step.action pipeline/parent/job/build/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"wrote\":\"{\\\"name\\\":\\\"checkout\\\",\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/$(params.ctx-repo).git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"$(params.ctx-sha)\\\"},{\\\"name\\\":\\\"output-path\\\",\\\"value\\\":\\\"/workspace\\\"}],\\\"ref\\\":{\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/tektoncd-catalog/git-clone.git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"v1.7.1\\\"},{\\\"name\\\":\\\"pathInRepo\\\",\\\"value\\\":\\\"stepaction/git-clone/git-clone.yaml\\\"}],\\\"resolver\\\":\\\"git\\\"}}\",\"at\":0}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: parent-build\nspec:\n  params:\n    - name: ctx-repo\n    - name: ctx-sha\n  stepTemplate:\n    image: golang:latest\n    workingDir: /workspace\n  steps:\n    - name: checkout\n      ref:\n        resolver: git\n        params:\n          - name: url\n            value: https://github.com/tektoncd-catalog/git-clone.git\n          - name: revision\n            value: v1.7.1\n          - name: pathInRepo\n            value: stepaction/git-clone/git-clone.yaml\n      params:\n        - name: url\n          value: https://github.com/$(params.ctx-repo).git\n        - name: revision\n          value: $(params.ctx-sha)\n        - name: output-path\n          value: /workspace\n    - name: build\n      script: |-\n        (\n        set -e\n        set -x\n        [ -e repo ] || ln -s \"$PWD\" repo\n        mkdir -p binary\n        root=$(pwd)\n        cd \"repo/${MODULE}\"\n        go build -o \"${root}/binary/${BINARY_NAME}\"\n\n        timestamp=$(date '+%Y%m%d%H%M%S')\n        tar czf \"$root/binary/$BINARY_NAME-$timestamp.tgz\" \"${root}/binary/${BINARY_NAME}\"\n        )\n      env:\n        - name: MODULE\n          value: apps/golang\n        - name: BINARY_NAME\n          value: ascii-banner\n    - name: run-binary\n      script: |-\n        (\n        set -e\n        set -x\n        ./binary/ascii-banner -list\n        ./binary/ascii-banner concourse\n        ./binary/ascii-banner plane\n        ./binary/ascii-banner pilot\n        )\n"
+     "text": "# pipemaster:emulated step.action pipeline/parent/job/build/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"wrote\":\"{\\\"name\\\":\\\"checkout\\\",\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/$(params.ctx-repo).git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"$(params.ctx-sha)\\\"},{\\\"name\\\":\\\"output-path\\\",\\\"value\\\":\\\"/workspace\\\"}],\\\"ref\\\":{\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/tektoncd-catalog/git-clone.git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"v1.7.1\\\"},{\\\"name\\\":\\\"pathInRepo\\\",\\\"value\\\":\\\"stepaction/git-clone/git-clone.yaml\\\"}],\\\"resolver\\\":\\\"git\\\"}}\",\"at\":0}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: parent-build\nspec:\n  params:\n    - name: ctx-event\n    - name: ctx-branch\n    - name: ctx-repo\n    - name: ctx-sha\n  stepTemplate:\n    image: golang:latest\n    workingDir: /workspace\n  steps:\n    - name: checkout\n      ref:\n        resolver: git\n        params:\n          - name: url\n            value: https://github.com/tektoncd-catalog/git-clone.git\n          - name: revision\n            value: v1.7.1\n          - name: pathInRepo\n            value: stepaction/git-clone/git-clone.yaml\n      params:\n        - name: url\n          value: https://github.com/$(params.ctx-repo).git\n        - name: revision\n          value: $(params.ctx-sha)\n        - name: output-path\n          value: /workspace\n    - name: build\n      script: |-\n        (\n        set -e\n        set -x\n        [ -e repo ] || ln -s \"$PWD\" repo\n        mkdir -p binary\n        root=$(pwd)\n        cd \"repo/${MODULE}\"\n        go build -o \"${root}/binary/${BINARY_NAME}\"\n\n        timestamp=$(date '+%Y%m%d%H%M%S')\n        tar czf \"$root/binary/$BINARY_NAME-$timestamp.tgz\" \"${root}/binary/${BINARY_NAME}\"\n        )\n      env:\n        - name: MODULE\n          value: apps/golang\n        - name: BINARY_NAME\n          value: ascii-banner\n    - name: run-binary\n      script: |-\n        (\n        set -e\n        set -x\n        ./binary/ascii-banner -list\n        ./binary/ascii-banner concourse\n        ./binary/ascii-banner plane\n        ./binary/ascii-banner pilot\n        )\n"
     },
     {
      "path": ".tekton/tasks/parent-set-feature-pipelines.yaml",
-     "text": "# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/branches has kind plugin\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/across has kind plugin\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"at\":0,\"seq\":1}\n# pipemaster:emulated step.script pipeline/parent/job/set-feature-pipelines\n# pipemaster:arg {\"image\":\"alpine:3.22\"}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: parent-set-feature-pipelines\nspec:\n  steps:\n    - name: noop\n      image: alpine:3.22\n      script: \"true\"\n"
+     "text": "# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/branches has kind plugin\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/across has kind plugin\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"at\":0,\"seq\":1}\n# pipemaster:emulated step.script pipeline/parent/job/set-feature-pipelines\n# pipemaster:arg {\"image\":\"alpine:3.22\"}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: parent-set-feature-pipelines\nspec:\n  params:\n    - name: ctx-event\n    - name: ctx-branch\n  steps:\n    - name: noop\n      image: alpine:3.22\n      script: \"true\"\n"
     },
     {
      "path": ".tekton/tasks/parent-test.yaml",
-     "text": "# pipemaster:emulated step.action pipeline/parent/job/test/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"wrote\":\"{\\\"name\\\":\\\"checkout\\\",\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/$(params.ctx-repo).git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"$(params.ctx-sha)\\\"},{\\\"name\\\":\\\"output-path\\\",\\\"value\\\":\\\"/workspace\\\"}],\\\"ref\\\":{\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/tektoncd-catalog/git-clone.git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"v1.7.1\\\"},{\\\"name\\\":\\\"pathInRepo\\\",\\\"value\\\":\\\"stepaction/git-clone/git-clone.yaml\\\"}],\\\"resolver\\\":\\\"git\\\"}}\",\"at\":0}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: parent-test\nspec:\n  params:\n    - name: ctx-repo\n    - name: ctx-sha\n  stepTemplate:\n    image: golang:latest\n    workingDir: /workspace\n  steps:\n    - name: checkout\n      ref:\n        resolver: git\n        params:\n          - name: url\n            value: https://github.com/tektoncd-catalog/git-clone.git\n          - name: revision\n            value: v1.7.1\n          - name: pathInRepo\n            value: stepaction/git-clone/git-clone.yaml\n      params:\n        - name: url\n          value: https://github.com/$(params.ctx-repo).git\n        - name: revision\n          value: $(params.ctx-sha)\n        - name: output-path\n          value: /workspace\n    - name: tests\n      script: |-\n        (\n        set -e\n        [ -e repo ] || ln -s \"$PWD\" repo\n        cd \"repo/${MODULE}\"\n        go test -v ./...\n        )\n      env:\n        - name: MODULE\n          value: apps/golang\n"
+     "text": "# pipemaster:emulated step.action pipeline/parent/job/test/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"wrote\":\"{\\\"name\\\":\\\"checkout\\\",\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/$(params.ctx-repo).git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"$(params.ctx-sha)\\\"},{\\\"name\\\":\\\"output-path\\\",\\\"value\\\":\\\"/workspace\\\"}],\\\"ref\\\":{\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/tektoncd-catalog/git-clone.git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"v1.7.1\\\"},{\\\"name\\\":\\\"pathInRepo\\\",\\\"value\\\":\\\"stepaction/git-clone/git-clone.yaml\\\"}],\\\"resolver\\\":\\\"git\\\"}}\",\"at\":0}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: parent-test\nspec:\n  params:\n    - name: ctx-event\n    - name: ctx-branch\n    - name: ctx-repo\n    - name: ctx-sha\n  stepTemplate:\n    image: golang:latest\n    workingDir: /workspace\n  steps:\n    - name: checkout\n      ref:\n        resolver: git\n        params:\n          - name: url\n            value: https://github.com/tektoncd-catalog/git-clone.git\n          - name: revision\n            value: v1.7.1\n          - name: pathInRepo\n            value: stepaction/git-clone/git-clone.yaml\n      params:\n        - name: url\n          value: https://github.com/$(params.ctx-repo).git\n        - name: revision\n          value: $(params.ctx-sha)\n        - name: output-path\n          value: /workspace\n    - name: tests\n      script: |-\n        (\n        set -e\n        [ -e repo ] || ln -s \"$PWD\" repo\n        cd \"repo/${MODULE}\"\n        go test -v ./...\n        )\n      env:\n        - name: MODULE\n          value: apps/golang\n"
     },
     {
      "path": ".tekton/triggers/eventlistener.yaml",
-     "text": "apiVersion: triggers.tekton.dev/v1beta1\nkind: EventListener\nmetadata:\n  name: pipemaster\nspec:\n  serviceAccountName: pipemaster-triggers\n  triggers: []\n"
+     "text": "# pipemaster:emulated trigger.push pipeline/parent/trigger/0\n# pipemaster:arg {\"kind\":\"push\",\"name\":\"parent-push-0\",\"branches\":{\"Include\":null,\"Exclude\":null},\"tags\":{\"Include\":null,\"Exclude\":null},\"paths\":{\"Include\":null,\"Exclude\":null}}\n# pipemaster:emulated trigger.push pipeline/parent/trigger/1\n# pipemaster:arg {\"kind\":\"push\",\"name\":\"parent-push-1\",\"branches\":{\"Include\":[\"feat/*\",\"feature/*\"],\"Exclude\":null},\"tags\":{\"Include\":null,\"Exclude\":null},\"paths\":{\"Include\":null,\"Exclude\":null}}\n# pipemaster:emulated trigger.filter.branches pipeline/parent/trigger/1\napiVersion: triggers.tekton.dev/v1beta1\nkind: EventListener\nmetadata:\n  name: pipemaster\nspec:\n  serviceAccountName: pipemaster-triggers\n  triggers:\n    - name: parent-push-0\n      interceptors:\n        - ref:\n            name: github\n          params:\n            - name: eventTypes\n              value:\n                - push\n            - name: secretRef\n              value:\n                secretName: pipemaster-github-webhook\n                secretKey: token\n        - ref:\n            name: cel\n          params:\n            - name: filter\n              value: body.ref.startsWith('refs/heads/')\n            - name: overlays\n              value:\n                - key: ctx_branch\n                  expression: body.ref.replace('refs/heads/','',1)\n                - key: ctx_event\n                  expression: '''push'''\n                - key: ctx_sha\n                  expression: body.after\n                - key: ctx_repo\n                  expression: body.repository.full_name\n      bindings:\n        - ref: parent-github\n      template:\n        ref: parent-run\n    - name: parent-push-1\n      interceptors:\n        - ref:\n            name: github\n          params:\n            - name: eventTypes\n              value:\n                - push\n            - name: secretRef\n              value:\n                secretName: pipemaster-github-webhook\n                secretKey: token\n        - ref:\n            name: cel\n          params:\n            - name: filter\n              value: body.ref.startsWith('refs/heads/') && (body.ref.replace('refs/heads/','',1).matches(r'^feat/[^/]*$') || body.ref.replace('refs/heads/','',1).matches(r'^feature/[^/]*$'))\n            - name: overlays\n              value:\n                - key: ctx_branch\n                  expression: body.ref.replace('refs/heads/','',1)\n                - key: ctx_event\n                  expression: '''push'''\n                - key: ctx_sha\n                  expression: body.after\n                - key: ctx_repo\n                  expression: body.repository.full_name\n      bindings:\n        - ref: parent-github\n      template:\n        ref: parent-run\n"
+    },
+    {
+     "path": ".tekton/triggers/triggerbinding.yaml",
+     "text": "# pipemaster:generated\napiVersion: triggers.tekton.dev/v1beta1\nkind: TriggerBinding\nmetadata:\n  name: parent-github\nspec:\n  params:\n    - name: ctx-branch\n      value: $(extensions.ctx_branch)\n    - name: ctx-event\n      value: $(extensions.ctx_event)\n    - name: ctx-sha\n      value: $(extensions.ctx_sha)\n    - name: ctx-repo\n      value: $(extensions.ctx_repo)\n"
+    },
+    {
+     "path": ".tekton/triggers/triggertemplate.yaml",
+     "text": "# pipemaster:generated\napiVersion: triggers.tekton.dev/v1beta1\nkind: TriggerTemplate\nmetadata:\n  name: parent-run\nspec:\n  params:\n    - name: ctx-branch\n      default: \"\"\n    - name: ctx-event\n      default: \"\"\n    - name: ctx-sha\n      default: \"\"\n    - name: ctx-repo\n      default: \"\"\n  resourcetemplates:\n    - apiVersion: tekton.dev/v1\n      kind: PipelineRun\n      metadata:\n        generateName: parent-run-\n      spec:\n        pipelineRef:\n          name: parent\n        params:\n          - name: ctx-branch\n            value: $(tt.params.ctx-branch)\n          - name: ctx-event\n            value: $(tt.params.ctx-event)\n          - name: ctx-sha\n            value: $(tt.params.ctx-sha)\n          - name: ctx-repo\n            value: $(tt.params.ctx-repo)\n"
     }
    ],
    "report": [
@@ -1298,20 +1296,6 @@
      "detail": "Ext of provider concourse (resources) is not written to the Tekton file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent",
-     "feature": "trigger.api",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "the trigger of resource branches is unreadable (source.branch_filters may filter versions and has no IR form); it becomes an api trigger that never fires, and the resource is kept in Ext"
-    },
-    {
-     "path": "pipeline/parent",
-     "feature": "trigger.api",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "the trigger of resource repo is unreadable (source.branch is not set and Concourse follows the default branch); it becomes an api trigger that never fires, and the resource is kept in Ext"
-    },
-    {
      "path": "pipeline/parent/job/build",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -1322,7 +1306,13 @@
      "path": "pipeline/parent/job/build",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, public) is not written to the Tekton file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (gets, public, trigger_if) is not written to the Tekton file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/parent/job/build",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "the condition has no Tekton when form and no shell guard; the task never runs"
     },
     {
      "path": "pipeline/parent/job/build/step/build",
@@ -1370,13 +1360,13 @@
      "path": "pipeline/parent/job/set-feature-pipelines",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, gets_in_parallel, public, triggers) is not written to the Tekton file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (gets, gets_in_parallel, public, trigger_if, triggers) is not written to the Tekton file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
-     "feature": "job.manual",
+     "feature": "job.if",
      "level": "lost",
-     "detail": "Tekton has no manual job gate"
+     "detail": "the condition has no Tekton when form and no shell guard; the task never runs"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -1384,13 +1374,6 @@
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
      "detail": "step across: across is a matrix over a step; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/set-feature-pipelines",
-     "feature": "trigger.resource",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "job set-feature-pipelines triggers on branches only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines/step/across",
@@ -1421,20 +1404,13 @@
      "path": "pipeline/parent/job/test",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, public, triggers) is not written to the Tekton file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (gets, public, trigger_if, triggers) is not written to the Tekton file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/job/test",
-     "feature": "job.manual",
+     "feature": "job.if",
      "level": "lost",
-     "detail": "Tekton has no manual job gate"
-    },
-    {
-     "path": "pipeline/parent/job/test",
-     "feature": "trigger.resource",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "job test triggers on repo only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
+     "detail": "the condition has no Tekton when form and no shell guard; the task never runs"
     },
     {
      "path": "pipeline/parent/job/test/step/tests",
@@ -1447,25 +1423,48 @@
      "path": "pipeline/parent/trigger/0",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Tekton file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/parent/trigger/0",
-     "feature": "trigger.api",
-     "level": "lost",
-     "detail": "Tekton has no API trigger kind; only an EventListener entry of a Tekton file is kept"
+     "detail": "Ext of provider concourse (resources) is not written to the Tekton file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/trigger/1",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Tekton file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (resources) is not written to the Tekton file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/parent/trigger/0",
+     "feature": "trigger.push",
+     "level": "external",
+     "strategy": "Secret pipemaster-github-webhook",
+     "detail": "create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign"
     },
     {
      "path": "pipeline/parent/trigger/1",
-     "feature": "trigger.api",
-     "level": "lost",
-     "detail": "Tekton has no API trigger kind; only an EventListener entry of a Tekton file is kept"
+     "feature": "trigger.push",
+     "level": "external",
+     "strategy": "Secret pipemaster-github-webhook",
+     "detail": "create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign"
+    },
+    {
+     "path": "pipeline/parent",
+     "feature": "trigger.push",
+     "level": "emulated",
+     "strategy": "trigger of the converted repository",
+     "detail": "the git resource branches watches https://github.com/concourse/examples (branch_filters feat/*, feature/*; Concourse emits a version when the set of matching branches changes, the push trigger fires on every push to one of them); the trigger fires on pushes to the repository that holds the converted pipeline"
+    },
+    {
+     "path": "pipeline/parent",
+     "feature": "trigger.push",
+     "level": "emulated",
+     "strategy": "trigger of the converted repository",
+     "detail": "the git resource repo watches https://github.com/concourse/examples (the default branch); the trigger fires on pushes to the repository that holds the converted pipeline"
+    },
+    {
+     "path": "pipeline/parent/job/build",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "job condition of the passed jobs",
+     "detail": "job build follows jobs that run only when (event == 'push') && (branch == default_branch); it takes their condition, so that it never waits for a job that does not run"
     },
     {
      "path": "pipeline/parent/job/build/step/build",
@@ -1490,10 +1489,24 @@
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "job condition on the pushes its gets watch",
+     "detail": "job set-feature-pipelines triggers on branches; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && ((branch =~ '(?i)^feat/') || (branch =~ '(?i)^feature/')); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
+    },
+    {
+     "path": "pipeline/parent/job/set-feature-pipelines",
      "feature": "step.script",
      "level": "emulated",
      "strategy": "placeholder step",
      "detail": "the job has no step and a Task needs one; a step that runs true stands in"
+    },
+    {
+     "path": "pipeline/parent/job/test",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "job condition on the pushes its gets watch",
+     "detail": "job test triggers on repo; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && (branch == default_branch); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
     },
     {
      "path": "pipeline/parent/job/test/step/checkout",
@@ -1515,6 +1528,13 @@
      "level": "emulated",
      "strategy": "directories made by script lines",
      "detail": "task file repo/tasks/go-test.yml: the first script lines link repo to the checkout (artifact repo). A link to the checkout is an untracked entry in the working tree, which tools that walk the tree also see"
+    },
+    {
+     "path": "pipeline/parent/trigger/1",
+     "feature": "trigger.filter.branches",
+     "level": "emulated",
+     "strategy": "CEL interceptor filter on the ref",
+     "detail": "the EventListener serves GitHub webhooks only"
     }
    ]
   },
@@ -1523,8 +1543,24 @@
    "roundtrip": "no differences",
    "files": [
     {
+     "path": ".argo/events/eventsource.yaml",
+     "text": "apiVersion: argoproj.io/v1alpha1\nkind: EventSource\nmetadata:\n  name: pipemaster-github\nspec:\n  github:\n    push:\n      active: true\n      contentType: json\n      events:\n        - push\n      repositories:\n        - names:\n            - REPO\n          owner: OWNER\n      webhook:\n        endpoint: /push\n        method: POST\n        port: \"12000\"\n        url: \"\"\n      webhookSecret:\n        key: token\n        name: pipemaster-github-webhook\n  service:\n    ports:\n      - port: 12000\n        targetPort: 12000\n"
+    },
+    {
+     "path": ".argo/events/sensor.yaml",
+     "text": "apiVersion: argoproj.io/v1alpha1\nkind: Sensor\nmetadata:\n  name: pipemaster\nspec:\n  dependencies:\n    - eventName: push\n      eventSourceName: pipemaster-github\n      name: parent-push\n    - eventName: push\n      eventSourceName: pipemaster-github\n      filters:\n        data:\n          - path: body.ref\n            type: string\n            value:\n              - ^refs/heads/feat/[^/]*$\n              - ^refs/heads/feature/[^/]*$\n      name: parent-push-2\n  template:\n    serviceAccountName: pipemaster-sensor\n  triggers:\n    - template:\n        conditions: parent-push\n        k8s:\n          operation: create\n          parameters:\n            - dest: spec.arguments.parameters.0.value\n              src:\n                dataTemplate: '{{ trimPrefix \"refs/heads/\" .Input.body.ref }}'\n                dependencyName: parent-push\n            - dest: spec.arguments.parameters.1.value\n              src:\n                dependencyName: parent-push\n                value: push\n            - dest: spec.arguments.parameters.2.value\n              src:\n                dataKey: body.after\n                dependencyName: parent-push\n            - dest: spec.arguments.parameters.3.value\n              src:\n                dataKey: body.repository.full_name\n                dependencyName: parent-push\n          source:\n            resource:\n              apiVersion: argoproj.io/v1alpha1\n              kind: Workflow\n              metadata:\n                generateName: parent-\n              spec:\n                arguments:\n                  parameters:\n                    - name: ctx-branch\n                      value: \"\"\n                    - name: ctx-event\n                      value: \"\"\n                    - name: ctx-sha\n                      value: \"\"\n                    - name: ctx-repo\n                      value: \"\"\n                serviceAccountName: pipemaster-workflow\n                workflowTemplateRef:\n                  name: parent\n        name: parent-push\n    - template:\n        conditions: parent-push-2\n        k8s:\n          operation: create\n          parameters:\n            - dest: spec.arguments.parameters.0.value\n              src:\n                dataTemplate: '{{ trimPrefix \"refs/heads/\" .Input.body.ref }}'\n                dependencyName: parent-push-2\n            - dest: spec.arguments.parameters.1.value\n              src:\n                dependencyName: parent-push-2\n                value: push\n            - dest: spec.arguments.parameters.2.value\n              src:\n                dataKey: body.after\n                dependencyName: parent-push-2\n            - dest: spec.arguments.parameters.3.value\n              src:\n                dataKey: body.repository.full_name\n                dependencyName: parent-push-2\n          source:\n            resource:\n              apiVersion: argoproj.io/v1alpha1\n              kind: Workflow\n              metadata:\n                generateName: parent-\n              spec:\n                arguments:\n                  parameters:\n                    - name: ctx-branch\n                      value: \"\"\n                    - name: ctx-event\n                      value: \"\"\n                    - name: ctx-sha\n                      value: \"\"\n                    - name: ctx-repo\n                      value: \"\"\n                serviceAccountName: pipemaster-workflow\n                workflowTemplateRef:\n                  name: parent\n        name: parent-push-2\n"
+    },
+    {
+     "path": ".argo/rbac/sensor.yaml",
+     "text": "# pipemaster:rbac\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: pipemaster-sensor\n---\n# pipemaster:rbac\napiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  name: pipemaster-sensor\nrules:\n  - apiGroups:\n      - argoproj.io\n    resources:\n      - workflows\n    verbs:\n      - create\n---\n# pipemaster:rbac\napiVersion: rbac.authorization.k8s.io/v1\nkind: RoleBinding\nmetadata:\n  name: pipemaster-sensor\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: Role\n  name: pipemaster-sensor\nsubjects:\n  - kind: ServiceAccount\n    name: pipemaster-sensor\n"
+    },
+    {
+     "path": ".argo/rbac/workflow.yaml",
+     "text": "# pipemaster:rbac\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: pipemaster-workflow\n---\n# pipemaster:rbac\napiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  name: pipemaster-workflow\nrules:\n  - apiGroups:\n      - argoproj.io\n    resources:\n      - workflowtaskresults\n    verbs:\n      - create\n      - patch\n---\n# pipemaster:rbac\napiVersion: rbac.authorization.k8s.io/v1\nkind: RoleBinding\nmetadata:\n  name: pipemaster-workflow\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: Role\n  name: pipemaster-workflow\nsubjects:\n  - kind: ServiceAccount\n    name: pipemaster-workflow\n"
+    },
+    {
      "path": ".argo/workflows/parent.yaml",
-     "text": "# pipemaster:emulated step.action pipeline/parent/job/build/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.ctx-sha}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"branches\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"across\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\",\"seq\":1}\n# pipemaster:emulated job.manual pipeline/parent/job/set-feature-pipelines\n# pipemaster:arg {\"manual\":true}\n# pipemaster:emulated step.action pipeline/parent/job/test/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.ctx-sha}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated job.manual pipeline/parent/job/test\n# pipemaster:arg {\"manual\":true}\napiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata:\n  name: parent\nspec:\n  entrypoint: main\n  arguments:\n    parameters:\n      - name: ctx-sha\n        value: \"\"\n      - name: ctx-repo\n        value: \"\"\n  templates:\n    - name: main\n      dag:\n        tasks:\n          - name: build\n            template: build\n            dependencies:\n              - test\n          - name: set-feature-pipelines-gate\n            template: set-feature-pipelines-gate\n          - name: set-feature-pipelines\n            template: set-feature-pipelines\n            dependencies:\n              - set-feature-pipelines-gate\n          - name: test-gate\n            template: test-gate\n          - name: test\n            template: test\n            dependencies:\n              - test-gate\n    - name: build\n      containerSet:\n        containers:\n          - name: build\n            image: golang:latest\n            command:\n              - sh\n              - -ec\n            args:\n              - |-\n                (\n                set -e\n                set -x\n                [ -e repo ] || ln -s \"$PWD\" repo\n                mkdir -p binary\n                root=$(pwd)\n                cd \"repo/${MODULE}\"\n                go build -o \"${root}/binary/${BINARY_NAME}\"\n\n                timestamp=$(date '+%Y%m%d%H%M%S')\n                tar czf \"$root/binary/$BINARY_NAME-$timestamp.tgz\" \"${root}/binary/${BINARY_NAME}\"\n                )\n            workingDir: /workspace\n            env:\n              - name: MODULE\n                value: apps/golang\n              - name: BINARY_NAME\n                value: ascii-banner\n          - # pipemaster:id run-binary\n            name: main\n            image: golang:latest\n            command:\n              - sh\n              - -ec\n            args:\n              - |-\n                (\n                set -e\n                set -x\n                ./binary/ascii-banner -list\n                ./binary/ascii-banner concourse\n                ./binary/ascii-banner plane\n                ./binary/ascii-banner pilot\n                )\n            workingDir: /workspace\n            dependencies:\n              - build\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.ctx-sha}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: set-feature-pipelines-gate\n      suspend: {}\n    - name: set-feature-pipelines\n      containerSet:\n        containers:\n          - name: branches\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n          - name: across\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n            dependencies:\n              - branches\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: test-gate\n      suspend: {}\n    - name: test\n      containerSet:\n        containers:\n          - # pipemaster:id tests\n            name: main\n            image: golang:latest\n            command:\n              - sh\n              - -ec\n            args:\n              - |-\n                (\n                set -e\n                [ -e repo ] || ln -s \"$PWD\" repo\n                cd \"repo/${MODULE}\"\n                go test -v ./...\n                )\n            workingDir: /workspace\n            env:\n              - name: MODULE\n                value: apps/golang\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.ctx-sha}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n"
+     "text": "# pipemaster:emulated job.if pipeline/parent/job/build\n# pipemaster:arg {\"job\":\"if: (event == 'push') \\u0026\\u0026 (branch == default_branch)\\nid: \\\"\\\"\\n\"}\n# pipemaster:emulated step.action pipeline/parent/job/build/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.ctx-sha}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated job.if pipeline/parent/job/set-feature-pipelines\n# pipemaster:arg {\"job\":\"if: (event == 'push') \\u0026\\u0026 ((branch =~ '(?i)^feat/') || (branch =~ '(?i)^feature/'))\\nid: \\\"\\\"\\n\"}\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"branches\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"across\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\",\"seq\":1}\n# pipemaster:emulated job.if pipeline/parent/job/test\n# pipemaster:arg {\"job\":\"if: (event == 'push') \\u0026\\u0026 (branch == default_branch)\\nid: \\\"\\\"\\n\"}\n# pipemaster:emulated step.action pipeline/parent/job/test/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.ctx-sha}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated trigger.filter.branches pipeline/parent/trigger/0\n# pipemaster:emulated trigger.push pipeline/parent/trigger/0\n# pipemaster:emulated trigger.filter.branches pipeline/parent/trigger/1\n# pipemaster:emulated trigger.push pipeline/parent/trigger/1\napiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata:\n  name: parent\nspec:\n  entrypoint: main\n  arguments:\n    parameters:\n      - name: ctx-branch\n        value: \"\"\n      - name: ctx-event\n        value: \"\"\n      - name: ctx-sha\n        value: \"\"\n      - name: ctx-repo\n        value: \"\"\n  templates:\n    - name: main\n      dag:\n        tasks:\n          - name: build\n            template: build\n            dependencies:\n              - test\n            when: '{{= false }}'\n          - name: set-feature-pipelines\n            template: set-feature-pipelines\n            when: '{{= false }}'\n          - name: test\n            template: test\n            when: '{{= false }}'\n    - name: build\n      containerSet:\n        containers:\n          - name: build\n            image: golang:latest\n            command:\n              - sh\n              - -ec\n            args:\n              - |-\n                (\n                set -e\n                set -x\n                [ -e repo ] || ln -s \"$PWD\" repo\n                mkdir -p binary\n                root=$(pwd)\n                cd \"repo/${MODULE}\"\n                go build -o \"${root}/binary/${BINARY_NAME}\"\n\n                timestamp=$(date '+%Y%m%d%H%M%S')\n                tar czf \"$root/binary/$BINARY_NAME-$timestamp.tgz\" \"${root}/binary/${BINARY_NAME}\"\n                )\n            workingDir: /workspace\n            env:\n              - name: MODULE\n                value: apps/golang\n              - name: BINARY_NAME\n                value: ascii-banner\n          - # pipemaster:id run-binary\n            name: main\n            image: golang:latest\n            command:\n              - sh\n              - -ec\n            args:\n              - |-\n                (\n                set -e\n                set -x\n                ./binary/ascii-banner -list\n                ./binary/ascii-banner concourse\n                ./binary/ascii-banner plane\n                ./binary/ascii-banner pilot\n                )\n            workingDir: /workspace\n            dependencies:\n              - build\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.ctx-sha}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: set-feature-pipelines\n      containerSet:\n        containers:\n          - name: branches\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n          - name: across\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n            dependencies:\n              - branches\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: test\n      containerSet:\n        containers:\n          - # pipemaster:id tests\n            name: main\n            image: golang:latest\n            command:\n              - sh\n              - -ec\n            args:\n              - |-\n                (\n                set -e\n                [ -e repo ] || ln -s \"$PWD\" repo\n                cd \"repo/${MODULE}\"\n                go test -v ./...\n                )\n            workingDir: /workspace\n            env:\n              - name: MODULE\n                value: apps/golang\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.ctx-sha}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n"
     }
    ],
    "report": [
@@ -1556,20 +1592,6 @@
      "detail": "Ext of provider concourse (resources) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent",
-     "feature": "trigger.api",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "the trigger of resource branches is unreadable (source.branch_filters may filter versions and has no IR form); it becomes an api trigger that never fires, and the resource is kept in Ext"
-    },
-    {
-     "path": "pipeline/parent",
-     "feature": "trigger.api",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "the trigger of resource repo is unreadable (source.branch is not set and Concourse follows the default branch); it becomes an api trigger that never fires, and the resource is kept in Ext"
-    },
-    {
      "path": "pipeline/parent/job/build",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -1580,7 +1602,13 @@
      "path": "pipeline/parent/job/build",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, public) is not written to the Argo file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (gets, public, trigger_if) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/parent/job/build",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "a reference of the condition has no Argo spelling; the task is disabled with when {{= false }}"
     },
     {
      "path": "pipeline/parent/job/build/step/build",
@@ -1646,7 +1674,13 @@
      "path": "pipeline/parent/job/set-feature-pipelines",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, gets_in_parallel, public, triggers) is not written to the Argo file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (gets, gets_in_parallel, public, trigger_if, triggers) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/parent/job/set-feature-pipelines",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "the condition has no when form; the task is disabled with when {{= false }}"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -1654,13 +1688,6 @@
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
      "detail": "step across: across is a matrix over a step; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/set-feature-pipelines",
-     "feature": "trigger.resource",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "job set-feature-pipelines triggers on branches only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines/step/across",
@@ -1697,14 +1724,13 @@
      "path": "pipeline/parent/job/test",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (gets, public, triggers) is not written to the Argo file; it is kept in round-trip metadata"
+     "detail": "Ext of provider concourse (gets, public, trigger_if, triggers) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/job/test",
-     "feature": "trigger.resource",
+     "feature": "job.if",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "job test triggers on repo only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
+     "detail": "a reference of the condition has no Argo spelling; the task is disabled with when {{= false }}"
     },
     {
      "path": "pipeline/parent/job/test/step/checkout",
@@ -1729,25 +1755,13 @@
      "path": "pipeline/parent/trigger/0",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Argo file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/parent/trigger/0",
-     "feature": "trigger.api",
-     "level": "lost",
-     "detail": "an api trigger that no Argo file held has no Argo form; no Sensor trigger is written"
+     "detail": "Ext of provider concourse (resources) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/trigger/1",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Argo file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/parent/trigger/1",
-     "feature": "trigger.api",
-     "level": "lost",
-     "detail": "an api trigger that no Argo file held has no Argo form; no Sensor trigger is written"
+     "detail": "Ext of provider concourse (resources) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/job/build/step/checkout",
@@ -1762,6 +1776,41 @@
      "level": "external",
      "strategy": "input git artifact at /workspace",
      "detail": "the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; a private repository needs usernameSecret and passwordSecret, or sshPrivateKeySecret, on the git artifact; the file names none"
+    },
+    {
+     "path": "pipeline/parent/trigger/0",
+     "feature": "trigger.push",
+     "level": "external",
+     "strategy": "EventSource webhook secret",
+     "detail": "Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource"
+    },
+    {
+     "path": "pipeline/parent/trigger/1",
+     "feature": "trigger.push",
+     "level": "external",
+     "strategy": "EventSource webhook secret",
+     "detail": "Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource"
+    },
+    {
+     "path": "pipeline/parent",
+     "feature": "trigger.push",
+     "level": "emulated",
+     "strategy": "trigger of the converted repository",
+     "detail": "the git resource branches watches https://github.com/concourse/examples (branch_filters feat/*, feature/*; Concourse emits a version when the set of matching branches changes, the push trigger fires on every push to one of them); the trigger fires on pushes to the repository that holds the converted pipeline"
+    },
+    {
+     "path": "pipeline/parent",
+     "feature": "trigger.push",
+     "level": "emulated",
+     "strategy": "trigger of the converted repository",
+     "detail": "the git resource repo watches https://github.com/concourse/examples (the default branch); the trigger fires on pushes to the repository that holds the converted pipeline"
+    },
+    {
+     "path": "pipeline/parent/job/build",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "job condition of the passed jobs",
+     "detail": "job build follows jobs that run only when (event == 'push') && (branch == default_branch); it takes their condition, so that it never waits for a job that does not run"
     },
     {
      "path": "pipeline/parent/job/build/step/build",
@@ -1778,6 +1827,20 @@
      "detail": "the get of the repository resource is the checkout step; the other gets of the step give the image of the tasks"
     },
     {
+     "path": "pipeline/parent/job/set-feature-pipelines",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "job condition on the pushes its gets watch",
+     "detail": "job set-feature-pipelines triggers on branches; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && ((branch =~ '(?i)^feat/') || (branch =~ '(?i)^feature/')); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
+    },
+    {
+     "path": "pipeline/parent/job/test",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "job condition on the pushes its gets watch",
+     "detail": "job test triggers on repo; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && (branch == default_branch); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
+    },
+    {
      "path": "pipeline/parent/job/test/step/checkout",
      "feature": "step.action",
      "level": "emulated",
@@ -1790,6 +1853,16 @@
      "level": "emulated",
      "strategy": "directories made by script lines",
      "detail": "task file repo/tasks/go-test.yml: the first script lines link repo to the checkout (artifact repo). A link to the checkout is an untracked entry in the working tree, which tools that walk the tree also see"
+    },
+    {
+     "path": "pipeline/parent/trigger/0",
+     "feature": "trigger.filter.branches",
+     "level": "emulated"
+    },
+    {
+     "path": "pipeline/parent/trigger/1",
+     "feature": "trigger.filter.branches",
+     "level": "emulated"
     }
    ]
   }

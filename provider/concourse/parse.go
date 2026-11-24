@@ -213,10 +213,12 @@ func (b *pipeBuilder) build(top *omap) (*ir.Pipeline, error) {
 		built = append(built, bj)
 		pl.Jobs = append(pl.Jobs, bj.job)
 	}
-	b.triggers(pl, built)
+	undoTriggers := b.triggers(pl, built)
 	b.concurrency(pl, built)
 	b.applyJobNames(pl)
-	b.carryPipeline(top, rawList, pl)
+	if b.carryPipeline(top, rawList, pl) {
+		undoTriggers()
+	}
 	b.finallyHooks(pl, built)
 	b.orphanNames()
 	b.secretNote()
