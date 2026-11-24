@@ -159,7 +159,7 @@ func TestImageGetKeepsTagAndDigestExactly(t *testing.T) {
 	for _, tc := range []struct{ name, res, get, want string }{
 		{"tag", "repository: golang, tag: 1.22-alpine", "", "golang:1.22-alpine"},
 		{"digest", "repository: golang", "version: {digest: 'sha256:abc'}", "golang@sha256:abc"},
-		{"tag and digest", "repository: reg.example.com/go, tag: '1.22'", "version: {digest: 'sha256:abc'}", "reg.example.com/go:1.22@sha256:abc"},
+		{"digest wins over tag", "repository: reg.example.com/go, tag: '1.22'", "version: {digest: 'sha256:abc'}", "reg.example.com/go@sha256:abc"},
 		{"no tag", "repository: golang", "", "golang"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -240,7 +240,7 @@ func TestTaskFileDirectoriesAreLaidOutByScriptLines(t *testing.T) {
 	if sh := step(t, j, "build").Shell; sh != "" {
 		t.Errorf("shell = %q, want none for sh -cex", sh)
 	}
-	if !hasEntry(rep, "link the checkout or make the directory") {
+	if !hasEntry(rep, "link repo to the checkout (artifact repo)") || !hasEntry(rep, "make the directory binary (output binary, artifact binary)") {
 		t.Error("no emulated entry for the layout lines")
 	}
 }
@@ -299,5 +299,55 @@ func TestTaskFileThatIsALinkIsNeverRead(t *testing.T) {
 	}
 	if !hasEntry(rep, "repo/tasks/go-test.yml") {
 		t.Error("no report entry names the path")
+	}
+}
+
+func taskFixtureStep(t *testing.T, name, jobID, stepID string) (*ir.Step, string, string) {
+	t.Helper()
+	p, rep, err := concourse.New().Parse(os.DirFS("../../testdata/concourse/taskfiles/" + name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := step(t, job(t, p.Pipelines[0], jobID), stepID)
+	var details []string
+	for _, e := range rep.Entries {
+		details = append(details, string(e.Level)+": "+e.Detail)
+	}
+	return st, strings.Join(st.Script, "\n"), strings.Join(details, "\n")
+}
+
+func TestTaskFileKeepsErrexitAndMappedDirectories(t *testing.T) {
+	st, script, rep := taskFixtureStep(t, "abort", "j", "t")
+	for _, want := range []string{"set -e", "mkdir -p result", "echo hi; false; echo after"} {
+		if !strings.Contains(script, want) {
+			t.Errorf("script lacks %q:\n%s", want, script)
+		}
+	}
+	if st.Shell != "" || st.WorkDir != "" {
+		t.Errorf("shell %q workdir %q, want none", st.Shell, st.WorkDir)
+	}
+	if !strings.Contains(rep, "make the directory result (output out, artifact renamed)") {
+		t.Errorf("report does not state the directory:\n%s", rep)
+	}
+}
+
+func TestTaskFileLayoutHonoursMappingPathAndOptional(t *testing.T) {
+	_, script, rep := taskFixtureStep(t, "defaults", "build", "second")
+	link, cd := strings.Index(script, `ln -s "$PWD" source`), strings.Index(script, "cd 'source/sub'")
+	if link < 0 || cd < link {
+		t.Errorf("link at %d, cd at %d:\n%s", link, cd, script)
+	}
+	for _, want := range []string{`ln -s "$PWD/result" gen`} {
+		if !strings.Contains(script, want) {
+			t.Errorf("script lacks %q:\n%s", want, script)
+		}
+	}
+	if strings.Contains(script, "extra") {
+		t.Errorf("the optional input without a source must make no line:\n%s", script)
+	}
+	for _, want := range []string{"skip the optional input extra", "run keys user=nobody"} {
+		if !strings.Contains(rep, want) {
+			t.Errorf("report lacks %q:\n%s", want, rep)
+		}
 	}
 }

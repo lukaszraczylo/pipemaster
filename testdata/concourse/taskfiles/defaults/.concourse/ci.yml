@@ -1,0 +1,16 @@
+resources:
+- name: repo
+  type: git
+  source: {uri: https://example.com/r.git, branch: main}
+
+jobs:
+- name: build
+  plan:
+  - get: repo
+    trigger: true
+  - task: first
+    file: repo/tasks/first.yml
+    params: {B: step}
+  - task: second
+    file: repo/tasks/second.yml
+    input_mapping: {source: repo}

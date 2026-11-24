@@ -177,7 +177,7 @@ func (jb *jobBuilder) taskStep(m *omap) *ir.Step {
 		r.Take("file")
 		k.Out["file"] = file
 		var resolved bool
-		cfgParams, resolved = jb.fileTask(st, k, file, written, m.Lines["file"])
+		cfgParams, resolved = jb.fileTask(st, k, m, file, written, m.Lines["file"])
 		jb.fresh[st] = resolved
 	} else {
 		r.Take("config")

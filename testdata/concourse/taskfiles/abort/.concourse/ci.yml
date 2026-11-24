@@ -1,0 +1,12 @@
+resources:
+- name: repo
+  type: git
+  source: {uri: https://example.com/r.git, branch: main}
+
+jobs:
+- name: j
+  plan:
+  - get: repo
+  - task: t
+    file: repo/tasks/t.yml
+    output_mapping: {out: renamed}

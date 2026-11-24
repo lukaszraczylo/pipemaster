@@ -142,7 +142,7 @@ Argo entries (72 to 75):
 - Entries 76 to 79 are rows 2, 4, 5 and 6 of section 8 of `docs/superpowers/research/argo.md`, copied byte for byte from the pinned commit into `.argo/` with the file name of the source path. Entry 76 holds two ClusterWorkflowTemplates and no workflow, entry 77 holds a template with no entrypoint, a Sensor and a webhook EventSource, and entry 79 holds a Workflow that only names a WorkflowTemplate. Those shapes parse into a pipeline with no job, with the documents kept in Ext.
 - Not stored, because the pinned file does not parse or does not round trip: `ci-workflow-s3.yml` of pipekit (a `parameters` key under `spec`, which the Argo schema rejects), `git-checkout-pr.yml` of pipekit (its tags read workflow parameters that no file declares), and `cron-workflow.yaml` of argo-workflows (the schedule is every minute, which the GHA linter rejects). The Helm-templated files of the research list are not stored. The entry numbers are not reused.
 
-Concourse entries (80 to 86):
+Concourse entries (80 to 87):
 
 - Rows 1, 2, 3, 5, 6, 7 and 8 of section 8 of `docs/superpowers/research/concourse.md`. The raw URL is `https://raw.githubusercontent.com/<repository>/<commit>/<path>`. Every file is byte-identical to the file at the pinned commit, and `fly validate-pipeline --strict` (fly 8.3.3) accepts each one except entries 80 and 82, which the next bullet explains.
 - The licence text was read at the pinned commit before use: Apache License 2.0 (`LICENSE`, and `LICENCE` for entry 82) for the Apache-2.0 entries, and the MIT text for entries 83 and 84. Each file holds only `((var))` references.

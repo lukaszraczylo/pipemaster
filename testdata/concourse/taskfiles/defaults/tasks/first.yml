@@ -1,0 +1,20 @@
+platform: linux
+image_resource:
+  type: registry-image
+  source: {repository: golang, tag: "1.22"}
+inputs:
+- name: repo
+outputs:
+- name: out
+  path: result
+params:
+  A: release
+  B: file
+  C:
+run:
+  path: sh
+  args:
+  - -ce
+  - |
+    echo "$A $B"
+    mkdir -p result

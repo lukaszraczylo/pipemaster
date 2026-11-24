@@ -7,9 +7,12 @@ import (
 	"strconv"
 	"strings"
 
+	"go.yaml.in/yaml/v3"
+
 	"github.com/lukaszraczylo/pipemaster/actions"
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
@@ -141,21 +144,22 @@ func fileDefaults(params *omap) *omap {
 
 // fileTask reads the task file of a step into the step. It returns the file params and whether the step is now a
 // script step. A file it cannot use leaves the step a task that holds the path, and the report names the path.
-func (jb *jobBuilder) fileTask(st *ir.Step, k *sink, file, written string, line int) (*omap, bool) {
+func (jb *jobBuilder) fileTask(st *ir.Step, k *sink, m *omap, file, written string, line int) (*omap, bool) {
 	rel, why := jb.taskPath(file)
 	if why == "" {
 		var cfg *omap
 		if cfg, why = jb.loadTaskFile(rel); cfg != nil {
 			ts := &ir.Step{}
-			scratch := newSink(&report.Report{}, rel, jb.path+"/step/"+st.ID)
+			scratchRep := &report.Report{}
+			scratch := newSink(scratchRep, rel, jb.path+"/step/"+st.ID)
 			jb.inFile = true
 			params := fileDefaults(jb.config(ts, scratch, cfg, 0, false))
 			jb.inFile = false
 			if len(ts.Script) > 0 {
 				jb.fileShell(ts, scratch)
-				ts.Script = append(jb.fileLayout(ts, file, cfg, scratch, line), ts.Script...)
+				ts.Script = jb.fileScript(ts, m, file, cfg, scratch, line)
 				st.Kind, st.Script, st.Shell, st.WorkDir, st.Image = ir.StepScript, ts.Script, ts.Shell, ts.WorkDir, ts.Image
-				jb.fileNotes(file, cfg, scratch, line)
+				jb.fileNotes(file, scratch, scratchRep, m, line)
 				return params, true
 			}
 			why = "the task file has no script that the IR can hold"
@@ -169,7 +173,7 @@ func (jb *jobBuilder) fileTask(st *ir.Step, k *sink, file, written string, line 
 		}
 		params := omapNew()
 		for _, kv := range a.Params {
-			params.Set(kv[0], kv[1], 0)
+			params.Set(kv[0], ynode.Scal{N: &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: kv[1]}}, 0)
 		}
 		return params, true
 	}
@@ -178,8 +182,8 @@ func (jb *jobBuilder) fileTask(st *ir.Step, k *sink, file, written string, line 
 	return nil, false
 }
 
-// fileShell drops the shell of a task that runs sh with only the flags -c, -e and -x: the target runs the script
-// lines in its own shell, and a script line fails the step as -e does.
+// fileShell drops the shell of a task that runs sh with only the flags -c, -e and -x: fileScript puts the -e and -x
+// options into the script, so the target needs no shell.
 func (jb *jobBuilder) fileShell(ts *ir.Step, scratch *sink) {
 	if ts.Shell != shellCommand {
 		return
@@ -193,44 +197,175 @@ func (jb *jobBuilder) fileShell(ts *ir.Step, scratch *sink) {
 	ts.Shell = ""
 }
 
-// fileLayout returns the script lines that lay out the inputs and outputs of a task file as directories of the
-// working directory, which is where Concourse puts them: the input that is the repository links to the checkout, and
-// each output is a directory. A task of another shell, or a name that is no plain directory name, gets no line.
-func (jb *jobBuilder) fileLayout(ts *ir.Step, file string, cfg *omap, scratch *sink, line int) []string {
+// shellOptions returns the set lines of the shell flags that the task ran with: -e stops at the first failing
+// command and -x traces. A task that runs a program directly, or a PowerShell task, has none.
+func shellOptions(ts *ir.Step, scratch *sink) []string {
+	if _, direct := scratch.Out[ExtCommand]; direct || isPowershell(ts.Shell) {
+		return nil
+	}
+	flags := defaultFlags
+	if l, ok := scratch.Out[ExtShellFlags].([]any); ok {
+		flags = ""
+		for _, f := range l {
+			t, _ := f.(string)
+			flags += t
+		}
+	}
+	var out []string
+	if strings.Contains(flags, "e") {
+		out = append(out, "set -e")
+	}
+	if strings.Contains(flags, "x") {
+		out = append(out, "set -x")
+	}
+	return out
+}
+
+// fileScript builds the script of a task file: the shell options, the lines that lay out the inputs and outputs, a
+// cd to run.dir, and then the script of the task. The cd sits in the script, after the layout, because a working
+// directory field of a target applies before the first script line and the directory can be an input.
+func (jb *jobBuilder) fileScript(ts *ir.Step, m *omap, file string, cfg *omap, scratch *sink, line int) []string {
+	opts := shellOptions(ts, scratch)
+	layout := jb.fileLayout(ts, m, file, cfg, scratch, line)
+	var enter []string
+	if ts.WorkDir != "" && len(layout) > 0 {
+		enter = append(enter, "cd "+shellQuote(ts.WorkDir))
+		ts.WorkDir = ""
+	}
+	if len(opts)+len(enter) == 0 {
+		return append(layout, ts.Script...)
+	}
+	// The subshell keeps set and cd from the steps that follow in a target that runs all lines in one shell.
+	body := append(append(append([]string{"("}, opts...), layout...), enter...)
+	return append(append(body, ts.Script...), ")")
+}
+
+func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
+
+// artifactDir matches a directory name or relative path that is safe in a script line.
+var artifactDir = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$`)
+
+// ioEntry is one input or output of a task file: its name, its directory and whether the input is optional.
+type ioEntry struct {
+	name, dir string
+	optional  bool
+}
+
+func ioEntries(v any) []ioEntry {
+	l, _ := v.([]any)
+	var out []ioEntry
+	for _, e := range l {
+		m, ok := asMap(e)
+		if !ok {
+			continue
+		}
+		name, ok := text(m.Vals["name"])
+		if !ok {
+			continue
+		}
+		en := ioEntry{name: name, dir: name}
+		if p, ok := text(m.Vals["path"]); ok && p != "" {
+			en.dir = p
+		}
+		en.optional, _ = boolOf(m.Vals["optional"])
+		out = append(out, en)
+	}
+	return out
+}
+
+// mapping reads input_mapping or output_mapping of the step: task name to artifact name.
+func mapping(m *omap, key string) map[string]string {
+	out := map[string]string{}
+	if mm, ok := asMap(m.Vals[key]); ok {
+		for _, n := range mm.Order {
+			if t, ok := text(mm.Vals[n]); ok {
+				out[n] = t
+			}
+		}
+	}
+	return out
+}
+
+func appendParent(lines []string, dir string) []string {
+	if i := strings.LastIndex(dir, "/"); i > 0 {
+		return append(lines, "mkdir -p "+dir[:i])
+	}
+	return lines
+}
+
+// fileLayout returns the script lines that lay out the inputs and outputs of a task file where the script reads
+// them, and reports exactly what the lines make. The repository input links to the checkout, an output is a
+// directory at its path, and an input that an earlier task made links to that directory when the paths differ.
+// input_mapping and output_mapping rename the artifacts, and an optional input with no source is skipped.
+func (jb *jobBuilder) fileLayout(ts *ir.Step, m *omap, file string, cfg *omap, scratch *sink, line int) []string {
 	if isPowershell(ts.Shell) {
 		return nil
 	}
-	var lines []string
-	var done []string
-	for _, name := range artifactNames(cfg.Vals["inputs"]) {
-		if g, ok := jb.gets[name]; ok && jb.b.isRepository(g.res) && artifactDir.MatchString(name) {
-			lines = append(lines, fmt.Sprintf("[ -e %[1]s ] || ln -s \"$PWD\" %[1]s", name))
-			done = append(done, "input "+name)
+	inMap, outMap := mapping(m, "input_mapping"), mapping(m, "output_mapping")
+	var lines, made, lost []string
+	for _, in := range ioEntries(cfg.Vals["inputs"]) {
+		art := in.name
+		if mapped, ok := inMap[in.name]; ok {
+			art = mapped
 		}
-	}
-	for _, name := range artifactNames(cfg.Vals["outputs"]) {
-		if artifactDir.MatchString(name) {
-			lines = append(lines, "mkdir -p "+name)
-			jb.outputs[name] = true
-			done = append(done, "output "+name)
+		if !artifactDir.MatchString(in.dir) {
+			lost = append(lost, "input "+in.name+" (the path is no plain directory name)")
+			continue
 		}
+		if g, ok := jb.gets[art]; ok && jb.b.isRepository(g.res) {
+			lines = appendParent(lines, in.dir)
+			lines = append(lines, fmt.Sprintf("[ -e %[1]s ] || ln -s \"$PWD\" %[1]s", in.dir))
+			made = append(made, fmt.Sprintf("link %s to the checkout (artifact %s)", in.dir, art))
+			continue
+		}
+		if src, ok := jb.outputs[art]; ok {
+			if src != in.dir {
+				lines = appendParent(lines, in.dir)
+				lines = append(lines, fmt.Sprintf("[ -e %[1]s ] || ln -s \"$PWD/%[2]s\" %[1]s", in.dir, src))
+				made = append(made, fmt.Sprintf("link %s to %s (artifact %s)", in.dir, src, art))
+			}
+			continue
+		}
+		if in.optional {
+			made = append(made, "skip the optional input "+in.name+" (artifact "+art+" has no source)")
+			continue
+		}
+		lost = append(lost, "input "+in.name+" (artifact "+art+" comes from a resource or a step that the target does not run)")
 	}
-	if len(done) > 0 {
+	for _, out := range ioEntries(cfg.Vals["outputs"]) {
+		art := out.name
+		if mapped, ok := outMap[out.name]; ok {
+			art = mapped
+		}
+		if !artifactDir.MatchString(out.dir) {
+			lost = append(lost, "output "+out.name+" (the path is no plain directory name)")
+			continue
+		}
+		lines = append(lines, "mkdir -p "+out.dir)
+		made = append(made, "make the directory "+out.dir+" (output "+out.name+", artifact "+art+")")
+		jb.outputs[art] = out.dir
+	}
+	if len(made) > 0 {
 		jb.k.Rep.Add(report.Entry{
 			IRPath: scratch.Path, Feature: caps.StepWorkdir, Level: caps.Emulated, Strategy: "directories made by script lines",
-			Detail:    "task file " + file + ": " + strings.Join(done, ", ") + " are directories of the working directory in Concourse; the first script lines link the checkout or make the directory",
+			Detail: "task file " + file + ": the first script lines " + strings.Join(made, "; ") +
+				". A link to the checkout is an untracked entry in the working tree, which tools that walk the tree also see",
+			SourceLoc: jb.k.Loc(line),
+		})
+	}
+	if len(lost) > 0 {
+		jb.k.Rep.Add(report.Entry{
+			IRPath: scratch.Path, Feature: caps.StepWorkdir, Level: caps.Lost, Strategy: "kept in the task file",
+			Detail:    "task file " + file + ": " + strings.Join(lost, "; ") + "; no script line makes them, and the script reads them as directories of the working directory",
 			SourceLoc: jb.k.Loc(line),
 		})
 	}
 	return lines
 }
 
-// artifactDir matches an artifact name that is safe as one directory name in a script line.
-var artifactDir = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]*$`)
-
-// fileNotes reports what a task file holds that the IR step does not: the keys with no IR field, and the inputs
-// that no script line lays out.
-func (jb *jobBuilder) fileNotes(file string, cfg *omap, scratch *sink, line int) {
+// fileNotes reports what a task file holds that the IR step does not: the keys with no IR field, run keys such as
+// user with their values, and the notes of the config reader.
+func (jb *jobBuilder) fileNotes(file string, scratch *sink, rep *report.Report, m *omap, line int) {
 	add := func(f caps.Feature, detail string) {
 		jb.k.Rep.Add(report.Entry{
 			IRPath: scratch.Path, Feature: f, Level: caps.Lost, Strategy: "kept in the task file",
@@ -240,33 +375,24 @@ func (jb *jobBuilder) fileNotes(file string, cfg *omap, scratch *sink, line int)
 	if rest, ok := scratch.Out[ExtConfig].(map[string]any); ok && len(rest) > 0 {
 		add(caps.ExtPassthrough, fmt.Sprintf("task file %s: keys %s have no IR field; they stay in the task file", file, strings.Join(sortedKeys(rest), ", ")))
 	}
+	if run, ok := scratch.Out[ExtRun].(map[string]any); ok && len(run) > 0 {
+		var kv []string
+		for _, key := range sortedKeys(run) {
+			kv = append(kv, fmt.Sprintf("%s=%v", key, run[key]))
+		}
+		add(caps.ExtPassthrough, "task file "+file+": run keys "+strings.Join(kv, ", ")+" have no IR field and no target runs the task with them; the task file keeps them")
+	}
 	if _, ok := scratch.Out[ExtImageResource]; ok {
-		add(caps.StepImage, "task file "+file+": image_resource is no plain registry-image reference; it stays in the task file")
-	}
-	var other []string
-	for _, name := range artifactNames(cfg.Vals["inputs"]) {
-		if g, ok := jb.gets[name]; !ok || !jb.b.isRepository(g.res) {
-			if !jb.outputs[name] {
-				other = append(other, name)
-			}
+		if name, isText := text(m.Vals[keyImage]); !isText || jb.gets[name].res == nil {
+			add(caps.StepImage, "task file "+file+": image_resource is no plain registry-image reference; it stays in the task file")
 		}
 	}
-	if len(other) > 0 {
-		add(caps.StepWorkdir, "task file "+file+": the inputs "+strings.Join(other, ", ")+" come from a resource or a step that the target does not run; the script reads them as directories of the working directory")
-	}
-}
-
-func artifactNames(v any) []string {
-	l, _ := v.([]any)
-	var out []string
-	for _, e := range l {
-		if m, ok := asMap(e); ok {
-			if n, ok := text(m.Vals["name"]); ok {
-				out = append(out, n)
-			}
+	for _, en := range rep.Entries {
+		if strings.HasPrefix(en.Detail, "task config keys") || strings.HasPrefix(en.Detail, "run keys") || strings.HasPrefix(en.Detail, "image_resource") || strings.HasPrefix(en.Detail, "run.path and run.args") || strings.HasPrefix(en.Detail, "shell flags") {
+			continue
 		}
+		add(en.Feature, "task file "+file+": "+en.Detail)
 	}
-	return out
 }
 
 // imageOfGet is the image reference of the registry-image get that the artifact name stands for: repository, tag
@@ -336,7 +462,7 @@ func refOfSource(src *omap, digest string, onCred func(string)) (string, bool) {
 			return "", false
 		}
 	}
-	if tag != "" {
+	if tag != "" && digest == "" {
 		ref += ":" + tag
 	}
 	if digest != "" {

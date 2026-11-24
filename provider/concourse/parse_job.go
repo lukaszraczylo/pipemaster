@@ -57,7 +57,7 @@ type jobBuilder struct {
 	axes  map[string]bool
 	used  map[string]bool
 	// outputs holds the task outputs that earlier file tasks of the job made as directories.
-	outputs map[string]bool
+	outputs map[string]string
 	// credNoted holds the image resources whose credentials the report named for this job.
 	credNoted map[string]bool
 	path      string
@@ -70,7 +70,7 @@ type jobBuilder struct {
 func (b *pipeBuilder) job(m *omap) *builtJob {
 	name, _ := text(m.Vals["name"])
 	j := &ir.Job{ID: name}
-	jb := &jobBuilder{b: b, job: j, ids: map[string]int{}, taken: map[string]bool{}, written: map[*ir.Step]string{}, fresh: map[*ir.Step]bool{}, outputs: map[string]bool{}, credNoted: map[string]bool{}, path: b.path() + "/job/" + name}
+	jb := &jobBuilder{b: b, job: j, ids: map[string]int{}, taken: map[string]bool{}, written: map[*ir.Step]string{}, fresh: map[*ir.Step]bool{}, outputs: map[string]string{}, credNoted: map[string]bool{}, path: b.path() + "/job/" + name}
 	jb.k = newSink(b.rep, b.file, jb.path)
 	b.present[jb.path] = true
 	r := newReader(m)
