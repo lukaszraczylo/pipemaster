@@ -61,7 +61,7 @@ func (tc *taskCtx) changesCond(path string, x expr.Expr) (condition, bool) {
 	if err := tc.e.markArg(caps.JobIf, path, arg); err != nil {
 		return condition{}, false
 	}
-	tc.e.emulate(path, caps.JobIf, "changed-paths task "+changesTask, "rules:changes is computed by the generated task "+changesTask+" and the task runs only when its result is true: a push compares with the commit before it, a merge request with the target branch, and a tag, a new branch, a schedule or any other event counts every path as changed; the task installs git and bash with apk and fetches the commits from github.com, so a private repository needs credentials; a commit before the push that cannot be fetched fails the task")
+	tc.e.emulate(path, caps.JobIf, "changed-paths task "+changesTask, "rules:changes is computed by the generated task "+changesTask+" and the task runs only when its result is true: a push compares with the commit before it, a merge request with the target branch, and a tag, a new branch, a schedule or any other event counts every path as changed; the task runs in the pinned image "+emitkit.ChangesImage+" and fetches the commits from github.com, or from the host in PIPEMASTER_CHECKOUT_HOST when the task sets it, so a private repository needs credentials and an air-gapped cluster needs a mirror of the image and the repository; a commit before the push that cannot be fetched fails the task")
 	return condition{when: append(head, rest...)}, true
 }
 
@@ -113,7 +113,6 @@ func (e *emitter) changesPipelineTask(pp *plan) *yaml.Node {
 	script := strings.Join([]string{
 		"#!/bin/sh",
 		"set -eu",
-		"if ! command -v bash >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1; then apk add --no-cache bash git >/dev/null; fi",
 		"cat > " + changesScriptPath + " <<'PIPEMASTER_CHANGES_EOF'",
 		strings.TrimRight(body, "\n"),
 		"PIPEMASTER_CHANGES_EOF",
@@ -121,7 +120,7 @@ func (e *emitter) changesPipelineTask(pp *plan) *yaml.Node {
 	}, "\n")
 	step := newMap()
 	step.SetStr("name", "changes")
-	step.SetStr("image", defaultImage)
+	step.SetStr("image", emitkit.ChangesImage)
 	step.Set("env", env)
 	step.Set("script", block(script))
 	spec.Set("params", params)

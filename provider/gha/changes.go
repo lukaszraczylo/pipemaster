@@ -150,8 +150,11 @@ func changesScript(atoms []changeAtom) string {
 	sb.WriteString(`set -eu
 files="$(mktemp)"
 all=false
+for rev in "${BEFORE:-}" "${AFTER:-}" "${BASE:-}" "${HEAD:-}"; do
+  case "$rev" in -*) echo "pipemaster-changes: refusing the commit value $rev, which starts with a dash" >&2; exit 1 ;; esac
+done
 diff_paths() {
-  git -c core.quotepath=off diff -z --name-only --no-renames "$@" > "$files" ||
+  git -c core.quotepath=off diff -z --name-only --no-renames --end-of-options "$@" > "$files" ||
     { echo "pipemaster-changes: cannot compute the changed paths for $*" >&2; exit 1; }
 }
 case "$EVENT" in
@@ -160,7 +163,7 @@ case "$EVENT" in
       all=true
     else
       if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-        git fetch --no-tags --quiet origin "$BEFORE" 2>/dev/null || true
+        git fetch --no-tags --quiet origin --end-of-options "$BEFORE" || echo "pipemaster-changes: git fetch failed for $BEFORE" >&2
       fi
       if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
         echo "pipemaster-changes: the commit before the push ($BEFORE) is not in the clone, as after a force push; GitLab documents no verdict for this" >&2

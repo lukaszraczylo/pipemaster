@@ -66,7 +66,7 @@ func (tc *jobCtx) changesCond(c taskCond) (taskCond, bool) {
 		return c, false
 	}
 	tc.pp.addChanges(plan)
-	tc.e.emulate(tc.jp.path, caps.JobIf, "changed-paths task "+changesTask, "rules:changes is computed by the generated task "+changesTask+" and the task runs only when its output is true: a push compares with the commit before it, a merge request with the target branch, and a tag, a new branch, a schedule or any other event counts every path as changed; the task installs git and bash with apk and fetches the commits from github.com, so a private repository needs credentials; a commit before the push that cannot be fetched fails the task")
+	tc.e.emulate(tc.jp.path, caps.JobIf, "changed-paths task "+changesTask, "rules:changes is computed by the generated task "+changesTask+" and the task runs only when its output is true: a push compares with the commit before it, a merge request with the target branch, and a tag, a new branch, a schedule or any other event counts every path as changed; the task runs in the pinned image "+emitkit.ChangesImage+" and fetches the commits from github.com, or from the host in PIPEMASTER_CHECKOUT_HOST when the task sets it, so a private repository needs credentials and an air-gapped cluster needs a mirror of the image and the repository; a commit before the push that cannot be fetched fails the task")
 	c.when = when
 	c.deps = append(c.deps, changesTask)
 	return c, true
@@ -101,7 +101,6 @@ func (e *emitter) changesTemplate(pp *plan) (task, tmpl *yaml.Node) {
 	body := emitkit.ChangesScript(pp.changes, true, func(out string) string { return `"` + changesDir + "/" + out + `"` })
 	script := strings.Join([]string{
 		"set -eu",
-		"if ! command -v bash >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1; then apk add --no-cache bash git >/dev/null; fi",
 		"mkdir -p " + changesDir,
 		"cat > " + changesScriptPath + " <<'PIPEMASTER_CHANGES_EOF'",
 		strings.TrimRight(body, "\n"),
@@ -109,7 +108,7 @@ func (e *emitter) changesTemplate(pp *plan) (task, tmpl *yaml.Node) {
 		"exec bash " + changesScriptPath,
 	}, "\n")
 	cont := newMap()
-	cont.SetStr("image", defaultImage)
+	cont.SetStr("image", emitkit.ChangesImage)
 	cont.Set("command", strSeq([]string{"sh", "-c"}))
 	cont.Set("args", strSeq([]string{script}))
 	cont.Set("env", env)

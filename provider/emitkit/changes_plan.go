@@ -87,6 +87,10 @@ func DecomposeChanges(x expr.Expr) (ChangesPlan, bool) {
 	return p, true
 }
 
+// ChangesImage runs the changes script on Tekton and Argo: it holds bash and git, so nothing installs at run time.
+// Tag trixie-scm (git 2.47, bash 5.2); the multi-arch index digest was read with docker pull on 2026-11-24.
+const ChangesImage = "buildpack-deps:trixie-scm@sha256:d524aa66d91264606eddea5b94af462fc3b969b84a1d4083e537a9ab84b579c5"
+
 // ChangesAtomsOf lists the distinct atoms of several plans in first-seen order.
 func ChangesAtomsOf(plans []ChangesPlan) []ChangeAtom {
 	var out []ChangeAtom
@@ -111,16 +115,19 @@ func ChangesScript(plans []ChangesPlan, fetch bool, dest func(out string) string
 	sb.WriteString(`set -eu
 files="$(mktemp)"
 all=false
+for rev in "${BEFORE:-}" "${AFTER:-}" "${BASE:-}" "${HEAD:-}"; do
+  case "$rev" in -*) echo "pipemaster-changes: refusing the commit value $rev, which starts with a dash" >&2; exit 1 ;; esac
+done
 diff_paths() {
-  git -c core.quotepath=off diff -z --name-only --no-renames "$@" > "$files" ||
+  git -c core.quotepath=off diff -z --name-only --no-renames --end-of-options "$@" > "$files" ||
     { echo "pipemaster-changes: cannot compute the changed paths for $*" >&2; exit 1; }
 }
 `)
 	if fetch {
 		sb.WriteString(`fetch_commits() {
   git init -q .
-  git remote add origin "https://github.com/$REPO.git"
-  git fetch --no-tags --quiet origin "$@" 2>/dev/null || true
+  git remote add origin "${PIPEMASTER_CHECKOUT_HOST:-https://github.com}/$REPO.git"
+  git fetch --no-tags --quiet origin --end-of-options "$@" || echo "pipemaster-changes: git fetch failed for $*" >&2
 }
 `)
 	}
@@ -134,7 +141,7 @@ diff_paths() {
 		sb.WriteString("      fetch_commits \"$AFTER\" \"$BEFORE\"\n")
 	}
 	sb.WriteString(`      if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-        git fetch --no-tags --quiet origin "$BEFORE" 2>/dev/null || true
+        git fetch --no-tags --quiet origin --end-of-options "$BEFORE" || echo "pipemaster-changes: git fetch failed for $BEFORE" >&2
       fi
       if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
         echo "pipemaster-changes: the commit before the push ($BEFORE) is not in the clone, as after a force push; GitLab documents no verdict for this" >&2

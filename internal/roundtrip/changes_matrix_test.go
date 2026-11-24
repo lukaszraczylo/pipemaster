@@ -492,6 +492,19 @@ func TestChangesForcePushFailsLoudly(t *testing.T) {
 	}
 }
 
+func TestChangesRefusesOptionLikeCommitsOnGHA(t *testing.T) {
+	_, doc := ghaFor(t, "'**/*.go'")
+	dir, before, _ := history(t, map[string]string{"a/x.go": "package a"})
+	pwn := filepath.Join(t.TempDir(), "pwn")
+	_, out, err := execChanges(t, doc, pushMain, dir, before, "--output="+pwn)
+	if err == nil || !strings.Contains(out, "starts with a dash") {
+		t.Fatalf("want a failure naming the dash, got err=%v out=%q", err, out)
+	}
+	if m, _ := filepath.Glob(pwn + "*"); len(m) > 0 {
+		t.Fatalf("git wrote %v", m)
+	}
+}
+
 type wpWhen []struct {
 	Event    any    `yaml:"event"`
 	Branch   any    `yaml:"branch"`

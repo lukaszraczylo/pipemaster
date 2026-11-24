@@ -83,6 +83,16 @@ var (
 // run executes the generated script for one event in a copy of the repository and returns each result.
 func (g generatedChanges) run(t *testing.T, target string, s scenario, files map[string]string) map[string]string {
 	t.Helper()
+	res, out, err := g.execute(t, target, s, files, nil)
+	if err != nil {
+		t.Fatalf("generated script failed: %v\n%s", err, out)
+	}
+	return res
+}
+
+// execute runs the script with the given context parameters replaced; it returns the results, the output and the error.
+func (g generatedChanges) execute(t *testing.T, target string, s scenario, files map[string]string, override map[string]string) (map[string]string, []byte, error) {
+	t.Helper()
 	dir, before, after := history(t, files)
 	resDir := t.TempDir()
 	script := g.script
@@ -110,6 +120,9 @@ func (g generatedChanges) run(t *testing.T, target string, s scenario, files map
 	case s.created:
 		params["ctx-before-sha"] = zeroSHA
 	}
+	for k, v := range override {
+		params[k] = v
+	}
 	cmd := exec.Command("sh", "-c", script) //nolint:gosec // generated script under test, temp repository
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null", "GIT_TERMINAL_PROMPT=0",
@@ -123,7 +136,7 @@ func (g generatedChanges) run(t *testing.T, target string, s scenario, files map
 		cmd.Env = append(cmd.Env, k+"="+v)
 	}
 	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("generated script failed: %v\n%s", err, out)
+		return nil, out, err
 	}
 	res := map[string]string{}
 	for _, n := range names {
@@ -133,7 +146,7 @@ func (g generatedChanges) run(t *testing.T, target string, s scenario, files map
 		}
 		res[n] = string(b)
 	}
-	return res
+	return res, nil, nil
 }
 
 var tektonParam = regexp.MustCompile(`^\$\(params\.([a-z-]+)\)$`)
@@ -185,6 +198,35 @@ func TestChangesTaskRunsOnTektonAndArgoExactlyWhereGitLabRuns(t *testing.T) {
 				}
 				if ran == 0 {
 					t.Error("the job never runs, so the comparison proves nothing")
+				}
+			})
+		}
+	}
+}
+
+// TestChangesScriptRefusesOptionLikeCommitValues: a commit value from the webhook that starts with a dash must fail the
+// task and write nothing, so it can neither pass an option to git nor make a negated changes condition true.
+func TestChangesScriptRefusesOptionLikeCommitValues(t *testing.T) {
+	src := "j:\n  script: [echo hi]\n  rules:\n" + armsYAML([]arm{{Changes: goGlobs}})
+	for _, target := range []string{provider.Tekton, provider.Argo} {
+		out, _ := convert(t, provider.GitLab, target, gitlabCI, src)
+		g := extractChanges(t, target, out)
+		for _, c := range []struct {
+			name string
+			key  string
+			pr   bool
+		}{{"after", "ctx-sha", false}, {"before", "ctx-before-sha", false}, {"base", "ctx-pr-base-sha", true}, {"head", "ctx-sha", true}} {
+			t.Run(target+"/"+c.name, func(t *testing.T) {
+				pwn := filepath.Join(t.TempDir(), "pwn")
+				res, text, err := g.execute(t, target, scenario{name: c.name, pr: c.pr}, map[string]string{"src/a.go": "package a"}, map[string]string{c.key: "--output=" + pwn})
+				if err == nil {
+					t.Fatalf("the script accepted an option as a commit value; results %v", res)
+				}
+				if !strings.Contains(string(text), "starts with a dash") {
+					t.Errorf("the failure does not name the dash:\n%s", text)
+				}
+				if matches, _ := filepath.Glob(pwn + "*"); len(matches) > 0 {
+					t.Errorf("git wrote %v", matches)
 				}
 			})
 		}
