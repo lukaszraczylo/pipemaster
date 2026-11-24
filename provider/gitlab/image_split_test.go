@@ -68,7 +68,7 @@ func TestImageSplitChainsJobsAndJoinsThemBack(t *testing.T) {
 	if lost := lostImage(rep); len(lost) > 0 {
 		t.Errorf("images lost: %v", lost)
 	}
-	for _, want := range []string{"build-1:", "build-2:", "build-3:", "image: go:1", "image: node:20", "- build-3", "$CI_PROJECT_DIR"} {
+	for _, want := range []string{"build-1:", "build-2:", "build-3:", "image: go:1", "image: node:20", "- build-3", "- .\n", "- .git/**/*"} {
 		if !strings.Contains(doc, want) {
 			t.Errorf("output lacks %q:\n%s", want, doc)
 		}
@@ -76,8 +76,8 @@ func TestImageSplitChainsJobsAndJoinsThemBack(t *testing.T) {
 	if strings.Count(doc, "MODE: fast") != 3 || strings.Count(doc, "postgres:16") != 3 {
 		t.Errorf("env and services must repeat in every split job:\n%s", doc)
 	}
-	if strings.Count(doc, "allow_failure: true") != 1 {
-		t.Errorf("allow_failure must stay on the last split job only:\n%s", doc)
+	if strings.Count(doc, "allow_failure: true") != 3 || strings.Contains(doc, "when: on_failure") || strings.Contains(doc, "when: always") {
+		t.Errorf("allow_failure must be on every split job, with the default when so a failed job stops its needs chain:\n%s", doc)
 	}
 	if got := splitJobIDs(pl); !slices.Equal(got, []string{"build", "deploy"}) {
 		t.Fatalf("jobs after the return = %v", got)
@@ -111,7 +111,7 @@ func TestImageSplitReportsEmulationOnEveryStep(t *testing.T) {
 	if len(details) != 2 {
 		t.Fatalf("want 2 emulated entries, got %v", details)
 	}
-	for _, w := range []string{"artifact size limit", "outside the project directory", "services and variables"} {
+	for _, w := range []string{"artifact size limit", "outside the project directory", "services and variables", "deletes comes back", "timeout times the job count", "retry reruns only the failed job", "still starts"} {
 		if !strings.Contains(details[0], w) {
 			t.Errorf("caveat lacks %q: %s", w, details[0])
 		}

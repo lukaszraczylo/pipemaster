@@ -15,12 +15,14 @@ import (
 
 const (
 	splitExpire   = "1 day"
-	workspacePath = "$CI_PROJECT_DIR"
+	workspacePath = "."
 	gitExclude    = ".git/**/*"
 	splitStrategy = "one job per run of steps that share an image, chained by needs; the workspace passes on as artifacts"
 	liftStrategy  = "the shared image of the steps is the job image"
 	splitCaveat   = "GitLab sets the image per job, so the job is split into %d jobs (%s) chained by needs; each job hands the project directory minus .git to the next as artifacts that expire in " + splitExpire +
-		", so the artifact size limit of the instance applies, files outside the project directory do not carry over, and every job repeats the services and variables of the source job"
+		", so the artifact size limit of the instance applies, files outside the project directory do not carry over, a file that an earlier job deletes comes back from the checkout in the next job, and every job repeats the services and variables of the source job. " +
+		"Timeout and retry apply to each job, so the total time can reach the timeout times the job count and a retry reruns only the failed job. " +
+		"An allow_failure setting applies to every job, so a job after a tolerated failure still starts, without the artifacts of the failed job"
 )
 
 // imageSplitArg is the marker argument of one job that came from a job whose steps ran in several images.
@@ -132,7 +134,7 @@ func planRuns(j *ir.Job) (runs []imageRun, why string) {
 				continue
 			}
 			if _, status, ok := splitStatus(st.If); !ok || (status != "" && status != "success") {
-				return nil, "step " + st.ID + " must run after a failure, and a later job never starts when an earlier one fails (job " + strconv.Itoa(k+2) + " of the split)"
+				return nil, "step " + st.ID + " must run after a failure, and a later job never starts when an earlier one fails (run " + strconv.Itoa(k+2) + " has its own image)"
 			}
 		}
 	}
@@ -288,7 +290,7 @@ func (e *emitter) buildParts(jp string, j *ir.Job, runs []imageRun, ids []string
 			cp.Manual = false
 		}
 		if !isLast {
-			cp.Artifacts, cp.AllowFailure = nil, false
+			cp.Artifacts = nil
 		}
 		cp.Ext = splitExt(j.Ext, isLast, sameImage(cp.Container, j.Container))
 		out = append(out, &cp)

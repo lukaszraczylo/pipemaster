@@ -124,7 +124,7 @@ func TestDroneCorpusSplitsGitLabJobsByImage(t *testing.T) {
 	}
 	for _, id := range []string{"API-1", "API-2", "UI-1", "UI-2"} {
 		art, _ := jobs[id]["artifacts"].(map[string]any)
-		if !slices.Contains(strList(art["paths"]), "$CI_PROJECT_DIR") || !slices.Contains(strList(art["exclude"]), ".git/**/*") || art["expire_in"] == nil {
+		if !slices.Contains(strList(art["paths"]), ".") || !slices.Contains(strList(art["exclude"]), ".git/**/*") || art["expire_in"] == nil {
 			t.Errorf("%s does not pass the workspace on: artifacts = %v", id, jobs[id]["artifacts"])
 		}
 	}

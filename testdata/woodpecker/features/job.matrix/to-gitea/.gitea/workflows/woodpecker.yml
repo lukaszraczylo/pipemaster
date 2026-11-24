@@ -23,7 +23,7 @@ jobs:
     steps:
       # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/test
       - id: test
-        run: docker run --rm -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" --entrypoint /bin/sh "$PIPEMASTER_IMAGE" -ec "$PIPEMASTER_SCRIPT"
+        run: docker run --rm -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" --entrypoint /bin/sh -- "$PIPEMASTER_IMAGE" -ec "$PIPEMASTER_SCRIPT"
         env:
           PIPEMASTER_IMAGE: golang:${{ matrix.GO_VERSION }}
           PIPEMASTER_SCRIPT: |

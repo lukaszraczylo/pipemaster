@@ -14,7 +14,7 @@ const (
 	runImageVar  = "PIPEMASTER_IMAGE"
 	runScriptVar = "PIPEMASTER_SCRIPT"
 	runStrategy  = "docker run in a script step"
-	runCaveat    = "the step needs a runner with Docker; the container runs as the image user, usually root, so files it writes in the workspace can belong to another user than the runner user, and it sees only the workspace and the variables the step passes"
+	runCaveat    = "the step needs a runner with Docker; the container runs as the image user, usually root, so files it writes in the workspace can belong to another user than the runner user, the workspace mount assumes the runner and the job container share the workspace path, and it sees only the workspace and the variables the step passes"
 )
 
 var (
@@ -33,7 +33,7 @@ func dockerRunLine(passed []string, inWorkDir bool) string {
 	for _, n := range passed {
 		parts = append(parts, "-e "+n)
 	}
-	parts = append(parts, "--entrypoint "+defaultEntrypoint, `"$`+runImageVar+`"`, `-ec "$`+runScriptVar+`"`)
+	parts = append(parts, "--entrypoint "+defaultEntrypoint, "--", `"$`+runImageVar+`"`, `-ec "$`+runScriptVar+`"`)
 	return strings.Join(parts, " ")
 }
 
