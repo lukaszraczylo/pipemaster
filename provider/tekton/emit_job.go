@@ -130,15 +130,20 @@ func firstNonEmpty(ss ...string) string {
 	return ""
 }
 
-// remoteTask writes a job that came from a remote taskRef back as a PipelineTask with that reference.
+// remoteTask writes a job that came from a remote or catalog taskRef back as a PipelineTask with that reference.
 func (e *emitter) remoteTask(pp *plan, jp *jobPlan) (*wmap, bool) {
 	j := jp.j
-	if !e.own || len(j.Steps) != 1 || j.Steps[0].Kind != ir.StepTask {
+	if !e.own {
 		return nil, false
 	}
-	ref, ok := extOf(j.Steps[0].Ext)["taskRef"]
+	ref, ok := extOf(j.Ext)[ExtCatalogRef]
 	if !ok {
-		return nil, false
+		if len(j.Steps) != 1 || j.Steps[0].Kind != ir.StepTask {
+			return nil, false
+		}
+		if ref, ok = extOf(j.Steps[0].Ext)["taskRef"]; !ok {
+			return nil, false
+		}
 	}
 	pt := newMap()
 	pt.SetStr("name", jp.tname)
@@ -509,7 +514,7 @@ func (tc *taskCtx) ports(sp string, ps []string) *yaml.Node {
 
 // jobHandled lists the job Ext keys that the emitter writes in a place of its own.
 var jobHandled = map[string]bool{
-	ExtImplicitNeeds: true, "task_name": true, "matrix_include_names": true, "array_params": true, "unused_params": true,
+	ExtImplicitNeeds: true, ExtCatalogRef: true, "task_name": true, "matrix_include_names": true, "array_params": true, "unused_params": true,
 	"params": true, "stepTemplate": true, "results": true, "task_metadata": true, "task_params": true, "task_workspaces": true,
 	"task_description": true, "workspaces": true, "description": true,
 }

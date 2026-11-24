@@ -88,7 +88,7 @@ Every file is byte-identical to the file at the pinned commit; the test run does
 | 66 | results | Tekton | <https://github.com/tektoncd/results> | `9d8626118d5582ae95b28107afbdd5b6ba551c9c` | Apache-2.0 | `tekton/ci.yaml`<br>`tekton/results-release-pipeline.yaml` |
 | 67 | chains | Tekton | <https://github.com/tektoncd/chains> | `afaaeac09fa09245a2f77bab556f0f6370db60f7` | Apache-2.0 | `release/release-pipeline.yaml` |
 | 68 | build-definitions | Tekton | <https://github.com/konflux-ci/build-definitions> | `8fed8ffff0ff01a8bd8d5ca2049e538c642f2d05` | Apache-2.0 | `.tekton/tasks/buildah.yaml`<br>`pipelines/enterprise-contract.yaml` |
-| 69 | pipelines-tutorial | Tekton | <https://github.com/openshift/pipelines-tutorial> | `4ebfb3d6f4e195de106f0f59a2506f4edffdfcf7` | Apache-2.0 | `01_pipeline/04_pipeline.yaml`<br>`01_pipeline/01_apply_manifest_task.yaml`<br>`.tekton/pipelinerun.yaml` |
+| 69 | pipelines-tutorial | Tekton | <https://github.com/openshift/pipelines-tutorial> | `4ebfb3d6f4e195de106f0f59a2506f4edffdfcf7` | Apache-2.0 | `01_pipeline/04_pipeline.yaml`<br>`01_pipeline/01_apply_manifest_task.yaml`<br>`01_pipeline/02_update_deployment_task.yaml`<br>`.tekton/pipelinerun.yaml` |
 | 70 | git-clone | Tekton | <https://github.com/tektoncd-catalog/git-clone> | `e1b1fafc3a0c1704a69beb894d65a8b3e090d5d8` | Apache-2.0 | `task/git-clone/git-clone.yaml`<br>`stepaction/git-clone/git-clone.yaml` |
 | 71 | catalog | Tekton | <https://github.com/tektoncd/catalog> | `112374ce1262b133a77300bd8133445722605e04` | Apache-2.0 | `task/git-clone/0.10/git-clone.yaml` |
 | 72 | ci-example | Argo | <https://github.com/pipekit/argo-workflows-ci-example> | `4f0e92c4a90d788ba22ca617dae52a547d869b4b` | BSD-3-Clause | `bootstrap/workflow-templates/nfs/ci-workflow.yml` |

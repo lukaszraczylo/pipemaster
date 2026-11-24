@@ -1,0 +1,268 @@
+# Catalog mapping: well-known Tekton catalog tasks that a taskRef names without a local Task.
+# Embedded in the binary; edit this file to add a task.
+#
+# Source: https://github.com/tektoncd/catalog at commit 112374ce1262b133a77300bd8133445722605e04
+#   task/git-clone/0.10, task/buildah/0.9, task/kaniko/0.7, task/golang-test/0.2,
+#   task/golang-build/0.3, task/yaml-lint/0.2
+#
+# One YAML document per task. The annotation pipemaster.dev/caveat is the caveat of the emulated verdict.
+#
+# kind: Task      a trimmed copy of the catalog Task; the parser reads it like a local Task, with the params
+#                 that the PipelineTask binds. An array param is bound as its joined, quoted words, so the
+#                 param is declared as a string. Workspace paths are left out: the job starts in the checkout.
+# kind: Checkout  the task becomes a checkout step.
+#   inputs:       catalog param (any case) -> checkout input, or {to: input, default: value}
+#   same:         catalog param -> value at which the param has no effect on a checkout
+#                 Any other bound param is reported, never dropped.
+---
+apiVersion: tekton.dev/v1
+kind: Checkout
+metadata:
+  name: git-clone
+  annotations:
+    pipemaster.dev/caveat: the cluster or hub task version may differ from the mapped behaviour; the checkout clones the repository of the pipeline, so a url param has no effect
+inputs:
+  revision: ref
+  depth: fetch-depth
+  submodules:
+    to: submodules
+    default: "true"
+same:
+  refspec: ""
+  sslVerify: "true"
+  subdirectory: ""
+  sparseCheckoutDirectories: ""
+  deleteExisting: "true"
+  httpProxy: ""
+  httpsProxy: ""
+  noProxy: ""
+  verbose: "true"
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: buildah
+  annotations:
+    pipemaster.dev/caveat: the cluster or hub task version may differ from the mapped behaviour; the build needs a privileged runner and registry credentials that the file does not set, and the image digest and url results are not produced
+spec:
+  params:
+    - name: IMAGE
+    - name: BUILDER_IMAGE
+      default: quay.io/buildah/stable:v1
+    - name: STORAGE_DRIVER
+      default: overlay
+    - name: DOCKERFILE
+      default: ./Dockerfile
+    - name: CONTEXT
+      default: .
+    - name: TLSVERIFY
+      default: "true"
+    - name: FORMAT
+      default: oci
+    - name: BUILD_EXTRA_ARGS
+      default: ""
+    - name: PUSH_EXTRA_ARGS
+      default: ""
+    - name: SKIP_PUSH
+      default: "false"
+  steps:
+    - name: build-and-push
+      image: $(params.BUILDER_IMAGE)
+      env:
+        - name: PARAM_IMAGE
+          value: $(params.IMAGE)
+        - name: PARAM_STORAGE_DRIVER
+          value: $(params.STORAGE_DRIVER)
+        - name: PARAM_DOCKERFILE
+          value: $(params.DOCKERFILE)
+        - name: PARAM_CONTEXT
+          value: $(params.CONTEXT)
+        - name: PARAM_TLSVERIFY
+          value: $(params.TLSVERIFY)
+        - name: PARAM_FORMAT
+          value: $(params.FORMAT)
+        - name: PARAM_BUILD_EXTRA_ARGS
+          value: $(params.BUILD_EXTRA_ARGS)
+        - name: PARAM_PUSH_EXTRA_ARGS
+          value: $(params.PUSH_EXTRA_ARGS)
+        - name: PARAM_SKIP_PUSH
+          value: $(params.SKIP_PUSH)
+      script: |
+        buildah "--storage-driver=${PARAM_STORAGE_DRIVER}" bud ${PARAM_BUILD_EXTRA_ARGS} \
+          "--format=${PARAM_FORMAT}" "--tls-verify=${PARAM_TLSVERIFY}" \
+          -f "${PARAM_DOCKERFILE}" -t "${PARAM_IMAGE}" "${PARAM_CONTEXT}"
+        [ "${PARAM_SKIP_PUSH}" = "true" ] && echo "Push skipped" && exit 0
+        buildah "--storage-driver=${PARAM_STORAGE_DRIVER}" push \
+          "--tls-verify=${PARAM_TLSVERIFY}" ${PARAM_PUSH_EXTRA_ARGS} \
+          "${PARAM_IMAGE}" "docker://${PARAM_IMAGE}"
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: kaniko
+  annotations:
+    pipemaster.dev/caveat: the cluster or hub task version may differ from the mapped behaviour; the executor needs registry credentials that the file does not set, and the image digest and url results are not produced; the executor image of the catalog has no shell, so the default is its -debug tag
+spec:
+  params:
+    - name: IMAGE
+    - name: DOCKERFILE
+      default: ./Dockerfile
+    - name: CONTEXT
+      default: ./
+    - name: EXTRA_ARGS
+      default: ""
+    - name: BUILDER_IMAGE
+      default: gcr.io/kaniko-project/executor:v1.5.1-debug
+  steps:
+    - name: build-and-push
+      image: $(params.BUILDER_IMAGE)
+      env:
+        - name: PARAM_IMAGE
+          value: $(params.IMAGE)
+        - name: PARAM_DOCKERFILE
+          value: $(params.DOCKERFILE)
+        - name: PARAM_CONTEXT
+          value: $(params.CONTEXT)
+        - name: PARAM_EXTRA_ARGS
+          value: $(params.EXTRA_ARGS)
+      script: |
+        /kaniko/executor ${PARAM_EXTRA_ARGS} "--dockerfile=${PARAM_DOCKERFILE}" \
+          "--context=${PARAM_CONTEXT}" "--destination=${PARAM_IMAGE}"
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: golang-test
+  annotations:
+    pipemaster.dev/caveat: the cluster or hub task version may differ from the mapped behaviour
+spec:
+  params:
+    - name: package
+    - name: packages
+      default: ./...
+    - name: context
+      default: .
+    - name: version
+      default: latest
+    - name: flags
+      default: -race -cover -v
+    - name: GOOS
+      default: linux
+    - name: GOARCH
+      default: amd64
+    - name: GO111MODULE
+      default: auto
+    - name: GOCACHE
+      default: ""
+    - name: GOMODCACHE
+      default: ""
+  steps:
+    - name: unit-test
+      image: docker.io/library/golang:$(params.version)
+      env:
+        - name: GOOS
+          value: $(params.GOOS)
+        - name: GOARCH
+          value: $(params.GOARCH)
+        - name: GO111MODULE
+          value: $(params.GO111MODULE)
+        - name: GOCACHE
+          value: $(params.GOCACHE)
+        - name: GOMODCACHE
+          value: $(params.GOMODCACHE)
+        - name: PARAM_PACKAGE
+          value: $(params.package)
+        - name: PARAM_PACKAGES
+          value: $(params.packages)
+        - name: PARAM_CONTEXT
+          value: $(params.context)
+        - name: PARAM_FLAGS
+          value: $(params.flags)
+      script: |
+        SRC_ROOT="$(pwd)"
+        if [ ! -e "$GOPATH/src/${PARAM_PACKAGE}/go.mod" ]; then
+          SRC_PATH="$GOPATH/src/${PARAM_PACKAGE}"
+          mkdir -p "$SRC_PATH"
+          cp -R "${SRC_ROOT}/${PARAM_CONTEXT}"/* "$SRC_PATH"
+          cd "$SRC_PATH"
+        fi
+        go test ${PARAM_FLAGS} ${PARAM_PACKAGES}
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: golang-build
+  annotations:
+    pipemaster.dev/caveat: the cluster or hub task version may differ from the mapped behaviour
+spec:
+  params:
+    - name: package
+    - name: packages
+      default: ./cmd/...
+    - name: version
+      default: latest
+    - name: flags
+      default: -v
+    - name: GOOS
+      default: linux
+    - name: GOARCH
+      default: amd64
+    - name: GO111MODULE
+      default: auto
+    - name: GOCACHE
+      default: ""
+    - name: GOMODCACHE
+      default: ""
+    - name: CGO_ENABLED
+      default: ""
+    - name: GOSUMDB
+      default: ""
+  steps:
+    - name: build
+      image: docker.io/library/golang:$(params.version)
+      env:
+        - name: GOOS
+          value: $(params.GOOS)
+        - name: GOARCH
+          value: $(params.GOARCH)
+        - name: GO111MODULE
+          value: $(params.GO111MODULE)
+        - name: GOCACHE
+          value: $(params.GOCACHE)
+        - name: GOMODCACHE
+          value: $(params.GOMODCACHE)
+        - name: CGO_ENABLED
+          value: $(params.CGO_ENABLED)
+        - name: GOSUMDB
+          value: $(params.GOSUMDB)
+        - name: PARAM_PACKAGE
+          value: $(params.package)
+        - name: PARAM_PACKAGES
+          value: $(params.packages)
+        - name: PARAM_FLAGS
+          value: $(params.flags)
+      script: |
+        SRC_ROOT="$(pwd)"
+        if [ ! -e "$GOPATH/src/${PARAM_PACKAGE}/go.mod" ]; then
+          SRC_PATH="$GOPATH/src/${PARAM_PACKAGE}"
+          mkdir -p "$SRC_PATH"
+          cp -R "${SRC_ROOT}"/* "$SRC_PATH"
+          cd "$SRC_PATH"
+        fi
+        go build ${PARAM_FLAGS} ${PARAM_PACKAGES}
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: yaml-lint
+  annotations:
+    pipemaster.dev/caveat: the cluster or hub task version may differ from the mapped behaviour
+spec:
+  params:
+    - name: args
+      default: --help
+  steps:
+    - name: lint-yaml-files
+      image: docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2
+      script: |
+        yamllint $(params.args)
