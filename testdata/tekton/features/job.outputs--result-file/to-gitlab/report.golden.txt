@@ -1,5 +1,5 @@
 Loss report: tekton -> gitlab
 [lost] pipeline/ci/job/use/step/use-step-1 script.interpolation (no GitLab variable for expression needs.version.outputs.tag; the line is commented out)
 [lost] pipeline/ci/job/version job.outputs (output tag has no value expression)
-[lost] pipeline/ci/job/version/step/tag step.image (GitLab sets the image per job, not per step)
+[lost] pipeline/ci/job/version/step/tag step.image (GitLab sets the image per job, not per step; the job is not split because the job has outputs)
 [lost] pipeline/ci/job/version/step/tag step.script (the line writes a Tekton result file, which has no form in this target; the write goes to /dev/null)

@@ -17,6 +17,7 @@ var noSourceForm = map[string]string{
 	provider.Gitea + "/" + string(caps.JobEnvironmentApproval):      "approval rules live in repository settings and no parser sets Environment.Approval",
 	provider.Forgejo + "/" + string(caps.JobEnvironmentApproval):    "approval rules live in repository settings and no parser sets Environment.Approval",
 	provider.GitLab + "/" + string(caps.JobEnvironmentApproval):     "approval rules live in project settings and no parser sets Environment.Approval",
+	provider.GitLab + "/" + string(caps.StepImage):                  "GitLab sets the image per job, so no gitlab source yields a step image",
 	provider.GitLab + "/" + string(caps.ConfigName):                 "GitLab variables parse as plain script text, so no gitlab source yields a secrets or vars reference",
 	provider.Woodpecker + "/" + string(caps.JobEnvironmentApproval): "approval rules live in repo settings and no parser sets Environment.Approval",
 	provider.Drone + "/" + string(caps.DisplayName):                 "a Drone pipeline or step name is its id, so no drone source holds a separate display name",

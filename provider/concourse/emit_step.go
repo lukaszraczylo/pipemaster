@@ -453,7 +453,7 @@ func (jx *jobEmitter) image(sc *scope, path string, st *ir.Step, ext map[string]
 		if n, ok := jx.imageNode(sc, ref); ok {
 			return n
 		}
-		e.lose(path, caps.StepImage, "the image "+ref+" has no Concourse spelling; the default image "+defaultImage+":"+defaultTag+" runs")
+		e.lose(path, caps.StepImage, "the image "+ref+" has no Concourse spelling; the script still runs, but in the default image "+defaultImage+":"+defaultTag+", not in that image")
 		return imageNode(defaultImage, "", defaultTag)
 	}
 	if raw, ok := ext[ExtImageResource]; ok {

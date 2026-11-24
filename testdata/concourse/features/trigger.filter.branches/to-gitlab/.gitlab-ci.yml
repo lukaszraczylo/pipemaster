@@ -7,7 +7,10 @@ workflow:
   rules:
     - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != "release/old"
     - if: $CI_COMMIT_BRANCH == "main"
+# pipemaster:emulated step.image pipeline/ci/job/build
+# pipemaster:arg {"job":"build","parts":["build"],"own":["build-step-1"]}
 build:
+  image: ubuntu:latest
   needs: []
   script:
     # pipemaster:step build-step-1

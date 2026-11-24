@@ -2,6 +2,8 @@
 # pipemaster:emulated job.if pipeline/woodpecker/job/ci
 # pipemaster:arg {"from":"woodpecker","guard":true}
 # pipemaster:emulated job.runner pipeline/woodpecker/job/ci
+# pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/test
+# pipemaster:arg {"kind":"script","image":{"Ref":"golang:$\u007b{ matrix.GO_VERSION }}","Entrypoint":null},"script":["go test -tags $\u007b{ matrix.TAGS }} ./..."],"run":true}
 on:
   push:
     branches:
@@ -18,5 +20,9 @@ jobs:
           - GO_VERSION: "1.25"
             TAGS: netgo
     steps:
+      # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/test
       - id: test
-        run: go test -tags ${{ matrix.TAGS }} ./...
+        run: docker run --rm -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" --entrypoint /bin/sh "$PIPEMASTER_IMAGE" -ec "$PIPEMASTER_SCRIPT"
+        env:
+          PIPEMASTER_IMAGE: golang:${{ matrix.GO_VERSION }}
+          PIPEMASTER_SCRIPT: go test -tags ${{ matrix.TAGS }} ./...

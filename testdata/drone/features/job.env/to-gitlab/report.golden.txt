@@ -1,3 +1,3 @@
 Loss report: drone -> gitlab
-[lost] pipeline/drone/job/ci/step/build step.image (GitLab sets the image per job, not per step)
 [external] pipeline/drone/job/ci job.env: create deploy_token as a masked CI/CD variable in the project settings, protected too for protected branches (a GitLab file cannot mark a secret as one; it writes deploy_token as plain variable references and the operator sets the values there)
+[emulated] pipeline/drone/job/ci/step/build step.image: the shared image of the steps is the job image (every script step of the job runs in this image)

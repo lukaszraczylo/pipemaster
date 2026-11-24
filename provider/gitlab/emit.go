@@ -29,7 +29,7 @@ func (adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
 	if p != nil {
 		origin = p.Origin.Provider
 	}
-	e := &emitter{from: sourceDialect(origin), led: emitkit.NewLedger("ir", dialect, adapter{}.Caps())}
+	e := &emitter{splits: map[*ir.Job]splitPart{}, noSplit: map[string]string{}, from: sourceDialect(origin), led: emitkit.NewLedger("ir", dialect, adapter{}.Caps())}
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)
@@ -93,6 +93,7 @@ func (e *emitter) pipelineFile(pls []*ir.Pipeline) ([]byte, error) {
 }
 
 func (e *emitter) document(pl *ir.Pipeline) (*yaml.Node, error) {
+	pl = e.splitImages(pl)
 	plan, err := e.stagePlan(pl)
 	if err != nil {
 		return nil, err
@@ -112,6 +113,7 @@ func (e *emitter) document(pl *ir.Pipeline) (*yaml.Node, error) {
 			return nil, fmt.Errorf("job id %q is used twice", j.ID)
 		}
 		p := newJobPrep(e.pathOf(pl.ID, j), j)
+		p.imgPath = e.splits[j].imgPath
 		if err := e.prepSteps(p); err != nil {
 			return nil, err
 		}
@@ -312,7 +314,7 @@ func (e *emitter) jobEntries(m *omap, c *pipeCtx) error {
 		if err != nil {
 			return fmt.Errorf("job %s: %w", j.ID, err)
 		}
-		comments = append(e.foldJobMarkers(j), comments...)
+		comments = append(append(e.foldJobMarkers(j), e.splitMarkers(c.pl.ID, j)...), comments...)
 		key := c.key(j.ID)
 		if m.has(key) {
 			return fmt.Errorf("job id %q collides with a top-level key", key)

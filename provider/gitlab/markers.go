@@ -55,7 +55,9 @@ func markerArgs(src []byte) map[ir.FeatureUse][]string { return emitkit.ParseArg
 func (s *state) collapseMarkers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string) {
 	queue := map[*ir.Job][]lineRewrite{}
 	s.queue = queue
+	merged := s.mergeImageSplits(pl, uses, args)
 	extractMoved(pl, uses, args)
+	s.applySplitImages()
 	s.restoreTriggers(pl, uses, args)
 	stepDone := map[string]map[caps.Feature]bool{}
 	// The dotenv writer lines end a step script, so they go before the step wrappers that enclose the lines.
@@ -67,6 +69,13 @@ func (s *state) collapseMarkers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[
 	}
 	for _, u := range uses {
 		if isTriggerMark(u) {
+			continue
+		}
+		if merged[u] {
+			continue
+		}
+		if u.Feature == caps.StepImage && !strings.Contains(u.IRPath, stepSep) {
+			s.unmergedSplit(u)
 			continue
 		}
 		if outputsDone[u] {

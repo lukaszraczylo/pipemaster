@@ -1,4 +1,4 @@
 Loss report: drone -> gitlab
-[lost] pipeline/drone/job/ci/step/build step.image (GitLab sets the image per job, not per step)
 [lost] pipeline/drone/job/ci/step/publish step.action (step kind plugin has no GitLab form)
 [lost] pipeline/drone/job/ci/step/publish step.image (GitLab sets the image per job, not per step)
+[emulated] pipeline/drone/job/ci/step/build step.image: the shared image of the steps is the job image (every script step of the job runs in this image)

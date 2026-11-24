@@ -1,7 +1,10 @@
 workflow:
   rules:
     - if: $CI_COMMIT_BRANCH
+# pipemaster:emulated step.image pipeline/drone/job/ci
+# pipemaster:arg {"job":"ci","parts":["ci"],"own":["test"]}
 ci:
+  image: golang:1.25
   services:
     - name: postgres:17
       alias: db

@@ -263,7 +263,11 @@ func (e *emitter) imageKey(m *omap, p *jobPrep, ext map[string]any, skip map[str
 	j := p.j
 	switch {
 	case j.Container != nil:
-		n, err := e.imageNode(p.path, *j.Container, ext[extImage])
+		at := p.path
+		if p.imgPath != "" {
+			at = p.imgPath
+		}
+		n, err := e.imageNode(at, *j.Container, ext[extImage])
 		if err != nil {
 			return err
 		}

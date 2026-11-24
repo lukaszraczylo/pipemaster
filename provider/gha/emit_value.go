@@ -26,6 +26,7 @@ type emitter struct {
 	led            *emitkit.Ledger
 	stepIDs        map[string]string
 	pluginVars     *yaml.Node
+	passEnv        []string
 	guarded        map[string]bool
 	guardJob       string
 	marks          []string

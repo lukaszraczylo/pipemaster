@@ -132,6 +132,7 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 			return nil, false, uerr
 		}
 	}
+	var markers []string
 	dockerOK := st.Image == nil || !strings.Contains(st.Image.Ref, "$")
 	switch {
 	case !usesOK:
@@ -141,10 +142,18 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 	case st.If != nil:
 		m.set("if", e.condition(sp, caps.StepIf, st.If, "step"))
 	}
-	var markers []string
 	wrapped := false
 	var err error
+	runOK := false
+	if !dockerOK {
+		var err error
+		if runOK, err = e.dockerRunStep(m, sp, st); err != nil {
+			return nil, false, err
+		}
+	}
 	switch {
+	case runOK:
+		markers = append(markers, emitkit.Marker(caps.StepImage, sp))
 	case !dockerOK && len(st.Script) == 0:
 		e.lose(sp, caps.StepImage, "a docker step needs a literal image reference and the reference holds a variable; the step does not run")
 		m.set("run", str(noopScript))
@@ -404,6 +413,8 @@ type imageArg struct {
 	Image    ir.Image    `json:"image"`
 	Script   []string    `json:"script,omitempty"`
 	Settings []string    `json:"settings,omitempty"`
+	Passed   []string    `json:"passed,omitempty"`
+	Run      bool        `json:"run,omitempty"`
 }
 
 // jobSteps lists a job's steps with the emulation steps around them: downloads and cache first, uploads last.
@@ -423,6 +434,7 @@ func (e *emitter) jobSteps(c jobCtx, j *ir.Job) (*yaml.Node, error) {
 		}
 	}
 	e.stepIDs = stepIDMap(j)
+	e.passEnv = append(varNames(c.pl.Env), varNames(j.Env)...)
 	for _, st := range j.Steps {
 		if st == nil {
 			continue

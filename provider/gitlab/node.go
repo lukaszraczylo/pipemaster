@@ -29,6 +29,7 @@ type state struct {
 	// wfCond is workflow:rules as one condition; nil when they do not compile.
 	wfCond   expr.Expr
 	queue    map[*ir.Job][]lineRewrite
+	splitImg map[*ir.Job]map[string]ir.Image
 	remote   []string
 	nodes    int
 	includes int

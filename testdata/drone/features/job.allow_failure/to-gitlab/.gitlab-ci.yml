@@ -1,7 +1,10 @@
 workflow:
   rules:
     - if: $CI_COMMIT_BRANCH
+# pipemaster:emulated step.image pipeline/drone/job/ci
+# pipemaster:arg {"job":"ci","parts":["ci"],"own":["flaky"]}
 ci:
+  image: alpine:3.20
   needs: []
   script:
     # pipemaster:step flaky

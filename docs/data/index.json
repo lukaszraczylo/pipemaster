@@ -1149,8 +1149,8 @@
     "note": "shell guard around the step's lines (step reports success instead of skipped)"
    },
    "step.image": {
-    "level": "lost",
-    "note": "(GitLab sets the image per job, not per step)"
+    "level": "emulated",
+    "note": "one job per run of steps that share an image, chained by needs (GitLab sets the image per job, so the workspace passes between the jobs as artifacts; a job that cannot split keeps the step image lost)"
    },
    "step.script": {
     "level": "native"

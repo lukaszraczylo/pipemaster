@@ -10,22 +10,31 @@ workflow:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_TAG =~ /^[^\/]*$/
+# pipemaster:emulated step.image pipeline/ci/job/lint
+# pipemaster:arg {"job":"lint","parts":["lint"],"own":["lint-step-1"]}
 lint:
   stage: stage-0
+  image: ubuntu:latest
   needs: []
   script:
     # pipemaster:step lint-step-1
     - echo lint
+# pipemaster:emulated step.image pipeline/ci/job/ship
+# pipemaster:arg {"job":"ship","parts":["ship"],"own":["ship-step-1"]}
 ship:
   stage: stage-1
+  image: ubuntu:latest
   needs:
     - lint
     - test
   script:
     # pipemaster:step ship-step-1
     - echo ship
+# pipemaster:emulated step.image pipeline/ci/job/test
+# pipemaster:arg {"job":"test","parts":["test"],"own":["test-step-1"]}
 test:
   stage: stage-0
+  image: ubuntu:latest
   needs: []
   script:
     # pipemaster:step test-step-1

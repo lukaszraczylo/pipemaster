@@ -57,6 +57,9 @@ type folded struct {
 
 // pathOf is the IR path of a job as the ledger knows it, which a folded copy does not carry in its own ID.
 func (e *emitter) pathOf(pid string, j *ir.Job) string {
+	if s, ok := e.splits[j]; ok {
+		return s.path
+	}
 	if e.fold != nil {
 		if fj, ok := e.fold.jobs[j]; ok {
 			return fj.path

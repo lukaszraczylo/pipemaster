@@ -25,6 +25,8 @@ type emitter struct {
 	wfGuard expr.Expr
 	from    *expr.Dialect
 	fold    *folded
+	splits  map[*ir.Job]splitPart
+	noSplit map[string]string
 	deadOut map[string]bool
 	// noVar holds the inputs that got no variable, because another input owns the name.
 	noVar    map[string]bool

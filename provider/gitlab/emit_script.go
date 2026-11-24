@@ -28,6 +28,7 @@ type jobPrep struct {
 	j        *ir.Job
 	sections map[string][]*yaml.Node
 	path     string
+	imgPath  string
 	image    string
 	vars     []ir.Var
 	caches   []*omap
@@ -160,7 +161,11 @@ func (e *emitter) stepGuard(sp string, st *ir.Step, sec string) (guard, arg, src
 // stepLosses reports the step fields a GitLab script cannot carry at all.
 func (e *emitter) stepLosses(sp string, st *ir.Step) {
 	if st.Image != nil {
-		e.lose(sp, caps.StepImage, "GitLab sets the image per job, not per step")
+		why := "GitLab sets the image per job, not per step"
+		if jp, _, _ := strings.Cut(sp, stepSep); e.noSplit[jp] != "" {
+			why += "; the job is not split because " + e.noSplit[jp]
+		}
+		e.lose(sp, caps.StepImage, why)
 	}
 	if st.Shell != "" {
 		e.lose(sp, caps.StepShell, "GitLab runs scripts in the runner's configured shell, not "+st.Shell)

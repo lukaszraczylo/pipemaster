@@ -22,7 +22,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.JobMatrix:              {Level: caps.Native, Strategy: "parallel:matrix", Caveat: "include and exclude are expanded into explicit entries"},
 		caps.JobOutputs:             {Level: caps.Emulated, Strategy: "dotenv artifact report"},
 		caps.StepAction:             {Level: caps.Native, Strategy: "per actions.Lookup verdict", Caveat: "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes the pinned default actions/checkout (not the source ref) with fetch-depth and submodules from GIT_DEPTH and GIT_SUBMODULE_STRATEGY"},
-		caps.StepImage:              {Level: caps.Lost, Caveat: "GitLab sets the image per job, not per step"},
+		caps.StepImage:              {Level: caps.Emulated, Strategy: "one job per run of steps that share an image, chained by needs", Caveat: "GitLab sets the image per job, so the workspace passes between the jobs as artifacts; a job that cannot split keeps the step image lost"},
 		caps.StepIf:                 {Level: caps.Emulated, Strategy: "shell guard around the step's lines", Caveat: "step reports success instead of skipped"},
 		caps.StepEnv:                {Level: caps.Emulated, Strategy: "export lines inside a subshell around the step"},
 		caps.StepContinueOnError:    {Level: caps.Emulated, Strategy: "|| true after each line of the step"},

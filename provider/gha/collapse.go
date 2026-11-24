@@ -452,7 +452,14 @@ func restoreFinallyNeeds(pl *ir.Pipeline, rep *report.Report, u ir.FeatureUse, a
 func collapseImage(e *emitter, pl *ir.Pipeline, rep *report.Report, u ir.FeatureUse, args []string) {
 	st := markedStep(pl, u.IRPath)
 	var a imageArg
-	if st == nil || len(args) != 1 || json.Unmarshal([]byte(args[0]), &a) != nil || st.Action == nil || st.Action.Kind != ir.ActionDocker {
+	if st == nil || len(args) != 1 || json.Unmarshal([]byte(args[0]), &a) != nil {
+		return
+	}
+	if a.Run {
+		collapseDockerRun(e, st, u, a, rep)
+		return
+	}
+	if st.Action == nil || st.Action.Kind != ir.ActionDocker {
 		return
 	}
 	ref, entrypoint, argText, err := e.imageParts(u.IRPath, &ir.Step{Image: &a.Image, Script: a.Script})

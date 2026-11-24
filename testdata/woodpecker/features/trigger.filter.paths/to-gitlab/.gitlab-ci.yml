@@ -6,7 +6,10 @@ workflow:
       changes:
         - src/main.go
         - go.mod
+# pipemaster:emulated step.image pipeline/woodpecker/job/ci
+# pipemaster:arg {"job":"ci","parts":["ci"],"own":["build"]}
 ci:
+  image: golang:1.25
   needs: []
   script:
     # pipemaster:step build

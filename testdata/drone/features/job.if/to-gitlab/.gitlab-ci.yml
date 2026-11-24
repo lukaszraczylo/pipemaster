@@ -1,8 +1,11 @@
 workflow:
   rules:
     - when: never
+# pipemaster:emulated step.image pipeline/drone/job/ci
+# pipemaster:arg {"job":"ci","parts":["ci"],"own":["build"]}
 # pipemaster:lost job.if pipeline/drone/job/ci: (event == 'push') && (actor == 'release-bot')
 ci:
+  image: golang:1.25
   needs: []
   rules:
     - when: never

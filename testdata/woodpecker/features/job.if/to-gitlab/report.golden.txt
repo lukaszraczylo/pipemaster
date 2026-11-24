@@ -1,4 +1,4 @@
 Loss report: woodpecker -> gitlab
 [lost] pipeline/woodpecker ext.passthrough (the pipeline has no trigger GitLab can express; workflow:rules never starts it)
 [lost] pipeline/woodpecker/job/ci job.if (condition not expressible in GitLab CI; job disabled)
-[lost] pipeline/woodpecker/job/ci/step/build step.image (GitLab sets the image per job, not per step)
+[emulated] pipeline/woodpecker/job/ci/step/build step.image: the shared image of the steps is the job image (every script step of the job runs in this image)
