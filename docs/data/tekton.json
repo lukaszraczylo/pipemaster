@@ -24,11 +24,11 @@
    "files": [
     {
      "path": ".github/workflows/build-and-deploy.yml",
-     "text": "# pipemaster:emulated job.runner pipeline/build-and-deploy/job/apply-manifests\n# pipemaster:emulated step.image pipeline/build-and-deploy/job/apply-manifests/step/apply\n# pipemaster:arg {\"kind\":\"script\",\"workdir\":\"/workspace/source\",\"image\":{\"Ref\":\"image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\",\"Entrypoint\":null},\"script\":[\"/bin/bash -c 'echo Applying manifests in $(inputs.params.manifest_dir) directory\\noc apply -f $(inputs.params.manifest_dir)\\necho -----------------------------------'\"]}\n# pipemaster:emulated job.runner pipeline/build-and-deploy/job/build-image\n# pipemaster:emulated job.runner pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:emulated job.runner pipeline/build-and-deploy/job/update-deployment\n# pipemaster:emulated step.image pipeline/build-and-deploy/job/update-deployment/step/patch\n# pipemaster:arg {\"kind\":\"script\",\"image\":{\"Ref\":\"image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\",\"Entrypoint\":null},\"script\":[\"/bin/bash -c 'oc patch deployment $(inputs.params.deployment) --patch='\\\\''{\\\"spec\\\":{\\\"template\\\":{\\\"spec\\\":{\\n  \\\"containers\\\":[{\\n    \\\"name\\\": \\\"$(inputs.params.deployment)\\\",\\n    \\\"image\\\":\\\"$(inputs.params.IMAGE)\\\"\\n  }]\\n}}}}'\\\\''\\n\\n# issue: https://issues.redhat.com/browse/SRVKP-2387\\n# images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\\n# as a workaround update a label in template, which triggers redeploy pods\\n# target label: \\\"spec.template.metadata.labels.patched_at\\\"\\n# NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\\npatched_at_timestamp=`date +%s`\\noc patch deployment $(inputs.params.deployment) --patch='\\\\''{\\\"spec\\\":{\\\"template\\\":{\\\"metadata\\\":{\\n  \\\"labels\\\":{\\n    \\\"patched_at\\\": '\\\\''\\\\\\\"$patched_at_timestamp\\\\\\\"'\\\\''\\n  }\\n}}}}'\\\\'''\"]}\non:\n  # pipemaster:emulated pipeline.inputs pipeline/build-and-deploy\n  workflow_dispatch:\n    inputs:\n      deployment-name:\n        description: name of the deployment to be patched\n        required: true\n        type: string\n      git-url:\n        description: url of the git repo for the code of deployment\n        required: true\n        type: string\n      git-revision:\n        description: revision to be used from repo of the code for deployment\n        default: master\n        type: string\n      IMAGE:\n        description: image to be build from the code\n        required: true\n        type: string\njobs:\n  apply-manifests:\n    needs:\n      - build-image\n    runs-on: ubuntu-latest\n    steps:\n      # pipemaster:emulated step.image pipeline/build-and-deploy/job/apply-manifests/step/apply\n      - id: apply\n        uses: docker://image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n        with:\n          entrypoint: /bin/sh\n          args: |-\n            -ec '/bin/bash -c '\\''echo Applying manifests in $(inputs.params.manifest_dir) directory\n            oc apply -f $(inputs.params.manifest_dir)\n            echo -----------------------------------'\\'''\n  build-image:\n    needs:\n      - fetch-repository\n    runs-on: ubuntu-latest\n    container: quay.io/buildah/stable:v1\n    steps:\n      - id: build-and-push\n        run: |\n          buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" bud ${PARAM_BUILD_EXTRA_ARGS} \\\n            \"--format=${PARAM_FORMAT}\" \"--tls-verify=${PARAM_TLSVERIFY}\" \\\n            -f \"${PARAM_DOCKERFILE}\" -t \"${PARAM_IMAGE}\" \"${PARAM_CONTEXT}\"\n          [ \"${PARAM_SKIP_PUSH}\" = \"true\" ] && echo \"Push skipped\" && exit 0\n          buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" push \\\n            \"--tls-verify=${PARAM_TLSVERIFY}\" ${PARAM_PUSH_EXTRA_ARGS} \\\n            \"${PARAM_IMAGE}\" \"docker://${PARAM_IMAGE}\"\n        env:\n          PARAM_IMAGE: ${{ inputs.IMAGE }}\n          PARAM_STORAGE_DRIVER: overlay\n          PARAM_DOCKERFILE: ./Dockerfile\n          PARAM_CONTEXT: .\n          PARAM_TLSVERIFY: \"true\"\n          PARAM_FORMAT: oci\n          PARAM_BUILD_EXTRA_ARGS: \"\"\n          PARAM_PUSH_EXTRA_ARGS: \"\"\n          PARAM_SKIP_PUSH: \"false\"\n  fetch-repository:\n    runs-on: ubuntu-latest\n    steps:\n      - id: fetch-repository-step-1\n        uses: actions/checkout@v7\n        with:\n          ref: ${{ inputs.git-revision }}\n          submodules: \"true\"\n  update-deployment:\n    needs:\n      - apply-manifests\n    runs-on: ubuntu-latest\n    steps:\n      # pipemaster:emulated step.image pipeline/build-and-deploy/job/update-deployment/step/patch\n      - id: patch\n        uses: docker://image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n        with:\n          entrypoint: /bin/sh\n          args: |-\n            -ec '/bin/bash -c '\\''oc patch deployment $(inputs.params.deployment) --patch='\\''\\'\\'''\\''{\"spec\":{\"template\":{\"spec\":{\n              \"containers\":[{\n                \"name\": \"$(inputs.params.deployment)\",\n                \"image\":\"$(inputs.params.IMAGE)\"\n              }]\n            }}}}'\\''\\'\\'''\\''\n\n            # issue: https://issues.redhat.com/browse/SRVKP-2387\n            # images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\n            # as a workaround update a label in template, which triggers redeploy pods\n            # target label: \"spec.template.metadata.labels.patched_at\"\n            # NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\n            patched_at_timestamp=`date +%s`\n            oc patch deployment $(inputs.params.deployment) --patch='\\''\\'\\'''\\''{\"spec\":{\"template\":{\"metadata\":{\n              \"labels\":{\n                \"patched_at\": '\\''\\'\\'''\\''\\\"$patched_at_timestamp\\\"'\\''\\'\\'''\\''\n              }\n            }}}}'\\''\\'\\'''\\'''\\'''\n"
+     "text": "# pipemaster:emulated job.runner pipeline/build-and-deploy/job/apply-manifests\n# pipemaster:emulated step.image pipeline/build-and-deploy/job/apply-manifests/step/apply\n# pipemaster:arg {\"kind\":\"script\",\"workdir\":\"/workspace/source\",\"image\":{\"Ref\":\"image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\",\"Entrypoint\":null},\"script\":[\"/bin/bash -c 'echo Applying manifests in $(inputs.params.manifest_dir) directory\\noc apply -f $(inputs.params.manifest_dir)\\necho -----------------------------------'\"]}\n# pipemaster:emulated job.runner pipeline/build-and-deploy/job/build-image\n# pipemaster:emulated job.runner pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:emulated job.runner pipeline/build-and-deploy/job/update-deployment\n# pipemaster:emulated step.image pipeline/build-and-deploy/job/update-deployment/step/patch\n# pipemaster:arg {\"kind\":\"script\",\"image\":{\"Ref\":\"image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\",\"Entrypoint\":null},\"script\":[\"/bin/bash -c 'oc patch deployment $(inputs.params.deployment) --patch='\\\\''{\\\"spec\\\":{\\\"template\\\":{\\\"spec\\\":{\\n  \\\"containers\\\":[{\\n    \\\"name\\\": \\\"$(inputs.params.deployment)\\\",\\n    \\\"image\\\":\\\"$(inputs.params.IMAGE)\\\"\\n  }]\\n}}}}'\\\\''\\n\\n# issue: https://issues.redhat.com/browse/SRVKP-2387\\n# images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\\n# as a workaround update a label in template, which triggers redeploy pods\\n# target label: \\\"spec.template.metadata.labels.patched_at\\\"\\n# NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\\npatched_at_timestamp=`date +%s`\\noc patch deployment $(inputs.params.deployment) --patch='\\\\''{\\\"spec\\\":{\\\"template\\\":{\\\"metadata\\\":{\\n  \\\"labels\\\":{\\n    \\\"patched_at\\\": '\\\\''\\\\\\\"$patched_at_timestamp\\\\\\\"'\\\\''\\n  }\\n}}}}'\\\\'''\"]}\non:\n  # pipemaster:emulated pipeline.inputs pipeline/build-and-deploy\n  workflow_dispatch:\n    inputs:\n      deployment-name:\n        description: name of the deployment to be patched\n        required: true\n        type: string\n      git-url:\n        description: url of the git repo for the code of deployment\n        required: true\n        type: string\n      git-revision:\n        description: revision to be used from repo of the code for deployment\n        default: master\n        type: string\n      IMAGE:\n        description: image to be build from the code\n        required: true\n        type: string\njobs:\n  apply-manifests:\n    needs:\n      - build-image\n    runs-on: ubuntu-latest\n    steps:\n      # pipemaster:emulated step.image pipeline/build-and-deploy/job/apply-manifests/step/apply\n      - id: apply\n        uses: docker://image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n        with:\n          entrypoint: /bin/sh\n          args: |-\n            -ec '/bin/bash -c '\\''echo Applying manifests in $(inputs.params.manifest_dir) directory\n            oc apply -f $(inputs.params.manifest_dir)\n            echo -----------------------------------'\\'''\n  build-image:\n    needs:\n      - fetch-repository\n    runs-on: ubuntu-latest\n    container: quay.io/buildah/stable:v1\n    steps:\n      - id: build-image-checkout\n        uses: actions/checkout@v7\n      - id: build-and-push\n        run: |\n          buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" bud ${PARAM_BUILD_EXTRA_ARGS} \"--format=${PARAM_FORMAT}\" \"--tls-verify=${PARAM_TLSVERIFY}\" -f \"${PARAM_DOCKERFILE}\" -t \"${PARAM_IMAGE}\" \"${PARAM_CONTEXT}\"\n          [ \"${PARAM_SKIP_PUSH}\" = \"true\" ] && echo \"Push skipped\" && exit 0\n          buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" push \"--tls-verify=${PARAM_TLSVERIFY}\" ${PARAM_PUSH_EXTRA_ARGS} \"${PARAM_IMAGE}\" \"docker://${PARAM_IMAGE}\"\n        env:\n          PARAM_IMAGE: ${{ inputs.IMAGE }}\n          PARAM_STORAGE_DRIVER: overlay\n          PARAM_DOCKERFILE: ./Dockerfile\n          PARAM_CONTEXT: .\n          PARAM_TLSVERIFY: \"true\"\n          PARAM_FORMAT: oci\n          PARAM_BUILD_EXTRA_ARGS: \"\"\n          PARAM_PUSH_EXTRA_ARGS: \"\"\n          PARAM_SKIP_PUSH: \"false\"\n  fetch-repository:\n    runs-on: ubuntu-latest\n    steps:\n      - id: fetch-repository-step-1\n        uses: actions/checkout@v7\n        with:\n          ref: ${{ inputs.git-revision }}\n          submodules: \"true\"\n  update-deployment:\n    needs:\n      - apply-manifests\n    runs-on: ubuntu-latest\n    steps:\n      # pipemaster:emulated step.image pipeline/build-and-deploy/job/update-deployment/step/patch\n      - id: patch\n        uses: docker://image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n        with:\n          entrypoint: /bin/sh\n          args: |-\n            -ec '/bin/bash -c '\\''oc patch deployment $(inputs.params.deployment) --patch='\\''\\'\\'''\\''{\"spec\":{\"template\":{\"spec\":{\n              \"containers\":[{\n                \"name\": \"$(inputs.params.deployment)\",\n                \"image\":\"$(inputs.params.IMAGE)\"\n              }]\n            }}}}'\\''\\'\\'''\\''\n\n            # issue: https://issues.redhat.com/browse/SRVKP-2387\n            # images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\n            # as a workaround update a label in template, which triggers redeploy pods\n            # target label: \"spec.template.metadata.labels.patched_at\"\n            # NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\n            patched_at_timestamp=`date +%s`\n            oc patch deployment $(inputs.params.deployment) --patch='\\''\\'\\'''\\''{\"spec\":{\"template\":{\"metadata\":{\n              \"labels\":{\n                \"patched_at\": '\\''\\'\\'''\\''\\\"$patched_at_timestamp\\\"'\\''\\'\\'''\\''\n              }\n            }}}}'\\''\\'\\'''\\'''\\'''\n"
     },
     {
      "path": ".github/workflows/pipeline-tutorial-check-pr.yml",
-     "text": "# pipemaster:emulated job.runner pipeline/pipeline-tutorial-check-pr/job/fetch\n# pipemaster:emulated job.runner pipeline/pipeline-tutorial-check-pr/job/yaml-lint\non:\n  # pipemaster:emulated pipeline.inputs pipeline/pipeline-tutorial-check-pr\n  workflow_dispatch:\n    inputs:\n      repo_url:\n        required: true\n      revision:\n        required: true\njobs:\n  fetch:\n    runs-on: ubuntu-latest\n    steps:\n      - id: fetch-step-1\n        uses: actions/checkout@v7\n        with:\n          ref: ${{ inputs.revision }}\n          submodules: \"true\"\n  yaml-lint:\n    needs:\n      - fetch\n    runs-on: ubuntu-latest\n    container: docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\n    steps:\n      - id: lint-yaml-files\n        run: yamllint .\n"
+     "text": "# pipemaster:emulated job.runner pipeline/pipeline-tutorial-check-pr/job/fetch\n# pipemaster:emulated job.runner pipeline/pipeline-tutorial-check-pr/job/yaml-lint\non:\n  # pipemaster:emulated pipeline.inputs pipeline/pipeline-tutorial-check-pr\n  workflow_dispatch:\n    inputs:\n      repo_url:\n        required: true\n      revision:\n        required: true\njobs:\n  fetch:\n    runs-on: ubuntu-latest\n    steps:\n      - id: fetch-step-1\n        uses: actions/checkout@v7\n        with:\n          ref: ${{ inputs.revision }}\n          submodules: \"true\"\n  yaml-lint:\n    needs:\n      - fetch\n    runs-on: ubuntu-latest\n    container: docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\n    steps:\n      - id: yaml-lint-checkout\n        uses: actions/checkout@v7\n      - id: lint-yaml-files\n        run: yamllint .\n"
     }
    ],
    "report": [
@@ -71,6 +71,13 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider tekton (task_name, task_params, task_workspaces, workspaces) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.manifest_dir) is a Tekton variable with no IR reference; it stays in the text as written"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
@@ -146,6 +153,20 @@
      "detail": "Ext of provider tekton (task_name, task_params, unused_params) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.deployment) is a Tekton variable with no IR reference; it stays in the text as written"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.IMAGE) is a Tekton variable with no IR reference; it stays in the text as written"
+    },
+    {
      "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -219,6 +240,20 @@
      "detail": "Ext of provider tekton (array_params, catalog_ref, params, workspaces) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
+     "level": "external",
+     "strategy": "set up outside the file",
+     "detail": "the build runs buildah in a container and needs a privileged runner; the file does not set privileged mode"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
+     "level": "external",
+     "strategy": "set up outside the file",
+     "detail": "pushing the image needs registry credentials, which the catalog task reads from a dockerconfig workspace; the file sets no registry login"
+    },
+    {
      "path": "pipeline/build-and-deploy",
      "feature": "pipeline.inputs",
      "level": "emulated",
@@ -258,6 +293,13 @@
      "level": "emulated",
      "strategy": "mapped to the catalog task buildah",
      "detail": "the cluster or hub task version may differ from the mapped behaviour; the build needs a privileged runner and registry credentials that the file does not set, and the image digest and url results are not produced"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step in the job",
+     "detail": "the Tekton workspace is not shared between jobs, so the job clones the pipeline repository itself; a revision that an earlier git-clone task set is not carried over"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -320,6 +362,13 @@
      "level": "emulated",
      "strategy": "mapped to the catalog task yaml-lint",
      "detail": "the cluster or hub task version may differ from the mapped behaviour"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step in the job",
+     "detail": "the Tekton workspace is not shared between jobs, so the job clones the pipeline repository itself; a revision that an earlier git-clone task set is not carried over"
     }
    ]
   },
@@ -329,7 +378,7 @@
    "files": [
     {
      "path": ".gitlab-ci.yml",
-     "text": "# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"inputs\":[{\"Name\":\"IMAGE\",\"Type\":\"string\",\"Default\":\"\",\"Description\":\"image to be build from the code\",\"Required\":true}],\"triggers\":null}\n# pipemaster:emulated script.interpolation pipeline/build-and-deploy\n# pipemaster:arg [{\"k\":\"x\",\"p\":\"job/build-image/step/build-and-push/env/0\",\"g\":\"$IMAGE\",\"s\":\"inputs.IMAGE\"}]\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg {\"inputs\":[{\"Name\":\"repo_url\",\"Type\":\"\",\"Default\":\"\",\"Description\":\"\",\"Required\":true},{\"Name\":\"revision\",\"Type\":\"\",\"Default\":\"\",\"Description\":\"\",\"Required\":true}],\"triggers\":null}\n# pipemaster:emulated script.interpolation pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg [{\"k\":\"x\",\"p\":\"job/fetch/step/fetch-step-1/with/ref\",\"g\":\"$revision\",\"s\":\"inputs.revision\"}]\nstages:\n  - stage-0\n  - stage-1\n  - stage-2\n  - stage-3\nworkflow:\n  rules:\n    - when: never\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy/job/apply-manifests\n# pipemaster:arg {}\nbuild-and-deploy:apply-manifests:\n  stage: stage-2\n  needs:\n    - build-and-deploy:build-image\n  rules:\n    - when: never\n  variables:\n    IMAGE: \"\"\n  script:\n    # pipemaster:step apply\n    # pipemaster:emulated step.workdir pipeline/build-and-deploy/job/apply-manifests/step/apply\n    - |\n      (\n      cd \"/workspace/source\" || exit 1\n      /bin/bash -c 'echo Applying manifests in $(inputs.params.manifest_dir) directory\n      oc apply -f $(inputs.params.manifest_dir)\n      echo -----------------------------------'\n      )\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy/job/build-image\n# pipemaster:arg {}\nbuild-and-deploy:build-image:\n  stage: stage-1\n  image: quay.io/buildah/stable:v1\n  needs:\n    - build-and-deploy:fetch-repository\n  rules:\n    - when: never\n  variables:\n    IMAGE: \"\"\n  script:\n    # pipemaster:step build-and-push\n    # pipemaster:emulated step.env pipeline/build-and-deploy/job/build-image/step/build-and-push\n    - |\n      (\n      export PARAM_IMAGE=\"$IMAGE\"\n      export PARAM_STORAGE_DRIVER=\"overlay\"\n      export PARAM_DOCKERFILE=\"./Dockerfile\"\n      export PARAM_CONTEXT=\".\"\n      export PARAM_TLSVERIFY=\"true\"\n      export PARAM_FORMAT=\"oci\"\n      export PARAM_BUILD_EXTRA_ARGS=\"\"\n      export PARAM_PUSH_EXTRA_ARGS=\"\"\n      export PARAM_SKIP_PUSH=\"false\"\n      buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" bud ${PARAM_BUILD_EXTRA_ARGS} \\\n        \"--format=${PARAM_FORMAT}\" \"--tls-verify=${PARAM_TLSVERIFY}\" \\\n        -f \"${PARAM_DOCKERFILE}\" -t \"${PARAM_IMAGE}\" \"${PARAM_CONTEXT}\"\n      [ \"${PARAM_SKIP_PUSH}\" = \"true\" ] && echo \"Push skipped\" && exit 0\n      buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" push \\\n        \"--tls-verify=${PARAM_TLSVERIFY}\" ${PARAM_PUSH_EXTRA_ARGS} \\\n        \"${PARAM_IMAGE}\" \"docker://${PARAM_IMAGE}\"\n      )\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:arg {}\nbuild-and-deploy:fetch-repository:\n  stage: stage-0\n  needs: []\n  rules:\n    - when: never\n  variables:\n    IMAGE: \"\"\n    GIT_SUBMODULE_STRATEGY: normal\n  script:\n    # pipemaster:emulated step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1\n    # pipemaster:arg {\"vars\":[\"GIT_SUBMODULE_STRATEGY\"]}\n    - \"true\"\n    # pipemaster:step fetch-repository-step-1\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy/job/update-deployment\n# pipemaster:arg {}\nbuild-and-deploy:update-deployment:\n  stage: stage-3\n  needs:\n    - build-and-deploy:apply-manifests\n  rules:\n    - when: never\n  variables:\n    IMAGE: \"\"\n  script:\n    # pipemaster:step patch\n    - |\n      /bin/bash -c 'oc patch deployment $(inputs.params.deployment) --patch='\\''{\"spec\":{\"template\":{\"spec\":{\n        \"containers\":[{\n          \"name\": \"$(inputs.params.deployment)\",\n          \"image\":\"$(inputs.params.IMAGE)\"\n        }]\n      }}}}'\\''\n\n      # issue: https://issues.redhat.com/browse/SRVKP-2387\n      # images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\n      # as a workaround update a label in template, which triggers redeploy pods\n      # target label: \"spec.template.metadata.labels.patched_at\"\n      # NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\n      patched_at_timestamp=`date +%s`\n      oc patch deployment $(inputs.params.deployment) --patch='\\''{\"spec\":{\"template\":{\"metadata\":{\n        \"labels\":{\n          \"patched_at\": '\\''\\\"$patched_at_timestamp\\\"'\\''\n        }\n      }}}}'\\'''\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr/job/fetch\n# pipemaster:arg {}\npipeline-tutorial-check-pr:fetch:\n  stage: stage-0\n  needs: []\n  rules:\n    - when: never\n  variables:\n    repo_url: \"\"\n    revision: \"\"\n    GIT_SUBMODULE_STRATEGY: normal\n  script:\n    # pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1\n    # pipemaster:arg {\"vars\":[\"GIT_SUBMODULE_STRATEGY\"]}\n    - \"true\"\n    # pipemaster:step fetch-step-1\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr/job/yaml-lint\n# pipemaster:arg {}\npipeline-tutorial-check-pr:yaml-lint:\n  stage: stage-1\n  image: docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\n  needs:\n    - pipeline-tutorial-check-pr:fetch\n  rules:\n    - when: never\n  variables:\n    repo_url: \"\"\n    revision: \"\"\n  script:\n    # pipemaster:step lint-yaml-files\n    - yamllint .\n"
+     "text": "# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"inputs\":[{\"Name\":\"IMAGE\",\"Type\":\"string\",\"Default\":\"\",\"Description\":\"image to be build from the code\",\"Required\":true}],\"triggers\":null}\n# pipemaster:emulated script.interpolation pipeline/build-and-deploy\n# pipemaster:arg [{\"k\":\"x\",\"p\":\"job/build-image/step/build-and-push/env/0\",\"g\":\"$IMAGE\",\"s\":\"inputs.IMAGE\"}]\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg {\"inputs\":[{\"Name\":\"repo_url\",\"Type\":\"\",\"Default\":\"\",\"Description\":\"\",\"Required\":true},{\"Name\":\"revision\",\"Type\":\"\",\"Default\":\"\",\"Description\":\"\",\"Required\":true}],\"triggers\":null}\n# pipemaster:emulated script.interpolation pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg [{\"k\":\"x\",\"p\":\"job/fetch/step/fetch-step-1/with/ref\",\"g\":\"$revision\",\"s\":\"inputs.revision\"}]\nstages:\n  - stage-0\n  - stage-1\n  - stage-2\n  - stage-3\nworkflow:\n  rules:\n    - when: never\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy/job/apply-manifests\n# pipemaster:arg {}\nbuild-and-deploy:apply-manifests:\n  stage: stage-2\n  needs:\n    - build-and-deploy:build-image\n  rules:\n    - when: never\n  variables:\n    IMAGE: \"\"\n  script:\n    # pipemaster:step apply\n    # pipemaster:emulated step.workdir pipeline/build-and-deploy/job/apply-manifests/step/apply\n    - |\n      (\n      cd \"/workspace/source\" || exit 1\n      /bin/bash -c 'echo Applying manifests in $(inputs.params.manifest_dir) directory\n      oc apply -f $(inputs.params.manifest_dir)\n      echo -----------------------------------'\n      )\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy/job/build-image\n# pipemaster:arg {}\nbuild-and-deploy:build-image:\n  stage: stage-1\n  image: quay.io/buildah/stable:v1\n  needs:\n    - build-and-deploy:fetch-repository\n  rules:\n    - when: never\n  variables:\n    IMAGE: \"\"\n  script:\n    # pipemaster:step build-image-checkout\n    # pipemaster:step build-and-push\n    # pipemaster:emulated step.env pipeline/build-and-deploy/job/build-image/step/build-and-push\n    - |\n      (\n      export PARAM_IMAGE=\"$IMAGE\"\n      export PARAM_STORAGE_DRIVER=\"overlay\"\n      export PARAM_DOCKERFILE=\"./Dockerfile\"\n      export PARAM_CONTEXT=\".\"\n      export PARAM_TLSVERIFY=\"true\"\n      export PARAM_FORMAT=\"oci\"\n      export PARAM_BUILD_EXTRA_ARGS=\"\"\n      export PARAM_PUSH_EXTRA_ARGS=\"\"\n      export PARAM_SKIP_PUSH=\"false\"\n      buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" bud ${PARAM_BUILD_EXTRA_ARGS} \"--format=${PARAM_FORMAT}\" \"--tls-verify=${PARAM_TLSVERIFY}\" -f \"${PARAM_DOCKERFILE}\" -t \"${PARAM_IMAGE}\" \"${PARAM_CONTEXT}\"\n      [ \"${PARAM_SKIP_PUSH}\" = \"true\" ] && echo \"Push skipped\" && exit 0\n      buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" push \"--tls-verify=${PARAM_TLSVERIFY}\" ${PARAM_PUSH_EXTRA_ARGS} \"${PARAM_IMAGE}\" \"docker://${PARAM_IMAGE}\"\n      )\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:arg {}\nbuild-and-deploy:fetch-repository:\n  stage: stage-0\n  needs: []\n  rules:\n    - when: never\n  variables:\n    IMAGE: \"\"\n    GIT_SUBMODULE_STRATEGY: normal\n  script:\n    # pipemaster:emulated step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1\n    # pipemaster:arg {\"vars\":[\"GIT_SUBMODULE_STRATEGY\"]}\n    - \"true\"\n    # pipemaster:step fetch-repository-step-1\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy/job/update-deployment\n# pipemaster:arg {}\nbuild-and-deploy:update-deployment:\n  stage: stage-3\n  needs:\n    - build-and-deploy:apply-manifests\n  rules:\n    - when: never\n  variables:\n    IMAGE: \"\"\n  script:\n    # pipemaster:step patch\n    - |\n      /bin/bash -c 'oc patch deployment $(inputs.params.deployment) --patch='\\''{\"spec\":{\"template\":{\"spec\":{\n        \"containers\":[{\n          \"name\": \"$(inputs.params.deployment)\",\n          \"image\":\"$(inputs.params.IMAGE)\"\n        }]\n      }}}}'\\''\n\n      # issue: https://issues.redhat.com/browse/SRVKP-2387\n      # images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\n      # as a workaround update a label in template, which triggers redeploy pods\n      # target label: \"spec.template.metadata.labels.patched_at\"\n      # NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\n      patched_at_timestamp=`date +%s`\n      oc patch deployment $(inputs.params.deployment) --patch='\\''{\"spec\":{\"template\":{\"metadata\":{\n        \"labels\":{\n          \"patched_at\": '\\''\\\"$patched_at_timestamp\\\"'\\''\n        }\n      }}}}'\\'''\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr/job/fetch\n# pipemaster:arg {}\npipeline-tutorial-check-pr:fetch:\n  stage: stage-0\n  needs: []\n  rules:\n    - when: never\n  variables:\n    repo_url: \"\"\n    revision: \"\"\n    GIT_SUBMODULE_STRATEGY: normal\n  script:\n    # pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1\n    # pipemaster:arg {\"vars\":[\"GIT_SUBMODULE_STRATEGY\"]}\n    - \"true\"\n    # pipemaster:step fetch-step-1\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr/job/yaml-lint\n# pipemaster:arg {}\npipeline-tutorial-check-pr:yaml-lint:\n  stage: stage-1\n  image: docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\n  needs:\n    - pipeline-tutorial-check-pr:fetch\n  rules:\n    - when: never\n  variables:\n    repo_url: \"\"\n    revision: \"\"\n  script:\n    # pipemaster:step yaml-lint-checkout\n    # pipemaster:step lint-yaml-files\n    - yamllint .\n"
     }
    ],
    "report": [
@@ -384,6 +433,13 @@
      "feature": "job.if",
      "level": "lost",
      "detail": "pipeline build-and-deploy has no trigger GitLab can express; job disabled"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.manifest_dir) is a Tekton variable with no IR reference; it stays in the text as written"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
@@ -489,6 +545,20 @@
      "detail": "pipeline build-and-deploy has no trigger GitLab can express; job disabled"
     },
     {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.deployment) is a Tekton variable with no IR reference; it stays in the text as written"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.IMAGE) is a Tekton variable with no IR reference; it stays in the text as written"
+    },
+    {
      "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -586,6 +656,20 @@
      "detail": "pipeline pipeline-tutorial-check-pr has no trigger GitLab can express; job disabled"
     },
     {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
+     "level": "external",
+     "strategy": "set up outside the file",
+     "detail": "the build runs buildah in a container and needs a privileged runner; the file does not set privileged mode"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
+     "level": "external",
+     "strategy": "set up outside the file",
+     "detail": "pushing the image needs registry credentials, which the catalog task reads from a dockerconfig workspace; the file sets no registry login"
+    },
+    {
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
      "feature": "step.workdir",
      "level": "emulated",
@@ -597,6 +681,13 @@
      "level": "emulated",
      "strategy": "mapped to the catalog task buildah",
      "detail": "the cluster or hub task version may differ from the mapped behaviour; the build needs a privileged runner and registry credentials that the file does not set, and the image digest and url results are not produced"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step in the job",
+     "detail": "the Tekton workspace is not shared between jobs, so the job clones the pipeline repository itself; a revision that an earlier git-clone task set is not carried over"
     },
     {
      "path": "pipeline/build-and-deploy/job/build-image/step/build-and-push",
@@ -638,6 +729,13 @@
      "level": "emulated",
      "strategy": "mapped to the catalog task yaml-lint",
      "detail": "the cluster or hub task version may differ from the mapped behaviour"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step in the job",
+     "detail": "the Tekton workspace is not shared between jobs, so the job clones the pipeline repository itself; a revision that an earlier git-clone task set is not carried over"
     }
    ]
   },
@@ -651,7 +749,7 @@
     },
     {
      "path": ".woodpecker/build-and-deploy-build-image.yaml",
-     "text": "# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"build-image\",\"p\":0,\"j\":1}\n# pipemaster:emulated job.container pipeline/build-and-deploy/job/build-image\n# pipemaster:arg {\"Ref\":\"quay.io/buildah/stable:v1\",\"Entrypoint\":null}\n# pipemaster:lost expr.opaque pipeline/build-and-deploy/job/build-image/step/build-and-push: inputs.IMAGE\n# pipemaster:emulated expr.opaque pipeline/build-and-deploy/job/build-image/step/build-and-push\n# pipemaster:arg {\"vars\":\"- name: PARAM_IMAGE\\n  value:\\n    expr: inputs.IMAGE\\n\",\"at\":[0],\"pos\":0}\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\ndepends_on:\n  - build-and-deploy-fetch-repository\nsteps:\n  - name: build-and-push\n    image: quay.io/buildah/stable:v1\n    commands:\n      - buildah \"--storage-driver=$${PARAM_STORAGE_DRIVER}\" bud $${PARAM_BUILD_EXTRA_ARGS} \\\n      - '  \"--format=$${PARAM_FORMAT}\" \"--tls-verify=$${PARAM_TLSVERIFY}\" \\'\n      - '  -f \"$${PARAM_DOCKERFILE}\" -t \"$${PARAM_IMAGE}\" \"$${PARAM_CONTEXT}\"'\n      - '[ \"$${PARAM_SKIP_PUSH}\" = \"true\" ] && echo \"Push skipped\" && exit 0'\n      - buildah \"--storage-driver=$${PARAM_STORAGE_DRIVER}\" push \\\n      - '  \"--tls-verify=$${PARAM_TLSVERIFY}\" $${PARAM_PUSH_EXTRA_ARGS} \\'\n      - '  \"$${PARAM_IMAGE}\" \"docker://$${PARAM_IMAGE}\"'\n    environment:\n      PARAM_STORAGE_DRIVER: overlay\n      PARAM_DOCKERFILE: ./Dockerfile\n      PARAM_CONTEXT: .\n      PARAM_TLSVERIFY: \"true\"\n      PARAM_FORMAT: oci\n      PARAM_BUILD_EXTRA_ARGS: \"\"\n      PARAM_PUSH_EXTRA_ARGS: \"\"\n      PARAM_SKIP_PUSH: \"false\"\n"
+     "text": "# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"build-image\",\"p\":0,\"j\":1}\n# pipemaster:emulated job.container pipeline/build-and-deploy/job/build-image\n# pipemaster:arg {\"Ref\":\"quay.io/buildah/stable:v1\",\"Entrypoint\":null}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/build-image/step/build-image-checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: build-image-checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:lost expr.opaque pipeline/build-and-deploy/job/build-image/step/build-and-push: inputs.IMAGE\n# pipemaster:emulated expr.opaque pipeline/build-and-deploy/job/build-image/step/build-and-push\n# pipemaster:arg {\"vars\":\"- name: PARAM_IMAGE\\n  value:\\n    expr: inputs.IMAGE\\n\",\"at\":[0],\"pos\":0}\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\ndepends_on:\n  - build-and-deploy-fetch-repository\nsteps:\n  - name: build-and-push\n    image: quay.io/buildah/stable:v1\n    commands:\n      - buildah \"--storage-driver=$${PARAM_STORAGE_DRIVER}\" bud $${PARAM_BUILD_EXTRA_ARGS} \"--format=$${PARAM_FORMAT}\" \"--tls-verify=$${PARAM_TLSVERIFY}\" -f \"$${PARAM_DOCKERFILE}\" -t \"$${PARAM_IMAGE}\" \"$${PARAM_CONTEXT}\"\n      - '[ \"$${PARAM_SKIP_PUSH}\" = \"true\" ] && echo \"Push skipped\" && exit 0'\n      - buildah \"--storage-driver=$${PARAM_STORAGE_DRIVER}\" push \"--tls-verify=$${PARAM_TLSVERIFY}\" $${PARAM_PUSH_EXTRA_ARGS} \"$${PARAM_IMAGE}\" \"docker://$${PARAM_IMAGE}\"\n    environment:\n      PARAM_STORAGE_DRIVER: overlay\n      PARAM_DOCKERFILE: ./Dockerfile\n      PARAM_CONTEXT: .\n      PARAM_TLSVERIFY: \"true\"\n      PARAM_FORMAT: oci\n      PARAM_BUILD_EXTRA_ARGS: \"\"\n      PARAM_PUSH_EXTRA_ARGS: \"\"\n      PARAM_SKIP_PUSH: \"false\"\n"
     },
     {
      "path": ".woodpecker/build-and-deploy-fetch-repository.yaml",
@@ -667,7 +765,7 @@
     },
     {
      "path": ".woodpecker/pipeline-tutorial-check-pr-yaml-lint.yaml",
-     "text": "# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg {\"pipeline\":\"pipeline-tutorial-check-pr\",\"job\":\"yaml-lint\",\"p\":1,\"j\":1}\n# pipemaster:emulated job.container pipeline/pipeline-tutorial-check-pr/job/yaml-lint\n# pipemaster:arg {\"Ref\":\"docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\",\"Entrypoint\":null}\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\ndepends_on:\n  - pipeline-tutorial-check-pr-fetch\nsteps:\n  - name: lint-yaml-files\n    image: docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\n    commands:\n      - yamllint .\n"
+     "text": "# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg {\"pipeline\":\"pipeline-tutorial-check-pr\",\"job\":\"yaml-lint\",\"p\":1,\"j\":1}\n# pipemaster:emulated job.container pipeline/pipeline-tutorial-check-pr/job/yaml-lint\n# pipemaster:arg {\"Ref\":\"docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\",\"Entrypoint\":null}\n# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: yaml-lint-checkout\\nkind: action\\n\",\"at\":0}\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\ndepends_on:\n  - pipeline-tutorial-check-pr-fetch\nsteps:\n  - name: lint-yaml-files\n    image: docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\n    commands:\n      - yamllint .\n"
     }
    ],
    "report": [
@@ -716,6 +814,13 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider tekton (task_name, task_params, task_workspaces, workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.manifest_dir) is a Tekton variable with no IR reference; it stays in the text as written"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
@@ -807,6 +912,20 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider tekton (task_name, task_params, unused_params) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.deployment) is a Tekton variable with no IR reference; it stays in the text as written"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.IMAGE) is a Tekton variable with no IR reference; it stays in the text as written"
     },
     {
      "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
@@ -902,9 +1021,30 @@
     {
      "path": "pipeline/build-and-deploy/job/build-image",
      "feature": "step.action",
+     "level": "external",
+     "strategy": "set up outside the file",
+     "detail": "the build runs buildah in a container and needs a privileged runner; the file does not set privileged mode"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
+     "level": "external",
+     "strategy": "set up outside the file",
+     "detail": "pushing the image needs registry credentials, which the catalog task reads from a dockerconfig workspace; the file sets no registry login"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
      "level": "emulated",
      "strategy": "mapped to the catalog task buildah",
      "detail": "the cluster or hub task version may differ from the mapped behaviour; the build needs a privileged runner and registry credentials that the file does not set, and the image digest and url results are not produced"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step in the job",
+     "detail": "the Tekton workspace is not shared between jobs, so the job clones the pipeline repository itself; a revision that an earlier git-clone task set is not carried over"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -961,6 +1101,13 @@
      "level": "emulated",
      "strategy": "mapped to the catalog task yaml-lint",
      "detail": "the cluster or hub task version may differ from the mapped behaviour"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step in the job",
+     "detail": "the Tekton workspace is not shared between jobs, so the job clones the pipeline repository itself; a revision that an earlier git-clone task set is not carried over"
     }
    ]
   },
@@ -970,7 +1117,7 @@
    "files": [
     {
      "path": ".drone.yml",
-     "text": "# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"apply-manifests\",\"p\":0,\"j\":0}\nkind: pipeline\ntype: docker\nname: build-and-deploy-apply-manifests\ndepends_on:\n  - build-and-deploy-build-image\nsteps:\n  - name: apply\n    image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n    commands:\n      - |-\n        /bin/bash -c 'echo Applying manifests in $$(inputs.params.manifest_dir) directory\n        oc apply -f $$(inputs.params.manifest_dir)\n        echo -----------------------------------'\n    working_dir: /workspace/source\n---\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"build-image\",\"p\":0,\"j\":1}\n# pipemaster:lost expr.opaque pipeline/build-and-deploy/job/build-image/step/build-and-push: inputs.IMAGE\n# pipemaster:emulated job.container pipeline/build-and-deploy/job/build-image\n# pipemaster:arg {\"Ref\":\"quay.io/buildah/stable:v1\",\"Entrypoint\":null,\"taken\":1}\nkind: pipeline\ntype: docker\nname: build-and-deploy-build-image\ndepends_on:\n  - build-and-deploy-fetch-repository\nsteps:\n  - name: build-and-push\n    image: quay.io/buildah/stable:v1\n    commands:\n      - buildah \"--storage-driver=$${PARAM_STORAGE_DRIVER}\" bud $${PARAM_BUILD_EXTRA_ARGS} \\\n      - '  \"--format=$${PARAM_FORMAT}\" \"--tls-verify=$${PARAM_TLSVERIFY}\" \\'\n      - '  -f \"$${PARAM_DOCKERFILE}\" -t \"$${PARAM_IMAGE}\" \"$${PARAM_CONTEXT}\"'\n      - '[ \"$${PARAM_SKIP_PUSH}\" = \"true\" ] && echo \"Push skipped\" && exit 0'\n      - buildah \"--storage-driver=$${PARAM_STORAGE_DRIVER}\" push \\\n      - '  \"--tls-verify=$${PARAM_TLSVERIFY}\" $${PARAM_PUSH_EXTRA_ARGS} \\'\n      - '  \"$${PARAM_IMAGE}\" \"docker://$${PARAM_IMAGE}\"'\n    environment:\n      PARAM_STORAGE_DRIVER: overlay\n      PARAM_DOCKERFILE: ./Dockerfile\n      PARAM_CONTEXT: .\n      PARAM_TLSVERIFY: \"true\"\n      PARAM_FORMAT: oci\n      PARAM_BUILD_EXTRA_ARGS: \"\"\n      PARAM_PUSH_EXTRA_ARGS: \"\"\n      PARAM_SKIP_PUSH: \"false\"\n---\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"fetch-repository\",\"p\":0,\"j\":2}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nwith:\\n    ref:\\n        expr: inputs.git-revision\\n    submodules:\\n        lit: \\\"true\\\"\\nid: fetch-repository-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:emulated job.container pipeline/build-and-deploy/job/fetch-repository\nkind: pipeline\ntype: docker\nname: build-and-deploy-fetch-repository\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n---\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"update-deployment\",\"p\":0,\"j\":3}\nkind: pipeline\ntype: docker\nname: build-and-deploy-update-deployment\ndepends_on:\n  - build-and-deploy-apply-manifests\nsteps:\n  - name: patch\n    image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n    commands:\n      - |-\n        /bin/bash -c 'oc patch deployment $$(inputs.params.deployment) --patch='\\''{\"spec\":{\"template\":{\"spec\":{\n          \"containers\":[{\n            \"name\": \"$$(inputs.params.deployment)\",\n            \"image\":\"$$(inputs.params.IMAGE)\"\n          }]\n        }}}}'\\''\n\n        # issue: https://issues.redhat.com/browse/SRVKP-2387\n        # images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\n        # as a workaround update a label in template, which triggers redeploy pods\n        # target label: \"spec.template.metadata.labels.patched_at\"\n        # NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\n        patched_at_timestamp=`date +%s`\n        oc patch deployment $$(inputs.params.deployment) --patch='\\''{\"spec\":{\"template\":{\"metadata\":{\n          \"labels\":{\n            \"patched_at\": '\\''\\\"$$patched_at_timestamp\\\"'\\''\n          }\n        }}}}'\\'''\n---\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg {\"pipeline\":\"pipeline-tutorial-check-pr\",\"job\":\"fetch\",\"p\":1,\"j\":0}\n# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nwith:\\n    ref:\\n        expr: inputs.revision\\n    submodules:\\n        lit: \\\"true\\\"\\nid: fetch-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/pipeline-tutorial-check-pr/job/fetch\n# pipemaster:emulated job.container pipeline/pipeline-tutorial-check-pr/job/fetch\nkind: pipeline\ntype: docker\nname: pipeline-tutorial-check-pr-fetch\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n---\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg {\"pipeline\":\"pipeline-tutorial-check-pr\",\"job\":\"yaml-lint\",\"p\":1,\"j\":1}\n# pipemaster:emulated job.container pipeline/pipeline-tutorial-check-pr/job/yaml-lint\n# pipemaster:arg {\"Ref\":\"docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\",\"Entrypoint\":null,\"taken\":1}\nkind: pipeline\ntype: docker\nname: pipeline-tutorial-check-pr-yaml-lint\ndepends_on:\n  - pipeline-tutorial-check-pr-fetch\nsteps:\n  - name: lint-yaml-files\n    image: docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\n    commands:\n      - yamllint .\n"
+     "text": "# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"apply-manifests\",\"p\":0,\"j\":0}\nkind: pipeline\ntype: docker\nname: build-and-deploy-apply-manifests\ndepends_on:\n  - build-and-deploy-build-image\nsteps:\n  - name: apply\n    image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n    commands:\n      - |-\n        /bin/bash -c 'echo Applying manifests in $$(inputs.params.manifest_dir) directory\n        oc apply -f $$(inputs.params.manifest_dir)\n        echo -----------------------------------'\n    working_dir: /workspace/source\n---\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"build-image\",\"p\":0,\"j\":1}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/build-image/step/build-image-checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: build-image-checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:lost expr.opaque pipeline/build-and-deploy/job/build-image/step/build-and-push: inputs.IMAGE\n# pipemaster:emulated job.container pipeline/build-and-deploy/job/build-image\n# pipemaster:arg {\"Ref\":\"quay.io/buildah/stable:v1\",\"Entrypoint\":null,\"taken\":1}\nkind: pipeline\ntype: docker\nname: build-and-deploy-build-image\ndepends_on:\n  - build-and-deploy-fetch-repository\nsteps:\n  - name: build-and-push\n    image: quay.io/buildah/stable:v1\n    commands:\n      - buildah \"--storage-driver=$${PARAM_STORAGE_DRIVER}\" bud $${PARAM_BUILD_EXTRA_ARGS} \"--format=$${PARAM_FORMAT}\" \"--tls-verify=$${PARAM_TLSVERIFY}\" -f \"$${PARAM_DOCKERFILE}\" -t \"$${PARAM_IMAGE}\" \"$${PARAM_CONTEXT}\"\n      - '[ \"$${PARAM_SKIP_PUSH}\" = \"true\" ] && echo \"Push skipped\" && exit 0'\n      - buildah \"--storage-driver=$${PARAM_STORAGE_DRIVER}\" push \"--tls-verify=$${PARAM_TLSVERIFY}\" $${PARAM_PUSH_EXTRA_ARGS} \"$${PARAM_IMAGE}\" \"docker://$${PARAM_IMAGE}\"\n    environment:\n      PARAM_STORAGE_DRIVER: overlay\n      PARAM_DOCKERFILE: ./Dockerfile\n      PARAM_CONTEXT: .\n      PARAM_TLSVERIFY: \"true\"\n      PARAM_FORMAT: oci\n      PARAM_BUILD_EXTRA_ARGS: \"\"\n      PARAM_PUSH_EXTRA_ARGS: \"\"\n      PARAM_SKIP_PUSH: \"false\"\n---\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"fetch-repository\",\"p\":0,\"j\":2}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nwith:\\n    ref:\\n        expr: inputs.git-revision\\n    submodules:\\n        lit: \\\"true\\\"\\nid: fetch-repository-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:emulated job.container pipeline/build-and-deploy/job/fetch-repository\nkind: pipeline\ntype: docker\nname: build-and-deploy-fetch-repository\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n---\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"update-deployment\",\"p\":0,\"j\":3}\nkind: pipeline\ntype: docker\nname: build-and-deploy-update-deployment\ndepends_on:\n  - build-and-deploy-apply-manifests\nsteps:\n  - name: patch\n    image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n    commands:\n      - |-\n        /bin/bash -c 'oc patch deployment $$(inputs.params.deployment) --patch='\\''{\"spec\":{\"template\":{\"spec\":{\n          \"containers\":[{\n            \"name\": \"$$(inputs.params.deployment)\",\n            \"image\":\"$$(inputs.params.IMAGE)\"\n          }]\n        }}}}'\\''\n\n        # issue: https://issues.redhat.com/browse/SRVKP-2387\n        # images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\n        # as a workaround update a label in template, which triggers redeploy pods\n        # target label: \"spec.template.metadata.labels.patched_at\"\n        # NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\n        patched_at_timestamp=`date +%s`\n        oc patch deployment $$(inputs.params.deployment) --patch='\\''{\"spec\":{\"template\":{\"metadata\":{\n          \"labels\":{\n            \"patched_at\": '\\''\\\"$$patched_at_timestamp\\\"'\\''\n          }\n        }}}}'\\'''\n---\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg {\"pipeline\":\"pipeline-tutorial-check-pr\",\"job\":\"fetch\",\"p\":1,\"j\":0}\n# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nwith:\\n    ref:\\n        expr: inputs.revision\\n    submodules:\\n        lit: \\\"true\\\"\\nid: fetch-step-1\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/pipeline-tutorial-check-pr/job/fetch\n# pipemaster:emulated job.container pipeline/pipeline-tutorial-check-pr/job/fetch\nkind: pipeline\ntype: docker\nname: pipeline-tutorial-check-pr-fetch\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n---\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg {\"pipeline\":\"pipeline-tutorial-check-pr\",\"job\":\"yaml-lint\",\"p\":1,\"j\":1}\n# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: yaml-lint-checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/pipeline-tutorial-check-pr/job/yaml-lint\n# pipemaster:arg {\"Ref\":\"docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\",\"Entrypoint\":null,\"taken\":1}\nkind: pipeline\ntype: docker\nname: pipeline-tutorial-check-pr-yaml-lint\ndepends_on:\n  - pipeline-tutorial-check-pr-fetch\nsteps:\n  - name: lint-yaml-files\n    image: docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\n    commands:\n      - yamllint .\n"
     }
    ],
    "report": [
@@ -1019,6 +1166,13 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider tekton (task_name, task_params, task_workspaces, workspaces) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.manifest_dir) is a Tekton variable with no IR reference; it stays in the text as written"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
@@ -1110,6 +1264,20 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider tekton (task_name, task_params, unused_params) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.deployment) is a Tekton variable with no IR reference; it stays in the text as written"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.IMAGE) is a Tekton variable with no IR reference; it stays in the text as written"
     },
     {
      "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
@@ -1205,9 +1373,37 @@
     {
      "path": "pipeline/build-and-deploy/job/build-image",
      "feature": "step.action",
+     "level": "external",
+     "strategy": "set up outside the file",
+     "detail": "the build runs buildah in a container and needs a privileged runner; the file does not set privileged mode"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
+     "level": "external",
+     "strategy": "set up outside the file",
+     "detail": "pushing the image needs registry credentials, which the catalog task reads from a dockerconfig workspace; the file sets no registry login"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
      "level": "emulated",
      "strategy": "mapped to the catalog task buildah",
      "detail": "the cluster or hub task version may differ from the mapped behaviour; the build needs a privileged runner and registry credentials that the file does not set, and the image digest and url results are not produced"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step in the job",
+     "detail": "the Tekton workspace is not shared between jobs, so the job clones the pipeline repository itself; a revision that an earlier git-clone task set is not carried over"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-checkout",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "per actions.Lookup verdict; a plugin step with settings",
+     "detail": "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -1264,6 +1460,20 @@
      "level": "emulated",
      "strategy": "mapped to the catalog task yaml-lint",
      "detail": "the cluster or hub task version may differ from the mapped behaviour"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step in the job",
+     "detail": "the Tekton workspace is not shared between jobs, so the job clones the pipeline repository itself; a revision that an earlier git-clone task set is not carried over"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-checkout",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "per actions.Lookup verdict; a plugin step with settings",
+     "detail": "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"
     }
    ]
   },
@@ -1273,11 +1483,11 @@
    "files": [
     {
      "path": ".argo/workflows/build-and-deploy.yaml",
-     "text": "# pipemaster:emulated step.image pipeline/build-and-deploy/job/apply-manifests\n# pipemaster:arg {\"steps\":{\"apply\":\"ref: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\\n\"},\"wrote\":{\"apply\":\"image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\"}}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nwith:\\n    ref:\\n        expr: inputs.git-revision\\n    submodules:\\n        lit: \\\"true\\\"\\nid: fetch-repository-step-1\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.git-revision}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:arg {}\n# pipemaster:emulated step.image pipeline/build-and-deploy/job/update-deployment\n# pipemaster:arg {\"steps\":{\"patch\":\"ref: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\\n\"},\"wrote\":{\"patch\":\"image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\"}}\n# pipemaster:emulated pipeline.inputs pipeline/build-and-deploy\n# pipemaster:arg {\"types\":{\"IMAGE\":\"string\",\"deployment-name\":\"string\",\"git-revision\":\"string\",\"git-url\":\"string\"},\"required\":[\"deployment-name\",\"git-url\",\"IMAGE\"]}\napiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata:\n  name: build-and-deploy\nspec:\n  entrypoint: main\n  arguments:\n    parameters:\n      - name: deployment-name\n        description: name of the deployment to be patched\n      - name: git-url\n        description: url of the git repo for the code of deployment\n      - name: git-revision\n        value: master\n        description: revision to be used from repo of the code for deployment\n      - name: IMAGE\n        description: image to be build from the code\n      - name: ctx-repo\n        value: \"\"\n  templates:\n    - name: main\n      dag:\n        tasks:\n          - name: apply-manifests\n            template: apply-manifests\n            dependencies:\n              - build-image\n          - name: build-image\n            template: build-image\n            dependencies:\n              - fetch-repository\n          - name: fetch-repository\n            template: fetch-repository\n          - name: update-deployment\n            template: update-deployment\n            dependencies:\n              - apply-manifests\n    - name: apply-manifests\n      containerSet:\n        containers:\n          - name: apply\n            image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n            command:\n              - sh\n              - -ec\n            args:\n              - |-\n                /bin/bash -c 'echo Applying manifests in $(inputs.params.manifest_dir) directory\n                oc apply -f $(inputs.params.manifest_dir)\n                echo -----------------------------------'\n            workingDir: /workspace/source\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: build-image\n      containerSet:\n        containers:\n          - name: build-and-push\n            image: quay.io/buildah/stable:v1\n            command:\n              - sh\n              - -ec\n            args:\n              - |-\n                buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" bud ${PARAM_BUILD_EXTRA_ARGS} \\\n                  \"--format=${PARAM_FORMAT}\" \"--tls-verify=${PARAM_TLSVERIFY}\" \\\n                  -f \"${PARAM_DOCKERFILE}\" -t \"${PARAM_IMAGE}\" \"${PARAM_CONTEXT}\"\n                [ \"${PARAM_SKIP_PUSH}\" = \"true\" ] && echo \"Push skipped\" && exit 0\n                buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" push \\\n                  \"--tls-verify=${PARAM_TLSVERIFY}\" ${PARAM_PUSH_EXTRA_ARGS} \\\n                  \"${PARAM_IMAGE}\" \"docker://${PARAM_IMAGE}\"\n            workingDir: /workspace\n            env:\n              - name: PARAM_IMAGE\n                value: '{{workflow.parameters.IMAGE}}'\n              - name: PARAM_STORAGE_DRIVER\n                value: overlay\n              - name: PARAM_DOCKERFILE\n                value: ./Dockerfile\n              - name: PARAM_CONTEXT\n                value: .\n              - name: PARAM_TLSVERIFY\n                value: \"true\"\n              - name: PARAM_FORMAT\n                value: oci\n              - name: PARAM_BUILD_EXTRA_ARGS\n                value: \"\"\n              - name: PARAM_PUSH_EXTRA_ARGS\n                value: \"\"\n              - name: PARAM_SKIP_PUSH\n                value: \"false\"\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: fetch-repository\n      containerSet:\n        containers:\n          - name: main\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.git-revision}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: update-deployment\n      containerSet:\n        containers:\n          - name: patch\n            image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n            command:\n              - sh\n              - -ec\n            args:\n              - |-\n                /bin/bash -c 'oc patch deployment $(inputs.params.deployment) --patch='\\''{\"spec\":{\"template\":{\"spec\":{\n                  \"containers\":[{\n                    \"name\": \"$(inputs.params.deployment)\",\n                    \"image\":\"$(inputs.params.IMAGE)\"\n                  }]\n                }}}}'\\''\n\n                # issue: https://issues.redhat.com/browse/SRVKP-2387\n                # images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\n                # as a workaround update a label in template, which triggers redeploy pods\n                # target label: \"spec.template.metadata.labels.patched_at\"\n                # NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\n                patched_at_timestamp=`date +%s`\n                oc patch deployment $(inputs.params.deployment) --patch='\\''{\"spec\":{\"template\":{\"metadata\":{\n                  \"labels\":{\n                    \"patched_at\": '\\''\\\"$patched_at_timestamp\\\"'\\''\n                  }\n                }}}}'\\'''\n            workingDir: /workspace\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n"
+     "text": "# pipemaster:emulated step.image pipeline/build-and-deploy/job/apply-manifests\n# pipemaster:arg {\"steps\":{\"apply\":\"ref: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\\n\"},\"wrote\":{\"apply\":\"image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\"}}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/build-image/step/build-image-checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: build-image-checkout\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.ctx-sha}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nwith:\\n    ref:\\n        expr: inputs.git-revision\\n    submodules:\\n        lit: \\\"true\\\"\\nid: fetch-repository-step-1\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.git-revision}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:arg {}\n# pipemaster:emulated step.image pipeline/build-and-deploy/job/update-deployment\n# pipemaster:arg {\"steps\":{\"patch\":\"ref: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\\n\"},\"wrote\":{\"patch\":\"image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\"}}\n# pipemaster:emulated pipeline.inputs pipeline/build-and-deploy\n# pipemaster:arg {\"types\":{\"IMAGE\":\"string\",\"deployment-name\":\"string\",\"git-revision\":\"string\",\"git-url\":\"string\"},\"required\":[\"deployment-name\",\"git-url\",\"IMAGE\"]}\napiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata:\n  name: build-and-deploy\nspec:\n  entrypoint: main\n  arguments:\n    parameters:\n      - name: deployment-name\n        description: name of the deployment to be patched\n      - name: git-url\n        description: url of the git repo for the code of deployment\n      - name: git-revision\n        value: master\n        description: revision to be used from repo of the code for deployment\n      - name: IMAGE\n        description: image to be build from the code\n      - name: ctx-sha\n        value: \"\"\n      - name: ctx-repo\n        value: \"\"\n  templates:\n    - name: main\n      dag:\n        tasks:\n          - name: apply-manifests\n            template: apply-manifests\n            dependencies:\n              - build-image\n          - name: build-image\n            template: build-image\n            dependencies:\n              - fetch-repository\n          - name: fetch-repository\n            template: fetch-repository\n          - name: update-deployment\n            template: update-deployment\n            dependencies:\n              - apply-manifests\n    - name: apply-manifests\n      containerSet:\n        containers:\n          - name: apply\n            image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n            command:\n              - sh\n              - -ec\n            args:\n              - |-\n                /bin/bash -c 'echo Applying manifests in $(inputs.params.manifest_dir) directory\n                oc apply -f $(inputs.params.manifest_dir)\n                echo -----------------------------------'\n            workingDir: /workspace/source\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: build-image\n      containerSet:\n        containers:\n          - # pipemaster:id build-and-push\n            name: main\n            image: quay.io/buildah/stable:v1\n            command:\n              - sh\n              - -ec\n            args:\n              - |-\n                buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" bud ${PARAM_BUILD_EXTRA_ARGS} \"--format=${PARAM_FORMAT}\" \"--tls-verify=${PARAM_TLSVERIFY}\" -f \"${PARAM_DOCKERFILE}\" -t \"${PARAM_IMAGE}\" \"${PARAM_CONTEXT}\"\n                [ \"${PARAM_SKIP_PUSH}\" = \"true\" ] && echo \"Push skipped\" && exit 0\n                buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" push \"--tls-verify=${PARAM_TLSVERIFY}\" ${PARAM_PUSH_EXTRA_ARGS} \"${PARAM_IMAGE}\" \"docker://${PARAM_IMAGE}\"\n            workingDir: /workspace\n            env:\n              - name: PARAM_IMAGE\n                value: '{{workflow.parameters.IMAGE}}'\n              - name: PARAM_STORAGE_DRIVER\n                value: overlay\n              - name: PARAM_DOCKERFILE\n                value: ./Dockerfile\n              - name: PARAM_CONTEXT\n                value: .\n              - name: PARAM_TLSVERIFY\n                value: \"true\"\n              - name: PARAM_FORMAT\n                value: oci\n              - name: PARAM_BUILD_EXTRA_ARGS\n                value: \"\"\n              - name: PARAM_PUSH_EXTRA_ARGS\n                value: \"\"\n              - name: PARAM_SKIP_PUSH\n                value: \"false\"\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.ctx-sha}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: fetch-repository\n      containerSet:\n        containers:\n          - name: main\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.git-revision}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: update-deployment\n      containerSet:\n        containers:\n          - name: patch\n            image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n            command:\n              - sh\n              - -ec\n            args:\n              - |-\n                /bin/bash -c 'oc patch deployment $(inputs.params.deployment) --patch='\\''{\"spec\":{\"template\":{\"spec\":{\n                  \"containers\":[{\n                    \"name\": \"$(inputs.params.deployment)\",\n                    \"image\":\"$(inputs.params.IMAGE)\"\n                  }]\n                }}}}'\\''\n\n                # issue: https://issues.redhat.com/browse/SRVKP-2387\n                # images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\n                # as a workaround update a label in template, which triggers redeploy pods\n                # target label: \"spec.template.metadata.labels.patched_at\"\n                # NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\n                patched_at_timestamp=`date +%s`\n                oc patch deployment $(inputs.params.deployment) --patch='\\''{\"spec\":{\"template\":{\"metadata\":{\n                  \"labels\":{\n                    \"patched_at\": '\\''\\\"$patched_at_timestamp\\\"'\\''\n                  }\n                }}}}'\\'''\n            workingDir: /workspace\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n"
     },
     {
      "path": ".argo/workflows/pipeline-tutorial-check-pr.yaml",
-     "text": "# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nwith:\\n    ref:\\n        expr: inputs.revision\\n    submodules:\\n        lit: \\\"true\\\"\\nid: fetch-step-1\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.revision}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.script pipeline/pipeline-tutorial-check-pr/job/fetch\n# pipemaster:arg {}\n# pipemaster:emulated pipeline.inputs pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg {\"required\":[\"repo_url\",\"revision\"]}\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\napiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata:\n  name: pipeline-tutorial-check-pr\nspec:\n  entrypoint: main\n  arguments:\n    parameters:\n      - name: repo_url\n      - name: revision\n      - name: ctx-repo\n        value: \"\"\n  templates:\n    - name: main\n      dag:\n        tasks:\n          - name: fetch\n            template: fetch\n          - name: yaml-lint\n            template: yaml-lint\n            dependencies:\n              - fetch\n    - name: fetch\n      containerSet:\n        containers:\n          - name: main\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.revision}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: yaml-lint\n      containerSet:\n        containers:\n          - name: lint-yaml-files\n            image: docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\n            command:\n              - sh\n              - -ec\n            args:\n              - yamllint .\n            workingDir: /workspace\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n"
+     "text": "# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nwith:\\n    ref:\\n        expr: inputs.revision\\n    submodules:\\n        lit: \\\"true\\\"\\nid: fetch-step-1\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.revision}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.script pipeline/pipeline-tutorial-check-pr/job/fetch\n# pipemaster:arg {}\n# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: yaml-lint-checkout\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.ctx-sha}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated pipeline.inputs pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg {\"required\":[\"repo_url\",\"revision\"]}\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\napiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata:\n  name: pipeline-tutorial-check-pr\nspec:\n  entrypoint: main\n  arguments:\n    parameters:\n      - name: repo_url\n      - name: revision\n      - name: ctx-sha\n        value: \"\"\n      - name: ctx-repo\n        value: \"\"\n  templates:\n    - name: main\n      dag:\n        tasks:\n          - name: fetch\n            template: fetch\n          - name: yaml-lint\n            template: yaml-lint\n            dependencies:\n              - fetch\n    - name: fetch\n      containerSet:\n        containers:\n          - name: main\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.revision}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: yaml-lint\n      containerSet:\n        containers:\n          - # pipemaster:id lint-yaml-files\n            name: main\n            image: docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\n            command:\n              - sh\n              - -ec\n            args:\n              - yamllint .\n            workingDir: /workspace\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.ctx-sha}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n"
     }
    ],
    "report": [
@@ -1320,6 +1530,13 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider tekton (task_name, task_params, task_workspaces, workspaces) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.manifest_dir) is a Tekton variable with no IR reference; it stays in the text as written"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
@@ -1399,6 +1616,20 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider tekton (task_name, task_params, unused_params) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.deployment) is a Tekton variable with no IR reference; it stays in the text as written"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.IMAGE) is a Tekton variable with no IR reference; it stays in the text as written"
     },
     {
      "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
@@ -1482,9 +1713,44 @@
     {
      "path": "pipeline/build-and-deploy/job/build-image",
      "feature": "step.action",
+     "level": "external",
+     "strategy": "set up outside the file",
+     "detail": "the build runs buildah in a container and needs a privileged runner; the file does not set privileged mode"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
+     "level": "external",
+     "strategy": "set up outside the file",
+     "detail": "pushing the image needs registry credentials, which the catalog task reads from a dockerconfig workspace; the file sets no registry login"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-checkout",
+     "feature": "step.action",
+     "level": "external",
+     "strategy": "input git artifact at /workspace",
+     "detail": "the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; a private repository needs usernameSecret and passwordSecret, or sshPrivateKeySecret, on the git artifact; the file names none"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-checkout",
+     "feature": "step.action",
+     "level": "external",
+     "strategy": "input git artifact at /workspace",
+     "detail": "the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; a private repository needs usernameSecret and passwordSecret, or sshPrivateKeySecret, on the git artifact; the file names none"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
      "level": "emulated",
      "strategy": "mapped to the catalog task buildah",
      "detail": "the cluster or hub task version may differ from the mapped behaviour; the build needs a privileged runner and registry credentials that the file does not set, and the image digest and url results are not produced"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step in the job",
+     "detail": "the Tekton workspace is not shared between jobs, so the job clones the pipeline repository itself; a revision that an earlier git-clone task set is not carried over"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -1527,6 +1793,13 @@
      "level": "emulated",
      "strategy": "mapped to the catalog task yaml-lint",
      "detail": "the cluster or hub task version may differ from the mapped behaviour"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step in the job",
+     "detail": "the Tekton workspace is not shared between jobs, so the job clones the pipeline repository itself; a revision that an earlier git-clone task set is not carried over"
     }
    ]
   },
@@ -1536,11 +1809,11 @@
    "files": [
     {
      "path": ".concourse/build-and-deploy.yml",
-     "text": "# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/apply-manifests/step/apply/carry\n# pipemaster:arg {\"digest\":\"1d3573cd8162bf776a903c8876c77706b6824f8c41babd6113bad6317b3697c3\",\"carry\":\"image:\\n    ref: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\\nid: apply\\nkind: script\\nworkdir: /workspace/source\\nscript:\\n    - |-\\n      /bin/bash -c 'echo Applying manifests in $(inputs.params.manifest_dir) directory\\n      oc apply -f $(inputs.params.manifest_dir)\\n      echo -----------------------------------'\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/apply-manifests/carry\n# pipemaster:arg {\"digest\":\"524d72a9ddc6a3717d69c17998be28acc44f88dc074039de42d8fd5c705a7bc3\",\"carry\":\"id: apply-manifests\\nneeds:\\n    - job: build-image\\n\"}\n# pipemaster:lost env PARAM_IMAGE: inputs.IMAGE\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/build-image/step/build-and-push/carry\n# pipemaster:arg {\"digest\":\"aa3e643b41e9feb6884736a96ce3c571fb08f4e1a0f6d2fee6eff74731088b0e\",\"carry\":\"id: build-and-push\\nkind: script\\nenv:\\n    - name: PARAM_IMAGE\\n      value:\\n        expr: inputs.IMAGE\\n    - name: PARAM_STORAGE_DRIVER\\n      value:\\n        lit: overlay\\n    - name: PARAM_DOCKERFILE\\n      value:\\n        lit: ./Dockerfile\\n    - name: PARAM_CONTEXT\\n      value:\\n        lit: .\\n    - name: PARAM_TLSVERIFY\\n      value:\\n        lit: \\\"true\\\"\\n    - name: PARAM_FORMAT\\n      value:\\n        lit: oci\\n    - name: PARAM_BUILD_EXTRA_ARGS\\n      value:\\n        lit: \\\"\\\"\\n    - name: PARAM_PUSH_EXTRA_ARGS\\n      value:\\n        lit: \\\"\\\"\\n    - name: PARAM_SKIP_PUSH\\n      value:\\n        lit: \\\"false\\\"\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/build-image/carry\n# pipemaster:arg {\"digest\":\"4f8311fefd79c9a2c39fdae84ef08226fc02ec1880bfc514bb17e73549051101\",\"carry\":\"container:\\n    ref: quay.io/buildah/stable:v1\\nid: build-image\\nneeds:\\n    - job: fetch-repository\\n\"}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nwith:\\n    ref:\\n        expr: inputs.git-revision\\n    submodules:\\n        lit: \\\"true\\\"\\nid: fetch-repository-step-1\\nkind: action\\n\",\"task\":\"fetch-repository-step-1\",\"hold\":\"{\\\"config\\\":{\\\"image_resource\\\":{\\\"source\\\":{\\\"repository\\\":\\\"ubuntu\\\",\\\"tag\\\":\\\"latest\\\"},\\\"type\\\":\\\"registry-image\\\"},\\\"platform\\\":\\\"linux\\\",\\\"run\\\":{\\\"args\\\":[\\\"-ec\\\",\\\"true\\\"],\\\"path\\\":\\\"sh\\\"}},\\\"task\\\":\\\"fetch-repository-step-1\\\"}\"}\n# pipemaster:emulated job.manual pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:arg {\"manual\":false,\"held\":true}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/fetch-repository/carry\n# pipemaster:arg {\"digest\":\"883a71152cc861e3463d04d666c0858af027174136fc8016db07213fa874742e\",\"carry\":\"id: fetch-repository\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/update-deployment/step/patch/carry\n# pipemaster:arg {\"digest\":\"c51327dec0c917863f2d64eb768ff376d8dd0f00b76930d2287deb517a3b2ebe\",\"carry\":\"image:\\n    ref: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\\nid: patch\\nkind: script\\nscript:\\n    - |-\\n      /bin/bash -c 'oc patch deployment $(inputs.params.deployment) --patch='\\\\''{\\\"spec\\\":{\\\"template\\\":{\\\"spec\\\":{\\n        \\\"containers\\\":[{\\n          \\\"name\\\": \\\"$(inputs.params.deployment)\\\",\\n          \\\"image\\\":\\\"$(inputs.params.IMAGE)\\\"\\n        }]\\n      }}}}'\\\\''\\n\\n      # issue: https://issues.redhat.com/browse/SRVKP-2387\\n      # images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\\n      # as a workaround update a label in template, which triggers redeploy pods\\n      # target label: \\\"spec.template.metadata.labels.patched_at\\\"\\n      # NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\\n      patched_at_timestamp=`date +%s`\\n      oc patch deployment $(inputs.params.deployment) --patch='\\\\''{\\\"spec\\\":{\\\"template\\\":{\\\"metadata\\\":{\\n        \\\"labels\\\":{\\n          \\\"patched_at\\\": '\\\\''\\\\\\\"$patched_at_timestamp\\\\\\\"'\\\\''\\n        }\\n      }}}}'\\\\'''\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/update-deployment/carry\n# pipemaster:arg {\"digest\":\"5812be378fc6d3954bdd783de8b8ff7b86e81b2dfbcfd2d370b04abae945f8d5\",\"carry\":\"id: update-deployment\\nneeds:\\n    - job: apply-manifests\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/carry\n# pipemaster:arg {\"digest\":\"1a201a0ae730789ae46088d417f4c7351cbc72cf21ab56db1b2d90a8d3f84622\",\"carry\":\"id: build-and-deploy\\ninputs:\\n    - name: deployment-name\\n      type: string\\n      description: name of the deployment to be patched\\n      required: true\\n    - name: git-url\\n      type: string\\n      description: url of the git repo for the code of deployment\\n      required: true\\n    - name: git-revision\\n      type: string\\n      default: master\\n      description: revision to be used from repo of the code for deployment\\n    - name: IMAGE\\n      type: string\\n      description: image to be build from the code\\n      required: true\\n\"}\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/apply-manifests/step/apply\n# pipemaster:emulated trigger.manual pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/update-deployment/step/patch\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\njobs:\n  - name: apply-manifests\n    plan:\n      - get: source\n        passed:\n          - build-image\n        trigger: true\n      - task: apply\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: image-registry.openshift-image-registry.svc:5000/openshift/cli\n              tag: latest\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                /bin/bash -c 'echo Applying manifests in $(inputs.params.manifest_dir) directory\n                oc apply -f $(inputs.params.manifest_dir)\n                echo -----------------------------------'\n            dir: /workspace/source\n  - name: build-image\n    plan:\n      - get: source\n        passed:\n          - fetch-repository\n        trigger: true\n      - task: build-and-push\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: quay.io/buildah/stable\n              tag: v1\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          params:\n            PARAM_STORAGE_DRIVER: overlay\n            PARAM_DOCKERFILE: ./Dockerfile\n            PARAM_CONTEXT: .\n            PARAM_TLSVERIFY: \"true\"\n            PARAM_FORMAT: oci\n            PARAM_BUILD_EXTRA_ARGS: \"\"\n            PARAM_PUSH_EXTRA_ARGS: \"\"\n            PARAM_SKIP_PUSH: \"false\"\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" bud ${PARAM_BUILD_EXTRA_ARGS} \\\n                  \"--format=${PARAM_FORMAT}\" \"--tls-verify=${PARAM_TLSVERIFY}\" \\\n                  -f \"${PARAM_DOCKERFILE}\" -t \"${PARAM_IMAGE}\" \"${PARAM_CONTEXT}\"\n                [ \"${PARAM_SKIP_PUSH}\" = \"true\" ] && echo \"Push skipped\" && exit 0\n                buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" push \\\n                  \"--tls-verify=${PARAM_TLSVERIFY}\" ${PARAM_PUSH_EXTRA_ARGS} \\\n                  \"${PARAM_IMAGE}\" \"docker://${PARAM_IMAGE}\"\n            dir: workspace\n  - name: fetch-repository\n    plan:\n      - get: source\n      - task: fetch-repository-step-1\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: ubuntu\n              tag: latest\n          run:\n            path: sh\n            args:\n              - -ec\n              - \"true\"\n  - name: update-deployment\n    plan:\n      - get: source\n        passed:\n          - apply-manifests\n        trigger: true\n      - task: patch\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: image-registry.openshift-image-registry.svc:5000/openshift/cli\n              tag: latest\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                /bin/bash -c 'oc patch deployment $(inputs.params.deployment) --patch='\\''{\"spec\":{\"template\":{\"spec\":{\n                  \"containers\":[{\n                    \"name\": \"$(inputs.params.deployment)\",\n                    \"image\":\"$(inputs.params.IMAGE)\"\n                  }]\n                }}}}'\\''\n\n                # issue: https://issues.redhat.com/browse/SRVKP-2387\n                # images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\n                # as a workaround update a label in template, which triggers redeploy pods\n                # target label: \"spec.template.metadata.labels.patched_at\"\n                # NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\n                patched_at_timestamp=`date +%s`\n                oc patch deployment $(inputs.params.deployment) --patch='\\''{\"spec\":{\"template\":{\"metadata\":{\n                  \"labels\":{\n                    \"patched_at\": '\\''\\\"$patched_at_timestamp\\\"'\\''\n                  }\n                }}}}'\\'''\n            dir: workspace\n"
+     "text": "# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/apply-manifests/step/apply/carry\n# pipemaster:arg {\"digest\":\"1d3573cd8162bf776a903c8876c77706b6824f8c41babd6113bad6317b3697c3\",\"carry\":\"image:\\n    ref: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\\nid: apply\\nkind: script\\nworkdir: /workspace/source\\nscript:\\n    - |-\\n      /bin/bash -c 'echo Applying manifests in $(inputs.params.manifest_dir) directory\\n      oc apply -f $(inputs.params.manifest_dir)\\n      echo -----------------------------------'\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/apply-manifests/carry\n# pipemaster:arg {\"digest\":\"524d72a9ddc6a3717d69c17998be28acc44f88dc074039de42d8fd5c705a7bc3\",\"carry\":\"id: apply-manifests\\nneeds:\\n    - job: build-image\\n\"}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/build-image/step/build-image-checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: build-image-checkout\\nkind: action\\n\",\"get\":\"source\",\"params\":\"null\"}\n# pipemaster:lost env PARAM_IMAGE: inputs.IMAGE\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/build-image/step/build-and-push/carry\n# pipemaster:arg {\"digest\":\"cce3a2654c6f0c66df8f6e777e47b85d22306c05d14456c2d8c734934fa5bc57\",\"carry\":\"id: build-and-push\\nkind: script\\nenv:\\n    - name: PARAM_IMAGE\\n      value:\\n        expr: inputs.IMAGE\\n    - name: PARAM_STORAGE_DRIVER\\n      value:\\n        lit: overlay\\n    - name: PARAM_DOCKERFILE\\n      value:\\n        lit: ./Dockerfile\\n    - name: PARAM_CONTEXT\\n      value:\\n        lit: .\\n    - name: PARAM_TLSVERIFY\\n      value:\\n        lit: \\\"true\\\"\\n    - name: PARAM_FORMAT\\n      value:\\n        lit: oci\\n    - name: PARAM_BUILD_EXTRA_ARGS\\n      value:\\n        lit: \\\"\\\"\\n    - name: PARAM_PUSH_EXTRA_ARGS\\n      value:\\n        lit: \\\"\\\"\\n    - name: PARAM_SKIP_PUSH\\n      value:\\n        lit: \\\"false\\\"\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/build-image/carry\n# pipemaster:arg {\"digest\":\"d05db7d5f008bcd2d20aa4f7d3d295d09d91dc2fef95bebd66402bb7f9b481b7\",\"carry\":\"container:\\n    ref: quay.io/buildah/stable:v1\\nid: build-image\\nneeds:\\n    - job: fetch-repository\\n\"}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nwith:\\n    ref:\\n        expr: inputs.git-revision\\n    submodules:\\n        lit: \\\"true\\\"\\nid: fetch-repository-step-1\\nkind: action\\n\",\"task\":\"fetch-repository-step-1\",\"hold\":\"{\\\"config\\\":{\\\"image_resource\\\":{\\\"source\\\":{\\\"repository\\\":\\\"ubuntu\\\",\\\"tag\\\":\\\"latest\\\"},\\\"type\\\":\\\"registry-image\\\"},\\\"platform\\\":\\\"linux\\\",\\\"run\\\":{\\\"args\\\":[\\\"-ec\\\",\\\"true\\\"],\\\"path\\\":\\\"sh\\\"}},\\\"task\\\":\\\"fetch-repository-step-1\\\"}\"}\n# pipemaster:emulated job.manual pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:arg {\"manual\":false,\"held\":true}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/fetch-repository/carry\n# pipemaster:arg {\"digest\":\"883a71152cc861e3463d04d666c0858af027174136fc8016db07213fa874742e\",\"carry\":\"id: fetch-repository\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/update-deployment/step/patch/carry\n# pipemaster:arg {\"digest\":\"c51327dec0c917863f2d64eb768ff376d8dd0f00b76930d2287deb517a3b2ebe\",\"carry\":\"image:\\n    ref: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\\nid: patch\\nkind: script\\nscript:\\n    - |-\\n      /bin/bash -c 'oc patch deployment $(inputs.params.deployment) --patch='\\\\''{\\\"spec\\\":{\\\"template\\\":{\\\"spec\\\":{\\n        \\\"containers\\\":[{\\n          \\\"name\\\": \\\"$(inputs.params.deployment)\\\",\\n          \\\"image\\\":\\\"$(inputs.params.IMAGE)\\\"\\n        }]\\n      }}}}'\\\\''\\n\\n      # issue: https://issues.redhat.com/browse/SRVKP-2387\\n      # images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\\n      # as a workaround update a label in template, which triggers redeploy pods\\n      # target label: \\\"spec.template.metadata.labels.patched_at\\\"\\n      # NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\\n      patched_at_timestamp=`date +%s`\\n      oc patch deployment $(inputs.params.deployment) --patch='\\\\''{\\\"spec\\\":{\\\"template\\\":{\\\"metadata\\\":{\\n        \\\"labels\\\":{\\n          \\\"patched_at\\\": '\\\\''\\\\\\\"$patched_at_timestamp\\\\\\\"'\\\\''\\n        }\\n      }}}}'\\\\'''\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/update-deployment/carry\n# pipemaster:arg {\"digest\":\"5812be378fc6d3954bdd783de8b8ff7b86e81b2dfbcfd2d370b04abae945f8d5\",\"carry\":\"id: update-deployment\\nneeds:\\n    - job: apply-manifests\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/carry\n# pipemaster:arg {\"digest\":\"1a201a0ae730789ae46088d417f4c7351cbc72cf21ab56db1b2d90a8d3f84622\",\"carry\":\"id: build-and-deploy\\ninputs:\\n    - name: deployment-name\\n      type: string\\n      description: name of the deployment to be patched\\n      required: true\\n    - name: git-url\\n      type: string\\n      description: url of the git repo for the code of deployment\\n      required: true\\n    - name: git-revision\\n      type: string\\n      default: master\\n      description: revision to be used from repo of the code for deployment\\n    - name: IMAGE\\n      type: string\\n      description: image to be build from the code\\n      required: true\\n\"}\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/apply-manifests/step/apply\n# pipemaster:emulated trigger.manual pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/update-deployment/step/patch\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\njobs:\n  - name: apply-manifests\n    plan:\n      - get: source\n        passed:\n          - build-image\n        trigger: true\n      - task: apply\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: image-registry.openshift-image-registry.svc:5000/openshift/cli\n              tag: latest\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                /bin/bash -c 'echo Applying manifests in $(inputs.params.manifest_dir) directory\n                oc apply -f $(inputs.params.manifest_dir)\n                echo -----------------------------------'\n            dir: /workspace/source\n  - name: build-image\n    plan:\n      - get: source\n        passed:\n          - fetch-repository\n        trigger: true\n      - task: build-and-push\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: quay.io/buildah/stable\n              tag: v1\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          params:\n            PARAM_STORAGE_DRIVER: overlay\n            PARAM_DOCKERFILE: ./Dockerfile\n            PARAM_CONTEXT: .\n            PARAM_TLSVERIFY: \"true\"\n            PARAM_FORMAT: oci\n            PARAM_BUILD_EXTRA_ARGS: \"\"\n            PARAM_PUSH_EXTRA_ARGS: \"\"\n            PARAM_SKIP_PUSH: \"false\"\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" bud ${PARAM_BUILD_EXTRA_ARGS} \"--format=${PARAM_FORMAT}\" \"--tls-verify=${PARAM_TLSVERIFY}\" -f \"${PARAM_DOCKERFILE}\" -t \"${PARAM_IMAGE}\" \"${PARAM_CONTEXT}\"\n                [ \"${PARAM_SKIP_PUSH}\" = \"true\" ] && echo \"Push skipped\" && exit 0\n                buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" push \"--tls-verify=${PARAM_TLSVERIFY}\" ${PARAM_PUSH_EXTRA_ARGS} \"${PARAM_IMAGE}\" \"docker://${PARAM_IMAGE}\"\n            dir: workspace\n  - name: fetch-repository\n    plan:\n      - get: source\n      - task: fetch-repository-step-1\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: ubuntu\n              tag: latest\n          run:\n            path: sh\n            args:\n              - -ec\n              - \"true\"\n  - name: update-deployment\n    plan:\n      - get: source\n        passed:\n          - apply-manifests\n        trigger: true\n      - task: patch\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: image-registry.openshift-image-registry.svc:5000/openshift/cli\n              tag: latest\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                /bin/bash -c 'oc patch deployment $(inputs.params.deployment) --patch='\\''{\"spec\":{\"template\":{\"spec\":{\n                  \"containers\":[{\n                    \"name\": \"$(inputs.params.deployment)\",\n                    \"image\":\"$(inputs.params.IMAGE)\"\n                  }]\n                }}}}'\\''\n\n                # issue: https://issues.redhat.com/browse/SRVKP-2387\n                # images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\n                # as a workaround update a label in template, which triggers redeploy pods\n                # target label: \"spec.template.metadata.labels.patched_at\"\n                # NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\n                patched_at_timestamp=`date +%s`\n                oc patch deployment $(inputs.params.deployment) --patch='\\''{\"spec\":{\"template\":{\"metadata\":{\n                  \"labels\":{\n                    \"patched_at\": '\\''\\\"$patched_at_timestamp\\\"'\\''\n                  }\n                }}}}'\\'''\n            dir: workspace\n"
     },
     {
      "path": ".concourse/pipeline-tutorial-check-pr.yml",
-     "text": "# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nwith:\\n    ref:\\n        expr: inputs.revision\\n    submodules:\\n        lit: \\\"true\\\"\\nid: fetch-step-1\\nkind: action\\n\",\"task\":\"fetch-step-1\",\"hold\":\"{\\\"config\\\":{\\\"image_resource\\\":{\\\"source\\\":{\\\"repository\\\":\\\"ubuntu\\\",\\\"tag\\\":\\\"latest\\\"},\\\"type\\\":\\\"registry-image\\\"},\\\"platform\\\":\\\"linux\\\",\\\"run\\\":{\\\"args\\\":[\\\"-ec\\\",\\\"true\\\"],\\\"path\\\":\\\"sh\\\"}},\\\"task\\\":\\\"fetch-step-1\\\"}\"}\n# pipemaster:emulated job.manual pipeline/pipeline-tutorial-check-pr/job/fetch\n# pipemaster:arg {\"manual\":false,\"held\":true}\n# pipemaster:emulated ext.passthrough pipeline/pipeline-tutorial-check-pr/job/fetch/carry\n# pipemaster:arg {\"digest\":\"9027eb7658677c4f11d9257463f9b1fe7f15558c5a04bac925ee029b5508a7eb\",\"carry\":\"id: fetch\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/lint-yaml-files/carry\n# pipemaster:arg {\"digest\":\"73dcf0f9547a965560d1a3f383f50cbaddc1c4de9b5c86ba8a416089163ace41\",\"carry\":\"id: lint-yaml-files\\nkind: script\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/pipeline-tutorial-check-pr/job/yaml-lint/carry\n# pipemaster:arg {\"digest\":\"1e63c80093b5a34fd5e79253c01f7ea4f73dbe4a83a418598c42529c348ed4fc\",\"carry\":\"container:\\n    ref: docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\\nid: yaml-lint\\nneeds:\\n    - job: fetch\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/pipeline-tutorial-check-pr/carry\n# pipemaster:arg {\"digest\":\"98cdca42585e2904c321dd2e5720c5fef989e547f10cfe219a00d13779f8dd51\",\"carry\":\"id: pipeline-tutorial-check-pr\\ninputs:\\n    - name: repo_url\\n      required: true\\n    - name: revision\\n      required: true\\n\"}\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\n# pipemaster:emulated trigger.manual pipeline/pipeline-tutorial-check-pr/job/fetch\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\njobs:\n  - name: fetch\n    plan:\n      - get: source\n      - task: fetch-step-1\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: ubuntu\n              tag: latest\n          run:\n            path: sh\n            args:\n              - -ec\n              - \"true\"\n  - name: yaml-lint\n    plan:\n      - get: source\n        passed:\n          - fetch\n        trigger: true\n      - task: lint-yaml-files\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: docker.io/cytopia/yamllint:1.23\n              digest: sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          run:\n            path: sh\n            args:\n              - -ec\n              - yamllint .\n            dir: workspace\n"
+     "text": "# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nwith:\\n    ref:\\n        expr: inputs.revision\\n    submodules:\\n        lit: \\\"true\\\"\\nid: fetch-step-1\\nkind: action\\n\",\"task\":\"fetch-step-1\",\"hold\":\"{\\\"config\\\":{\\\"image_resource\\\":{\\\"source\\\":{\\\"repository\\\":\\\"ubuntu\\\",\\\"tag\\\":\\\"latest\\\"},\\\"type\\\":\\\"registry-image\\\"},\\\"platform\\\":\\\"linux\\\",\\\"run\\\":{\\\"args\\\":[\\\"-ec\\\",\\\"true\\\"],\\\"path\\\":\\\"sh\\\"}},\\\"task\\\":\\\"fetch-step-1\\\"}\"}\n# pipemaster:emulated job.manual pipeline/pipeline-tutorial-check-pr/job/fetch\n# pipemaster:arg {\"manual\":false,\"held\":true}\n# pipemaster:emulated ext.passthrough pipeline/pipeline-tutorial-check-pr/job/fetch/carry\n# pipemaster:arg {\"digest\":\"9027eb7658677c4f11d9257463f9b1fe7f15558c5a04bac925ee029b5508a7eb\",\"carry\":\"id: fetch\\n\"}\n# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: yaml-lint-checkout\\nkind: action\\n\",\"get\":\"source\",\"params\":\"null\"}\n# pipemaster:emulated ext.passthrough pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/lint-yaml-files/carry\n# pipemaster:arg {\"digest\":\"73dcf0f9547a965560d1a3f383f50cbaddc1c4de9b5c86ba8a416089163ace41\",\"carry\":\"id: lint-yaml-files\\nkind: script\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/pipeline-tutorial-check-pr/job/yaml-lint/carry\n# pipemaster:arg {\"digest\":\"1e63c80093b5a34fd5e79253c01f7ea4f73dbe4a83a418598c42529c348ed4fc\",\"carry\":\"container:\\n    ref: docker.io/cytopia/yamllint:1.23@sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\\nid: yaml-lint\\nneeds:\\n    - job: fetch\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/pipeline-tutorial-check-pr/carry\n# pipemaster:arg {\"digest\":\"98cdca42585e2904c321dd2e5720c5fef989e547f10cfe219a00d13779f8dd51\",\"carry\":\"id: pipeline-tutorial-check-pr\\ninputs:\\n    - name: repo_url\\n      required: true\\n    - name: revision\\n      required: true\\n\"}\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\n# pipemaster:emulated trigger.manual pipeline/pipeline-tutorial-check-pr/job/fetch\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\njobs:\n  - name: fetch\n    plan:\n      - get: source\n      - task: fetch-step-1\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: ubuntu\n              tag: latest\n          run:\n            path: sh\n            args:\n              - -ec\n              - \"true\"\n  - name: yaml-lint\n    plan:\n      - get: source\n        passed:\n          - fetch\n        trigger: true\n      - task: lint-yaml-files\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: docker.io/cytopia/yamllint:1.23\n              digest: sha256:e9deea51bbdc35950cacf6594dab94100d9bbf5c987540b8874167d58e6bdce2\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          run:\n            path: sh\n            args:\n              - -ec\n              - yamllint .\n            dir: workspace\n"
     }
    ],
    "report": [
@@ -1588,6 +1861,13 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider tekton (task_name, task_params, task_workspaces, workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.manifest_dir) is a Tekton variable with no IR reference; it stays in the text as written"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
@@ -1675,6 +1955,20 @@
      "detail": "Ext of provider tekton (task_name, task_params, unused_params) is not written to the Concourse file; it is kept in round-trip metadata"
     },
     {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.deployment) is a Tekton variable with no IR reference; it stays in the text as written"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "script.interpolation",
+     "level": "lost",
+     "strategy": "kept as written",
+     "detail": "$(inputs.params.IMAGE) is a Tekton variable with no IR reference; it stays in the text as written"
+    },
+    {
      "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -1759,6 +2053,20 @@
      "detail": "Ext of provider tekton (array_params, catalog_ref, params, workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
     },
     {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
+     "level": "external",
+     "strategy": "set up outside the file",
+     "detail": "the build runs buildah in a container and needs a privileged runner; the file does not set privileged mode"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
+     "level": "external",
+     "strategy": "set up outside the file",
+     "detail": "pushing the image needs registry credentials, which the catalog task reads from a dockerconfig workspace; the file sets no registry login"
+    },
+    {
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
      "feature": "step.script",
      "level": "emulated",
@@ -1771,6 +2079,20 @@
      "level": "emulated",
      "strategy": "mapped to the catalog task buildah",
      "detail": "the cluster or hub task version may differ from the mapped behaviour; the build needs a privileged runner and registry credentials that the file does not set, and the image digest and url results are not produced"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step in the job",
+     "detail": "the Tekton workspace is not shared between jobs, so the job clones the pipeline repository itself; a revision that an earlier git-clone task set is not carried over"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-checkout",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "task per actions.Lookup verdict",
+     "detail": "unknown actions are lost"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -1820,6 +2142,20 @@
      "level": "emulated",
      "strategy": "mapped to the catalog task yaml-lint",
      "detail": "the cluster or hub task version may differ from the mapped behaviour"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step in the job",
+     "detail": "the Tekton workspace is not shared between jobs, so the job clones the pipeline repository itself; a revision that an earlier git-clone task set is not carried over"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-checkout",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "task per actions.Lookup verdict",
+     "detail": "unknown actions are lost"
     }
    ]
   }

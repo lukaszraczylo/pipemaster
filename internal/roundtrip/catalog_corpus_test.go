@@ -39,6 +39,9 @@ func TestCorpus69CatalogTasksHaveNoPlaceholder(t *testing.T) {
 	}{
 		{provider.GHA, []string{
 			"uses: actions/checkout@",
+			"id: build-image-checkout",
+			"id: yaml-lint-checkout",
+			"oc patch deployment $(inputs.params.deployment)",
 			"ref: ${{ inputs.git-revision }}",
 			"container: quay.io/buildah/stable:v1",
 			"PARAM_IMAGE: ${{ inputs.IMAGE }}",
@@ -67,6 +70,11 @@ func TestCorpus69CatalogTasksHaveNoPlaceholder(t *testing.T) {
 			for _, bad := range []string{"a task reference has no", `run: "true"`} {
 				if strings.Contains(files, bad) || strings.Contains(rep, bad) {
 					t.Errorf("%s output holds the placeholder %q", c.to, bad)
+				}
+			}
+			for _, w := range []string{"needs a privileged runner", "pushing the image needs registry credentials", "the job clones the pipeline repository itself", "$(inputs.params.deployment) is a Tekton variable with no IR reference"} {
+				if !strings.Contains(rep, w) {
+					t.Errorf("report lacks %q", w)
 				}
 			}
 			if !strings.Contains(rep, "mapped to the catalog task buildah") || !strings.Contains(rep, "param URL of the catalog task git-clone has no checkout input") {

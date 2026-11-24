@@ -7,6 +7,9 @@
 #
 # One YAML document per task. The annotation pipemaster.dev/caveat is the caveat of the emulated verdict.
 #
+# source: true   the task reads the workspace, so its job gets its own checkout step
+# entrypoint:     entrypoint of the one-step image, for an image whose entrypoint is no shell
+# external:       what the file cannot set; one report entry per line and job
 # kind: Task      a trimmed copy of the catalog Task; the parser reads it like a local Task, with the params
 #                 that the PipelineTask binds. An array param is bound as its joined, quoted words, so the
 #                 param is declared as a string. Workspace paths are left out: the job starts in the checkout.
@@ -44,6 +47,10 @@ metadata:
   name: buildah
   annotations:
     pipemaster.dev/caveat: the cluster or hub task version may differ from the mapped behaviour; the build needs a privileged runner and registry credentials that the file does not set, and the image digest and url results are not produced
+source: true
+external:
+  - the build runs buildah in a container and needs a privileged runner; the file does not set privileged mode
+  - pushing the image needs registry credentials, which the catalog task reads from a dockerconfig workspace; the file sets no registry login
 spec:
   params:
     - name: IMAGE
@@ -88,20 +95,20 @@ spec:
         - name: PARAM_SKIP_PUSH
           value: $(params.SKIP_PUSH)
       script: |
-        buildah "--storage-driver=${PARAM_STORAGE_DRIVER}" bud ${PARAM_BUILD_EXTRA_ARGS} \
-          "--format=${PARAM_FORMAT}" "--tls-verify=${PARAM_TLSVERIFY}" \
-          -f "${PARAM_DOCKERFILE}" -t "${PARAM_IMAGE}" "${PARAM_CONTEXT}"
+        buildah "--storage-driver=${PARAM_STORAGE_DRIVER}" bud ${PARAM_BUILD_EXTRA_ARGS} "--format=${PARAM_FORMAT}" "--tls-verify=${PARAM_TLSVERIFY}" -f "${PARAM_DOCKERFILE}" -t "${PARAM_IMAGE}" "${PARAM_CONTEXT}"
         [ "${PARAM_SKIP_PUSH}" = "true" ] && echo "Push skipped" && exit 0
-        buildah "--storage-driver=${PARAM_STORAGE_DRIVER}" push \
-          "--tls-verify=${PARAM_TLSVERIFY}" ${PARAM_PUSH_EXTRA_ARGS} \
-          "${PARAM_IMAGE}" "docker://${PARAM_IMAGE}"
+        buildah "--storage-driver=${PARAM_STORAGE_DRIVER}" push "--tls-verify=${PARAM_TLSVERIFY}" ${PARAM_PUSH_EXTRA_ARGS} "${PARAM_IMAGE}" "docker://${PARAM_IMAGE}"
 ---
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: kaniko
   annotations:
-    pipemaster.dev/caveat: the cluster or hub task version may differ from the mapped behaviour; the executor needs registry credentials that the file does not set, and the image digest and url results are not produced; the executor image of the catalog has no shell, so the default is its -debug tag
+    pipemaster.dev/caveat: the cluster or hub task version may differ from the mapped behaviour; the executor needs registry credentials that the file does not set, and the image digest and url results are not produced; the executor image of the catalog has no shell, so the default is its -debug tag with the entrypoint cleared
+source: true
+entrypoint: [""]
+external:
+  - pushing the image needs registry credentials, which the catalog task reads from a dockerconfig workspace; the file sets no registry login
 spec:
   params:
     - name: IMAGE
@@ -112,7 +119,7 @@ spec:
     - name: EXTRA_ARGS
       default: ""
     - name: BUILDER_IMAGE
-      default: gcr.io/kaniko-project/executor:v1.5.1-debug
+      default: gcr.io/kaniko-project/executor:v1.14.0-debug
   steps:
     - name: build-and-push
       image: $(params.BUILDER_IMAGE)
@@ -126,8 +133,7 @@ spec:
         - name: PARAM_EXTRA_ARGS
           value: $(params.EXTRA_ARGS)
       script: |
-        /kaniko/executor ${PARAM_EXTRA_ARGS} "--dockerfile=${PARAM_DOCKERFILE}" \
-          "--context=${PARAM_CONTEXT}" "--destination=${PARAM_IMAGE}"
+        /kaniko/executor ${PARAM_EXTRA_ARGS} "--dockerfile=${PARAM_DOCKERFILE}" "--context=${PARAM_CONTEXT}" "--destination=${PARAM_IMAGE}"
 ---
 apiVersion: tekton.dev/v1
 kind: Task
@@ -135,6 +141,7 @@ metadata:
   name: golang-test
   annotations:
     pipemaster.dev/caveat: the cluster or hub task version may differ from the mapped behaviour
+source: true
 spec:
   params:
     - name: package
@@ -194,6 +201,7 @@ metadata:
   name: golang-build
   annotations:
     pipemaster.dev/caveat: the cluster or hub task version may differ from the mapped behaviour
+source: true
 spec:
   params:
     - name: package
@@ -257,6 +265,7 @@ metadata:
   name: yaml-lint
   annotations:
     pipemaster.dev/caveat: the cluster or hub task version may differ from the mapped behaviour
+source: true
 spec:
   params:
     - name: args

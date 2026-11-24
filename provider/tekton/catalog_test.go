@@ -40,7 +40,7 @@ func TestCatalogLookup(t *testing.T) {
 		{name: "ClusterTask kind", task: "    taskRef: {name: git-clone, kind: ClusterTask}\n", wantStep: ir.StepAction, mapped: true},
 		{name: "git-clone cluster resolver", task: cluster("git-clone"), wantStep: ir.StepAction, mapped: true},
 		{name: "buildah cluster resolver", task: cluster("buildah"), wantStep: ir.StepScript, wantImg: "quay.io/buildah/stable:v1", mapped: true},
-		{name: "kaniko by name", task: "    taskRef: {name: kaniko}\n", wantStep: ir.StepScript, wantImg: "gcr.io/kaniko-project/executor:v1.5.1-debug", mapped: true},
+		{name: "kaniko by name", task: "    taskRef: {name: kaniko}\n", wantStep: ir.StepScript, wantImg: "gcr.io/kaniko-project/executor:v1.14.0-debug", mapped: true},
 		{name: "golang-test by name", task: "    taskRef: {name: golang-test}\n", wantStep: ir.StepScript, wantImg: "docker.io/library/golang:latest", mapped: true},
 		{name: "golang-build by name", task: "    taskRef: {name: golang-build}\n", wantStep: ir.StepScript, wantImg: "docker.io/library/golang:latest", mapped: true},
 		{name: "yaml-lint by name", task: "    taskRef: {name: yaml-lint}\n", wantStep: ir.StepScript, mapped: true},
@@ -71,12 +71,22 @@ func TestCatalogLookup(t *testing.T) {
 			}
 			p, rep := parseFiles(t, files)
 			j := job(t, p.Pipelines[0], "t")
-			if len(j.Steps) == 0 || j.Steps[0].Kind != tt.wantStep {
-				t.Fatalf("steps = %+v, want kind %s", j.Steps, tt.wantStep)
+			if len(j.Steps) == 0 {
+				t.Fatal("the job has no step")
+			}
+			last := j.Steps[len(j.Steps)-1]
+			if last.Kind != tt.wantStep {
+				t.Fatalf("steps = %+v, want last kind %s", j.Steps, tt.wantStep)
+			}
+			if tt.wantStep == ir.StepScript && tt.mapped {
+				first := j.Steps[0]
+				if len(j.Steps) != 2 || first.Kind != ir.StepAction || first.Action == nil || first.Action.Repo != "checkout" {
+					t.Fatalf("a mapped task that reads the workspace needs its own checkout first: %+v", j.Steps)
+				}
 			}
 			img := j.Container
 			if img == nil {
-				img = j.Steps[0].Image
+				img = last.Image
 			}
 			if tt.wantImg != "" && (img == nil || img.Ref != tt.wantImg) {
 				t.Fatalf("image = %+v, want %s", img, tt.wantImg)
@@ -148,8 +158,55 @@ func TestCatalogArrayParamIsJoined(t *testing.T) {
     params:
     - {name: args, value: ["-d", "relaxed", "."]}
 `)})
-	st := job(t, p.Pipelines[0], "t").Steps[0]
+	steps := job(t, p.Pipelines[0], "t").Steps
+	st := steps[len(steps)-1]
 	if len(st.Script) == 0 || !strings.Contains(strings.Join(st.Script, "\n"), "yamllint -d relaxed .") {
 		t.Fatalf("script = %q", st.Script)
+	}
+}
+
+func TestCatalogKanikoClearsTheEntrypoint(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"p.yaml": catalogPipeline("    taskRef: {name: kaniko}\n")})
+	c := job(t, p.Pipelines[0], "t").Container
+	if c == nil || len(c.Entrypoint) != 1 || c.Entrypoint[0] != "" {
+		t.Fatalf("container = %+v, want entrypoint [\"\"]", c)
+	}
+}
+
+func TestCatalogReportsWhatTheFileCannotSet(t *testing.T) {
+	for name, want := range map[string][]string{
+		"buildah": {"privileged runner", "registry credentials"},
+		"kaniko":  {"registry credentials"},
+	} {
+		_, rep := parseFiles(t, map[string]string{"p.yaml": catalogPipeline("    taskRef: {name: " + name + "}\n")})
+		for _, w := range want {
+			found := false
+			for _, e := range rep.Entries {
+				found = found || (e.Level == caps.External && strings.Contains(e.Detail, w) && strings.Contains(e.IRPath, "/job/t"))
+			}
+			if !found {
+				t.Errorf("%s: no external entry for %q: %+v", name, w, rep.Entries)
+			}
+		}
+	}
+}
+
+func TestLegacyInputsParamsAreReported(t *testing.T) {
+	pl, rep := parseYAML(t, pipelineWith(`  tasks:
+  - name: t
+    taskSpec:
+      params:
+      - {name: image}
+      steps:
+      - name: s
+        image: alpine
+        script: echo $(inputs.params.image)
+`))
+	s := step(t, job(t, pl, "t"), "s")
+	if len(s.Script) != 1 || !strings.Contains(s.Script[0], "$(inputs.params.image)") {
+		t.Fatalf("script = %q", s.Script)
+	}
+	if !hasEntry(rep, "$(inputs.params.image) is a Tekton variable with no IR reference") {
+		t.Fatalf("the untranslated reference needs an entry: %+v", rep.Entries)
 	}
 }

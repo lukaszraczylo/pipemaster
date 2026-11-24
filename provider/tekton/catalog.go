@@ -68,18 +68,24 @@ type catalogTask struct {
 	params     map[string]bool
 	name       string
 	caveat     string
+	external   []string
+	entrypoint []string
 	isCheckout bool
+	source     bool
 }
 
 type catalogDoc struct {
+	Inputs   map[string]checkoutInput `yaml:"inputs"`
+	Same     map[string]string        `yaml:"same"`
 	Metadata struct {
 		Annotations map[string]string `yaml:"annotations"`
 		Name        string            `yaml:"name"`
 	} `yaml:"metadata"`
-	Inputs map[string]checkoutInput `yaml:"inputs"`
-	Same   map[string]string        `yaml:"same"`
-	Kind   string                   `yaml:"kind"`
-	Spec   yaml.Node                `yaml:"spec"`
+	Kind       string    `yaml:"kind"`
+	External   []string  `yaml:"external"`
+	Entrypoint []string  `yaml:"entrypoint"`
+	Spec       yaml.Node `yaml:"spec"`
+	Source     bool      `yaml:"source"`
 }
 
 var loadCatalog = sync.OnceValues(func() (map[string]*catalogTask, error) {
@@ -108,6 +114,7 @@ func parseCatalog(data []byte) (map[string]*catalogTask, error) {
 
 func (d *catalogDoc) task() (*catalogTask, error) {
 	t := &catalogTask{name: d.Metadata.Name, caveat: d.Metadata.Annotations[annotationCaveat]}
+	t.external, t.entrypoint, t.source = d.External, d.Entrypoint, d.Source
 	if t.name == "" || t.caveat == "" {
 		return nil, fmt.Errorf("catalog: an entry needs a name and the %s annotation", annotationCaveat)
 	}
@@ -237,17 +244,36 @@ func (b *jobBuilder) catalog(rm *omap, line int, t *catalogTask) error {
 	if err := b.body(t.spec, nil); err != nil {
 		return err
 	}
-	b.hoistImage()
+	b.hoistImage(t)
+	b.addSource(t)
 	return nil
+}
+
+// addSource gives a job that reads the workspace its own checkout. The Tekton workspace that git-clone filled
+// is not shared between jobs, so a target with one runner per job needs the clone in each job.
+func (b *jobBuilder) addSource(t *catalogTask) {
+	if !t.source {
+		return
+	}
+	ref, ok := actions.Reverse(actionCheckout)
+	if !ok {
+		return
+	}
+	b.job.Steps = append([]*ir.Step{{ID: b.job.ID + "-checkout", Kind: ir.StepAction, Action: &ref}}, b.job.Steps...)
+	b.c.p.rep.Add(report.Entry{
+		IRPath: b.path, Feature: caps.StepAction, Level: caps.Emulated, Strategy: "checkout step in the job",
+		Detail: "the Tekton workspace is not shared between jobs, so the job clones the pipeline repository itself; a revision that an earlier git-clone task set is not carried over", SourceLoc: b.c.file,
+	})
 }
 
 // hoistImage makes the image of a one-step task the job image. A target that sets the image per job, such as
 // GitLab, then keeps it, and a one-step Task runs in that image either way.
-func (b *jobBuilder) hoistImage() {
+func (b *jobBuilder) hoistImage(t *catalogTask) {
 	if len(b.job.Steps) != 1 || b.job.Steps[0].Image == nil || b.job.Container != nil {
 		return
 	}
 	b.job.Container, b.job.Steps[0].Image = b.job.Steps[0].Image, nil
+	b.job.Container.Entrypoint = t.entrypoint
 }
 
 // keepCatalog stores the reference and the bindings, and states the verdict.
@@ -260,6 +286,12 @@ func (b *jobBuilder) keepCatalog(rm *omap, t *catalogTask) {
 		IRPath: b.path, Feature: caps.StepAction, Level: caps.Emulated,
 		Strategy: catalogStrategy + " " + t.name, Detail: t.caveat, SourceLoc: b.c.file,
 	})
+	for _, need := range t.external {
+		b.c.p.rep.Add(report.Entry{
+			IRPath: b.path, Feature: caps.StepAction, Level: caps.External, Strategy: "set up outside the file",
+			Detail: need, SourceLoc: b.c.file,
+		})
+	}
 }
 
 // arrayWords joins each bound array param that the entry declares into one quoted word list. An element with
