@@ -165,7 +165,7 @@
 21-gitlab-gitlab-shell gitlab->gha native= 135 emulated=  40 external=   0 lost=  28
 21-gitlab-gitlab-shell gitlab->gitea native= 134 emulated=  40 external=   0 lost=  28
 21-gitlab-gitlab-shell gitlab->tekton native=  90 emulated=  41 external=   3 lost=  60
-21-gitlab-gitlab-shell gitlab->woodpecker native=  89 emulated=  28 external=   0 lost=  77
+21-gitlab-gitlab-shell gitlab->woodpecker native=  89 emulated=  35 external=   0 lost=  70
 22-gitlab-gitlab-vscode-extension gitlab->argo native= 116 emulated=  61 external=   2 lost=  74
 22-gitlab-gitlab-vscode-extension gitlab->concourse native=  86 emulated= 100 external=   3 lost=  63
 22-gitlab-gitlab-vscode-extension gitlab->drone native= 104 emulated=  35 external=   0 lost= 112

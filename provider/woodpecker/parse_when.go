@@ -82,14 +82,38 @@ func (s *whenSpec) configure(m *marks) {
 	s.sharedStatus = s.sharedStatusList()
 	for _, u := range m.uses {
 		var g gateArg
-		if u.Feature == caps.JobIf && decodeArg(m.args[u], &g) && g.Gate {
-			s.gated = true
+		if u.Feature == caps.JobIf && decodeArg(m.args[u], &g) {
+			s.gated = s.gated || g.Gate
+			s.lenient = s.lenient || g.Paths != nil
+			s.stripChanges(g.Paths)
 		}
 		switch u.Feature {
 		case caps.TriggerFilterBranch, caps.TriggerFilterPaths, caps.TriggerFilterTags:
 			s.lenient = s.lenient || u.IRPath == pipelinePth
 		case caps.PipelineFinally:
 			s.ignoreStatus = true
+		}
+	}
+}
+
+// stripChanges removes the path filter an emitter wrote for a path predicate, so the entries read as the triggers
+// the pipeline had. The entries the emitter made for a pipeline with no triggers are dropped whole.
+func (s *whenSpec) stripChanges(a *changesArg) {
+	if a == nil {
+		return
+	}
+	src, err := expr.ParseCanonical(a.Src)
+	globs, ok := expr.ChangesGlobs(src)
+	if err != nil || !ok {
+		return
+	}
+	if a.Synth {
+		s.items = nil
+		return
+	}
+	for i := range s.items {
+		if slices.Equal(s.items[i].path.Include, globs) && len(s.items[i].path.Exclude) == 0 {
+			s.items[i].path = wpexpr.Filter{}
 		}
 	}
 }

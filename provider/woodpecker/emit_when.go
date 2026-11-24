@@ -12,6 +12,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	wpexpr "github.com/lukaszraczylo/pipemaster/expr/woodpecker"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 )
 
 const (
@@ -425,6 +426,7 @@ func regexTest(ref string, f ir.Filter) (string, bool) {
 // gateArg says that the evaluate text of the one when entry is the job condition, not part of a trigger. It also
 // carries the condition in its source dialect when the translation changed its text.
 type gateArg struct {
+	Paths *changesArg `json:"paths,omitempty"`
 	srcArg
 	Gate bool `json:"gate"`
 }
@@ -579,6 +581,9 @@ func (e *emitter) jobWhen(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (
 	}
 	var cond []wpexpr.Item
 	var status []string
+	if j.If != nil && expr.HasChanges(j.If) {
+		return e.changesWhen(j, jp, finally, base)
+	}
 	if j.If != nil {
 		var ok bool
 		if cond, status, ok = e.condition(jp, caps.JobIf, j.If, "the workflow"); !ok {
@@ -674,4 +679,88 @@ func completeEvents(entries []whenEntry) []whenEntry {
 		}
 	}
 	return out
+}
+
+// changesArg marks a workflow whose job condition is a path predicate that the file states as a path filter on its
+// push and pull request entries. Synth is true when the emitter made the entries, so the pipeline had no triggers.
+type changesArg struct {
+	Src   string `json:"src"`
+	From  string `json:"from,omitempty"`
+	Synth bool   `json:"synth,omitempty"`
+}
+
+// fnmatchExact is true for a GitLab glob (Ruby fnmatch with FNM_PATHNAME) that doublestar reads the same: literal
+// characters, * and ? inside a segment, **/ as a whole segment and {a,b} lists. A class, an escape or a ** inside a
+// segment has no certain equal.
+func fnmatchExact(g string) bool {
+	if g == "" || strings.ContainsAny(g, `[]\+!`) {
+		return false
+	}
+	for i := 0; i+1 < len(g); i++ {
+		if g[i] == '*' && g[i+1] == '*' && (i > 0 && g[i-1] != '/' || !strings.HasPrefix(g[i:], "**/")) {
+			return false
+		}
+	}
+	return !strings.HasSuffix(g, "**")
+}
+
+// changesWhen states a job condition that is one path predicate as a path filter. Woodpecker applies a path filter
+// to push and pull request events only and treats any other event as a match, as GitLab does for changes. A push
+// that creates a branch is compared with its own commits, where GitLab counts every path as changed, so the filter
+// can skip a run GitLab makes; it never runs one GitLab skips. Any other condition shape is disabled and reported.
+func (e *emitter) changesWhen(j *ir.Job, jp string, finally bool, base []whenEntry) ([]whenEntry, error) {
+	globs, ok := expr.ChangesGlobs(j.If)
+	if !ok || !slices.ContainsFunc(globs, func(string) bool { return true }) || slices.ContainsFunc(globs, func(g string) bool { return !fnmatchExact(g) }) || e.from == nil || e.from.ID != provider.GitLab {
+		e.disable(jp, caps.JobIf, j.If, "the workflow")
+		if j.Manual {
+			e.lose(jp, caps.JobManual, "a workflow that never runs has no manual start")
+		}
+		return neverEntries(base), nil
+	}
+	if j.Manual {
+		base = []whenEntry{{Item: wpexpr.Item{Event: wpexpr.Filter{Include: []string{eventMan}}}}}
+	}
+	synth := len(base) == 0
+	if synth {
+		base = []whenEntry{{}}
+	}
+	var out []whenEntry
+	for _, ent := range base {
+		if !ent.path.Empty() || len(ent.Event.Exclude) > 0 {
+			e.disable(jp, caps.JobIf, j.If, "the workflow")
+			return neverEntries(base), nil
+		}
+		events := ent.Event.Include
+		if ent.Event.Empty() {
+			events = allEvents
+		}
+		var with, without []string
+		for _, ev := range events {
+			if ev == eventPush || ev == eventPR {
+				with = append(with, ev)
+			} else {
+				without = append(without, ev)
+			}
+		}
+		if len(with) > 0 {
+			w := ent
+			w.Event.Include = with
+			w.path = wpexpr.Filter{Include: slices.Clone(globs)}
+			out = append(out, w)
+		}
+		if len(without) > 0 {
+			w := ent
+			w.Event.Include = without
+			out = append(out, w)
+		}
+	}
+	e.emulate(jp, caps.JobIf, "when path", "the path filter applies to push and pull request events and every other event runs, as GitLab rules:changes does; a push that creates a branch is compared with its own commits")
+	if err := e.markArg(caps.JobIf, jp, gateArg{Paths: &changesArg{Src: expr.String(j.If), From: e.from.ID, Synth: synth}}); err != nil {
+		e.comment("job condition marker not carried: " + err.Error())
+	}
+	var status []string
+	if finally {
+		status = []string{statusOK, statusFail}
+	}
+	return withStatus(out, status), nil
 }

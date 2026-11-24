@@ -29,31 +29,44 @@ jobs:
           AFTER: ${{ github.sha }}
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
+          RE_c65065151: ^(src/(.*/)?[^/]*|go\.mod)$
+          RE_cd6c3e186: ^(go\.sum)$
         run: |-
           set -eu
           files="$(mktemp)"
           all=false
+          diff_paths() {
+            git -c core.quotepath=off diff -z --name-only --no-renames "$@" > "$files" ||
+              { echo "pipemaster-changes: cannot compute the changed paths for $*" >&2; exit 1; }
+          }
           case "$EVENT" in
             push)
               if [ "$REF_TYPE" = tag ] || [ "$BEFORE" = 0000000000000000000000000000000000000000 ]; then
                 all=true
               else
-                git -c core.quotepath=off diff --name-only --no-renames "$BEFORE" "$AFTER" > "$files"
+                if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+                  git fetch --no-tags --quiet origin "$BEFORE" 2>/dev/null || true
+                fi
+                if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+                  echo "pipemaster-changes: the commit before the push ($BEFORE) is not in the clone, as after a force push; GitLab documents no verdict for this" >&2
+                  exit 1
+                fi
+                diff_paths "$BEFORE" "$AFTER"
               fi ;;
             pull_request)
-              git -c core.quotepath=off diff --name-only --no-renames "$BASE...$HEAD" > "$files" ;;
+              diff_paths "$BASE...$HEAD" ;;
             *)
               all=true ;;
           esac
           emit() {
-            if [ "$all" = true ] || grep -Eq -e "$2" "$files"; then
+            if [ "$all" = true ] || grep -zEq -e "$2" "$files"; then
               echo "$1=true" >> "$GITHUB_OUTPUT"
             else
               echo "$1=false" >> "$GITHUB_OUTPUT"
             fi
           }
-          emit c65065151 '^(src/(.*/)?[^/]*|go\.mod)$'
-          emit cd6c3e186 '^(go\.sum)$'
+          emit c65065151 "$RE_c65065151"
+          emit cd6c3e186 "$RE_cd6c3e186"
   build:
     needs:
       - pipemaster-changes

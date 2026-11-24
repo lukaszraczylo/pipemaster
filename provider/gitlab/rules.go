@@ -218,7 +218,7 @@ func changesGlobs(n *yaml.Node) ([]string, bool) {
 // okGlob admits the glob syntax of Ruby's File.fnmatch that the target emitters spell out: literal characters,
 // *, **, ?, [] classes and {a,b} lists. A variable, a backslash escape or a relative path has no such reading.
 func okGlob(g string) bool {
-	if g == "" || strings.ContainsAny(g, "$\\\n\x00") || strings.HasPrefix(g, "./") || strings.HasPrefix(g, "/") || strings.Contains(g, "//") {
+	if g == "" || strings.ContainsAny(g, "$\\\n\x00'\"`") || strings.HasPrefix(g, "./") || strings.HasPrefix(g, "/") || strings.Contains(g, "//") {
 		return false
 	}
 	return true

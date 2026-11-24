@@ -631,6 +631,7 @@ func (g *group) build(rep *report.Report) (*ir.Pipeline, error) {
 		}
 	}
 	for _, w := range g.wfs {
+		restoreChanges(rep, w)
 		restoreJobIf(rep, w)
 	}
 	collapsePipeline(rep, pl, g.wfs)
@@ -746,4 +747,21 @@ func sameCondition(a, b expr.Expr) bool {
 		return expr.String(a) == expr.String(b)
 	}
 	return ta == tb
+}
+
+// restoreChanges puts the path predicate back as the job condition; the parser already took the filter the emitter
+// wrote out of the triggers.
+func restoreChanges(rep *report.Report, w *workflow) {
+	for _, u := range w.marks.uses {
+		var a gateArg
+		if u.Feature != caps.JobIf || !decodeArg(w.marks.args[u], &a) || a.Paths == nil {
+			continue
+		}
+		src, err := expr.ParseCanonical(a.Paths.Src)
+		if _, ok := expr.ChangesGlobs(src); err != nil || !ok || w.job.If != nil {
+			reportUncollapsed(rep, u, "the file edit changed the path filter, so the parsed one stands")
+			continue
+		}
+		w.job.If = src
+	}
 }

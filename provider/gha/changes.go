@@ -139,7 +139,7 @@ func globERE(g string) (string, bool) {
 	for i := 0; i < len(g); i++ {
 		c := g[i]
 		switch {
-		case c >= 0x80 || c == '\'' || c == '\\' || c == '\n':
+		case !globByte(c):
 			return "", false
 		case c == '*' && strings.HasPrefix(g[i:], "**/") && (i == 0 || g[i-1] == '/'):
 			sb.WriteString("(.*/)?")
@@ -164,16 +164,13 @@ func globERE(g string) (string, bool) {
 			if j < 2 {
 				return "", false
 			}
-			cls := g[i+1 : i+j]
-			if strings.HasPrefix(cls, "!") {
-				cls = "^" + cls[1:]
-			}
-			if strings.ContainsAny(cls, "[]") || strings.Contains(cls, "[:") {
+			cls, ok := classERE(g[i+1 : i+j])
+			if !ok {
 				return "", false
 			}
-			sb.WriteString("[" + cls + "]")
+			sb.WriteString(cls)
 			i += j
-		case strings.IndexByte(`.+()|^$}`, c) >= 0:
+		case strings.IndexByte(`.+()|^}`, c) >= 0:
 			sb.WriteString(`\` + string(c))
 		default:
 			sb.WriteByte(c)
@@ -183,6 +180,37 @@ func globERE(g string) (string, bool) {
 		return "", false
 	}
 	return sb.String(), true
+}
+
+// globByte is the allow-list of glob characters: printable ASCII without quotes, backslash, dollar and backtick.
+// The regex travels as data, never as shell text; the list keeps the markers and the report readable too.
+func globByte(c byte) bool {
+	return c >= 0x20 && c < 0x7f && strings.IndexByte("'\"\\$`", c) < 0
+}
+
+// classERE converts the body of a glob character class. A class never matches a slash, as under FNM_PATHNAME.
+// Only letters, digits, underscore, dot and a range of two alphanumerics are allowed; anything else is not modelled.
+func classERE(body string) (string, bool) {
+	neg := false
+	if strings.HasPrefix(body, "!") || strings.HasPrefix(body, "^") {
+		neg, body = true, body[1:]
+	}
+	if body == "" {
+		return "", false
+	}
+	alnum := func(c byte) bool { return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
+	for i := 0; i < len(body); i++ {
+		switch c := body[i]; {
+		case alnum(c) || c == '_' || c == '.':
+		case c == '-' && i > 0 && i+1 < len(body) && alnum(body[i-1]) && alnum(body[i+1]) && body[i-1] <= body[i+1]:
+		default:
+			return "", false
+		}
+	}
+	if neg {
+		return "[^/" + body + "]", true
+	}
+	return "[" + body + "]", true
 }
 
 func atomERE(globs []string) (string, bool) {
@@ -199,26 +227,39 @@ func atomERE(globs []string) (string, bool) {
 
 // changesScript computes the verdict of each atom, as GitLab's rules:changes does: a push compares with the
 // commit before it, a merge request with the target branch, and a tag, a new branch, a schedule or a manual
-// run counts every path as changed. A diff that cannot be computed fails the job, so no gated job runs.
-func changesScript(atoms []changeAtom) (string, bool) {
+// run counts every path as changed. A diff that cannot be computed fails the job with a message, so no gated
+// job runs. The regexes come in as RE_<output> environment variables and never enter the script text. Paths are
+// NUL-separated, so a name with a quote, a backslash or a newline matches as it is.
+func changesScript(atoms []changeAtom) string {
 	var sb strings.Builder
 	sb.WriteString(`set -eu
 files="$(mktemp)"
 all=false
+diff_paths() {
+  git -c core.quotepath=off diff -z --name-only --no-renames "$@" > "$files" ||
+    { echo "pipemaster-changes: cannot compute the changed paths for $*" >&2; exit 1; }
+}
 case "$EVENT" in
   push)
     if [ "$REF_TYPE" = tag ] || [ "$BEFORE" = ` + zeroSHA + ` ]; then
       all=true
     else
-      git -c core.quotepath=off diff --name-only --no-renames "$BEFORE" "$AFTER" > "$files"
+      if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+        git fetch --no-tags --quiet origin "$BEFORE" 2>/dev/null || true
+      fi
+      if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+        echo "pipemaster-changes: the commit before the push ($BEFORE) is not in the clone, as after a force push; GitLab documents no verdict for this" >&2
+        exit 1
+      fi
+      diff_paths "$BEFORE" "$AFTER"
     fi ;;
   pull_request)
-    git -c core.quotepath=off diff --name-only --no-renames "$BASE...$HEAD" > "$files" ;;
+    diff_paths "$BASE...$HEAD" ;;
   *)
     all=true ;;
 esac
 emit() {
-  if [ "$all" = true ] || grep -Eq -e "$2" "$files"; then
+  if [ "$all" = true ] || grep -zEq -e "$2" "$files"; then
     echo "$1=true" >> "$GITHUB_OUTPUT"
   else
     echo "$1=false" >> "$GITHUB_OUTPUT"
@@ -226,13 +267,9 @@ emit() {
 }
 `)
 	for _, a := range atoms {
-		re, ok := atomERE(a.globs)
-		if !ok {
-			return "", false
-		}
-		sb.WriteString("emit " + a.out + " '" + re + "'\n")
+		sb.WriteString("emit " + a.out + ` "$RE_` + a.out + `"` + "\n")
 	}
-	return sb.String(), true
+	return sb.String()
 }
 
 // sourceChanges translates a condition with path predicates and records what the generated job must compute.
@@ -250,7 +287,7 @@ func (e *emitter) sourceChanges(path string, f caps.Feature, x expr.Expr) (expr.
 		}
 	}
 	e.changesNeeded = true
-	detail := "rules:changes is computed by the generated job " + changesJobID + ": a push compares with the commit before it, a merge request with the target branch, and a tag, a new branch or a schedule counts every path as changed"
+	detail := "rules:changes is computed by the generated job " + changesJobID + ": a push compares with the commit before it, a merge request with the target branch, and a tag, a new branch, a schedule or any other event counts every path as changed; a commit before the push that the clone cannot fetch, as after a force push, fails the job"
 	if len(cav) > 0 {
 		detail += "; " + strings.Join(cav, "; ")
 	}
@@ -264,10 +301,7 @@ func (e *emitter) sourceChanges(path string, f caps.Feature, x expr.Expr) (expr.
 // changesJob writes the generated job that holds the verdict of each path predicate.
 func (e *emitter) changesJob(pl *ir.Pipeline) (*yaml.Node, error) {
 	jp := jobPath(pl.ID, changesJobID)
-	script, ok := changesScript(e.changeAtoms)
-	if !ok {
-		return nil, fmt.Errorf("a path glob has no regular expression")
-	}
+	script := changesScript(e.changeAtoms)
 	ref, err := reverseAction("checkout", "")
 	if err != nil {
 		return nil, err
@@ -301,6 +335,13 @@ func (e *emitter) changesJob(pl *ir.Pipeline) (*yaml.Node, error) {
 		{"AFTER", "github.sha"}, {"BASE", "github.event.pull_request.base.sha"}, {"HEAD", "github.event.pull_request.head.sha"},
 	} {
 		env.set(kv[0], str("${{ "+kv[1]+" }}"))
+	}
+	for _, a := range e.changeAtoms {
+		re, ok := atomERE(a.globs)
+		if !ok {
+			return nil, fmt.Errorf("a path glob has no regular expression")
+		}
+		env.set("RE_"+a.out, str(re))
 	}
 	run.set("env", env.n)
 	run.set("run", block([]string{strings.TrimRight(script, "\n")}))

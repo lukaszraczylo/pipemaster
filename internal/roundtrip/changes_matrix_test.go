@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -249,9 +250,19 @@ var ghaExprRE = strings.NewReplacer("${{", "", "}}", "")
 // runChanges runs the step the emitter wrote for the changed-paths job, as GitHub would, and returns its outputs.
 func runChanges(t *testing.T, doc ghaWorkflowDoc, s scenario, dir, before, after string) map[string]string {
 	t.Helper()
+	res, out, err := execChanges(t, doc, s, dir, before, after)
+	if err != nil {
+		t.Fatalf("%s: step failed: %v\n%s", s.name, err, out)
+	}
+	return res
+}
+
+// execChanges runs the changed-paths step and returns its outputs, its console text and its error.
+func execChanges(t *testing.T, doc ghaWorkflowDoc, s scenario, dir, before, after string) (map[string]string, string, error) {
+	t.Helper()
 	job, ok := doc.Jobs[changesJob]
 	if !ok {
-		return nil
+		return nil, "", nil
 	}
 	values := map[string]string{
 		"github.event_name":                  s.gh["event"].(string),
@@ -272,10 +283,13 @@ func runChanges(t *testing.T, doc ghaWorkflowDoc, s scenario, dir, before, after
 		}
 		env := os.Environ()
 		for k, v := range st.Env {
-			key := strings.TrimSpace(ghaExprRE.Replace(v))
-			val, known := values[key]
-			if !known {
-				t.Fatalf("env %s uses %q, which the harness has no value for", k, v)
+			val := v
+			if strings.Contains(v, "${{") {
+				key := strings.TrimSpace(ghaExprRE.Replace(v))
+				var known bool
+				if val, known = values[key]; !known {
+					t.Fatalf("env %s uses %q, which the harness has no value for", k, v)
+				}
 			}
 			env = append(env, k+"="+val)
 		}
@@ -283,9 +297,7 @@ func runChanges(t *testing.T, doc ghaWorkflowDoc, s scenario, dir, before, after
 		env = append(env, "GITHUB_OUTPUT="+out, "RUNNER_TEMP="+t.TempDir(), "GIT_CONFIG_GLOBAL=/dev/null")
 		cmd := exec.Command("bash", "-e", "-c", st.Run) //nolint:gosec // runs the emitted script in a temp repo
 		cmd.Dir, cmd.Env = dir, env
-		if b, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("%s: step failed: %v\n%s\nscript:\n%s", s.name, err, b, st.Run)
-		}
+		b, err := cmd.CombinedOutput()
 		raw, _ := os.ReadFile(out) //nolint:gosec // path in the test temp dir
 		res := map[string]string{}
 		for _, l := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
@@ -293,9 +305,9 @@ func runChanges(t *testing.T, doc ghaWorkflowDoc, s scenario, dir, before, after
 				res[k] = v
 			}
 		}
-		return res
+		return res, string(b), err
 	}
-	return nil
+	return nil, "", nil
 }
 
 type changesCase struct {
@@ -404,4 +416,207 @@ func parseCond(t *testing.T, text string) expr.Expr {
 		t.Fatalf("parse %q: %v", text, err)
 	}
 	return x
+}
+
+func ghaFor(t *testing.T, glob string) (string, ghaWorkflowDoc) {
+	t.Helper()
+	src := "j:\n  script: [echo hi]\n  rules:\n    - changes:\n        - " + glob + "\n"
+	out, _ := convert(t, provider.GitLab, provider.GHA, gitlabCI, src)
+	_, wf, _ := strings.Cut(out, "### .github/workflows/")
+	_, wf, _ = strings.Cut(wf, "\n")
+	var doc ghaWorkflowDoc
+	if err := yaml.Unmarshal([]byte(wf), &doc); err != nil {
+		t.Fatalf("emitted workflow: %v\n%s", err, wf)
+	}
+	return wf, doc
+}
+
+var pushMain = scenarios[0]
+
+// TestChangesGlobsNeverReachTheShell: a glob is data. Hostile globs either stay out of the workflow (the job is
+// disabled and reported) or run with no side effect, and no glob text appears in the script body.
+func TestChangesGlobsNeverReachTheShell(t *testing.T) {
+	hostile := []string{
+		`"a[';touch PWNED;']b"`, `"$(touch PWNED)"`, "\"`touch PWNED`\"", `"x;touch PWNED"`, `"a[;touch PWNED]b"`,
+		`"a']b[']"`, `"*.go' ; touch PWNED ; '"`, `'a"b'`, `"a\\b"`, `"a[!b]c"`, `"a[]]b"`, `"{a,b;touch PWNED}"`,
+	}
+	for _, g := range hostile {
+		t.Run(g, func(t *testing.T) {
+			wf, doc := ghaFor(t, g)
+			dir, before, after := history(t, map[string]string{"a/x.go": "package a"})
+			if job, ok := doc.Jobs[changesJob]; ok {
+				for _, st := range job.Steps {
+					if strings.Contains(st.Run, "touch") {
+						t.Fatalf("glob text is in the script body:\n%s", st.Run)
+					}
+				}
+				runChanges(t, doc, pushMain, dir, before, after)
+			}
+			if _, err := os.Stat(filepath.Join(dir, "PWNED")); err == nil {
+				t.Fatalf("the glob ran a command:\n%s", wf)
+			}
+			if _, ok := doc.Jobs[changesJob]; !ok && !strings.Contains(doc.Jobs["j"].If, "false") {
+				t.Fatalf("no changed-paths job and the job is not disabled:\n%s", wf)
+			}
+		})
+	}
+}
+
+// TestChangesMatchesAwkwardFileNames: a name with a quote, a backslash, a tab or a newline is a path like any other.
+func TestChangesMatchesAwkwardFileNames(t *testing.T) {
+	_, doc := ghaFor(t, "'**/*.go'")
+	for _, name := range []string{"a/we\"ird.go", "a/back\\slash.go", "a/tab\there.go", "a/new\nline.go", "a/semi;colon.go"} {
+		dir, before, after := history(t, map[string]string{name: "package a"})
+		got := runChanges(t, doc, pushMain, dir, before, after)
+		if len(got) != 1 {
+			t.Fatalf("outputs = %v", got)
+		}
+		for _, v := range got {
+			if v != "true" {
+				t.Errorf("%q: changes is %s, want true", name, v)
+			}
+		}
+	}
+}
+
+// TestChangesForcePushFailsLoudly: a commit before the push that the clone cannot get fails the job with its reason,
+// so no gated job runs; it never reports false.
+func TestChangesForcePushFailsLoudly(t *testing.T) {
+	_, doc := ghaFor(t, "'**/*.go'")
+	dir, _, after := history(t, map[string]string{"a/x.go": "package a"})
+	_, out, err := execChanges(t, doc, pushMain, dir, "1111111111111111111111111111111111111111", after)
+	if err == nil || !strings.Contains(out, "is not in the clone") {
+		t.Fatalf("want a failure naming the reason, got err=%v out=%q", err, out)
+	}
+}
+
+type wpWhen []struct {
+	Event    any    `yaml:"event"`
+	Branch   any    `yaml:"branch"`
+	Path     any    `yaml:"path"`
+	Evaluate string `yaml:"evaluate"`
+}
+
+func anyList(v any) []string {
+	switch x := v.(type) {
+	case string:
+		return []string{x}
+	case []any:
+		var out []string
+		for _, e := range x {
+			out = append(out, e.(string))
+		}
+		return out
+	case map[string]any:
+		return anyList(x["include"])
+	}
+	return nil
+}
+
+// wpEvent names the Woodpecker event of a scenario.
+func wpEvent(s scenario) string {
+	switch {
+	case s.pr:
+		return "pull_request"
+	case s.sched:
+		return "cron"
+	case s.tag:
+		return "tag"
+	}
+	return "push"
+}
+
+// wpRuns evaluates the emitted when list for an event: a path filter applies to push and pull request only and any
+// other event passes it, as the Woodpecker workflow syntax documents.
+func wpRuns(w wpWhen, s scenario, changed bool) bool {
+	for _, e := range w {
+		if e.Evaluate == "false" {
+			continue
+		}
+		if ev := anyList(e.Event); len(ev) > 0 && !slices.Contains(ev, wpEvent(s)) {
+			continue
+		}
+		if br := anyList(e.Branch); len(br) > 0 && !slices.Contains(br, s.gh["ref_name"].(string)) {
+			continue
+		}
+		if p := anyList(e.Path); len(p) > 0 && (s.push && !s.tag || s.pr) && !changed {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// wpListsEvent is true when some entry names the scenario's event; an event no entry names is a trigger difference,
+// not a path filter result.
+func wpListsEvent(w wpWhen, s scenario) bool {
+	return slices.ContainsFunc(w, func(e struct {
+		Event    any    `yaml:"event"`
+		Branch   any    `yaml:"branch"`
+		Path     any    `yaml:"path"`
+		Evaluate string `yaml:"evaluate"`
+	}) bool {
+		return slices.Contains(anyList(e.Event), wpEvent(s))
+	})
+}
+
+// TestGitlabChangesRunOnWoodpeckerNeverWhereGitLabSkips: a path predicate becomes a native path filter; a condition
+// the filter cannot state keeps the workflow disabled. Woodpecker may skip a run GitLab makes (a new branch) but
+// never makes a run GitLab skips.
+func TestGitlabChangesRunOnWoodpeckerNeverWhereGitLabSkips(t *testing.T) {
+	cases := []struct {
+		name     string
+		workflow []arm
+		rules    []arm
+		native   bool
+	}{
+		{name: "changes only", rules: []arm{{Changes: goGlobs}}, native: true},
+		{name: "changes under workflow triggers", workflow: mrOrMain, rules: []arm{{Changes: goGlobs}}, native: true},
+		{name: "changes and if", rules: []arm{{If: onMain, Changes: goGlobs}}},
+		{name: "two changes arms", rules: []arm{{Changes: []string{"**/*.go"}}, {Changes: []string{"Makefile"}}}},
+		{name: "glob with a class", rules: []arm{{Changes: []string{"src/[ab].go"}}}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var sb strings.Builder
+			if len(c.workflow) > 0 {
+				sb.WriteString("workflow:\n  rules:\n" + armsYAML(c.workflow))
+			}
+			sb.WriteString("j:\n  script: [echo hi]\n  rules:\n" + armsYAML(c.rules))
+			out, _ := convert(t, provider.GitLab, provider.Woodpecker, gitlabCI, sb.String())
+			_, wf, _ := strings.Cut(out, "### .woodpecker/")
+			_, wf, _ = strings.Cut(wf, "\n")
+			var doc struct {
+				When wpWhen `yaml:"when"`
+			}
+			if err := yaml.Unmarshal([]byte(wf), &doc); err != nil {
+				t.Fatalf("emitted workflow: %v\n%s", err, wf)
+			}
+			if c.native != strings.Contains(wf, "path:") {
+				t.Fatalf("native path filter = %v, want %v:\n%s", strings.Contains(wf, "path:"), c.native, wf)
+			}
+			runs := 0
+			for _, changed := range []bool{true, false} {
+				for _, s := range scenarios {
+					if s.deleted {
+						continue
+					}
+					want := glDecision(t, s, c.workflow, c.rules, changed)
+					got := wpRuns(doc.When, s, changed)
+					if got && !want {
+						t.Errorf("%s changed=%v: Woodpecker runs the job and GitLab does not\n%s", s.name, changed, wf)
+					}
+					if got {
+						runs++
+					}
+					if c.native && want && !got && wpListsEvent(doc.When, s) && (!s.created || !s.push) && (!s.pr || len(c.workflow) != 0) {
+						t.Errorf("%s changed=%v: GitLab runs the job and the native filter does not\n%s", s.name, changed, wf)
+					}
+				}
+			}
+			if c.native != (runs > 0) {
+				t.Errorf("runs = %d, native = %v:\n%s", runs, c.native, wf)
+			}
+		})
+	}
 }
