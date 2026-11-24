@@ -44,6 +44,20 @@ required=(
   Pipemaster.TranslateFacts.glGha_affix_unsound
   Pipemaster.TranslateFacts.wpGl_neg_unsound
   Pipemaster.TranslateFacts.wpGha_neg_unsound
+  Pipemaster.TranslateFacts.fam_bridge
+  Pipemaster.TranslateFacts.tr_EvAgn
+  Pipemaster.TranslateFacts.trFactsWpFam_sound
+  Pipemaster.TranslateFacts.glWpFam_sound
+  Pipemaster.TranslateFacts.famExact_unsound
+  Pipemaster.TranslateFacts.famPrefix_sound
+  Pipemaster.TranslateFacts.ghaGlRn_plain_bad
+  Pipemaster.TranslateFacts.ghaGlRn_guard_ok
+  Pipemaster.TranslateFacts.ghaGlRn_neg_bad
+  Pipemaster.TranslateFacts.ghaGlRn_neg_ok
+  Pipemaster.TranslateFacts.glGhaRn_neg_bad
+  Pipemaster.TranslateFacts.glGhaRn_neg_ok
+  Pipemaster.TranslateFacts.glDrone_plain_bad
+  Pipemaster.TranslateFacts.glDrone_sound
   Pipemaster.TranslateClass.eval_congr
   Pipemaster.TranslateClass.rename_sound
   Pipemaster.TranslateClass.tr_sound_dialect

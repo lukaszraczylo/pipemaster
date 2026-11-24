@@ -43,16 +43,25 @@ func loadEnvs(t *testing.T, name string) ([]canonEnv, []vectors.Case) {
 
 // factOut is one vector result; a null truthiness is an environment the case's facts rule out.
 type factOut struct {
-	Tr   json.RawMessage `json:"tr"`
-	Src  []*bool         `json:"src"`
-	Tgt  []*bool         `json:"tgt"`
-	Wp   []*bool         `json:"wp"`
-	WpOK bool            `json:"wp_ok"`
+	Tr      json.RawMessage `json:"tr"`
+	TrPlain json.RawMessage `json:"tr_plain"`
+	Src     []*bool         `json:"src"`
+	Tgt     []*bool         `json:"tgt"`
+	Wp      []*bool         `json:"wp"`
+	WpClose []*bool         `json:"wp_closed"`
+	WpMeta  []*bool         `json:"wp_metadata"`
+	WpOK    bool            `json:"wp_ok"`
 }
 
-// factWoodpeckerView is what a Woodpecker run presents (Mirrors wpMap in Pipemaster/TranslateFacts.lean): on a
-// pull request CI_COMMIT_BRANCH is the target branch and there is no CI_COMMIT_TAG.
-func (e canonEnv) factWoodpeckerView() expr.Env {
+// factWoodpeckerView is what a Woodpecker run presents (Mirrors wpMapS in Pipemaster/TranslateFacts.lean): on a
+// pull request CI_COMMIT_BRANCH is the target branch, there is no CI_COMMIT_TAG, and the event is pull_request
+// followed by sfx (pull_request_closed, pull_request_metadata).
+func (e canonEnv) factWoodpeckerView(sfx string) expr.Env {
+	return woodpecker.UnsetEnv{Env: e.wpRawView(sfx)}
+}
+
+// wpRawView is the variables a pull request run sets, as the Woodpecker and Drone pipelines see them.
+func (e canonEnv) wpRawView(sfx string) view {
 	v := e.gitlabView()
 	delete(v, "event")
 	if e.Event != nil {
@@ -61,8 +70,9 @@ func (e canonEnv) factWoodpeckerView() expr.Env {
 	if e.Event != nil && *e.Event == "pull_request" {
 		delete(v, "tag")
 		v["branch"] = wpTarget
+		v["event"] = wpEvents[*e.Event] + sfx
 	}
-	return woodpecker.UnsetEnv{Env: v}
+	return v
 }
 
 // wpTarget is the target branch of a Woodpecker pull request run in the vectors (wpTarget in lean4/GenVectors.lean).
@@ -108,7 +118,7 @@ func TestTranslateFactsVectors(t *testing.T) {
 			}
 			continue
 		}
-		want, err := decodeExpr(out.Tr, gitlab.Lang.ID)
+		want, err := decodeExpr(out.TrPlain, gitlab.Lang.ID)
 		if err != nil {
 			t.Fatalf("case %d: %v", i, err)
 		}
@@ -164,9 +174,14 @@ func checkFactsWoodpecker(t *testing.T, i int, src expr.Expr, facts expr.Facts, 
 		if out.Src[j] == nil {
 			continue
 		}
-		g := woodpeckerHolds(t, wp, e.factWoodpeckerView())
-		if g != *out.Src[j] || g != *out.Wp[j] {
-			t.Errorf("case %d env %d %s -> %s: Woodpecker = %v, GHA source = %v, Lean wp = %v", i, j, expr.String(src), expr.String(wp), g, *out.Src[j], *out.Wp[j])
+		for _, v := range []struct {
+			sfx  string
+			lean []*bool
+		}{{"", out.Wp}, {"_closed", out.WpClose}, {"_metadata", out.WpMeta}} {
+			g := woodpeckerHolds(t, wp, e.factWoodpeckerView(v.sfx))
+			if g != *out.Src[j] || g != *v.lean[j] {
+				t.Errorf("case %d env %d %s -> %s: Woodpecker%s = %v, GHA source = %v, Lean wp = %v", i, j, expr.String(src), expr.String(wp), v.sfx, g, *out.Src[j], *v.lean[j])
+			}
 		}
 	}
 }
@@ -179,21 +194,21 @@ func TestTranslateFactsTable(t *testing.T) {
 		facts  expr.Facts
 	}{
 		{`github.ref_name == 'main'`, "woodpecker",
-			`!(CI_PIPELINE_EVENT matches "(?i)^pull_request$") && CI_COMMIT_BRANCH matches "(?i)^main$"`, branchFacts},
+			`!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH matches "(?i)^main$"`, branchFacts},
 		{`github.ref_name != 'main'`, "woodpecker",
-			`CI_PIPELINE_EVENT matches "(?i)^pull_request$" || !(CI_COMMIT_BRANCH matches "(?i)^main$")`, branchFacts},
+			`CI_PIPELINE_EVENT matches "(?i)^pull_request" || !(CI_COMMIT_BRANCH matches "(?i)^main$")`, branchFacts},
 		{`'main' == github.ref_name`, "woodpecker",
-			`!(CI_PIPELINE_EVENT matches "(?i)^pull_request$") && CI_COMMIT_BRANCH matches "(?i)^main$"`, branchFacts},
+			`!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH matches "(?i)^main$"`, branchFacts},
 		{`github.ref_name == 'main' || github.event_name == 'schedule'`, "woodpecker",
-			`!(CI_PIPELINE_EVENT matches "(?i)^pull_request$") && CI_COMMIT_BRANCH matches "(?i)^main$" || CI_PIPELINE_EVENT matches "(?i)^cron$"`, branchFacts},
+			`!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH matches "(?i)^main$" || CI_PIPELINE_EVENT matches "(?i)^cron$"`, branchFacts},
 		// No facts: refused as before.
 		{`github.ref_name == 'main'`, "woodpecker", ``, expr.Facts{}},
 		// A branch guard gains the pull request test: CI_COMMIT_BRANCH is the target branch there.
 		{`github.ref_type == 'branch' && github.ref_name == 'main'`, "woodpecker",
-			`!(CI_PIPELINE_EVENT matches "(?i)^pull_request$") && CI_COMMIT_BRANCH matches "(?i)^main$"`, branchFacts},
+			`!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH matches "(?i)^main$"`, branchFacts},
 		// Without the facts the guarded form still excludes pull requests: Woodpecker reports the target branch there.
 		{`github.ref_type == 'branch' && github.ref_name == 'main'`, "woodpecker",
-			`!(CI_PIPELINE_EVENT matches "(?i)^pull_request$") && CI_COMMIT_BRANCH matches "(?i)^main$"`, expr.Facts{}},
+			`!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH matches "(?i)^main$"`, expr.Facts{}},
 		{`github.ref_type == 'branch' && github.ref_name != 'main'`, "woodpecker", ``, expr.Facts{}},
 		{`github.ref_type == 'branch' && startsWith(github.ref_name, 'rel')`, "woodpecker", ``, expr.Facts{}},
 		// A tag guard names no branch and keeps its shape.
@@ -232,12 +247,32 @@ func TestTranslateFactsTable(t *testing.T) {
 	}
 }
 
-// A target that names ref_name takes the plain path, facts or not.
+// A target that names ref_name takes the same path, facts or not, and keeps what cannot differ on a pull request.
 func TestTranslateFactsKeepsPlain(t *testing.T) {
-	src := ghaParse(t, `github.ref_name == 'main'`)
+	src := ghaParse(t, `github.ref_name != 'main'`)
 	plain, ok := expr.Translate(src, gha.Lang, gitlab.Lang)
 	got, ok2 := expr.TranslateFacts(src, gha.Lang, gitlab.Lang, branchFacts)
 	if !ok || !ok2 || !reflect.DeepEqual(plain, got) {
 		t.Errorf("plain %v, %v; with facts %v, %v", plain, ok, got, ok2)
+	}
+}
+
+// A GitLab merge request pipeline holds the source branch in CI_COMMIT_REF_NAME, and GHA ref_name on a pull
+// request is <number>/merge, so a test that raises the condition gains the pull request exclusion.
+func TestRefNameGainsPullRequestExclusionInGitLab(t *testing.T) {
+	for _, c := range []struct{ src, want string }{
+		{`github.ref_name == 'main'`, `$CI_PIPELINE_SOURCE !~ /^merge_request_event$/i && $CI_COMMIT_REF_NAME =~ /^main$/i`},
+		{`!(github.ref_name != 'main')`, `!($CI_PIPELINE_SOURCE =~ /^merge_request_event$/i || $CI_COMMIT_REF_NAME !~ /^main$/i)`},
+		{`startsWith(github.ref_name, 'rel')`, `$CI_PIPELINE_SOURCE !~ /^merge_request_event$/i && $CI_COMMIT_REF_NAME =~ /^rel/i`},
+		{`!(github.ref_name == 'main')`, `!($CI_COMMIT_REF_NAME =~ /^main$/i)`},
+	} {
+		got, ok := expr.TranslateFacts(ghaParse(t, c.src), gha.Lang, gitlab.Lang, expr.Facts{})
+		if !ok {
+			t.Errorf("%q refused", c.src)
+			continue
+		}
+		if text, err := gitlab.Print(got); err != nil || text != c.want {
+			t.Errorf("%q = %q, %v; want %q", c.src, text, err, c.want)
+		}
 	}
 }

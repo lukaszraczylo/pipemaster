@@ -1,6 +1,9 @@
 package expr
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // Facts is what a pipeline's triggers guarantee about every run that can reach a condition (Mirrors expr.Facts
 // (expr/translate_facts.go): lean4/Pipemaster/TranslateFacts.lean, BranchFact; a pull request has PrFact whatever
@@ -53,44 +56,86 @@ func route(from, to Dialect) prRoute {
 //   - GHA to a target with no ref_name (Assume): a branch-guarded ref_name equality excludes pull requests, and
 //     with the facts a ref_name comparison states them too. A branch-guarded affix test is refused.
 //   - GHA to GitLab: a branch-guarded affix test under ! is refused: it is false in GitLab on a merge request
-//     and may be true in GHA, where ref_name is <number>/merge.
+//     and may be true in GHA, where ref_name is <number>/merge. A test of an unguarded ref_name that raises the
+//     condition gains the pull request exclusion (AssumeRefName): GitLab holds the source branch there.
 //   - GitLab to a target that holds the target branch (AssumeGitLab): each branch test gains the pull request
 //     test.
 //   - To GHA, and from a source that holds the target branch to GitLab: a branch test whose result can differ
-//     on a pull request in the direction that runs more is refused.
+//     on a pull request in the direction that runs more is refused. A GitLab-class ref_name test that
+//     lowers the condition gains the exclusion for GHA (AssumeGitLabRef).
+//   - A target with several pull request events (Dialect.PRFamily) states each pull request test as a prefix test.
 func TranslateFacts(e Expr, from, to Dialect, f Facts) (Expr, bool) {
-	x, ok := rewriteFacts(e, from, to, f)
-	if !ok {
-		return nil, false
+	for _, x := range rewrites(e, from, to, f) {
+		if t, ok := Translate(x, from, to); ok {
+			if to.PRFamily {
+				t = prFamily(t, to)
+			}
+			return t, true
+		}
 	}
-	return Translate(x, from, to)
+	return nil, false
 }
 
 // TranslatableFacts reports whether TranslateFacts succeeds. It states the subset as the Lean model does:
 // guardOk, and the condition after the rewrite is Translatable (lean4/Pipemaster/TranslateFacts.lean).
 func TranslatableFacts(e Expr, from, to Dialect, f Facts) bool {
+	return slices.ContainsFunc(rewrites(e, from, to, f), func(x Expr) bool { return Translatable(x, from, to) })
+}
+
+// rewrites lists the conditions to try, best first. A GitLab-class source gets the pull request test in the
+// idiom of the test it guards, and then as a pattern test, which a target that reads no event equality takes.
+func rewrites(e Expr, from, to Dialect, f Facts) []Expr {
 	x, ok := rewriteFacts(e, from, to, f)
-	return ok && Translatable(x, from, to)
+	if !ok {
+		return nil
+	}
+	out := []Expr{x}
+	if route(from, to) == routeGLToBranch {
+		if y, yok := assumeGitLab(e, from, true); yok {
+			out = append(out, y)
+		}
+	}
+	return out
 }
 
 // rewriteFacts is the condition to translate, and false when the pair has no safe form of it.
 func rewriteFacts(e Expr, from, to Dialect, f Facts) (Expr, bool) {
 	switch route(from, to) {
 	case routeGHAFacts:
-		if guardedAffix(e) {
+		if guardedAffix(e) || to.PRFamily && bareEvent(e) {
 			return nil, false
 		}
 		return Assume(e, f.Branch), true
 	case routeGHAToGL:
-		return e, !guardedAffixUnderNot(e, false)
+		if guardedAffixUnderNot(e, false) {
+			return nil, false
+		}
+		return AssumeRefName(e, false)
 	case routeGLToBranch:
 		return AssumeGitLab(e, from)
 	case routeToGHA:
-		return e, !riskyBranch(e, false, toGHARisk(from))
+		if riskyBranch(e, false, toGHARisk(from)) {
+			return nil, false
+		}
+		return AssumeGitLabRef(e, from, false)
 	case routeBranchToGL:
 		return e, !riskyBranch(e, false, branchToGLRisk)
 	}
 	return e, true
+}
+
+// bareEvent (Mirrors NoBareEv: lean4/Pipemaster/TranslateFacts.lean) finds the event ref used as a value under !, &&
+// and ||: its string differs between the pull request events of a dialect that has several.
+func bareEvent(e Expr) bool {
+	switch v := e.(type) {
+	case Ref:
+		return pathName(v) == CtxEvent
+	case Unary:
+		return v.Op == OpNot && bareEvent(v.X)
+	case Binary:
+		return (v.Op == OpAnd || v.Op == OpOr) && (bareEvent(v.L) || bareEvent(v.R))
+	}
+	return false
 }
 
 // guardedAffix (Mirrors guardOk: lean4/Pipemaster/TranslateFacts.lean) finds a branch guard on a startsWith, endsWith or contains test of ref_name. The branch ref
@@ -264,21 +309,24 @@ func branchLeaf(b Binary) (Mode, string, bool) {
 // the branch ref in a GitLab-class condition, for a target that holds the target branch on a pull request. The
 // source leaves the branch unset in a merge request pipeline, so a positive test is false there and a negative
 // one is true. A use of the branch ref in any other shape has no rewrite.
-func AssumeGitLab(e Expr, from Dialect) (Expr, bool) {
+func AssumeGitLab(e Expr, from Dialect) (Expr, bool) { return assumeGitLab(e, from, false) }
+
+// assumeGitLab is AssumeGitLab; patterns says to state the pull request test as a pattern test in every case.
+func assumeGitLab(e Expr, from Dialect, patterns bool) (Expr, bool) {
 	switch v := e.(type) {
 	case Unary:
 		if v.Op == OpNot {
-			x, ok := AssumeGitLab(v.X, from)
+			x, ok := assumeGitLab(v.X, from, patterns)
 			return Unary{Op: OpNot, X: x}, ok
 		}
 	case Binary:
 		switch v.Op {
 		case OpAnd, OpOr:
-			l, lok := AssumeGitLab(v.L, from)
-			r, rok := AssumeGitLab(v.R, from)
+			l, lok := assumeGitLab(v.L, from, patterns)
+			r, rok := assumeGitLab(v.R, from, patterns)
 			return Binary{Op: v.Op, L: l, R: r}, lok && rok
 		case OpMatch, OpNoMatch, OpEq, OpNe:
-			return assumeBranchLeaf(v, from)
+			return assumeBranchLeaf(v, from, patterns)
 		}
 	}
 	return e, noBranch(e)
@@ -286,7 +334,7 @@ func AssumeGitLab(e Expr, from Dialect) (Expr, bool) {
 
 func noBranch(e Expr) bool { return walkRefs(e, func(r Ref) bool { return pathName(r) != CtxBranch }) }
 
-func assumeBranchLeaf(b Binary, from Dialect) (Expr, bool) {
+func assumeBranchLeaf(b Binary, from Dialect, patterns bool) (Expr, bool) {
 	if noBranch(b) {
 		return b, true
 	}
@@ -303,11 +351,194 @@ func assumeBranchLeaf(b Binary, from Dialect) (Expr, bool) {
 	if !ok {
 		return b, false
 	}
-	test := func(op string) Expr {
+	eqForm := !patterns && (b.Op == OpEq || b.Op == OpNe)
+	// match builds the test of the pull request event in the idiom of the leaf, so that a target that reads only
+	// that idiom (Drone) accepts it.
+	match := func(positive bool) Expr {
+		if eqForm {
+			eq := Binary{Op: OpEq, L: ctxRef(CtxEvent), R: Lit{Kind: LitStr, Str: pr}}
+			if positive {
+				return eq
+			}
+			return Unary{Op: OpNot, X: eq}
+		}
+		op := OpNoMatch
+		if positive {
+			op = OpMatch
+		}
 		return Binary{Op: op, L: ctxRef(CtxEvent), R: Lit{Kind: LitStr, Str: Pattern(ModeExact, pr)}}
 	}
 	if b.Op == OpMatch || b.Op == OpEq {
-		return Binary{Op: OpAnd, L: test(OpNoMatch), R: b}, true
+		return Binary{Op: OpAnd, L: match(false), R: b}, true
 	}
-	return Binary{Op: OpOr, L: test(OpMatch), R: b}, true
+	return Binary{Op: OpOr, L: match(true), R: b}, true
+}
+
+// AssumeRefName (Mirrors ghaGlRn_guard_ok: lean4/Pipemaster/TranslateFacts.lean) guards the tests of an
+// unguarded ref_name that go to GitLab. A GHA pull request has the ref_name <number>/merge, but a GitLab merge
+// request pipeline holds the source branch name in CI_COMMIT_REF_NAME (lib/gitlab/ci/variables/builder/pipeline.rb:72
+// and app/models/ci/pipeline.rb:1871 of gitlab-org/gitlab), which a literal can equal. A test that raises the
+// condition (== under an even number of negations, != under an odd number) is false in GHA there, so it gains
+// the pull request test. A test that lowers it cannot run GitLab more often and stays. An affix test whose
+// literal a <number>/merge name can pass has no rewrite. A branch guard keeps its test: it becomes a test of the
+// branch ref, which GitLab leaves unset there.
+func AssumeRefName(e Expr, odd bool) (Expr, bool) {
+	switch v := e.(type) {
+	case Unary:
+		if v.Op == OpNot {
+			x, ok := AssumeRefName(v.X, !odd)
+			return Unary{Op: OpNot, X: x}, ok
+		}
+	case Call:
+		if m := affixMode(v); m != nil && nameTest(v) {
+			lit, _ := isStr(v.Args[1])
+			if !prMissesAffix(*m, lit) {
+				return nil, false
+			}
+			if odd {
+				return v, true
+			}
+			return Binary{Op: OpAnd, L: eventTest(OpNe), R: v}, true
+		}
+	case Binary:
+		switch v.Op {
+		case OpEq, OpNe:
+			if !isNameCmp(v) {
+				return v, true
+			}
+			switch {
+			case v.Op == OpEq && !odd:
+				return Binary{Op: OpAnd, L: eventTest(OpNe), R: v}, true
+			case v.Op == OpNe && odd:
+				return Binary{Op: OpOr, L: eventTest(OpEq), R: v}, true
+			}
+			return v, true
+		case OpAnd:
+			if _, g := typeGuard(v.L); g && nameTest(v.R) {
+				return v, true
+			}
+			fallthrough
+		case OpOr:
+			l, lok := AssumeRefName(v.L, odd)
+			r, rok := AssumeRefName(v.R, odd)
+			return Binary{Op: v.Op, L: l, R: r}, lok && rok
+		}
+	}
+	return e, true
+}
+
+// AssumeGitLabRef (Mirrors glRn: lean4/Pipemaster/TranslateFacts.lean) guards the tests of CI_COMMIT_REF_NAME in a
+// GitLab-class condition for GHA. In a merge request pipeline the variable holds the source branch name
+// (lib/gitlab/ci/variables/builder/pipeline.rb:72 and app/models/ci/pipeline.rb:1871 of gitlab-org/gitlab), but
+// the GHA ref_name on a pull request is <number>/merge. A test that lowers the condition is false there in GHA:
+// a negative test under an even number of negations gains the pull request exclusion, and a positive test under
+// an odd number gains the pull request alternative. A test that raises the condition has no rewrite when a
+// <number>/merge name can pass it.
+func AssumeGitLabRef(e Expr, from Dialect, odd bool) (Expr, bool) {
+	switch v := e.(type) {
+	case Unary:
+		if v.Op == OpNot {
+			x, ok := AssumeGitLabRef(v.X, from, !odd)
+			return Unary{Op: OpNot, X: x}, ok
+		}
+	case Binary:
+		switch v.Op {
+		case OpAnd, OpOr:
+			l, lok := AssumeGitLabRef(v.L, from, odd)
+			r, rok := AssumeGitLabRef(v.R, from, odd)
+			return Binary{Op: v.Op, L: l, R: r}, lok && rok
+		case OpMatch, OpNoMatch, OpEq, OpNe:
+			m, lit, ok := nameLeaf(v)
+			if !ok {
+				return v, true
+			}
+			pr, has := from.Events[eventPR]
+			if !has {
+				return v, false
+			}
+			test := func(op string) Expr {
+				return Binary{Op: op, L: ctxRef(CtxEvent), R: Lit{Kind: LitStr, Str: Pattern(ModeExact, pr)}}
+			}
+			pos := v.Op == OpMatch || v.Op == OpEq
+			switch {
+			case pos != odd:
+				return v, prMissesAffix(m, lit)
+			case pos:
+				return Binary{Op: OpOr, L: test(OpMatch), R: v}, true
+			}
+			return Binary{Op: OpAnd, L: test(OpNoMatch), R: v}, true
+		}
+	}
+	return e, true
+}
+
+// nameLeaf recognises a test of ref_name against a string, and its mode and literal.
+func nameLeaf(b Binary) (Mode, string, bool) {
+	switch b.Op {
+	case OpMatch, OpNoMatch:
+		ref, isRef := b.L.(Ref)
+		pat, isPat := isStr(b.R)
+		m, s, parsed := ParsePattern(pat)
+		return m, s, isRef && isPat && parsed && pathName(ref) == CtxRefName
+	case OpEq, OpNe:
+		ref, lit, isCmp := refSide(b.L, b.R)
+		return ModeExact, lit, isCmp && pathName(ref) == CtxRefName
+	}
+	return 0, "", false
+}
+
+// prFamily (Mirrors fam: lean4/Pipemaster/TranslateFacts.lean) writes each test of the pull request event as a
+// prefix test, so that it holds for every pull request event of the dialect: pull_request_closed and
+// pull_request_metadata as well as pull_request.
+func prFamily(e Expr, to Dialect) Expr {
+	pr, ok := to.Events[eventPR]
+	if !ok {
+		return e
+	}
+	switch v := e.(type) {
+	case Unary:
+		if v.Op == OpNot {
+			return Unary{Op: OpNot, X: prFamily(v.X, to)}
+		}
+	case Binary:
+		switch v.Op {
+		case OpAnd, OpOr:
+			return Binary{Op: v.Op, L: prFamily(v.L, to), R: prFamily(v.R, to)}
+		case OpEq, OpNe, OpMatch, OpNoMatch:
+			if t, ok := familyTest(v, pr); ok {
+				return t
+			}
+		}
+	}
+	return e
+}
+
+// familyTest rewrites a test of the event ref against the literal pr.
+func familyTest(b Binary, pr string) (Expr, bool) {
+	ref, isRef := b.L.(Ref)
+	if !isRef || pathName(ref) != CtxEvent {
+		return nil, false
+	}
+	lit, isLit := isStr(b.R)
+	if !isLit {
+		return nil, false
+	}
+	op := OpMatch
+	switch b.Op {
+	case OpEq:
+		if lit != pr {
+			return nil, false
+		}
+	case OpNe:
+		if lit != pr {
+			return nil, false
+		}
+		op = OpNoMatch
+	case OpMatch, OpNoMatch:
+		if m, s, ok := ParsePattern(lit); !ok || m != ModeExact || s != pr {
+			return nil, false
+		}
+		op = b.Op
+	}
+	return Binary{Op: op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: Pattern(ModePrefix, pr)}}, true
 }

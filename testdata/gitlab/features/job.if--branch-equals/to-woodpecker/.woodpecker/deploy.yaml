@@ -3,9 +3,9 @@
 # pipemaster:arg {"src":"branch == 'main'","from":"gitlab","gate":false}
 when:
   - event: push
-    evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request$$") && CI_COMMIT_BRANCH == "main"'
+    evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "main"'
   - event: tag
-    evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request$$") && CI_COMMIT_BRANCH == "main"'
+    evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "main"'
 steps:
   - name: script
     image: ubuntu:latest

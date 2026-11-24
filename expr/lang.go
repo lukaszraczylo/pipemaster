@@ -63,7 +63,7 @@ func SourceFor(origin string, target Dialect) *Dialect {
 
 // sameLang is true when the dialects differ at most in ID, so no ref or event renames between them.
 func (d Dialect) sameLang(o Dialect) bool {
-	return d.Class == o.Class && d.BranchOnPR == o.BranchOnPR && maps.Equal(d.Events, o.Events) &&
+	return d.Class == o.Class && d.BranchOnPR == o.BranchOnPR && d.PRFamily == o.PRFamily && maps.Equal(d.Events, o.Events) &&
 		maps.EqualFunc(d.Vocab.ToCanon, o.Vocab.ToCanon, slices.Equal) &&
 		maps.EqualFunc(d.Vocab.FromCanon, o.Vocab.FromCanon, slices.Equal)
 }
@@ -179,7 +179,10 @@ func mapEventBinary(b Binary, from, to Dialect) (Expr, bool) {
 	case (b.Op == OpMatch || b.Op == OpNoMatch) && isRef(b.L, CtxEvent) && from.Class == ClassGitLab:
 		pat, ok := isStr(b.R)
 		m, s, pok := ParsePattern(pat)
-		if !ok || !pok || m != ModeExact {
+		// A prefix test of the pull request event is how a dialect with several of them names them all (prFamily); a
+		// dialect with one names the one.
+		family := m == ModePrefix && from.PRFamily && s == from.Events[eventPR]
+		if !ok || !pok || (m != ModeExact && !family) {
 			return nil, false
 		}
 		t, ok := mapEventLit(from, to, s, true)

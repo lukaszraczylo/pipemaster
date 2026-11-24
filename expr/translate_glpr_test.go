@@ -26,10 +26,13 @@ func (e canonEnv) glView() view {
 }
 
 type glPrOut struct {
-	Tr    json.RawMessage `json:"tr"`
-	Src   []bool          `json:"src"`
-	Wp    []bool          `json:"wp"`
-	Plain []bool          `json:"plain"`
+	Tr      json.RawMessage `json:"tr"`
+	Src     []bool          `json:"src"`
+	Wp      []bool          `json:"wp"`
+	Plain   []bool          `json:"plain"`
+	WpClose []bool          `json:"wp_closed"`
+	WpMeta  []bool          `json:"wp_metadata"`
+	TrPlain json.RawMessage `json:"tr_plain"`
 }
 
 func TestGitLabToWoodpeckerVectors(t *testing.T) {
@@ -61,7 +64,7 @@ func TestGitLabToWoodpeckerVectors(t *testing.T) {
 			}
 			continue
 		}
-		want, err := decodeExpr(out.Tr, gitlab.Lang.ID)
+		want, err := decodeExpr(out.TrPlain, gitlab.Lang.ID)
 		if err != nil {
 			t.Fatalf("case %d: %v", i, err)
 		}
@@ -83,12 +86,17 @@ func TestGitLabToWoodpeckerVectors(t *testing.T) {
 			if s := holdsOf(t, src, e.glView(), gitlab.Lang.Sem); s != out.Src[j] {
 				t.Errorf("case %d env %d %s: GitLab = %v, Lean = %v", i, j, expr.String(src), s, out.Src[j])
 			}
-			g := woodpeckerHolds(t, wp, e.factWoodpeckerView())
-			if g != out.Src[j] || g != out.Wp[j] {
-				t.Errorf("case %d env %d %s -> %s: Woodpecker = %v, GitLab = %v, Lean wp = %v", i, j, expr.String(src), expr.String(wp), g, out.Src[j], out.Wp[j])
+			for _, v := range []struct {
+				sfx  string
+				lean []bool
+			}{{"", out.Wp}, {"_closed", out.WpClose}, {"_metadata", out.WpMeta}} {
+				g := woodpeckerHolds(t, wp, e.factWoodpeckerView(v.sfx))
+				if g != out.Src[j] || g != v.lean[j] {
+					t.Errorf("case %d env %d %s -> %s: Woodpecker%s = %v, GitLab = %v, Lean wp = %v", i, j, expr.String(src), expr.String(wp), v.sfx, g, out.Src[j], v.lean[j])
+				}
 			}
 			if pok {
-				p := woodpeckerHolds(t, plain, e.factWoodpeckerView())
+				p := woodpeckerHolds(t, plain, e.factWoodpeckerView(""))
 				if p != out.Plain[j] {
 					t.Errorf("case %d env %d: plain translation = %v, Lean = %v", i, j, p, out.Plain[j])
 				}

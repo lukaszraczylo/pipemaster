@@ -25,6 +25,9 @@ type Dialect struct {
 	// BranchOnPR is true when the branch ref holds the target branch in a pull request run (Woodpecker, Drone).
 	// GitLab leaves it unset in a merge request pipeline.
 	BranchOnPR bool
+	// PRFamily is true when the dialect reports a pull request under more than one event (Woodpecker:
+	// pull_request, pull_request_closed, pull_request_metadata), each named by the one event name as a prefix.
+	PRFamily bool
 }
 
 // caseFlag is the inline flag every translator-made pattern starts with.

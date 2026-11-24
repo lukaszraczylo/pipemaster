@@ -641,6 +641,7 @@ def glEnv (env : Env) : View
 
 def evPrRx : E := .rx (.ref .event) .exact "merge_request_event"
 def evNotPrRx : E := .nrx (.ref .event) .exact "merge_request_event"
+def evEqPr : E := .eq (.ref .event) (.str "merge_request_event")
 
 /-- Mirrors expr.AssumeGitLab (expr/translate_facts.go): a test of the branch ref against a non-empty literal
 gains the pull request test. A positive test is false on a pull request, so it is guarded by `event !~ pr`;
@@ -652,8 +653,8 @@ def glPr : E → Option E
   | .or l r => (glPr l).bind fun a => (glPr r).map fun b => .or a b
   | .rx (.ref .branch) m s => if s != "" then some (.and evNotPrRx (.rx (.ref .branch) m s)) else none
   | .nrx (.ref .branch) m s => if s != "" then some (.or evPrRx (.nrx (.ref .branch) m s)) else none
-  | .eq (.ref .branch) (.str s) => if s != "" then some (.and evNotPrRx (.eq (.ref .branch) (.str s))) else none
-  | .ne (.ref .branch) (.str s) => if s != "" then some (.or evPrRx (.ne (.ref .branch) (.str s))) else none
+  | .eq (.ref .branch) (.str s) => if s != "" then some (.and (.not evEqPr) (.eq (.ref .branch) (.str s))) else none
+  | .ne (.ref .branch) (.str s) => if s != "" then some (.or evEqPr (.ne (.ref .branch) (.str s))) else none
   | e => if (TranslateClass.refs e).all (fun r => r != .branch) then some e else none
 
 theorem glEnv_wpMap (env : Env) (tgt : Option String) {r : Ref} (h : r ≠ .branch) : glEnv env r = wpMap env tgt r := by
@@ -671,6 +672,12 @@ theorem evPrRx_eval (V : View) (hV : V .event = (mapEnv env) .event) :
   | none => simp [evPrRx, eval, refV, hV, mapEnv, h, matchV, modeTest]
   | some e => cases e <;> simp [evPrRx, eval, refV, hV, mapEnv, h, evGl, matchV, modeTest, lower]
 
+
+theorem evEqPr_eval (V : View) (hV : V .event = (mapEnv env) .event) :
+    eval .gitlab V evEqPr = .bool (decide (env.event = some .pullRequest)) := by
+  cases h : env.event with
+  | none => simp [evEqPr, eval, refV, hV, mapEnv, h, eqV]
+  | some e => cases e <;> simp [evEqPr, eval, refV, hV, mapEnv, h, evGl, eqV]
 
 theorem glPr_free {e e' : E} (env : Env) (tgt : Option String)
     (h : (TranslateClass.refs e).all (fun r => r != .branch) = true) (he : e' = e) :
@@ -707,6 +714,26 @@ theorem glPr_pos (env : Env) (tgt : Option String) (T : E)
   · have hl := evNotPrRx_eval (env := env) (wpMap env tgt) (by simp [wpMap, hp])
     simp [eval, hl, hp, logicalTruthy, rubyTruthy, hT hp]
   · have hl := evNotPrRx_eval (env := env) (wpMap env tgt) (by simp [wpMap, hp])
+    simp [eval, hl, hp, logicalTruthy, rubyTruthy, hn hp]
+
+theorem glPr_pos_eq (env : Env) (tgt : Option String) (T : E)
+    (hT : ∀ hp : env.event = some .pullRequest, eval .gitlab (glEnv env) T = .bool false)
+    (hn : ∀ hp : env.event ≠ some .pullRequest, eval .gitlab (wpMap env tgt) T = eval .gitlab (glEnv env) T) :
+    eval .gitlab (wpMap env tgt) (.and (.not evEqPr) T) = eval .gitlab (glEnv env) T := by
+  by_cases hp : env.event = some .pullRequest
+  · have hl := evEqPr_eval (env := env) (wpMap env tgt) (by simp [wpMap, hp])
+    simp [eval, hl, hp, logicalTruthy, rubyTruthy, truthy, hT hp]
+  · have hl := evEqPr_eval (env := env) (wpMap env tgt) (by simp [wpMap, hp])
+    simp [eval, hl, hp, logicalTruthy, rubyTruthy, truthy, hn hp]
+
+theorem glPr_neg_eq (env : Env) (tgt : Option String) (T : E)
+    (hT : ∀ hp : env.event = some .pullRequest, eval .gitlab (glEnv env) T = .bool true)
+    (hn : ∀ hp : env.event ≠ some .pullRequest, eval .gitlab (wpMap env tgt) T = eval .gitlab (glEnv env) T) :
+    eval .gitlab (wpMap env tgt) (.or evEqPr T) = eval .gitlab (glEnv env) T := by
+  by_cases hp : env.event = some .pullRequest
+  · have hl := evEqPr_eval (env := env) (wpMap env tgt) (by simp [wpMap, hp])
+    simp [eval, hl, hp, logicalTruthy, rubyTruthy, hT hp]
+  · have hl := evEqPr_eval (env := env) (wpMap env tgt) (by simp [wpMap, hp])
     simp [eval, hl, hp, logicalTruthy, rubyTruthy, hn hp]
 
 theorem glPr_neg (env : Env) (tgt : Option String) (T : E)
@@ -799,7 +826,7 @@ theorem glPr_eval (env : Env) (tgt : Option String) :
           · rename_i hs
             have hs' : s ≠ "" := by simpa using hs
             cases h
-            apply glPr_pos
+            apply glPr_pos_eq
             · intro hp
               simp [eval, refV, branch_none tgt hp, eqV]
             · intro hp
@@ -821,7 +848,7 @@ theorem glPr_eval (env : Env) (tgt : Option String) :
           · rename_i hs
             have hs' : s ≠ "" := by simpa using hs
             cases h
-            apply glPr_neg
+            apply glPr_neg_eq
             · intro hp
               simp [eval, refV, branch_none tgt hp, eqV]
             · intro hp
@@ -882,13 +909,13 @@ theorem glPr_glSub : ∀ e e' : E, Woodpecker.GlSub e = true → glPr e = some e
     intro e' hg h
     cases l
     case ref x0 _ =>
-      cases x0 <;> cases r <;> (simp only [glPr] at h; split at h <;> first | (cases h; simp [Woodpecker.GlSub, evNotPrRx, evPrRx] at hg ⊢; simp_all; done) | (cases h; exact hg) | simp at h)
+      cases x0 <;> cases r <;> (simp only [glPr] at h; split at h <;> first | (cases h; simp [Woodpecker.GlSub, evNotPrRx, evPrRx, evEqPr] at hg ⊢; simp_all; done) | (cases h; exact hg) | simp at h)
     all_goals (simp only [glPr] at h; split at h <;> first | (cases h; exact hg) | simp at h)
   | ne l r _ _ =>
     intro e' hg h
     cases l
     case ref x0 _ =>
-      cases x0 <;> cases r <;> (simp only [glPr] at h; split at h <;> first | (cases h; simp [Woodpecker.GlSub, evNotPrRx, evPrRx] at hg ⊢; simp_all; done) | (cases h; exact hg) | simp at h)
+      cases x0 <;> cases r <;> (simp only [glPr] at h; split at h <;> first | (cases h; simp [Woodpecker.GlSub, evNotPrRx, evPrRx, evEqPr] at hg ⊢; simp_all; done) | (cases h; exact hg) | simp at h)
     all_goals (simp only [glPr] at h; split at h <;> first | (cases h; exact hg) | simp at h)
   | _ =>
     intro e' hg h
@@ -919,6 +946,527 @@ theorem glWp_plain_unsound_neg : ∃ (env : Env) (tgt : Option String),
     holds .gitlab (Woodpecker.wpView (wpMap env tgt)) (.nrx (.ref .branch) .exact "main") ≠
       holds .gitlab (glEnv env) (.nrx (.ref .branch) .exact "main") := by
   refine ⟨⟨some "feature", some .branch, some .pullRequest, none, none⟩, some "main", by decide +kernel⟩
+
+
+/-! ### Pull request events
+
+Woodpecker reports a pull request under `pull_request`, `pull_request_closed` and `pull_request_metadata`
+(https://woodpecker-ci.org/docs/usage/workflow-syntax, `event` filter). GHA `pull_request` covers those runs. `wpMapS`
+is the Woodpecker run whose event value is the pull request value followed by `sfx`. An exact test of the pull request
+event is false when `sfx` is not empty, so an exclusion that uses it runs on a closed pull request. `fam` (Mirrors
+expr.prFamily (expr/translate_facts.go)) writes the test as a prefix test. -/
+
+/-- The GitLab-class spelling of the pull request event. -/
+def prEv : String := "merge_request_event"
+
+/-- Woodpecker on a pull request run: the event is the pull request event followed by `sfx`. -/
+def wpMapS (env : Env) (tgt : Option String) (sfx : String) : View
+  | .event => if env.event = some .pullRequest then some (evGl .pullRequest ++ sfx) else mapEnv env .event
+  | r => wpMap env tgt r
+
+/-- Mirrors expr.prFamily (expr/translate_facts.go): an exact test of the pull request event becomes a prefix test. -/
+def fam : E → E
+  | .not x => .not (fam x)
+  | .and l r => .and (fam l) (fam r)
+  | .or l r => .or (fam l) (fam r)
+  | .rx (.ref .event) .exact s => .rx (.ref .event) (if s == prEv then .prefix else .exact) s
+  | .nrx (.ref .event) .exact s => .nrx (.ref .event) (if s == prEv then .prefix else .exact) s
+  | .eq (.ref .event) (.str s) => if s == prEv then .rx (.ref .event) .prefix s else .eq (.ref .event) (.str s)
+  | .ne (.ref .event) (.str s) => if s == prEv then .nrx (.ref .event) .prefix s else .ne (.ref .event) (.str s)
+  | e => e
+
+def NoEv (e : E) : Bool := (TranslateClass.refs e).all (fun r => r != .event)
+
+/-- Event reads that a longer event value does not change: tests of the pull request event, and exact tests of a
+literal shorter than it. -/
+def EvAgn : E → Bool
+  | .not x => EvAgn x
+  | .and l r | .or l r => EvAgn l && EvAgn r
+  | .rx (.ref .event) m s | .nrx (.ref .event) m s => m == .exact && (decide (s.length < 19) || s == prEv)
+  | .eq (.ref .event) (.str s) | .ne (.ref .event) (.str s) => decide (s.length < 19) || s == prEv
+  | e => NoEv e
+
+/-- No condition is the event ref alone. -/
+def NoBareEv : E → Bool
+  | .ref .event => false
+  | .not x => NoBareEv x
+  | .and l r | .or l r => NoBareEv l && NoBareEv r
+  | _ => true
+
+theorem lower_prefix (sfx : String) :
+    modeTest .prefix (lower (prEv ++ sfx)) (lower prEv) = true := by
+  simp [prEv, modeTest, lower, String.toList_append]
+
+theorem lower_toList (s : String) : (lower s).toList = s.toList.map Char.toLower := by
+  simp [lower]
+
+theorem lower_exact_short (sfx : String) (s : String) (h : s.length < 19) :
+    modeTest .exact (lower (prEv ++ sfx)) (lower s) = false := by
+  have h1 : (lower s).toList.length < 19 := by simp [lower_toList]; simpa [String.length] using h
+  have h2 : 19 ≤ (lower (prEv ++ sfx)).toList.length := by
+    simp [lower_toList, String.toList_append, prEv]
+  simp only [modeTest, beq_eq_false_iff_ne, ne_eq]
+  intro h3
+  rw [h3] at h2
+  omega
+
+theorem wpMapS_ne (env : Env) (tgt : Option String) (sfx : String) {r : Ref} (h : r ≠ .event) :
+    wpMapS env tgt sfx r = wpMap env tgt r := by
+  cases r <;> simp [wpMapS] at h ⊢
+
+theorem wpMapS_event_np (env : Env) (tgt : Option String) (sfx : String) (hp : env.event ≠ some .pullRequest) :
+    wpMapS env tgt sfx .event = wpMap env tgt .event := by
+  simp [wpMapS, wpMap, hp]
+
+theorem fam_noEv : ∀ e : E, NoEv e = true → fam e = e := by
+  intro e
+  induction e with
+  | not x ih => intro h; simp [fam, ih (by simpa [NoEv, TranslateClass.refs] using h)]
+  | and l r ihl ihr =>
+    intro h
+    simp only [NoEv, TranslateClass.refs, List.all_append, Bool.and_eq_true] at h
+    simp [fam, ihl h.1, ihr h.2]
+  | or l r ihl ihr =>
+    intro h
+    simp only [NoEv, TranslateClass.refs, List.all_append, Bool.and_eq_true] at h
+    simp [fam, ihl h.1, ihr h.2]
+  | rx x m s ih =>
+    intro h
+    clear ih
+    cases x <;> try (simp [fam]; done)
+    case ref r =>
+      cases r <;> cases m <;> simp [fam, NoEv, TranslateClass.refs] at h ⊢
+  | nrx x m s ih =>
+    intro h
+    clear ih
+    cases x <;> try (simp [fam]; done)
+    case ref r =>
+      cases r <;> cases m <;> simp [fam, NoEv, TranslateClass.refs] at h ⊢
+  | eq l r ihl ihr =>
+    intro h
+    clear ihl ihr
+    cases l <;> try (simp [fam]; done)
+    case ref r0 =>
+      cases r0 <;> cases r <;> simp_all [fam, NoEv, TranslateClass.refs]
+  | ne l r ihl ihr =>
+    intro h
+    clear ihl ihr
+    cases l <;> try (simp [fam]; done)
+    case ref r0 =>
+      cases r0 <;> cases r <;> simp_all [fam, NoEv, TranslateClass.refs]
+  | _ => intro _; simp [fam]
+
+theorem leaf_prefix (env : Env) (tgt : Option String) (sfx : String) :
+    matchV .prefix prEv (refV (wpMapS env tgt sfx) .event) = matchV .exact prEv (refV (wpMap env tgt) .event) := by
+  by_cases hp : env.event = some .pullRequest
+  · simp [refV, wpMapS, wpMap, mapEnv, hp, matchV, evGl, lower_prefix, prEv, modeTest, lower]
+  · have hw := wpMapS_event_np env tgt sfx hp
+    cases h : env.event with
+    | none => simp [refV, hw, wpMap, mapEnv, h, matchV]
+    | some e => cases e <;> simp [refV, hw, wpMap, mapEnv, h, evGl, matchV, modeTest, lower, prEv] at hp ⊢ <;> rfl
+
+theorem leaf_short (env : Env) (tgt : Option String) (sfx : String) {s : String} (hs : s.length < 19) :
+    matchV .exact s (refV (wpMapS env tgt sfx) .event) = matchV .exact s (refV (wpMap env tgt) .event) := by
+  by_cases hp : env.event = some .pullRequest
+  · have a := lower_exact_short sfx s hs
+    have b := lower_exact_short "" s hs
+    simp [refV, wpMapS, wpMap, mapEnv, hp, matchV, evGl, ← prEv.eq_1] at a b ⊢
+    simp [a, b]
+  · simp [refV, wpMapS_event_np env tgt sfx hp]
+
+theorem prEv_length : prEv.length = 19 := by decide
+
+/-- The pull request test as a prefix test on the longer value is the equality test on the shorter one. -/
+theorem leaf_eq_prefix (env : Env) (tgt : Option String) (sfx : String) :
+    eval .gitlab (wpMapS env tgt sfx) (.rx (.ref .event) .prefix prEv) =
+      eval .gitlab (wpMap env tgt) (.eq (.ref .event) (.str prEv)) := by
+  by_cases hp : env.event = some .pullRequest
+  · simp [eval, refV, wpMapS, wpMap, mapEnv, hp, matchV, eqV, evGl, prEv, modeTest, lower, String.toList_append]
+  · have hw := wpMapS_event_np env tgt sfx hp
+    cases h : env.event with
+    | none => simp [eval, refV, hw, wpMap, mapEnv, h, matchV, eqV]
+    | some e => cases e <;> simp [eval, refV, hw, wpMap, mapEnv, h, evGl, matchV, eqV, modeTest, lower, prEv] at hp ⊢ <;> rfl
+
+theorem leaf_eq_short (env : Env) (tgt : Option String) (sfx : String) {s : String} (hs : s.length < 19) :
+    eval .gitlab (wpMapS env tgt sfx) (.eq (.ref .event) (.str s)) =
+      eval .gitlab (wpMap env tgt) (.eq (.ref .event) (.str s)) := by
+  by_cases hp : env.event = some .pullRequest
+  · have a : (prEv ++ sfx) ≠ s := by
+      intro h
+      have := congrArg String.length h
+      rw [String.length_append, prEv_length] at this
+      omega
+    have b : prEv ≠ s := by
+      intro h
+      have := congrArg String.length h
+      rw [prEv_length] at this
+      omega
+    simp [eval, refV, wpMapS, wpMap, mapEnv, hp, eqV, evGl, prEv] at a b ⊢
+    simp [a, b]
+  · simp [eval, refV, wpMapS_event_np env tgt sfx hp]
+
+theorem fam_bridge_noEv (env : Env) (tgt : Option String) (sfx : String) (e : E) (hn : NoEv e = true) :
+    eval .gitlab (wpMapS env tgt sfx) (fam e) = eval .gitlab (wpMap env tgt) e := by
+  rw [fam_noEv _ hn]
+  apply TranslateClass.eval_congr
+  intro r hr
+  apply wpMapS_ne
+  have := List.all_eq_true.mp hn r hr
+  simpa using this
+
+theorem fam_leaf (env : Env) (tgt : Option String) (sfx : String) (neg : Bool) (m : Mode) (s : String)
+    (h : (m == .exact && (decide (s.length < 19) || s == prEv)) = true) :
+    eval .gitlab (wpMapS env tgt sfx) (fam (rxNode neg (.ref .event) m s)) =
+      eval .gitlab (wpMap env tgt) (rxNode neg (.ref .event) m s) := by
+  simp only [Bool.and_eq_true, Bool.or_eq_true, beq_iff_eq, decide_eq_true_eq] at h
+  obtain ⟨rfl, h2⟩ := h
+  by_cases hs : s = prEv
+  · subst hs; cases neg <;> simp [rxNode, fam, eval, leaf_prefix]
+  · have hl : s.length < 19 := by
+      rcases h2 with h2 | h2
+      · exact h2
+      · exact absurd (by simpa using h2) hs
+    cases neg <;> simp [rxNode, fam, hs, eval, leaf_short env tgt sfx hl]
+
+theorem fam_leaf_eq (env : Env) (tgt : Option String) (sfx : String) (s : String)
+    (h : (decide (s.length < 19) || s == prEv) = true) :
+    eval .gitlab (wpMapS env tgt sfx) (fam (.eq (.ref .event) (.str s))) =
+      eval .gitlab (wpMap env tgt) (.eq (.ref .event) (.str s)) ∧
+    eval .gitlab (wpMapS env tgt sfx) (fam (.ne (.ref .event) (.str s))) =
+      eval .gitlab (wpMap env tgt) (.ne (.ref .event) (.str s)) := by
+  simp only [Bool.or_eq_true, decide_eq_true_eq, beq_iff_eq] at h
+  by_cases hs : s = prEv
+  · subst hs
+    have e := leaf_eq_prefix env tgt sfx
+    refine ⟨?_, ?_⟩
+    · simp [fam, e]
+    · have e' : matchV .prefix prEv (refV (wpMapS env tgt sfx) .event) = eqV .gitlab (refV (wpMap env tgt) .event) (.str prEv) := by
+        simpa [eval] using e
+      simp [fam, eval, e']
+  · have hl : s.length < 19 := by rcases h with h | h; exact h; exact absurd h hs
+    have e := leaf_eq_short env tgt sfx hl
+    simp only [eval] at e
+    refine ⟨?_, ?_⟩
+    · simp [fam, hs, eval]; simpa [eval] using e
+    · simp [fam, hs, eval]; simpa [eval] using e
+
+/-- A longer pull request event value changes no test that `fam` and `EvAgn` allow. -/
+theorem fam_bridge (env : Env) (tgt : Option String) (sfx : String) :
+    ∀ e : E, EvAgn e = true → eval .gitlab (wpMapS env tgt sfx) (fam e) = eval .gitlab (wpMap env tgt) e := by
+  intro e
+  induction e with
+  | not x ih => intro h; simp [fam, eval, ih (by simpa [EvAgn] using h)]
+  | and l r ihl ihr =>
+    intro h
+    simp only [EvAgn, Bool.and_eq_true] at h
+    simp [fam, eval, ihl h.1, ihr h.2]
+  | or l r ihl ihr =>
+    intro h
+    simp only [EvAgn, Bool.and_eq_true] at h
+    simp [fam, eval, ihl h.1, ihr h.2]
+  | rx x m s ih =>
+    intro h
+    clear ih
+    by_cases hx : x = .ref .event
+    · subst hx
+      exact fam_leaf env tgt sfx false m s (by simpa [EvAgn] using h)
+    · apply fam_bridge_noEv
+      cases x <;> simp [EvAgn] at h hx ⊢ <;> first | exact h | (rename_i r; cases r <;> simp_all [EvAgn])
+  | nrx x m s ih =>
+    intro h
+    clear ih
+    by_cases hx : x = .ref .event
+    · subst hx
+      exact fam_leaf env tgt sfx true m s (by simpa [EvAgn] using h)
+    · apply fam_bridge_noEv
+      cases x <;> simp [EvAgn] at h hx ⊢ <;> first | exact h | (rename_i r; cases r <;> simp_all [EvAgn])
+  | eq l r ihl ihr =>
+    intro h
+    clear ihl ihr
+    cases l <;> try (apply fam_bridge_noEv; simpa [EvAgn] using h; done)
+    case ref r0 =>
+      cases r0 <;> try (apply fam_bridge_noEv; simpa [EvAgn] using h; done)
+      case event =>
+        cases r <;> try (apply fam_bridge_noEv; simpa [EvAgn] using h; done)
+        case str s => exact (fam_leaf_eq env tgt sfx s (by simpa [EvAgn] using h)).1
+  | ne l r ihl ihr =>
+    intro h
+    clear ihl ihr
+    cases l <;> try (apply fam_bridge_noEv; simpa [EvAgn] using h; done)
+    case ref r0 =>
+      cases r0 <;> try (apply fam_bridge_noEv; simpa [EvAgn] using h; done)
+      case event =>
+        cases r <;> try (apply fam_bridge_noEv; simpa [EvAgn] using h; done)
+        case str s => exact (fam_leaf_eq env tgt sfx s (by simpa [EvAgn] using h)).2
+  | _ => intro h; exact fam_bridge_noEv env tgt sfx _ (by simpa [EvAgn] using h)
+
+
+theorem NoEv_rx_ref {r : Ref} (h : r ≠ .event) (m : Mode) (s : String) : EvAgn (.rx (.ref r) m s) = true := by
+  cases r <;> simp_all [EvAgn, NoEv, TranslateClass.refs]
+
+theorem EvAgn_ref {r : Ref} (h : r ≠ .event) : EvAgn (.ref r) = true := by
+  cases r <;> simp_all [EvAgn, NoEv, TranslateClass.refs]
+
+theorem trEq_EvAgn {neg : Bool} {l r e' : E} (h : trEq neg l r = some e') : EvAgn e' = true := by
+  have key : ∀ (x : Ref) (s : String), trCmp neg x s = some e' → EvAgn e' = true := by
+    intro x s hx
+    cases x
+    case event =>
+      simp only [trCmp] at hx
+      obtain ⟨e0, _, rfl⟩ := Option.map_eq_some_iff.mp hx
+      cases e0 <;> cases neg <;> simp [rxNode, EvAgn, evGl, prEv] <;> decide
+    case refName | sha =>
+      simp only [trCmp] at hx
+      split at hx
+      · cases hx; cases neg <;> simp [rxNode, EvAgn, NoEv, TranslateClass.refs]
+      · simp at hx
+    all_goals simp [trCmp] at hx
+  unfold trEq at h
+  split at h
+  · exact key _ _ h
+  · exact key _ _ h
+  · simp at h
+
+theorem trAffE_EvAgn {m : Mode} {a b e' : E} (h : trAffE m a b = some e') : EvAgn e' = true := by
+  unfold trAffE at h
+  split at h
+  · rename_i x s
+    cases x
+    case refName | sha =>
+      simp only [trAff] at h
+      split at h
+      · cases h; simp [EvAgn, NoEv, TranslateClass.refs]
+      · simp at h
+    all_goals simp [trAff] at h
+  · simp at h
+
+/-- Every event read of a translation is a test the pull request events do not change, once no condition is the
+event ref alone. -/
+theorem tr_EvAgn : ∀ e e' : E, NoBareEv e = true → tr e = some e' → EvAgn e' = true := by
+  intro e
+  induction e with
+  | ref r =>
+    intro e' hb h
+    cases r <;> simp_all [tr, NoBareEv] <;> (subst h; simp [EvAgn, NoEv, TranslateClass.refs])
+  | eq l r => intro e' _ h; exact trEq_EvAgn (by simpa [tr] using h)
+  | ne l r => intro e' _ h; exact trEq_EvAgn (by simpa [tr] using h)
+  | startsWith a b => intro e' _ h; exact trAffE_EvAgn (by simpa [tr] using h)
+  | endsWith a b => intro e' _ h; exact trAffE_EvAgn (by simpa [tr] using h)
+  | contains a b => intro e' _ h; exact trAffE_EvAgn (by simpa [tr] using h)
+  | not x ih =>
+    intro e' hb h
+    simp only [tr] at h
+    obtain ⟨a, ha, rfl⟩ := Option.map_eq_some_iff.mp h
+    simpa [EvAgn] using ih a (by simpa [NoBareEv] using hb) ha
+  | or l r ihl ihr =>
+    intro e' hb h
+    simp only [tr] at h
+    simp only [NoBareEv, Bool.and_eq_true] at hb
+    split at h
+    · obtain ⟨a, ha, h2⟩ := Option.bind_eq_some_iff.mp h
+      obtain ⟨b, hb', rfl⟩ := Option.map_eq_some_iff.mp h2
+      have := ihl a hb.1 ha
+      have := ihr b hb.2 hb'
+      simp [EvAgn, *]
+    · simp at h
+  | and l r ihl ihr =>
+    intro e' hb h
+    simp only [NoBareEv, Bool.and_eq_true] at hb
+    simp only [tr] at h
+    split at h
+    · rename_i t m s hg1 hr1
+      cases h
+      cases t <;> simp [rtRef, EvAgn, NoEv, TranslateClass.refs]
+    · split at h
+      · obtain ⟨a, ha, h2⟩ := Option.bind_eq_some_iff.mp h
+        obtain ⟨b, hb', rfl⟩ := Option.map_eq_some_iff.mp h2
+        have := ihl a hb.1 ha
+        have := ihr b hb.2 hb'
+        simp [EvAgn, *]
+      · simp at h
+  | _ => intro e' _ h; simp [tr] at h
+
+theorem noBareEv_assume (fa : Bool) : ∀ e : E, NoBareEv e = true → NoBareEv (assume fa e) = true := by
+  intro e
+  induction e with
+  | ref r => intro h; simpa [assume] using h
+  | eq l r =>
+    intro _
+    simp only [assume]
+    split <;> simp [NoBareEv, evNotPr, brGuard]
+  | ne l r =>
+    intro _
+    simp only [assume]
+    split <;> simp [NoBareEv, evIsPr, brGuard]
+  | not x ih => intro h; simpa [assume, NoBareEv] using ih (by simpa [NoBareEv] using h)
+  | or l r ihl ihr =>
+    intro h
+    simp only [NoBareEv, Bool.and_eq_true] at h
+    simp [assume, NoBareEv, ihl h.1, ihr h.2]
+  | and l r ihl ihr =>
+    intro h
+    simp only [NoBareEv, Bool.and_eq_true] at h
+    simp only [assume]
+    split
+    · simp [NoBareEv, evNotPr, h.1, h.2]
+    · split
+      · simp [NoBareEv, h.1, h.2]
+      · simp [NoBareEv, ihl h.1, ihr h.2]
+  | _ => intro h; simpa [assume] using h
+
+/-- Mirrors expr.TranslatableFacts for a Woodpecker target (expr/translate_facts.go): also, no condition is the
+event ref alone. -/
+def TranslatableWpF (fa : Bool) (e : E) : Prop := TranslatableWp fa e ∧ NoBareEv e = true
+
+/-- With the pull request events written as prefix tests, the Woodpecker translation of the rewritten condition has
+the truthiness of the source on every pull request event Woodpecker reports. -/
+theorem trFactsWpFam_sound {fa : Bool} {e : E} (env : Env) (tgt : Option String) (sfx : String) (F : Fact fa env)
+    (h : TranslatableWpF fa e) :
+    ∃ e', tr (assume fa e) = some e' ∧
+      holds .gitlab (wpMapS env tgt sfx) (fam e') = holds .gha (ghaView env) e := by
+  obtain ⟨e', he', hh⟩ := trFactsWp_sound (e := e) env tgt F h.1
+  refine ⟨e', he', ?_⟩
+  have hev := tr_EvAgn _ _ (noBareEv_assume fa e h.2) he'
+  unfold holds at hh ⊢
+  rw [fam_bridge env tgt sfx e' hev, hh]
+
+theorem famE_glSub : ∀ e : E, Woodpecker.GlSub e = true → Woodpecker.GlSub (fam e) = true := by
+  intro e
+  induction e with
+  | not x ih => intro h; simpa [fam, Woodpecker.GlSub] using ih (by simpa [Woodpecker.GlSub] using h)
+  | and l r ihl ihr =>
+    intro h
+    simp only [Woodpecker.GlSub, Bool.and_eq_true] at h
+    simp [fam, Woodpecker.GlSub, ihl h.1, ihr h.2]
+  | or l r ihl ihr =>
+    intro h
+    simp only [Woodpecker.GlSub, Bool.and_eq_true] at h
+    simp [fam, Woodpecker.GlSub, ihl h.1, ihr h.2]
+  | rx x m s ih =>
+    intro h
+    clear ih
+    cases x <;> try (simpa [fam] using h)
+    case ref r => cases r <;> cases m <;> simp_all [fam, Woodpecker.GlSub]
+  | nrx x m s ih =>
+    intro h
+    clear ih
+    cases x <;> try (simpa [fam] using h)
+    case ref r => cases r <;> cases m <;> simp_all [fam, Woodpecker.GlSub]
+  | eq l r ihl ihr =>
+    intro h
+    clear ihl ihr
+    cases l <;> try (simpa [fam] using h)
+    case ref r0 =>
+      cases r0 <;> cases r <;> simp_all [fam, Woodpecker.GlSub] <;> (split <;> simp_all [Woodpecker.GlSub])
+  | ne l r ihl ihr =>
+    intro h
+    clear ihl ihr
+    cases l <;> try (simpa [fam] using h)
+    case ref r0 =>
+      cases r0 <;> cases r <;> simp_all [fam, Woodpecker.GlSub] <;> (split <;> simp_all [Woodpecker.GlSub])
+  | _ => intro h; simpa [fam] using h
+
+/-- A GitLab condition in the subset, rewritten by `glPr`, has on every Woodpecker pull request event the truthiness
+it has in GitLab, when its event tests are ones the longer event value does not change. -/
+theorem glWpFam_sound (env : Env) (tgt : Option String) (sfx : String) {e e' : E} (hg : Woodpecker.GlSub e = true)
+    (h : glPr e = some e') (hev : EvAgn e' = true) :
+    holds .gitlab (Woodpecker.wpView (wpMapS env tgt sfx)) (fam e') = holds .gitlab (glEnv env) e := by
+  have hs := famE_glSub e' (glPr_glSub e e' hg h)
+  unfold holds
+  rw [Woodpecker.eval_woodpecker (wpMapS env tgt sfx) (Woodpecker.wpView (wpMapS env tgt sfx)) (fam e') hs
+    (fun r _ => rfl), fam_bridge env tgt sfx e' hev, glPr_eval env tgt e e' h]
+
+/-- Why the prefix test exists: the exact exclusion is true on a closed pull request, where the source, GHA
+`pull_request`, is false. -/
+theorem famExact_unsound : ∃ (env : Env) (tgt : Option String) (sfx : String), Fact true env ∧
+    holds .gitlab (wpMapS env tgt sfx) (.and evNotPrRx (.rx (.ref .branch) .exact "main")) ≠
+      holds .gha (ghaView env) (.eq (.ref .refName) (.str "main")) := by
+  refine ⟨⟨some "7/merge", some .branch, some .pullRequest, none, none⟩, some "main", "_closed", ⟨⟨?_, ?_⟩, ?_⟩, by decide +kernel⟩
+  · intro _; rfl
+  · intro _ r hr; cases hr; decide
+  · intro _ h; exact absurd rfl h
+
+/-- The prefix form is false on the same run. -/
+theorem famPrefix_sound : ∃ (env : Env) (tgt : Option String) (sfx : String), Fact true env ∧
+    holds .gitlab (wpMapS env tgt sfx) (fam (.and evNotPrRx (.rx (.ref .branch) .exact "main"))) =
+      holds .gha (ghaView env) (.eq (.ref .refName) (.str "main")) := by
+  refine ⟨⟨some "7/merge", some .branch, some .pullRequest, none, none⟩, some "main", "_closed", ⟨⟨?_, ?_⟩, ?_⟩, by decide +kernel⟩
+  · intro _; rfl
+  · intro _ r hr; cases hr; decide
+  · intro _ h; exact absurd rfl h
+
+
+/-! ### CI_COMMIT_REF_NAME in a merge request pipeline
+
+In a merge request pipeline CI_COMMIT_REF_NAME is the source branch name: `source_ref` of the pipeline is
+`merge_request.source_branch` (app/models/ci/pipeline.rb:1871 of gitlab-org/gitlab), and the variable is set from
+`pipeline.source_ref` (lib/gitlab/ci/variables/builder/pipeline.rb:72). GHA `ref_name` on a pull request is
+`<number>/merge`. `glMr` is the GitLab run with the source branch `src`. -/
+
+def glMr (env : Env) (src : String) : View
+  | .refName => if env.event = some .pullRequest then some src else env.refName
+  | r => glEnv env r
+
+/-- GHA to GitLab: the plain translation of `ref_name == 'main'` is true in a merge request pipeline whose source
+branch is `main`, where the GHA name `7/merge` makes the source false. -/
+theorem ghaGlRn_plain_bad : ∃ (env : Env) (src : String),
+    holds .gitlab (glMr env src) (.rx (.ref .refName) .exact "main") ≠
+      holds .gha (ghaView env) (.eq (.ref .refName) (.str "main")) := by
+  refine ⟨⟨some "7/merge", some .branch, some .pullRequest, some "abc", none⟩, "main", by decide +kernel⟩
+
+/-- The pull request test in front of it keeps GitLab false on the same run. -/
+theorem ghaGlRn_guard_ok :
+    holds .gitlab (glMr ⟨some "7/merge", some .branch, some .pullRequest, some "abc", none⟩ "main")
+      (.and evNotPrRx (.rx (.ref .refName) .exact "main")) = false ∧
+    holds .gha (ghaView ⟨some "7/merge", some .branch, some .pullRequest, some "abc", none⟩)
+      (.eq (.ref .refName) (.str "main")) = false := by
+  decide +kernel
+
+/-- The same under `!`: the plain translation of `!(ref_name != 'main')` is true on that run. -/
+theorem ghaGlRn_neg_bad : ∃ (env : Env) (src : String),
+    holds .gitlab (glMr env src) (.not (.nrx (.ref .refName) .exact "main")) ≠
+      holds .gha (ghaView env) (.not (.ne (.ref .refName) (.str "main"))) := by
+  refine ⟨⟨some "7/merge", some .branch, some .pullRequest, some "abc", none⟩, "main", by decide +kernel⟩
+
+theorem ghaGlRn_neg_ok :
+    holds .gitlab (glMr ⟨some "7/merge", some .branch, some .pullRequest, some "abc", none⟩ "main")
+      (.not (.or evPrRx (.nrx (.ref .refName) .exact "main"))) = false ∧
+    holds .gha (ghaView ⟨some "7/merge", some .branch, some .pullRequest, some "abc", none⟩)
+      (.not (.ne (.ref .refName) (.str "main"))) = false := by
+  decide +kernel
+
+/-- GitLab to GHA: `ref_name != 'main'` is false in a merge request pipeline from `main`, and its GHA form is
+true on `7/merge`. -/
+theorem glGhaRn_neg_bad : ∃ (env : Env) (src : String),
+    holds .gitlab (glMr env src) (.nrx (.ref .refName) .exact "main") ≠
+      holds .gha (ghaView env) (.ne (.ref .refName) (.str "main")) := by
+  refine ⟨⟨some "7/merge", some .branch, some .pullRequest, some "abc", none⟩, "main", by decide +kernel⟩
+
+/-- With the pull request test in front, the GHA form is false there as well. -/
+theorem glGhaRn_neg_ok :
+    holds .gitlab (glMr ⟨some "7/merge", some .branch, some .pullRequest, some "abc", none⟩ "main")
+      (.and evNotPrRx (.nrx (.ref .refName) .exact "main")) = false ∧
+    holds .gha (ghaView ⟨some "7/merge", some .branch, some .pullRequest, some "abc", none⟩)
+      (.and (.ne (.ref .event) (.str "pull_request")) (.ne (.ref .refName) (.str "main"))) = false := by
+  decide +kernel
+
+/-! ### Drone
+
+Drone holds the target branch in DRONE_BRANCH on a pull request run (docs/superpowers/research/drone.md, section
+4.4), as Woodpecker does, so `wpMap` is the Drone view of the branch ref as well. The filter `event: exclude:
+[pull_request]` is the test `evEqPr` negated in that view. The Woodpecker theorems state what the exclusion
+buys. -/
+
+/-- Drone to GitLab: a plain `branch == main` filter holds on a pull request into `main` from `feature`, where
+the GitLab source has no branch. -/
+theorem glDrone_plain_bad : ∃ (env : Env) (tgt : Option String),
+    holds .gitlab (Woodpecker.wpView (wpMap env tgt)) (.rx (.ref .branch) .exact "main") ≠
+      holds .gitlab (glEnv env) (.rx (.ref .branch) .exact "main") := glWp_plain_unsound
+
+/-- With the exclusion, the Drone filter holds exactly where the GitLab source does. -/
+theorem glDrone_sound (env : Env) (tgt : Option String) {e e' : E} (hg : Woodpecker.GlSub e = true)
+    (h : glPr e = some e') :
+    holds .gitlab (Woodpecker.wpView (wpMap env tgt)) e' = holds .gitlab (glEnv env) e := glWp_sound env tgt hg h
 
 
 /-! ### The other pairs

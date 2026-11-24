@@ -53,7 +53,7 @@
 07-gha-pandas gha->gitea native= 121 emulated=   0 external=   0 lost=   1
 07-gha-pandas gha->gitlab native=  52 emulated=   8 external=   2 lost=  75
 07-gha-pandas gha->tekton native=  67 emulated=  27 external=   5 lost=  57
-07-gha-pandas gha->woodpecker native=  60 emulated=  22 external=   2 lost=  75
+07-gha-pandas gha->woodpecker native=  59 emulated=  22 external=   3 lost=  75
 08-gha-node_exporter gha->argo native= 114 emulated=  75 external=   9 lost=  64
 08-gha-node_exporter gha->concourse native= 146 emulated=  62 external=   0 lost=  50
 08-gha-node_exporter gha->drone native= 120 emulated=  31 external=   0 lost= 113

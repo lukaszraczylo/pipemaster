@@ -406,11 +406,15 @@ def factCase (dir : String) (fa : Bool) (e : E) : Json × Json :=
   let on (f : Env → Bool) : List (Option Bool) := factEnvs.map fun env => if factOk fa env then some (f env) else none
   let out := match tr (assume fa e) with
     | none => Json.mkObj [("tr", Json.null)]
-    | some t => Json.mkObj [("tr", exprJson t),
-        ("wp_ok", Json.bool (guardOk e)),
+    | some t0 =>
+      let t := fam t0
+      Json.mkObj [("tr", exprJson t), ("tr_plain", exprJson t0),
+        ("wp_ok", Json.bool (guardOk e && NoBareEv e)),
         ("src", optBoolsJson (on fun env => holds .gha (ghaView env) e)),
-        ("tgt", optBoolsJson (on fun env => holds .gitlab (mapEnv env) t)),
-        ("wp", optBoolsJson (on fun env => holds .gitlab (wpMap env wpTarget) t))]
+        ("tgt", optBoolsJson (on fun env => holds .gitlab (mapEnv env) t0)),
+        ("wp", optBoolsJson (on fun env => holds .gitlab (wpMapS env wpTarget "") t)),
+        ("wp_closed", optBoolsJson (on fun env => holds .gitlab (wpMapS env wpTarget "_closed") t)),
+        ("wp_metadata", optBoolsJson (on fun env => holds .gitlab (wpMapS env wpTarget "_metadata") t))]
   (Json.mkObj [("dir", dir), ("expr", exprJson e)], out)
 
 open Expr in
@@ -455,8 +459,11 @@ def glPrCase (e : E) : Json × Json :=
   let src := glEnvs.map fun env => holds .gitlab (glEnv env) e
   let out := match glPr e with
     | none => Json.mkObj [("tr", Json.null)]
-    | some t => Json.mkObj [("tr", exprJson t), ("src", Json.arr (src.map Json.bool).toArray),
-        ("wp", Json.arr (glEnvs.map (fun env => Json.bool (holds .gitlab (Woodpecker.wpView (wpMap env wpTarget)) t))).toArray),
+    | some t0 =>
+      let t := fam t0
+      let wpAt (sfx : String) := Json.arr (glEnvs.map (fun env => Json.bool (holds .gitlab (Woodpecker.wpView (wpMapS env wpTarget sfx)) t))).toArray
+      Json.mkObj [("tr", exprJson t), ("tr_plain", exprJson t0), ("src", Json.arr (src.map Json.bool).toArray),
+        ("wp", wpAt ""), ("wp_closed", wpAt "_closed"), ("wp_metadata", wpAt "_metadata"),
         ("plain", Json.arr (glEnvs.map (fun env => Json.bool (holds .gitlab (Woodpecker.wpView (wpMap env wpTarget)) e))).toArray)]
   (Json.mkObj [("dir", "gitlab-woodpecker-pr"), ("expr", exprJson e)], out)
 

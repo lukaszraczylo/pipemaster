@@ -15,17 +15,22 @@ import (
 
 type prRun struct {
 	name, typ, event string
+	// sfx follows the Woodpecker pull request event name: pull_request_closed, pull_request_metadata.
+	sfx string
 }
 
 var prRuns = []prRun{
-	{"main", "branch", "push"},
-	{"dev", "branch", "push"},
-	{"hotfix-merge", "branch", "push"},
-	{"release/1", "branch", "push"},
-	{"feature", "branch", "pull_request"},
-	{"main", "branch", "pull_request"},
-	{"merge", "branch", "pull_request"},
-	{"v1", "tag", "push"},
+	{"main", "branch", "push", ""},
+	{"dev", "branch", "push", ""},
+	{"hotfix-merge", "branch", "push", ""},
+	{"release/1", "branch", "push", ""},
+	{"feature", "branch", "pull_request", ""},
+	{"main", "branch", "pull_request", ""},
+	{"merge", "branch", "pull_request", ""},
+	{"v1", "tag", "push", ""},
+	{"feature", "branch", "pull_request", "_closed"},
+	{"main", "branch", "pull_request", "_closed"},
+	{"merge", "branch", "pull_request", "_metadata"},
 }
 
 // holds evaluates e as dialect d reports run r. A pull request has the ref name 7/merge in GHA, no branch and no
@@ -41,15 +46,10 @@ func (r prRun) holds(t *testing.T, e expr.Expr, d expr.Dialect) bool {
 		}
 		return holdsOf(t, e, c.ghaView(), gha.Lang.Sem)
 	case gitlab.Dialect:
-		v := c.glView()
-		if pr {
-			// What CI_COMMIT_REF_NAME holds in a merge request pipeline is not in the GitLab variable docs, so the
-			// run leaves it unset and this test says nothing about it.
-			delete(v, "ref_name")
-		}
-		return holdsOf(t, e, v, gitlab.Lang.Sem)
+		// CI_COMMIT_REF_NAME holds the source branch in a merge request pipeline (see AssumeRefName), which c.RefName is.
+		return holdsOf(t, e, c.glView(), gitlab.Lang.Sem)
 	}
-	return woodpeckerHolds(t, e, c.factWoodpeckerView())
+	return woodpeckerHolds(t, e, c.factWoodpeckerView(r.sfx))
 }
 
 var prSources = map[string][]string{

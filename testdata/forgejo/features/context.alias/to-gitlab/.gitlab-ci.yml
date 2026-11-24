@@ -7,10 +7,10 @@ build:
   script:
     # pipemaster:step build-step-1
     # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-1
-    # pipemaster:arg "ref_name =~ '(?i)^main$'"
+    # pipemaster:arg "(event !~ '(?i)^merge_request_event$') \u0026\u0026 (ref_name =~ '(?i)^main$')"
     # pipemaster:arg {"src":"ref_name == 'main'"}
     - |
-      if printf '%s\n' "$CI_COMMIT_REF_NAME" | grep -Eiq '^main$'; then
+      if ! printf '%s\n' "$CI_PIPELINE_SOURCE" | grep -Eiq '^merge_request_event$' && printf '%s\n' "$CI_COMMIT_REF_NAME" | grep -Eiq '^main$'; then
       echo $CI_COMMIT_REF_NAME
       fi
     # pipemaster:step build-step-2

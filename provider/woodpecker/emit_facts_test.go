@@ -16,7 +16,7 @@ func factsWorkflow(on, cond string) map[string]string {
 
 const (
 	onPushPR      = "  push:\n    branches: [main]\n  pull_request:\n    branches: [main]\n"
-	prExclusion   = `!(CI_PIPELINE_EVENT matches "(?i)^pull_request$$")`
+	prExclusion   = `!(CI_PIPELINE_EVENT matches "(?i)^pull_request")`
 	branchIsMain  = `CI_COMMIT_BRANCH matches "(?i)^main$$"`
 	refNameIsMain = "github.ref_name == 'main'"
 )
@@ -110,7 +110,7 @@ func TestNotEqualRefNameGainsPullRequestTest(t *testing.T) {
 	if reportHas(rep, caps.JobIf, caps.Lost) {
 		t.Fatalf("job.if lost:\n%v", rep.Entries)
 	}
-	if !strings.Contains(text, `CI_PIPELINE_EVENT matches "(?i)^pull_request$$" || !(`+branchIsMain+`)`) {
+	if !strings.Contains(text, `CI_PIPELINE_EVENT matches "(?i)^pull_request" || !(`+branchIsMain+`)`) {
 		t.Errorf("!= must be true on a pull request:\n%s", text)
 	}
 }
@@ -125,7 +125,7 @@ func TestGitLabBranchTestExcludesPullRequests(t *testing.T) {
 	for name, c := range map[string]struct{ cond, want string }{
 		"equals":     {`$CI_COMMIT_BRANCH == "main"`, prExclusion + ` && CI_COMMIT_BRANCH == "main"`},
 		"matches":    {`$CI_COMMIT_BRANCH =~ /^main$/i`, prExclusion + ` && ` + branchIsMain},
-		"not equals": {`$CI_COMMIT_BRANCH != "main"`, `CI_PIPELINE_EVENT matches "(?i)^pull_request$$" || CI_COMMIT_BRANCH != "main"`},
+		"not equals": {`$CI_COMMIT_BRANCH != "main"`, `CI_PIPELINE_EVENT matches "(?i)^pull_request" || CI_COMMIT_BRANCH != "main"`},
 	} {
 		t.Run(name, func(t *testing.T) {
 			p := parseProject(t, "gitlab", glWorkflow(c.cond))

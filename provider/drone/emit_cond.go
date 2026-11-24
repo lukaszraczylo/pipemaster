@@ -272,14 +272,31 @@ func (e *emitter) exprSet(x expr.Expr) (condSet, bool) {
 
 // noteBranch adds the pull request caveat to a condition that is written as a branch filter.
 func (e *emitter) noteBranch(path string, f caps.Feature, strategy string, cs condSet) {
-	if len(cs.c.Branch.Include)+len(cs.c.Branch.Exclude) > 0 {
-		e.note(path, f, caps.Native, strategy, branchCaveat)
+	if len(cs.c.Branch.Include)+len(cs.c.Branch.Exclude) == 0 {
+		return
 	}
+	detail := branchCaveat
+	if skipsPullRequests(cs.c.Event) {
+		detail = branchExcluded
+	}
+	e.note(path, f, caps.Native, strategy, detail)
 }
 
 // toDrone reads a condition of a dialect in the Drone class with the Drone event names. A condition that does
 // not translate stays as written, and the filter and guard readers then refuse it.
 func (e *emitter) toDrone(x expr.Expr) expr.Expr {
+	if e.from == nil {
+		return x
+	}
+	if t, ok := expr.TranslateFacts(x, *e.from, dexpr.Lang, expr.Facts{}); ok {
+		return t
+	}
+	return x
+}
+
+// toDronePlain is toDrone without the pull request rewrite: the condition the file stands for, which the
+// markers keep so that a round trip returns the source.
+func (e *emitter) toDronePlain(x expr.Expr) expr.Expr {
 	if e.from == nil {
 		return x
 	}
@@ -348,6 +365,13 @@ func (e *emitter) stepWhen(sp string, st *ir.Step, script bool) (n *yaml.Node, g
 	return n, false, err
 }
 
+// skipsPullRequests is true when the event filter excludes pull requests, or lists only events that are not one.
+func skipsPullRequests(f dexpr.Filter) bool {
+	return slices.Contains(f.Exclude, eventPR) || len(f.Include) > 0 && !slices.Contains(f.Include, eventPR) && literalFilter(f)
+}
+
+const branchExcluded = "on a pull request Drone matches the branch filter against the target branch, so the condition leaves pull requests out, as a branch test of a GitLab merge request pipeline does"
+
 const branchCaveat = "on a pull request Drone matches the branch filter against the target branch, so the condition also holds on a pull request that targets the branch; the source may not"
 
 // condArg carries a condition that the file reads back as another expression: the IR condition, and what the
@@ -363,12 +387,12 @@ type condArg struct {
 
 // markGuard writes the marker of a shell guard. It holds the condition when the guard reads back as another
 // expression, which happens when a folded comparison is printed case-sensitively.
-func (e *emitter) markGuard(f caps.Feature, path string, orig expr.Expr) error {
-	orig = e.toDrone(orig)
-	line, err := e.printGuard(orig)
+func (e *emitter) markGuard(f caps.Feature, path string, src expr.Expr) error {
+	line, err := e.printGuard(e.toDrone(src))
 	if err != nil {
 		return err
 	}
+	orig := e.toDronePlain(src)
 	back, ok := dexpr.ParseGuard(line)
 	if !ok || expr.String(back) == expr.String(orig) {
 		e.mark(f, path)
@@ -383,7 +407,7 @@ func (e *emitter) markCond(f caps.Feature, path string, orig expr.Expr, cs condS
 	if _, own := orig.(expr.Opaque); own {
 		return nil
 	}
-	orig = e.toDrone(orig)
+	orig = e.toDronePlain(orig)
 	back, err := dexpr.ToExpr(cs.c)
 	if err != nil {
 		// The parser keeps a condition with no expression form as Drone text.
