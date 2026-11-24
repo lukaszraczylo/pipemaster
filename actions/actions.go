@@ -240,9 +240,23 @@ func (r *registry) lookup(ref ir.ActionRef, target string, with map[string]strin
 		if !ok {
 			return Target{}, false
 		}
+		if c.doc.Kind == KindCache && provider.Family(target) != provider.GHA && gatesBehaviour(with) {
+			return Target{}, false
+		}
 		return resolve(c, target, with), true
 	}
 	return Target{}, false
+}
+
+// gatesBehaviour is true when a cache input makes the step fail or branch on a miss, which no other target's
+// cache keyword can do; the step then has no mapping and the emitters write a failing step.
+func gatesBehaviour(with map[string]string) bool {
+	for _, k := range []string{"fail-on-cache-miss", "lookup-only"} {
+		if v, ok := with[k]; ok && !strings.EqualFold(strings.TrimSpace(v), "false") && strings.TrimSpace(v) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func resolve(c compiled, target string, with map[string]string) Target {

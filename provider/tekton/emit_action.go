@@ -2,6 +2,7 @@ package tekton
 
 import (
 	"encoding/json"
+	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
 	"regexp"
 	"strings"
 
@@ -146,7 +147,7 @@ func (tc *taskCtx) actionStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 	if st.Action == nil || st.Kind == ir.StepPipelineCall {
 		m := tc.extAction(st, sp, name)
 		if m == nil {
-			return nil, tc.markAction(b, sp, st, "", nil)
+			return tc.failedAction(b, st, sp, name, "the step has no action reference and no Tekton ref")
 		}
 		return m, nil
 	}
@@ -161,8 +162,9 @@ func (tc *taskCtx) actionStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 	}
 	t, ok := actions.Lookup(*st.Action, dialect, with)
 	if !ok {
-		tc.dropAction(st, sp, "no Tekton mapping for action "+actionRef(st.Action))
-		return nil, tc.markAction(b, sp, st, "", nil)
+		why := "no Tekton mapping for action " + actionRef(st.Action)
+		tc.dropAction(st, sp, why)
+		return tc.failedAction(b, st, sp, name, why)
 	}
 	tc.e.led.Note(use(sp, caps.StepAction), t.Support, t.Support.Caveat)
 	for _, k := range t.Unmapped {
@@ -170,13 +172,50 @@ func (tc *taskCtx) actionStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 	}
 	if t.Support.Level == caps.Lost {
 		tc.dropAction(st, sp, t.Support.Caveat)
-		return nil, tc.markAction(b, sp, st, "", nil)
+		return tc.failedAction(b, st, sp, name, "the action has no Tekton form: "+t.Support.Caveat)
 	}
 	m, image, err := tc.applyTarget(b, st, sp, name, t)
 	if err != nil {
 		return nil, err
 	}
+	if m == nil && image == "" && t.Kind != actions.KindCache {
+		return tc.failedAction(b, st, sp, name, "action kind "+t.Kind+" has no Tekton form")
+	}
 	return m, tc.markAction(b, sp, st, image, m)
+}
+
+// failedAction writes the step that stands for a step with no Tekton form: it prints the loss and exits 1.
+func (tc *taskCtx) failedAction(b *stepBook, st *ir.Step, sp, name, why string) (*wmap, error) {
+	m, err := tc.failStep(b, st, sp, name, why)
+	if err != nil {
+		return nil, err
+	}
+	return m, tc.markAction(b, sp, st, "", m)
+}
+
+func (tc *taskCtx) failStep(b *stepBook, st *ir.Step, sp, name, why string) (*wmap, error) {
+	sc := newScope()
+	m := newMap()
+	m.SetStr("name", name)
+	img, _ := tc.stepImage(sc, &ir.Step{}, sp)
+	if img != "" {
+		m.SetStr("image", img)
+	}
+	cond := tc.cond(sp, caps.StepIf, st.If, taskScope)
+	lines := []string{emitkit.FailLoud(caps.StepAction, sp, why)}
+	if guard := andGuard(b.guard, cond.guard); guard != nil {
+		var err error
+		if lines, err = exprtekton.AddGuard(lines, guard); err != nil {
+			return nil, err
+		}
+		guardEnv(sc, guard)
+	}
+	m.Set("script", block(strings.Join(lines, "\n")))
+	if len(sc.env) > 0 {
+		m.Set("env", seqOf(sc.env...))
+	}
+	tc.stepTail(m, st, cond)
+	return m, nil
 }
 
 func (tc *taskCtx) dropAction(st *ir.Step, sp, why string) {

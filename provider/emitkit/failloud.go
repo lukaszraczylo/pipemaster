@@ -41,7 +41,7 @@ func failLoudText(s string) string {
 		switch {
 		case r == '$' || r == '{' || r == '}' || r == '`' || r == '\'' || r == '\\' || r == '"' || r == '<' || r == '>':
 			r = '?'
-		case unicode.IsControl(r):
+		case !unicode.IsPrint(r):
 			r = ' '
 		}
 		b.WriteRune(r)

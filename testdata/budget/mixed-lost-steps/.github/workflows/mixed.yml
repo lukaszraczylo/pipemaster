@@ -1,0 +1,19 @@
+name: mixed
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo one
+      - uses: ./.github/actions/local-thing
+      - uses: slackapi/slack-github-action@v1
+        with:
+          channel-id: C123
+      - run: echo two
+      - uses: slackapi/slack-github-action@v1
+        if: always()
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache
+          key: k-${{ hashFiles('go.sum') }}
+          fail-on-cache-miss: true

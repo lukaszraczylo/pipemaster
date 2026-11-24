@@ -242,9 +242,8 @@ func (e *emitter) lostStep(p *jobPrep, st *ir.Step, what, why string) error {
 	sp := stepPath(p.path, st.ID)
 	p.pending = append(p.pending, lostPrefix+commentSafe("step "+st.ID+" "+what))
 	if st.If != nil {
-		// An always() or failure() step runs after the job's other lines, and after_script cannot fail the job.
 		if _, status, _ := splitStatus(st.If); status != "" && status != "success" {
-			return nil
+			e.lose(sp, caps.StepIf, "an always() or failure() step runs in after_script, which cannot fail the job: the loss shows in the job log only and the job does not fail for it")
 		}
 	}
 	c := *st

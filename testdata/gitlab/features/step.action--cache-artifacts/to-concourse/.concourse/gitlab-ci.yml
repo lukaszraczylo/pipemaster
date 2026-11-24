@@ -1,17 +1,17 @@
 # pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/build-step-1
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: cache\n    ref: v4\nwith:\n    key:\n        lit: go-mod\n    path:\n        lit: ~/go/pkg/mod\nid: build-step-1\nkind: action\n","task":"build-step-1","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/gitlab-ci/job/build/step/build-step-1: Concourse does not run the action' \\u003e\\u00262; exit 1\"],\"path\":\"sh\"}},\"task\":\"build-step-1\"}"}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: cache\n    ref: v4\nwith:\n    key:\n        lit: go-mod\n    path:\n        lit: ~/go/pkg/mod\nid: build-step-1\nkind: action\n","task":"build-step-1","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"build-step-1\"}"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/build-step-2/carry
 # pipemaster:arg {"digest":"7e08f00b91459dfc13d850c2a2417a4bd55274a4c05d3509470d48fd42d4cf40","carry":"id: build-step-2\nkind: script\n"}
 # pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/build-step-3
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\nid: build-step-3\nkind: action\n","task":"build-step-3","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/gitlab-ci/job/build/step/build-step-3: Concourse does not run the action' \\u003e\\u00262; exit 1\"],\"path\":\"sh\"}},\"task\":\"build-step-3\"}"}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\nid: build-step-3\nkind: action\n","task":"build-step-3","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"build-step-3\"}"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"3e21f31bfb699ea98f4e08fee5e18aae993048fcd93bcd31198aa6b9a7a794b5","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"7ae1f1ba0a1b05c77be4971fd6a6d90a8dc39438b71b285b70e6f376c2213506","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated step.action pipeline/gitlab-ci/job/test/step/test-step-1
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\nid: test-step-1\nkind: action\n","task":"test-step-1","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/gitlab-ci/job/test/step/test-step-1: Concourse does not run the action' \\u003e\\u00262; exit 1\"],\"path\":\"sh\"}},\"task\":\"test-step-1\"}"}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\nid: test-step-1\nkind: action\n","task":"test-step-1","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"test-step-1\"}"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/test/step/test-step-2/carry
 # pipemaster:arg {"digest":"ad4676c209657f33d00f14624d673541234bcb6047386369e8b82f08e5461287","carry":"id: test-step-2\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/test/carry
-# pipemaster:arg {"digest":"216fa3ff7049f66c8c208e48b3f14d25cb4dad96a657970ea409bdc594beb522","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: build\n"}
+# pipemaster:arg {"digest":"8a95914ad6076fa2519437760ef63c5ee9c546dfe54772fa2c04bb52b6043dce","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"45ccad76918a30b965c250ae4114592623aed42b88890de31c892e091082be63","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -43,7 +43,7 @@ jobs:
             path: sh
             args:
               - -ec
-              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/gitlab-ci/job/build/step/build-step-1: Concourse does not run the action'' >&2; exit 1'
+              - "true"
       - task: build-step-2
         input_mapping:
           workspace: source
@@ -80,7 +80,7 @@ jobs:
             path: sh
             args:
               - -ec
-              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/gitlab-ci/job/build/step/build-step-3: Concourse does not run the action'' >&2; exit 1'
+              - "true"
   - name: test
     plan:
       - get: source
@@ -99,7 +99,7 @@ jobs:
             path: sh
             args:
               - -ec
-              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/gitlab-ci/job/test/step/test-step-1: Concourse does not run the action'' >&2; exit 1'
+              - "true"
       - task: test-step-2
         input_mapping:
           workspace: source

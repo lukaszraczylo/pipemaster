@@ -1,19 +1,19 @@
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: checkout\n    ref: v4\next:\n    gha:\n        _derived_id: true\nid: build-step-1\nkind: action\n","get":"source","params":"null"}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: cache\n    ref: v4\nwith:\n    key:\n        lit: go-mod\n    path:\n        lit: ~/go/pkg/mod\next:\n    gha:\n        _derived_id: true\nid: build-step-2\nkind: action\n","task":"build-step-2","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: Concourse does not run the action' \\u003e\\u00262; exit 1\"],\"path\":\"sh\"}},\"task\":\"build-step-2\"}"}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: cache\n    ref: v4\nwith:\n    key:\n        lit: go-mod\n    path:\n        lit: ~/go/pkg/mod\next:\n    gha:\n        _derived_id: true\nid: build-step-2\nkind: action\n","task":"build-step-2","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"build-step-2\"}"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-3/carry
 # pipemaster:arg {"digest":"9569062072f91bcd5bb8bbf2269c4cd108fb87d028b57fc614b58973d18fac56","carry":"id: build-step-3\nkind: script\n"}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-4
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\next:\n    gha:\n        _derived_id: true\nid: build-step-4\nkind: action\n","task":"build-step-4","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-4: Concourse does not run the action' \\u003e\\u00262; exit 1\"],\"path\":\"sh\"}},\"task\":\"build-step-4\"}"}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\next:\n    gha:\n        _derived_id: true\nid: build-step-4\nkind: action\n","task":"build-step-4","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"build-step-4\"}"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"f3231c084c59f58f63f6bfd98c65c0e80368e89385dd3f3133686d75d1359171","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"c1725bf4435ed71a430e4cce191d06a2ac94ab3dd983f32b3ffd29f58f4aae6a","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\next:\n    gha:\n        _derived_id: true\nid: test-step-1\nkind: action\n","task":"test-step-1","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/test/step/test-step-1: Concourse does not run the action' \\u003e\\u00262; exit 1\"],\"path\":\"sh\"}},\"task\":\"test-step-1\"}"}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\next:\n    gha:\n        _derived_id: true\nid: test-step-1\nkind: action\n","task":"test-step-1","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"test-step-1\"}"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-2/carry
 # pipemaster:arg {"digest":"ad4676c209657f33d00f14624d673541234bcb6047386369e8b82f08e5461287","carry":"id: test-step-2\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
-# pipemaster:arg {"digest":"b1af811e101c2d6fed9c426b1b99c137f6aac5819dc56d2b0d83cb694c690735","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: build\n"}
+# pipemaster:arg {"digest":"c23052dbf8d56e3eee1422cad3d87afcdf567c8b89b1e99471e8aeec521d3893","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"31077445882a502d3384a2cd30d749931d715d733c6d3bef3336333bf597ef4e","carry":"id: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -54,7 +54,7 @@ jobs:
             path: sh
             args:
               - -ec
-              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: Concourse does not run the action'' >&2; exit 1'
+              - "true"
       - task: build-step-3
         input_mapping:
           workspace: source
@@ -91,7 +91,7 @@ jobs:
             path: sh
             args:
               - -ec
-              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-4: Concourse does not run the action'' >&2; exit 1'
+              - "true"
   - name: test
     plan:
       - get: source
@@ -111,7 +111,7 @@ jobs:
             path: sh
             args:
               - -ec
-              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/test/step/test-step-1: Concourse does not run the action'' >&2; exit 1'
+              - "true"
       - task: test-step-2
         input_mapping:
           workspace: source

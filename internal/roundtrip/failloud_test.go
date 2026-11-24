@@ -11,6 +11,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
@@ -104,9 +105,6 @@ func noFormStep(to string) *ir.Step {
 // A step with no target form must not become a step that passes: the emitted script exits 1 and says what was lost.
 func TestLostStepEmitsFailingScript(t *testing.T) {
 	for _, to := range failLoudTargets {
-		if to == "tekton" {
-			continue
-		}
 		t.Run(to, func(t *testing.T) {
 			files, _, err := prov(t, to).Emit(oneJob(noFormStep(to)))
 			if err != nil {
@@ -204,5 +202,108 @@ func TestFailingScriptRestoresTheSourceStep(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// shStep is a command step of the source.
+func shStep(id, line string) *ir.Step {
+	return &ir.Step{ID: id, Kind: ir.StepScript, Image: &ir.Image{Ref: "alpine:3"}, Script: []string{line}}
+}
+
+// A lost step between two running steps stops the job at that step: the commands before it run, the commands
+// after it do not, and the exit code is 1.
+func TestLostStepInARunningJobStopsTheJob(t *testing.T) {
+	for _, to := range failLoudTargets {
+		t.Run(to, func(t *testing.T) {
+			files, _, err := prov(t, to).Emit(oneJob(shStep("a", "echo one"), noFormStep(to), shStep("b", "echo two")))
+			if err != nil {
+				t.Fatal(err)
+			}
+			cands := scriptCandidates(t, files)
+			ran := ""
+			stopped := false
+			for _, s := range cands {
+				switch {
+				case hasFailLoud(s) && strings.Contains(s, "echo one") && strings.Contains(s, "echo two"):
+					// GitLab runs the steps as one command list.
+					stdout, stderr, code := runScript(t, s)
+					ran, stopped = stdout, code == 1 && strings.Contains(stderr, "pipemaster: lost: ")
+				case hasFailLoud(s) && !strings.Contains(s, "echo "):
+					_, stderr, code := runScript(t, s)
+					if code != 1 || !strings.Contains(stderr, "pipemaster: lost: ") {
+						t.Errorf("failing step: code=%d stderr=%q", code, stderr)
+					}
+					stopped = true
+				}
+				if stopped {
+					break
+				}
+				if strings.Contains(s, "echo ") && !hasFailLoud(s) && !strings.Contains(s, "\n") {
+					stdout, _, _ := runScript(t, s)
+					ran += stdout
+				}
+			}
+			if !stopped {
+				t.Fatalf("no failing step in:\n%v", names(files))
+			}
+			if strings.Contains(ran, "two") {
+				t.Errorf("a command after the lost step ran: %q", ran)
+			}
+		})
+	}
+}
+
+// A lost step that only runs after the job fails or always cannot fail the job on GitLab: the loss goes to the
+// job log from after_script.
+func TestLostAlwaysStepFailsLoudInAfterScript(t *testing.T) {
+	st := noFormStep("gitlab")
+	st.If = expr.Call{Name: "always"}
+	files, rep, err := prov(t, "gitlab").Emit(oneJob(shStep("a", "echo one"), st))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out string
+	for _, b := range files {
+		out += string(b)
+	}
+	i := strings.Index(out, "after_script:")
+	if i < 0 || !strings.Contains(out[i:], "pipemaster: lost: ") {
+		t.Fatalf("no failing line in after_script:\n%s", out)
+	}
+	found := false
+	for _, e := range rep.Entries {
+		found = found || strings.Contains(e.Detail, "after_script, which cannot fail the job")
+	}
+	if !found {
+		t.Errorf("the report does not say the loss cannot fail the job")
+	}
+}
+
+// A cache whose result gates the build is not a plain cache: it fails loudly on every target but the source.
+func TestGatingCacheFailsLoudly(t *testing.T) {
+	cache := func(with map[string]ir.Value) *ir.Step {
+		return &ir.Step{ID: "c", Kind: ir.StepAction, With: with, Action: &ir.ActionRef{Kind: ir.ActionRepo, Host: "https://github.com", Owner: "actions", Repo: "cache", Ref: "v4"}}
+	}
+	lit := func(s string) ir.Value { return ir.Value{Kind: ir.ValueLit, Lit: s} }
+	for _, to := range failLoudTargets {
+		if to == provider.GHA {
+			continue
+		}
+		t.Run(to, func(t *testing.T) {
+			gated, _, err := prov(t, to).Emit(oneJob(cache(map[string]ir.Value{"path": lit("~/.cache"), "key": lit("k"), "fail-on-cache-miss": lit("true")})))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.ContainsFunc(scriptCandidates(t, gated), hasFailLoud) {
+				t.Errorf("fail-on-cache-miss: no failing script in %v", names(gated))
+			}
+			plain, _, err := prov(t, to).Emit(oneJob(cache(map[string]ir.Value{"path": lit("~/.cache"), "key": lit("k")})))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if slices.ContainsFunc(scriptCandidates(t, plain), hasFailLoud) {
+				t.Errorf("a plain cache fails")
+			}
+		})
 	}
 }

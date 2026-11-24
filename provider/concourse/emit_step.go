@@ -58,7 +58,7 @@ func (c *chain) step(st *ir.Step) []*yaml.Node {
 		return c.action(st, path, at)
 	case ir.StepPipelineCall:
 		e.lose(path, caps.StepAction, "a call of another pipeline has no Concourse form; a placeholder task keeps its place")
-		return c.placeholder(st, path, actionArg{})
+		return c.placeholder(st, path, actionArg{}, true)
 	case ir.StepScript, "":
 		if n := c.taskFile(st, path); n != nil {
 			return []*yaml.Node{n}
@@ -71,7 +71,7 @@ func (c *chain) step(st *ir.Step) []*yaml.Node {
 				feature = caps.StepAction
 			}
 			e.lose(path, feature, "the "+string(st.Kind)+" step has no Concourse form outside a Concourse file; a placeholder task keeps its place")
-			return c.placeholder(st, path, actionArg{})
+			return c.placeholder(st, path, actionArg{}, true)
 		}
 		n := c.verbatim(st, path)
 		if n == nil {

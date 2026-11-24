@@ -6,6 +6,7 @@ Loss report: gha -> drone
 [lost] pipeline/ci/job/test job.runner (only the platform has a Drone form; other runner labels are lost)
 [lost] pipeline/ci/job/test/step/test-step-1 ext.passthrough (the action reference actions/download-artifact@v4 is not in the Drone file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/test/step/test-step-1 step.action (no upload of artifact dist in this document; documents do not share a workspace)
+[lost] pipeline/ci/job/test/step/test-step-1 step.shell (Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [lost] pipeline/ci/job/test/step/test-step-2 step.shell (Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.action: per actions.Lookup verdict; a plugin step with settings (unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth)

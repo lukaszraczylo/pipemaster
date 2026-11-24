@@ -303,8 +303,11 @@ func (e *emitter) step(c *docCtx, st *ir.Step, name string) (stepDone, error) {
 	case st.Kind == ir.StepScript || len(st.Script) > 0:
 		m, err = e.scriptStep(c, sp, st)
 	default:
-		e.lose(sp, caps.StepAction, "step kind "+string(st.Kind)+" has no Drone form")
+		why := "step kind " + string(st.Kind) + " has no Drone form"
+		e.lose(sp, caps.StepAction, why)
 		e.comment("step " + sp + " kind " + string(st.Kind))
+		m, err = e.failingStep(c, sp, st, caps.StepAction, why)
+		carried = true
 	}
 	if err != nil {
 		return stepDone{}, err
@@ -312,7 +315,7 @@ func (e *emitter) step(c *docCtx, st *ir.Step, name string) (stepDone, error) {
 	if m == nil {
 		if !carried {
 			e.unapplied(sp, st)
-			err = e.markAction(sp, st, c.pos, "")
+			err = e.markAction(sp, st, c.pos, "", false)
 		}
 		return stepDone{}, err
 	}
@@ -570,9 +573,10 @@ func (e *emitter) stepLosses(sp string, st *ir.Step) {
 
 func (e *emitter) pluginStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
 	if st.Image == nil || st.Image.Ref == "" {
-		e.lose(sp, caps.StepAction, "a plugin step needs an image")
+		why := "a plugin step needs an image"
+		e.lose(sp, caps.StepAction, why)
 		e.comment("step " + sp + ": plugin without an image")
-		return nil, nil
+		return e.failingStep(c, sp, st, caps.StepAction, why)
 	}
 	m := newYMap()
 	if err := e.common(c, sp, st, m, false); err != nil {

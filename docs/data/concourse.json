@@ -613,7 +613,7 @@
     },
     {
      "path": ".woodpecker/set-feature-pipelines.yaml",
-     "text": "# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/branches: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/across: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"at\":1}\n# pipemaster:emulated step.script pipeline/parent/job/set-feature-pipelines\n# pipemaster:emulated job.container pipeline/parent/job/set-feature-pipelines\n# pipemaster:emulated trigger.filter.branches pipeline/parent\n# pipemaster:arg \"- ext:\\n    concourse:\\n        resources:\\n            - repo\\n  kind: push\\n- ext:\\n    concourse:\\n        resources:\\n            - branches\\n  kind: push\\n  branches:\\n    include:\\n        - feat/**\\n        - feature/**\\n\"\n# pipemaster:lost job.if pipeline/parent/job/set-feature-pipelines: (event == 'push') && (before_sha == '0000000000000000000000000000000000000000') && ((branch =~ '^feat/') || (branch =~ '^feature/'))\nwhen:\n  - event: push\n    evaluate: \"false\"\n  - event: push\n    branch:\n      - feat/**\n      - feature/**\n    evaluate: \"false\"\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - 'printf ''%s\\n'' ''pipemaster: lost: step.script pipeline/parent/job/set-feature-pipelines: no step of the job has a Woodpecker form'' >&2; exit 1'\n"
+     "text": "# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/branches: plugin without an image\n# pipemaster:emulated job.container pipeline/parent/job/set-feature-pipelines\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"at\":0,\"fail\":true}\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/across: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"at\":1,\"fail\":true}\n# pipemaster:emulated trigger.filter.branches pipeline/parent\n# pipemaster:arg \"- ext:\\n    concourse:\\n        resources:\\n            - repo\\n  kind: push\\n- ext:\\n    concourse:\\n        resources:\\n            - branches\\n  kind: push\\n  branches:\\n    include:\\n        - feat/**\\n        - feature/**\\n\"\n# pipemaster:lost job.if pipeline/parent/job/set-feature-pipelines: (event == 'push') && (before_sha == '0000000000000000000000000000000000000000') && ((branch =~ '^feat/') || (branch =~ '^feature/'))\nwhen:\n  - event: push\n    evaluate: \"false\"\n  - event: push\n    branch:\n      - feat/**\n      - feature/**\n    evaluate: \"false\"\nsteps:\n  - name: branches\n    image: ubuntu:latest\n    commands:\n      - 'printf ''%s\\n'' ''pipemaster: lost: step.action pipeline/parent/job/set-feature-pipelines/step/branches: a plugin step needs an image'' >&2; exit 1'\n  - name: across\n    image: ubuntu:latest\n    commands:\n      - 'printf ''%s\\n'' ''pipemaster: lost: step.action pipeline/parent/job/set-feature-pipelines/step/across: a plugin step needs an image'' >&2; exit 1'\n"
     },
     {
      "path": ".woodpecker/test.yaml",
@@ -771,12 +771,6 @@
      "detail": "a plugin step needs an image"
     },
     {
-     "path": "pipeline/parent/job/set-feature-pipelines/step/script",
-     "feature": "step.script",
-     "level": "lost",
-     "detail": "no step of the job has a Woodpecker form; a step that prints the loss and exits 1 keeps the workflow valid and the pipeline honest; not kept in round-trip metadata: no node at this path in the source project"
-    },
-    {
      "path": "pipeline/parent/job/test",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -876,13 +870,6 @@
      "detail": "job set-feature-pipelines triggers on branches; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && (before_sha == '0000000000000000000000000000000000000000') && ((branch =~ '^feat/') || (branch =~ '^feature/')); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
     },
     {
-     "path": "pipeline/parent/job/set-feature-pipelines",
-     "feature": "step.script",
-     "level": "emulated",
-     "strategy": "failing step",
-     "detail": "Woodpecker needs a step; no step of the job has a Woodpecker form, so a step that prints the loss and exits 1 stands in"
-    },
-    {
      "path": "pipeline/parent/job/test",
      "feature": "job.if",
      "level": "emulated",
@@ -918,7 +905,7 @@
    "files": [
     {
      "path": ".drone.yml",
-     "text": "# pipemaster:emulated trigger.filter.branches pipeline/parent\n# pipemaster:arg \"- ext:\\n    concourse:\\n        resources:\\n            - repo\\n  kind: push\\n- ext:\\n    concourse:\\n        resources:\\n            - branches\\n  kind: push\\n  branches:\\n    include:\\n        - feat/**\\n        - feature/**\\n\"\n# pipemaster:lost job.if pipeline/parent/job/build: (event == 'push') && (branch == default_branch)\n# pipemaster:emulated step.action pipeline/parent/job/build/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/parent/job/build\n# pipemaster:arg {\"Ref\":\"golang:latest\",\"Entrypoint\":null,\"taken\":2}\nkind: pipeline\ntype: docker\nname: build\ntrigger:\n  event:\n    exclude:\n      - '**'\ndepends_on:\n  - test\nsteps:\n  - name: build\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - set -x\n      - '[ -e repo ] || ln -s \"$$PWD\" repo'\n      - mkdir -p binary\n      - root=$$(pwd)\n      - cd \"repo/$${MODULE}\"\n      - |+\n        go build -o \"$${root}/binary/$${BINARY_NAME}\"\n\n      - timestamp=$$(date '+%Y%m%d%H%M%S')\n      - tar czf \"$$root/binary/$$BINARY_NAME-$$timestamp.tgz\" \"$${root}/binary/$${BINARY_NAME}\"\n      - )\n    environment:\n      MODULE: apps/golang\n      BINARY_NAME: ascii-banner\n  - name: run-binary\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - set -x\n      - ./binary/ascii-banner -list\n      - ./binary/ascii-banner concourse\n      - ./binary/ascii-banner plane\n      - ./binary/ascii-banner pilot\n      - )\n---\n# pipemaster:emulated trigger.filter.branches pipeline/parent\n# pipemaster:arg \"- ext:\\n    concourse:\\n        resources:\\n            - repo\\n  kind: push\\n- ext:\\n    concourse:\\n        resources:\\n            - branches\\n  kind: push\\n  branches:\\n    include:\\n        - feat/**\\n        - feature/**\\n\"\n# pipemaster:lost job.if pipeline/parent/job/set-feature-pipelines: (event == 'push') && (before_sha == '0000000000000000000000000000000000000000') && ((branch =~ '^feat/') || (branch =~ '^feature/'))\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/branches: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/across: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/parent/job/set-feature-pipelines\n# pipemaster:emulated job.container pipeline/parent/job/set-feature-pipelines\nkind: pipeline\ntype: docker\nname: set-feature-pipelines\ntrigger:\n  event:\n    exclude:\n      - '**'\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - 'printf ''%s\\n'' ''pipemaster: lost: step.script pipeline/parent/job/set-feature-pipelines: no step of the job has a Drone form'' >&2; exit 1'\n---\n# pipemaster:emulated trigger.filter.branches pipeline/parent\n# pipemaster:arg \"- ext:\\n    concourse:\\n        resources:\\n            - repo\\n  kind: push\\n- ext:\\n    concourse:\\n        resources:\\n            - branches\\n  kind: push\\n  branches:\\n    include:\\n        - feat/**\\n        - feature/**\\n\"\n# pipemaster:lost job.if pipeline/parent/job/test: (event == 'push') && (branch == default_branch)\n# pipemaster:emulated step.action pipeline/parent/job/test/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/parent/job/test\n# pipemaster:arg {\"Ref\":\"golang:latest\",\"Entrypoint\":null,\"taken\":1}\nkind: pipeline\ntype: docker\nname: test\ntrigger:\n  event:\n    exclude:\n      - '**'\nsteps:\n  - name: tests\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - '[ -e repo ] || ln -s \"$$PWD\" repo'\n      - cd \"repo/$${MODULE}\"\n      - go test -v ./...\n      - )\n    environment:\n      MODULE: apps/golang\n"
+     "text": "# pipemaster:emulated trigger.filter.branches pipeline/parent\n# pipemaster:arg \"- ext:\\n    concourse:\\n        resources:\\n            - repo\\n  kind: push\\n- ext:\\n    concourse:\\n        resources:\\n            - branches\\n  kind: push\\n  branches:\\n    include:\\n        - feat/**\\n        - feature/**\\n\"\n# pipemaster:lost job.if pipeline/parent/job/build: (event == 'push') && (branch == default_branch)\n# pipemaster:emulated step.action pipeline/parent/job/build/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/parent/job/build\n# pipemaster:arg {\"Ref\":\"golang:latest\",\"Entrypoint\":null,\"taken\":2}\nkind: pipeline\ntype: docker\nname: build\ntrigger:\n  event:\n    exclude:\n      - '**'\ndepends_on:\n  - test\nsteps:\n  - name: build\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - set -x\n      - '[ -e repo ] || ln -s \"$$PWD\" repo'\n      - mkdir -p binary\n      - root=$$(pwd)\n      - cd \"repo/$${MODULE}\"\n      - |+\n        go build -o \"$${root}/binary/$${BINARY_NAME}\"\n\n      - timestamp=$$(date '+%Y%m%d%H%M%S')\n      - tar czf \"$$root/binary/$$BINARY_NAME-$$timestamp.tgz\" \"$${root}/binary/$${BINARY_NAME}\"\n      - )\n    environment:\n      MODULE: apps/golang\n      BINARY_NAME: ascii-banner\n  - name: run-binary\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - set -x\n      - ./binary/ascii-banner -list\n      - ./binary/ascii-banner concourse\n      - ./binary/ascii-banner plane\n      - ./binary/ascii-banner pilot\n      - )\n---\n# pipemaster:emulated trigger.filter.branches pipeline/parent\n# pipemaster:arg \"- ext:\\n    concourse:\\n        resources:\\n            - repo\\n  kind: push\\n- ext:\\n    concourse:\\n        resources:\\n            - branches\\n  kind: push\\n  branches:\\n    include:\\n        - feat/**\\n        - feature/**\\n\"\n# pipemaster:lost job.if pipeline/parent/job/set-feature-pipelines: (event == 'push') && (before_sha == '0000000000000000000000000000000000000000') && ((branch =~ '^feat/') || (branch =~ '^feature/'))\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/branches: plugin without an image\n# pipemaster:emulated job.container pipeline/parent/job/set-feature-pipelines\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"at\":0,\"fail\":true}\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/across: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"at\":1,\"fail\":true}\nkind: pipeline\ntype: docker\nname: set-feature-pipelines\ntrigger:\n  event:\n    exclude:\n      - '**'\nsteps:\n  - name: branches\n    image: ubuntu:latest\n    commands:\n      - 'printf ''%s\\n'' ''pipemaster: lost: step.action pipeline/parent/job/set-feature-pipelines/step/branches: a plugin step needs an image'' >&2; exit 1'\n  - name: across\n    image: ubuntu:latest\n    commands:\n      - 'printf ''%s\\n'' ''pipemaster: lost: step.action pipeline/parent/job/set-feature-pipelines/step/across: a plugin step needs an image'' >&2; exit 1'\n---\n# pipemaster:emulated trigger.filter.branches pipeline/parent\n# pipemaster:arg \"- ext:\\n    concourse:\\n        resources:\\n            - repo\\n  kind: push\\n- ext:\\n    concourse:\\n        resources:\\n            - branches\\n  kind: push\\n  branches:\\n    include:\\n        - feat/**\\n        - feature/**\\n\"\n# pipemaster:lost job.if pipeline/parent/job/test: (event == 'push') && (branch == default_branch)\n# pipemaster:emulated step.action pipeline/parent/job/test/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/parent/job/test\n# pipemaster:arg {\"Ref\":\"golang:latest\",\"Entrypoint\":null,\"taken\":1}\nkind: pipeline\ntype: docker\nname: test\ntrigger:\n  event:\n    exclude:\n      - '**'\nsteps:\n  - name: tests\n    image: golang:latest\n    commands:\n      - (\n      - set -e\n      - '[ -e repo ] || ln -s \"$$PWD\" repo'\n      - cd \"repo/$${MODULE}\"\n      - go test -v ./...\n      - )\n    environment:\n      MODULE: apps/golang\n"
     }
    ],
    "report": [
@@ -1072,12 +1059,6 @@
      "detail": "a plugin step needs an image"
     },
     {
-     "path": "pipeline/parent/job/set-feature-pipelines/step/script",
-     "feature": "step.script",
-     "level": "lost",
-     "detail": "no step of the job has a Drone form; a step that prints the loss and exits 1 keeps the document valid and the pipeline honest; not kept in round-trip metadata: no node at this path in the source project"
-    },
-    {
      "path": "pipeline/parent/job/test",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -1196,13 +1177,6 @@
      "detail": "job set-feature-pipelines triggers on branches; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && (before_sha == '0000000000000000000000000000000000000000') && ((branch =~ '^feat/') || (branch =~ '^feature/')); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
     },
     {
-     "path": "pipeline/parent/job/set-feature-pipelines",
-     "feature": "step.script",
-     "level": "emulated",
-     "strategy": "failing step",
-     "detail": "Drone needs a step; no step of the job has a Drone form, so a step that prints the loss and exits 1 stands in"
-    },
-    {
      "path": "pipeline/parent/job/test",
      "feature": "job.if",
      "level": "emulated",
@@ -1261,7 +1235,7 @@
     },
     {
      "path": ".tekton/tasks/parent-set-feature-pipelines.yaml",
-     "text": "# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/branches has kind plugin\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/across has kind plugin\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"at\":0,\"seq\":1}\n# pipemaster:emulated step.script pipeline/parent/job/set-feature-pipelines\n# pipemaster:arg {\"image\":\"alpine:3.22\"}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: parent-set-feature-pipelines\nspec:\n  params:\n    - name: ctx-event\n    - name: ctx-branch\n  steps:\n    - name: noop\n      image: alpine:3.22\n      script: 'printf ''%s\\n'' ''pipemaster: lost: step.script pipeline/parent/job/set-feature-pipelines: no step of the job has a Tekton form'' >&2; exit 1'\n"
+     "text": "# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/branches has kind plugin\n# pipemaster:emulated step.image pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"image\":\"alpine:3.22\"}\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"wrote\":\"{\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"branches\\\",\\\"script\\\":\\\"printf '%s\\\\\\\\n' 'pipemaster: lost: step.action pipeline/parent/job/set-feature-pipelines/step/branches: step kind plugin has no Tekton form' \\\\u003e\\\\u00262; exit 1\\\"}\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/across has kind plugin\n# pipemaster:emulated step.image pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"image\":\"alpine:3.22\"}\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"wrote\":\"{\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"across\\\",\\\"script\\\":\\\"printf '%s\\\\\\\\n' 'pipemaster: lost: step.action pipeline/parent/job/set-feature-pipelines/step/across: step kind plugin has no Tekton form' \\\\u003e\\\\u00262; exit 1\\\"}\",\"at\":1,\"seq\":1}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: parent-set-feature-pipelines\nspec:\n  params:\n    - name: ctx-event\n    - name: ctx-branch\n  steps:\n    - name: branches\n      image: alpine:3.22\n      script: 'printf ''%s\\n'' ''pipemaster: lost: step.action pipeline/parent/job/set-feature-pipelines/step/branches: step kind plugin has no Tekton form'' >&2; exit 1'\n    - name: across\n      image: alpine:3.22\n      script: 'printf ''%s\\n'' ''pipemaster: lost: step.action pipeline/parent/job/set-feature-pipelines/step/across: step kind plugin has no Tekton form'' >&2; exit 1'\n"
     },
     {
      "path": ".tekton/tasks/parent-test.yaml",
@@ -1401,12 +1375,6 @@
      "detail": "step kind plugin has no Tekton form"
     },
     {
-     "path": "pipeline/parent/job/set-feature-pipelines/step/script",
-     "feature": "step.script",
-     "level": "lost",
-     "detail": "no step of the job has a Tekton form; a step that prints the loss and exits 1 keeps the Task valid and the pipeline honest; not kept in round-trip metadata: no node at this path in the source project"
-    },
-    {
      "path": "pipeline/parent/job/test",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -1508,11 +1476,18 @@
      "detail": "job set-feature-pipelines triggers on branches; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && (before_sha == '0000000000000000000000000000000000000000') && ((branch =~ '^feat/') || (branch =~ '^feature/')); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
     },
     {
-     "path": "pipeline/parent/job/set-feature-pipelines",
-     "feature": "step.script",
+     "path": "pipeline/parent/job/set-feature-pipelines/step/across",
+     "feature": "step.image",
      "level": "emulated",
-     "strategy": "failing step",
-     "detail": "the job has no step with a Tekton form and a Task needs one; a step that prints the loss and exits 1 stands in"
+     "strategy": "default image",
+     "detail": "the step names no image and Tekton requires one; alpine:3.22 runs it"
+    },
+    {
+     "path": "pipeline/parent/job/set-feature-pipelines/step/branches",
+     "feature": "step.image",
+     "level": "emulated",
+     "strategy": "default image",
+     "detail": "the step names no image and Tekton requires one; alpine:3.22 runs it"
     },
     {
      "path": "pipeline/parent/job/test",

@@ -1,7 +1,7 @@
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v4\nwith:\n    fetch-depth:\n        lit: \"0\"\n    token:\n        secret: PAT\nid: build-step-1\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: setup-go\n    ref: v5\nwith:\n    go-version:\n        lit: \"1.24\"\nid: build-step-2\nkind: action\n","image":"golang:1.24","kind":"image","hold":"{\"args\":[\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: Argo does not run the action' \\u003e\\u00262; exit 1\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"golang:1.24\",\"name\":\"build-step-2\",\"workingDir\":\"/workspace\"}","seq":1}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: setup-go\n    ref: v5\nwith:\n    go-version:\n        lit: \"1.24\"\nid: build-step-2\nkind: action\n","image":"golang:1.24","kind":"image","hold":"{\"args\":[\"true\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"golang:1.24\",\"name\":\"build-step-2\",\"workingDir\":\"/workspace\"}","seq":1}
 # pipemaster:lost uses: docker://alpine:3.20
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-3
 # pipemaster:arg {"step":"action:\n    kind: docker\n    image: alpine:3.20\nid: build-step-3\nkind: action\n","hold":"{\"args\":[\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: Argo does not run the action' \\u003e\\u00262; exit 1\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"golang:1.24\",\"name\":\"build-step-3\",\"workingDir\":\"/workspace\"}","seq":2}
@@ -45,7 +45,7 @@ spec:
               - sh
               - -ec
             args:
-              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: Argo does not run the action'' >&2; exit 1'
+              - "true"
             workingDir: /workspace
           - name: build-step-3
             image: golang:1.24

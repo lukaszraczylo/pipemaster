@@ -1,13 +1,16 @@
 # pipemaster:lost step pipeline/ci/job/test/step/test-step-1 downloads dist
-# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\nid: test-step-1\nkind: action\n","at":0}
 # pipemaster:emulated job.container pipeline/ci/job/test
+# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\nid: test-step-1\nkind: action\n","at":0,"fail":true}
 when:
   - event: push
   - event: tag
 depends_on:
   - build
 steps:
+  - image: ubuntu:latest
+    commands:
+      - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/test/step/test-step-1: no upload of the artifact in this workflow'' >&2; exit 1'
   - image: ubuntu:latest
     commands:
       - make test

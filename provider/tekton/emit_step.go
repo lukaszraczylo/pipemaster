@@ -52,9 +52,10 @@ func (tc *taskCtx) step(b *stepBook, st *ir.Step, sp string) (*wmap, error) {
 	case st.Kind == ir.StepScript || st.Kind == "":
 		m, err = tc.scriptStep(b, st, sp, name)
 	default:
-		tc.e.lose(sp, caps.StepAction, "step kind "+string(st.Kind)+" has no Tekton form")
+		why := "step kind " + string(st.Kind) + " has no Tekton form"
+		tc.e.lose(sp, caps.StepAction, why)
 		tc.e.comment(sp, "step "+sp+" has kind "+string(st.Kind))
-		err = tc.markAction(b, sp, st, "", nil)
+		m, err = tc.failedAction(b, st, sp, name, why)
 	}
 	if m != nil && comment != "" {
 		m.N.HeadComment = comment

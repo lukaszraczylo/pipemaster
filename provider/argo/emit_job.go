@@ -234,7 +234,7 @@ func (sx *stepCtx) containers(jx map[string]any) (conts []*container, taskStep *
 					e.lose(path, caps.StepScript, "the step has no script; no container runs it")
 				}
 				sx.act, sx.disabled = actionArg{}, false
-				conts = append(conts, sx.placeholder(st))
+				conts = append(conts, sx.placeholder(st, false))
 				sx.markAction(st)
 			}
 		case ir.StepTask:
@@ -244,12 +244,12 @@ func (sx *stepCtx) containers(jx map[string]any) (conts []*container, taskStep *
 			}
 			e.lose(path, caps.StepAction, "a task step has no Argo form; the step is dropped")
 			sx.act, sx.disabled = actionArg{}, false
-			conts = append(conts, sx.placeholder(st))
+			conts = append(conts, sx.placeholder(st, true))
 			sx.markAction(st)
 		default:
 			e.lose(path, caps.StepAction, "a "+string(st.Kind)+" step has no Argo form; the step is dropped")
 			sx.act, sx.disabled = actionArg{}, false
-			conts = append(conts, sx.placeholder(st))
+			conts = append(conts, sx.placeholder(st, true))
 			sx.markAction(st)
 		}
 	}

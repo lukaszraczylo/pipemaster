@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
@@ -21,6 +23,15 @@ const (
 	lostLineMark = failLoudMark + "script.interpolation "
 )
 
+// lostStepComment matches the comment that keeps the source of a step with no target form; a disabled step has
+// a comment of its own.
+var lostStepComment = regexp.MustCompile(`^# pipemaster:lost step \S+ (uses|kind|has kind|downloads)\b`)
+
+// budgetSamples are fixtures that only the budget test converts, beside the site samples.
+var budgetSamples = []siteSample{
+	{Key: "mixed-lost-steps", From: provider.GHA, Title: "lost steps between running steps", dir: "../../testdata/budget/mixed-lost-steps"},
+}
+
 // budget counts, per site sample and target, the places where a converted pipeline does less than the source.
 type budget struct {
 	// Placeholder counts failing steps that stand in for a step or job with no target form.
@@ -29,6 +40,8 @@ type budget struct {
 	LostLine int `yaml:"lost_line"`
 	// Disabled counts jobs and steps that stay disabled because their condition has no target form.
 	Disabled int `yaml:"disabled"`
+	// Silent counts lost-step comments that no failing step answers. It has no budget: it must be 0.
+	Silent int `yaml:"-"`
 }
 
 // disabledMarks holds, per target, the text that a disabled job or step leaves in the file.
@@ -46,8 +59,21 @@ var disabledMarks = map[string]*regexp.Regexp{
 func countBudget(target string, files []siteFile) budget {
 	var b budget
 	for _, f := range files {
-		b.LostLine += strings.Count(f.Text, lostLineMark)
-		b.Placeholder += strings.Count(f.Text, failLoudMark) - strings.Count(f.Text, lostLineMark)
+		lostLines, steps, comments := 0, 0, 0
+		for _, line := range strings.Split(f.Text, "\n") {
+			// A marker copy in a comment holds the same text as the line it describes: count what runs.
+			if text := strings.TrimSpace(line); strings.HasPrefix(text, "#") {
+				if lostStepComment.MatchString(text) {
+					comments++
+				}
+				continue
+			}
+			lostLines += strings.Count(line, lostLineMark)
+			steps += strings.Count(line, failLoudMark) - strings.Count(line, lostLineMark)
+		}
+		b.LostLine += lostLines
+		b.Placeholder += steps
+		b.Silent += max(0, comments-steps)
 		b.Disabled += len(disabledMarks[target].FindAllStringIndex(f.Text, -1))
 	}
 	return b
@@ -57,10 +83,17 @@ func countBudget(target string, files []siteFile) budget {
 func measureBudgets(t *testing.T) map[string]map[string]budget {
 	t.Helper()
 	out := map[string]map[string]budget{}
-	for _, s := range siteSamples {
+	for _, s := range append(slices.Clone(siteSamples), budgetSamples...) {
 		out[s.Key] = map[string]budget{}
-		for _, c := range siteConvert(t, s).Conversions {
-			out[s.Key][c.ID] = countBudget(c.ID, c.Files)
+		for _, id := range siteTargets {
+			if id == s.From {
+				continue
+			}
+			dir := t.TempDir()
+			if code, _, stderr := runOut("convert", s.dir, "--from", s.From, "--to", id, "-o", dir); code != 0 {
+				t.Fatalf("%s: convert --to %s = %d\n%s", s.Key, id, code, stderr)
+			}
+			out[s.Key][id] = countBudget(id, siteTree(t, dir))
 		}
 	}
 	return out
@@ -94,7 +127,7 @@ func sortedKeys[V any](m map[string]V) []string {
 }
 
 // TestPlaceholderBudgets fails when a conversion holds more failing steps, failing lines or disabled jobs than
-// testdata/site/budgets.yaml allows. A lower count only prints a hint.
+// testdata/site/budgets.yaml allows. A lower count fails too, so a failing line that disappears cannot pass as an improvement.
 func TestPlaceholderBudgets(t *testing.T) {
 	got := measureBudgets(t)
 	if os.Getenv(budgetWrite) != "" {
@@ -116,6 +149,9 @@ func TestPlaceholderBudgets(t *testing.T) {
 				t.Errorf("%s>%s has no budget in %s", src, to, budgetFile)
 				continue
 			}
+			if g.Silent > 0 {
+				t.Errorf("%s>%s keeps %d lost step comments with no failing step: a converted pipeline skips them without a sign", src, to, g.Silent)
+			}
 			for _, c := range []struct {
 				name      string
 				got, want int
@@ -124,7 +160,7 @@ func TestPlaceholderBudgets(t *testing.T) {
 				case c.got > c.want:
 					t.Errorf("%s>%s %s = %d, budget %d: a conversion lost more than it may", src, to, c.name, c.got, c.want)
 				case c.got < c.want:
-					t.Logf("hint: %s>%s %s dropped to %d; lower its budget from %d in %s", src, to, c.name, c.got, c.want, budgetFile)
+					t.Errorf("%s>%s %s dropped to %d from %d: lower the budget to %d in %s (a silent drop must not pass)", src, to, c.name, c.got, c.want, c.got, budgetFile)
 				}
 			}
 		}

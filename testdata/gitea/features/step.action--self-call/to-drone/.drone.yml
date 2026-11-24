@@ -1,8 +1,7 @@
 # pipemaster:lost step pipeline/ci/job/call/step/call-step-1 uses org/shared/.gitea/workflows/build.yml@main
-# pipemaster:emulated step.action pipeline/ci/job/call/step/call-step-1
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'self:'\n    owner: org\n    repo: shared\n    path: .gitea/workflows/build.yml\n    ref: main\nid: call-step-1\nkind: pipeline_call\n","at":0}
-# pipemaster:emulated step.script pipeline/ci/job/call
 # pipemaster:emulated job.container pipeline/ci/job/call
+# pipemaster:emulated step.action pipeline/ci/job/call/step/call-step-1
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'self:'\n    owner: org\n    repo: shared\n    path: .gitea/workflows/build.yml\n    ref: main\nid: call-step-1\nkind: pipeline_call\n","at":0,"fail":true}
 kind: pipeline
 type: docker
 name: call
@@ -11,10 +10,10 @@ trigger:
     - push
     - tag
 steps:
-  - name: noop
+  - name: call-step-1
     image: ubuntu:latest
     commands:
-      - 'printf ''%s\n'' ''pipemaster: lost: step.script pipeline/ci/job/call: no step of the job has a Drone form'' >&2; exit 1'
+      - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/call/step/call-step-1: step kind pipeline_call has no Drone form'' >&2; exit 1'
 ---
 # pipemaster:emulated job.container pipeline/ci/job/plain
 kind: pipeline

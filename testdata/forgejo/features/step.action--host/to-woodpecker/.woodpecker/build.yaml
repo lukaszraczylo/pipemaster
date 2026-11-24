@@ -1,18 +1,19 @@
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: checkout\n    ref: v4\nid: build-step-1\nkind: action\n","at":0}
 # pipemaster:lost step pipeline/ci/job/build/step/build-step-2 uses actions/setup-go@v5: missing input go-version
+# pipemaster:emulated job.container pipeline/ci/job/build
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: setup-go\n    ref: v5\nid: build-step-2\nkind: action\n","at":1}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: setup-go\n    ref: v5\nid: build-step-2\nkind: action\n","at":1,"fail":true}
 # pipemaster:lost step pipeline/ci/job/build/step/build-step-3 uses org/tool/sub@v2
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-3
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://codeberg.org\n    owner: org\n    repo: tool\n    path: sub\n    ref: v2\nid: build-step-3\nkind: action\n","at":2}
-# pipemaster:emulated step.script pipeline/ci/job/build
-# pipemaster:emulated job.container pipeline/ci/job/build
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://codeberg.org\n    owner: org\n    repo: tool\n    path: sub\n    ref: v2\nid: build-step-3\nkind: action\n","at":2,"fail":true}
 when:
   - event: push
   - event: tag
 steps:
-  - name: noop
-    image: ubuntu:latest
+  - image: ubuntu:latest
     commands:
-      - 'printf ''%s\n'' ''pipemaster: lost: step.script pipeline/ci/job/build: no step of the job has a Woodpecker form'' >&2; exit 1'
+      - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: the action has no Woodpecker form: missing input go-version'' >&2; exit 1'
+  - image: ubuntu:latest
+    commands:
+      - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: no Woodpecker mapping for action org/tool/sub@v2'' >&2; exit 1'

@@ -267,7 +267,7 @@ func (e *emitter) placeLines(p *jobPrep, st *ir.Step, lines []string) error {
 	}
 	items, targets := wrapLines(st, sec, lines, guard, dir, exports)
 	if moved {
-		pos := slices.Index(p.j.Steps, st)
+		pos := slices.IndexFunc(p.j.Steps, func(o *ir.Step) bool { return o.ID == st.ID })
 		mv := movedArg{Moved: "always", Offset: p.lineCount(secAfter), COE: st.ContinueOnError, Pos: &pos}
 		for _, it := range items {
 			mv.Lines += lineCount(it)

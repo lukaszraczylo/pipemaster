@@ -353,7 +353,7 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool, at int) *cont
 	if st.Action == nil || st.Action.Kind != ir.ActionRepo {
 		e.lose(path, caps.StepAction, "the action "+actionRef(st.Action)+" has no Argo form; the step is dropped")
 		e.comment(path, "uses: "+actionRef(st.Action))
-		return sx.placeholder(st)
+		return sx.placeholder(st, true)
 	}
 	with := map[string]string{}
 	for k, v := range st.With {
@@ -368,14 +368,14 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool, at int) *cont
 	if !ok {
 		e.lose(path, caps.StepAction, "the action "+actionRef(st.Action)+" has no Argo mapping; Argo does not run the step, and the marker and a comment keep the reference")
 		e.comment(path, "uses: "+actionRef(st.Action))
-		return sx.placeholder(st)
+		return sx.placeholder(st, true)
 	}
 	e.note(path, caps.StepAction, t.Support.Level, t.Support.Strategy, t.Support.Caveat)
 	for _, k := range t.Unmapped {
 		e.lose(path, caps.StepAction, "the input "+k+" of the action has no Argo form")
 	}
 	if t.Support.Level == caps.Lost {
-		return sx.placeholder(st)
+		return sx.placeholder(st, true)
 	}
 	sx.act.Kind = t.Kind
 	nIn, nOut := len(sx.artIn), len(sx.artOut)
@@ -409,12 +409,13 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool, at int) *cont
 	if sx.act.Wrote == checkoutWrote && at == 0 {
 		return nil
 	}
-	return sx.placeholder(st)
+	return sx.placeholder(st, false)
 }
 
 // placeholder writes the container that keeps the place of an action that Argo does not run. The marker holds
-// the canonical text of the container, so the parser restores the action only when the file still has it.
-func (sx *stepCtx) placeholder(st *ir.Step) *container {
+// the canonical text of the container, so the parser restores the action only when the file still has it. A
+// lost action fails; an action that the file applied some other way runs a no-op.
+func (sx *stepCtx) placeholder(st *ir.Step, lost bool) *container {
 	tc := sx.tc
 	path := tc.jp.path + "/step/" + st.ID
 	name := tc.e.dnsName(sx.nameTaken, path, "step id", st.ID, maxName, true)
@@ -426,10 +427,18 @@ func (sx *stepCtx) placeholder(st *ir.Step) *container {
 	c.image = sx.imageOf(st, path)
 	c.m.SetStr("image", c.image)
 	c.m.Set("command", strSeq([]string{shellCommand, shellFlags}))
-	c.m.Set("args", seqOf(block(emitkit.FailLoud(caps.StepAction, path, "Argo does not run the action"))))
+	script := placeholderScript
+	if lost {
+		script = emitkit.FailLoud(caps.StepAction, path, "Argo does not run the action")
+	}
+	c.m.Set("args", seqOf(block(script)))
 	c.m.SetStr("workingDir", workspaceMount)
 	sx.act.Hold = nodeCanon(c.m.N)
-	tc.e.emulate(path, caps.StepAction, "failing container", "Argo does not run the action; a container that prints the loss and exits 1 keeps its place")
+	if lost {
+		tc.e.emulate(path, caps.StepAction, "failing container", "Argo does not run the action; a container that prints the loss and exits 1 keeps its place")
+	} else {
+		tc.e.emulate(path, caps.StepAction, "placeholder container", "the action is applied without a step; a container that runs "+placeholderScript+" keeps its place")
+	}
 	return c
 }
 

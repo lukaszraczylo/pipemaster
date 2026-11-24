@@ -6,5 +6,5 @@ Loss report: argo -> concourse
 [lost] pipeline/ci/trigger/0 trigger.filter.branches (the push trigger has no branch filter, and a git resource follows one branch; the resource follows the default branch of the repository)
 [lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the Concourse file; it is kept in round-trip metadata)
 [emulated] pipeline/ci ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
-[emulated] pipeline/ci/job/build/step/build-step-2 step.action: image selection; failing task (later tasks without an image run in this image; Concourse does not run the action; a task that prints the loss and exits 1 keeps its place)
+[emulated] pipeline/ci/job/build/step/build-step-2 step.action: image selection; placeholder task (later tasks without an image run in this image; the action is applied without a task; a task that runs true keeps its place)
 [emulated] pipeline/ci/trigger/1 trigger.tag: git resource with source.tag_filter (a tag trigger that also has a branch filter is lost, because one git resource cannot hold both sets)

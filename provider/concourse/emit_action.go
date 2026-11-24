@@ -104,20 +104,20 @@ func (c *chain) action(st *ir.Step, path string, at int) []*yaml.Node {
 	if st.Action == nil || st.Action.Kind != ir.ActionRepo {
 		e.lose(path, caps.StepAction, "the action "+actionRef(st.Action)+" has no Concourse form; a placeholder task keeps its place")
 		e.comment(path, "uses: "+actionRef(st.Action))
-		return c.placeholder(st, path, arg)
+		return c.placeholder(st, path, arg, true)
 	}
 	t, ok := lookupAction(st)
 	if !ok {
 		e.lose(path, caps.StepAction, "the action "+actionRef(st.Action)+" has no Concourse mapping; a placeholder task keeps its place, and the marker and a comment keep the reference")
 		e.comment(path, "uses: "+actionRef(st.Action))
-		return c.placeholder(st, path, arg)
+		return c.placeholder(st, path, arg, true)
 	}
 	e.note(path, caps.StepAction, t.Support.Level, t.Support.Strategy, t.Support.Caveat)
 	for _, k := range t.Unmapped {
 		e.lose(path, caps.StepAction, "the input "+k+" of the action has no Concourse form")
 	}
 	if t.Support.Level == caps.Lost {
-		return c.placeholder(st, path, arg)
+		return c.placeholder(st, path, arg, true)
 	}
 	switch t.Kind {
 	case actions.KindImage:
@@ -148,7 +148,7 @@ func (c *chain) action(st *ir.Step, path string, at int) []*yaml.Node {
 		cp.Script, cp.Kind, cp.Action = t.Script, ir.StepScript, nil
 		return []*yaml.Node{c.script(&cp, path)}
 	}
-	return c.placeholder(st, path, arg)
+	return c.placeholder(st, path, arg, false)
 }
 
 // addCaches adds task cache paths that a task directory can hold.
@@ -189,7 +189,7 @@ func (jx *jobEmitter) markCheckout(st *ir.Step, path string) {
 
 // placeholder writes the task that keeps the place of an action that Concourse does not run. The marker holds
 // the canonical text of the task, so the parser restores the action only when the file still has it.
-func (c *chain) placeholder(st *ir.Step, path string, arg actionArg) []*yaml.Node {
+func (c *chain) placeholder(st *ir.Step, path string, arg actionArg, lost bool) []*yaml.Node {
 	jx := c.jx
 	e := jx.pe.e
 	name := jx.stepName(st, path)
@@ -198,7 +198,11 @@ func (c *chain) placeholder(st *ir.Step, path string, arg actionArg) []*yaml.Nod
 	cfg.Set("image_resource", imageNode(defaultImage, "", defaultTag))
 	run := newMap()
 	run.SetStr("path", shellCommand)
-	run.Set("args", strSeq([]string{defaultFlags, emitkit.FailLoud(caps.StepAction, path, "Concourse does not run the action")}))
+	script := placeholderCmd
+	if lost {
+		script = emitkit.FailLoud(caps.StepAction, path, "Concourse does not run the action")
+	}
+	run.Set("args", strSeq([]string{defaultFlags, script}))
 	cfg.Set("run", run.N)
 	m := newMap()
 	m.SetStr("task", name)
@@ -212,7 +216,11 @@ func (c *chain) placeholder(st *ir.Step, path string, arg actionArg) []*yaml.Nod
 	}
 	arg.Step, arg.Task, arg.Hold = body, name, nodeCanon(m.N)
 	e.markArg(caps.StepAction, jx.sm(name), arg)
-	e.emulate(path, caps.StepAction, "failing task", "Concourse does not run the action; a task that prints the loss and exits 1 keeps its place")
+	if lost {
+		e.emulate(path, caps.StepAction, "failing task", "Concourse does not run the action; a task that prints the loss and exits 1 keeps its place")
+	} else {
+		e.emulate(path, caps.StepAction, "placeholder task", "the action is applied without a task; a task that runs "+placeholderCmd+" keeps its place")
+	}
 	return []*yaml.Node{m.N}
 }
 

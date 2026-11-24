@@ -519,9 +519,21 @@ func collapseActions(d *doc) {
 	}
 	slices.SortStableFunc(found, func(a, b actionMark) int { return a.arg.At - b.arg.At })
 	j := d.job
-	for inserted, am := range found {
+	inserted := 0
+	for _, am := range found {
 		st := am.st
 		at := min(am.arg.At+inserted, len(j.Steps))
+		if am.arg.Fail {
+			if at >= len(j.Steps) || !emitkit.IsFailLoud(j.Steps[at].Script) {
+				reportIgnored(d.rep, am.use, "the failing step was edited after pipemaster wrote it")
+				continue
+			}
+			// The held step keeps no condition; the one the file carries is the one the source had.
+			st.If = j.Steps[at].If
+			j.Steps[at] = &st
+			continue
+		}
+		inserted++
 		if am.arg.Image != "" {
 			for _, later := range j.Steps[at:] {
 				if later.Image != nil && later.Image.Ref == am.arg.Image && len(later.Image.Entrypoint) == 0 {

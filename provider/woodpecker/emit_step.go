@@ -133,12 +133,15 @@ func (e *emitter) step(c *wfCtx, st *ir.Step, idx int) (stepDone, error) {
 		m, err = e.actionStep(c, sp, st, idx)
 		carried = true
 	case st.Kind == ir.StepPlugin:
-		m, err = e.pluginStep(c, sp, st)
+		m, err = e.pluginStep(c, sp, st, idx)
 	case st.Kind == ir.StepScript || len(st.Script) > 0:
 		m, err = e.scriptStep(c, sp, st)
 	default:
-		e.lose(sp, caps.StepAction, "step kind "+string(st.Kind)+" has no Woodpecker form")
+		why := "step kind " + string(st.Kind) + " has no Woodpecker form"
+		e.lose(sp, caps.StepAction, why)
 		e.comment("step " + sp + " kind " + string(st.Kind))
+		m, err = e.failingStep(c, sp, st, idx, caps.StepAction, why)
+		carried = true
 	}
 	if err != nil {
 		return stepDone{}, err
@@ -146,7 +149,7 @@ func (e *emitter) step(c *wfCtx, st *ir.Step, idx int) (stepDone, error) {
 	if m == nil {
 		if !carried {
 			e.unapplied(sp, st)
-			err = e.markAction(sp, st, idx, "")
+			err = e.markAction(sp, st, idx, "", false)
 		}
 		return stepDone{}, err
 	}
@@ -446,11 +449,12 @@ func (e *emitter) stepLosses(sp string, st *ir.Step) {
 	}
 }
 
-func (e *emitter) pluginStep(c *wfCtx, sp string, st *ir.Step) (*wmap, error) {
+func (e *emitter) pluginStep(c *wfCtx, sp string, st *ir.Step, idx int) (*wmap, error) {
 	if st.Image == nil || st.Image.Ref == "" {
-		e.lose(sp, caps.StepAction, "a plugin step needs an image")
+		why := "a plugin step needs an image"
+		e.lose(sp, caps.StepAction, why)
 		e.comment("step " + sp + ": plugin without an image")
-		return nil, nil
+		return e.failingStep(c, sp, st, idx, caps.StepAction, why)
 	}
 	m := newMap()
 	if err := e.common(c, sp, st, m); err != nil {

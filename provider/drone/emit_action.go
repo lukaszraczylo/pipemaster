@@ -92,6 +92,8 @@ type actionArg struct {
 	Step  string `json:"step"`
 	Image string `json:"image,omitempty"`
 	At    int    `json:"at"`
+	// Fail is true when a failing step stands in the file at At for the held step.
+	Fail bool `json:"fail,omitempty"`
 }
 
 // markTriggers writes a marker whose argument holds the pipeline triggers as the IR had them, because a file
@@ -135,18 +137,34 @@ func actionRef(a *ir.ActionRef) string {
 // becomes a clone setting, an image choice or the shared workspace, so the step itself is not written. Every
 // action step leaves a marker that holds it, so the parser can put it back where it stood.
 func (e *emitter) actionStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
-	image, err := e.mapAction(c, sp, st)
+	image, lost, err := e.mapAction(c, sp, st)
 	if err != nil {
 		return nil, err
 	}
-	return nil, e.markAction(sp, st, c.pos, image)
+	if lost != "" {
+		return e.failingStep(c, sp, st, caps.StepAction, lost)
+	}
+	return nil, e.markAction(sp, st, c.pos, image, false)
 }
 
-// mapAction applies the action to the document and returns the image it selected, if any.
-func (e *emitter) mapAction(c *docCtx, sp string, st *ir.Step) (string, error) {
+// failingStep writes the step that stands for a step with no Drone form: it prints the loss and exits 1, keeps
+// the condition and the failure policy of the source step, and the marker holds the source step.
+func (e *emitter) failingStep(c *docCtx, sp string, st *ir.Step, f caps.Feature, why string) (*ymap, error) {
+	fail := &ir.Step{ID: st.ID, Kind: ir.StepScript, Image: st.Image, Env: st.Env, Script: []string{emitkit.FailLoud(f, sp, why)}}
+	m, err := e.scriptStep(c, sp, fail)
+	if err != nil {
+		return nil, err
+	}
+	return m, e.markAction(sp, st, c.pos, "", true)
+}
+
+// mapAction applies the action to the document and returns the image it selected, if any. lost is the reason
+// when the action has no Drone form and a failing step must stand in for it.
+func (e *emitter) mapAction(c *docCtx, sp string, st *ir.Step) (image, lost string, err error) {
 	if st.Action == nil || st.Kind == ir.StepPipelineCall {
-		e.dropAction(sp, st, "step kind "+string(st.Kind)+" has no Drone form")
-		return "", nil
+		why := "step kind " + string(st.Kind) + " has no Drone form"
+		e.dropAction(sp, st, why)
+		return "", why, nil
 	}
 	with := map[string]string{}
 	for k, v := range st.With {
@@ -159,8 +177,9 @@ func (e *emitter) mapAction(c *docCtx, sp string, st *ir.Step) (string, error) {
 	}
 	t, ok := actions.Lookup(*st.Action, dialect, with)
 	if !ok {
-		e.dropAction(sp, st, "no Drone mapping for action "+actionRef(st.Action))
-		return "", nil
+		why := "no Drone mapping for action " + actionRef(st.Action)
+		e.dropAction(sp, st, why)
+		return "", why, nil
 	}
 	e.led.Note(use(sp, caps.StepAction), t.Support, t.Support.Caveat)
 	for _, k := range t.Unmapped {
@@ -168,8 +187,7 @@ func (e *emitter) mapAction(c *docCtx, sp string, st *ir.Step) (string, error) {
 	}
 	if t.Support.Level == caps.Lost {
 		e.comment("step " + sp + " uses " + actionRef(st.Action) + ": " + t.Support.Caveat)
-		e.unapplied(sp, st)
-		return "", nil
+		return "", "the action has no Drone form: " + t.Support.Caveat, nil
 	}
 	if detail := "the action reference " + actionRef(st.Action) + " is not in the Drone file; it is kept in round-trip metadata"; t.WritesEquivalent() {
 		e.led.Retain(use(sp, caps.ExtPassthrough), detail)
@@ -182,7 +200,7 @@ func (e *emitter) mapAction(c *docCtx, sp string, st *ir.Step) (string, error) {
 
 // markAction writes the marker that holds a step the file does not have. The step keeps no condition: the IR
 // states conditions in the dialect of its origin, and a restored one would read in the wrong dialect.
-func (e *emitter) markAction(sp string, st *ir.Step, at int, image string) error {
+func (e *emitter) markAction(sp string, st *ir.Step, at int, image string, fail bool) error {
 	held := *st
 	held.If = nil
 	held.Ext = withoutBookkeeping(st.Ext)
@@ -190,7 +208,7 @@ func (e *emitter) markAction(sp string, st *ir.Step, at int, image string) error
 	if err != nil {
 		return err
 	}
-	return e.markArg(caps.StepAction, sp, actionArg{Step: body, At: at, Image: image})
+	return e.markArg(caps.StepAction, sp, actionArg{Step: body, At: at, Image: image, Fail: fail})
 }
 
 // withoutBookkeeping drops the keys a parser sets only to rebuild its own layout, and the Ext of other providers.
@@ -232,7 +250,6 @@ func (e *emitter) dropAction(sp string, st *ir.Step, why string) {
 		ref = actionRef(st.Action)
 	}
 	e.comment("step " + sp + " uses " + ref)
-	e.unapplied(sp, st)
 }
 
 // unapplied reports the step fields that have nothing to attach to once the action is not a step.
@@ -254,7 +271,7 @@ func (e *emitter) unapplied(sp string, st *ir.Step) {
 }
 
 // applyTarget applies a mapped action to the document and returns the image it selected, if any.
-func (e *emitter) applyTarget(c *docCtx, sp string, t actions.Target) (string, error) {
+func (e *emitter) applyTarget(c *docCtx, sp string, t actions.Target) (image, lost string, err error) {
 	switch t.Kind {
 	case actions.KindImplicit:
 		if d, ok := t.With["depth"].(string); ok {
@@ -263,10 +280,10 @@ func (e *emitter) applyTarget(c *docCtx, sp string, t actions.Target) (string, e
 	case actions.KindImage:
 		img, err := e.text(nil, sp, caps.StepAction, valueText, t.Image)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		c.image = img
-		return img, nil
+		return img, "", nil
 	case actions.KindCache:
 	case actions.KindUpload:
 		name, _ := t.With["name"].(string)
@@ -276,10 +293,12 @@ func (e *emitter) applyTarget(c *docCtx, sp string, t actions.Target) (string, e
 		if !c.uploads[name] && (name != "" || len(c.uploads) == 0) {
 			e.lose(sp, caps.StepAction, "no upload of "+strings.TrimSpace("artifact "+name)+" in this document; documents do not share a workspace")
 			e.comment("step " + sp + " downloads " + name)
-			return "", nil
+			return "", "no upload of the artifact in this document", nil
 		}
 	default:
-		e.lose(sp, caps.StepAction, "action kind "+t.Kind+" has no Drone form")
+		why := "action kind " + t.Kind + " has no Drone form"
+		e.lose(sp, caps.StepAction, why)
+		return "", why, nil
 	}
-	return "", nil
+	return "", "", nil
 }
