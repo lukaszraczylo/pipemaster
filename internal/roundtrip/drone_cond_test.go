@@ -25,7 +25,7 @@ func TestDroneFilterBecomesGHACondition(t *testing.T) {
 
 func TestDronePushIsBranchPushOnGHA(t *testing.T) {
 	out, _ := convert(t, "drone", "gha", ".drone.yml", dronePushDoc)
-	if !strings.Contains(out, "github.event_name == 'push' && github.ref_type == 'branch'") {
+	if !strings.Contains(out, "github.event_name == 'push' && !github.event.deleted && github.ref_type == 'branch'") {
 		t.Fatalf("push did not map to a branch push:\n%s", out)
 	}
 }

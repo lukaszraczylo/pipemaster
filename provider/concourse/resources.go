@@ -196,6 +196,7 @@ func (b *pipeBuilder) inheritConds(jobs []*builtJob) []func() {
 		}
 		done[j.job.ID] = true
 		var conds []expr.Expr
+		derivedUp := map[string]bool{}
 		for _, n := range j.job.Needs {
 			up := byID[n.JobID]
 			if up == nil {
@@ -203,28 +204,46 @@ func (b *pipeBuilder) inheritConds(jobs []*builtJob) []func() {
 			}
 			visit(up)
 			derived, _ := up.job.Ext[dialect].(map[string]any)[ExtTriggerIf].(string)
-			if up.job.If != nil && derived != "" && !slices.ContainsFunc(conds, func(c expr.Expr) bool { return expr.String(c) == expr.String(up.job.If) }) {
+			if up.job.If == nil || derived == "" {
+				continue
+			}
+			derivedUp[n.JobID] = true
+			if !slices.ContainsFunc(conds, func(c expr.Expr) bool { return expr.String(c) == expr.String(up.job.If) }) {
 				conds = append(conds, up.job.If)
 			}
 		}
-		if len(j.roots) > 0 || len(conds) == 0 || j.job.If != nil || j.job.Manual {
+		if len(derivedUp) == 0 {
 			return
-		}
-		c := conds[0]
-		for _, x := range conds[1:] {
-			c = expr.Binary{Op: expr.OpAnd, L: c, R: x}
 		}
 		prev := *j.job
 		undos = append(undos, func() {
-			j.job.If, j.job.Ext = prev.If, prev.Ext
+			j.job.If, j.job.Ext, j.job.Needs, j.job.Manual = prev.If, prev.Ext, prev.Needs, prev.Manual
 			if m, ok := j.job.Ext[dialect].(map[string]any); ok {
 				delete(m, ExtTriggerIf)
 			}
 		})
-		j.job.If = c
-		jobExt(j.job)[ExtTriggerIf] = expr.String(c)
-		b.note(caps.JobIf, caps.Emulated, b.path()+"/job/"+j.job.ID, "job condition of the passed jobs",
-			fmt.Sprintf("job %s follows jobs that run only when %s; it takes their condition, so that it never waits for a job that does not run", j.job.ID, expr.String(c)), 0)
+		path := b.path() + "/job/" + j.job.ID
+		follows := len(j.roots) == 0 && j.job.If == nil && !j.job.Manual
+		switch {
+		case follows && len(conds) == 1:
+			j.job.If = conds[0]
+			jobExt(j.job)[ExtTriggerIf] = expr.String(conds[0])
+			b.note(caps.JobIf, caps.Emulated, path, "job condition of the passed jobs",
+				fmt.Sprintf("job %s follows jobs that run only when %s; it takes their condition, so that it never waits for a job that does not run", j.job.ID, expr.String(conds[0])), 0)
+			return
+		case follows:
+			j.job.Manual = true
+			b.note(caps.JobIf, caps.Lost, path, strategyExt,
+				fmt.Sprintf("job %s follows %d jobs with different conditions, and no run can be sure to satisfy all of them; the job runs only on a manual start", j.job.ID, len(derivedUp)), 0)
+		}
+		// The job exists whether or not a conditioned job it needs does, and GitLab rejects a need on a job that is absent.
+		needs := slices.Clone(j.job.Needs)
+		for i := range needs {
+			needs[i].Optional = needs[i].Optional || derivedUp[needs[i].JobID]
+		}
+		j.job.Needs = needs
+		b.note(caps.JobNeeds, caps.Emulated, path, "optional need",
+			fmt.Sprintf("job %s needs a job that runs only on some events; the need is optional, so the job does not wait for a job that is absent", j.job.ID), 0)
 	}
 	for _, j := range jobs {
 		visit(j)

@@ -797,7 +797,12 @@ func approxCmp(b Binary, from Dialect, cav *caveats) (Expr, bool) {
 			return nil, false
 		}
 		cav.add(ciCaveat)
-		return Binary{Op: b.Op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: canon}}, true
+		eq := Binary{Op: b.Op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: canon}}
+		if b.Op == OpEq && canon == "push" {
+			// A GHA push event also fires for a branch deletion (payload field deleted); the source has no run for one.
+			return Binary{Op: OpAnd, L: eq, R: Unary{Op: OpNot, X: ctxRef(CtxDeleted)}}, true
+		}
+		return eq, true
 	case CtxRefName, CtxSHA, CtxBeforeSHA:
 		addAll(cav, litCaveats(lit))
 		return Binary{Op: b.Op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: lit}}, true

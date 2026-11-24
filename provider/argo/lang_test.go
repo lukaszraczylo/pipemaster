@@ -30,7 +30,7 @@ func TestArgoConditionTranslatesToGHA(t *testing.T) {
 	for id, want := range map[string]string{
 		"a": "(ref_type == 'branch') && (ref_name == 'main') && (inputs.env != 'prod')",
 		"b": "needs.build.outputs.version == 'v1'",
-		"c": "event == 'push'",
+		"c": "(event == 'push') && !deleted",
 	} {
 		j := job(t, pl, id)
 		got, _, ok := expr.TranslateApprox(j.If, *from, exprgha.Lang)

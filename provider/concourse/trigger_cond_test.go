@@ -1,14 +1,21 @@
 package concourse_test
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprconcourse "github.com/lukaszraczylo/pipemaster/expr/concourse"
+	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
+	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/gha"
 	"github.com/lukaszraczylo/pipemaster/provider/gitlab"
+	"github.com/lukaszraczylo/pipemaster/validate"
+	"go.yaml.in/yaml/v3"
 )
 
 const (
@@ -23,7 +30,7 @@ const (
 )
 
 // condEnv is a run of a converted pipeline: the event, the ref and the default branch of the repository.
-type condEnv map[string]string
+type condEnv map[string]any
 
 func (c condEnv) Lookup(path []string) (expr.Value, bool) {
 	v, ok := c[strings.Join(path, ".")]
@@ -222,5 +229,207 @@ func TestDefaultBranchRootWidensNoJob(t *testing.T) {
 	}
 	if runs(t, both, condEnv{"event": "push", "branch": "dev", "default_branch": "main"}) {
 		t.Errorf("both runs on a push to dev: if %s", cond(both.If))
+	}
+}
+
+// target payloads: the conditions that the GHA and GitLab files carry, evaluated on the values each provider sets.
+
+func ghaFile(t *testing.T, y string) map[string]any {
+	t.Helper()
+	proj, _ := parseFiles(t, map[string]string{"ci.yml": y})
+	out, _, err := gha.New(gha.GHA).Emit(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, b := range out {
+		if strings.HasSuffix(name, ".yml") {
+			var doc map[string]any
+			if err := yaml.Unmarshal(b, &doc); err != nil {
+				t.Fatal(err)
+			}
+			return doc
+		}
+	}
+	t.Fatal("no GHA workflow written")
+	return nil
+}
+
+// ghaRuns evaluates the if of a job on a GHA payload; a job with no if runs.
+func ghaRuns(t *testing.T, doc map[string]any, id string, env condEnv) bool {
+	t.Helper()
+	jobs, _ := doc["jobs"].(map[string]any)
+	j, _ := jobs[id].(map[string]any)
+	if j == nil {
+		t.Fatalf("GHA job %s missing", id)
+	}
+	raw, has := j["if"]
+	if !has {
+		return true
+	}
+	x, err := exprgha.Parse(fmt.Sprint(raw))
+	if err != nil {
+		t.Fatalf("parse GHA if %v: %v", raw, err)
+	}
+	v, err := expr.Eval(x, env, exprgha.Semantics)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := v.(bool)
+	return b
+}
+
+func gitlabFile(t *testing.T, y string) (map[string]any, []byte) {
+	t.Helper()
+	proj, _ := parseFiles(t, map[string]string{"ci.yml": y})
+	out, _, err := gitlab.New().Emit(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := yaml.Unmarshal(out[".gitlab-ci.yml"], &doc); err != nil {
+		t.Fatal(err)
+	}
+	return doc, out[".gitlab-ci.yml"]
+}
+
+// gitlabRuns is true when a rule of the job holds on the variables of a pipeline that GitLab creates.
+func gitlabRuns(t *testing.T, doc map[string]any, id string, env condEnv) bool {
+	t.Helper()
+	j, _ := doc[id].(map[string]any)
+	if j == nil {
+		t.Fatalf("GitLab job %s missing", id)
+	}
+	rules, _ := j["rules"].([]any)
+	if len(rules) == 0 {
+		return j["when"] != "manual"
+	}
+	for _, r := range rules {
+		rm, _ := r.(map[string]any)
+		holds := true
+		if c, has := rm["if"]; has {
+			x, err := exprgitlab.Parse(fmt.Sprint(c))
+			if err != nil {
+				t.Fatalf("parse GitLab rule %v: %v", c, err)
+			}
+			v, err := expr.Eval(x, env, exprgitlab.Semantics)
+			if err != nil {
+				t.Fatal(err)
+			}
+			holds, _ = v.(bool)
+		}
+		if holds {
+			return rm["when"] != "never"
+		}
+	}
+	return false
+}
+
+func TestTargetPayloadsNeverRunAJobOnAWrongEvent(t *testing.T) {
+	const y = multiBranch
+	gh := ghaFile(t, y)
+	gl, _ := gitlabFile(t, y)
+	const zero, old = "0000000000000000000000000000000000000000", "1111111111111111111111111111111111111111"
+	ghPush := func(branch, before string, deleted bool) condEnv {
+		return condEnv{"event": "push", "ref_type": "branch", "ref_name": branch, "before_sha": before, "deleted": deleted, "default_branch": "main"}
+	}
+	glPush := func(branch, before string) condEnv {
+		return condEnv{"event": "push", "branch": branch, "before_sha": before, "default_branch": "main"}
+	}
+	for _, c := range []struct {
+		gh, gl    condEnv // nil: the provider starts no pipeline
+		name      string
+		test, set bool
+	}{
+		{ghPush("main", old, false), glPush("main", old), "push to the default branch", true, false},
+		{ghPush("main", old, true), nil, "deletion push of the default branch: GHA fires a push, GitLab no pipeline", false, false},
+		{ghPush("feat/x", zero, true), nil, "deletion push of feat/x", false, false},
+		{ghPush("feat/x", zero, false), glPush("feat/x", zero), "creation of feat/x", false, true},
+		{ghPush("feat/x", old, false), glPush("feat/x", old), "push to feat/x", false, false},
+		{condEnv{"event": "push", "ref_type": "tag", "ref_name": "main", "before_sha": zero, "deleted": false, "default_branch": "main"}, condEnv{"event": "push", "tag": "main", "before_sha": zero, "default_branch": "main"}, "tag named like the default branch", false, false},
+		{condEnv{"event": "pull_request", "ref_type": "branch", "ref_name": "1/merge", "default_branch": "main"}, condEnv{"event": "merge_request_event", "branch": "", "default_branch": "main"}, "pull request", false, false},
+		{condEnv{"event": "schedule", "ref_type": "branch", "ref_name": "main", "default_branch": "main"}, condEnv{"event": "schedule", "branch": "main", "before_sha": zero, "default_branch": "main"}, "schedule on the default branch", false, false},
+		{condEnv{"event": "workflow_dispatch", "ref_type": "branch", "ref_name": "main", "default_branch": "main"}, condEnv{"event": "web", "branch": "main", "before_sha": zero, "default_branch": "main"}, "manual start on the default branch", false, false},
+	} {
+		if got := ghaRuns(t, gh, "test", c.gh); got != c.test {
+			t.Errorf("GHA %s: test runs=%v, want %v", c.name, got, c.test)
+		}
+		if got := ghaRuns(t, gh, "set-feature", c.gh); got {
+			t.Errorf("GHA %s: set-feature is disabled on GHA and must not run", c.name)
+		}
+		if c.gl == nil {
+			continue
+		}
+		if got := gitlabRuns(t, gl, "test", c.gl); got != c.test {
+			t.Errorf("GitLab %s: test runs=%v, want %v", c.name, got, c.test)
+		}
+		if got := gitlabRuns(t, gl, "set-feature", c.gl); got != c.set {
+			t.Errorf("GitLab %s: set-feature runs=%v, want %v", c.name, got, c.set)
+		}
+	}
+}
+
+func TestExactBranchJobIgnoresADeletionPushOnGHA(t *testing.T) {
+	doc := ghaFile(t, "resources:\n- {name: src, type: git, source: {uri: u, branch: dev}}\n- {name: tick, type: time, source: {interval: 24h}}\njobs:\n- name: a\n  plan:\n  - {get: src, trigger: true}\n"+task+"- name: b\n  plan:\n  - {get: tick, trigger: true}\n"+task)
+	env := func(deleted bool) condEnv {
+		return condEnv{"event": "push", "ref_type": "branch", "ref_name": "dev", "deleted": deleted}
+	}
+	if !ghaRuns(t, doc, "a", env(false)) || ghaRuns(t, doc, "a", env(true)) {
+		t.Error("a must run on a push to dev and not on its deletion")
+	}
+}
+
+const needsProbe = "resources:\n- {name: src, type: git, source: {uri: u, branch: main}}\n- {name: other, type: git, source: {uri: u, branch: dev}}\njobs:\n" +
+	"- name: test\n  plan:\n  - {get: src, trigger: true}\n" + task +
+	"- name: nodtrig\n  plan:\n  - {get: src, passed: [test]}\n" + task +
+	"- name: both\n  plan:\n  - {get: other, trigger: true}\n  - {get: src, passed: [test], trigger: true}\n" + task
+
+func TestJobsThatNeedAConditionedJobKeepTheNeedOptional(t *testing.T) {
+	pl, rep := parseYAML(t, needsProbe)
+	for _, id := range []string{"nodtrig", "both"} {
+		j := job(t, pl, id)
+		if len(j.Needs) != 1 || !j.Needs[0].Optional {
+			t.Errorf("%s: need on test must be optional: %+v", id, j.Needs)
+		}
+	}
+	if !hasEntry(rep, "optional") {
+		t.Error("no entry names the optional need")
+	}
+	doc, body := gitlabFile(t, needsProbe)
+	for _, id := range []string{"nodtrig", "both"} {
+		j, _ := doc[id].(map[string]any)
+		needs, _ := j["needs"].([]any)
+		nm, _ := needs[0].(map[string]any)
+		if len(needs) != 1 || nm["optional"] != true {
+			t.Errorf("GitLab %s needs = %v, want optional", id, needs)
+		}
+	}
+	if err := validate.File("gitlab", ".gitlab-ci.yml", body); err != nil && !errors.Is(err, validate.ErrNoSchema) {
+		t.Errorf("GitLab schema: %v\n%s", err, body)
+	}
+}
+
+const fanProbe = "resources:\n- {name: m, type: git, source: {uri: u, branch: main}}\n- {name: d, type: git, source: {uri: u, branch: dev}}\njobs:\n" +
+	"- name: a\n  plan:\n  - {get: m, trigger: true}\n" + task +
+	"- name: b\n  plan:\n  - {get: d, trigger: true}\n" + task +
+	"- name: fan\n  plan:\n  - {get: m, passed: [a, b], trigger: true}\n" + task
+
+func TestFanInOfDifferentConditionsIsLostAndManual(t *testing.T) {
+	pl, rep := parseYAML(t, fanProbe)
+	fan := job(t, pl, "fan")
+	if !fan.Manual || fan.If != nil {
+		t.Errorf("fan must be manual with no condition: manual=%v if=%q", fan.Manual, cond(fan.If))
+	}
+	found := false
+	for _, e := range rep.Entries {
+		if strings.Contains(e.IRPath, "job/fan") && e.Feature == caps.JobIf && e.Level == caps.Lost {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("no lost job.if entry for fan: %v", rep.Entries)
+	}
+	same, _ := parseYAML(t, strings.Replace(fanProbe, "- name: b\n  plan:\n  - {get: d, trigger: true}", "- name: b\n  plan:\n  - {get: m, trigger: true}\n"+task+"- name: c\n  plan:\n  - {get: d, trigger: true}", 1))
+	if f := job(t, same, "fan"); f.Manual || f.If == nil {
+		t.Errorf("identical conditions must still be inherited: manual=%v if=%q", f.Manual, cond(f.If))
 	}
 }

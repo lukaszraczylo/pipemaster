@@ -12,5 +12,5 @@ jobs:
         if: always()
         run: echo cleanup
       - id: build-step-2
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && !github.event.deleted
         run: echo push
