@@ -1,6 +1,8 @@
 package gitlab
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"maps"
 	"slices"
@@ -20,6 +22,7 @@ const (
 	guardStepID   = "pipemaster-split-guard"
 	markStepID    = "pipemaster-split-ok"
 	markDir       = ".pipemaster-split"
+	markHashLen   = 8
 	markExclude   = markDir + "/**/*"
 	splitStrategy = "one job per run of steps that share an image, chained by needs; the workspace passes on as artifacts"
 	liftStrategy  = "the shared image of the steps is the job image"
@@ -324,7 +327,19 @@ func singleQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\'
 
 // markPath is the marker file of a part, anchored at the project directory so a step that changes directory cannot move it.
 func markPath(id string) string {
-	return `"$` + "CI_PROJECT_DIR" + `"/` + singleQuote(markDir+"/"+id+".ok")
+	return `"$` + "CI_PROJECT_DIR" + `"/` + singleQuote(markDir+"/"+markName(id)+".ok")
+}
+
+// markName is a file name for a part id: a safe spelling plus a short hash, so ids that spell the same stay apart.
+func markName(id string) string {
+	safe := strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '.' || r == '_' || r == '-' {
+			return r
+		}
+		return '_'
+	}, id)
+	sum := sha256.Sum256([]byte(id))
+	return safe + "-" + hex.EncodeToString(sum[:])[:markHashLen]
 }
 
 // markStep records that every step of a part ran. Its line runs only if the lines before it succeeded.

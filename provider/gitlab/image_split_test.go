@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -315,7 +316,7 @@ func TestImageSplitStaleMarkerDoesNotLetALaterJobRun(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dir, ".pipemaster-split"), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".pipemaster-split", "build-2.ok"), nil, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ".pipemaster-split", markFileOf(t, doc, "build-2")), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	codes, log := runPartsIn(t, dir, doc, "build-1", "build-2", "build-3")
@@ -334,5 +335,59 @@ func TestImageSplitHidesMarkersFromTheSourceArtifacts(t *testing.T) {
 	}
 	if b := job(t, pl, "build"); len(b.Artifacts) != 1 || b.Ext["gitlab"] != nil && strings.Contains(fmt.Sprint(b.Ext["gitlab"]), "pipemaster-split") {
 		t.Errorf("the exclude leaked into the joined job: %+v", b.Ext)
+	}
+}
+
+func markFileOf(t *testing.T, doc, id string) string {
+	t.Helper()
+	m := regexp.MustCompile(`'\.pipemaster-split/(` + regexp.QuoteMeta(id) + `-[0-9a-f]{8}\.ok)'`).FindStringSubmatch(doc)
+	if m == nil {
+		t.Fatalf("no marker file for %s:\n%s", id, doc)
+	}
+	return m[1]
+}
+
+func TestImageSplitMarkerNamesSurviveAnyJobName(t *testing.T) {
+	for _, name := range []string{"rspec 1/3", "a b", "ü", "a/b", "a_b", "x'y", "$(touch pwn)"} {
+		t.Run(name, func(t *testing.T) {
+			j := glJob(name, imgStep("a", "go:1", "echo a >> log"), imgStep("b", "node:20", "false"), imgStep("c", "go:1", "echo c >> log"))
+			j.AllowFailure = true
+			doc := emitDoc(t, glProject("drone", j))
+			first := name + "-1"
+			if m := regexp.MustCompile(`\.pipemaster-split/([^']*)'`).FindAllStringSubmatch(doc, -1); len(m) == 0 {
+				t.Fatalf("no marker in:\n%s", doc)
+			} else {
+				for _, x := range m {
+					if strings.ContainsAny(x[1], "/ '$") || x[1] == "" {
+						t.Errorf("unsafe marker name %q", x[1])
+					}
+				}
+			}
+			codes, log := runParts(t, doc, first, name+"-2", name+"-3")
+			if codes[0] != 0 || codes[1] == 0 || codes[2] != 0 || log != "a\n" {
+				t.Errorf("codes %v, log %q: the first job must pass, the second fail, the last skip", codes, log)
+			}
+			if _, err := os.Stat("pwn"); err == nil {
+				t.Error("a job name ran as a command")
+			}
+		})
+	}
+}
+
+func TestImageSplitNamesThatSpellTheSameKeepSeparateMarkers(t *testing.T) {
+	a := markFileOf(t, emitDoc(t, failingChain(true)), "build-2")
+	if !regexp.MustCompile(`^build-2-[0-9a-f]{8}\.ok$`).MatchString(a) {
+		t.Fatalf("marker name %q", a)
+	}
+	split := func(name string) string {
+		j := glJob(name, imgStep("x", "go:1", "x"), imgStep("y", "node:20", "y"))
+		j.AllowFailure = true
+		return emitDoc(t, glProject("drone", j))
+	}
+	slash, under := split("a/b"), split("a_b")
+	slashM := regexp.MustCompile(`a_b-1-[0-9a-f]{8}`).FindString(slash)
+	underM := regexp.MustCompile(`a_b-1-[0-9a-f]{8}`).FindString(under)
+	if slashM == "" || underM == "" || slashM == underM {
+		t.Errorf("markers %q and %q must differ, or a_b-1 and a/b-1 would share a file", slashM, underM)
 	}
 }
