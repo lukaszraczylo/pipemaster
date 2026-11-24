@@ -18,13 +18,14 @@ import (
 )
 
 const (
-	workspaceName     = "workspace"
-	workspaceMount    = "/workspace"
-	outputsDir        = workspaceMount + "/.pipemaster/outputs"
-	artifactsDir      = workspaceMount + "/artifacts"
-	shellCommand      = "sh"
-	shellFlags        = "-ec"
-	continueTrap      = "trap 'exit 0' EXIT # pipemaster:continue-on-error"
+	workspaceName  = "workspace"
+	workspaceMount = "/workspace"
+	outputsDir     = workspaceMount + "/.pipemaster/outputs"
+	artifactsDir   = workspaceMount + "/artifacts"
+	shellCommand   = "sh"
+	shellFlags     = "-ec"
+	continueTrap   = "trap 'exit 0' EXIT # pipemaster:continue-on-error"
+	// placeholderScript runs where the source holds no work and the file only needs a container.
 	placeholderScript = "true"
 	placeholderTask   = "noop"
 	disabledScript    = "exit 0 # pipemaster:lost the step condition has no shell form"
@@ -97,13 +98,17 @@ func (tc *jobCtx) stepScripts(sc *stepScope, path string, st *ir.Step) []string 
 		}
 		lines[i], why[i] = out, w
 	}
-	keep := emitkit.DropLost(st.Script, why, func(detail, text string) {
+	pieces := emitkit.ReplaceLost(st.Script, why, func(detail, text string) {
 		tc.e.lose(path, caps.ScriptInterpolation, detail)
 		tc.e.comment(path, "script "+path+": "+text)
 	})
 	var out []string
-	for _, i := range keep {
-		out = append(out, lines[i])
+	for _, p := range pieces {
+		if p.Lost {
+			out = append(out, emitkit.FailLoud(caps.ScriptInterpolation, path, p.Detail))
+			continue
+		}
+		out = append(out, lines[p.Index])
 	}
 	return out
 }
@@ -421,10 +426,10 @@ func (sx *stepCtx) placeholder(st *ir.Step) *container {
 	c.image = sx.imageOf(st, path)
 	c.m.SetStr("image", c.image)
 	c.m.Set("command", strSeq([]string{shellCommand, shellFlags}))
-	c.m.Set("args", seqOf(block(placeholderScript)))
+	c.m.Set("args", seqOf(block(emitkit.FailLoud(caps.StepAction, path, "Argo does not run the action"))))
 	c.m.SetStr("workingDir", workspaceMount)
 	sx.act.Hold = nodeCanon(c.m.N)
-	tc.e.emulate(path, caps.StepAction, "placeholder container", "Argo does not run the action; a container that runs "+placeholderScript+" keeps its place")
+	tc.e.emulate(path, caps.StepAction, "failing container", "Argo does not run the action; a container that prints the loss and exits 1 keeps its place")
 	return c
 }
 

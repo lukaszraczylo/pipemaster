@@ -1,7 +1,7 @@
 Loss report: gha -> argo
 [lost] pipeline/ci/job/build job.if (the condition is gha text, which Argo cannot read; the task is disabled with when {{= false }})
 [lost] pipeline/ci/job/build job.runner (Argo schedules pods; a runner label has no form)
-[lost] pipeline/ci/job/build/step/build-step-1 script.interpolation (no Argo spelling for expression opaque(gha): env[github.job]; the line is commented out)
+[lost] pipeline/ci/job/build/step/build-step-1 script.interpolation (no Argo spelling for expression opaque(gha): env[github.job]; the line is replaced by a line that prints the loss and exits 1)
 [external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [external] pipeline/ci/trigger/1 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.shell: container command sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)

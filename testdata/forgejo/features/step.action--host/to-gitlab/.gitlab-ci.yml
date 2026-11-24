@@ -3,9 +3,10 @@ build:
     - docker
   needs: []
   script:
-    # pipemaster:lost step build-step-2 uses actions/setup-go@v5: missing input go-version
-    # pipemaster:lost step build-step-3 uses org/tool/sub@v2
-    - "true"
     # pipemaster:step build-step-1
     # pipemaster:step build-step-2
+    # pipemaster:lost step build-step-2 uses actions/setup-go@v5: missing input go-version
+    - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: the action has no GitLab form'' >&2; exit 1'
     # pipemaster:step build-step-3
+    # pipemaster:lost step build-step-3 uses org/tool/sub@v2
+    - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: no GitLab mapping for the action'' >&2; exit 1'

@@ -96,7 +96,9 @@ type emitter struct {
 	made  map[string]bool
 	// pendingEL holds the EventListeners that a Tekton file kept as resources, by name.
 	pendingEL map[string][]resourceDoc
-	origin    string
+	// lostWork holds the path of every step that lost script, action or image work.
+	lostWork []string
+	origin   string
 	// keptEntries holds the names of EventListener entries that a Tekton file kept, so a generated one is not written twice.
 	keptEntries map[string]bool
 	plans       []*plan
@@ -114,6 +116,18 @@ type emitter struct {
 func use(path string, f caps.Feature) ir.FeatureUse { return ir.FeatureUse{IRPath: path, Feature: f} }
 
 func (e *emitter) lose(path string, f caps.Feature, detail string) {
+	if strings.Contains(path, "/step/") && (f == caps.StepScript || f == caps.StepAction || f == caps.StepImage) {
+		e.lostWork = append(e.lostWork, path)
+	}
+	e.note(path, f, caps.Lost, "", detail)
+}
+
+// lostStepWork is true when a step of the job at jp lost its work.
+func (e *emitter) lostStepWork(jp string) bool {
+	return slices.ContainsFunc(e.lostWork, func(p string) bool { return strings.HasPrefix(p, jp+"/step/") })
+}
+
+func (e *emitter) noteLost(path string, f caps.Feature, detail string) {
 	e.note(path, f, caps.Lost, "", detail)
 }
 

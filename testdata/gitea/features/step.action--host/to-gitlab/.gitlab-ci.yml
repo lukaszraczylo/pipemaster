@@ -3,11 +3,13 @@ build:
     - ubuntu-latest
   needs: []
   script:
-    # pipemaster:lost step build-step-2 uses org/tool@v2
-    # pipemaster:lost step build-step-3 uses org/local-action@main
-    # pipemaster:lost step build-step-4 uses /checkout
-    - "true"
     # pipemaster:step build-step-1
     # pipemaster:step build-step-2
+    # pipemaster:lost step build-step-2 uses org/tool@v2
+    - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: no GitLab mapping for the action'' >&2; exit 1'
     # pipemaster:step build-step-3
+    # pipemaster:lost step build-step-3 uses org/local-action@main
+    - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: no GitLab mapping for the action'' >&2; exit 1'
     # pipemaster:step build-step-4
+    # pipemaster:lost step build-step-4 uses /checkout
+    - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-4: no GitLab mapping for the action'' >&2; exit 1'

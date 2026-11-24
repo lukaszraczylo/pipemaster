@@ -103,7 +103,7 @@ func TestEditedAnchorOfASetupOrUploadKeepsTheFile(t *testing.T) {
 	for _, name := range []string{"go", "up"} {
 		t.Run(name, func(t *testing.T) {
 			ids, j, rep := jobParse(t, mixedJob(), func(_ *testing.T, ce *containerEdit) {
-				ce.blocks[name] = strings.Replace(ce.blocks[name], `- "true"`, "- echo hi", 1)
+				ce.blocks[name] = replaceFailLoud(ce.blocks[name], "- echo hi")
 			})
 			want := []string{"one", "go!", "two", "up!", "three", "four"}
 			want[slices.Index(want, name+"!")] = name

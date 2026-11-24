@@ -216,7 +216,7 @@ func (b *jobBuilder) collapseNoop() {
 }
 
 func (b *jobBuilder) isPlaceholder(st *ir.Step, image string) bool {
-	return st.ID == noopStepName && st.Kind == ir.StepScript && slices.Equal(st.Script, []string{noopScript}) &&
+	return st.ID == noopStepName && st.Kind == ir.StepScript && (slices.Equal(st.Script, []string{noopScript}) || emitkit.IsFailLoud(st.Script)) &&
 		b.plainStep(st) && b.holdsImage(st, image)
 }
 

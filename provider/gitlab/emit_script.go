@@ -18,6 +18,7 @@ const (
 	secScript = "script"
 	secAfter  = "after_script"
 
+	// noopLine runs where the source holds no work and the file only needs a script line.
 	noopLine = "true"
 )
 
@@ -354,13 +355,17 @@ func (e *emitter) stepLines(sp string, st *ir.Step) ([]string, error) {
 			return nil, err
 		}
 	}
-	keep := emitkit.DropLost(texts, why, func(detail, text string) {
+	pieces := emitkit.ReplaceLost(texts, why, func(detail, text string) {
 		e.lose(sp, caps.ScriptInterpolation, detail)
 		e.comment("script.interpolation " + sp + ": " + text)
 	})
-	out := make([]string, 0, len(keep))
-	for _, i := range keep {
-		out = append(out, outs[i])
+	out := make([]string, 0, len(pieces))
+	for _, p := range pieces {
+		if p.Lost {
+			out = append(out, emitkit.FailLoud(caps.ScriptInterpolation, sp, p.Detail))
+			continue
+		}
+		out = append(out, outs[p.Index])
 	}
 	return out, nil
 }

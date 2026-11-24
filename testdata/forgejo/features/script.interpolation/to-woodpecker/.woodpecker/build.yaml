@@ -1,15 +1,11 @@
 # pipemaster:lost script.interpolation pipeline/ci/job/build/step/build-step-1: echo "sha {{ sha }} on {{ ref_name }}"
 # pipemaster:lost script.interpolation pipeline/ci/job/build/step/build-step-1: echo "{{ gha.github.workspace }}"
-# pipemaster:lost step.script pipeline/ci/job/build/step/build-step-1: the step has no command left
-# pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
-# pipemaster:arg {"step":"id: build-step-1\nkind: script\nscript:\n    - echo \"sha $$\u007b{ sha }} on $$\u007b{ ref_name }}\"\n    - echo \"$$\u007b{ gha.github.workspace }}\"\n","at":0}
-# pipemaster:emulated step.script pipeline/ci/job/build
 # pipemaster:emulated job.container pipeline/ci/job/build
 when:
   - event: push
   - event: tag
 steps:
-  - name: noop
-    image: ubuntu:latest
+  - image: ubuntu:latest
     commands:
-      - "true"
+      - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Woodpecker spelling for expression ref_name; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'
+      - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Woodpecker spelling for expression gha.github.workspace; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'

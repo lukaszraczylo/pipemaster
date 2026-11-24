@@ -98,8 +98,12 @@ func (e *emitter) reidentify(j *ir.Job, st *ir.Step, pos int) *ir.Step {
 	return &c
 }
 
-// noopScript runs for a script step whose lines an earlier conversion could not carry.
+// noopScript runs where the source holds no work: a job with no steps, a workflow with no jobs, or a script step
+// with no lines. It only keeps the file valid. Source work with no GHA form uses failLoud instead.
 const noopScript = "true"
+
+// failLoud makes the run text of a step that stands in for source work with no GHA form.
+func failLoud(f caps.Feature, sp, why string) *yaml.Node { return str(emitkit.FailLoud(f, sp, why)) }
 
 func retryable(shell string) bool { return shell == "" || shell == shellBash || shell == shellSh }
 
@@ -155,8 +159,9 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 	case runOK:
 		markers = append(markers, emitkit.Marker(caps.StepImage, sp))
 	case !dockerOK && len(st.Script) == 0:
-		e.lose(sp, caps.StepImage, "a docker step needs a literal image reference and the reference holds a variable; the step does not run")
-		m.set("run", str(noopScript))
+		why := "a docker step needs a literal image reference and the reference holds a variable"
+		e.lose(sp, caps.StepImage, why+"; the step fails with a message")
+		m.set("run", failLoud(caps.StepImage, sp, why))
 	case !dockerOK:
 		e.lose(sp, caps.StepImage, "a docker step needs a literal image reference and the reference holds a variable; the script runs on the runner")
 		lines := e.withoutRemoteRefs(sp, st.Script)
@@ -170,7 +175,7 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 	case st.Kind == ir.StepScript && len(st.Script) > 0:
 		lines := e.withoutRemoteRefs(sp, st.Script)
 		if len(lines) == 0 {
-			lines = []string{noopScript}
+			lines = []string{emitkit.FailLoud(caps.StepScript, sp, "every line of the script is a remote reference with no GHA form")}
 		}
 		if attempts > 0 && retryable(st.Shell) {
 			lines, wrapped = retryScript(lines, attempts), true
@@ -182,7 +187,7 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 		}
 	case (st.Kind == ir.StepAction || st.Kind == ir.StepPipelineCall) && st.Action != nil:
 		if !usesOK {
-			m.set("run", str(noopScript))
+			m.set("run", failLoud(caps.StepAction, sp, whyDisabled))
 			break
 		}
 		m.set("uses", str(usesText))
@@ -190,14 +195,17 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 	case st.Kind == ir.StepScript && st.Image == nil:
 		m.set("run", str(noopScript))
 	case st.Kind == ir.StepAction && st.Action == nil:
-		e.lose(sp, caps.StepAction, "the step names no action GHA can run; the step runs "+noopScript)
-		m.set("run", str(noopScript))
+		why := "the step names no action GHA can run"
+		e.lose(sp, caps.StepAction, why+"; the step fails with a message")
+		m.set("run", failLoud(caps.StepAction, sp, why))
 	case st.Kind == ir.StepTask:
-		e.lose(sp, caps.StepAction, "a task reference has no GHA form; the step runs "+noopScript)
-		m.set("run", str(noopScript))
+		why := "a task reference has no GHA form"
+		e.lose(sp, caps.StepAction, why+"; the step fails with a message")
+		m.set("run", failLoud(caps.StepAction, sp, why))
 	default:
-		e.lose(sp, caps.StepAction, "a step of kind "+string(st.Kind)+" has no GHA form; the step runs "+noopScript)
-		m.set("run", str(noopScript))
+		why := "a step of kind " + string(st.Kind) + " has no GHA form"
+		e.lose(sp, caps.StepAction, why+"; the step fails with a message")
+		m.set("run", failLoud(caps.StepAction, sp, why))
 	}
 	if err != nil {
 		return nil, false, err

@@ -198,7 +198,7 @@ func (c *chain) placeholder(st *ir.Step, path string, arg actionArg) []*yaml.Nod
 	cfg.Set("image_resource", imageNode(defaultImage, "", defaultTag))
 	run := newMap()
 	run.SetStr("path", shellCommand)
-	run.Set("args", strSeq([]string{defaultFlags, placeholderCmd}))
+	run.Set("args", strSeq([]string{defaultFlags, emitkit.FailLoud(caps.StepAction, path, "Concourse does not run the action")}))
 	cfg.Set("run", run.N)
 	m := newMap()
 	m.SetStr("task", name)
@@ -212,7 +212,7 @@ func (c *chain) placeholder(st *ir.Step, path string, arg actionArg) []*yaml.Nod
 	}
 	arg.Step, arg.Task, arg.Hold = body, name, nodeCanon(m.N)
 	e.markArg(caps.StepAction, jx.sm(name), arg)
-	e.emulate(path, caps.StepAction, "placeholder task", "Concourse does not run the action; a task that runs "+placeholderCmd+" keeps its place")
+	e.emulate(path, caps.StepAction, "failing task", "Concourse does not run the action; a task that prints the loss and exits 1 keeps its place")
 	return []*yaml.Node{m.N}
 }
 

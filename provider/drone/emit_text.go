@@ -47,14 +47,31 @@ type emitter struct {
 	// from is the source dialect of a condition that shares the Drone class, so its event names map to Drone's.
 	from *expr.Dialect
 	head []string
+	// lostWork holds the path of every step that lost script, action or image work.
+	lostWork []string
 	// cut is set when an image or workdir lost an expression; the step or service being written owns it.
 	cut bool
+	// scriptLost is set when the step being written holds a failing line for a lost statement.
+	scriptLost bool
 }
 
 func use(path string, f caps.Feature) ir.FeatureUse { return ir.FeatureUse{IRPath: path, Feature: f} }
 
 func (e *emitter) lose(path string, f caps.Feature, detail string) {
+	e.noteLostWork(path, f)
 	e.note(path, f, caps.Lost, "", detail)
+}
+
+// noteLostWork remembers a step whose work has no Drone form, so an empty job can tell it from one with no work.
+func (e *emitter) noteLostWork(path string, f caps.Feature) {
+	if strings.Contains(path, "/step/") && (f == caps.StepScript || f == caps.StepAction || f == caps.StepImage) {
+		e.lostWork = append(e.lostWork, path)
+	}
+}
+
+// lostStepWork is true when a step of the job at jp lost its work.
+func (e *emitter) lostStepWork(jp string) bool {
+	return slices.ContainsFunc(e.lostWork, func(p string) bool { return strings.HasPrefix(p, jp+"/step/") })
 }
 
 // emulate notes an emulation. A second note for the same path and feature adds its text to the first, so the
@@ -297,9 +314,9 @@ func (e *emitter) command(b *bindings, s string) (out string, lost []string, err
 	return out, lost, nil
 }
 
-// commentSpans comments out every statement of texts that holds a lost entry and returns the entries that stay.
-func (e *emitter) commentSpans(path string, texts, why []string) []int {
-	return emitkit.DropLost(texts, why, func(detail, text string) {
+// commentSpans swaps every statement of texts that holds a lost entry for a failing piece and returns the pieces in order.
+func (e *emitter) commentSpans(path string, texts, why []string) []emitkit.Piece {
+	return emitkit.ReplaceLost(texts, why, func(detail, text string) {
 		e.lose(path, caps.ScriptInterpolation, detail)
 		e.comment("script.interpolation " + path + ": " + text)
 	})

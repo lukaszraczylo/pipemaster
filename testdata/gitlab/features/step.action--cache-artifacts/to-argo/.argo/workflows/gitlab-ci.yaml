@@ -1,9 +1,9 @@
 # pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/build-step-1
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: cache\n    ref: v4\nwith:\n    key:\n        lit: go-mod\n    path:\n        lit: ~/go/pkg/mod\nid: build-step-1\nkind: action\n","kind":"cache","hold":"{\"args\":[\"true\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-1\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: cache\n    ref: v4\nwith:\n    key:\n        lit: go-mod\n    path:\n        lit: ~/go/pkg/mod\nid: build-step-1\nkind: action\n","kind":"cache","hold":"{\"args\":[\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/gitlab-ci/job/build/step/build-step-1: Argo does not run the action' \\u003e\\u00262; exit 1\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-1\",\"workingDir\":\"/workspace\"}"}
 # pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/build-step-3
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\nid: build-step-3\nkind: action\n","kind":"artifact_upload","hold":"{\"args\":[\"true\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-3\",\"workingDir\":\"/workspace\"}","arts":["dist"],"outs":["{\"name\":\"dist\",\"path\":\"/workspace/dist/\"}"],"seq":1}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\nid: build-step-3\nkind: action\n","kind":"artifact_upload","hold":"{\"args\":[\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/gitlab-ci/job/build/step/build-step-3: Argo does not run the action' \\u003e\\u00262; exit 1\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-3\",\"workingDir\":\"/workspace\"}","arts":["dist"],"outs":["{\"name\":\"dist\",\"path\":\"/workspace/dist/\"}"],"seq":1}
 # pipemaster:emulated step.action pipeline/gitlab-ci/job/test/step/test-step-1
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\nid: test-step-1\nkind: action\n","kind":"artifact_download","hold":"{\"args\":[\"true\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"test-step-1\",\"workingDir\":\"/workspace\"}","needs":["build"]}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\nid: test-step-1\nkind: action\n","kind":"artifact_download","hold":"{\"args\":[\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/gitlab-ci/job/test/step/test-step-1: Argo does not run the action' \\u003e\\u00262; exit 1\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"test-step-1\",\"workingDir\":\"/workspace\"}","needs":["build"]}
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/build-step-2
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/test/step/test-step-2
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
@@ -37,7 +37,7 @@ spec:
               - sh
               - -ec
             args:
-              - "true"
+              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/gitlab-ci/job/build/step/build-step-1: Argo does not run the action'' >&2; exit 1'
             workingDir: /workspace
           - # pipemaster:id build-step-2
             name: main
@@ -58,7 +58,7 @@ spec:
               - sh
               - -ec
             args:
-              - "true"
+              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/gitlab-ci/job/build/step/build-step-3: Argo does not run the action'' >&2; exit 1'
             workingDir: /workspace
             dependencies:
               - main
@@ -81,7 +81,7 @@ spec:
               - sh
               - -ec
             args:
-              - "true"
+              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/gitlab-ci/job/test/step/test-step-1: Argo does not run the action'' >&2; exit 1'
             workingDir: /workspace
           - # pipemaster:id test-step-2
             name: main

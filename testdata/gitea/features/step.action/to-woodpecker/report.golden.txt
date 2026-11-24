@@ -5,6 +5,6 @@ Loss report: gitea -> woodpecker
 [lost] pipeline/ci/job/build/step/build-step-2 ext.passthrough (the action reference actions/setup-go@v5 is not in the Woodpecker file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (no Woodpecker mapping for action docker://alpine:3.20)
 [lost] pipeline/ci/job/build/step/local step.action (no Woodpecker mapping for action ./.github/actions/setup)
-[lost] pipeline/ci/job/build/step/script step.script (the job has no steps; a no-op step keeps the workflow valid)
-[emulated] pipeline/ci/job/build step.script: no-op step (Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in)
+[lost] pipeline/ci/job/build/step/script step.script (no step of the job has a Woodpecker form; a step that prints the loss and exits 1 keeps the workflow valid and the pipeline honest)
+[emulated] pipeline/ci/job/build step.script: failing step (Woodpecker needs a step; no step of the job has a Woodpecker form, so a step that prints the loss and exits 1 stands in)
 [emulated] pipeline/ci/job/build/step/build-step-2 step.action: image selection (later steps without an image run in this image)

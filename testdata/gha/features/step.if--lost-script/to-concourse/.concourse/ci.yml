@@ -5,11 +5,11 @@
 # pipemaster:emulated display.name pipeline/ci/job/check/step/check-step-2
 # pipemaster:arg {"name":"Inspect","id":"check-step-2","written":"check-step-2","kind":"step"}
 # pipemaster:emulated step.if pipeline/ci/job/check/step/check-step-2
-# pipemaster:arg {"if":"event != 'pull_request'","script":"# pipemaster:lost docker inspect {{ steps.meta.outputs.version }}"}
+# pipemaster:arg {"if":"event != 'pull_request'","script":"# pipemaster:lost docker inspect {{ steps.meta.outputs.version }}\nprintf '%s\\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/check/step/check-step-2: no Concourse spelling for expression steps.meta.outputs.version; the line is replaced by a line that prints the loss and exits 1' \u003e\u00262; exit 1"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/check/step/check-step-2/carry
-# pipemaster:arg {"digest":"36944c832ccdc49ddc84c94014372a2c33c334204021824cf5bd088f19b42d3d","carry":"if: event != 'pull_request'\nid: check-step-2\nname: Inspect\nkind: script\nscript:\n    - docker inspect $\u007b{ steps.meta.outputs.version }}\n"}
+# pipemaster:arg {"digest":"1f12eedb66dae7a427c58d9459c8cce9298657caed5bcbd443385bae196724e2","carry":"if: event != 'pull_request'\nid: check-step-2\nname: Inspect\nkind: script\nscript:\n    - docker inspect $\u007b{ steps.meta.outputs.version }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/check/carry
-# pipemaster:arg {"digest":"083932a2c833448f4ac3c1ac819942fb9f6ad24cadebde9c5d323b95488e3c79","carry":"id: check\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"e967c1d39b24989432fe0abe2f70582999e6c2529a5c82aa706622f1eff4ef7c","carry":"id: check\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -82,6 +82,7 @@ jobs:
               - |-
                 exit 0 # pipemaster:guard the step condition has no shell form
                 # pipemaster:lost docker inspect {{ steps.meta.outputs.version }}
+                printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/check/step/check-step-2: no Concourse spelling for expression steps.meta.outputs.version; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
             dir: workspace
         tags:
           - ubuntu-latest

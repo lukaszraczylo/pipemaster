@@ -1,13 +1,13 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"alias","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-1
-# pipemaster:arg {"if":"ref_name == 'main'","script":"# pipemaster:lost echo {{ ref_name }}"}
+# pipemaster:arg {"if":"ref_name == 'main'","script":"# pipemaster:lost echo {{ ref_name }}\nprintf '%s\\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Concourse spelling for expression ref_name; the line is replaced by a line that prints the loss and exits 1' \u003e\u00262; exit 1"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"9a615e9313cb38cbbbf4f7614ffb402bc6e0ba81f93f74c6769f6fdbe9058342","carry":"if: ref_name == 'main'\nid: build-step-1\nkind: script\nscript:\n    - echo $\u007b{ ref_name }}\n"}
+# pipemaster:arg {"digest":"6435e25899cfa14ceb9def38d793559a908831499274895f12b2ecae86982123","carry":"if: ref_name == 'main'\nid: build-step-1\nkind: script\nscript:\n    - echo $\u007b{ ref_name }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-2/carry
 # pipemaster:arg {"digest":"14e70d730b4920e91de46811d6be38ee5c74ee689d24938466a41441ef8993e2","carry":"if: sha != ''\nid: build-step-2\nkind: script\nscript:\n    - echo $\u007b{ sha }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"0f374e8f5564c271c0672859ba5f472352d4b3673ac97935fb4249ae31982473","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
+# pipemaster:arg {"digest":"bfa9cc3cb8ea37051edfbb6a798475406a8bf9578f6ad77e770ed61f8ef3975c","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: alias\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -59,6 +59,7 @@ jobs:
               - |-
                 exit 0 # pipemaster:guard the step condition has no shell form
                 # pipemaster:lost echo {{ ref_name }}
+                printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Concourse spelling for expression ref_name; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
             dir: workspace
         tags:
           - docker

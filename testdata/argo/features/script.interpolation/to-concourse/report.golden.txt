@@ -1,5 +1,5 @@
 Loss report: argo -> concourse
-[lost] pipeline/ci/job/build/step/build-step-1 script.interpolation (no Concourse spelling for expression ref_name; the line is commented out; no Concourse spelling for expression gha.github.workspace; the line is commented out)
+[lost] pipeline/ci/job/build/step/build-step-1 script.interpolation (no Concourse spelling for expression ref_name; the line is replaced by a line that prints the loss and exits 1; no Concourse spelling for expression gha.github.workspace; the line is replaced by a line that prints the loss and exits 1)
 [lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the Concourse file; it is kept in round-trip metadata)
 [lost] pipeline/ci/trigger/0 trigger.filter.branches (the push trigger has no branch filter, and a git resource follows one branch; the resource follows the default branch of the repository)
 [lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider argo (dependency, eventSource, sensor, trigger) is not written to the Concourse file; it is kept in round-trip metadata)

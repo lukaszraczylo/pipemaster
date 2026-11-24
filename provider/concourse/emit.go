@@ -25,12 +25,13 @@ const (
 	workspaceName   = "workspace"
 	primaryName     = "source"
 	defaultPlatform = "linux"
-	placeholderCmd  = "true"
-	placeholderJob  = "placeholder"
-	disabledScript  = "exit 0 " + disabledTag
-	disabledTag     = "# pipemaster:guard the step condition has no shell form"
-	lostPrefix      = "# pipemaster:lost "
-	markerIgnored   = "marker ignored: "
+	// placeholderCmd runs where the source holds no work and the file only needs a task.
+	placeholderCmd = "true"
+	placeholderJob = "placeholder"
+	disabledScript = "exit 0 " + disabledTag
+	disabledTag    = "# pipemaster:guard the step condition has no shell form"
+	lostPrefix     = "# pipemaster:lost "
+	markerIgnored  = "marker ignored: "
 )
 
 type (

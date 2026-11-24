@@ -1,8 +1,8 @@
 Loss report: gitea -> drone
 [lost] pipeline/ci/job/call/step/call-step-1 step.action (step kind pipeline_call has no Drone form)
-[lost] pipeline/ci/job/call/step/script step.script (the job has no steps; a no-op step keeps the document valid)
+[lost] pipeline/ci/job/call/step/script step.script (no step of the job has a Drone form; a step that prints the loss and exits 1 keeps the document valid and the pipeline honest)
 [lost] pipeline/ci/job/plain job.runner (only the platform has a Drone form; other runner labels are lost)
 [lost] pipeline/ci/job/plain/step/plain-step-1 step.shell (Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [emulated] pipeline/ci/job/call job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
-[emulated] pipeline/ci/job/call step.script: no-op step (Drone needs a step; no step of the job has a Drone form, so a no-op step stands in)
+[emulated] pipeline/ci/job/call step.script: failing step (Drone needs a step; no step of the job has a Drone form, so a step that prints the loss and exits 1 stands in)
 [emulated] pipeline/ci/job/plain job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

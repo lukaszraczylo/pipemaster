@@ -1,8 +1,4 @@
 # pipemaster:lost script.interpolation pipeline/ci/job/use/step/use-step-1: echo {{ needs.version.outputs.tag }}
-# pipemaster:lost step.script pipeline/ci/job/use/step/use-step-1: the step has no command left
-# pipemaster:emulated step.action pipeline/ci/job/use/step/use-step-1
-# pipemaster:arg {"step":"id: use-step-1\nkind: script\nscript:\n    - echo $$\u007b{ needs.version.outputs.tag }}\n","at":0}
-# pipemaster:emulated step.script pipeline/ci/job/use
 # pipemaster:emulated job.container pipeline/ci/job/use
 kind: pipeline
 type: docker
@@ -14,10 +10,10 @@ trigger:
 depends_on:
   - version
 steps:
-  - name: noop
+  - name: use-step-1
     image: ubuntu:latest
     commands:
-      - "true"
+      - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/use/step/use-step-1: no Drone spelling for expression needs.version.outputs.tag; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'
 ---
 kind: pipeline
 type: docker

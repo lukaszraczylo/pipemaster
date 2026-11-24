@@ -1615,7 +1615,7 @@
      "feature": "step.script",
      "level": "emulated",
      "strategy": "no-op step",
-     "detail": "Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in"
+     "detail": "Woodpecker needs a step; the job has no step to run, so a no-op step stands in"
     },
     {
      "path": "pipeline/gitlab-ci/job/check_gitaly_version",
@@ -1629,14 +1629,14 @@
      "feature": "step.script",
      "level": "emulated",
      "strategy": "no-op step",
-     "detail": "Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in"
+     "detail": "Woodpecker needs a step; the job has no step to run, so a no-op step stands in"
     },
     {
      "path": "pipeline/gitlab-ci/job/gitlab-advanced-sast",
      "feature": "step.script",
      "level": "emulated",
      "strategy": "no-op step",
-     "detail": "Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in"
+     "detail": "Woodpecker needs a step; the job has no step to run, so a no-op step stands in"
     },
     {
      "path": "pipeline/gitlab-ci/job/lint",
@@ -1713,14 +1713,14 @@
      "feature": "step.script",
      "level": "emulated",
      "strategy": "no-op step",
-     "detail": "Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in"
+     "detail": "Woodpecker needs a step; the job has no step to run, so a no-op step stands in"
     },
     {
      "path": "pipeline/gitlab-ci/job/semgrep-sast",
      "feature": "step.script",
      "level": "emulated",
      "strategy": "no-op step",
-     "detail": "Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in"
+     "detail": "Woodpecker needs a step; the job has no step to run, so a no-op step stands in"
     },
     {
      "path": "pipeline/gitlab-ci/job/ssh-audit",
@@ -2639,7 +2639,7 @@
      "feature": "step.script",
      "level": "emulated",
      "strategy": "no-op step",
-     "detail": "Drone needs a step; no step of the job has a Drone form, so a no-op step stands in"
+     "detail": "Drone needs a step; the job has no step to run, so a no-op step stands in"
     },
     {
      "path": "pipeline/gitlab-ci/job/check_gitaly_version",
@@ -2653,14 +2653,14 @@
      "feature": "step.script",
      "level": "emulated",
      "strategy": "no-op step",
-     "detail": "Drone needs a step; no step of the job has a Drone form, so a no-op step stands in"
+     "detail": "Drone needs a step; the job has no step to run, so a no-op step stands in"
     },
     {
      "path": "pipeline/gitlab-ci/job/gitlab-advanced-sast",
      "feature": "step.script",
      "level": "emulated",
      "strategy": "no-op step",
-     "detail": "Drone needs a step; no step of the job has a Drone form, so a no-op step stands in"
+     "detail": "Drone needs a step; the job has no step to run, so a no-op step stands in"
     },
     {
      "path": "pipeline/gitlab-ci/job/lint",
@@ -2709,14 +2709,14 @@
      "feature": "step.script",
      "level": "emulated",
      "strategy": "no-op step",
-     "detail": "Drone needs a step; no step of the job has a Drone form, so a no-op step stands in"
+     "detail": "Drone needs a step; the job has no step to run, so a no-op step stands in"
     },
     {
      "path": "pipeline/gitlab-ci/job/semgrep-sast",
      "feature": "step.script",
      "level": "emulated",
      "strategy": "no-op step",
-     "detail": "Drone needs a step; no step of the job has a Drone form, so a no-op step stands in"
+     "detail": "Drone needs a step; the job has no step to run, so a no-op step stands in"
     },
     {
      "path": "pipeline/gitlab-ci/job/ssh-audit",

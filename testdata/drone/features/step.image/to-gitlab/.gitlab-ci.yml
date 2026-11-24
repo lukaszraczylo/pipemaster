@@ -11,3 +11,4 @@ ci:
     - cargo build --release
     # pipemaster:step publish
     # pipemaster:lost step publish kind plugin
+    - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/drone/job/ci/step/publish: the step kind has no GitLab form'' >&2; exit 1'

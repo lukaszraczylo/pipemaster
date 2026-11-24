@@ -1,9 +1,9 @@
 call:
   needs: []
   script:
-    # pipemaster:lost step call-step-1 kind pipeline_call
-    - "true"
     # pipemaster:step call-step-1
+    # pipemaster:lost step call-step-1 kind pipeline_call
+    - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/call/step/call-step-1: the step kind has no GitLab form'' >&2; exit 1'
 plain:
   tags:
     - ubuntu-latest

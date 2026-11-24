@@ -1,5 +1,5 @@
 Loss report: gha -> concourse
-[lost] pipeline/ci/job/use/step/use-step-1 script.interpolation (no Concourse spelling for expression needs.version.outputs.tag; the line is commented out)
+[lost] pipeline/ci/job/use/step/use-step-1 script.interpolation (no Concourse spelling for expression needs.version.outputs.tag; the line is replaced by a line that prints the loss and exits 1)
 [lost] pipeline/ci/job/version job.outputs (a Concourse job has no named outputs for other jobs)
 [lost] pipeline/ci/trigger/0 trigger.filter.branches (the push trigger has no branch filter, and a git resource follows one branch; the resource follows the default branch of the repository)
 [emulated] pipeline/ci ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)

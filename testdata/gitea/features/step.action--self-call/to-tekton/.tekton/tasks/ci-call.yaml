@@ -10,4 +10,4 @@ spec:
   steps:
     - name: noop
       image: alpine:3.22
-      script: "true"
+      script: 'printf ''%s\n'' ''pipemaster: lost: step.script pipeline/ci/job/call: no step of the job has a Tekton form'' >&2; exit 1'

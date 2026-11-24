@@ -1,6 +1,7 @@
 package concourse_test
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -127,7 +128,7 @@ func TestHeldActionIsAPlaceholderAndParsesBack(t *testing.T) {
 func TestHeldActionEditIsKept(t *testing.T) {
 	files, _ := emit(t, project(actionJob()))
 	src := files[".concourse/ci.yml"]
-	edited := strings.Replace(src, `- "true"`, "- echo edited", 1)
+	edited := replaceFailLoud(src, "- echo edited")
 	if edited == src {
 		t.Fatalf("placeholder script changed shape:\n%s", src)
 	}
@@ -268,4 +269,16 @@ func TestFirstVersionNoteSeparatesIntervalFromWindow(t *testing.T) {
 			t.Errorf("%s: want %q and not %q in %v", c.cron, c.has, c.hasNot, rep.Entries)
 		}
 	}
+}
+
+// failLoudItem matches the list item of a failing script that an emitter wrote for a lost step.
+var failLoudItem = regexp.MustCompile(`(?m)- '?printf [^\n]*pipemaster: lost: [^\n]*exit 1'?$`)
+
+// replaceFailLoud swaps the first failing script item in src for repl.
+func replaceFailLoud(src, repl string) string {
+	loc := failLoudItem.FindStringIndex(src)
+	if loc == nil {
+		return src
+	}
+	return src[:loc[0]] + repl + src[loc[1]:]
 }

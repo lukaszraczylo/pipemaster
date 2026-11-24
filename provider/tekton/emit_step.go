@@ -184,7 +184,7 @@ func (tc *taskCtx) stepExt(m *wmap, st *ir.Step) error {
 }
 
 // scriptLines converts the script of a step. A line with no spelling is commented out with the rest of its
-// statement, line by line, so the lines that stay are valid shell.
+// statement, and a failing line takes its place so the step stops where the source would have run it.
 func (tc *taskCtx) scriptLines(sc *stepScope, st *ir.Step, sp string) ([]string, error) {
 	script := st.Script
 	if x := extOf(st.Ext); tc.e.own && x[ExtScriptIR] == strings.Join(script, "\n") {
@@ -209,17 +209,32 @@ func (tc *taskCtx) scriptLines(sc *stepScope, st *ir.Step, sp string) ([]string,
 		}
 		lost[i] = why[i] != ""
 	}
-	for _, span := range emitkit.CommentSpans(script, lost) {
-		first := ""
-		for i := span.From; i <= span.To; i++ {
-			outs[i] = "# pipemaster:lost script.interpolation: " + commentSafe(script[i])
-			if first == "" {
-				first = why[i]
-			}
-		}
-		tc.e.lose(sp, caps.ScriptInterpolation, emitkit.SpanDetail(first, span.To-span.From+1, span.Open))
+	spans := emitkit.CommentSpans(script, lost)
+	if len(spans) == 0 {
+		return outs, nil
 	}
-	return outs, nil
+	var out []string
+	next := 0
+	for i := 0; i < len(script); i++ {
+		if next < len(spans) && spans[next].From == i {
+			span := spans[next]
+			next++
+			first := ""
+			for k := span.From; k <= span.To; k++ {
+				out = append(out, "# pipemaster:lost script.interpolation: "+commentSafe(script[k]))
+				if first == "" {
+					first = why[k]
+				}
+			}
+			detail := emitkit.SpanDetail(first, span.To-span.From+1, span.Open)
+			tc.e.lose(sp, caps.ScriptInterpolation, detail)
+			out = append(out, emitkit.FailLoud(caps.ScriptInterpolation, sp, detail))
+			i = span.To
+			continue
+		}
+		out = append(out, outs[i])
+	}
+	return out, nil
 }
 
 // stepImage picks the image of a step: its own, the one a setup action chose, or the default. The job

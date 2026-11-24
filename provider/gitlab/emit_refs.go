@@ -279,7 +279,7 @@ func restoreLines(c *collapseCtx, owned map[*string]bool) {
 		}
 		owned[st.text] = true
 		cur := *st.text
-		if cur == p.S {
+		if cur == p.S || emitkit.IsFailLoudLine(cur) {
 			continue
 		}
 		if cur != p.G {

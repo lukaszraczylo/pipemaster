@@ -1,9 +1,10 @@
 package gitlab
 
 import (
-	"go.yaml.in/yaml/v3"
 	"slices"
 	"strings"
+
+	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"

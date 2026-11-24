@@ -18,13 +18,15 @@ import (
 
 const (
 	placeholderName = "noop"
-	keyEnv          = "environment"
-	keySettings     = "settings"
-	keyCommands     = "commands"
-	keyDependsOn    = "depends_on"
-	keyWorkingDir   = "working_dir"
-	keyEntrypoint   = "entrypoint"
-	keyFailure      = "failure"
+	// noopScript runs in a step that only keeps the document valid and stands for no source work.
+	noopScript    = "true"
+	keyEnv        = "environment"
+	keySettings   = "settings"
+	keyCommands   = "commands"
+	keyDependsOn  = "depends_on"
+	keyWorkingDir = "working_dir"
+	keyEntrypoint = "entrypoint"
+	keyFailure    = "failure"
 	// defaultImage runs steps that name no image; the IR does not hold the runner image of a hosted runner.
 	defaultImage = "ubuntu:latest"
 )
@@ -126,6 +128,7 @@ func (e *emitter) steps(c *docCtx) (*yaml.Node, error) {
 		}
 		name := names[at]
 		at++
+		e.scriptLost = false
 		c.pos = len(done)
 		d, err := e.step(c, st, name)
 		if err != nil {
@@ -138,7 +141,7 @@ func (e *emitter) steps(c *docCtx) (*yaml.Node, error) {
 		if name != st.ID {
 			e.stepIDs[pipelinePth+"/job/"+c.name+"/step/"+name] = st.ID
 		}
-		c.hold(st, len(done))
+		c.hold(st, len(done), e.scriptLost)
 		done = append(done, d)
 	}
 	if len(done) == 0 {
@@ -158,7 +161,7 @@ func (e *emitter) steps(c *docCtx) (*yaml.Node, error) {
 
 // hold records the text of a step of the first matrix cell that reads a matrix name, so the parser can put the
 // references back.
-func (c *docCtx) hold(st *ir.Step, pos int) {
+func (c *docCtx) hold(st *ir.Step, pos int, scriptLost bool) {
 	if c.j.Matrix == nil || !c.plan.first {
 		return
 	}
@@ -169,7 +172,7 @@ func (c *docCtx) hold(st *ir.Step, pos int) {
 	if readsMatrix(st.WorkDir) {
 		h.WorkDir = st.WorkDir
 	}
-	if slices.ContainsFunc(st.Script, readsMatrix) {
+	if !scriptLost && slices.ContainsFunc(st.Script, readsMatrix) {
 		h.Script = st.Script
 	}
 	if env := slices.DeleteFunc(slices.Clone(st.Env), func(v ir.Var) bool { return !valueReadsMatrix(v.Value) }); len(env) > 0 {
@@ -465,9 +468,14 @@ func (e *emitter) scriptStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
 		}
 		why[i] = noSpelling(lost)
 	}
-	for _, i := range e.commentSpans(sp, texts, why) {
+	for _, p := range e.commentSpans(sp, texts, why) {
+		if p.Lost {
+			e.scriptLost = true
+			lines = append(lines, block(emitkit.FailLoud(caps.ScriptInterpolation, sp, p.Detail)))
+			continue
+		}
 		b.hits = nil
-		out, _, err := e.command(b, texts[i])
+		out, _, err := e.command(b, texts[p.Index])
 		if err != nil {
 			return nil, err
 		}
@@ -601,9 +609,19 @@ func (e *emitter) settingNode(sp string, v ir.Value) (*yaml.Node, error) {
 
 // placeholder is the one step of a document that has none Drone can run; Drone rejects a pipeline without steps.
 func (e *emitter) placeholder(c *docCtx) (stepDone, error) {
-	e.emulate(c.jp, caps.StepScript, "no-op step", "Drone needs a step; no step of the job has a Drone form, so a no-op step stands in")
+	script := noopScript
+	if e.lostStepWork(c.jp) {
+		script = emitkit.FailLoud(caps.StepScript, c.jp, "no step of the job has a Drone form")
+		e.emulate(c.jp, caps.StepScript, "failing step", "Drone needs a step; no step of the job has a Drone form, so a step that prints the loss and exits 1 stands in")
+	} else {
+		e.emulate(c.jp, caps.StepScript, "no-op step", "Drone needs a step; the job has no step to run, so a no-op step stands in")
+	}
 	e.mark(caps.StepScript, c.jp)
-	e.lose(c.jp+"/step/script", caps.StepScript, "the job has no steps; a no-op step keeps the document valid")
+	why := "the job has no steps; a no-op step keeps the document valid"
+	if script != noopScript {
+		why = "no step of the job has a Drone form; a step that prints the loss and exits 1 keeps the document valid and the pipeline honest"
+	}
+	e.note(c.jp+"/step/script", caps.StepScript, caps.Lost, "", why)
 	m := newYMap()
 	m.set("name", ystr(placeholderName))
 	img, err := e.stepImage(c, c.jp, &ir.Step{})
@@ -611,7 +629,7 @@ func (e *emitter) placeholder(c *docCtx) (stepDone, error) {
 		return stepDone{}, err
 	}
 	m.set(keyImage, ystr(img))
-	m.set(keyCommands, ystrSeq([]string{"true"}))
+	m.set(keyCommands, ystrSeq([]string{script}))
 	return stepDone{m: m}, nil
 }
 

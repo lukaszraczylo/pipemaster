@@ -2,15 +2,15 @@
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v4\next:\n    gha:\n        _derived_id: true\nid: build-step-1\nkind: action\n","get":"source","params":"null"}
 # pipemaster:lost uses: org/tool@v2
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://git.example.com\n    owner: org\n    repo: tool\n    ref: v2\next:\n    gha:\n        _derived_id: true\nid: build-step-2\nkind: action\n","task":"build-step-2","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"build-step-2\"}"}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://git.example.com\n    owner: org\n    repo: tool\n    ref: v2\next:\n    gha:\n        _derived_id: true\nid: build-step-2\nkind: action\n","task":"build-step-2","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: Concourse does not run the action' \\u003e\\u00262; exit 1\"],\"path\":\"sh\"}},\"task\":\"build-step-2\"}"}
 # pipemaster:lost uses: org/local-action@main
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-3
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'self:'\n    owner: org\n    repo: local-action\n    ref: main\next:\n    gha:\n        _derived_id: true\nid: build-step-3\nkind: action\n","task":"build-step-3","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"build-step-3\"}"}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'self:'\n    owner: org\n    repo: local-action\n    ref: main\next:\n    gha:\n        _derived_id: true\nid: build-step-3\nkind: action\n","task":"build-step-3","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: Concourse does not run the action' \\u003e\\u00262; exit 1\"],\"path\":\"sh\"}},\"task\":\"build-step-3\"}"}
 # pipemaster:lost uses: /checkout
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-4
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'builtin:'\n    repo: checkout\next:\n    gha:\n        _derived_id: true\nid: build-step-4\nkind: action\n","task":"build-step-4","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"build-step-4\"}"}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'builtin:'\n    repo: checkout\next:\n    gha:\n        _derived_id: true\nid: build-step-4\nkind: action\n","task":"build-step-4","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-4: Concourse does not run the action' \\u003e\\u00262; exit 1\"],\"path\":\"sh\"}},\"task\":\"build-step-4\"}"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"36d64a944025e5474627ace1adbc8648b5119f3b29802cb25ecca48ffcffb5ac","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"dd29c1dcbfac0225dbee0fa986c7799a224c7f870d405fbf3127ffb1b8d81ad2","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -45,7 +45,7 @@ jobs:
             path: sh
             args:
               - -ec
-              - "true"
+              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: Concourse does not run the action'' >&2; exit 1'
       - task: build-step-3
         config:
           platform: linux
@@ -58,7 +58,7 @@ jobs:
             path: sh
             args:
               - -ec
-              - "true"
+              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: Concourse does not run the action'' >&2; exit 1'
       - task: build-step-4
         config:
           platform: linux
@@ -71,4 +71,4 @@ jobs:
             path: sh
             args:
               - -ec
-              - "true"
+              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-4: Concourse does not run the action'' >&2; exit 1'

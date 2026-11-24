@@ -230,7 +230,7 @@ func (s *scope) scriptLine(path, line string) (out, why string, err error) {
 	return out, "", nil
 }
 
-// scriptLines converts the lines of a script; a statement with no spelling is commented out whole.
+// scriptLines converts the lines of a script; a statement with no spelling is commented out whole and a failing line takes its place.
 func (s *scope) scriptLines(path string, script []string) []string {
 	e := s.jx.pe.e
 	lines := make([]string, len(script))
@@ -267,7 +267,9 @@ func (s *scope) scriptLines(path string, script []string) []string {
 			}
 			out = append(out, lostPrefix+noVarSyntax(commentSafe(script[k])))
 		}
-		e.lose(path, caps.ScriptInterpolation, emitkit.SpanDetail(first, sp.To-sp.From+1, sp.Open))
+		detail := emitkit.SpanDetail(first, sp.To-sp.From+1, sp.Open)
+		e.lose(path, caps.ScriptInterpolation, detail)
+		out = append(out, emitkit.FailLoud(caps.ScriptInterpolation, path, detail))
 		i = sp.To
 	}
 	return out

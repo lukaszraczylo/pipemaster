@@ -27,6 +27,7 @@ spec:
         if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
         set -e
         # pipemaster:lost script.interpolation: docker inspect {{ steps.meta.outputs.version }}
+        printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/check/step/check-step-2: no Tekton spelling for expression steps.meta.outputs.version; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
       when:
         - input: $(params.ctx-event)
           operator: notin

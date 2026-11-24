@@ -4,4 +4,4 @@ Loss report: gitlab -> drone
 [lost] pipeline/gitlab-ci/job/downstream/step/script step.script (the job has no steps; a no-op step keeps the document valid)
 [emulated] pipeline/gitlab-ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/gitlab-ci/job/downstream job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
-[emulated] pipeline/gitlab-ci/job/downstream step.script: no-op step (Drone needs a step; no step of the job has a Drone form, so a no-op step stands in)
+[emulated] pipeline/gitlab-ci/job/downstream step.script: no-op step (Drone needs a step; the job has no step to run, so a no-op step stands in)

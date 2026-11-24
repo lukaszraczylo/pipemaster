@@ -13,6 +13,6 @@ build:
   rules:
     - when: never
   script:
-    # pipemaster:lost script.interpolation pipeline/ci/job/build/step/build-step-1: echo {{ opaque(gha): env[github.job] }}
-    - "true"
     # pipemaster:step build-step-1
+    # pipemaster:lost script.interpolation pipeline/ci/job/build/step/build-step-1: echo {{ opaque(gha): env[github.job] }}
+    - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no GitLab variable for expression opaque(gha): env[github.job]; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'

@@ -125,9 +125,8 @@ func (e *emitter) actionStep(p *jobPrep, st *ir.Step) error {
 	e.stepLosses(sp, st)
 	if st.Action == nil || st.Kind == ir.StepPipelineCall {
 		e.lose(sp, caps.StepAction, "step kind "+string(st.Kind)+" has no GitLab form")
-		p.pending = append(p.pending, lostPrefix+commentSafe("step "+st.ID+" kind "+string(st.Kind)))
 		e.unappliedFields(sp, st, "the step is lost")
-		return nil
+		return e.lostStep(p, st, "kind "+string(st.Kind), "the step kind has no GitLab form")
 	}
 	with := map[string]string{}
 	for k, v := range st.With {
@@ -141,18 +140,16 @@ func (e *emitter) actionStep(p *jobPrep, st *ir.Step) error {
 	t, ok := actions.Lookup(*st.Action, "gitlab", with)
 	if !ok {
 		e.lose(sp, caps.StepAction, "no GitLab mapping for action "+ghaRef(st.Action))
-		p.pending = append(p.pending, lostPrefix+commentSafe("step "+st.ID+" uses "+ghaRef(st.Action)))
 		e.unappliedFields(sp, st, "the step is lost")
-		return nil
+		return e.lostStep(p, st, "uses "+ghaRef(st.Action), "no GitLab mapping for the action")
 	}
 	e.led.Note(e.use(sp, caps.StepAction), t.Support, t.Support.Caveat)
 	for _, k := range t.Unmapped {
 		e.lose(sp, caps.StepAction, "input "+k+" has no GitLab equivalent")
 	}
 	if t.Support.Level == caps.Lost {
-		p.pending = append(p.pending, lostPrefix+commentSafe("step "+st.ID+" uses "+ghaRef(st.Action)+": "+t.Support.Caveat))
 		e.unappliedFields(sp, st, "the step is lost")
-		return nil
+		return e.lostStep(p, st, "uses "+ghaRef(st.Action)+": "+t.Support.Caveat, "the action has no GitLab form")
 	}
 	if !carriedKind(t.Kind) {
 		const detail = "the action reference %s is not in the GitLab file; it is kept in round-trip metadata"
@@ -220,6 +217,7 @@ func (e *emitter) applyTarget(p *jobPrep, sp string, st *ir.Step, t actions.Targ
 		c, err := e.cacheAction(p, sp, t)
 		if err != nil || c == nil {
 			if err == nil {
+				// A cache only saves time, so its loss keeps the comment and fails nothing.
 				p.pending = append(p.pending, lostPrefix+commentSafe("step "+st.ID+" uses "+ghaRef(st.Action)))
 			}
 			return err
@@ -233,9 +231,25 @@ func (e *emitter) applyTarget(p *jobPrep, sp string, st *ir.Step, t actions.Targ
 		}
 	default:
 		e.lose(sp, caps.StepAction, "action kind "+t.Kind+" has no GitLab form")
-		p.pending = append(p.pending, lostPrefix+commentSafe("step "+st.ID+" uses "+ghaRef(st.Action)))
+		return e.lostStep(p, st, "uses "+ghaRef(st.Action), "the action kind has no GitLab form")
 	}
 	return nil
+}
+
+// lostStep keeps the lost step in the file as a comment and as a script line that prints the loss and exits 1, so
+// the job stops where the source step would have run. The condition and continue-on-error of the step still apply.
+func (e *emitter) lostStep(p *jobPrep, st *ir.Step, what, why string) error {
+	sp := stepPath(p.path, st.ID)
+	p.pending = append(p.pending, lostPrefix+commentSafe("step "+st.ID+" "+what))
+	if st.If != nil {
+		// An always() or failure() step runs after the job's other lines, and after_script cannot fail the job.
+		if _, status, _ := splitStatus(st.If); status != "" && status != "success" {
+			return nil
+		}
+	}
+	c := *st
+	c.Env, c.WorkDir = nil, ""
+	return e.placeLines(p, &c, []string{emitkit.FailLoud(caps.StepAction, sp, why)})
 }
 
 func (e *emitter) setImage(p *jobPrep, sp, image string) error {

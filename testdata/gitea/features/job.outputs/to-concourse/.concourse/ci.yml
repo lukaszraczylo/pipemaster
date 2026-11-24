@@ -1,9 +1,9 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"outputs","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/use/step/use-step-1/carry
-# pipemaster:arg {"digest":"414ec9b45fa4240dacbb701b0ef5aa6754fd0fb6caf548284d1063d5d4e04e6f","carry":"id: use-step-1\nkind: script\nscript:\n    - echo $\u007b{ needs.version.outputs.tag }}\n"}
+# pipemaster:arg {"digest":"3c9ae4822c3801e26a0f292189ec8daed71c6a52b8c5d731ee0b83635b3534d8","carry":"id: use-step-1\nkind: script\nscript:\n    - echo $\u007b{ needs.version.outputs.tag }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/use/carry
-# pipemaster:arg {"digest":"dc4d2d2686cb2682dd39674fa0a0aefca9193af6e07cabdecbe2f2240f7ec45e","carry":"id: use\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: version\n"}
+# pipemaster:arg {"digest":"c6867fd60fe9c5a1dff62b23d5949b5da0fba1a31ab3d6caf20f3b75834048ae","carry":"id: use\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: version\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/version/step/tag/carry
 # pipemaster:arg {"digest":"559fc337e2f3fcf90924154f3181280aa7cb4cbbb0a0fd844a986e116b1a65ea","carry":"id: tag\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/version/carry
@@ -57,7 +57,9 @@ jobs:
               - -c
               - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
               - pipemaster
-              - '# pipemaster:lost echo {{ needs.version.outputs.tag }}'
+              - |-
+                # pipemaster:lost echo {{ needs.version.outputs.tag }}
+                printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/use/step/use-step-1: no Concourse spelling for expression needs.version.outputs.tag; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
             dir: workspace
         tags:
           - ubuntu-latest

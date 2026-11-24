@@ -10,9 +10,11 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
+	// noopScript runs in a step that only keeps the Task valid and stands for no source work.
 	noopScript   = "true"
 	noopStepName = "noop"
 	// placeholderStepID is the step ID that every provider reports for the step it adds to a job without steps.
@@ -99,8 +101,15 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 		return nil, err
 	}
 	if len(b.nodes) == 0 {
-		tc.e.lose(jp.path+"/step/"+placeholderStepID, caps.StepScript, "the job has no steps; a no-op step keeps the Task valid")
-		tc.e.emulate(jp.path, caps.StepScript, "placeholder step", "the job has no step and a Task needs one; a step that runs "+noopScript+" stands in")
+		script := noopScript
+		if tc.e.lostStepWork(jp.path) {
+			script = emitkit.FailLoud(caps.StepScript, jp.path, "no step of the job has a Tekton form")
+			tc.e.noteLost(jp.path+"/step/"+placeholderStepID, caps.StepScript, "no step of the job has a Tekton form; a step that prints the loss and exits 1 keeps the Task valid and the pipeline honest")
+			tc.e.emulate(jp.path, caps.StepScript, "failing step", "the job has no step with a Tekton form and a Task needs one; a step that prints the loss and exits 1 stands in")
+		} else {
+			tc.e.lose(jp.path+"/step/"+placeholderStepID, caps.StepScript, "the job has no steps; a no-op step keeps the Task valid")
+			tc.e.emulate(jp.path, caps.StepScript, "placeholder step", "the job has no step and a Task needs one; a step that runs "+noopScript+" stands in")
+		}
 		image := firstNonEmpty(tc.containerRef, defaultImage)
 		if err := tc.e.markArg(caps.StepScript, jp.path, imageArg{Image: image}); err != nil {
 			return nil, err
@@ -108,7 +117,7 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 		m := newMap()
 		m.SetStr("name", noopStepName)
 		m.SetStr("image", image)
-		lines, sc := []string{noopScript}, newScope()
+		lines, sc := []string{script}, newScope()
 		if b.guard != nil {
 			var err error
 			if lines, err = exprtekton.AddGuard(lines, b.guard); err != nil {

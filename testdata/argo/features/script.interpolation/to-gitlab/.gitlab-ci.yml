@@ -13,3 +13,4 @@ build:
     # pipemaster:step build-step-1
     # pipemaster:lost script.interpolation pipeline/ci/job/build/step/build-step-1: echo "{{ gha.github.workspace }}"
     - echo "sha $CI_COMMIT_SHA on $CI_COMMIT_REF_NAME"
+    - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no GitLab variable for expression gha.github.workspace; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'

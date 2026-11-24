@@ -1,8 +1,7 @@
 # pipemaster:lost script.interpolation pipeline/ci/job/build/step/build-step-1: echo {{ ref_name }}
-# pipemaster:lost step.script pipeline/ci/job/build/step/build-step-1: the step has no command left
-# pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
-# pipemaster:arg {"step":"id: build-step-1\nkind: script\nscript:\n    - echo $$\u007b{ ref_name }}\n","at":0}
 # pipemaster:emulated job.container pipeline/ci/job/build
+# pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"if":"ref_name == 'main'","back":"(ref == 'refs/heads/main') || (tag == 'main')"}
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
 kind: pipeline
 type: docker
@@ -12,6 +11,14 @@ trigger:
     - push
     - tag
 steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Drone spelling for expression ref_name; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'
+    when:
+      ref:
+        - refs/heads/main
+        - refs/tags/main
   - name: build-step-2
     image: ubuntu:latest
     commands:

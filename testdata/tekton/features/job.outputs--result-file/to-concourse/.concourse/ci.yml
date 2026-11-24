@@ -1,9 +1,9 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"outputs","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/use/step/use-step-1/carry
-# pipemaster:arg {"digest":"c5012206d25b5c15fe4eb4f0d2db56c9b04d57fffa94463bfd16a2399fb4c8dd","carry":"id: use-step-1\nkind: script\nscript:\n    - echo $\u007b{ needs.version.outputs.tag }}\n"}
+# pipemaster:arg {"digest":"acf40159d175398bbc76e1cca8f0b7dbe828bc8ab0406da6599cdfeff111452d","carry":"id: use-step-1\nkind: script\nscript:\n    - echo $\u007b{ needs.version.outputs.tag }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/use/carry
-# pipemaster:arg {"digest":"ecdbed8edc2c6465abb275bc22bc1dd4ae72bb39874e4e4a62d9639aa6a766cb","carry":"id: use\nneeds:\n    - job: version\n"}
+# pipemaster:arg {"digest":"734188dbaae0062def0bd8f6df2025f386aad9e0710176d78103063d74bb95cf","carry":"id: use\nneeds:\n    - job: version\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/version/step/tag/carry
 # pipemaster:arg {"digest":"e6b7105fcadb99b18ced88416a11b50f6c8a5b0556e9d844c49e448498f87cf6","carry":"image:\n    ref: alpine:3.22\nid: tag\nkind: script\nscript:\n    - printf '%s' v1 \u003e $(results.tag.path)\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/version/carry
@@ -50,7 +50,9 @@ jobs:
             path: sh
             args:
               - -ec
-              - '# pipemaster:lost echo {{ needs.version.outputs.tag }}'
+              - |-
+                # pipemaster:lost echo {{ needs.version.outputs.tag }}
+                printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/use/step/use-step-1: no Concourse spelling for expression needs.version.outputs.tag; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
             dir: workspace
   - name: version
     plan:

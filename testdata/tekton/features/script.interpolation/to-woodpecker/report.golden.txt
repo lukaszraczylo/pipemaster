@@ -1,4 +1,4 @@
 Loss report: tekton -> woodpecker
 [lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
-[lost] pipeline/ci/job/build/step/build-step-1 script.interpolation (no Woodpecker spelling for expression ref_name; the line is commented out)
+[lost] pipeline/ci/job/build/step/build-step-1 script.interpolation (no Woodpecker spelling for expression ref_name; the line is replaced by a line that prints the loss and exits 1)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

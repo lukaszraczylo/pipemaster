@@ -1,5 +1,5 @@
 # pipemaster:emulated step.action pipeline/drone/job/ci/step/publish
-# pipemaster:arg {"step":"image:\n    ref: woodpeckerci/plugin-docker-buildx\nwith:\n    repo:\n        lit: example/app\n    tags:\n        lit: latest\nid: publish\nkind: plugin\n","hold":"{\"args\":[\"true\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"woodpeckerci/plugin-docker-buildx\",\"name\":\"publish\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:arg {"step":"image:\n    ref: woodpeckerci/plugin-docker-buildx\nwith:\n    repo:\n        lit: example/app\n    tags:\n        lit: latest\nid: publish\nkind: plugin\n","hold":"{\"args\":[\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/drone/job/ci/step/publish: Argo does not run the action' \\u003e\\u00262; exit 1\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"woodpeckerci/plugin-docker-buildx\",\"name\":\"publish\",\"workingDir\":\"/workspace\"}"}
 # pipemaster:emulated trigger.filter.branches pipeline/drone/trigger/0
 # pipemaster:emulated trigger.push pipeline/drone/trigger/0
 apiVersion: argoproj.io/v1alpha1
@@ -31,7 +31,7 @@ spec:
               - sh
               - -ec
             args:
-              - "true"
+              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/drone/job/ci/step/publish: Argo does not run the action'' >&2; exit 1'
             workingDir: /workspace
             dependencies:
               - build

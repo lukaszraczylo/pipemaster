@@ -24,4 +24,4 @@ steps:
   - name: noop
     image: golang:1.24
     commands:
-      - "true"
+      - 'printf ''%s\n'' ''pipemaster: lost: step.script pipeline/ci/job/build: no step of the job has a Woodpecker form'' >&2; exit 1'

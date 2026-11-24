@@ -16,16 +16,18 @@ import (
 
 const (
 	placeholderName = "noop"
-	stepKey         = "step-"
-	failKey         = "failure"
-	envKey          = "environment"
-	settKey         = "settings"
-	cmdsKey         = "commands"
-	imageKey        = "image"
-	dirKey          = "directory"
-	nameKey         = "name"
-	entryKey        = "entrypoint"
-	extDerive       = ExtDerivedID
+	// noopScript runs in a step that only keeps the workflow valid and stands for no source work.
+	noopScript = "true"
+	stepKey    = "step-"
+	failKey    = "failure"
+	envKey     = "environment"
+	settKey    = "settings"
+	cmdsKey    = "commands"
+	imageKey   = "image"
+	dirKey     = "directory"
+	nameKey    = "name"
+	entryKey   = "entrypoint"
+	extDerive  = ExtDerivedID
 )
 
 // stepDone is one emitted step: the node and the map key it has in map form.
@@ -337,8 +339,12 @@ func (e *emitter) scriptStep(c *wfCtx, sp string, st *ir.Step) (*wmap, error) {
 		}
 		why[i] = noSpelling(lost)
 	}
-	for _, i := range e.commentSpans(sp, texts, why) {
-		out, _, err := e.command(b, texts[i])
+	for _, p := range e.commentSpans(sp, texts, why) {
+		if p.Lost {
+			lines = append(lines, block(emitkit.FailLoud(caps.ScriptInterpolation, sp, p.Detail)))
+			continue
+		}
+		out, _, err := e.command(b, texts[p.Index])
 		if err != nil {
 			return nil, err
 		}
@@ -481,9 +487,16 @@ func (e *emitter) settingNode(sp string, v ir.Value) (*yaml.Node, error) {
 
 // placeholder is the one step of a workflow that has none Woodpecker can run; Woodpecker rejects a workflow without steps.
 func (e *emitter) placeholder(c *wfCtx) (stepDone, error) {
-	e.emulate(c.jp, caps.StepScript, "no-op step", "Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in")
+	script, why := noopScript, "the job has no steps; a no-op step keeps the workflow valid"
+	if e.lostStepWork(c.jp) {
+		script = emitkit.FailLoud(caps.StepScript, c.jp, "no step of the job has a Woodpecker form")
+		why = "no step of the job has a Woodpecker form; a step that prints the loss and exits 1 keeps the workflow valid and the pipeline honest"
+		e.emulate(c.jp, caps.StepScript, "failing step", "Woodpecker needs a step; no step of the job has a Woodpecker form, so a step that prints the loss and exits 1 stands in")
+	} else {
+		e.emulate(c.jp, caps.StepScript, "no-op step", "Woodpecker needs a step; the job has no step to run, so a no-op step stands in")
+	}
 	e.mark(caps.StepScript, c.jp)
-	e.lose(c.jp+"/step/script", caps.StepScript, "the job has no steps; a no-op step keeps the workflow valid")
+	e.noteLost(c.jp+"/step/script", caps.StepScript, why)
 	m := newMap()
 	m.set(nameKey, str(placeholderName))
 	img, err := e.stepImage(c, c.jp, &ir.Step{})
@@ -491,6 +504,6 @@ func (e *emitter) placeholder(c *wfCtx) (stepDone, error) {
 		return stepDone{}, err
 	}
 	m.set(imageKey, str(img))
-	m.set(cmdsKey, strSeq([]string{"true"}))
+	m.set(cmdsKey, strSeq([]string{script}))
 	return stepDone{node: m.n, key: placeholderName}, nil
 }

@@ -704,7 +704,7 @@ func TestNoPosixGuardOnWindows(t *testing.T) {
 }
 
 func TestDependencyOnAnUnwrittenStepIsReported(t *testing.T) {
-	a := gstep("a", "echo ${{ steps.x.outputs.y }}")
+	a := gstep("a")
 	b := gstep("b", "make")
 	b.Ext = ir.Ext{"drone": map[string]any{"depends_on": []any{"a"}}}
 	_, rep := emitText(t, gproject("drone", gjob("j", a, b)))

@@ -136,7 +136,7 @@ func decodeYAMLArg(args []string, v any) bool {
 func validPos(j *ir.Job, pos int) bool { return pos >= 0 && pos < len(j.Steps) }
 
 func isPlaceholder(st *ir.Step) bool {
-	return st.ID == placeholderName && slices.Equal(st.Script, []string{"true"})
+	return st.ID == placeholderName && (slices.Equal(st.Script, []string{noopScript}) || emitkit.IsFailLoud(st.Script))
 }
 
 // dropGuardShape removes the command shape of a guard line, which the script no longer holds.

@@ -10,7 +10,7 @@ jobs:
       - uses: org/tool@v2
       # pipemaster:lost step.action pipeline/ci/job/build/step/build-step-3: self:org/local-action@main
       - if: false
-        run: "true"
+        run: 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: the condition is replaced by false because the action host has no form in this dialect; an absent condition is recorded as absent'' >&2; exit 1'
       # pipemaster:lost step.action pipeline/ci/job/build/step/build-step-4: builtin:checkout
       - if: false
-        run: "true"
+        run: 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-4: the condition is replaced by false because the action host has no form in this dialect; an absent condition is recorded as absent'' >&2; exit 1'

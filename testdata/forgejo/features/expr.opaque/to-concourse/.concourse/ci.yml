@@ -1,11 +1,11 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"opaque","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"60e2dfa91b409514e3fe728d05a0905ddc1fad70c182a1843d049498d35252d7","carry":"id: build-step-1\nkind: script\nscript:\n    - 'echo $\u007b{ opaque(gha): env[github.job] }}'\n"}
+# pipemaster:arg {"digest":"9d86fd9b68f7b5bfa6140355098ac96b52617a72f2929e4a4616d3bd5dae7217","carry":"id: build-step-1\nkind: script\nscript:\n    - 'echo $\u007b{ opaque(gha): env[github.job] }}'\n"}
 # pipemaster:emulated job.manual pipeline/ci/job/build
 # pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"60e2c7bfc1f362beec18c47324438a5a20d2ff68132df42df70506a6c2f6edab","carry":"if: 'opaque(gha): fromJSON(''{\"a\":1}'').a == 1'\nid: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"7f8e51c24656197e82db497447218f0df7339b1758926e2fdfc7ffbd27b2cd44","carry":"if: 'opaque(gha): fromJSON(''{\"a\":1}'').a == 1'\nid: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: ci\nname: opaque\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -48,7 +48,9 @@ jobs:
               - -c
               - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
               - pipemaster
-              - '# pipemaster:lost echo {{ opaque(gha): env[github.job] }}'
+              - |-
+                # pipemaster:lost echo {{ opaque(gha): env[github.job] }}
+                printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Concourse spelling for expression opaque(gha): env[github.job]; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
             dir: workspace
         tags:
           - ubuntu-latest

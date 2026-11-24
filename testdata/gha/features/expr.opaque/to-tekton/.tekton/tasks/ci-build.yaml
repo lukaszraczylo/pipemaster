@@ -14,3 +14,4 @@ spec:
         if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
         set -e
         # pipemaster:lost script.interpolation: echo {{ opaque(gha): env[github.job] }}
+        printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Tekton spelling for expression opaque(gha): env[github.job]; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
