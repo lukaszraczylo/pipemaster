@@ -1,4 +1,5 @@
 Loss report: drone -> forgejo
+[emulated] pipeline/ci job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/ci pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)
 [emulated] pipeline/ci/job/test job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/ci/job/test/step/test step.image: uses: docker://<image> with entrypoint and args

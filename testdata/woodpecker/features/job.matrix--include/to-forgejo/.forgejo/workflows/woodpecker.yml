@@ -1,5 +1,7 @@
 # pipemaster:emulated trigger.push pipeline/woodpecker/trigger/0
 # pipemaster:emulated pipeline.concurrency pipeline/woodpecker
+# pipemaster:emulated job.if pipeline/woodpecker/job/ci
+# pipemaster:arg {"from":"woodpecker","guard":true}
 # pipemaster:emulated job.runner pipeline/woodpecker/job/ci
 on:
   push:
@@ -10,6 +12,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   ci:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     strategy:
       matrix:

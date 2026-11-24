@@ -1,4 +1,6 @@
 # pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
 # pipemaster:emulated job.cache pipeline/gitlab-ci/job/build
 # pipemaster:arg {"cache":[{"Key":"$\u007b{ hashFiles('go.sum') }}","Policy":"pull-push","Paths":[".cache/go-build"]}],"pre":2,"post":0}
@@ -9,6 +11,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: https://github.com/actions/checkout@v7

@@ -1,4 +1,6 @@
 # pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/release
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/release
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/release
 # pipemaster:arg {"pre":1,"post":0}
@@ -11,6 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: https://github.com/actions/checkout@v7

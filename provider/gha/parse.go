@@ -38,6 +38,11 @@ func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	}
 	switch {
 	case !scan.restored():
+		// Only the deletion guards named a source: the project still reads as that dialect's, or a later emit to
+		// GHA would run its jobs on a branch deletion.
+		if g := scan.guardOrigins; len(g) > 0 && !scan.nativeConds && !slices.ContainsFunc(g, func(o string) bool { return o != g[0] }) {
+			proj.Origin.Provider, proj.Origin.Dialect = g[0], g[0]
+		}
 	case scan.mixed():
 		// Restored conditions read in their source dialect and native ones in GHA's, and the project holds one
 		// dialect, so no file restores its source conditions.
@@ -63,8 +68,10 @@ func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 type condScan struct {
 	restoredFiles []string
 	// origins holds the source dialect of each restored file, in the order of restoredFiles.
-	origins     []string
-	nativeConds bool
+	origins []string
+	// guardOrigins holds the source dialect of each file whose deletion guard was stripped.
+	guardOrigins []string
+	nativeConds  bool
 }
 
 func (c condScan) restored() bool { return len(c.restoredFiles) > 0 }
@@ -102,7 +109,11 @@ func (a *adapter) parseFiles(fsys fs.FS, files []string, rep *report.Report, res
 		if err != nil {
 			return nil, scan, err
 		}
-		if from := collapseMarkers(&emitter{d: a.d, led: emitkit.NewLedger("", a.d.ID, a.Caps())}, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src), rep, restoreConds); from != "" {
+		from, guardFrom := collapseMarkers(&emitter{d: a.d, led: emitkit.NewLedger("", a.d.ID, a.Caps())}, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src), rep, restoreConds)
+		if guardFrom != "" {
+			scan.guardOrigins = append(scan.guardOrigins, guardFrom)
+		}
+		if from != "" {
 			scan.restoredFiles = append(scan.restoredFiles, f)
 			scan.origins = append(scan.origins, from)
 		} else if hasConds(pl) {

@@ -1,4 +1,6 @@
 # pipemaster:emulated trigger.push pipeline/woodpecker/trigger/0
+# pipemaster:emulated job.if pipeline/woodpecker/job/ci
+# pipemaster:arg {"from":"woodpecker","guard":true}
 # pipemaster:emulated job.runner pipeline/woodpecker/job/ci
 # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/build
 # pipemaster:arg {"kind":"script","image":{"Ref":"golang:1.25","Entrypoint":null},"script":["go build ./..."]}
@@ -10,6 +12,7 @@ concurrency:
   group: deploy
 jobs:
   ci:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/build

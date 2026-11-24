@@ -1,4 +1,5 @@
 Loss report: drone -> gitea
+[emulated] pipeline/drone job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/drone/job/ci job.cache: actions/cache step
 [emulated] pipeline/drone/job/ci job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/drone/job/ci/step/build step.image: uses: docker://<image> with entrypoint and args

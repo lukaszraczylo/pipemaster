@@ -3,6 +3,7 @@ package gha
 import (
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"time"
 
@@ -171,6 +172,11 @@ func (e *emitter) needIDs(c jobCtx, j *ir.Job) []string {
 // A condition GHA cannot state disables the job rather than running it unguarded.
 func (e *emitter) jobCondition(c jobCtx, jp string, j *ir.Job, call *ir.Step) (*yaml.Node, []string) {
 	cond := j.If
+	guard := !j.Manual && e.deletionGuarded(c.pl)
+	e.guardJob, e.guardMarked = "", false
+	if guard {
+		e.guardJob = jp
+	}
 	if cond != nil {
 		t, ok := e.source(jp, caps.JobIf, cond)
 		if ok {
@@ -204,6 +210,10 @@ func (e *emitter) jobCondition(c jobCtx, jp string, j *ir.Job, call *ir.Step) (*
 	}
 	if c.finally {
 		cond = andExpr(expr.Call{Name: "always"}, cond)
+	}
+	if guard {
+		cond = andExpr(cond, deletedGuard())
+		e.guardMarker(c.pl, jp)
 	}
 	if cond == nil {
 		return nil, markers
@@ -525,4 +535,36 @@ func narrowsMatrix(j *ir.Job, id string) bool {
 	_, inst := n["_instance"]
 	_, par := n["parallel"]
 	return inst || par
+}
+
+// deletionGuarded is true when jobs of pl need the deletion guard: GHA starts a push workflow when a branch is
+// deleted, and every other provider starts nothing, so a project from another provider must not run there.
+func (e *emitter) deletionGuarded(pl *ir.Pipeline) bool {
+	if e.from == nil {
+		return false
+	}
+	if slices.ContainsFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerPush || t.Kind == ir.TriggerTag }) {
+		return true
+	}
+	events, _ := e.ext(pl.Ext)[extEvents].(map[string]any)
+	_, ok := events["push"]
+	return ok
+}
+
+// guardMarker tags a job's deletion guard so Parse strips it, and reports it once for the workflow.
+func (e *emitter) guardMarker(pl *ir.Pipeline, jp string) {
+	if !e.guarded[pl.ID] {
+		if e.guarded == nil {
+			e.guarded = map[string]bool{}
+		}
+		e.guarded[pl.ID] = true
+		e.emulate("pipeline/"+pl.ID, caps.JobIf, "!github.event.deleted on every job",
+			"GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard")
+	}
+	if e.guardMarked {
+		return
+	}
+	if err := e.markArg(caps.JobIf, jp, srcArg{Guard: true, From: markFrom(e.from)}); err != nil {
+		e.comment("deletion guard not carried: " + err.Error())
+	}
 }

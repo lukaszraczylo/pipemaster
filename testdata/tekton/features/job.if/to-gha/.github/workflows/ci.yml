@@ -1,5 +1,5 @@
 # pipemaster:emulated job.if pipeline/ci/job/deploy
-# pipemaster:arg {"src":"(ref == 'refs/heads/main') \u0026\u0026 (event == 'push')","from":"tekton"}
+# pipemaster:arg {"src":"(ref == 'refs/heads/main') \u0026\u0026 (event == 'push')","from":"tekton","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/deploy
 name: cond
 on:

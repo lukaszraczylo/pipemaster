@@ -1,4 +1,5 @@
 Loss report: woodpecker -> gitea
+[emulated] pipeline/woodpecker job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/woodpecker/job/ci job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/woodpecker/job/ci/step/build step.image: uses: docker://<image> with entrypoint and args
 [emulated] pipeline/woodpecker/trigger/0 trigger.tag: tags: '**' (GHA fires tag pushes only when a tags filter names them)

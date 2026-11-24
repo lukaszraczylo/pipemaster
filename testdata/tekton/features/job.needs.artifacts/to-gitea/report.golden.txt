@@ -1,4 +1,5 @@
 Loss report: tekton -> gitea
+[emulated] pipeline/gitlab-ci job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/gitlab-ci/job/compile job.artifacts: upload-artifact step at job end
 [emulated] pipeline/gitlab-ci/job/compile job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/gitlab-ci/job/docs job.runner: default runner label ubuntu-latest (the IR holds no runner label)

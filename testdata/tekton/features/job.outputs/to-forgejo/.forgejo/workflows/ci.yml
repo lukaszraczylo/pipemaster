@@ -1,5 +1,9 @@
 # pipemaster:emulated pipeline.concurrency pipeline/ci
+# pipemaster:emulated job.if pipeline/ci/job/use
+# pipemaster:arg {"from":"tekton","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/use
+# pipemaster:emulated job.if pipeline/ci/job/version
+# pipemaster:arg {"from":"tekton","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/version
 name: outputs
 on:
@@ -11,11 +15,13 @@ jobs:
   use:
     needs:
       - version
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - id: use-step-1
         run: echo ${{ needs.version.outputs.tag }}
   version:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - id: tag

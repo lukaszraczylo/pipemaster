@@ -18,7 +18,7 @@ import (
 
 // collapseMarkers undoes the emulations another provider's emitter marked in the file, so a pipeline that
 // travelled through GHA and came back carries no trace of the detour.
-func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string, rep *report.Report, restoreConds bool) (condsFrom string) {
+func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string, rep *report.Report, restoreConds bool) (condsFrom, guardFrom string) {
 	carriedDone := map[string]bool{}
 	finallyPaths := map[string]bool{}
 	for _, u := range uses {
@@ -26,6 +26,7 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			finallyPaths[u.IRPath] = true
 		}
 	}
+	guardFrom = stripGuards(pl, rep, uses, args)
 	// Condition markers run last: they compare against the condition once the guards are gone.
 	slices.SortStableFunc(uses, func(a, b ir.FeatureUse) int { return condRank(a.Feature) - condRank(b.Feature) })
 	for _, u := range uses {
@@ -90,7 +91,7 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			dropMatchAll(pl, ir.TriggerTag, func(t *ir.Trigger) *ir.Filter { return &t.Tags })
 		}
 	}
-	return condsFrom
+	return condsFrom, guardFrom
 }
 
 func markedJob(pl *ir.Pipeline, path string) *ir.Job {
@@ -227,6 +228,53 @@ func sourceCond(rep *report.Report, u ir.FeatureUse, args []string, parsed expr.
 	return parsed
 }
 
+// stripGuards removes the deletion guard the emitter ANDed onto each marked job condition, before any other
+// marker reads the condition, and returns the source dialect the markers name. A guard without a marker is the
+// author's and stays.
+func stripGuards(pl *ir.Pipeline, rep *report.Report, uses []ir.FeatureUse, args map[ir.FeatureUse][]string) (from string) {
+	for _, u := range uses {
+		if u.Feature != caps.JobIf || !strings.HasPrefix(u.IRPath, "pipeline/"+pl.ID+"/job/") {
+			continue
+		}
+		for _, a := range args[u] {
+			var s srcArg
+			if json.Unmarshal([]byte(a), &s) != nil || !s.Guard {
+				continue
+			}
+			src, ok := foreignLang(s.From)
+			switch {
+			case !ok:
+				rep.Add(ignoredMarker(u, fmt.Sprintf("the source dialect %q is not a registered GitLab-class dialect", markName(s.From))))
+				continue
+			case from != "" && from != src.ID:
+				rep.Add(ignoredMarker(u, fmt.Sprintf("the file already restores conditions from %q, not %q", from, src.ID)))
+				continue
+			}
+			if j := markedJob(pl, u.IRPath); j != nil {
+				if rest, ok := dropGuard(j.If); ok {
+					j.If = rest
+					from = src.ID
+					continue
+				}
+			}
+			rep.Add(ignoredMarker(u, "the deletion guard was edited after conversion, so the parsed condition stands"))
+		}
+	}
+	return from
+}
+
+// dropGuard returns x without the deletion guard that ends it; ok is false when x does not end with one.
+func dropGuard(x expr.Expr) (expr.Expr, bool) {
+	guard := expr.String(deletedGuard())
+	if x != nil && expr.String(x) == guard {
+		return nil, true
+	}
+	if b, ok := x.(expr.Binary); ok && b.Op == expr.OpAnd && expr.String(b.R) == guard {
+		return b.L, true
+	}
+	return nil, false
+}
+
 func ignoredMarker(u ir.FeatureUse, why string) report.Entry {
 	return report.Entry{IRPath: u.IRPath, Feature: u.Feature, Level: caps.Lost, Strategy: "marker ignored", Detail: "marker ignored: " + why}
 }
@@ -253,10 +301,6 @@ func foreignLang(id string) (*expr.Dialect, bool) {
 // status guard such as `failure() && cond` on its own, so the status call stays and only the other side is
 // replaced. ok is false when the emitter would not have written parsed from src.
 func restoreCond(src, parsed expr.Expr, from expr.Dialect) (expr.Expr, bool) {
-	// The emitter ends every translated condition with the deletion guard; src stands for the part before it.
-	if b, ok := parsed.(expr.Binary); ok && b.Op == expr.OpAnd && expr.String(b.R) == expr.String(deletedGuard()) {
-		return restoreCond(src, b.L, from)
-	}
 	if b, ok := parsed.(expr.Binary); ok && b.Op == expr.OpAnd {
 		switch {
 		case isStatus(b.L) && !isStatus(b.R):

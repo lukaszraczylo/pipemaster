@@ -1,5 +1,6 @@
 Loss report: gitlab -> gitea
 [lost] pipeline/gitlab-ci/job/build job.container (container entrypoint has no GHA key)
+[emulated] pipeline/gitlab-ci job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/gitlab-ci/job/build job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/gitlab-ci/job/build step.action: actions/checkout step (GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs)
 [native] pipeline/gitlab-ci/job/build/synth/checkout step.action (resolves against DEFAULT_ACTIONS_URL; default github)

@@ -1,15 +1,25 @@
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/compile
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/compile
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
 # pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/lint
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/lint
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/lint
 # pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/summary
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/summary
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/summary
 # pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/unit
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/unit
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/unit
 # pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/cleanup
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/cleanup
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/cleanup
 # pipemaster:arg {"pre":1,"post":0}
@@ -19,12 +29,14 @@ on:
   push:
 jobs:
   compile:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - id: script
         run: make build
   lint:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -35,6 +47,7 @@ jobs:
       - compile
       - lint
       - unit
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -44,6 +57,7 @@ jobs:
     needs:
       - compile
       - lint
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -56,7 +70,7 @@ jobs:
       - lint
       - summary
       - unit
-    if: always()
+    if: always() && !github.event.deleted
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

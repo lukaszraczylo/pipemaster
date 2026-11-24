@@ -1,5 +1,6 @@
 Loss report: gitlab -> gha
 [lost] pipeline/gitlab-ci ext.passthrough (Ext of provider gitlab (hidden) is not written to the GHA file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci/job/unit ext.passthrough (Ext of provider gitlab (extends) is not written to the GHA file; it is kept in round-trip metadata)
+[emulated] pipeline/gitlab-ci job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/gitlab-ci/job/unit job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/gitlab-ci/job/unit step.action: actions/checkout step (GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs)

@@ -1,7 +1,11 @@
 # pipemaster:emulated trigger.push pipeline/drone/trigger/0
+# pipemaster:emulated job.if pipeline/drone/job/build
+# pipemaster:arg {"from":"drone","guard":true}
 # pipemaster:emulated job.runner pipeline/drone/job/build
 # pipemaster:emulated step.image pipeline/drone/job/build/step/build
 # pipemaster:arg {"kind":"script","image":{"Ref":"golang:1.25","Entrypoint":null},"script":["go build ./..."]}
+# pipemaster:emulated job.if pipeline/drone/job/notify
+# pipemaster:arg {"from":"drone","guard":true}
 # pipemaster:emulated job.runner pipeline/drone/job/notify
 # pipemaster:emulated step.image pipeline/drone/job/notify/step/notify
 # pipemaster:arg {"kind":"script","image":{"Ref":"alpine:3.20","Entrypoint":null},"script":["./notify.sh"]}
@@ -13,6 +17,7 @@ on:
       - '**'
 jobs:
   build:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       # pipemaster:emulated step.image pipeline/drone/job/build/step/build
@@ -25,7 +30,7 @@ jobs:
   notify:
     needs:
       - build
-    if: always()
+    if: always() && !github.event.deleted
     runs-on: ubuntu-latest
     steps:
       # pipemaster:emulated step.image pipeline/drone/job/notify/step/notify

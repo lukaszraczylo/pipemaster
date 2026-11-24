@@ -1,4 +1,6 @@
 # pipemaster:emulated trigger.push pipeline/drone/trigger/0
+# pipemaster:emulated job.if pipeline/drone/job/ci
+# pipemaster:arg {"from":"drone","guard":true}
 # pipemaster:emulated job.runner pipeline/drone/job/ci
 # pipemaster:emulated step.image pipeline/drone/job/ci/step/test
 # pipemaster:arg {"kind":"script","image":{"Ref":"golang:1.25","Entrypoint":null},"script":["go test ./..."]}
@@ -8,6 +10,7 @@ on:
       - '**'
 jobs:
   ci:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     services:
       db:

@@ -1,12 +1,18 @@
 # pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/alert
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/alert
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/alert
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/alert
 # pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}]}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/report
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/report
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/report
 # pipemaster:arg {"pre":1,"post":0}
@@ -19,6 +25,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: https://github.com/actions/checkout@v7
@@ -28,7 +35,7 @@ jobs:
   alert:
     needs:
       - build
-    if: always() && failure()
+    if: always() && failure() && !github.event.deleted
     runs-on: ubuntu-latest
     steps:
       - uses: https://github.com/actions/checkout@v7
@@ -38,7 +45,7 @@ jobs:
   report:
     needs:
       - build
-    if: always()
+    if: always() && !github.event.deleted
     runs-on: ubuntu-latest
     steps:
       - uses: https://github.com/actions/checkout@v7

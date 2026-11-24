@@ -1,9 +1,12 @@
+# pipemaster:emulated job.if pipeline/ci/job/build
+# pipemaster:arg {"from":"argo","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/build
 name: container
 on:
   push:
 jobs:
   build:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     container: golang:1.24
     steps:

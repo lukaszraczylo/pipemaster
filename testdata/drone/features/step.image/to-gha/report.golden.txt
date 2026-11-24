@@ -1,4 +1,5 @@
 Loss report: drone -> gha
+[emulated] pipeline/drone job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/drone/job/ci job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/drone/job/ci/step/build step.image: uses: docker://<image> with entrypoint and args
 [emulated] pipeline/drone/job/ci/step/publish step.image: settings as PLUGIN_ environment variables (the plugin settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a GHA docker action reads its inputs as INPUT_<NAME>)

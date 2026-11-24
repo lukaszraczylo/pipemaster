@@ -1,11 +1,18 @@
+# pipemaster:emulated job.if pipeline/ci/job/lint
+# pipemaster:arg {"from":"tekton","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/lint
+# pipemaster:emulated job.if pipeline/ci/job/ship
+# pipemaster:arg {"from":"tekton","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/ship
+# pipemaster:emulated job.if pipeline/ci/job/test
+# pipemaster:arg {"from":"tekton","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/test
 name: needs
 on:
   push:
 jobs:
   lint:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - id: lint-step-1
@@ -14,11 +21,13 @@ jobs:
     needs:
       - lint
       - test
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - id: ship-step-1
         run: echo ship
   test:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - id: test-step-1

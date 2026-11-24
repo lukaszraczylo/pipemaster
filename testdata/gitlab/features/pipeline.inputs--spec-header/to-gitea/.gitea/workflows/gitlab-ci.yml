@@ -1,3 +1,5 @@
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/deploy
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/deploy
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/deploy
 # pipemaster:arg {"pre":1,"post":0}
@@ -19,6 +21,7 @@ env:
   TAG: $[[ inputs.image_tag ]]
 jobs:
   deploy:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

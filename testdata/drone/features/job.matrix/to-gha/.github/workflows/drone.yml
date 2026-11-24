@@ -1,4 +1,6 @@
 # pipemaster:emulated trigger.push pipeline/drone/trigger/0
+# pipemaster:emulated job.if pipeline/drone/job/ci
+# pipemaster:arg {"from":"drone","guard":true}
 # pipemaster:emulated job.runner pipeline/drone/job/ci
 on:
   push:
@@ -6,6 +8,7 @@ on:
       - '**'
 jobs:
   ci:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     strategy:
       matrix:

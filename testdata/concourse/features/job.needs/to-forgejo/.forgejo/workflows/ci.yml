@@ -1,10 +1,16 @@
 # pipemaster:emulated pipeline.concurrency pipeline/ci
+# pipemaster:emulated job.if pipeline/ci/job/lint
+# pipemaster:arg {"from":"concourse","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/lint
 # pipemaster:emulated step.image pipeline/ci/job/lint/step/lint-step-1
 # pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo lint"]}
+# pipemaster:emulated job.if pipeline/ci/job/ship
+# pipemaster:arg {"from":"concourse","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/ship
 # pipemaster:emulated step.image pipeline/ci/job/ship/step/ship-step-1
 # pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo ship"]}
+# pipemaster:emulated job.if pipeline/ci/job/test
+# pipemaster:arg {"from":"concourse","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/test
 # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
 # pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo test"]}
@@ -20,6 +26,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   lint:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       # pipemaster:emulated step.image pipeline/ci/job/lint/step/lint-step-1
@@ -32,6 +39,7 @@ jobs:
     needs:
       - lint
       - test
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       # pipemaster:emulated step.image pipeline/ci/job/ship/step/ship-step-1
@@ -41,6 +49,7 @@ jobs:
           entrypoint: /bin/sh
           args: -ec 'echo ship'
   test:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1

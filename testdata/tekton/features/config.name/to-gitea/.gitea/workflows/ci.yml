@@ -1,3 +1,5 @@
+# pipemaster:emulated job.if pipeline/ci/job/build
+# pipemaster:arg {"from":"tekton","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/build
 name: config
 on:
@@ -6,6 +8,7 @@ env:
   API_TOKEN: ${{ secrets.API_TOKEN }}
 jobs:
   build:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - id: build-step-1

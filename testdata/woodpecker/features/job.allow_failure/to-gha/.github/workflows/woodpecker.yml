@@ -1,4 +1,6 @@
 # pipemaster:emulated trigger.push pipeline/woodpecker/trigger/0
+# pipemaster:emulated job.if pipeline/woodpecker/job/ci
+# pipemaster:arg {"from":"woodpecker","guard":true}
 # pipemaster:emulated job.runner pipeline/woodpecker/job/ci
 # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/flaky
 # pipemaster:arg {"kind":"script","image":{"Ref":"alpine:3.20","Entrypoint":null},"script":["./flaky.sh"]}
@@ -8,6 +10,7 @@ on:
       - '**'
 jobs:
   ci:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:

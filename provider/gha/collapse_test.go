@@ -448,7 +448,7 @@ func TestParseRefusesMarkerNamingAGHAClassDialect(t *testing.T) {
 		t.Fatal(err)
 	}
 	for n, b := range files {
-		files[n] = []byte(strings.ReplaceAll(string(b), `{"src"`, `{"from":"gitea","src"`))
+		files[n] = []byte(markFrom(string(b), "gitea"))
 	}
 	back, rep := parseGHAText(t, files)
 	if back.Origin.Provider == "gitea" || back.Origin.Provider == provider.GitLab {
@@ -457,6 +457,12 @@ func TestParseRefusesMarkerNamingAGHAClassDialect(t *testing.T) {
 	if !slices.ContainsFunc(rep.Entries, func(e report.Entry) bool { return e.Strategy == "marker ignored" }) {
 		t.Errorf("no marker-ignored entry: %+v", rep.Entries)
 	}
+}
+
+// markFrom makes every condition marker of text name the dialect id as its source.
+func markFrom(text, id string) string {
+	text = strings.ReplaceAll(text, `{"src"`, `{"from":"`+id+`","src"`)
+	return strings.ReplaceAll(text, `{"guard"`, `{"from":"`+id+`","guard"`)
 }
 
 func markerIgnoredDetails(rep *report.Report) []string {
@@ -481,12 +487,13 @@ func TestMarkerNamingAnUnusableDialectGetsAnAccurateReport(t *testing.T) {
 				t.Fatal(err)
 			}
 			for n, b := range files {
-				files[n] = []byte(strings.ReplaceAll(string(b), `{"src"`, `{"from":"`+c.from+`","src"`))
+				files[n] = []byte(markFrom(string(b), c.from))
 			}
 			_, rep := parseGHAText(t, files)
 			got := markerIgnoredDetails(rep)
-			if len(got) != 1 || !strings.Contains(got[0], c.want) || strings.Contains(got[0], "edited") {
-				t.Errorf("details = %q, want one mentioning %q and not an edit", got, c.want)
+			// One entry per marked job: the conditioned job and each job that only carries the deletion guard.
+			if len(got) == 0 || slices.ContainsFunc(got, func(d string) bool { return !strings.Contains(d, c.want) || strings.Contains(d, "edited") }) {
+				t.Errorf("details = %q, want each mentioning %q and not an edit", got, c.want)
 			}
 		})
 	}
@@ -544,7 +551,7 @@ func TestSecondMarkerFromAnotherDialectCannotRestoreOverTheFirst(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const first = "# pipemaster:arg {\"src\":\"branch == 'main'\"}\n"
+	const first = "# pipemaster:arg {\"src\":\"branch == 'main'\",\"guard\":true}\n"
 	for n, b := range files {
 		files[n] = []byte(strings.Replace(string(b), first, first+"# pipemaster:arg {\"from\":\""+id+"\",\"src\":\"branch == 'main'\"}\n", 1))
 	}

@@ -1,4 +1,6 @@
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated step.if pipeline/gitlab-ci/job/build/step/build-step-2
 # pipemaster:arg {"src":"event == 'push'"}
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
@@ -9,6 +11,7 @@ on:
       - '**'
 jobs:
   build:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -16,5 +19,5 @@ jobs:
         if: always()
         run: echo cleanup
       - id: build-step-2
-        if: github.event_name == 'push' && !github.event.deleted
+        if: github.event_name == 'push'
         run: echo push

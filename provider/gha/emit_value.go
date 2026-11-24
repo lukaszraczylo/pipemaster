@@ -2,7 +2,6 @@ package gha
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -30,9 +29,13 @@ type emitter struct {
 	stepIDs map[string]string
 	// pluginVars holds the PLUGIN_ variables of the plugin step being written, for stepTail to add to its env.
 	pluginVars *yaml.Node
-	d          Dialect
-	// srcMarked is true when the last source call wrote the marker of its condition.
-	srcMarked bool
+	// guarded holds the pipelines whose deletion guard the report already names.
+	guarded map[string]bool
+	// guardJob is the job path whose condition gets the deletion guard.
+	guardJob string
+	d        Dialect
+	// guardMarked is true once the marker of the guarded job is written.
+	guardMarked bool
 }
 
 // sourceDialect is the expression dialect of a project's origin; nil means GHA semantics already hold.
@@ -41,81 +44,18 @@ func sourceDialect(origin string) *expr.Dialect { return expr.SourceFor(origin, 
 // source rewrites x from the origin dialect's semantics into GHA's. An approximate result is
 // reported as emulated with the translator's caveats; ok is false when no translation exists.
 func (e *emitter) source(path string, f caps.Feature, x expr.Expr) (expr.Expr, bool) {
-	e.srcMarked = false
-	t, ok := e.sourceExpr(path, f, x)
-	if !ok || e.from == nil || isStatus(x) || (f != caps.JobIf && f != caps.StepIf) || !mentionsPush(x) || excludesPush(t) {
-		return t, ok
-	}
-	// A GHA push event also fires when a branch is deleted, and no source has a run for that. The guard sits
-	// once at the top, because inside a term that a ! can negate it would widen the condition.
-	if !e.srcMarked {
-		if err := e.markArg(f, path, srcArg{Src: expr.String(x), From: markFrom(e.from)}); err != nil {
-			e.comment("expression source not carried: " + err.Error())
-		}
-	}
-	return expr.Binary{Op: expr.OpAnd, L: t, R: deletedGuard()}, true
-}
-
-// excludesPush is true for a condition that no push event satisfies: a conjunct tests the event against another value.
-func excludesPush(t expr.Expr) bool {
-	b, ok := t.(expr.Binary)
-	if !ok {
-		return false
-	}
-	switch b.Op {
-	case expr.OpAnd:
-		return excludesPush(b.L) || excludesPush(b.R)
-	case expr.OpOr:
-		return excludesPush(b.L) && excludesPush(b.R)
-	case expr.OpEq:
-		r, rok := b.L.(expr.Ref)
-		l, lok := b.R.(expr.Lit)
-		return rok && lok && len(r.Path) == 1 && r.Path[0] == expr.CtxEvent && l.Kind == expr.LitStr && !strings.EqualFold(l.Str, "push")
-	}
-	return false
-}
-
-// mentionsPush is true when x compares the event with push, in any form, so a condition that never names the
-// event stays as the source wrote it.
-func mentionsPush(x expr.Expr) bool {
-	switch v := x.(type) {
-	case expr.Unary:
-		return mentionsPush(v.X)
-	case expr.Binary:
-		if r, ok := v.L.(expr.Ref); ok && len(r.Path) == 1 && r.Path[0] == expr.CtxEvent {
-			if l, ok := v.R.(expr.Lit); ok && l.Kind == expr.LitStr && strings.EqualFold(l.Str, "push") {
-				return true
-			}
-		}
-		return mentionsPush(v.L) || mentionsPush(v.R)
-	case expr.Call:
-		return slices.ContainsFunc(v.Args, mentionsPush)
-	}
-	return false
-}
-
-// deletedGuard is the test that a push event does not delete the ref.
-func deletedGuard() expr.Expr {
-	return expr.Unary{Op: expr.OpNot, X: expr.Ref{Path: []string{expr.CtxDeleted}}}
-}
-
-// sourceExpr is source without the deletion guard.
-func (e *emitter) sourceExpr(path string, f caps.Feature, x expr.Expr) (expr.Expr, bool) {
 	if e.from == nil || isStatus(x) {
 		return x, true
 	}
 	if b, ok := x.(expr.Binary); ok && b.Op == expr.OpAnd && (isStatus(b.L) || isStatus(b.R)) {
-		l, lok := e.sourceExpr(path, f, b.L)
-		r, rok := e.sourceExpr(path, f, b.R)
+		l, lok := e.source(path, f, b.L)
+		r, rok := e.source(path, f, b.R)
 		return expr.Binary{Op: expr.OpAnd, L: l, R: r}, lok && rok
 	}
 	if t, ok := expr.TranslateFacts(x, *e.from, exprgha.Lang, expr.Facts{}); ok {
 		// An exact translation can still change the shape, such as a tag test that GHA spells with ref_type.
 		if (f == caps.JobIf || f == caps.StepIf) && expr.String(t) != expr.String(x) {
-			e.srcMarked = true
-			if err := e.markArg(f, path, srcArg{Src: expr.String(x), From: markFrom(e.from)}); err != nil {
-				e.comment("expression source not carried: " + err.Error())
-			}
+			e.markSource(f, path, x)
 		}
 		return t, true
 	}
@@ -125,18 +65,32 @@ func (e *emitter) sourceExpr(path string, f caps.Feature, x expr.Expr) (expr.Exp
 	}
 	e.emulate(path, f, "approximate expression translation", strings.Join(cav, "; "))
 	if f == caps.JobIf || f == caps.StepIf {
-		e.srcMarked = true
-		if err := e.markArg(f, path, srcArg{Src: expr.String(x), From: markFrom(e.from)}); err != nil {
-			e.comment("expression source not carried: " + err.Error())
-		}
+		e.markSource(f, path, x)
 	}
 	return t, true
 }
 
+// markSource carries the condition as the source wrote it. The marker of a job condition also tells that the
+// emitter ANDs the deletion guard onto it.
+func (e *emitter) markSource(f caps.Feature, path string, x expr.Expr) {
+	guard := f == caps.JobIf && path == e.guardJob
+	if err := e.markArg(f, path, srcArg{Src: expr.String(x), From: markFrom(e.from), Guard: guard}); err != nil {
+		e.comment("expression source not carried: " + err.Error())
+	}
+	e.guardMarked = e.guardMarked || guard
+}
+
+// deletedGuard is the test that a push event does not delete the ref.
+func deletedGuard() expr.Expr {
+	return expr.Unary{Op: expr.OpNot, X: expr.Ref{Path: []string{expr.CtxDeleted}}}
+}
+
 // srcArg carries a condition as the source dialect wrote it, which the emitted one only approximates.
+// Guard marks the deletion guard the emitter ANDed onto the job condition; it carries no Src.
 type srcArg struct {
-	Src  string `json:"src"`
-	From string `json:"from,omitempty"`
+	Src   string `json:"src,omitempty"`
+	From  string `json:"from,omitempty"`
+	Guard bool   `json:"guard,omitempty"`
 }
 
 // markFrom names the source dialect in a marker. GitLab is the default and stays unnamed.
