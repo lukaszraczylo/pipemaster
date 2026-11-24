@@ -330,3 +330,12 @@ func TestCapsLedger(t *testing.T) {
 func gitlabParse(files map[string][]byte) (*ir.Project, *report.Report, error) {
 	return gitlab.New().Parse(asFS(files))
 }
+
+func TestIdentityKeepsSubshellLinesInBeforeAndScript(t *testing.T) {
+	src := "j:\n  before_script:\n    - (\n    - cd sub\n    - make\n    - )\n  script:\n    - (\n    - echo x\n    - )\n"
+	p, _ := parseFiles(t, map[string]string{".gitlab-ci.yml": src})
+	back, files := roundTrip(t, p)
+	if ok, diff := ir.Equal(p, back); !ok {
+		t.Fatalf("identity broken:\n%s\n--- emitted ---\n%s", diff, dumpFiles(files))
+	}
+}

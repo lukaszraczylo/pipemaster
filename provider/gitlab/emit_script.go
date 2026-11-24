@@ -288,7 +288,7 @@ func (e *emitter) placeLines(p *jobPrep, st *ir.Step, lines []string) error {
 // before_script and script; any wrapper turns the step into one item so it runs in one shell.
 func wrapLines(st *ir.Step, sec string, lines []string, guard, dir string, exports []string) (items, targets []string) {
 	sub := dir != "" || len(exports) > 0
-	if !sub && guard == "" && len(lines) > 2 && lines[0] == "(" && lines[len(lines)-1] == ")" {
+	if !sub && guard == "" && sec == secScript && beforeLines(st, sec, len(lines)) == 0 && len(lines) > 2 && lines[0] == "(" && lines[len(lines)-1] == ")" {
 		return []string{strings.Join(lines, "\n")}, []string{sec}
 	}
 	if !sub && guard == "" {
