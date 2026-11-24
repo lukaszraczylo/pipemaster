@@ -1,15 +1,16 @@
 # pipemaster:lost cron 
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/nightly/step/script/carry
-# pipemaster:arg {"digest":"5f8796da56531bc78abce3460d80a001019e9de9f71b05f6f61f988438f812d3","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"19f7ce00b49e526425ce4b608943719bc6f35fd4741d5145673173f28263fab9","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/nightly
 # pipemaster:arg {"manual":false,"held":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/nightly/carry
-# pipemaster:arg {"digest":"7e6738e535836f6902c763186ccb0476e6ea87486815f4509971340c9c8ef28f","carry":"id: nightly\n"}
+# pipemaster:arg {"digest":"a61ca635ae2bf3326186c201d306d6130ad9442450a9ae10a7cacb35113ea69e","carry":"id: nightly\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"23421ff0998514f47173ea5b7668acb70c8af5e253b5c3264a1655012e26476f","carry":"id: gitlab-ci\ntriggers:\n    - kind: schedule\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated trigger.manual pipeline/gitlab-ci/job/nightly
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/nightly/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/nightly/step/script
 resources:
   - name: source
     type: git
@@ -36,6 +37,8 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make nightly
             dir: workspace

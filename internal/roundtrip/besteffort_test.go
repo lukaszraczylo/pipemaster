@@ -181,8 +181,12 @@ func covered(d irDiff, reps ...*report.Report) bool {
 var pipelineRE = regexp.MustCompile(`^pipeline/[^/]+`)
 
 func TestRoundTripWithoutMetaBestEffort(t *testing.T) {
+	n := 0
 	for _, f := range allFixtures(t) {
 		for _, to := range targets(f.provider) {
+			if n++; raceEnabled && n%2 == 0 {
+				continue
+			}
 			t.Run(f.provider+"/"+f.name+"/to-"+to, func(t *testing.T) {
 				r := hops(t, os.DirFS(f.dir), prov(t, f.provider), prov(t, to), false, false)
 				if same, _ := ir.Equal(r.src, r.back); same {

@@ -1,5 +1,6 @@
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
 # pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -13,6 +14,9 @@ spec:
     - name: script
       image: alpine:3.22
       script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
         echo "building ${PM_CTX_SHA} on ${PM_CTX_BRANCH} for ${PM_CTX_ACTOR}"
         echo "keeps $HOME and ${UNMAPPED}"
       env:

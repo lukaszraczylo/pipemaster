@@ -162,6 +162,18 @@ pre.yaml .k { color:var(--external); }
 pre.yaml .c { color:var(--muted); }
 pre.yaml .m { color:var(--emulated); background:var(--emulated-bg); }
 pre.yaml .ml { color:var(--lost); background:var(--lost-bg); }
+.step { display:flex; align-items:center; gap:.5rem; margin:2rem 0 .6rem; font-family:var(--mono); font-size:.75rem; color:var(--muted); }
+.step.in { margin:0; padding:.6rem .9rem 0; }
+.step-n { display:inline-grid; place-items:center; width:1.4rem; height:1.4rem; border-radius:50%; background:var(--ink); color:var(--bg); font-weight:700; }
+.sources { display:grid; gap:.5rem; grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr)); }
+.sources button {
+  font:inherit; text-align:left; cursor:pointer; background:var(--surface); color:var(--ink);
+  border:1px solid var(--rule); border-radius:8px; padding:.55rem .75rem; display:flex; flex-direction:column; gap:.1rem; min-height:44px;
+}
+.sources button span { font-family:var(--mono); font-size:.6875rem; color:var(--muted); overflow-wrap:anywhere; }
+.sources button[aria-selected="true"] { border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink); }
+.credit { margin:0; padding:.5rem .9rem; font-size:.75rem; color:var(--muted); border-top:1px solid var(--rule); }
+.desk { margin-top:1rem; }
 .report { margin-top:1rem; background:var(--surface); border:1px solid var(--rule); border-radius:10px; }
 .tally { display:flex; height:8px; border-radius:10px 10px 0 0; overflow:hidden; }
 .tally span { display:block; }
@@ -281,7 +293,7 @@ footer .wrap { display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; justify-content:s
 <section class="hero" aria-labelledby="h-hero">
   <h1 id="h-hero">Move your CI to another provider. <em>See exactly what does not move.</em></h1>
   <p class="lede">pipemaster converts pipeline definitions between nine CI/CD providers, in every direction. For each feature your pipeline uses, it gives one verdict. A feature that the target cannot express is reported and kept for the trip back, never dropped silently.</p>
-  <p class="status">Pre-alpha. MIT licence. Written in Go, ships as one static binary.</p>
+  <p class="status">Pre-alpha. MIT licence. Written in Go, ships as one static binary: <code>brew install --cask lukaszraczylo/taps/pipemaster</code></p>
   <div class="cta">
     <a class="btn primary" href="#try">Convert the sample</a>
     <a class="btn ghost" href="https://github.com/lukaszraczylo/pipemaster">
@@ -300,15 +312,21 @@ footer .wrap { display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; justify-content:s
 
 <section id="try" aria-labelledby="h-try">
   <p class="kicker">$ pipemaster convert ./repo --to &lt;provider&gt;</p>
-  <h2 id="h-try">One GitHub Actions workflow, eight targets</h2>
-  <p class="lede">The current code produced every file and report below. A test regenerates them from <code>testdata/site</code> and fails when this page and the converter disagree. Each target also ran a round trip back to GitHub Actions.</p>
+  <h2 id="h-try">Pick a source, then a target</h2>
+  <p class="lede">Each source is a real pipeline: one written for this page and six public pipelines from the test corpus, with their repository, commit and licence. The current code produced every file and report below. A test regenerates them and fails when this page and the converter disagree. Each conversion also ran a round trip back to its source.</p>
+
+  <div class="step"><span class="step-n">0</span><span>Source</span></div>
+  <div class="sources" role="tablist" aria-label="Source pipeline" id="sources"></div>
 
   <div class="desk">
     <div class="pane">
-      <div class="pane-head"><b>GitHub Actions</b> <span id="src-path">.github/workflows/ci.yml</span></div>
-      <pre class="yaml" id="src-code" aria-label="Source workflow"><noscript><span class="ln">Turn on JavaScript to load the sample workflow.</span></noscript></pre>
+      <div class="pane-head"><b id="src-name">Source</b> <span id="src-title"></span></div>
+      <div class="files" id="src-files" aria-label="Source files"></div>
+      <pre class="yaml" id="src-code" aria-label="Source pipeline"><noscript><span class="ln">Turn on JavaScript to load the samples.</span></noscript></pre>
+      <p class="credit" id="src-credit"></p>
     </div>
     <div class="pane">
+      <div class="step in"><span class="step-n">1</span><span>Target</span></div>
       <div class="tabs" role="tablist" aria-label="Target provider" id="targets"></div>
       <div class="files" id="files" aria-label="Files written"></div>
       <pre class="yaml" id="out-code" aria-live="polite" aria-label="Converted file"></pre>
@@ -398,18 +416,18 @@ footer .wrap { display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; justify-content:s
 </section>
 
 <section id="install" aria-labelledby="h-install">
-  <p class="kicker">$ go build ./cmd/pipemaster</p>
-  <h2 id="h-install">Build it, then convert</h2>
+  <p class="kicker">$ brew install --cask lukaszraczylo/taps/pipemaster</p>
+  <h2 id="h-install">Install it, then convert</h2>
   <div class="twocol">
     <div>
-      <p class="lede">No release is published yet. Build the binary from a checkout with Go 1.27.</p>
-      <div class="term"><pre><span class="p">$ </span>git clone https://github.com/lukaszraczylo/pipemaster
-<span class="p">$ </span>cd pipemaster &amp;&amp; go build -o pipemaster ./cmd/pipemaster
+      <p class="lede">Install with Homebrew on macOS or Linux, with <code>go install</code>, or from an archive on the <a href="https://github.com/lukaszraczylo/pipemaster/releases">releases page</a> (Linux, macOS and Windows, with a cosign-signed checksum file).</p>
+      <div class="term"><pre><span class="p">$ </span>brew install --cask lukaszraczylo/taps/pipemaster
+<span class="p">$ </span>go install github.com/lukaszraczylo/pipemaster/cmd/pipemaster@latest
 
-<span class="p">$ </span>./pipemaster convert ./repo --to gitlab -o ./out --report md
-<span class="p">$ </span>./pipemaster roundtrip ./repo --via gitlab
+<span class="p">$ </span>pipemaster convert ./repo --to gitlab -o ./out --report md
+<span class="p">$ </span>pipemaster roundtrip ./repo --via gitlab
 <span class="o">no differences</span>
-<span class="p">$ </span>./pipemaster roundtrip ./repo --from gha --via gitlab,gitea
+<span class="p">$ </span>pipemaster roundtrip ./repo --from gha --via gitlab,gitea
 <span class="o">no differences</span></pre></div>
       <div class="tablewrap">
       <table class="plain">
@@ -459,7 +477,6 @@ footer .wrap { display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; justify-content:s
   const REPO = "https://github.com/lukaszraczylo/pipemaster";
   const LEVELS = ["native", "emulated", "external", "lost"];
   const LETTER = { native: "N", emulated: "E", external: "X", lost: "L" };
-  const ORDER = ["gitlab", "gitea", "forgejo", "woodpecker", "drone", "tekton", "argo", "concourse"];
   const $ = (id) => document.getElementById(id);
   const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const chip = (level, text) => `<span class="chip v-${level}" data-l="${LETTER[level]}">${esc(text || level)}</span>`;
@@ -482,62 +499,99 @@ footer .wrap { display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; justify-content:s
       `<span style="width:${(100 * counts[l]) / total}%;background:var(--${l})" title="${l}: ${counts[l]}"></span>`).join("");
   }
 
+  const TARGETS = ["gha", "gitlab", "woodpecker", "drone", "tekton", "argo", "concourse"];
+  const ALL = ["gha", "gitea", "forgejo", "gitlab", "woodpecker", "drone", "tekton", "argo", "concourse"];
+  const cache = {};
+  const loadSample = (key) => cache[key] || (cache[key] = fetch(`data/${key}.json`).then((r) => {
+    if (!r.ok) throw new Error(r.status);
+    return r.json();
+  }));
+
+  // fileButtons fills el with one button per file and shows file i in pre on click.
+  function fileButtons(el, pre, files) {
+    const pick = (i) => {
+      el.querySelectorAll("button").forEach((b, j) => b.setAttribute("aria-pressed", String(i === j)));
+      pre.innerHTML = yaml(files[i].text);
+      pre.scrollTop = 0;
+    };
+    el.innerHTML = files.map((f, i) => `<button type="button" data-i="${i}" aria-pressed="false">${esc(f.path)}</button>`).join("");
+    el.onclick = (e) => { const b = e.target.closest("button"); if (b) pick(Number(b.dataset.i)); };
+    // Open the largest file first: it is the pipeline, not a kustomization or RBAC file.
+    pick(files.reduce((best, f, i) => (f.text.length > files[best].text.length ? i : best), 0));
+  }
+
+  // tablist wires arrow-key movement and selection over a role=tablist of buttons with data-id.
+  function tablist(el, ids, onSelect) {
+    el.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) onSelect(b.dataset.id); });
+    el.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      const cur = el.querySelector('[aria-selected="true"]');
+      const i = ids.indexOf(cur ? cur.dataset.id : ids[0]) + (e.key === "ArrowRight" ? 1 : -1);
+      const id = ids[(i + ids.length) % ids.length];
+      onSelect(id);
+      el.querySelector(`[data-id="${id}"]`).focus();
+    });
+  }
+  const select = (el, id) => el.querySelectorAll("button").forEach((b) => {
+    const on = b.dataset.id === id;
+    b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1;
+  });
+
   function init(d) {
     const names = Object.fromEntries(d.providers.map((p) => [p.id, p.name]));
-    const conv = Object.fromEntries(d.conversions.map((c) => [c.id, c]));
-    const targets = ORDER.filter((id) => conv[id]);
+    const samples = Object.fromEntries(d.samples.map((x) => [x.key, x]));
+    const keys = d.samples.map((x) => x.key);
+    let sample = null, doc = null, target = null;
 
-    // Source pane.
-    const src = d.source[0];
-    $("src-path").textContent = src.path;
-    $("src-code").innerHTML = yaml(src.text);
+    const srcEl = $("sources");
+    srcEl.innerHTML = d.samples.map((x) =>
+      `<button role="tab" aria-selected="false" data-id="${x.key}">${esc(names[x.from])}<span>${esc(x.title)}</span></button>`).join("");
+    tablist(srcEl, keys, (key) => showSample(key));
 
-    // Target tabs.
-    let current = targets[0];
     const tabs = $("targets");
-    tabs.innerHTML = targets.map((id) =>
-      `<button role="tab" id="tab-${id}" aria-selected="false" data-id="${id}">${esc(names[id])}</button>`).join("");
-    tabs.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) show(b.dataset.id); });
-    tabs.addEventListener("keydown", (e) => {
-      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-      const i = targets.indexOf(current) + (e.key === "ArrowRight" ? 1 : -1);
-      const id = targets[(i + targets.length) % targets.length];
-      show(id); $("tab-" + id).focus();
-    });
+    tablist(tabs, TARGETS, (id) => { if (doc && doc.conv[id]) showTarget(id); });
 
-    function showFile(c, i) {
-      $("files").querySelectorAll("button").forEach((b, j) => b.setAttribute("aria-pressed", String(i === j)));
-      $("out-code").innerHTML = yaml(c.files[i].text);
-      $("out-code").scrollTop = 0;
+    function showSample(key) {
+      select(srcEl, key);
+      sample = samples[key];
+      loadSample(key).then((data) => {
+        if (sample.key !== key) return;
+        doc = { ...data, conv: Object.fromEntries(data.conversions.map((c) => [c.id, c])) };
+        $("src-name").textContent = names[sample.from];
+        $("src-title").textContent = sample.title;
+        $("src-credit").innerHTML = sample.repo
+          ? `From <a href="${esc(sample.repo)}">${esc(sample.repo.replace(/^https:\/\//, ""))}</a> at <code>${esc(sample.commit.slice(0, 12))}</code>, ${esc(sample.licence)} licence, stored verbatim in <code>testdata/corpus</code>.`
+          : "Written for this page, stored in <code>testdata/site</code>.";
+        fileButtons($("src-files"), $("src-code"), doc.source);
+        const ids = TARGETS.filter((id) => doc.conv[id]);
+        tabs.innerHTML = ids.map((id) =>
+          `<button role="tab" aria-selected="false" data-id="${id}">${esc(names[id])}</button>`).join("");
+        showTarget(ids.includes(target) ? target : ids[0]);
+      }).catch(() => {
+        $("src-code").innerHTML = '<span class="ln">The sample did not load. Serve this page over HTTP, not from a file.</span>';
+      });
     }
 
-    function show(id) {
-      current = id;
-      const c = conv[id];
-      tabs.querySelectorAll("button").forEach((b) => {
-        const on = b.dataset.id === id;
-        b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1;
-      });
-      const files = $("files");
-      files.innerHTML = c.files.map((f, i) => `<button type="button" data-i="${i}" aria-pressed="false">${esc(f.path)}</button>`).join("");
-      files.onclick = (e) => { const b = e.target.closest("button"); if (b) showFile(c, Number(b.dataset.i)); };
-      showFile(c, 0);
-
+    function showTarget(id) {
+      target = id;
+      select(tabs, id);
+      const c = doc.conv[id];
+      fileButtons($("files"), $("out-code"), c.files);
       const entries = [...c.report].sort((a, b) => LEVELS.indexOf(b.level) - LEVELS.indexOf(a.level));
       const counts = {};
       entries.forEach((e) => { counts[e.level] = (counts[e.level] || 0) + 1; });
       tallyBar($("tally"), counts, entries.length || 1);
-      $("report-title").textContent = `Loss report: GitHub Actions to ${names[id]}`;
+      $("report-title").textContent = `Loss report: ${names[sample.from]} to ${names[id]}`;
       $("rt").textContent = `Round trip back: ${c.roundtrip}`;
-      $("entries").innerHTML = entries.map((e) => {
+      $("entries").innerHTML = entries.length ? entries.map((e) => {
         const why = [e.strategy, e.detail].filter(Boolean).join(": ");
         return `<li>${chip(e.level)}<span><span class="feat">${esc(e.feature)}</span> <span class="path">${esc(e.path)}</span></span>${why ? `<span class="why">${esc(why)}</span>` : ""}</li>`;
-      }).join("");
+      }).join("") : "<li><span></span><span>Every feature converted natively.</span></li>";
     }
-    show(current);
+    showSample(keys[0]);
 
     // Provider cards.
-    const all = ["gha", ...ORDER].filter((id) => d.caps[id]);
+    const all = ALL.filter((id) => d.caps[id]);
     $("cards").innerHTML = all.map((id) => {
       const counts = {};
       d.features.forEach((f) => { const l = d.caps[id][f].level; counts[l] = (counts[l] || 0) + 1; });
@@ -579,11 +633,11 @@ footer .wrap { display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; justify-content:s
     });
   }
 
-  fetch("data.json")
+  fetch("data/index.json")
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(init)
     .catch(() => {
-      $("out-code").innerHTML = '<span class="ln">The sample data did not load. Serve this page over HTTP, not from a file.</span>';
+      $("src-code").innerHTML = '<span class="ln">The sample data did not load. Serve this page over HTTP, not from a file.</span>';
     });
 })();
 </script>

@@ -1,14 +1,15 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/step/script/carry
-# pipemaster:arg {"digest":"6ac8bb717fb74619f0b0d413adf44cd17815a59a5d88fe285138520772bbb9dd","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"0ecf926402f145e573baf27d7ab7ce1f12c314082e09fcafcee5189a835e69fe","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/deploy
 # pipemaster:arg {"environment":{"Name":"production","URL":"https://example.com","Approval":false},"manual":false,"held":false}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/carry
-# pipemaster:arg {"digest":"83c65b1329fdcb91b935e66ab884acd4908d09c6bb3097e3be6bc868cebf7f79","carry":"environment:\n    name: production\n    url: https://example.com\nid: deploy\n"}
+# pipemaster:arg {"digest":"4deb34e6ed7b18eb12f4f11e54ae97bffe845a54108bfbd2699e37263a0d0fb3","carry":"environment:\n    name: production\n    url: https://example.com\nid: deploy\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/job/deploy
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/deploy/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/deploy/step/script
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
@@ -44,6 +45,8 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make deploy
             dir: workspace

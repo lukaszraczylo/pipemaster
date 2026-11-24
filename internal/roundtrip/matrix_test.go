@@ -13,9 +13,13 @@ import (
 )
 
 func TestRoundTripMatrix(t *testing.T) {
+	n := 0
 	for _, f := range allFixtures(t) {
 		for _, to := range targets(f.provider) {
 			for _, mode := range []string{"sidecar", "embed"} {
+				if n++; raceEnabled && n%2 == 0 {
+					continue
+				}
 				t.Run(f.provider+"/"+f.name+"/to-"+to+"/"+mode, func(t *testing.T) {
 					r := hops(t, os.DirFS(f.dir), prov(t, f.provider), prov(t, to), mode == "embed", true)
 					if same, diff := ir.Equal(r.src, r.back); !same {

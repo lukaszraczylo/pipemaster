@@ -3,6 +3,7 @@ package argo_test
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/internal/vectors"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/argo"
 )
 
@@ -74,6 +76,7 @@ const (
 	featName      = "display.name"
 	featEnv       = "job.env"
 	featNoop      = "step.script"
+	featShell     = "step.shell"
 	featPrefix    = "trigger."
 	jobSegment    = "/job/"
 	stepSegment   = "/step/"
@@ -157,6 +160,7 @@ func decodeContainer(n *yaml.Node, prev string) (vStep, error) {
 		return s, err
 	}
 	var deps []string
+	wrapped := false
 	for _, e := range es {
 		switch e.Key {
 		case "name":
@@ -167,15 +171,25 @@ func decodeContainer(n *yaml.Node, prev string) (vStep, error) {
 			}
 		case "command":
 			var cmd []string
-			if cmd, err = vectors.Strings(e.Val); err == nil && strings.Join(cmd, " ") != "sh -ec" {
-				err = fmt.Errorf("command %v is not sh -ec", cmd)
+			if cmd, err = vectors.Strings(e.Val); err == nil {
+				// A step from a bash-default source runs the script through the bash-if-present wrapper.
+				switch wrapped = strings.Join(cmd, " ") == "sh -c"; {
+				case wrapped:
+				case strings.Join(cmd, " ") != "sh -ec":
+					err = fmt.Errorf("command %v is not sh -ec", cmd)
+				}
 			}
 		case "args":
 			var args []string
 			if args, err = vectors.Strings(e.Val); err == nil {
-				if len(args) != 1 {
+				switch {
+				case wrapped && (len(args) != 3 || args[0] != provider.BashOrShScript || args[1] != provider.BashOrShArgv0):
+					err = fmt.Errorf("args %v are not the bash-if-present wrapper and one script", args)
+				case wrapped:
+					s.Script = strings.Split(strings.TrimSuffix(args[2], "\n"), "\n")
+				case len(args) != 1:
 					err = fmt.Errorf("%d args, want one script", len(args))
-				} else {
+				default:
 					s.Script = strings.Split(strings.TrimSuffix(args[0], "\n"), "\n")
 				}
 			}
@@ -419,6 +433,11 @@ func applyMarks(d *vDoc, src []byte) error {
 			t.Noop = true
 			if len(t.Steps) != 1 || t.Steps[0].Name != noopName || strings.Join(t.Steps[0].Script, "\n") != noopCmd {
 				return fmt.Errorf("marker %s %s: container is not the placeholder", m.Feature, m.Path)
+			}
+		case featShell:
+			// The note says a step from a bash-default source runs through the wrapper; the decoder reads the wrapper itself.
+			if !isStep || !slices.ContainsFunc(t.Steps, func(s vStep) bool { return s.Name == stepID }) {
+				return fmt.Errorf("marker %s %s names no container", m.Feature, m.Path)
 			}
 		default:
 			return fmt.Errorf("marker %s %s is not modelled", m.Feature, m.Path)

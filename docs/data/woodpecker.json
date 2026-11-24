@@ -1,0 +1,800 @@
+{
+ "source": [
+  {
+   "path": ".woodpecker/build-latest-image.yaml",
+   "text": "when:\n  - event: [push, manual]\n    branch:\n      exclude: [main]\n  - event: [pull_request]\n    # Only run when PR targets development or other branches (not main)\n    evaluate: 'CI_COMMIT_TARGET_BRANCH != \"main\"'\n\nvariables:\n  - &registry_url 'https://registry.cloud.josa.ngo'\n  - &docker_repo 'registry.cloud.josa.ngo/library/contributions-web'\n  - &slack_channel 'builds'\n  # Success message template\n  - &success_message >\n    ✅ *SUCCESS* - Latest Build #{{ build.number }}\n\n    📁 *Repository:* {{ repo.name }}\n    🌿 *Branch:* {{ build.branch }}\n    📝 *Commit:* {{ truncate build.commit 8 }}\n    👤 *Author:* {{ build.author }}\n\n    🔗 *Links:*\n    • <{{ build.link }}|View Build>\n  # Failure message template\n  - &failure_message >\n    ❌ *FAILED* - Latest Build #{{ build.number }}\n\n    📁 *Repository:* {{ repo.name }}\n    🌿 *Branch:* {{ build.branch }}\n    📝 *Commit:* {{ truncate build.commit 8 }}\n    👤 *Author:* {{ build.author }}\n\n    🔗 *Links:*\n    • <{{ build.link }}|View Build>\n\nsteps:\n  # Security check - scan for secrets/credentials\n  - name: run-pre-commit-hooks\n    image: registry.cloud.josa.ngo/library/pre-commit-runner\n    settings:\n      args: '--all-files'\n      skip: 'end-of-file-fixer, yamllint'\n\n  # Build latest image (development and other branches)\n  - name: build-latest-image\n    image: woodpeckerci/plugin-docker-buildx\n    settings:\n      repo: *docker_repo\n      registry: *registry_url\n      dockerfile: ./Dockerfile\n      tags:\n        - latest-${CI_COMMIT_SHA}\n        - latest\n      username:\n        from_secret: REGISTRY_USERNAME\n      password:\n        from_secret: REGISTRY_SECRET\n      build_args:\n        CI_REPO: '${CI_REPO}'\n        CI_REPO_NAME: '${CI_REPO_NAME}'\n        CI_REPO_URL: '${CI_REPO_URL}'\n        CI_COMMIT_SHA: '${CI_COMMIT_SHA}'\n        CI_COMMIT_REF: '${CI_COMMIT_REF}'\n        CI_PIPELINE_URL: '${CI_PIPELINE_URL}'\n        CI_PIPELINE_CREATED: '${CI_PIPELINE_CREATED}'\n        CI_PREV_PIPELINE_URL: '${CI_PREV_PIPELINE_URL}'\n        CI_PIPELINE_NUMBER: '${CI_PIPELINE_NUMBER}'\n        CONTRIBUTIONS_API_URL: http://contributions.api.svc.cluster.local:80\n        MATOMO_SITE_ID: '11'\n        TARGET_ENV: production\n    depends_on:\n      - run-pre-commit-hooks\n\n  # Slack notification for latest build success\n  - name: notify-slack-latest-success\n    image: plugins/slack\n    settings:\n      webhook:\n        from_secret: SLACK_WEBHOOK\n      channel: *slack_channel\n      template: *success_message\n    when:\n      - status: success\n    depends_on:\n      - run-pre-commit-hooks\n      - build-latest-image\n\n  # Slack notification for latest build failure\n  - name: notify-slack-latest-failure\n    image: plugins/slack\n    settings:\n      webhook:\n        from_secret: SLACK_WEBHOOK\n      channel: *slack_channel\n      template: *failure_message\n    when:\n      - status: failure\n    depends_on:\n      - run-pre-commit-hooks\n      - build-latest-image\n"
+  }
+ ],
+ "conversions": [
+  {
+   "id": "gha",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".github/workflows/woodpecker.yml",
+     "text": "# pipemaster:emulated job.runner pipeline/woodpecker/job/build-latest-image\n# pipemaster:emulated step.image pipeline/woodpecker/job/build-latest-image/step/run-pre-commit-hooks\n# pipemaster:arg {\"kind\":\"plugin\",\"image\":{\"Ref\":\"registry.cloud.josa.ngo/library/pre-commit-runner\",\"Entrypoint\":null},\"settings\":[\"args\",\"skip\"]}\n# pipemaster:emulated step.image pipeline/woodpecker/job/build-latest-image/step/build-latest-image\n# pipemaster:arg {\"kind\":\"plugin\",\"image\":{\"Ref\":\"woodpeckerci/plugin-docker-buildx\",\"Entrypoint\":null},\"settings\":[\"dockerfile\",\"password\",\"registry\",\"repo\",\"username\"]}\n# pipemaster:emulated step.image pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success\n# pipemaster:arg {\"kind\":\"plugin\",\"image\":{\"Ref\":\"plugins/slack\",\"Entrypoint\":null},\"settings\":[\"channel\",\"template\",\"webhook\"]}\n# pipemaster:emulated step.image pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure\n# pipemaster:arg {\"kind\":\"plugin\",\"image\":{\"Ref\":\"plugins/slack\",\"Entrypoint\":null},\"settings\":[\"channel\",\"template\",\"webhook\"]}\non:\n  # pipemaster:emulated trigger.manual pipeline/woodpecker\n  workflow_dispatch:\njobs:\n  build-latest-image:\n    if: false\n    runs-on: ubuntu-latest\n    steps:\n      # pipemaster:emulated step.image pipeline/woodpecker/job/build-latest-image/step/run-pre-commit-hooks\n      # pipemaster:lost job.if pipeline/woodpecker/job/build-latest-image: (((event == 'push') || (event == 'manual')) && ((event == 'tag') || !(branch == 'main'))) || ((event == 'pull_request') && (pr.base_ref != 'main'))\n      - id: run-pre-commit-hooks\n        uses: docker://registry.cloud.josa.ngo/library/pre-commit-runner\n        env:\n          PLUGIN_ARGS: --all-files\n          PLUGIN_SKIP: end-of-file-fixer, yamllint\n      # pipemaster:emulated step.image pipeline/woodpecker/job/build-latest-image/step/build-latest-image\n      - id: build-latest-image\n        uses: docker://woodpeckerci/plugin-docker-buildx\n        env:\n          PLUGIN_DOCKERFILE: ./Dockerfile\n          PLUGIN_PASSWORD: ${{ secrets.REGISTRY_SECRET }}\n          PLUGIN_REGISTRY: https://registry.cloud.josa.ngo\n          PLUGIN_REPO: registry.cloud.josa.ngo/library/contributions-web\n          PLUGIN_USERNAME: ${{ secrets.REGISTRY_USERNAME }}\n      # pipemaster:emulated step.image pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success\n      - id: notify-slack-latest-success\n        uses: docker://plugins/slack\n        env:\n          PLUGIN_CHANNEL: builds\n          PLUGIN_TEMPLATE: \"✅ *SUCCESS* - Latest Build #{{ build.number }}\\n\\U0001F4C1 *Repository:* {{ repo.name }} \\U0001F33F *Branch:* {{ build.branch }} \\U0001F4DD *Commit:* {{ truncate build.commit 8 }} \\U0001F464 *Author:* {{ build.author }}\\n\\U0001F517 *Links:* • <{{ build.link }}|View Build>\\n\"\n          PLUGIN_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}\n      # pipemaster:emulated step.image pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure\n      - id: notify-slack-latest-failure\n        if: failure()\n        uses: docker://plugins/slack\n        env:\n          PLUGIN_CHANNEL: builds\n          PLUGIN_TEMPLATE: \"❌ *FAILED* - Latest Build #{{ build.number }}\\n\\U0001F4C1 *Repository:* {{ repo.name }} \\U0001F33F *Branch:* {{ build.branch }} \\U0001F4DD *Commit:* {{ truncate build.commit 8 }} \\U0001F464 *Author:* {{ build.author }}\\n\\U0001F517 *Links:* • <{{ build.link }}|View Build>\\n\"\n          PLUGIN_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key variables has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (variables) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "condition not expressible in GitHub Actions; job disabled"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "settings.tags has no Value form; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "settings.build_args has no Value form; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (depends_on, settings) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (depends_on) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (depends_on) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "job.runner",
+     "level": "emulated",
+     "strategy": "default runner label ubuntu-latest",
+     "detail": "the IR holds no runner label"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "step.image",
+     "level": "emulated",
+     "strategy": "settings as PLUGIN_ environment variables",
+     "detail": "the plugin settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a GHA docker action reads its inputs as INPUT_<NAME>"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "step.image",
+     "level": "emulated",
+     "strategy": "settings as PLUGIN_ environment variables",
+     "detail": "the plugin settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a GHA docker action reads its inputs as INPUT_<NAME>"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "step.image",
+     "level": "emulated",
+     "strategy": "settings as PLUGIN_ environment variables",
+     "detail": "the plugin settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a GHA docker action reads its inputs as INPUT_<NAME>"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/run-pre-commit-hooks",
+     "feature": "step.image",
+     "level": "emulated",
+     "strategy": "settings as PLUGIN_ environment variables",
+     "detail": "the plugin settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a GHA docker action reads its inputs as INPUT_<NAME>"
+    }
+   ]
+  },
+  {
+   "id": "gitlab",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".gitlab-ci.yml",
+     "text": "workflow:\n  rules:\n    - when: never\n# pipemaster:lost job.if pipeline/woodpecker/job/build-latest-image: (((event == 'push') || (event == 'manual')) && ((event == 'tag') || !(branch == 'main'))) || ((event == 'pull_request') && (pr.base_ref != 'main'))\nbuild-latest-image:\n  needs: []\n  rules:\n    - when: never\n  script:\n    # pipemaster:lost step run-pre-commit-hooks kind plugin\n    # pipemaster:lost step build-latest-image kind plugin\n    # pipemaster:lost step notify-slack-latest-success kind plugin\n    # pipemaster:lost step notify-slack-latest-failure kind plugin\n    - \"true\"\n    # pipemaster:step run-pre-commit-hooks\n    # pipemaster:step build-latest-image\n    # pipemaster:step notify-slack-latest-success\n    # pipemaster:step notify-slack-latest-failure\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/woodpecker",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "the pipeline has no trigger GitLab can express; workflow:rules never starts it"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key variables has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (variables) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "condition not expressible in GitLab CI; job disabled"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "settings.tags has no Value form; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "settings.build_args has no Value form; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (depends_on, settings) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind plugin has no GitLab form"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "step.image",
+     "level": "lost",
+     "detail": "GitLab sets the image per job, not per step"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (depends_on) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind plugin has no GitLab form"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "step.if",
+     "level": "lost",
+     "detail": "a step condition cannot guard a job keyword: the step is lost"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "step.image",
+     "level": "lost",
+     "detail": "GitLab sets the image per job, not per step"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (depends_on) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind plugin has no GitLab form"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "step.image",
+     "level": "lost",
+     "detail": "GitLab sets the image per job, not per step"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/run-pre-commit-hooks",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind plugin has no GitLab form"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/run-pre-commit-hooks",
+     "feature": "step.image",
+     "level": "lost",
+     "detail": "GitLab sets the image per job, not per step"
+    }
+   ]
+  },
+  {
+   "id": "drone",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".drone.yml",
+     "text": "# pipemaster:lost job.if pipeline/woodpecker/job/build-latest-image: (((event == 'push') || (event == 'manual')) && ((event == 'tag') || !(branch == 'main'))) || ((event == 'pull_request') && (pr.base_ref != 'main'))\nkind: pipeline\ntype: docker\nname: build-latest-image\ntrigger:\n  event:\n    exclude:\n      - '**'\nsteps:\n  - name: run-pre-commit-hooks\n    image: registry.cloud.josa.ngo/library/pre-commit-runner\n    settings:\n      args: --all-files\n      skip: end-of-file-fixer, yamllint\n  - name: build-latest-image\n    image: woodpeckerci/plugin-docker-buildx\n    settings:\n      dockerfile: ./Dockerfile\n      password:\n        from_secret: REGISTRY_SECRET\n      registry: https://registry.cloud.josa.ngo\n      repo: registry.cloud.josa.ngo/library/contributions-web\n      username:\n        from_secret: REGISTRY_USERNAME\n  - name: notify-slack-latest-success\n    image: plugins/slack\n    settings:\n      channel: builds\n      template: \"✅ *SUCCESS* - Latest Build #{{ build.number }}\\n\\U0001F4C1 *Repository:* {{ repo.name }} \\U0001F33F *Branch:* {{ build.branch }} \\U0001F4DD *Commit:* {{ truncate build.commit 8 }} \\U0001F464 *Author:* {{ build.author }}\\n\\U0001F517 *Links:* • <{{ build.link }}|View Build>\\n\"\n      webhook:\n        from_secret: SLACK_WEBHOOK\n  - name: notify-slack-latest-failure\n    image: plugins/slack\n    settings:\n      channel: builds\n      template: \"❌ *FAILED* - Latest Build #{{ build.number }}\\n\\U0001F4C1 *Repository:* {{ repo.name }} \\U0001F33F *Branch:* {{ build.branch }} \\U0001F4DD *Commit:* {{ truncate build.commit 8 }} \\U0001F464 *Author:* {{ build.author }}\\n\\U0001F517 *Links:* • <{{ build.link }}|View Build>\\n\"\n      webhook:\n        from_secret: SLACK_WEBHOOK\n    when:\n      status:\n        - failure\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key variables has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (variables) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "condition not expressible in Drone CI; the document disabled"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "settings.tags has no Value form; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "settings.build_args has no Value form; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (depends_on, settings) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (depends_on) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (depends_on) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "per actions.Lookup verdict; a plugin step with settings",
+     "detail": "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "per actions.Lookup verdict; a plugin step with settings",
+     "detail": "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "per actions.Lookup verdict; a plugin step with settings",
+     "detail": "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/run-pre-commit-hooks",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "per actions.Lookup verdict; a plugin step with settings",
+     "detail": "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"
+    }
+   ]
+  },
+  {
+   "id": "tekton",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".tekton/kustomization.yaml",
+     "text": "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n  - pipeline.yaml\n  - tasks/woodpecker-build-latest-image.yaml\n"
+    },
+    {
+     "path": ".tekton/pipeline.yaml",
+     "text": "# pipemaster:emulated config.name pipeline/woodpecker/ref/secrets.REGISTRY_SECRET\n# pipemaster:emulated config.name pipeline/woodpecker/ref/secrets.REGISTRY_USERNAME\n# pipemaster:emulated config.name pipeline/woodpecker/ref/secrets.SLACK_WEBHOOK\napiVersion: tekton.dev/v1\nkind: Pipeline\nmetadata:\n  name: woodpecker\nspec:\n  params:\n    - name: ctx-branch\n      default: \"\"\n    - name: ctx-event\n      default: \"\"\n    - name: ctx-pr-base-ref\n      default: \"\"\n  tasks:\n    - name: build-latest-image\n      taskRef:\n        name: woodpecker-build-latest-image\n      params:\n        - name: ctx-event\n          value: $(params.ctx-event)\n        - name: ctx-branch\n          value: $(params.ctx-branch)\n        - name: ctx-pr-base-ref\n          value: $(params.ctx-pr-base-ref)\n"
+    },
+    {
+     "path": ".tekton/tasks/woodpecker-build-latest-image.yaml",
+     "text": "# pipemaster:emulated job.if pipeline/woodpecker/job/build-latest-image\n# pipemaster:arg {\"if\":\"(((event == 'push') || (event == 'manual')) \\u0026\\u0026 ((event == 'tag') || !(branch == 'main'))) || ((event == 'pull_request') \\u0026\\u0026 (pr.base_ref != 'main'))\",\"back\":\"(((event == 'push') || (event == 'manual')) \\u0026\\u0026 ((event == 'tag') || !(branch == 'main'))) || ((event == 'pull_request') \\u0026\\u0026 (pr.base_ref != 'main'))\"}\n# pipemaster:emulated step.action pipeline/woodpecker/job/build-latest-image/step/run-pre-commit-hooks\n# pipemaster:arg {\"step\":\"image:\\n    ref: registry.cloud.josa.ngo/library/pre-commit-runner\\nwith:\\n    args:\\n        lit: --all-files\\n    skip:\\n        lit: end-of-file-fixer, yamllint\\nid: run-pre-commit-hooks\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:emulated step.action pipeline/woodpecker/job/build-latest-image/step/build-latest-image\n# pipemaster:arg {\"step\":\"image:\\n    ref: woodpeckerci/plugin-docker-buildx\\nwith:\\n    dockerfile:\\n        lit: ./Dockerfile\\n    password:\\n        secret: REGISTRY_SECRET\\n    registry:\\n        lit: https://registry.cloud.josa.ngo\\n    repo:\\n        lit: registry.cloud.josa.ngo/library/contributions-web\\n    username:\\n        secret: REGISTRY_USERNAME\\nid: build-latest-image\\nkind: plugin\\n\",\"at\":0,\"seq\":1}\n# pipemaster:emulated step.action pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success\n# pipemaster:arg {\"step\":\"image:\\n    ref: plugins/slack\\nwith:\\n    channel:\\n        lit: builds\\n    template:\\n        lit: \\\"✅ *SUCCESS* - Latest Build #{{ build.number }}\\\\n\\\\U0001F4C1 *Repository:* {{ repo.name }} \\\\U0001F33F *Branch:* {{ build.branch }} \\\\U0001F4DD *Commit:* {{ truncate build.commit 8 }} \\\\U0001F464 *Author:* {{ build.author }}\\\\n\\\\U0001F517 *Links:* • \\u003c{{ build.link }}|View Build\\u003e\\\\n\\\"\\n    webhook:\\n        secret: SLACK_WEBHOOK\\nid: notify-slack-latest-success\\nkind: plugin\\n\",\"at\":0,\"seq\":2}\n# pipemaster:emulated step.action pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure\n# pipemaster:arg {\"step\":\"image:\\n    ref: plugins/slack\\nwith:\\n    channel:\\n        lit: builds\\n    template:\\n        lit: \\\"❌ *FAILED* - Latest Build #{{ build.number }}\\\\n\\\\U0001F4C1 *Repository:* {{ repo.name }} \\\\U0001F33F *Branch:* {{ build.branch }} \\\\U0001F4DD *Commit:* {{ truncate build.commit 8 }} \\\\U0001F464 *Author:* {{ build.author }}\\\\n\\\\U0001F517 *Links:* • \\u003c{{ build.link }}|View Build\\u003e\\\\n\\\"\\n    webhook:\\n        secret: SLACK_WEBHOOK\\nid: notify-slack-latest-failure\\nkind: plugin\\n\",\"at\":0,\"seq\":3}\n# pipemaster:emulated step.script pipeline/woodpecker/job/build-latest-image\n# pipemaster:arg {\"image\":\"alpine:3.22\"}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: woodpecker-build-latest-image\nspec:\n  params:\n    - name: ctx-event\n    - name: ctx-branch\n    - name: ctx-pr-base-ref\n  steps:\n    - name: noop\n      image: alpine:3.22\n      script: |-\n        if ! ( ( ( [ \"$PM_CTX_EVENT\" = 'push' ] || [ \"$PM_CTX_EVENT\" = 'manual' ] ) && ( [ \"$PM_CTX_EVENT\" = 'tag' ] || ( ! [ \"$PM_CTX_BRANCH\" = 'main' ] ) ) ) || ( [ \"$PM_CTX_EVENT\" = 'pull_request' ] && [ \"$PM_CTX_PR_BASE_REF\" != 'main' ] ) ); then exit 0; fi # pipemaster:guard\n        true\n      env:\n        - name: PM_CTX_EVENT\n          value: $(params.ctx-event)\n        - name: PM_CTX_BRANCH\n          value: $(params.ctx-branch)\n        - name: PM_CTX_PR_BASE_REF\n          value: $(params.ctx-pr-base-ref)\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key variables has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (variables) is not written to the Tekton file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "settings.tags has no Value form; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "settings.build_args has no Value form; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "the step has no action reference and no Tekton ref"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "step.image",
+     "level": "lost",
+     "detail": "the step is lost, so the setting is lost with it"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "the step has no action reference and no Tekton ref"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "step.if",
+     "level": "lost",
+     "detail": "the step is lost, so the setting is lost with it; the marker of a step the file does not hold keeps no condition"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "step.image",
+     "level": "lost",
+     "detail": "the step is lost, so the setting is lost with it"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "the step has no action reference and no Tekton ref"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "step.image",
+     "level": "lost",
+     "detail": "the step is lost, so the setting is lost with it"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/run-pre-commit-hooks",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "the step has no action reference and no Tekton ref"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/run-pre-commit-hooks",
+     "feature": "step.image",
+     "level": "lost",
+     "detail": "the step is lost, so the setting is lost with it"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/script",
+     "feature": "step.script",
+     "level": "lost",
+     "detail": "the job has no steps; a no-op step keeps the Task valid; not kept in round-trip metadata: no node at this path in the source project"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "job.if",
+     "level": "emulated",
+     "strategy": "shell guard",
+     "detail": "the condition has no when form; the script steps start with a guard line that reads the values from step env"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "step.script",
+     "level": "emulated",
+     "strategy": "placeholder step",
+     "detail": "the job has no step and a Task needs one; a step that runs true stands in"
+    },
+    {
+     "path": "pipeline/woodpecker/ref/secrets.REGISTRY_SECRET",
+     "feature": "config.name",
+     "level": "emulated",
+     "strategy": "secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars",
+     "detail": "the Secret values and ConfigMap values are not written"
+    },
+    {
+     "path": "pipeline/woodpecker/ref/secrets.REGISTRY_USERNAME",
+     "feature": "config.name",
+     "level": "emulated",
+     "strategy": "secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars",
+     "detail": "the Secret values and ConfigMap values are not written"
+    },
+    {
+     "path": "pipeline/woodpecker/ref/secrets.SLACK_WEBHOOK",
+     "feature": "config.name",
+     "level": "emulated",
+     "strategy": "secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars",
+     "detail": "the Secret values and ConfigMap values are not written"
+    }
+   ]
+  },
+  {
+   "id": "argo",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".argo/workflows/woodpecker.yaml",
+     "text": "# pipemaster:emulated step.action pipeline/woodpecker/job/build-latest-image/step/run-pre-commit-hooks\n# pipemaster:arg {\"step\":\"image:\\n    ref: registry.cloud.josa.ngo/library/pre-commit-runner\\nwith:\\n    args:\\n        lit: --all-files\\n    skip:\\n        lit: end-of-file-fixer, yamllint\\nid: run-pre-commit-hooks\\nkind: plugin\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"registry.cloud.josa.ngo/library/pre-commit-runner\\\",\\\"name\\\":\\\"run-pre-commit-hooks\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.action pipeline/woodpecker/job/build-latest-image/step/build-latest-image\n# pipemaster:arg {\"step\":\"image:\\n    ref: woodpeckerci/plugin-docker-buildx\\nwith:\\n    dockerfile:\\n        lit: ./Dockerfile\\n    password:\\n        secret: REGISTRY_SECRET\\n    registry:\\n        lit: https://registry.cloud.josa.ngo\\n    repo:\\n        lit: registry.cloud.josa.ngo/library/contributions-web\\n    username:\\n        secret: REGISTRY_USERNAME\\nid: build-latest-image\\nkind: plugin\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"woodpeckerci/plugin-docker-buildx\\\",\\\"name\\\":\\\"build-latest-image\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\",\"seq\":1}\n# pipemaster:emulated step.action pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success\n# pipemaster:arg {\"step\":\"image:\\n    ref: plugins/slack\\nwith:\\n    channel:\\n        lit: builds\\n    template:\\n        lit: \\\"✅ *SUCCESS* - Latest Build #{{ build.number }}\\\\n\\\\U0001F4C1 *Repository:* {{ repo.name }} \\\\U0001F33F *Branch:* {{ build.branch }} \\\\U0001F4DD *Commit:* {{ truncate build.commit 8 }} \\\\U0001F464 *Author:* {{ build.author }}\\\\n\\\\U0001F517 *Links:* • \\u003c{{ build.link }}|View Build\\u003e\\\\n\\\"\\n    webhook:\\n        secret: SLACK_WEBHOOK\\nid: notify-slack-latest-success\\nkind: plugin\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"plugins/slack\\\",\\\"name\\\":\\\"notify-slack-latest-success\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\",\"seq\":2}\n# pipemaster:emulated step.action pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure\n# pipemaster:arg {\"step\":\"if: failure()\\nimage:\\n    ref: plugins/slack\\nwith:\\n    channel:\\n        lit: builds\\n    template:\\n        lit: \\\"❌ *FAILED* - Latest Build #{{ build.number }}\\\\n\\\\U0001F4C1 *Repository:* {{ repo.name }} \\\\U0001F33F *Branch:* {{ build.branch }} \\\\U0001F4DD *Commit:* {{ truncate build.commit 8 }} \\\\U0001F464 *Author:* {{ build.author }}\\\\n\\\\U0001F517 *Links:* • \\u003c{{ build.link }}|View Build\\u003e\\\\n\\\"\\n    webhook:\\n        secret: SLACK_WEBHOOK\\nid: notify-slack-latest-failure\\nkind: plugin\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"plugins/slack\\\",\\\"name\\\":\\\"notify-slack-latest-failure\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\",\"seq\":3}\n# pipemaster:emulated step.if pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure\n# pipemaster:emulated config.name pipeline/woodpecker/ref/secrets.REGISTRY_SECRET\n# pipemaster:emulated config.name pipeline/woodpecker/ref/secrets.REGISTRY_USERNAME\n# pipemaster:emulated config.name pipeline/woodpecker/ref/secrets.SLACK_WEBHOOK\napiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata:\n  name: woodpecker\nspec:\n  entrypoint: main\n  arguments:\n    parameters:\n      - name: ctx-branch\n        value: \"\"\n      - name: ctx-event\n        value: \"\"\n      - name: ctx-pr-base-ref\n        value: \"\"\n  templates:\n    - name: main\n      dag:\n        tasks:\n          - name: build-latest-image\n            template: build-latest-image\n            when: '{{= ((workflow.parameters[''ctx-event''] == ''push'' || workflow.parameters[''ctx-event''] == ''manual'') && (workflow.parameters[''ctx-event''] == ''tag'' || !(workflow.parameters[''ctx-branch''] == ''main''))) || (workflow.parameters[''ctx-event''] == ''pull_request'' && workflow.parameters[''ctx-pr-base-ref''] != ''main'') }}'\n    - name: build-latest-image\n      containerSet:\n        containers:\n          - name: run-pre-commit-hooks\n            image: registry.cloud.josa.ngo/library/pre-commit-runner\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n          - name: build-latest-image\n            image: woodpeckerci/plugin-docker-buildx\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n            dependencies:\n              - run-pre-commit-hooks\n          - name: notify-slack-latest-success\n            image: plugins/slack\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n            dependencies:\n              - build-latest-image\n          - name: notify-slack-latest-failure\n            image: plugins/slack\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n            dependencies:\n              - notify-slack-latest-success\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key variables has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (variables) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "settings.tags has no Value form; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "settings.build_args has no Value form; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (depends_on, settings) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "a plugin step has no Argo form; the step is dropped"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (depends_on) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "a plugin step has no Argo form; the step is dropped"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (depends_on) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "a plugin step has no Argo form; the step is dropped"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/run-pre-commit-hooks",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "a plugin step has no Argo form; the step is dropped"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "step.if",
+     "level": "emulated",
+     "strategy": "guard in the script that reads context values from env",
+     "detail": "containerSet has no when, so every step condition runs as a shell guard that reads context values from env; a condition with no guard form disables the script and the container still starts; a containerSet starts every container at once and each waits for its dependencies, and a container that exits non-zero stops its dependents"
+    },
+    {
+     "path": "pipeline/woodpecker/ref/secrets.REGISTRY_SECRET",
+     "feature": "config.name",
+     "level": "emulated",
+     "strategy": "secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars",
+     "detail": "the Secret values and ConfigMap values are not written"
+    },
+    {
+     "path": "pipeline/woodpecker/ref/secrets.REGISTRY_USERNAME",
+     "feature": "config.name",
+     "level": "emulated",
+     "strategy": "secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars",
+     "detail": "the Secret values and ConfigMap values are not written"
+    },
+    {
+     "path": "pipeline/woodpecker/ref/secrets.SLACK_WEBHOOK",
+     "feature": "config.name",
+     "level": "emulated",
+     "strategy": "secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars",
+     "detail": "the Secret values and ConfigMap values are not written"
+    }
+   ]
+  },
+  {
+   "id": "concourse",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".concourse/woodpecker.yml",
+     "text": "# pipemaster:emulated step.action pipeline/woodpecker/job/build-latest-image/step/run-pre-commit-hooks\n# pipemaster:arg {\"step\":\"image:\\n    ref: registry.cloud.josa.ngo/library/pre-commit-runner\\nwith:\\n    args:\\n        lit: --all-files\\n    skip:\\n        lit: end-of-file-fixer, yamllint\\nid: run-pre-commit-hooks\\nkind: plugin\\n\",\"task\":\"run-pre-commit-hooks\",\"hold\":\"{\\\"config\\\":{\\\"image_resource\\\":{\\\"source\\\":{\\\"repository\\\":\\\"ubuntu\\\",\\\"tag\\\":\\\"latest\\\"},\\\"type\\\":\\\"registry-image\\\"},\\\"platform\\\":\\\"linux\\\",\\\"run\\\":{\\\"args\\\":[\\\"-ec\\\",\\\"true\\\"],\\\"path\\\":\\\"sh\\\"}},\\\"task\\\":\\\"run-pre-commit-hooks\\\"}\"}\n# pipemaster:emulated step.action pipeline/woodpecker/job/build-latest-image/step/build-latest-image\n# pipemaster:arg {\"step\":\"image:\\n    ref: woodpeckerci/plugin-docker-buildx\\nwith:\\n    dockerfile:\\n        lit: ./Dockerfile\\n    password:\\n        secret: REGISTRY_SECRET\\n    registry:\\n        lit: https://registry.cloud.josa.ngo\\n    repo:\\n        lit: registry.cloud.josa.ngo/library/contributions-web\\n    username:\\n        secret: REGISTRY_USERNAME\\next:\\n    woodpecker:\\n        depends_on:\\n            - run-pre-commit-hooks\\n        settings:\\n            build_args:\\n                CI_COMMIT_REF: ${CI_COMMIT_REF}\\n                CI_COMMIT_SHA: ${CI_COMMIT_SHA}\\n                CI_PIPELINE_CREATED: ${CI_PIPELINE_CREATED}\\n                CI_PIPELINE_NUMBER: ${CI_PIPELINE_NUMBER}\\n                CI_PIPELINE_URL: ${CI_PIPELINE_URL}\\n                CI_PREV_PIPELINE_URL: ${CI_PREV_PIPELINE_URL}\\n                CI_REPO: ${CI_REPO}\\n                CI_REPO_NAME: ${CI_REPO_NAME}\\n                CI_REPO_URL: ${CI_REPO_URL}\\n                CONTRIBUTIONS_API_URL: http://contributions.api.svc.cluster.local:80\\n                MATOMO_SITE_ID: \\\"11\\\"\\n                TARGET_ENV: production\\n            tags:\\n                - latest-${CI_COMMIT_SHA}\\n                - latest\\nid: build-latest-image\\nkind: plugin\\n\",\"task\":\"build-latest-image\",\"hold\":\"{\\\"config\\\":{\\\"image_resource\\\":{\\\"source\\\":{\\\"repository\\\":\\\"ubuntu\\\",\\\"tag\\\":\\\"latest\\\"},\\\"type\\\":\\\"registry-image\\\"},\\\"platform\\\":\\\"linux\\\",\\\"run\\\":{\\\"args\\\":[\\\"-ec\\\",\\\"true\\\"],\\\"path\\\":\\\"sh\\\"}},\\\"task\\\":\\\"build-latest-image\\\"}\"}\n# pipemaster:emulated step.action pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success\n# pipemaster:arg {\"step\":\"image:\\n    ref: plugins/slack\\nwith:\\n    channel:\\n        lit: builds\\n    template:\\n        lit: \\\"✅ *SUCCESS* - Latest Build #{{ build.number }}\\\\n\\\\U0001F4C1 *Repository:* {{ repo.name }} \\\\U0001F33F *Branch:* {{ build.branch }} \\\\U0001F4DD *Commit:* {{ truncate build.commit 8 }} \\\\U0001F464 *Author:* {{ build.author }}\\\\n\\\\U0001F517 *Links:* • \\u003c{{ build.link }}|View Build\\u003e\\\\n\\\"\\n    webhook:\\n        secret: SLACK_WEBHOOK\\next:\\n    woodpecker:\\n        depends_on:\\n            - run-pre-commit-hooks\\n            - build-latest-image\\nid: notify-slack-latest-success\\nkind: plugin\\n\",\"task\":\"notify-slack-latest-success\",\"hold\":\"{\\\"config\\\":{\\\"image_resource\\\":{\\\"source\\\":{\\\"repository\\\":\\\"ubuntu\\\",\\\"tag\\\":\\\"latest\\\"},\\\"type\\\":\\\"registry-image\\\"},\\\"platform\\\":\\\"linux\\\",\\\"run\\\":{\\\"args\\\":[\\\"-ec\\\",\\\"true\\\"],\\\"path\\\":\\\"sh\\\"}},\\\"task\\\":\\\"notify-slack-latest-success\\\"}\"}\n# pipemaster:emulated step.action pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure\n# pipemaster:arg {\"step\":\"image:\\n    ref: plugins/slack\\nwith:\\n    channel:\\n        lit: builds\\n    template:\\n        lit: \\\"❌ *FAILED* - Latest Build #{{ build.number }}\\\\n\\\\U0001F4C1 *Repository:* {{ repo.name }} \\\\U0001F33F *Branch:* {{ build.branch }} \\\\U0001F4DD *Commit:* {{ truncate build.commit 8 }} \\\\U0001F464 *Author:* {{ build.author }}\\\\n\\\\U0001F517 *Links:* • \\u003c{{ build.link }}|View Build\\u003e\\\\n\\\"\\n    webhook:\\n        secret: SLACK_WEBHOOK\\next:\\n    woodpecker:\\n        depends_on:\\n            - run-pre-commit-hooks\\n            - build-latest-image\\nid: notify-slack-latest-failure\\nkind: plugin\\n\",\"task\":\"notify-slack-latest-failure\",\"hold\":\"{\\\"config\\\":{\\\"image_resource\\\":{\\\"source\\\":{\\\"repository\\\":\\\"ubuntu\\\",\\\"tag\\\":\\\"latest\\\"},\\\"type\\\":\\\"registry-image\\\"},\\\"platform\\\":\\\"linux\\\",\\\"run\\\":{\\\"args\\\":[\\\"-ec\\\",\\\"true\\\"],\\\"path\\\":\\\"sh\\\"}},\\\"task\\\":\\\"notify-slack-latest-failure\\\"}\"}\n# pipemaster:emulated job.manual pipeline/woodpecker/job/build-latest-image\n# pipemaster:arg {\"manual\":false,\"held\":true,\"cond\":true}\n# pipemaster:emulated ext.passthrough pipeline/woodpecker/job/build-latest-image/carry\n# pipemaster:arg {\"digest\":\"86f93a39b08723147a9c16e2a44f97d59c4522954051f7406bfd97e9c227009e\",\"carry\":\"if: (((event == 'push') || (event == 'manual')) \\u0026\\u0026 ((event == 'tag') || !(branch == 'main'))) || ((event == 'pull_request') \\u0026\\u0026 (pr.base_ref != 'main'))\\nid: build-latest-image\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/woodpecker/carry\n# pipemaster:arg {\"digest\":\"23421ff0998514f47173ea5b7668acb70c8af5e253b5c3264a1655012e26476f\",\"carry\":\"id: woodpecker\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/woodpecker\n# pipemaster:emulated step.if pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\njobs:\n  - name: build-latest-image\n    plan:\n      - get: source\n      - task: run-pre-commit-hooks\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: ubuntu\n              tag: latest\n          run:\n            path: sh\n            args:\n              - -ec\n              - \"true\"\n      - task: build-latest-image\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: ubuntu\n              tag: latest\n          run:\n            path: sh\n            args:\n              - -ec\n              - \"true\"\n      - task: notify-slack-latest-success\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: ubuntu\n              tag: latest\n          run:\n            path: sh\n            args:\n              - -ec\n              - \"true\"\n    on_failure:\n      task: notify-slack-latest-failure\n      config:\n        platform: linux\n        image_resource:\n          type: registry-image\n          source:\n            repository: ubuntu\n            tag: latest\n        run:\n          path: sh\n          args:\n            - -ec\n            - \"true\"\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key variables has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (variables) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "the reference event has no spelling in a Concourse task; the job has no triggering get, so a person starts it"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "settings.tags has no Value form; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "settings.build_args has no Value form; kept in Ext"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (depends_on, settings) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "the plugin step has no Concourse form outside a Concourse file; a placeholder task keeps its place"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (depends_on) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "the plugin step has no Concourse form outside a Concourse file; a placeholder task keeps its place"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[woodpecker]",
+     "detail": "key depends_on has no IR field; kept in Ext; step order follows the file and the step DAG is not applied"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider woodpecker (depends_on) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-success",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "the plugin step has no Concourse form outside a Concourse file; a placeholder task keeps its place"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/run-pre-commit-hooks",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "the plugin step has no Concourse form outside a Concourse file; a placeholder task keeps its place"
+    },
+    {
+     "path": "pipeline/woodpecker",
+     "feature": "ext.passthrough",
+     "level": "emulated",
+     "strategy": "git-uri variable",
+     "detail": "the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager"
+    },
+    {
+     "path": "pipeline/woodpecker/job/build-latest-image/step/notify-slack-latest-failure",
+     "feature": "step.if",
+     "level": "emulated",
+     "strategy": "job hook on_failure",
+     "detail": "the step runs as the on_failure hook of the job"
+    }
+   ]
+  }
+ ]
+}

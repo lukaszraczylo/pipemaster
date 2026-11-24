@@ -1,2 +1,2 @@
 Loss report: gitlab -> drone
-No losses: every feature converted natively.
+[lost] pipeline/gitlab-ci/job/build/step/script step.shell (Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)

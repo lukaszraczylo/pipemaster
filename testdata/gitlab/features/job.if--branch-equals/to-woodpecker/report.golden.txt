@@ -1,3 +1,4 @@
 Loss report: gitlab -> woodpecker
+[lost] pipeline/gitlab-ci/job/deploy/step/script step.shell (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [external] pipeline/gitlab-ci/job/deploy job.if: pull request test (Woodpecker holds the target branch in CI_COMMIT_BRANCH on a pull request, so the condition gains a pull request test; the source condition is kept in a marker)
 [emulated] pipeline/gitlab-ci/job/deploy job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

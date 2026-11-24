@@ -10,6 +10,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/internal/linttool"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/concourse"
 	"github.com/lukaszraczylo/pipemaster/report"
 	"github.com/lukaszraczylo/pipemaster/validate"
@@ -187,7 +188,12 @@ func checkShellTasks(t *testing.T, src string, reported int) {
 				args, _ := run["args"].([]any)
 				if (shell == "sh" || shell == "bash") && len(args) > 0 {
 					script, _ := args[len(args)-1].(string)
-					if !passesSyntax(shell, script) {
+					if wrapped := len(args) == 4 && args[1] == provider.BashOrShScript; wrapped {
+						// The wrapper itself must parse under sh; the script runs under bash when the image has it.
+						if !passesSyntax("sh", provider.BashOrShScript) || !passesSyntax("bash", script) {
+							failed++
+						}
+					} else if !passesSyntax(shell, script) {
 						failed++
 					}
 				}
@@ -204,23 +210,33 @@ func checkShellTasks(t *testing.T, src string, reported int) {
 }
 
 func passesSyntax(shell, script string) bool {
-	cmd := exec.Command("sh", "-n")
-	if shell == "bash" {
-		cmd = exec.Command("bash", "-n")
-	}
+	return syntaxCmd(shell).run(script)
+}
+
+type syntaxChecker struct{ name string }
+
+func (c syntaxChecker) run(script string) bool {
+	cmd := exec.Command(c.name, "-n") // #nosec G204 -- fixed shell binary
 	cmd.Stdin = strings.NewReader(script)
 	return cmd.Run() == nil
+}
+
+// syntaxCmd names the checker for a shell. The sh check uses dash when it exists, because dash is /bin/sh on
+// Debian and Ubuntu images and rejects bash-only syntax that the sh of macOS accepts.
+func syntaxCmd(shell string) syntaxChecker {
+	if shell == "bash" {
+		return syntaxChecker{"bash"}
+	}
+	if p, err := exec.LookPath("dash"); err == nil {
+		return syntaxChecker{p}
+	}
+	return syntaxChecker{"sh"}
 }
 
 // syntaxCheck runs sh -n or bash -n on the script.
 func syntaxCheck(t *testing.T, shell, script string) {
 	t.Helper()
-	var cmd *exec.Cmd
-	if shell == "bash" {
-		cmd = exec.Command("bash", "-n")
-	} else {
-		cmd = exec.Command("sh", "-n")
-	}
+	cmd := exec.Command(syntaxCmd(shell).name, "-n") // #nosec G204 -- fixed shell binary
 	cmd.Stdin = strings.NewReader(script)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Errorf("%s -n: %v %s\n%s", shell, err, out, script)

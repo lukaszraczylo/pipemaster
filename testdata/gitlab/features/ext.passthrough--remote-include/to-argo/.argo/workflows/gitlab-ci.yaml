@@ -1,5 +1,7 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/deploy
 # pipemaster:arg {"job":"if: |\n    opaque(gitlab): - changes: '!reference [.remote-patterns]'\n      if: $CI_COMMIT_TAG\nid: \"\"\n"}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/deploy/step/script
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
@@ -29,8 +31,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - |-
                 !reference [.remote-setup, script]
                 make
@@ -48,8 +52,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make deploy
             workingDir: /workspace
         volumeMounts:

@@ -1,5 +1,8 @@
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:arg {"vars":"- name: SHARED\n  value:\n    lit: \"1\"\n","names":["SHARED"]}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/common/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/prod/step/script
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
@@ -31,8 +34,10 @@ spec:
             image: alpine:3
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make
             workingDir: /workspace
             env:
@@ -53,8 +58,10 @@ spec:
             image: alpine:3
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo common
             workingDir: /workspace
             env:
@@ -75,8 +82,10 @@ spec:
             image: alpine:3
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - ./deploy.sh
             workingDir: /workspace
             env:

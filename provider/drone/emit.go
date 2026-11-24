@@ -67,7 +67,7 @@ func (a adapter) emit(p *ir.Project) (map[string][]byte, *report.Report, map[str
 	if p != nil {
 		origin = p.Origin.Provider
 	}
-	e := &emitter{led: emitkit.NewLedger("ir", dialect, a.Caps()), stepIDs: map[string]string{}}
+	e := &emitter{led: emitkit.NewLedger("ir", dialect, a.Caps()), origin: origin, stepIDs: map[string]string{}}
 	if lang, ok := expr.LangOf(origin); ok && origin != dialect {
 		e.sem = lang.Sem
 		if from := expr.SourceFor(origin, dexpr.Lang); from != nil && from.Class == dexpr.Lang.Class {

@@ -60,7 +60,7 @@ The following table comes from `pipemaster caps --to tekton --format md`.
 | step.if | native | step when (only the input/operator/values subset; any other condition is emulated or lost) |
 | step.image | native |  |
 | step.script | native |  |
-| step.shell | native | shebang line of the script |
+| step.shell | native | shebang line of the script (a step with no shell from a GHA or GitLab source gets a preamble that re-runs the script under bash -e when the image has bash, else it runs under sh -e, so bash-only syntax fails under sh) |
 | step.timeout | native |  |
 | step.workdir | native |  |
 | trigger.api | emulated | EventListener entry of the Tekton file (only an entry that a Tekton file held is written; any other API trigger is lost) |

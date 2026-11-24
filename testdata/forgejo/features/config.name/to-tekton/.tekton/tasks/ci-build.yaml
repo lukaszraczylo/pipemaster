@@ -2,6 +2,7 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated script.interpolation pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"refs":[{"ref":"vars.CI","name":"CI","at":[0],"of":1},{"ref":"vars.FORGEJO_REGION","name":"FORGEJO_REGION","at":[0],"of":1}]}
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -10,7 +11,11 @@ spec:
   steps:
     - name: build-step-1
       image: alpine:3.22
-      script: echo "${FORGEJO_REGION} ${CI}"
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        echo "${FORGEJO_REGION} ${CI}"
       env:
         - name: KEY
           valueFrom:

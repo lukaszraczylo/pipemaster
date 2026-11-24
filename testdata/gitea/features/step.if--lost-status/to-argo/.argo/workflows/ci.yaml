@@ -1,7 +1,11 @@
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
-# pipemaster:arg {"step":"if: failure()\nid: build-step-2\nkind: script\nscript:\n    - echo cleanup\n","hold":"{\"args\":[\"exit 0 # pipemaster:lost the step condition has no shell form\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-2\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:arg {"step":"if: failure()\nid: build-step-2\nkind: script\nscript:\n    - echo cleanup\n","hold":"{\"args\":[\"if command -v bash \\u003e/dev/null 2\\u003e\\u00261; then exec bash -e -c \\\"$1\\\"; fi; exec sh -e -c \\\"$1\\\"\",\"pipemaster\",\"exit 0 # pipemaster:lost the step condition has no shell form\"],\"command\":[\"sh\",\"-c\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-2\",\"workingDir\":\"/workspace\"}"}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-4
-# pipemaster:arg {"step":"if: steps.config.outputs.configured == 'true'\nid: build-step-4\nkind: script\nscript:\n    - echo configured\n","hold":"{\"args\":[\"exit 0 # pipemaster:lost the step condition has no shell form\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-4\",\"workingDir\":\"/workspace\"}","seq":1}
+# pipemaster:arg {"step":"if: steps.config.outputs.configured == 'true'\nid: build-step-4\nkind: script\nscript:\n    - echo configured\n","hold":"{\"args\":[\"if command -v bash \\u003e/dev/null 2\\u003e\\u00261; then exec bash -e -c \\\"$1\\\"; fi; exec sh -e -c \\\"$1\\\"\",\"pipemaster\",\"exit 0 # pipemaster:lost the step condition has no shell form\"],\"command\":[\"sh\",\"-c\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-4\",\"workingDir\":\"/workspace\"}","seq":1}
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-2
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-4
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/config
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
@@ -28,16 +32,20 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo build
             workingDir: /workspace
           - name: build-step-2
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - 'exit 0 # pipemaster:lost the step condition has no shell form'
             workingDir: /workspace
             dependencies:
@@ -46,8 +54,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo "configured=true" >> "$GITHUB_OUTPUT"
             workingDir: /workspace
             dependencies:
@@ -56,8 +66,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - 'exit 0 # pipemaster:lost the step condition has no shell form'
             workingDir: /workspace
             dependencies:

@@ -1,10 +1,12 @@
 Loss report: gitlab -> woodpecker
 [lost] pipeline/gitlab-ci/job/build job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
 [lost] pipeline/gitlab-ci/job/build/step/build-step-1 ext.passthrough (the action reference actions/cache@v4 is not in the Woodpecker file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/job/build/step/build-step-2 step.shell (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [lost] pipeline/gitlab-ci/job/build/step/build-step-3 ext.passthrough (the action reference actions/upload-artifact@v4 is not in the Woodpecker file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci/job/test job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
 [lost] pipeline/gitlab-ci/job/test/step/test-step-1 ext.passthrough (the action reference actions/download-artifact@v4 is not in the Woodpecker file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci/job/test/step/test-step-1 step.action (no upload of artifact dist in this workflow; workflows do not share a workspace)
+[lost] pipeline/gitlab-ci/job/test/step/test-step-2 step.shell (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [emulated] pipeline/gitlab-ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/gitlab-ci/job/build/step/build-step-1 step.action: shared workspace of the steps in one workflow (nothing persists between runs)
 [emulated] pipeline/gitlab-ci/job/build/step/build-step-3 step.action: shared workspace of the steps in one workflow (other workflows cannot read the files)

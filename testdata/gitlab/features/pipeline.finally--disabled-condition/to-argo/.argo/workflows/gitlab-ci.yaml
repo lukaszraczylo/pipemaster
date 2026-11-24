@@ -1,5 +1,7 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/cleanup
 # pipemaster:arg {"job":"if: |\n    opaque(gitlab): - if: $PIPELINE_TYPE =~ /_MR_PIPELINE$/\nid: \"\"\n"}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/cleanup/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
@@ -33,8 +35,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make build
             workingDir: /workspace
         volumeMounts:
@@ -50,8 +54,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make clean
             workingDir: /workspace
         volumeMounts:

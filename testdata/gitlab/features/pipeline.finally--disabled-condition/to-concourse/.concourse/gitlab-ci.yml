@@ -1,13 +1,14 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/step/script/carry
-# pipemaster:arg {"digest":"614688d955c08ff89bac2f7d1f6c9f1f64e48e7f4f368ccafc133c0df00f0a7b","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"b031fe97ca33ecbd3ab02ef7b3daed552051b278e3a390168ad1737b473f6423","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/carry
-# pipemaster:arg {"digest":"18f128dda2f5047bead1b33efcd04fc32aeabf5d459f99ef9e11900df39d4f3c","carry":"id: compile\n"}
+# pipemaster:arg {"digest":"ee4abe74686313acd28a1438ee7b31c7b69864639ba96b8c240485c3c3a56464","carry":"id: compile\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nfinally:\n    - if: |\n        opaque(gitlab): - if: $PIPELINE_TYPE =~ /_MR_PIPELINE$/\n      id: cleanup\n      needs:\n        - job: compile\n      steps:\n        - id: script\n          kind: script\n          script:\n            - make clean\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/job/compile
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/compile/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
@@ -43,6 +44,8 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make build
             dir: workspace

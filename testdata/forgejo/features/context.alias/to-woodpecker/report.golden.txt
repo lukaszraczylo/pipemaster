@@ -4,5 +4,7 @@ Loss report: forgejo -> woodpecker
 [lost] pipeline/ci/job/build/step/build-step-1 script.interpolation (no Woodpecker spelling for expression ref_name; the line is commented out)
 [lost] pipeline/ci/job/build/step/build-step-1 step.if (a step condition cannot guard an action that is not a step: the action is not written as a step)
 [lost] pipeline/ci/job/build/step/build-step-1 step.script (no command of the step has a Woodpecker spelling; the step is not written)
+[lost] pipeline/ci/job/build/step/build-step-1 step.shell (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [lost] pipeline/ci/job/build/step/build-step-2 step.if (condition not expressible in Woodpecker CI; the step disabled)
+[lost] pipeline/ci/job/build/step/build-step-2 step.shell (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

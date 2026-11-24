@@ -4,4 +4,6 @@ Loss report: gitea -> woodpecker
 [lost] pipeline/ci/job/check/step/check-step-2 script.interpolation (no Woodpecker spelling for expression steps.meta.outputs.version; the line is commented out)
 [lost] pipeline/ci/job/check/step/check-step-2 step.if (a step condition cannot guard an action that is not a step: the action is not written as a step)
 [lost] pipeline/ci/job/check/step/check-step-2 step.script (no command of the step has a Woodpecker spelling; the step is not written)
+[lost] pipeline/ci/job/check/step/check-step-2 step.shell (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
+[lost] pipeline/ci/job/check/step/meta step.shell (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [emulated] pipeline/ci/job/check job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

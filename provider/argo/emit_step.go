@@ -13,6 +13,7 @@ import (
 	exprargo "github.com/lukaszraczylo/pipemaster/expr/argo"
 	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
@@ -141,6 +142,10 @@ func (sx *stepCtx) containerFor(st *ir.Step, name string, last bool) *container 
 				c.m.Set(strings.ToLower(k), e.node(path, k, v))
 			}
 		}
+	} else if sx.bashDefault(st, sx0) {
+		e.emulate(path, caps.StepShell, "container command sh with a bash-if-present wrapper", "the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh")
+		c.m.Set("command", strSeq([]string{shellCommand, "-c"}))
+		c.m.Set("args", seqOf(block(provider.BashOrShScript), str(provider.BashOrShArgv0), block(strings.Join(script, "\n"))))
 	} else {
 		c.m.Set("command", strSeq([]string{sx.shellOf(st, path), shellFlags}))
 		c.m.Set("args", seqOf(block(strings.Join(script, "\n"))))
@@ -172,7 +177,7 @@ func (sx *stepCtx) containerFor(st *ir.Step, name string, last bool) *container 
 }
 
 // containerSkip lists the step Ext keys that the emitter writes itself.
-var containerSkip = map[string]bool{ExtScriptLine: true, ExtCommand: true, ExtArgs: true, "valueFrom": true, keyDeps: true, ExtTemplate: true}
+var containerSkip = map[string]bool{ExtScriptLine: true, ExtBashDefault: true, ExtCommand: true, ExtArgs: true, "valueFrom": true, keyDeps: true, ExtTemplate: true}
 
 // workdir moves a relative working directory under the workspace.
 func (tc *jobCtx) workdir(sc *stepScope, path, w string) string {
@@ -481,6 +486,19 @@ func actionRef(a *ir.ActionRef) string {
 
 // posixShells are the shells that run a script with -ec as the container command.
 var posixShells = []string{"bash", "dash", "zsh", "ash"}
+
+// bashDefault is true when a step with no shell runs under bash-if-present: the source default is bash, or an
+// Argo file held the wrapper.
+func (sx *stepCtx) bashDefault(st *ir.Step, ext map[string]any) bool {
+	if strings.TrimSpace(st.Shell) != "" {
+		return false
+	}
+	if b, _ := ext[ExtBashDefault].(bool); b {
+		return true
+	}
+	e := sx.tc.e
+	return !e.own && provider.BashDefault(e.origin)
+}
 
 // shellOf picks the container command for the shell of a step. A shell with no -ec form stays sh and is reported.
 func (sx *stepCtx) shellOf(st *ir.Step, path string) string {

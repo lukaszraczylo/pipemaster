@@ -32,8 +32,10 @@ const (
 
 // emitter carries the state of one Emit call: the ledger and the comment lines of the document being written.
 type emitter struct {
-	led  *emitkit.Ledger
-	said map[ir.FeatureUse][2]string
+	led *emitkit.Ledger
+	// origin is the provider ID the project was parsed from.
+	origin string
+	said   map[ir.FeatureUse][2]string
 	// stepIDs maps the path of each renamed step to its ID in the IR.
 	stepIDs map[string]string
 	// cell is the matrix combination of the document being written.

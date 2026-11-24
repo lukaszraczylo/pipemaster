@@ -1,5 +1,6 @@
 # pipemaster:emulated job.env pipeline/gitlab-ci/job/lint
 # pipemaster:arg {"vars":"- name: GOCACHE\n  value:\n    lit: $CI_PROJECT_DIR/.cache/go-build\n- name: GOMODCACHE\n  value:\n    lit: $CI_PROJECT_DIR/.cache/go-mod\n","names":["GOCACHE","GOMODCACHE"]}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/lint/step/script
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
@@ -24,8 +25,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make lint
             workingDir: /workspace
             env:

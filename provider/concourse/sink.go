@@ -45,6 +45,8 @@ const (
 	ExtScriptLine = "script_line"
 	// ExtShellFlags keeps the flags before the script in a shell -c run.
 	ExtShellFlags = "shell_flags"
+	// ExtBashDefault marks a shell -c run that holds the bash-if-present wrapper, so the step has no IR shell.
+	ExtBashDefault = "bash_default"
 	// ExtEntrypoint marks a task with no run.path, which runs the image entrypoint.
 	ExtEntrypoint = "entrypoint"
 	// ExtConfig keeps the task config keys with no IR field.

@@ -1,5 +1,6 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/build
 # pipemaster:arg {"image":"ref: golang:1.22\nentrypoint:\n    - \"\"\n","written":"golang:1.22"}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
@@ -24,8 +25,10 @@ spec:
             image: golang:1.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make
             workingDir: /workspace
         volumeMounts:

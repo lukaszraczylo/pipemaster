@@ -1,14 +1,15 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/placeholder/step/placeholder/carry
-# pipemaster:arg {"digest":"649003518803ccddaa0efbf0eb0367f1db09ad862a7dcff882832edada35089b","carry":"id: placeholder\nkind: script\n"}
+# pipemaster:arg {"digest":"54017fbc4b6f6b0a689732910233b32a27905ac0fdf0b6d0b87fb5e66cfd6aef","carry":"id: placeholder\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/placeholder/carry
-# pipemaster:arg {"digest":"83c739354fca240adbf3aab804e33138b38a7ac23f2eb929fcd21c315abe4619","carry":"id: placeholder\n"}
+# pipemaster:arg {"digest":"343ea149da87669c3b08d229f420a233d566aec8425ec1e8ae16e7f145d0ea9a","carry":"id: placeholder\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/placeholder
-# pipemaster:arg {"hold":"{\"name\":\"placeholder\",\"plan\":[{\"get\":\"source\",\"trigger\":true},{\"get\":\"source-tags\",\"trigger\":true},{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"inputs\":[{\"name\":\"workspace\"}],\"outputs\":[{\"name\":\"workspace\"}],\"params\":{\"REGION\":\"eu\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"dir\":\"workspace\",\"path\":\"sh\"}},\"input_mapping\":{\"workspace\":\"source\"},\"task\":\"placeholder\"}]}"}
+# pipemaster:arg {"hold":"{\"name\":\"placeholder\",\"plan\":[{\"get\":\"source\",\"trigger\":true},{\"get\":\"source-tags\",\"trigger\":true},{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"inputs\":[{\"name\":\"workspace\"}],\"outputs\":[{\"name\":\"workspace\"}],\"params\":{\"REGION\":\"eu\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-c\",\"if command -v bash \\u003e/dev/null 2\\u003e\\u00261; then exec bash -e -c \\\"$1\\\"; fi; exec sh -e -c \\\"$1\\\"\",\"pipemaster\",\"true\"],\"dir\":\"workspace\",\"path\":\"sh\"}},\"input_mapping\":{\"workspace\":\"source\"},\"task\":\"placeholder\"}]}"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: REGION\n      value:\n        lit: eu\n"}
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/job/placeholder
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/placeholder/step/placeholder
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/placeholder/step/placeholder
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
@@ -46,6 +47,8 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - "true"
             dir: workspace

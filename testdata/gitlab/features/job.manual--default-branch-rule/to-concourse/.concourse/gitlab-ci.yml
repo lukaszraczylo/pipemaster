@@ -1,13 +1,14 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/publish/step/script/carry
-# pipemaster:arg {"digest":"4f86b2610b77a68a298e79a09fbb617ce87dd50cad7ade165d33e73485ebde78","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"d0524b3e89a990bdd0aebfc25f2217c7abaa76590889aecf508771b065028198","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/publish
 # pipemaster:arg {"manual":true,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/publish/carry
-# pipemaster:arg {"digest":"27aa41d8b6e229d8fa06794536e809fc881691f23d0c98521175be7f6303638a","carry":"if: branch == gitlab.CI_DEFAULT_BRANCH\nid: publish\nmanual: true\n"}
+# pipemaster:arg {"digest":"868dd324f79c885d49d825be8fbae5a075c5f91b99dbb175a5b90e9307db3d7e","carry":"if: branch == gitlab.CI_DEFAULT_BRANCH\nid: publish\nmanual: true\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/publish/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/publish/step/script
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
@@ -41,6 +42,8 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make publish
             dir: workspace

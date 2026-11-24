@@ -2,6 +2,8 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated step.image pipeline/ci/job/check/step/check-step-2
 # pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated step.shell pipeline/ci/job/check/step/check-step-2
+# pipemaster:emulated step.shell pipeline/ci/job/check/step/meta
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -12,11 +14,19 @@ spec:
   steps:
     - name: meta
       image: alpine:3.22
-      script: echo "version=1" >> "$GITHUB_OUTPUT"
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        echo "version=1" >> "$GITHUB_OUTPUT"
     - name: check-step-2
       displayName: Inspect
       image: alpine:3.22
-      script: '# pipemaster:lost script.interpolation: docker inspect {{ steps.meta.outputs.version }}'
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        # pipemaster:lost script.interpolation: docker inspect {{ steps.meta.outputs.version }}
       when:
         - input: $(params.ctx-event)
           operator: notin

@@ -1,9 +1,9 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
-# pipemaster:arg {"digest":"974e71482133116c83ab5e17621e324c8e3b060aa4bdcea34b6cf264e25d6090","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"25c2d16b013e82c5564d7fa297863d04b738c92a702d905a6626dff701006ea8","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/after_script/carry
-# pipemaster:arg {"digest":"39930e565759cd05c99fbb183b445bd7ed916c15c81728a7d9c3c8e9a4f29ca0","carry":"id: after_script\nkind: script\ncontinue_on_error: true\n"}
+# pipemaster:arg {"digest":"16886ad232b93208df14afa92d71cdb22ac997aad05099821e4f6277b05efa6c","carry":"id: after_script\nkind: script\ncontinue_on_error: true\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"7cbc689d82fa5f4b84212566bf449465a9f0a32747d61ad1c7e0fc47dc8abcc5","carry":"id: build\n"}
+# pipemaster:arg {"digest":"32a3dd764455dc209a84fe8fec46dbbbf4c4bf10b43ddf18c52f4508f5a14ed4","carry":"id: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -11,7 +11,9 @@
 # pipemaster:emulated step.continue_on_error pipeline/gitlab-ci/job/build/step/after_script
 # pipemaster:emulated step.if pipeline/gitlab-ci/job/build/step/after_script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/after_script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/after_script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
@@ -47,7 +49,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - |-
                 echo prepare
                 make build
@@ -72,6 +76,8 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo cleanup
             dir: workspace

@@ -12,6 +12,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -531,6 +532,11 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, r *reader) error {
 		}
 		return nil
 	}
+	if lines, ok := b.wrappedScript(cmd, args); ok {
+		st.Script = lines
+		k.Out[ExtBashDefault] = true
+		return nil
+	}
 	var words []string
 	tagged := false
 	for _, part := range []any{cmd, args} {
@@ -562,6 +568,25 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, r *reader) error {
 	k.Out[ExtArgs] = plain(args)
 	k.Note(caps.StepScript, "command and args are written as one script line; both lists are kept in Ext", 0)
 	return nil
+}
+
+// wrappedScript reads command [sh, -c] with the bash-if-present wrapper, its $0 and the script as the arguments.
+func (b *jobBuilder) wrappedScript(cmd, args any) ([]string, bool) {
+	c, okC := textList(cmd)
+	a, okA := textList(args)
+	if !okC || !okA || len(c) != 2 || c[0] != shellCommand || c[1] != "-c" || len(a) != 3 ||
+		strings.TrimSuffix(a[0], "\n") != provider.BashOrShScript || a[1] != provider.BashOrShArgv0 {
+		return nil, false
+	}
+	var lines []string
+	for _, l := range strings.Split(strings.TrimSuffix(a[2], "\n"), "\n") {
+		tl, err := b.tx.template(l)
+		if err != nil {
+			return nil, false
+		}
+		lines = append(lines, tl)
+	}
+	return lines, true
 }
 
 // shellScript reads command [shell, -ec] with one argument as the script lines that the emitter writes.

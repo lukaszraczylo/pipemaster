@@ -1,16 +1,17 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"cond","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/step/deploy-step-1/carry
-# pipemaster:arg {"digest":"d7e254c72ff31179c9edddd6c2047f7ef98071f3a219dcbd2d7887d655afea41","carry":"id: deploy-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"a862ffcfff0e05799fc37aa5bc4043854e1433db96f52e31c128321db85098e3","carry":"id: deploy-step-1\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/ci/job/deploy
 # pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry
-# pipemaster:arg {"digest":"76cb527d2fd8553a05ded834c76a595dfe15b718b49d4f2a97be99ed82ce832e","carry":"if: (ref == 'refs/heads/main') \u0026\u0026 (event == 'push')\nid: deploy\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"f20c371ede3a2c4899bcda9bd2c59b17c64aaa579446b1eac613b9f4e8ed08e6","carry":"if: (ref == 'refs/heads/main') \u0026\u0026 (event == 'push')\nid: deploy\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: ci\nname: cond\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/deploy
 # pipemaster:emulated step.image pipeline/ci/job/deploy/step/deploy-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/deploy/step/deploy-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
@@ -44,7 +45,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo deploy
             dir: workspace
         tags:

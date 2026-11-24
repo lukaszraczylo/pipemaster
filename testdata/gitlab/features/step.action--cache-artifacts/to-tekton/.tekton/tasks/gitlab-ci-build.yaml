@@ -6,6 +6,7 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/build-step-3
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\nid: build-step-3\nkind: action\n","wrote":"{\"image\":\"alpine:3.22\",\"name\":\"build-step-3\",\"script\":\"set -e\\nmkdir -p '/pipemaster/artifacts/dist'\\ntar -cf - 'dist/' | tar -xf - -C '/pipemaster/artifacts/dist'\"}","at":1,"seq":1}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/build-step-2
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -14,7 +15,11 @@ spec:
   steps:
     - name: build-step-2
       image: alpine:3.22
-      script: make build
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        make build
     - name: build-step-3
       image: alpine:3.22
       script: |-

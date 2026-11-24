@@ -1,15 +1,16 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"perms","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"74ee880a814078762726d9e9fc7509f60f14beeb2836038bec70a2df37caf9e6","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"3bb72ced831005ec6675b6371a537f977391911217561890eeb08d39aee7ed78","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"f3fc6c91817a4e2f839c92fe6cc237729584bdb4d1018e4ba9cceecb2cb63545","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
+# pipemaster:arg {"digest":"35601324c1aeae111d3e60605b09b279ab36402bc4959be95bde45bb68ed4b71","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"permissions:\n    scopes:\n        contents: read\n    oidc: true\nid: ci\nname: perms\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
@@ -45,7 +46,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo ok
             dir: workspace
         tags:

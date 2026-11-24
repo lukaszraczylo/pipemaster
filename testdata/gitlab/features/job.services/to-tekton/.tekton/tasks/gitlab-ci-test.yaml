@@ -1,4 +1,5 @@
 # pipemaster:emulated job.services pipeline/gitlab-ci/job/test
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/test/step/script
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -8,7 +9,11 @@ spec:
     image: golang:1.22
   steps:
     - name: script
-      script: make test
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        make test
   sidecars:
     - name: postgres
       image: postgres:15

@@ -2,9 +2,9 @@
 # pipemaster:arg {"name":"env","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:lost env LABEL: gha.github.run_number
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"df5e2f1b03fd2dd99acf36ee9da97b6927187e25669768824709d4cd7f55a77f","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"50a18f76282f12303294f231b854ae32beae000007134805519fb1bf96b95bb9","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"67db72db41c5722b2d500f8e391106ef467ee1e41ea0104001eec16e1c991e6e","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"a734b435f8357206ce3be017bdefe7f5b971b3883cf4d6f629df608130a0dfc6","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: env\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: CGO_ENABLED\n      value:\n        lit: \"0\"\n    - name: VERSION\n      value:\n        lit: \"3.1\"\n    - name: TOKEN\n      value:\n        secret: DEPLOY_TOKEN\n    - name: LABEL\n      value:\n        expr: format('build-{0}', gha.github.run_number)\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -12,6 +12,7 @@
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
@@ -51,7 +52,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo ok
             dir: workspace
         tags:

@@ -2,6 +2,7 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated job.needs.artifacts pipeline/gitlab-ci/job/unit
 # pipemaster:arg {"workspace":"pipemaster-workspace","restore":"set -e\nmkdir -p '.'\ntar -cf - -C '/pipemaster/artifacts/compile' . | tar -xf - -C '.'","needs":["compile"]}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/unit/step/script
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -16,7 +17,11 @@ spec:
         tar -cf - -C '/pipemaster/artifacts/compile' . | tar -xf - -C '.'
     - name: script
       image: alpine:3.22
-      script: make test
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        make test
   workspaces:
     - name: pipemaster-workspace
       mountPath: /pipemaster

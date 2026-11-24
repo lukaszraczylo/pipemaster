@@ -1,6 +1,7 @@
 Loss report: gha -> woodpecker
 [lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
 [lost] pipeline/ci/job/build job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
+[lost] pipeline/ci/job/build/step/build-step-1 step.shell (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/ci/trigger/0 trigger.filter.branches: doublestar glob (pattern wip/** has a different meaning in doublestar than in the source; it is written as is)
 [emulated] pipeline/ci/trigger/1 trigger.filter.branches: doublestar glob (pattern release/**, !release/old has a different meaning in doublestar than in the source; it is written as is)

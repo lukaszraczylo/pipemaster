@@ -1,5 +1,6 @@
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"arts":"- name: pkg-$\u007b{ sha }}\n  paths:\n    - out/\n","names":["pkg-----sha"],"outs":["{\"name\":\"pkg-----sha\",\"path\":\"/workspace/out/\"}"]}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
@@ -25,8 +26,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make
             workingDir: /workspace
         volumeMounts:

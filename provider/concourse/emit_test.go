@@ -256,14 +256,17 @@ func TestEnvAndSecretsGoToParams(t *testing.T) {
 	if params["MODE"] != "fast" || params["API_TOKEN"] != "((api-token))" || params["DEPLOY"] != "((DEPLOY))" || params["region"] != "((region))" {
 		t.Fatalf("params = %v", params)
 	}
-	script := list(dict(dict(task["config"])["run"])["args"])[1].(string)
+	args := list(dict(dict(task["config"])["run"])["args"])
+	script := args[len(args)-1].(string)
 	if !strings.Contains(script, "${DEPLOY}") || strings.Contains(script, "((") {
 		t.Fatalf("script = %q", script)
 	}
 }
 
 func TestDefaultShellFlagsMatchOtherEmitters(t *testing.T) {
-	files, _ := emit(t, project(scriptJob("build", "make")))
+	p := project(scriptJob("build", "make"))
+	p.Origin = ir.Origin{Provider: "tekton", Dialect: "tekton"}
+	files, _ := emit(t, p)
 	run := dict(dict(dict(list(jobDoc(t, pipelineDoc(t, files), "build")["plan"])[1])["config"])["run"])
 	if run["path"] != "sh" || list(run["args"])[0] != "-ec" {
 		t.Fatalf("run = %v", run)

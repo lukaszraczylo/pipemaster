@@ -55,7 +55,7 @@ The following table comes from `pipemaster caps --to drone --format md`.
 | step.if | native | step when (only the translatable expression subset; any other condition is emulated or lost) |
 | step.image | native |  |
 | step.script | native |  |
-| step.shell | lost | (Drone compiles commands into its own set -e script) |
+| step.shell | lost | (Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash) |
 | step.timeout | lost | (the docker runner ignores a step timeout) |
 | step.workdir | native |  |
 | trigger.api | lost | (Drone starts API builds as event custom) |

@@ -11,11 +11,12 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprconcourse "github.com/lukaszraczylo/pipemaster/expr/concourse"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 )
 
 // stepSkip lists the step Ext keys that the emitter writes itself.
 var stepSkip = map[string]bool{
-	"file": true, ExtConfig: true, ExtParams: true, ExtShellFlags: true, ExtCommand: true, ExtArgs: true, ExtScriptLine: true,
+	"file": true, ExtConfig: true, ExtParams: true, ExtShellFlags: true, ExtBashDefault: true, ExtCommand: true, ExtArgs: true, ExtScriptLine: true,
 	ExtEntrypoint: true, ExtImageResource: true, ExtRun: true, ExtKind: true, ExtStep: true,
 }
 
@@ -378,8 +379,14 @@ func (jx *jobEmitter) run(sc *scope, path string, st *ir.Step, ext map[string]an
 			if strings.TrimSpace(st.Shell) == "" && looksPowershell(script) {
 				jx.pe.e.lose(path, caps.StepShell, "the script may be PowerShell, but the IR names no shell and the runner is not Windows; it runs under "+shellCommand)
 			}
-			run.SetStr("path", jx.shellOf(st, path))
-			run.Set("args", strSeq(append(flags, strings.Join(script, "\n"))))
+			if jx.bashDefault(st, ext) && (len(flags) == 1 && flags[0] == defaultFlags) {
+				jx.pe.e.emulate(path, caps.StepShell, "run.path sh with a bash-if-present wrapper", "the source runs the step under bash when the image has it; the task runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh")
+				run.SetStr("path", shellCommand)
+				run.Set("args", strSeq([]string{"-c", provider.BashOrShScript, provider.BashOrShArgv0, strings.Join(script, "\n")}))
+			} else {
+				run.SetStr("path", jx.shellOf(st, path))
+				run.Set("args", strSeq(append(flags, strings.Join(script, "\n"))))
+			}
 		}
 	}
 	if dir != "" {
@@ -391,6 +398,19 @@ func (jx *jobEmitter) run(sc *scope, path string, st *ir.Step, ext map[string]an
 		}
 	}
 	return run.N
+}
+
+// bashDefault is true when a step with no shell runs under bash-if-present: the source default is bash, or a
+// Concourse file held the wrapper.
+func (jx *jobEmitter) bashDefault(st *ir.Step, ext map[string]any) bool {
+	if strings.TrimSpace(st.Shell) != "" {
+		return false
+	}
+	if b, _ := ext[ExtBashDefault].(bool); b {
+		return true
+	}
+	e := jx.pe.e
+	return !e.own && provider.BashDefault(e.origin)
 }
 
 func strOf(v any) string { s, _ := v.(string); return s }

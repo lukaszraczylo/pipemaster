@@ -6,6 +6,8 @@
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\nid: build-step-4\nkind: action\n","kind":"artifact_upload","hold":"{\"args\":[\"true\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-4\",\"workingDir\":\"/workspace\"}","arts":["dist"],"outs":["{\"name\":\"dist\",\"path\":\"/workspace/dist/\"}"],"seq":2}
 # pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\nid: test-step-1\nkind: action\n","kind":"artifact_download","hold":"{\"args\":[\"true\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"test-step-1\",\"workingDir\":\"/workspace\"}","needs":["build"]}
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-3
+# pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-2
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
@@ -53,8 +55,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make build
             workingDir: /workspace
             dependencies:
@@ -102,8 +106,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make test
             workingDir: /workspace
             dependencies:

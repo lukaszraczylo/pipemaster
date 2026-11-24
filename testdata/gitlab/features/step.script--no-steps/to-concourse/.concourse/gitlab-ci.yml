@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
-# pipemaster:arg {"digest":"614688d955c08ff89bac2f7d1f6c9f1f64e48e7f4f368ccafc133c0df00f0a7b","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"b031fe97ca33ecbd3ab02ef7b3daed552051b278e3a390168ad1737b473f6423","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"065a320001b3da20ded58eba0d4d6f29b14f60d496fa094b3c43c9d11d31f150","carry":"id: build\n"}
+# pipemaster:arg {"digest":"0d3a8a0ea5028ead3a0d24cdb1390576f1a0c2b87d96b6418ef606091a236c88","carry":"id: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/downstream/carry
 # pipemaster:arg {"digest":"0a8831e321912a9d97ec7e04263dacd10fb4b75240e329306e6e8fc4e567a0ca","carry":"id: downstream\nneeds:\n    - job: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
@@ -9,6 +9,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/job/build
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
@@ -44,7 +45,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make build
             dir: workspace
   - name: downstream

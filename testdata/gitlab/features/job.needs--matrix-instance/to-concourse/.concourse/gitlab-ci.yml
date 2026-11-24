@@ -1,24 +1,27 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/images/step/script/carry
-# pipemaster:arg {"digest":"73656ff5cfd2a36f5d9c50d551c2300b22394659eb6f48109e62f955ebbc7e97","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"26be022f7b198d969d733a213e2609461484699aaf53f0d16b612a1ece6e761f","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated job.matrix pipeline/gitlab-ci/job/images
 # pipemaster:arg {"matrix":"axes:\n    - name: TARGET\n      values:\n        - alpine\n        - ubuntu\n","across":"[{\"max_in_flight\":\"all\",\"values\":[\"alpine\",\"ubuntu\"],\"var\":\"TARGET\"}]"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/images/carry
-# pipemaster:arg {"digest":"71d654d99dd6719ab879d172638870bf752132c452f99f2acc64491166590322","carry":"matrix:\n    axes:\n        - name: TARGET\n          values:\n            - alpine\n            - ubuntu\nid: images\n"}
+# pipemaster:arg {"digest":"c02e14e90213810db6405c73ffba30f7aee3f8a52aaefeea0366edbe1c79b985","carry":"matrix:\n    axes:\n        - name: TARGET\n          values:\n            - alpine\n            - ubuntu\nid: images\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package/step/script/carry
-# pipemaster:arg {"digest":"5150123b9aea2e04a5c677c03bbcc22f67007c8279befe2977fb693338c0ab08","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"7a97e027ba38e9ba6ba41e14dc1b27f8652c0b2ef34c7574e2682fcf29d02a44","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package/carry
-# pipemaster:arg {"digest":"0608a0946faaa159341066fa732018750e0c6b360019685347f1ec6e24cb1d00","carry":"id: package\nneeds:\n    - job: images\n"}
+# pipemaster:arg {"digest":"422ad433c513906e1d60cf54f0a640569a54a23fad8750cf7b0850c9d5ef1bbd","carry":"id: package\nneeds:\n    - job: images\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package-all/step/script/carry
-# pipemaster:arg {"digest":"fd52c002b957d8b82a114095027ef907628bd55b433196d0ff5ee82605077743","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"b69bc756879b85a3d60bd5879699b54b7d1d3a8baeb6a4218e29a0889d726fd9","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package-all/carry
-# pipemaster:arg {"digest":"78f97c5804072e3c281fc6227142eac5a0df6631be4363725e27f7493d822f3a","carry":"id: package-all\nneeds:\n    - job: images\n"}
+# pipemaster:arg {"digest":"56da333373d37888e70e005f1eeb273be2405f2732a64a220a1d7c0cb4c8a412","carry":"id: package-all\nneeds:\n    - job: images\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"b455d135cccade9524885acf666bd98751568c44b191c3cedd6410b2d71082f3","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/job/images
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/images/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/images/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/package-all/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/package-all/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/package/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/package/step/script
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
@@ -55,7 +58,9 @@ jobs:
               run:
                 path: sh
                 args:
-                  - -ec
+                  - -c
+                  - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+                  - pipemaster
                   - make images
                 dir: workspace
         across:
@@ -88,7 +93,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make package
             dir: workspace
   - name: package-all
@@ -115,6 +122,8 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make package-all
             dir: workspace

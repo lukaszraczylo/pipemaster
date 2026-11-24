@@ -58,7 +58,7 @@ The following table comes from `pipemaster caps --to woodpecker --format md`.
 | step.if | native |  |
 | step.image | native |  |
 | step.script | native |  |
-| step.shell | lost | (Woodpecker runs commands in the image entrypoint shell) |
+| step.shell | lost | (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash) |
 | step.timeout | lost | (Woodpecker has only a pipeline timeout in the repo settings) |
 | step.workdir | native |  |
 | trigger.api | lost | (Woodpecker starts API pipelines as manual events) |

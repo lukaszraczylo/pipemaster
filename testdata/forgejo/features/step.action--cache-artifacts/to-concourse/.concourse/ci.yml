@@ -3,25 +3,27 @@
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: cache\n    ref: v4\nwith:\n    key:\n        lit: go-mod\n    path:\n        lit: ~/go/pkg/mod\next:\n    gha:\n        _derived_id: true\nid: build-step-2\nkind: action\n","task":"build-step-2","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"build-step-2\"}"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-3/carry
-# pipemaster:arg {"digest":"2c4850bd0c3584f61d34587d9fe21873c5b29dbf00e5885504ee709b58ee4b88","carry":"id: build-step-3\nkind: script\n"}
+# pipemaster:arg {"digest":"9569062072f91bcd5bb8bbf2269c4cd108fb87d028b57fc614b58973d18fac56","carry":"id: build-step-3\nkind: script\n"}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-4
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\next:\n    gha:\n        _derived_id: true\nid: build-step-4\nkind: action\n","task":"build-step-4","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"build-step-4\"}"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"f3ee1b4cf54f2d5493756e2634281b2d167bdb2c9e42dd0488900ab0dea00aa3","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"c1725bf4435ed71a430e4cce191d06a2ac94ab3dd983f32b3ffd29f58f4aae6a","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\next:\n    gha:\n        _derived_id: true\nid: test-step-1\nkind: action\n","task":"test-step-1","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"test-step-1\"}"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-2/carry
-# pipemaster:arg {"digest":"3520ddf68dd19e625f9b529fa1d4b6f5c709cce713aba2e105caff59efbe27d8","carry":"id: test-step-2\nkind: script\n"}
+# pipemaster:arg {"digest":"ad4676c209657f33d00f14624d673541234bcb6047386369e8b82f08e5461287","carry":"id: test-step-2\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
-# pipemaster:arg {"digest":"29ce9602c2d78f83c596998c8d08e3ba33779f824df745ddfe1b53b47a410d91","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: build\n"}
+# pipemaster:arg {"digest":"c23052dbf8d56e3eee1422cad3d87afcdf567c8b89b1e99471e8aeec521d3893","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"31077445882a502d3384a2cd30d749931d715d733c6d3bef3336333bf597ef4e","carry":"id: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-3
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-3
 # pipemaster:emulated job.runner pipeline/ci/job/test
 # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-2
+# pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-2
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
@@ -70,7 +72,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make build
             dir: workspace
         tags:
@@ -125,7 +129,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make test
             dir: workspace
         tags:

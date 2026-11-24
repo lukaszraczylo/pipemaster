@@ -1,15 +1,16 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"services","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
-# pipemaster:arg {"digest":"134adf7e2a8cd00f90911516fc57d33f1d5003c7101c13084853830d5f84b232","carry":"id: test-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"03fc4382da4fc32e05c89d4c2de76d80b5a687465ae7a8a03b1105435f2ec14a","carry":"id: test-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
-# pipemaster:arg {"digest":"b2e94ebeb834867de797c9daa4183e7871fae402d7880ef3974eace1c6b17739","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\nservices:\n    - name: db\n      image:\n        ref: postgres:16\n      env:\n        - name: POSTGRES_PASSWORD\n          value:\n            secret: DB_PASSWORD\n      ports:\n        - 5432:5432\n    - name: cache\n      image:\n        ref: redis:7\n"}
+# pipemaster:arg {"digest":"907144e395eae68791a22f76adfad02519afaa5509de800c1cf18f686f8c17cb","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\nservices:\n    - name: db\n      image:\n        ref: postgres:16\n      env:\n        - name: POSTGRES_PASSWORD\n          value:\n            secret: DB_PASSWORD\n      ports:\n        - 5432:5432\n    - name: cache\n      image:\n        ref: redis:7\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: services\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/test
 # pipemaster:emulated trigger.push pipeline/ci/job/test
 # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
@@ -45,7 +46,9 @@ jobs:
           run:
             path: sh
             args:
-              - -ec
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - echo ok
             dir: workspace
         tags:

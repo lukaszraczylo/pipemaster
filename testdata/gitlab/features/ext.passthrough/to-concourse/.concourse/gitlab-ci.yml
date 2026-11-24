@@ -1,23 +1,26 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
-# pipemaster:arg {"digest":"85db9f7899be0caacb026a69968038f0f06cd75c0882c8914f2f76b6d6b9bbad","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"746284e6caaac39707df8564f17167cffacc4ff5be1ed03ed91de27e81c30817","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"fe373421f0af4239df5ce67f5c26dbffd6581ff25f6f4a35a9403d3e6b742237","carry":"container:\n    ref: alpine:3\nretry:\n    attempts: 2\nid: build\n"}
+# pipemaster:arg {"digest":"232485cec7c010de22c73047739aa5f844f67b37a3312aed008b54a21ebf06c7","carry":"container:\n    ref: alpine:3\nretry:\n    attempts: 2\nid: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/common/step/script/carry
-# pipemaster:arg {"digest":"48311b358ab0c67e200dd02d942d1789755c153f9f08f68007ee2d81b77ed81c","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"af5a94ba6d492f624994b4498c35001fff0608d7cc32785cbe904b3207f9c6ad","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/common/carry
-# pipemaster:arg {"digest":"77f148b8665d09600960dc52f1c0ecd749473536dcc67cd3fc49b74f40c4f268","carry":"container:\n    ref: alpine:3\nretry:\n    attempts: 2\nid: common\n"}
+# pipemaster:arg {"digest":"740bca90d848d23c07e5f094658aa542a74305276db0e3722308e7f61e47742c","carry":"container:\n    ref: alpine:3\nretry:\n    attempts: 2\nid: common\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/prod/step/script/carry
-# pipemaster:arg {"digest":"9d508b986a66ed2c9ab4cfd44a8464452a7ef4aaecd72c6199cd5ee3e2a6f5c8","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"bc193f4593316c18f2dac65629c70fecafc7919e893328ddf43c8a3453dc22ad","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/prod/carry
-# pipemaster:arg {"digest":"3525012e953fcb5c78bb308198917ec39c67a1775650742d39f70e1fe2afeea0","carry":"container:\n    ref: alpine:3\nretry:\n    attempts: 2\nid: prod\nneeds:\n    - job: build\n    - job: common\n"}
+# pipemaster:arg {"digest":"652ed62a6d0206994f71b045edb966433e450e7bdc97027e1a7e08da1c59b5d5","carry":"container:\n    ref: alpine:3\nretry:\n    attempts: 2\nid: prod\nneeds:\n    - job: build\n    - job: common\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: SHARED\n      value:\n        lit: \"1\"\n"}
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/common
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/job/common
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/common/step/script
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/prod
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/prod/step/script
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
@@ -56,7 +59,9 @@ jobs:
               run:
                 path: sh
                 args:
-                  - -ec
+                  - -c
+                  - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+                  - pipemaster
                   - make
                 dir: workspace
         attempts: 2
@@ -86,7 +91,9 @@ jobs:
               run:
                 path: sh
                 args:
-                  - -ec
+                  - -c
+                  - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+                  - pipemaster
                   - echo common
                 dir: workspace
         attempts: 2
@@ -118,7 +125,9 @@ jobs:
               run:
                 path: sh
                 args:
-                  - -ec
+                  - -c
+                  - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+                  - pipemaster
                   - ./deploy.sh
                 dir: workspace
         attempts: 2

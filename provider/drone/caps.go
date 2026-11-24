@@ -42,7 +42,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.JobOutputs:             {Level: caps.Lost, Caveat: "Drone steps cannot pass values to other pipelines"},
 		caps.StepAction:             {Level: caps.Emulated, Strategy: "per actions.Lookup verdict; a plugin step with settings", Caveat: "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"},
 		caps.StepTimeout:            {Level: caps.Lost, Caveat: "the docker runner ignores a step timeout"},
-		caps.StepShell:              {Level: caps.Lost, Caveat: "Drone compiles commands into its own set -e script"},
+		caps.StepShell:              {Level: caps.Lost, Caveat: "Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash"},
 		caps.ProjectMultiPipeline:   {Level: caps.Emulated, Strategy: "each pipeline is a document named <pipeline>-<job>", Caveat: "each document carries its pipeline's trigger condition"},
 	} {
 		m[f] = s

@@ -24,7 +24,7 @@ func (a adapter) emit(p *ir.Project) (map[string][]byte, *report.Report, map[str
 		origin = p.Origin.Provider
 	}
 	e := &emitter{
-		from: sourceDialect(origin), own: origin == dialect, led: emitkit.NewLedger("ir", dialect, a.Caps()),
+		origin: origin, from: sourceDialect(origin), own: origin == dialect, led: emitkit.NewLedger("ir", dialect, a.Caps()),
 		stepIDs: map[string]string{},
 	}
 	uses := ir.Features(p)

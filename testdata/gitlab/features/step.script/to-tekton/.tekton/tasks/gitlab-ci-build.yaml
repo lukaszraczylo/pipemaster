@@ -3,6 +3,8 @@
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/after_script
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/after_script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/after_script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -12,11 +14,18 @@ spec:
     - name: script
       image: alpine:3.22
       script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
         echo prepare
         make build
         make test
     # pipemaster:id after_script
     - name: after-script
       image: alpine:3.22
-      script: echo cleanup
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        echo cleanup
       onError: continue

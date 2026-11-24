@@ -1,0 +1,2155 @@
+{
+ "source": [
+  {
+   "path": ".tekton/01_apply_manifest_task.yaml",
+   "text": "apiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: apply-manifests\nspec:\n  workspaces:\n  - name: source\n  params:\n    - name: manifest_dir\n      description: The directory in source that contains yaml manifests\n      type: string\n      default: \"k8s\"\n  steps:\n    - name: apply\n      image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n      workingDir: /workspace/source\n      command: [\"/bin/bash\", \"-c\"]\n      args:\n        - |-\n          echo Applying manifests in $(inputs.params.manifest_dir) directory\n          oc apply -f $(inputs.params.manifest_dir)\n          echo -----------------------------------\n"
+  },
+  {
+   "path": ".tekton/04_pipeline.yaml",
+   "text": "apiVersion: tekton.dev/v1\nkind: Pipeline\nmetadata:\n  name: build-and-deploy\nspec:\n  workspaces:\n  - name: shared-workspace\n  params:\n  - name: deployment-name\n    type: string\n    description: name of the deployment to be patched\n  - name: git-url\n    type: string\n    description: url of the git repo for the code of deployment\n  - name: git-revision\n    type: string\n    description: revision to be used from repo of the code for deployment\n    default: master\n  - name: IMAGE\n    type: string\n    description: image to be build from the code\n  tasks:\n  - name: fetch-repository\n    taskRef:\n      resolver: cluster\n      params:\n      - name: kind\n        value: task\n      - name: name\n        value: git-clone\n      - name: namespace\n        value: openshift-pipelines\n    workspaces:\n    - name: output\n      workspace: shared-workspace\n    params:\n    - name: URL\n      value: $(params.git-url)\n    - name: SUBDIRECTORY\n      value: \"\"\n    - name: DELETE_EXISTING\n      value: \"true\"\n    - name: REVISION\n      value: $(params.git-revision)\n  - name: build-image\n    taskRef:\n      resolver: cluster\n      params:\n      - name: kind\n        value: task\n      - name: name\n        value: buildah\n      - name: namespace\n        value: openshift-pipelines\n    params:\n    - name: IMAGE\n      value: $(params.IMAGE)\n    workspaces:\n    - name: source\n      workspace: shared-workspace\n    runAfter:\n    - fetch-repository\n  - name: apply-manifests\n    taskRef:\n      name: apply-manifests\n    workspaces:\n    - name: source\n      workspace: shared-workspace\n    runAfter:\n    - build-image\n  - name: update-deployment\n    taskRef:\n      name: update-deployment\n    params:\n    - name: deployment\n      value: $(params.deployment-name)\n    - name: IMAGE\n      value: $(params.IMAGE)\n    runAfter:\n    - apply-manifests\n"
+  },
+  {
+   "path": ".tekton/pipelinerun.yaml",
+   "text": "---\napiVersion: tekton.dev/v1beta1\nkind: PipelineRun\nmetadata:\n  name: pipeline-tutorial-check-pr\nspec:\n  pipelineSpec:\n    params:\n      - name: repo_url\n      - name: revision\n    workspaces:\n    - name: source\n    tasks:\n      - name: fetch\n        taskRef:\n          name: git-clone\n        params:\n          - name: url\n            value: $(params.repo_url)\n          - name: revision\n            value: $(params.revision)\n        workspaces:\n          - name: output\n            workspace: source\n      - name: yaml-lint\n        runAfter: [fetch]\n        taskRef:\n          name: yaml-lint\n        params:\n          - name: args\n            value: [\".\"]\n        workspaces:\n          - name: shared-workspace\n            workspace: source\n  params:\n    - name: repo_url\n      value: {{repo_url}}\n    - name: revision\n      value: {{revision}}\n  workspaces:\n  - name: source\n    volumeClaimTemplate:\n      spec:\n        accessModes:\n          - ReadWriteOnce\n        resources:\n          requests:\n            storage: 50Mi\n"
+  }
+ ],
+ "conversions": [
+  {
+   "id": "gha",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".github/workflows/build-and-deploy.yml",
+     "text": "# pipemaster:emulated job.runner pipeline/build-and-deploy/job/apply-manifests\n# pipemaster:emulated step.image pipeline/build-and-deploy/job/apply-manifests/step/apply\n# pipemaster:arg {\"kind\":\"script\",\"workdir\":\"/workspace/source\",\"image\":{\"Ref\":\"image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\",\"Entrypoint\":null},\"script\":[\"/bin/bash -c 'echo Applying manifests in $(inputs.params.manifest_dir) directory\\noc apply -f $(inputs.params.manifest_dir)\\necho -----------------------------------'\"]}\n# pipemaster:emulated job.runner pipeline/build-and-deploy/job/build-image\n# pipemaster:emulated job.runner pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:emulated job.runner pipeline/build-and-deploy/job/update-deployment\non:\n  # pipemaster:emulated pipeline.inputs pipeline/build-and-deploy\n  workflow_dispatch:\n    inputs:\n      deployment-name:\n        description: name of the deployment to be patched\n        required: true\n        type: string\n      git-url:\n        description: url of the git repo for the code of deployment\n        required: true\n        type: string\n      git-revision:\n        description: revision to be used from repo of the code for deployment\n        default: master\n        type: string\n      IMAGE:\n        description: image to be build from the code\n        required: true\n        type: string\njobs:\n  apply-manifests:\n    needs:\n      - build-image\n    runs-on: ubuntu-latest\n    steps:\n      # pipemaster:emulated step.image pipeline/build-and-deploy/job/apply-manifests/step/apply\n      - id: apply\n        uses: docker://image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n        with:\n          entrypoint: /bin/sh\n          args: |-\n            -ec '/bin/bash -c '\\''echo Applying manifests in $(inputs.params.manifest_dir) directory\n            oc apply -f $(inputs.params.manifest_dir)\n            echo -----------------------------------'\\'''\n  build-image:\n    needs:\n      - fetch-repository\n    runs-on: ubuntu-latest\n    steps:\n      - id: build-image-step-1\n        run: \"true\"\n  fetch-repository:\n    runs-on: ubuntu-latest\n    steps:\n      - id: fetch-repository-step-1\n        run: \"true\"\n  update-deployment:\n    needs:\n      - apply-manifests\n    runs-on: ubuntu-latest\n    steps:\n      - id: update-deployment-step-1\n        run: \"true\"\n"
+    },
+    {
+     "path": ".github/workflows/pipeline-tutorial-check-pr.yml",
+     "text": "# pipemaster:emulated job.runner pipeline/pipeline-tutorial-check-pr/job/fetch\n# pipemaster:emulated job.runner pipeline/pipeline-tutorial-check-pr/job/yaml-lint\non:\n  # pipemaster:emulated pipeline.inputs pipeline/pipeline-tutorial-check-pr\n  workflow_dispatch:\n    inputs:\n      repo_url:\n        required: true\n      revision:\n        required: true\njobs:\n  fetch:\n    runs-on: ubuntu-latest\n    steps:\n      - id: fetch-step-1\n        run: \"true\"\n  yaml-lint:\n    needs:\n      - fetch\n    runs-on: ubuntu-latest\n    steps:\n      - id: yaml-lint-step-1\n        run: \"true\"\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "pipeline workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (workspaces) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "Task param manifest_dir: key description has no IR form; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "Task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (task_name, task_params, task_workspaces, workspaces) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (args, command, script_line) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "command and args are written as one script line; both lists are kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "remote taskRef (cluster resolver); the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "a task reference has no GHA form; the step runs true"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "remote taskRef (cluster resolver); the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "a task reference has no GHA form; the step runs true"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef update-deployment names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "a task reference has no GHA form; the step runs true"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the PipelineRun spec beside pipelineSpec has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "pipeline workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (pipelineRun, workspaces) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef git-clone names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "a task reference has no GHA form; the step runs true"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "param args is not a string; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (array_params, params, workspaces) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef yaml-lint names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "a task reference has no GHA form; the step runs true"
+    },
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "pipeline.inputs",
+     "level": "emulated",
+     "strategy": "workflow_dispatch trigger",
+     "detail": "inputs need a workflow_dispatch trigger; the pipeline had none"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "job.runner",
+     "level": "emulated",
+     "strategy": "default runner label ubuntu-latest",
+     "detail": "the IR holds no runner label"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "step.image",
+     "level": "emulated",
+     "strategy": "uses: docker://<image> with entrypoint and args"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "step.workdir",
+     "level": "emulated",
+     "strategy": "kept in the image step marker",
+     "detail": "a docker step has no working-directory"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "job.runner",
+     "level": "emulated",
+     "strategy": "default runner label ubuntu-latest",
+     "detail": "the IR holds no runner label"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "job.runner",
+     "level": "emulated",
+     "strategy": "default runner label ubuntu-latest",
+     "detail": "the IR holds no runner label"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "job.runner",
+     "level": "emulated",
+     "strategy": "default runner label ubuntu-latest",
+     "detail": "the IR holds no runner label"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "pipeline.inputs",
+     "level": "emulated",
+     "strategy": "workflow_dispatch trigger",
+     "detail": "inputs need a workflow_dispatch trigger; the pipeline had none"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "job.runner",
+     "level": "emulated",
+     "strategy": "default runner label ubuntu-latest",
+     "detail": "the IR holds no runner label"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "job.runner",
+     "level": "emulated",
+     "strategy": "default runner label ubuntu-latest",
+     "detail": "the IR holds no runner label"
+    }
+   ]
+  },
+  {
+   "id": "gitlab",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".gitlab-ci.yml",
+     "text": "# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"inputs\":[{\"Name\":\"IMAGE\",\"Type\":\"string\",\"Default\":\"\",\"Description\":\"image to be build from the code\",\"Required\":true}],\"triggers\":null}\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg {\"inputs\":[{\"Name\":\"repo_url\",\"Type\":\"\",\"Default\":\"\",\"Description\":\"\",\"Required\":true},{\"Name\":\"revision\",\"Type\":\"\",\"Default\":\"\",\"Description\":\"\",\"Required\":true}],\"triggers\":null}\nstages:\n  - stage-0\n  - stage-1\n  - stage-2\n  - stage-3\nworkflow:\n  rules:\n    - when: never\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy/job/apply-manifests\n# pipemaster:arg {}\nbuild-and-deploy:apply-manifests:\n  stage: stage-2\n  needs:\n    - build-and-deploy:build-image\n  rules:\n    - when: never\n  variables:\n    IMAGE: \"\"\n  script:\n    # pipemaster:step apply\n    # pipemaster:emulated step.workdir pipeline/build-and-deploy/job/apply-manifests/step/apply\n    - |\n      (\n      cd \"/workspace/source\" || exit 1\n      /bin/bash -c 'echo Applying manifests in $(inputs.params.manifest_dir) directory\n      oc apply -f $(inputs.params.manifest_dir)\n      echo -----------------------------------'\n      )\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy/job/build-image\n# pipemaster:arg {}\nbuild-and-deploy:build-image:\n  stage: stage-1\n  needs:\n    - build-and-deploy:fetch-repository\n  rules:\n    - when: never\n  variables:\n    IMAGE: \"\"\n  script:\n    # pipemaster:lost step build-image-step-1 kind task\n    - \"true\"\n    # pipemaster:step build-image-step-1\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:arg {}\nbuild-and-deploy:fetch-repository:\n  stage: stage-0\n  needs: []\n  rules:\n    - when: never\n  variables:\n    IMAGE: \"\"\n  script:\n    # pipemaster:lost step fetch-repository-step-1 kind task\n    - \"true\"\n    # pipemaster:step fetch-repository-step-1\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy/job/update-deployment\n# pipemaster:arg {}\nbuild-and-deploy:update-deployment:\n  stage: stage-3\n  needs:\n    - build-and-deploy:apply-manifests\n  rules:\n    - when: never\n  variables:\n    IMAGE: \"\"\n  script:\n    # pipemaster:lost step update-deployment-step-1 kind task\n    - \"true\"\n    # pipemaster:step update-deployment-step-1\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr/job/fetch\n# pipemaster:arg {}\npipeline-tutorial-check-pr:fetch:\n  stage: stage-0\n  needs: []\n  rules:\n    - when: never\n  variables:\n    repo_url: \"\"\n    revision: \"\"\n  script:\n    # pipemaster:lost step fetch-step-1 kind task\n    - \"true\"\n    # pipemaster:step fetch-step-1\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr/job/yaml-lint\n# pipemaster:arg {}\npipeline-tutorial-check-pr:yaml-lint:\n  stage: stage-1\n  needs:\n    - pipeline-tutorial-check-pr:fetch\n  rules:\n    - when: never\n  variables:\n    repo_url: \"\"\n    revision: \"\"\n  script:\n    # pipemaster:lost step yaml-lint-step-1 kind task\n    - \"true\"\n    # pipemaster:step yaml-lint-step-1\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "pipeline workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "the pipeline has no trigger GitLab can express; workflow:rules never starts it"
+    },
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "pipeline.inputs",
+     "level": "lost",
+     "detail": "input git-revision is not a unique variable name"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "Task param manifest_dir: key description has no IR form; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "Task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (task_name, task_params, task_workspaces, workspaces) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "pipeline build-and-deploy has no trigger GitLab can express; job disabled"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (args, command, script_line) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "step.image",
+     "level": "lost",
+     "detail": "GitLab sets the image per job, not per step"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "command and args are written as one script line; both lists are kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "pipeline build-and-deploy has no trigger GitLab can express; job disabled"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "remote taskRef (cluster resolver); the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind task has no GitLab form"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "pipeline build-and-deploy has no trigger GitLab can express; job disabled"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "remote taskRef (cluster resolver); the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind task has no GitLab form"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "pipeline build-and-deploy has no trigger GitLab can express; job disabled"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef update-deployment names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind task has no GitLab form"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the PipelineRun spec beside pipelineSpec has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "pipeline workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "the pipeline has no trigger GitLab can express; workflow:rules never starts it"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "pipeline pipeline-tutorial-check-pr has no trigger GitLab can express; job disabled"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef git-clone names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind task has no GitLab form"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "param args is not a string; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (array_params, params, workspaces) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "job.if",
+     "level": "lost",
+     "detail": "pipeline pipeline-tutorial-check-pr has no trigger GitLab can express; job disabled"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef yaml-lint names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind task has no GitLab form"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "step.workdir",
+     "level": "emulated",
+     "strategy": "cd in a subshell around the step"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "pipeline.inputs",
+     "level": "emulated",
+     "strategy": "variable copied into every job of the pipeline",
+     "detail": "the pipeline marker keeps the input list"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "project.multi_pipeline",
+     "level": "emulated",
+     "strategy": "jobs of every pipeline in one file under <pipeline>:<job> keys",
+     "detail": "each job carries its pipeline's trigger condition and a marker; workflow:rules is the union of all triggers"
+    }
+   ]
+  },
+  {
+   "id": "woodpecker",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".woodpecker/build-and-deploy-apply-manifests.yaml",
+     "text": "# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"apply-manifests\",\"p\":0,\"j\":0}\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\ndepends_on:\n  - build-and-deploy-build-image\nsteps:\n  - name: apply\n    image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n    commands:\n      - |-\n        /bin/bash -c 'echo Applying manifests in $$(inputs.params.manifest_dir) directory\n        oc apply -f $$(inputs.params.manifest_dir)\n        echo -----------------------------------'\n    directory: /workspace/source\n"
+    },
+    {
+     "path": ".woodpecker/build-and-deploy-build-image.yaml",
+     "text": "# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"build-image\",\"p\":0,\"j\":1}\n# pipemaster:lost step pipeline/build-and-deploy/job/build-image/step/build-image-step-1 kind task\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/build-image/step/build-image-step-1\n# pipemaster:arg {\"step\":\"id: build-image-step-1\\nkind: task\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/build-image\n# pipemaster:emulated job.container pipeline/build-and-deploy/job/build-image\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\ndepends_on:\n  - build-and-deploy-fetch-repository\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n"
+    },
+    {
+     "path": ".woodpecker/build-and-deploy-fetch-repository.yaml",
+     "text": "# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"fetch-repository\",\"p\":0,\"j\":2}\n# pipemaster:lost step pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1 kind task\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1\n# pipemaster:arg {\"step\":\"id: fetch-repository-step-1\\nkind: task\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:emulated job.container pipeline/build-and-deploy/job/fetch-repository\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n"
+    },
+    {
+     "path": ".woodpecker/build-and-deploy-update-deployment.yaml",
+     "text": "# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"update-deployment\",\"p\":0,\"j\":3}\n# pipemaster:lost step pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1 kind task\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1\n# pipemaster:arg {\"step\":\"id: update-deployment-step-1\\nkind: task\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/update-deployment\n# pipemaster:emulated job.container pipeline/build-and-deploy/job/update-deployment\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\ndepends_on:\n  - build-and-deploy-apply-manifests\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n"
+    },
+    {
+     "path": ".woodpecker/pipeline-tutorial-check-pr-fetch.yaml",
+     "text": "# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg {\"pipeline\":\"pipeline-tutorial-check-pr\",\"job\":\"fetch\",\"p\":1,\"j\":0}\n# pipemaster:lost step pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1 kind task\n# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1\n# pipemaster:arg {\"step\":\"id: fetch-step-1\\nkind: task\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/pipeline-tutorial-check-pr/job/fetch\n# pipemaster:emulated job.container pipeline/pipeline-tutorial-check-pr/job/fetch\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n"
+    },
+    {
+     "path": ".woodpecker/pipeline-tutorial-check-pr-yaml-lint.yaml",
+     "text": "# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg {\"pipeline\":\"pipeline-tutorial-check-pr\",\"job\":\"yaml-lint\",\"p\":1,\"j\":1}\n# pipemaster:lost step pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1 kind task\n# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1\n# pipemaster:arg {\"step\":\"id: yaml-lint-step-1\\nkind: task\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/pipeline-tutorial-check-pr/job/yaml-lint\n# pipemaster:emulated job.container pipeline/pipeline-tutorial-check-pr/job/yaml-lint\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\ndepends_on:\n  - pipeline-tutorial-check-pr-fetch\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "pipeline workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "pipeline.inputs",
+     "level": "lost",
+     "detail": "Woodpecker has no typed pipeline inputs"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "Task param manifest_dir: key description has no IR form; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "Task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (task_name, task_params, task_workspaces, workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (args, command, script_line) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "command and args are written as one script line; both lists are kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "remote taskRef (cluster resolver); the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind task has no Woodpecker form"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/script",
+     "feature": "step.script",
+     "level": "lost",
+     "detail": "the job has no steps; a no-op step keeps the workflow valid; not kept in round-trip metadata: no node at this path in the source project"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "remote taskRef (cluster resolver); the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind task has no Woodpecker form"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/script",
+     "feature": "step.script",
+     "level": "lost",
+     "detail": "the job has no steps; a no-op step keeps the workflow valid; not kept in round-trip metadata: no node at this path in the source project"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/script",
+     "feature": "step.script",
+     "level": "lost",
+     "detail": "the job has no steps; a no-op step keeps the workflow valid; not kept in round-trip metadata: no node at this path in the source project"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef update-deployment names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind task has no Woodpecker form"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the PipelineRun spec beside pipelineSpec has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "pipeline workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (pipelineRun, workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "pipeline.inputs",
+     "level": "lost",
+     "detail": "Woodpecker has no typed pipeline inputs"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef git-clone names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind task has no Woodpecker form"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/script",
+     "feature": "step.script",
+     "level": "lost",
+     "detail": "the job has no steps; a no-op step keeps the workflow valid; not kept in round-trip metadata: no node at this path in the source project"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "param args is not a string; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (array_params, params, workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/script",
+     "feature": "step.script",
+     "level": "lost",
+     "detail": "the job has no steps; a no-op step keeps the workflow valid; not kept in round-trip metadata: no node at this path in the source project"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef yaml-lint names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind task has no Woodpecker form"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "job.container",
+     "level": "emulated",
+     "strategy": "default image ubuntu:latest",
+     "detail": "the job names no image, so steps without one run in ubuntu:latest"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.script",
+     "level": "emulated",
+     "strategy": "no-op step",
+     "detail": "Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "job.container",
+     "level": "emulated",
+     "strategy": "default image ubuntu:latest",
+     "detail": "the job names no image, so steps without one run in ubuntu:latest"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "step.script",
+     "level": "emulated",
+     "strategy": "no-op step",
+     "detail": "Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "job.container",
+     "level": "emulated",
+     "strategy": "default image ubuntu:latest",
+     "detail": "the job names no image, so steps without one run in ubuntu:latest"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "step.script",
+     "level": "emulated",
+     "strategy": "no-op step",
+     "detail": "Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "project.multi_pipeline",
+     "level": "emulated",
+     "strategy": "each job of each pipeline is a workflow named <pipeline>-<job>",
+     "detail": "each workflow carries its pipeline's trigger condition"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "job.container",
+     "level": "emulated",
+     "strategy": "default image ubuntu:latest",
+     "detail": "the job names no image, so steps without one run in ubuntu:latest"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "step.script",
+     "level": "emulated",
+     "strategy": "no-op step",
+     "detail": "Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "job.container",
+     "level": "emulated",
+     "strategy": "default image ubuntu:latest",
+     "detail": "the job names no image, so steps without one run in ubuntu:latest"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "step.script",
+     "level": "emulated",
+     "strategy": "no-op step",
+     "detail": "Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in"
+    }
+   ]
+  },
+  {
+   "id": "drone",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".drone.yml",
+     "text": "# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"apply-manifests\",\"p\":0,\"j\":0}\nkind: pipeline\ntype: docker\nname: build-and-deploy-apply-manifests\ndepends_on:\n  - build-and-deploy-build-image\nsteps:\n  - name: apply\n    image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n    commands:\n      - |-\n        /bin/bash -c 'echo Applying manifests in $$(inputs.params.manifest_dir) directory\n        oc apply -f $$(inputs.params.manifest_dir)\n        echo -----------------------------------'\n    working_dir: /workspace/source\n---\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"build-image\",\"p\":0,\"j\":1}\n# pipemaster:lost step pipeline/build-and-deploy/job/build-image/step/build-image-step-1 kind task\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/build-image/step/build-image-step-1\n# pipemaster:arg {\"step\":\"id: build-image-step-1\\nkind: task\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/build-image\n# pipemaster:emulated job.container pipeline/build-and-deploy/job/build-image\nkind: pipeline\ntype: docker\nname: build-and-deploy-build-image\ndepends_on:\n  - build-and-deploy-fetch-repository\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n---\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"fetch-repository\",\"p\":0,\"j\":2}\n# pipemaster:lost step pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1 kind task\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1\n# pipemaster:arg {\"step\":\"id: fetch-repository-step-1\\nkind: task\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:emulated job.container pipeline/build-and-deploy/job/fetch-repository\nkind: pipeline\ntype: docker\nname: build-and-deploy-fetch-repository\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n---\n# pipemaster:emulated project.multi_pipeline pipeline/build-and-deploy\n# pipemaster:arg {\"pipeline\":\"build-and-deploy\",\"job\":\"update-deployment\",\"p\":0,\"j\":3}\n# pipemaster:lost step pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1 kind task\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1\n# pipemaster:arg {\"step\":\"id: update-deployment-step-1\\nkind: task\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/update-deployment\n# pipemaster:emulated job.container pipeline/build-and-deploy/job/update-deployment\nkind: pipeline\ntype: docker\nname: build-and-deploy-update-deployment\ndepends_on:\n  - build-and-deploy-apply-manifests\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n---\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg {\"pipeline\":\"pipeline-tutorial-check-pr\",\"job\":\"fetch\",\"p\":1,\"j\":0}\n# pipemaster:lost step pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1 kind task\n# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1\n# pipemaster:arg {\"step\":\"id: fetch-step-1\\nkind: task\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/pipeline-tutorial-check-pr/job/fetch\n# pipemaster:emulated job.container pipeline/pipeline-tutorial-check-pr/job/fetch\nkind: pipeline\ntype: docker\nname: pipeline-tutorial-check-pr-fetch\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n---\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg {\"pipeline\":\"pipeline-tutorial-check-pr\",\"job\":\"yaml-lint\",\"p\":1,\"j\":1}\n# pipemaster:lost step pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1 kind task\n# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1\n# pipemaster:arg {\"step\":\"id: yaml-lint-step-1\\nkind: task\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/pipeline-tutorial-check-pr/job/yaml-lint\n# pipemaster:emulated job.container pipeline/pipeline-tutorial-check-pr/job/yaml-lint\nkind: pipeline\ntype: docker\nname: pipeline-tutorial-check-pr-yaml-lint\ndepends_on:\n  - pipeline-tutorial-check-pr-fetch\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "pipeline workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (workspaces) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "pipeline.inputs",
+     "level": "lost",
+     "detail": "Drone has no typed pipeline inputs"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "Task param manifest_dir: key description has no IR form; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "Task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (task_name, task_params, task_workspaces, workspaces) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (args, command, script_line) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "command and args are written as one script line; both lists are kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "remote taskRef (cluster resolver); the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind task has no Drone form"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/script",
+     "feature": "step.script",
+     "level": "lost",
+     "detail": "the job has no steps; a no-op step keeps the document valid; not kept in round-trip metadata: no node at this path in the source project"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "remote taskRef (cluster resolver); the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind task has no Drone form"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/script",
+     "feature": "step.script",
+     "level": "lost",
+     "detail": "the job has no steps; a no-op step keeps the document valid; not kept in round-trip metadata: no node at this path in the source project"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/script",
+     "feature": "step.script",
+     "level": "lost",
+     "detail": "the job has no steps; a no-op step keeps the document valid; not kept in round-trip metadata: no node at this path in the source project"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef update-deployment names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind task has no Drone form"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the PipelineRun spec beside pipelineSpec has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "pipeline workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (pipelineRun, workspaces) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "pipeline.inputs",
+     "level": "lost",
+     "detail": "Drone has no typed pipeline inputs"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef git-clone names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind task has no Drone form"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/script",
+     "feature": "step.script",
+     "level": "lost",
+     "detail": "the job has no steps; a no-op step keeps the document valid; not kept in round-trip metadata: no node at this path in the source project"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "param args is not a string; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (array_params, params, workspaces) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/script",
+     "feature": "step.script",
+     "level": "lost",
+     "detail": "the job has no steps; a no-op step keeps the document valid; not kept in round-trip metadata: no node at this path in the source project"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef yaml-lint names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "step kind task has no Drone form"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "job.container",
+     "level": "emulated",
+     "strategy": "default image ubuntu:latest",
+     "detail": "the job names no image, so steps without one run in ubuntu:latest"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "step.script",
+     "level": "emulated",
+     "strategy": "no-op step",
+     "detail": "Drone needs a step; no step of the job has a Drone form, so a no-op step stands in"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "job.container",
+     "level": "emulated",
+     "strategy": "default image ubuntu:latest",
+     "detail": "the job names no image, so steps without one run in ubuntu:latest"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "step.script",
+     "level": "emulated",
+     "strategy": "no-op step",
+     "detail": "Drone needs a step; no step of the job has a Drone form, so a no-op step stands in"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "job.container",
+     "level": "emulated",
+     "strategy": "default image ubuntu:latest",
+     "detail": "the job names no image, so steps without one run in ubuntu:latest"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "step.script",
+     "level": "emulated",
+     "strategy": "no-op step",
+     "detail": "Drone needs a step; no step of the job has a Drone form, so a no-op step stands in"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "project.multi_pipeline",
+     "level": "emulated",
+     "strategy": "each pipeline is a document named <pipeline>-<job>",
+     "detail": "each document carries its pipeline's trigger condition"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "job.container",
+     "level": "emulated",
+     "strategy": "default image ubuntu:latest",
+     "detail": "the job names no image, so steps without one run in ubuntu:latest"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "step.script",
+     "level": "emulated",
+     "strategy": "no-op step",
+     "detail": "Drone needs a step; no step of the job has a Drone form, so a no-op step stands in"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "job.container",
+     "level": "emulated",
+     "strategy": "default image ubuntu:latest",
+     "detail": "the job names no image, so steps without one run in ubuntu:latest"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "step.script",
+     "level": "emulated",
+     "strategy": "no-op step",
+     "detail": "Drone needs a step; no step of the job has a Drone form, so a no-op step stands in"
+    }
+   ]
+  },
+  {
+   "id": "argo",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".argo/workflows/build-and-deploy.yaml",
+     "text": "# pipemaster:emulated step.image pipeline/build-and-deploy/job/apply-manifests\n# pipemaster:arg {\"steps\":{\"apply\":\"ref: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\\n\"},\"wrote\":{\"apply\":\"image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\"}}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/build-image/step/build-image-step-1\n# pipemaster:arg {\"step\":\"id: build-image-step-1\\nkind: task\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"build-image-step-1\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1\n# pipemaster:arg {\"step\":\"id: fetch-repository-step-1\\nkind: task\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"fetch-repository-step-1\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1\n# pipemaster:arg {\"step\":\"id: update-deployment-step-1\\nkind: task\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"update-deployment-step-1\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated pipeline.inputs pipeline/build-and-deploy\n# pipemaster:arg {\"types\":{\"IMAGE\":\"string\",\"deployment-name\":\"string\",\"git-revision\":\"string\",\"git-url\":\"string\"},\"required\":[\"deployment-name\",\"git-url\",\"IMAGE\"]}\napiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata:\n  name: build-and-deploy\nspec:\n  entrypoint: main\n  arguments:\n    parameters:\n      - name: deployment-name\n        description: name of the deployment to be patched\n      - name: git-url\n        description: url of the git repo for the code of deployment\n      - name: git-revision\n        value: master\n        description: revision to be used from repo of the code for deployment\n      - name: IMAGE\n        description: image to be build from the code\n  templates:\n    - name: main\n      dag:\n        tasks:\n          - name: apply-manifests\n            template: apply-manifests\n            dependencies:\n              - build-image\n          - name: build-image\n            template: build-image\n            dependencies:\n              - fetch-repository\n          - name: fetch-repository\n            template: fetch-repository\n          - name: update-deployment\n            template: update-deployment\n            dependencies:\n              - apply-manifests\n    - name: apply-manifests\n      containerSet:\n        containers:\n          - name: apply\n            image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\n            command:\n              - sh\n              - -ec\n            args:\n              - |-\n                /bin/bash -c 'echo Applying manifests in $(inputs.params.manifest_dir) directory\n                oc apply -f $(inputs.params.manifest_dir)\n                echo -----------------------------------'\n            workingDir: /workspace/source\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: build-image\n      containerSet:\n        containers:\n          - name: build-image-step-1\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: fetch-repository\n      containerSet:\n        containers:\n          - name: fetch-repository-step-1\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: update-deployment\n      containerSet:\n        containers:\n          - name: update-deployment-step-1\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n"
+    },
+    {
+     "path": ".argo/workflows/pipeline-tutorial-check-pr.yaml",
+     "text": "# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1\n# pipemaster:arg {\"step\":\"id: fetch-step-1\\nkind: task\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"fetch-step-1\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1\n# pipemaster:arg {\"step\":\"id: yaml-lint-step-1\\nkind: task\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"yaml-lint-step-1\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated pipeline.inputs pipeline/pipeline-tutorial-check-pr\n# pipemaster:arg {\"required\":[\"repo_url\",\"revision\"]}\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\napiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata:\n  name: pipeline-tutorial-check-pr\nspec:\n  entrypoint: main\n  arguments:\n    parameters:\n      - name: repo_url\n      - name: revision\n  templates:\n    - name: main\n      dag:\n        tasks:\n          - name: fetch\n            template: fetch\n          - name: yaml-lint\n            template: yaml-lint\n            dependencies:\n              - fetch\n    - name: fetch\n      containerSet:\n        containers:\n          - name: fetch-step-1\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: yaml-lint\n      containerSet:\n        containers:\n          - name: yaml-lint-step-1\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "pipeline workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (workspaces) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "Task param manifest_dir: key description has no IR form; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "Task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (task_name, task_params, task_workspaces, workspaces) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (args, command, script_line) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "command and args are written as one script line; both lists are kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "remote taskRef (cluster resolver); the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "a task step has no Argo form; the step is dropped"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "remote taskRef (cluster resolver); the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "a task step has no Argo form; the step is dropped"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef update-deployment names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "a task step has no Argo form; the step is dropped"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the PipelineRun spec beside pipelineSpec has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "pipeline workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (pipelineRun, workspaces) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef git-clone names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "a task step has no Argo form; the step is dropped"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "param args is not a string; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (array_params, params, workspaces) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (taskRef) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef yaml-lint names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "detail": "a task step has no Argo form; the step is dropped"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "project.multi_pipeline",
+     "level": "emulated",
+     "strategy": "one WorkflowTemplate per IR pipeline",
+     "detail": "each pipeline gets its own trigger"
+    }
+   ]
+  },
+  {
+   "id": "concourse",
+   "roundtrip": "no differences",
+   "files": [
+    {
+     "path": ".concourse/build-and-deploy.yml",
+     "text": "# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/apply-manifests/step/apply/carry\n# pipemaster:arg {\"digest\":\"1d3573cd8162bf776a903c8876c77706b6824f8c41babd6113bad6317b3697c3\",\"carry\":\"image:\\n    ref: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\\nid: apply\\nkind: script\\nworkdir: /workspace/source\\nscript:\\n    - |-\\n      /bin/bash -c 'echo Applying manifests in $(inputs.params.manifest_dir) directory\\n      oc apply -f $(inputs.params.manifest_dir)\\n      echo -----------------------------------'\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/apply-manifests/carry\n# pipemaster:arg {\"digest\":\"524d72a9ddc6a3717d69c17998be28acc44f88dc074039de42d8fd5c705a7bc3\",\"carry\":\"id: apply-manifests\\nneeds:\\n    - job: build-image\\n\"}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/build-image/step/build-image-step-1\n# pipemaster:arg {\"step\":\"ext:\\n    tekton:\\n        taskRef:\\n            params:\\n                - name: kind\\n                  value: task\\n                - name: name\\n                  value: buildah\\n                - name: namespace\\n                  value: openshift-pipelines\\n            resolver: cluster\\nid: build-image-step-1\\nkind: task\\n\",\"task\":\"build-image-step-1\",\"hold\":\"{\\\"config\\\":{\\\"image_resource\\\":{\\\"source\\\":{\\\"repository\\\":\\\"ubuntu\\\",\\\"tag\\\":\\\"latest\\\"},\\\"type\\\":\\\"registry-image\\\"},\\\"platform\\\":\\\"linux\\\",\\\"run\\\":{\\\"args\\\":[\\\"-ec\\\",\\\"true\\\"],\\\"path\\\":\\\"sh\\\"}},\\\"task\\\":\\\"build-image-step-1\\\"}\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/build-image/carry\n# pipemaster:arg {\"digest\":\"bcf562f46304aca19747d119c531d1cf0a9805053e1cde828a9482a87a5f5aa7\",\"carry\":\"id: build-image\\nneeds:\\n    - job: fetch-repository\\n\"}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1\n# pipemaster:arg {\"step\":\"ext:\\n    tekton:\\n        taskRef:\\n            params:\\n                - name: kind\\n                  value: task\\n                - name: name\\n                  value: git-clone\\n                - name: namespace\\n                  value: openshift-pipelines\\n            resolver: cluster\\nid: fetch-repository-step-1\\nkind: task\\n\",\"task\":\"fetch-repository-step-1\",\"hold\":\"{\\\"config\\\":{\\\"image_resource\\\":{\\\"source\\\":{\\\"repository\\\":\\\"ubuntu\\\",\\\"tag\\\":\\\"latest\\\"},\\\"type\\\":\\\"registry-image\\\"},\\\"platform\\\":\\\"linux\\\",\\\"run\\\":{\\\"args\\\":[\\\"-ec\\\",\\\"true\\\"],\\\"path\\\":\\\"sh\\\"}},\\\"task\\\":\\\"fetch-repository-step-1\\\"}\"}\n# pipemaster:emulated job.manual pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:arg {\"manual\":false,\"held\":true}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/fetch-repository/carry\n# pipemaster:arg {\"digest\":\"883a71152cc861e3463d04d666c0858af027174136fc8016db07213fa874742e\",\"carry\":\"id: fetch-repository\\n\"}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1\n# pipemaster:arg {\"step\":\"ext:\\n    tekton:\\n        taskRef:\\n            name: update-deployment\\nid: update-deployment-step-1\\nkind: task\\n\",\"task\":\"update-deployment-step-1\",\"hold\":\"{\\\"config\\\":{\\\"image_resource\\\":{\\\"source\\\":{\\\"repository\\\":\\\"ubuntu\\\",\\\"tag\\\":\\\"latest\\\"},\\\"type\\\":\\\"registry-image\\\"},\\\"platform\\\":\\\"linux\\\",\\\"run\\\":{\\\"args\\\":[\\\"-ec\\\",\\\"true\\\"],\\\"path\\\":\\\"sh\\\"}},\\\"task\\\":\\\"update-deployment-step-1\\\"}\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/update-deployment/carry\n# pipemaster:arg {\"digest\":\"40ba66d367bd4d53fce6123236649653e1560fd5bd859cd81465b2f5b60a891f\",\"carry\":\"id: update-deployment\\nneeds:\\n    - job: apply-manifests\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/carry\n# pipemaster:arg {\"digest\":\"1a201a0ae730789ae46088d417f4c7351cbc72cf21ab56db1b2d90a8d3f84622\",\"carry\":\"id: build-and-deploy\\ninputs:\\n    - name: deployment-name\\n      type: string\\n      description: name of the deployment to be patched\\n      required: true\\n    - name: git-url\\n      type: string\\n      description: url of the git repo for the code of deployment\\n      required: true\\n    - name: git-revision\\n      type: string\\n      default: master\\n      description: revision to be used from repo of the code for deployment\\n    - name: IMAGE\\n      type: string\\n      description: image to be build from the code\\n      required: true\\n\"}\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/apply-manifests/step/apply\n# pipemaster:emulated trigger.manual pipeline/build-and-deploy/job/fetch-repository\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\njobs:\n  - name: apply-manifests\n    plan:\n      - get: source\n        passed:\n          - build-image\n        trigger: true\n      - task: apply\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: image-registry.openshift-image-registry.svc:5000/openshift/cli\n              tag: latest\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                /bin/bash -c 'echo Applying manifests in $(inputs.params.manifest_dir) directory\n                oc apply -f $(inputs.params.manifest_dir)\n                echo -----------------------------------'\n            dir: /workspace/source\n  - name: build-image\n    plan:\n      - get: source\n        passed:\n          - fetch-repository\n        trigger: true\n      - task: build-image-step-1\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: ubuntu\n              tag: latest\n          run:\n            path: sh\n            args:\n              - -ec\n              - \"true\"\n  - name: fetch-repository\n    plan:\n      - get: source\n      - task: fetch-repository-step-1\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: ubuntu\n              tag: latest\n          run:\n            path: sh\n            args:\n              - -ec\n              - \"true\"\n  - name: update-deployment\n    plan:\n      - get: source\n        passed:\n          - apply-manifests\n        trigger: true\n      - task: update-deployment-step-1\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: ubuntu\n              tag: latest\n          run:\n            path: sh\n            args:\n              - -ec\n              - \"true\"\n"
+    },
+    {
+     "path": ".concourse/pipeline-tutorial-check-pr.yml",
+     "text": "# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1\n# pipemaster:arg {\"step\":\"ext:\\n    tekton:\\n        taskRef:\\n            name: git-clone\\nid: fetch-step-1\\nkind: task\\n\",\"task\":\"fetch-step-1\",\"hold\":\"{\\\"config\\\":{\\\"image_resource\\\":{\\\"source\\\":{\\\"repository\\\":\\\"ubuntu\\\",\\\"tag\\\":\\\"latest\\\"},\\\"type\\\":\\\"registry-image\\\"},\\\"platform\\\":\\\"linux\\\",\\\"run\\\":{\\\"args\\\":[\\\"-ec\\\",\\\"true\\\"],\\\"path\\\":\\\"sh\\\"}},\\\"task\\\":\\\"fetch-step-1\\\"}\"}\n# pipemaster:emulated job.manual pipeline/pipeline-tutorial-check-pr/job/fetch\n# pipemaster:arg {\"manual\":false,\"held\":true}\n# pipemaster:emulated ext.passthrough pipeline/pipeline-tutorial-check-pr/job/fetch/carry\n# pipemaster:arg {\"digest\":\"9027eb7658677c4f11d9257463f9b1fe7f15558c5a04bac925ee029b5508a7eb\",\"carry\":\"id: fetch\\n\"}\n# pipemaster:emulated step.action pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1\n# pipemaster:arg {\"step\":\"ext:\\n    tekton:\\n        taskRef:\\n            name: yaml-lint\\nid: yaml-lint-step-1\\nkind: task\\n\",\"task\":\"yaml-lint-step-1\",\"hold\":\"{\\\"config\\\":{\\\"image_resource\\\":{\\\"source\\\":{\\\"repository\\\":\\\"ubuntu\\\",\\\"tag\\\":\\\"latest\\\"},\\\"type\\\":\\\"registry-image\\\"},\\\"platform\\\":\\\"linux\\\",\\\"run\\\":{\\\"args\\\":[\\\"-ec\\\",\\\"true\\\"],\\\"path\\\":\\\"sh\\\"}},\\\"task\\\":\\\"yaml-lint-step-1\\\"}\"}\n# pipemaster:emulated ext.passthrough pipeline/pipeline-tutorial-check-pr/job/yaml-lint/carry\n# pipemaster:arg {\"digest\":\"d235d91c76a747240ec358a177091d58c5bf15b7b2b25bd70d3c0c15829a03ae\",\"carry\":\"id: yaml-lint\\nneeds:\\n    - job: fetch\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/pipeline-tutorial-check-pr/carry\n# pipemaster:arg {\"digest\":\"98cdca42585e2904c321dd2e5720c5fef989e547f10cfe219a00d13779f8dd51\",\"carry\":\"id: pipeline-tutorial-check-pr\\ninputs:\\n    - name: repo_url\\n      required: true\\n    - name: revision\\n      required: true\\n\"}\n# pipemaster:emulated project.multi_pipeline pipeline/pipeline-tutorial-check-pr\n# pipemaster:emulated trigger.manual pipeline/pipeline-tutorial-check-pr/job/fetch\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\njobs:\n  - name: fetch\n    plan:\n      - get: source\n      - task: fetch-step-1\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: ubuntu\n              tag: latest\n          run:\n            path: sh\n            args:\n              - -ec\n              - \"true\"\n  - name: yaml-lint\n    plan:\n      - get: source\n        passed:\n          - fetch\n        trigger: true\n      - task: yaml-lint-step-1\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: ubuntu\n              tag: latest\n          run:\n            path: sh\n            args:\n              - -ec\n              - \"true\"\n"
+    }
+   ],
+   "report": [
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "pipeline workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "pipeline.inputs",
+     "level": "lost"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "Task param manifest_dir: key description has no IR form; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "Task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (task_name, task_params, task_workspaces, workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (args, command, script_line) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "step.script",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "command and args are written as one script line; both lists are kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "the task step has no Concourse form outside a Concourse file; a placeholder task keeps its place"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "remote taskRef (cluster resolver); the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "the task step has no Concourse form outside a Concourse file; a placeholder task keeps its place"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "remote taskRef (cluster resolver); the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "the task step has no Concourse form outside a Concourse file; a placeholder task keeps its place"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef update-deployment names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the PipelineRun spec beside pipelineSpec has no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "pipeline workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (pipelineRun, workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "pipeline.inputs",
+     "level": "lost"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (params, workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "the task step has no Concourse form outside a Concourse file; a placeholder task keeps its place"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef git-clone names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "task workspaces have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "param args is not a string; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "the params of a remote task have no IR field; kept in Ext"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider tekton (array_params, params, workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "the task step has no Concourse form outside a Concourse file; a placeholder task keeps its place"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "step.action",
+     "level": "lost",
+     "strategy": "kept in Ext[tekton]",
+     "detail": "taskRef yaml-lint names no Task in the parsed files; the reference is kept in Ext"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
+     "feature": "step.script",
+     "level": "emulated",
+     "strategy": "script in the carry marker",
+     "detail": "the args of a task cannot say an empty last line or a newline inside a line, so the carry marker holds the script"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/build-image/step/build-image-step-1",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "placeholder task",
+     "detail": "Concourse does not run the action; a task that runs true keeps its place"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository",
+     "feature": "trigger.manual",
+     "level": "emulated",
+     "strategy": "get with no trigger",
+     "detail": "no trigger starts the job, so a person starts it"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "placeholder task",
+     "detail": "Concourse does not run the action; a task that runs true keeps its place"
+    },
+    {
+     "path": "pipeline/build-and-deploy/job/update-deployment/step/update-deployment-step-1",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "placeholder task",
+     "detail": "Concourse does not run the action; a task that runs true keeps its place"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr",
+     "feature": "project.multi_pipeline",
+     "level": "emulated",
+     "strategy": "one pipeline file per IR pipeline under .concourse/",
+     "detail": "each pipeline needs its own fly set-pipeline and gets its own triggers"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
+     "feature": "trigger.manual",
+     "level": "emulated",
+     "strategy": "get with no trigger",
+     "detail": "no trigger starts the job, so a person starts it"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "placeholder task",
+     "detail": "Concourse does not run the action; a task that runs true keeps its place"
+    },
+    {
+     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint/step/yaml-lint-step-1",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "placeholder task",
+     "detail": "Concourse does not run the action; a task that runs true keeps its place"
+    }
+   ]
+  }
+ ]
+}

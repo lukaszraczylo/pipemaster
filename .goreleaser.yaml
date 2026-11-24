@@ -41,7 +41,43 @@ changelog:
       - "^chore"
       - "^style:"
 
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+# Keyless cosign signature of the checksum file; the release job has id-token: write.
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+    output: true
+
 release:
   github:
     owner: lukaszraczylo
     name: pipemaster
+  name_template: "v{{ .Version }}"
+  draft: false
+  prerelease: auto
+
+homebrew_casks:
+  - name: pipemaster
+    repository:
+      owner: lukaszraczylo
+      name: homebrew-taps
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Casks
+    homepage: https://pipemaster.raczylo.com
+    description: "Convert CI/CD pipelines between nine providers, with a loss report for every feature"
+    license: MIT
+    # Homebrew rejects a postflight block (Cask/InstallSteps); install_steps writes postflight_steps.
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{" }}staged_path{{ "}}" }}/pipemaster"]
+          end

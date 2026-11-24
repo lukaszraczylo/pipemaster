@@ -1,3 +1,4 @@
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/release/step/script
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/0
@@ -20,8 +21,10 @@ spec:
             image: alpine:3.22
             command:
               - sh
-              - -ec
+              - -c
             args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
               - make release
             workingDir: /workspace
         volumeMounts:

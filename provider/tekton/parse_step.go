@@ -149,7 +149,7 @@ func (b *jobBuilder) command(st *ir.Step, k *sink, r *reader) error {
 		}
 		var err error
 		ctxEnv := ctxEnvOf(r.M.Vals["env"])
-		if guardEnv, err = b.script(st, ctxEnv.restore(t)); err != nil {
+		if guardEnv, err = b.script(st, k, ctxEnv.restore(t)); err != nil {
 			return err
 		}
 		guardEnv = append(guardEnv, ctxEnv.vars...)
@@ -168,9 +168,12 @@ func (b *jobBuilder) env(st *ir.Step, k *sink, r *reader) error { return b.envWi
 
 // script reads script text: a shebang becomes the shell, a leading guard becomes the step condition, and the
 // rest becomes script lines. It returns the env entries that only the guard reads.
-func (b *jobBuilder) script(st *ir.Step, t string) ([]exprtekton.EnvVar, error) {
+func (b *jobBuilder) script(st *ir.Step, k *sink, t string) ([]exprtekton.EnvVar, error) {
 	lines := strings.Split(strings.TrimSuffix(t, "\n"), "\n")
-	if len(lines) > 0 && strings.HasPrefix(lines[0], shebang) {
+	if pre := bashPreamble(); len(lines) >= len(pre) && slices.Equal(lines[:len(pre)], pre) {
+		lines = lines[len(pre):]
+		k.Out[ExtBashDefault] = true
+	} else if len(lines) > 0 && strings.HasPrefix(lines[0], shebang) {
 		st.Shell = strings.TrimSpace(strings.TrimPrefix(lines[0], shebang))
 		lines = lines[1:]
 	}
