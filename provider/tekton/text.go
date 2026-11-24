@@ -23,8 +23,10 @@ const wsMark = "\x00"
 // litMark brackets the name of a workspace in a literal /workspace/<name> path of a script line.
 const litMark = "\x01"
 
-// workspaceLiteral matches the path of a workspace as a script writes it by hand.
-var workspaceLiteral = regexp.MustCompile(`/workspace/[A-Za-z0-9_.-]+`)
+// workspaceLiteral matches the path of a workspace as a script writes it by hand. The path must start a shell
+// word: at the start of the text, after a space, a quote, `=`, `(` or `:`. Thus /mnt/workspace/x and a URL path stay.
+// A dot ends the name unless a name character follows it.
+var workspaceLiteral = regexp.MustCompile(`(?:^|[\s"'=(:])/workspace/[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*`)
 
 const (
 	varOpen  = "$("

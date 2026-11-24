@@ -61,6 +61,7 @@ func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) 
 	rep.Entries = slices.DeleteFunc(rep.Entries, func(en report.Entry) bool {
 		return en.Feature == caps.StepAction && e.skipped[en.IRPath]
 	})
+	rep.Withdrawn = e.withdrawn
 	e.markEmulations(rep)
 	files, err := e.render()
 	if err != nil {
@@ -101,6 +102,8 @@ type emitter struct {
 	plans       []*plan
 	// skipped holds the paths of the parser-added checkout steps that the file does not write.
 	skipped map[string]bool
+	// withdrawn holds the parser entries for the checkout steps that the file does not write.
+	withdrawn []report.Entry
 	// listeners are the EventListeners in order of first use.
 	listeners []*listener
 	// own is true when the project came from Tekton, so its Ext keys are ours to write back.
@@ -294,4 +297,9 @@ func (e *emitter) node(path, what string, v any) *yaml.Node {
 		return nil
 	}
 	return n
+}
+
+// withdrawCheckout retracts the parser's entry that says the job got its own checkout step.
+func (e *emitter) withdrawCheckout(jobPath string) {
+	e.withdrawn = append(e.withdrawn, report.Entry{IRPath: jobPath, Feature: caps.StepAction, Strategy: checkoutStrategy})
 }

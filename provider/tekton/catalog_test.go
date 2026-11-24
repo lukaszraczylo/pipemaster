@@ -329,3 +329,47 @@ func TestWorkspaceWithoutACloneTaskIsNotMapped(t *testing.T) {
 		t.Fatalf("steps = %+v", j.Steps)
 	}
 }
+
+const literalWSScript = `ls /mnt/workspace/src/x https://h.example/workspace/src/y
+tool --dir=/workspace/src/x "/workspace/src" /workspace/src2/z
+PATH=/bin:/workspace/src/bin cd /workspace/src.`
+
+const literalWSTask = `apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: use-src
+spec:
+  workspaces:
+  - name: src
+  steps:
+  - name: a
+    image: alpine
+    script: |
+      ls /mnt/workspace/src/x https://h.example/workspace/src/y
+      tool --dir=/workspace/src/x "/workspace/src" /workspace/src2/z
+      PATH=/bin:/workspace/src/bin cd /workspace/src.
+`
+
+func TestLiteralWorkspacePathNeedsAWordStart(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"p.yaml": sourceWSPipeline, "t.yaml": literalWSTask})
+	j := job(t, p.Pipelines[0], "use")
+	want := "ls /mnt/workspace/src/x https://h.example/workspace/src/y\n" +
+		"tool --dir=./x \".\" /workspace/src2/z\n" +
+		"PATH=/bin:./bin cd .."
+	if got := strings.Join(step(t, j, "a").Script, "\n"); got != want {
+		t.Fatalf("script =\n%s\nwant\n%s", got, want)
+	}
+	files, _, err := tekton.New().Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var all strings.Builder
+	for _, f := range files {
+		all.Write(f)
+	}
+	for _, w := range strings.Split(literalWSScript, "\n") {
+		if !strings.Contains(all.String(), w) {
+			t.Errorf("Tekton output lacks %q:\n%s", w, all.String())
+		}
+	}
+}

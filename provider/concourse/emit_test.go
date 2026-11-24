@@ -617,7 +617,7 @@ func TestScriptTheArgsCannotSayComesBackExact(t *testing.T) {
 		if got := back.Pipelines[0].Jobs[0].Steps[0].Script; !slices.Equal(got, script) {
 			t.Fatalf("script %q came back as %q", script, got)
 		}
-		if !hasFeatureEntry(rep, string(caps.StepScript), "carry marker holds the script") {
+		if !hasFeatureEntry(rep, string(caps.StepScript), "carry marker also holds the exact text") {
 			t.Fatalf("no entry for script %q: %v", script, rep.Entries)
 		}
 	}

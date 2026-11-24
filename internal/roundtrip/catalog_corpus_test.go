@@ -267,9 +267,13 @@ func TestCorpus69GitLabReturnsTheInputReference(t *testing.T) {
 
 func TestCorpus69TektonReportNamesNoUnwrittenCheckout(t *testing.T) {
 	files, rep := emitCorpus69(t, provider.Tekton)
-	for _, l := range strings.Split(files+"\n"+rep, "\n") {
-		if strings.Contains(l, "-checkout") && strings.Contains(l, "step.action") {
-			t.Errorf("an entry names a checkout step that the file does not write: %s", l)
+	if strings.Contains(files, "checkout") {
+		t.Errorf("the Tekton files name a checkout step:\n%s", files)
+	}
+	for _, l := range strings.Split(rep, "\n") {
+		if strings.Contains(l, "-checkout") || strings.Contains(l, "checkout step in the job") ||
+			(strings.Contains(l, "/step/") && strings.Contains(l, "step.action")) {
+			t.Errorf("an entry names a step or checkout that the Tekton files do not write: %s", l)
 		}
 	}
 }

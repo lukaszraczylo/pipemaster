@@ -2052,8 +2052,8 @@
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
      "feature": "step.script",
      "level": "emulated",
-     "strategy": "script in the carry marker",
-     "detail": "the args of a task cannot say an empty last line or a newline inside a line, so the carry marker holds the script"
+     "strategy": "exact script copy in the carry marker",
+     "detail": "the task runs the script from its args; the args cannot say an empty last line or a newline inside a line, so the carry marker also holds the exact text for the return trip"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply-manifests-checkout",
@@ -2101,8 +2101,8 @@
      "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
      "feature": "step.script",
      "level": "emulated",
-     "strategy": "script in the carry marker",
-     "detail": "the args of a task cannot say an empty last line or a newline inside a line, so the carry marker holds the script"
+     "strategy": "exact script copy in the carry marker",
+     "detail": "the task runs the script from its args; the args cannot say an empty last line or a newline inside a line, so the carry marker also holds the exact text for the return trip"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr",

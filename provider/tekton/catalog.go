@@ -249,6 +249,9 @@ func (b *jobBuilder) catalog(rm *omap, line int, t *catalogTask) error {
 	return nil
 }
 
+// checkoutStrategy is the strategy of the report entry for the checkout step that the parser adds to a job.
+const checkoutStrategy = "checkout step in the job"
+
 // addSource gives a job that reads the workspace its own checkout. The Tekton workspace that git-clone filled
 // is not shared between jobs, so a target with one runner per job needs the clone in each job.
 func (b *jobBuilder) addSource(t *catalogTask) {
@@ -261,7 +264,7 @@ func (b *jobBuilder) addSource(t *catalogTask) {
 	}
 	b.job.Steps = append([]*ir.Step{{ID: b.job.ID + "-checkout", Kind: ir.StepAction, Action: &ref}}, b.job.Steps...)
 	b.c.p.rep.Add(report.Entry{
-		IRPath: b.path, Feature: caps.StepAction, Level: caps.Emulated, Strategy: "checkout step in the job",
+		IRPath: b.path, Feature: caps.StepAction, Level: caps.Emulated, Strategy: checkoutStrategy,
 		Detail: "the Tekton workspace is not shared between jobs, so the job clones the pipeline repository itself; a revision that an earlier git-clone task set is not carried over", SourceLoc: b.c.file,
 	})
 }

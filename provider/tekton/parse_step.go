@@ -495,12 +495,13 @@ func anyStrings(ss []string) []any {
 func (b *jobBuilder) markWorkspaceLiterals(l string) (string, int) {
 	n := 0
 	out := workspaceLiteral.ReplaceAllStringFunc(l, func(m string) string {
-		ws := strings.TrimPrefix(m, workspaceDir+"/")
+		at := strings.Index(m, workspaceDir+"/")
+		lead, ws := m[:at], m[at+len(workspaceDir)+1:]
 		if !b.tx.srcWS[ws] {
 			return m
 		}
 		n++
-		return litMark + ws + litMark
+		return lead + litMark + ws + litMark
 	})
 	return out, n
 }

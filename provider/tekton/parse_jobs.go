@@ -469,7 +469,7 @@ func (b *jobBuilder) addSourceCheckout() {
 	st := &ir.Step{ID: id, Kind: ir.StepAction, Action: &ref, Ext: ir.Ext{dialect: map[string]any{ExtSourceCheckout: true}}}
 	b.job.Steps = append([]*ir.Step{st}, b.job.Steps...)
 	b.c.p.rep.Add(report.Entry{
-		IRPath: b.path, Feature: caps.StepAction, Level: caps.Emulated, Strategy: "checkout step in the job",
+		IRPath: b.path, Feature: caps.StepAction, Level: caps.Emulated, Strategy: checkoutStrategy,
 		Detail: "the Task reads the workspace that the git-clone task filled, which is not shared between jobs, so the job clones the pipeline repository itself", SourceLoc: b.c.file,
 	})
 }
