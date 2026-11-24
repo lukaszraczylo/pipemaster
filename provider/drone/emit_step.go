@@ -14,6 +14,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
@@ -463,13 +464,21 @@ func (e *emitter) scriptStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
 	seen := map[string]int{}
 	texts := slices.Clone(commandTexts(st))
 	why := make([]string, len(texts))
+	var stmt vars.Statement
+	ctxs := make([]string, len(texts))
 	for i, l := range texts {
 		texts[i] = emitkit.NeutralizeResultWrite(e.lose, sp, l)
-		_, lost, err := e.command(&bindings{}, texts[i])
+		ctxs[i] = stmt.Prefix()
+		out, lost, err := e.command(&bindings{}, texts[i], ctxs[i])
 		if err != nil {
 			return nil, err
 		}
 		why[i] = noSpelling(lost)
+		if why[i] != "" {
+			stmt.Reset()
+		} else {
+			stmt.Add(out)
+		}
 	}
 	var outs []string
 	for _, p := range e.commentSpans(sp, texts, why) {
@@ -481,7 +490,7 @@ func (e *emitter) scriptStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
 			continue
 		}
 		b.hits = nil
-		out, _, err := e.command(b, texts[p.Index])
+		out, _, err := e.command(b, texts[p.Index], ctxs[p.Index])
 		if err != nil {
 			return nil, err
 		}

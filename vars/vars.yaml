@@ -46,8 +46,17 @@ vars:
       # gha doc, GITHUB_REF_TYPE: "Valid values are branch or tag."
       gha: '`if [ "${GITHUB_REF_TYPE}" = branch ] && [ "${GITHUB_EVENT_NAME}" != pull_request ]; then printf %s "${GITHUB_REF_NAME}"; fi`'
   # The value that Woodpecker and Drone call the branch: the target branch on a pull request.
+  # A field has no script to hold a derivation, so the target spells the same value in its own field syntax.
+  # gitlab doc: CI_MERGE_REQUEST_TARGET_BRANCH_NAME is "available in merge request pipelines" only and
+  # CI_COMMIT_BRANCH is "Not available in merge request pipelines", so exactly one of the two is set on a branch
+  # or merge request pipeline. gitlab doc (variables, where they can be used): `image` expands variables in the
+  # runner, https://docs.gitlab.com/ci/variables/where_variables_can_be_used/.
   branch_or_target:
     script_text: true
+    push_canon: branch
+    field:
+      gha: "${{ event == 'pull_request' && pr.base_ref || ref_name }}"
+      gitlab: '${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}${CI_COMMIT_BRANCH}'
     names: {drone: [DRONE_COMMIT_BRANCH, DRONE_BRANCH], woodpecker: CI_COMMIT_BRANCH}
     derive:
       gitlab: '`if [ "${CI_PIPELINE_SOURCE}" = merge_request_event ]; then printf %s "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"; else printf %s "${CI_COMMIT_BRANCH}"; fi`'

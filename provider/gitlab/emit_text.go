@@ -167,12 +167,38 @@ func identPart(c byte) bool {
 
 // convert rewrites a canonical template as GitLab text. lost holds the canonical text of each
 // expression GitLab has no variable for; those parts are omitted from out.
-func convert(s string) (out string, lost []string, err error) {
+func convert(s string) (out string, lost []string, err error) { return convertIn(s, "") }
+
+// convertIn is convert for a line that follows the lines of ctx in one shell statement: a quote that a line of
+// ctx opened is still open.
+func convertIn(s, ctx string) (out string, lost []string, err error) {
 	parts, err := expr.ParseScriptTemplate(s)
 	if err != nil {
 		return "", nil, err
 	}
-	return convertParts(parts)
+	return convertPartsIn(parts, ctx)
+}
+
+func convertParts(parts []expr.Part) (string, []string, error) { return convertPartsIn(parts, "") }
+
+// lineCtx carries the shell state from one script line to the next: the converted lines of the statement that is
+// still open, so a quote that spans lines is known when the next line converts.
+type lineCtx struct{ open string }
+
+// prefix is the text that precedes the next line.
+func (c *lineCtx) prefix() string {
+	if c.open == "" {
+		return ""
+	}
+	return c.open + "\n"
+}
+
+// add records the converted text of a line.
+func (c *lineCtx) add(line string) {
+	c.open = strings.TrimSuffix(c.prefix()+line, "\n")
+	if !vars.Open(c.open) {
+		c.open = ""
+	}
 }
 
 // A variable inside single quotes does not expand, so the text leaves the quotes around it.
@@ -181,7 +207,7 @@ const (
 	quoteBreakClose = `"'`
 )
 
-func convertParts(parts []expr.Part) (string, []string, error) {
+func convertPartsIn(parts []expr.Part, ctx string) (string, []string, error) {
 	var sb strings.Builder
 	var lost []string
 	for i, p := range parts {
@@ -206,8 +232,7 @@ func convertParts(parts []expr.Part) (string, []string, error) {
 		if i+1 < len(parts) && parts[i+1].Expr == nil && parts[i+1].Text != "" {
 			next = parts[i+1].Text[0]
 		}
-		cur := sb.String()
-		cur = cur[strings.LastIndexByte(cur, '\n')+1:]
+		cur := ctx + sb.String()
 		if !strings.Contains(cur, "<<") && vars.Protected(cur + "$")[len(cur)] {
 			sb.WriteString(quoteBreakOpen + "$" + name + quoteBreakClose)
 		} else if next != 0 && identPart(next) {
@@ -234,11 +259,18 @@ func litText(l expr.Lit) string {
 func refLines(src []string) []string {
 	seen := map[string]bool{}
 	var out []string
+	var ctx lineCtx
 	for _, l := range src {
 		if !strings.Contains(l, "${{") {
+			ctx.add(l)
 			continue
 		}
-		if t, _, err := convert(l); err == nil && t != l && !seen[t] {
+		t, _, err := convertIn(l, ctx.prefix())
+		if err != nil {
+			continue
+		}
+		ctx.add(t)
+		if t != l && !seen[t] {
 			seen[t] = true
 			out = append(out, t)
 		}
@@ -254,11 +286,12 @@ type refArg struct {
 
 // jobRefLines is refLines over a job's runner labels and step scripts.
 func jobRefLines(j *ir.Job) []string {
-	src := slices.Clone(j.Runner.Labels)
+	out := refLines(j.Runner.Labels)
 	for _, st := range j.Steps {
-		src = append(src, st.Script...)
+		out = append(out, refLines(st.Script)...)
 	}
-	return refLines(src)
+	slices.Sort(out)
+	return slices.Compact(out)
 }
 
 // field converts text that sits inside a YAML value; expressions with no GitLab variable are omitted and reported.
@@ -281,11 +314,11 @@ func (e *emitter) field(path string, f caps.Feature, s string) (string, error) {
 // scriptLine converts one script entry. why is empty when the entry stays; otherwise it names the reason GitLab
 // cannot spell the entry, and the caller comments out the whole statement around it, because dropping the part
 // could change what the command does.
-func (e *emitter) scriptLine(s string) (out, why string, err error) {
+func (e *emitter) scriptLine(s, ctx string) (out, why string, err error) {
 	if !strings.Contains(s, "${{") {
 		return s, "", nil
 	}
-	out, lost, err := convert(s)
+	out, lost, err := convertIn(s, ctx)
 	if err != nil {
 		return "", "", err
 	}

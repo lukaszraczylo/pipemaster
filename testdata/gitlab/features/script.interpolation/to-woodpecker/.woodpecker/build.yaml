@@ -7,5 +7,5 @@ steps:
     image: ubuntu:latest
     commands:
       - |-
-        sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'export PIPEMASTER_VARS=1; export GITLAB_USER_LOGIN="$${CI_PIPELINE_AUTHOR}"; : pipemaster-end; echo "building ${CI_COMMIT_SHA} on $${CI_COMMIT_BRANCH} for $$GITLAB_USER_LOGIN"
+        sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'export PIPEMASTER_VARS=2; CI_COMMIT_BRANCH="$$(if [ -z "$${CI_COMMIT_TAG}" ] && [ "$${CI_PIPELINE_EVENT}" != pull_request ]; then printf %s "$${CI_COMMIT_BRANCH}"; fi)"; export CI_COMMIT_BRANCH; export GITLAB_USER_LOGIN="$${CI_PIPELINE_AUTHOR}"; : pipemaster-end; echo "building ${CI_COMMIT_SHA} on $${CI_COMMIT_BRANCH} for $$GITLAB_USER_LOGIN"
         echo "keeps $$HOME and $${UNMAPPED}"'

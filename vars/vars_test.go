@@ -189,3 +189,26 @@ func TestPrepareStopsStepsWhoseImageNeedsALostName(t *testing.T) {
 		t.Fatal("no result")
 	}
 }
+
+func TestOpen(t *testing.T) {
+	for _, c := range []struct {
+		text string
+		want bool
+	}{
+		{"echo hi", false},
+		{"echo 'first", true},
+		{"echo 'a'\necho 'b", true},
+		{"echo \"a\nb\"", false},
+		{"echo \"a", true},
+		{"cat <<EOT", true},
+		{"cat <<EOT\nbody", true},
+		{"cat <<EOT\nbody\nEOT", false},
+		{"echo a \\", true},
+		{"echo it\\'s", false},
+		{"echo \"it's\"", false},
+	} {
+		if got := vars.Open(c.text); got != c.want {
+			t.Errorf("Open(%q) = %v, want %v", c.text, got, c.want)
+		}
+	}
+}

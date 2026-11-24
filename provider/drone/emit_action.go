@@ -347,7 +347,7 @@ func (e *emitter) explainUnspelled(sp string, st *ir.Step, t actions.Target) {
 		if v.Kind != ir.ValueExpr {
 			continue
 		}
-		if _, lost := e.convertParts(nil, valueText, emitkit.ValueParts(v)); len(lost) > 0 {
+		if _, lost := e.convertParts(nil, valueText, emitkit.ValueParts(v), ""); len(lost) > 0 {
 			e.lose(sp, caps.StepAction, "input "+in+" has no value on this target: its value "+strings.Join(lost, ", ")+" is a pipeline parameter or an expression with no Drone spelling, so the step stops before it runs git")
 		}
 	}

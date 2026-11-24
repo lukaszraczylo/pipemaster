@@ -36,8 +36,11 @@ type entry struct {
 	Names   map[string]names  `yaml:"names"`
 	Derive  map[string]string `yaml:"derive"`
 	Literal map[string]string `yaml:"literal"`
+	Field   map[string]string `yaml:"field"`
 	Canon   string            `yaml:"canon"`
-	Values  string            `yaml:"values"`
+	// PushCanon is the canonical ref that has the entry's meaning when the pipeline runs on push events only.
+	PushCanon string `yaml:"push_canon"`
+	Values    string `yaml:"values"`
 	// LostOnPR lists the providers whose value differs on a pull request from every other provider.
 	LostOnPR []string `yaml:"lost_on_pr"`
 	// ScriptText keeps the name as text in a script, so the prelude spells it, because the canonical ref
@@ -138,18 +141,14 @@ func (t *Table) IDs() []string { return append([]string(nil), t.sorted...) }
 // Names lists the spellings of entry id on provider id; nil when the provider sets none.
 func (t *Table) Names(id, prov string) []string { return t.raw.Vars[id].Names[provider.Family(prov)] }
 
-// Native reports whether name is set by target: it is spelled in an entry or documented by the provider.
-func (t *Table) Native(name, target string) bool {
+// Native reports whether name is set by target for a project from origin: the entry that gives name its meaning
+// there is spelled so on target, or the provider documents the name. A same-spelled name of another entry does
+// not count, because it has another meaning.
+func (t *Table) Native(name, origin, target string) bool {
 	target = provider.Family(target)
-	if o, ok := t.owner[name]; ok {
-		// A name that an entry maps has the entry's meaning; a provider that documents the same name for
-		// something else does not set it here.
-		for _, c := range append([]owner{o}, t.alt[name]...) {
-			if slices.Contains(t.raw.Vars[c.id].Names[target], name) {
-				return true
-			}
-		}
-		return false
+	if _, ok := t.owner[name]; ok {
+		o, _ := t.ownerFor(name, origin)
+		return slices.Contains(t.raw.Vars[o.id].Names[target], name)
 	}
 	return t.known[target][name]
 }
@@ -171,9 +170,9 @@ func (t *Table) ownerFor(name, origin string) (owner, bool) {
 
 // foreign reports whether name is a predefined variable of another provider that target does not set. A
 // name that only shares a prefix with target stays the target's own, because no list of names is complete.
-func (t *Table) foreign(name, target string) bool {
+func (t *Table) foreign(name, origin, target string) bool {
 	target = provider.Family(target)
-	if t.skip[name] || t.Native(name, target) {
+	if t.skip[name] || t.Native(name, origin, target) {
 		return false
 	}
 	if _, ok := t.owner[name]; ok {

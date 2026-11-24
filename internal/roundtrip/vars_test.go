@@ -250,7 +250,7 @@ func TestCorpusGitLabShellHasNoUntranslatedVariables(t *testing.T) {
 					}
 					for _, m := range gitlabRefRE.FindAllStringSubmatch(line, -1) {
 						n := m[1]
-						if tab.Native(n, to) || !need[n] {
+						if tab.Native(n, provider.GitLab, to) || !need[n] {
 							continue
 						}
 						if !strings.Contains(text, "export "+n+"=") && !strings.Contains(text, "${"+n+":?") {

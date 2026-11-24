@@ -51,7 +51,7 @@ func ScanRefs(text string, shell bool) []Ref {
 	return out
 }
 
-func scan(text string, shell bool, found func(int, Ref), mask []bool) {
+func scan(text string, shell bool, found func(int, Ref), mask []bool) (open bool) {
 	var single, double bool
 	var pending []heredoc
 	protect := func(from, to int) {
@@ -69,11 +69,18 @@ func scan(text string, shell bool, found func(int, Ref), mask []bool) {
 			protect(i, i+1)
 			continue
 		case c == '\n' && shell && len(pending) > 0:
-			i = heredocBodies(text, i+1, pending, found, protect) - 1
+			next, done := heredocBodies(text, i+1, pending, found, protect)
+			i = next - 1
 			pending = nil
+			if !done {
+				open = true
+			}
 			continue
 		case c == '\\' && shell:
 			protect(i, i+2)
+			if i+1 >= len(text) {
+				open = true
+			}
 			i++
 			continue
 		case c == '\'' && shell && !double:
@@ -123,6 +130,13 @@ func scan(text string, shell bool, found func(int, Ref), mask []bool) {
 		}
 		i = end - 1
 	}
+	return open || single || (shell && double) || len(pending) > 0
+}
+
+// Open reports whether shell text ends inside a quote, a here-document or a line continuation, so the next line
+// still belongs to the same shell statement.
+func Open(text string) bool {
+	return scan(text, true, func(int, Ref) {}, nil)
 }
 
 // bareAfter reports whether the text after a braced name leaves the name without a default or error operator.
@@ -174,10 +188,12 @@ func heredocStart(text string, i int) (heredoc, int) {
 
 // heredocBodies reads the bodies that start at text[from:], one for each pending delimiter, scans an unquoted
 // body for references and returns the index after the last delimiter line.
-func heredocBodies(text string, from int, pending []heredoc, found func(int, Ref), protect func(int, int)) int {
+func heredocBodies(text string, from int, pending []heredoc, found func(int, Ref), protect func(int, int)) (int, bool) {
 	at := from
+	done := true
 	for _, h := range pending {
 		bodyStart := at
+		closed := false
 		for at < len(text) {
 			nl := strings.IndexByte(text[at:], '\n')
 			line := text[at:]
@@ -189,10 +205,12 @@ func heredocBodies(text string, from int, pending []heredoc, found func(int, Ref
 				line = strings.TrimLeft(line, "\t")
 			}
 			if line == h.word {
+				closed = true
 				break
 			}
 			at = next
 		}
+		done = done && closed
 		if h.quoted {
 			protect(bodyStart, at)
 		} else {
@@ -204,7 +222,7 @@ func heredocBodies(text string, from int, pending []heredoc, found func(int, Ref
 			at = len(text)
 		}
 	}
-	return at
+	return at, done
 }
 
 // scanBody finds the references of an unquoted here-document body, where only a backslash or a doubled dollar
@@ -242,4 +260,44 @@ func scanBody(body string, base int, found func(int, Ref)) {
 
 func nameChar(c byte, first bool) bool {
 	return c == '_' || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (!first && c >= '0' && c <= '9')
+}
+
+// Quote break: a variable that the target expands before the shell reads the text, or that the shell expands
+// outside the quotes only, leaves a single-quoted region as '"VAR"'.
+const (
+	QuoteBreakOpen  = `'"`
+	QuoteBreakClose = `"'`
+)
+
+// Statement carries the shell state from one script line to the next, so a quote that spans lines is known when
+// the next line converts.
+type Statement struct{ open string }
+
+// Prefix is the text of the open statement that precedes the next line.
+func (s *Statement) Prefix() string {
+	if s.open == "" {
+		return ""
+	}
+	return s.open + "\n"
+}
+
+// Add records the converted text of a line.
+func (s *Statement) Add(line string) {
+	s.open = strings.TrimSuffix(s.Prefix()+line, "\n")
+	if !Open(s.open) {
+		s.open = ""
+	}
+}
+
+// Reset forgets the open statement.
+func (s *Statement) Reset() { s.open = "" }
+
+// BreakOut writes ref for a position after before, which follows the lines of ctx: inside single quotes the ref
+// leaves the quotes, and a here-document is left alone because no quote works there.
+func BreakOut(ctx, before, ref string) string {
+	cur := ctx + before
+	if strings.Contains(cur, "<<") || !Protected(cur + "$")[len(cur)] {
+		return ref
+	}
+	return QuoteBreakOpen + ref + QuoteBreakClose
 }

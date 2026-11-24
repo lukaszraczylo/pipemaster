@@ -112,7 +112,7 @@
 14-gha-fastapi gha->woodpecker native= 105 emulated=  32 external=   8 lost=  77
 15-gitlab-charts-gitlab gitlab->argo native= 102 emulated= 129 external=   2 lost= 193
 15-gitlab-charts-gitlab gitlab->concourse native=  74 emulated= 140 external=  15 lost= 176
-15-gitlab-charts-gitlab gitlab->drone native=  99 emulated= 123 external=   2 lost= 198
+15-gitlab-charts-gitlab gitlab->drone native= 104 emulated= 123 external=   2 lost= 193
 15-gitlab-charts-gitlab gitlab->forgejo native= 124 emulated= 147 external=   0 lost= 170
 15-gitlab-charts-gitlab gitlab->gha native= 126 emulated= 146 external=   0 lost= 168
 15-gitlab-charts-gitlab gitlab->gitea native= 124 emulated= 146 external=   0 lost= 170
@@ -152,7 +152,7 @@
 19-gitlab-gitlab-pages gitlab->woodpecker native=  50 emulated=  48 external=   1 lost=  51
 20-gitlab-gitlab-runner gitlab->argo native= 287 emulated= 244 external=   2 lost= 538
 20-gitlab-gitlab-runner gitlab->concourse native= 185 emulated= 459 external=  43 lost= 376
-20-gitlab-gitlab-runner gitlab->drone native= 258 emulated= 215 external=  33 lost= 555
+20-gitlab-gitlab-runner gitlab->drone native= 278 emulated= 215 external=  33 lost= 535
 20-gitlab-gitlab-runner gitlab->forgejo native= 864 emulated= 311 external=   0 lost= 297
 20-gitlab-gitlab-runner gitlab->gha native= 869 emulated= 310 external=   0 lost= 282
 20-gitlab-gitlab-runner gitlab->gitea native= 864 emulated= 310 external=   0 lost= 297
@@ -384,12 +384,12 @@
 50-woodpecker-rust-confirm-email woodpecker->tekton native=   6 emulated=   1 external=   1 lost=   1
 51-drone-parsr drone->argo native=  28 emulated=  23 external=   0 lost=  14
 51-drone-parsr drone->concourse native=  30 emulated=  22 external=   0 lost=  15
-51-drone-parsr drone->forgejo native=  25 emulated=  20 external=   0 lost=   8
-51-drone-parsr drone->gha native=  25 emulated=  20 external=   0 lost=   8
-51-drone-parsr drone->gitea native=  25 emulated=  20 external=   0 lost=   8
-51-drone-parsr drone->gitlab native=  21 emulated=  14 external=   1 lost=  18
+51-drone-parsr drone->forgejo native=  27 emulated=  22 external=   0 lost=   4
+51-drone-parsr drone->gha native=  27 emulated=  22 external=   0 lost=   4
+51-drone-parsr drone->gitea native=  27 emulated=  22 external=   0 lost=   4
+51-drone-parsr drone->gitlab native=  23 emulated=  14 external=   1 lost=  16
 51-drone-parsr drone->tekton native=  22 emulated=  26 external=   0 lost=  17
-51-drone-parsr drone->woodpecker native=  36 emulated=   0 external=   0 lost=  17
+51-drone-parsr drone->woodpecker native=  38 emulated=   0 external=   0 lost=  15
 52-drone-distribution drone->argo native= 205 emulated=  70 external=   0 lost= 165
 52-drone-distribution drone->concourse native= 198 emulated=  90 external=   0 lost= 155
 52-drone-distribution drone->forgejo native= 264 emulated= 123 external=   0 lost= 101

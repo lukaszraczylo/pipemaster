@@ -2,6 +2,7 @@ package vars
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -27,7 +28,7 @@ const (
 )
 
 // Result holds the report entries of one Prepare call.
-type Result struct{ entries []report.Entry }
+type Result struct{ entries, retained []report.Entry }
 
 // Report adds the entries to rep.
 func (r *Result) Report(rep *report.Report) {
@@ -37,6 +38,7 @@ func (r *Result) Report(rep *report.Report) {
 	for _, e := range r.entries {
 		rep.Add(e)
 	}
+	rep.Retained = append(rep.Retained, r.retained...)
 }
 
 // Prepare returns p with a variable prelude on each script step that reads a predefined variable that target
@@ -74,6 +76,7 @@ type preparer struct {
 	jobPaths map[*ir.Job]string
 	target   string
 	origin   string
+	pushOnly bool
 }
 
 func (pr *preparer) pipeline(pl *ir.Pipeline) *ir.Pipeline {
@@ -91,6 +94,7 @@ func (pr *preparer) jobs(pl *ir.Pipeline, jobs []*ir.Job) []*ir.Job {
 		return nil
 	}
 	out := make([]*ir.Job, len(jobs))
+	pr.pushOnly = pushOnly(pl)
 	for i, j := range jobs {
 		if j == nil {
 			continue
@@ -146,7 +150,7 @@ func (pr *preparer) step(st *ir.Step, outer []ir.Var, fieldLost []string) *ir.St
 	}
 	var guards, defs, defined, lost []string
 	for _, n := range names {
-		if _, user := env[n]; user || pr.t.skip[n] || pr.t.Native(n, pr.target) {
+		if _, user := env[n]; user || pr.t.skip[n] || pr.t.Native(n, pr.origin, pr.target) {
 			continue
 		}
 		rhs, ok := pr.resolve(n)
@@ -158,7 +162,7 @@ func (pr *preparer) step(st *ir.Step, outer []ir.Var, fieldLost []string) *ir.St
 				guards = append(guards, g)
 				lost = append(lost, n+" on pull request events")
 			}
-		case pr.t.foreign(n, pr.target):
+		case pr.t.foreign(n, pr.origin, pr.target):
 			// A script that sets a default for the name copes with it being unset, so it gets no guard.
 			if bare[n] {
 				guards = append(guards, fmt.Sprintf(lostFormat, n, n, pr.target))
@@ -376,27 +380,67 @@ func (pr *preparer) prGuard(name string) (string, bool) {
 		ev, strings.Join(vals, "|"), name, pr.target), true
 }
 
+// pushOnly reports whether the triggers of pl admit push events on branches only, where the target branch and the
+// branch are one value.
+func pushOnly(pl *ir.Pipeline) bool {
+	if pl == nil || len(pl.Triggers) == 0 {
+		return false
+	}
+	for _, tr := range pl.Triggers {
+		if tr.Kind != ir.TriggerPush || len(tr.Tags.Include) > 0 || len(tr.Tags.Exclude) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // fieldRefs rewrites the variable references of a field that no script runs in, such as an image or a cache
-// key. A name that has a canonical ref with one meaning on every event becomes that ref, which the emitter
-// spells; any other predefined name of another provider has no source in a field, so it is returned.
+// key. A name that has the same meaning on the target is spelled in the target's own syntax. A name whose value
+// depends on the event gets the target's event-keyed spelling where the table has one. Any other predefined name
+// of another provider has no source in a field, so it is returned.
 func (pr *preparer) fieldRefs(text string) (string, []string) {
 	var lost []string
 	for _, n := range Refs(text, false) {
-		if !pr.t.foreign(n, pr.target) {
+		if !pr.t.foreign(n, pr.origin, pr.target) {
 			continue
 		}
-		if o, ok := pr.t.ownerFor(n, pr.origin); ok {
-			if e := pr.t.raw.Vars[o.id]; e.Canon != "" && !e.ScriptText && len(e.LostOnPR) == 0 {
-				text = strings.NewReplacer("${"+n+"}", "${{ "+e.Canon+" }}", "$"+n, "${{ "+e.Canon+" }}").Replace(text)
-				continue
-			}
+		spelling, ok := pr.fieldSpelling(n)
+		if !ok {
+			lost = append(lost, n)
+			continue
 		}
-		lost = append(lost, n)
+		re := regexp.MustCompile(`\$\{` + regexp.QuoteMeta(n) + `\}|\$` + regexp.QuoteMeta(n) + `\b`)
+		text = re.ReplaceAllLiteralString(text, spelling)
 	}
 	return text, lost
 }
 
-// field applies fieldRefs to one text and reports what is lost at path.
+// fieldSpelling is the text that stands for the name n in a field of the target.
+func (pr *preparer) fieldSpelling(n string) (string, bool) {
+	o, ok := pr.t.ownerFor(n, pr.origin)
+	if !ok {
+		return "", false
+	}
+	e := pr.t.raw.Vars[o.id]
+	family := provider.Family(pr.target)
+	if ns := e.Names[family]; len(ns) > 0 && (family == provider.Drone || family == provider.Woodpecker) {
+		return "${{ " + family + "." + ns[0] + " }}", true
+	}
+	if f := e.Field[family]; f != "" {
+		return f, true
+	}
+	canon := e.Canon
+	if e.PushCanon != "" && pr.pushOnly {
+		canon = e.PushCanon
+	}
+	if canon == "" || len(e.LostOnPR) > 0 || (e.ScriptText && !pr.pushOnly) {
+		return "", false
+	}
+	return "${{ " + canon + " }}", true
+}
+
+// field applies fieldRefs to one text and reports what is lost at path. A rewritten text is kept in the metadata, so
+// the return trip reads the source text again.
 func (pr *preparer) field(text, path string, f caps.Feature) (string, []string) {
 	out, lost := pr.fieldRefs(text)
 	var msgs []string
@@ -407,6 +451,9 @@ func (pr *preparer) field(text, path string, f caps.Feature) (string, []string) 
 			IRPath: path, Feature: f, Level: caps.Lost,
 			Detail: "the field reads " + n + ", which " + pr.target + " has no source for in a field; the steps that use it stop with a message",
 		})
+	}
+	if out != text && len(lost) == 0 {
+		pr.res.retained = append(pr.res.retained, report.Entry{IRPath: path, Feature: f, Level: caps.Lost, Detail: "variable spelled for " + pr.target})
 	}
 	return out, msgs
 }

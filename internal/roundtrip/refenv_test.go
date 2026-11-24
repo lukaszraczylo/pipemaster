@@ -116,6 +116,9 @@ func TestPreludeDerivesBranchPerEvent(t *testing.T) {
 		{"drone ref name on pull request", provider.Drone, "echo \"n=$CI_COMMIT_REF_NAME\"", "n=feat", []string{"DRONE_BUILD_EVENT=pull_request", "DRONE_SOURCE_BRANCH=feat", "DRONE_COMMIT_BRANCH=main"}},
 		{"drone ref name on tag", provider.Drone, "echo \"n=$CI_COMMIT_REF_NAME\"", "n=v1", []string{"DRONE_BUILD_EVENT=tag", "DRONE_TAG=v1", "DRONE_COMMIT_BRANCH=main"}},
 		{"woodpecker ref name on pull request", provider.Woodpecker, "echo \"n=$CI_COMMIT_REF_NAME\"", "n=feat", []string{"CI_PIPELINE_EVENT=pull_request", "CI_COMMIT_SOURCE_BRANCH=feat", "CI_COMMIT_BRANCH=main"}},
+		{"woodpecker branch on push", provider.Woodpecker, "echo \"b=$CI_COMMIT_BRANCH\"", "b=main", []string{"CI_PIPELINE_EVENT=push", "CI_COMMIT_BRANCH=main"}},
+		{"woodpecker branch on pull request", provider.Woodpecker, "echo \"b=$CI_COMMIT_BRANCH\"", "b=", []string{"CI_PIPELINE_EVENT=pull_request", "CI_COMMIT_BRANCH=main"}},
+		{"woodpecker branch on tag", provider.Woodpecker, "echo \"b=$CI_COMMIT_BRANCH\"", "b=", []string{"CI_PIPELINE_EVENT=tag", "CI_COMMIT_TAG=v1", "CI_COMMIT_BRANCH=main"}},
 		{"gha branch on push", provider.GHA, "echo \"b=$CI_COMMIT_BRANCH\"", "b=main", []string{"GITHUB_EVENT_NAME=push", "GITHUB_REF_TYPE=branch", "GITHUB_REF_NAME=main"}},
 		{"gha branch on tag", provider.GHA, "echo \"b=$CI_COMMIT_BRANCH\"", "b=", []string{"GITHUB_EVENT_NAME=push", "GITHUB_REF_TYPE=tag", "GITHUB_REF_NAME=v1"}},
 	}
@@ -139,5 +142,89 @@ func TestPreludeDerivesBranchPerEvent(t *testing.T) {
 				t.Errorf("out %q code %d stderr %q, want %q", out, code, errOut, c.want)
 			}
 		})
+	}
+}
+
+// A quote that a line opens stays open on the next lines, so a name there is neither translated nor lost on the way back.
+func TestMultiLineQuoteSurvivesTheRoundTrip(t *testing.T) {
+	const glDoc = "build:\n  script:\n    - |\n      echo \"one $CI_COMMIT_SHA\"\n      msg=\"$CI_COMMIT_SHA inside multiline'\"\n      echo 'first\n      $CI_COMMIT_SHA literal\n      end'\n"
+	for _, via := range []string{provider.GHA, provider.Woodpecker, provider.Drone} {
+		t.Run(via, func(t *testing.T) {
+			r := hops(t, toFS(map[string][]byte{".gitlab-ci.yml": []byte(glDoc)}), prov(t, provider.GitLab), prov(t, via), false, true)
+			if same, diff := ir.Equal(r.src, r.back); !same {
+				t.Fatalf("not exact via %s:\n%s", via, diff)
+			}
+			got := strings.Join(r.src.Pipelines[0].Jobs[0].Steps[0].Script, "\n")
+			if !strings.Contains(got, "\n$CI_COMMIT_SHA literal\n") || !strings.Contains(got, "${{ sha }} inside") {
+				t.Errorf("the quoted line was translated or the plain one was not:\n%s", got)
+			}
+		})
+	}
+}
+
+// GHA expands an expression before the shell runs, so a reference inside a multi-line single quote leaves the quote.
+func TestGHAReferenceInMultiLineQuoteIsExpandedOnGitLab(t *testing.T) {
+	const wf = "name: ci\non: [push]\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          echo 'first\n          ${{ github.sha }} second\n          end'\n"
+	proj, _, err := prov(t, provider.GHA).Parse(toFS(map[string][]byte{".github/workflows/ci.yml": []byte(wf)}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, _, err := prov(t, provider.GitLab).Emit(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := string(files[".gitlab-ci.yml"])
+	if !strings.Contains(doc, `'"$CI_COMMIT_SHA"' second`) {
+		t.Errorf("the reference stays inside the quote:\n%s", doc)
+	}
+	if strings.Contains(doc, "- echo 'first\n") {
+		t.Errorf("the quoted lines are separate script items:\n%s", doc)
+	}
+}
+
+const droneBranchImage = "kind: pipeline\nname: ci\nsteps:\n  - name: build\n    image: alpine:${DRONE_BRANCH}\n    commands:\n      - echo hi\n"
+
+// DRONE_BRANCH is the target branch on a pull request. Each target spells that value in its own field syntax.
+func TestFieldVariableUsesTheTargetFieldSyntax(t *testing.T) {
+	for _, c := range []struct{ to, want string }{
+		{provider.Woodpecker, "image: alpine:${CI_COMMIT_BRANCH}"},
+		{provider.GitLab, "image: alpine:${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}${CI_COMMIT_BRANCH}"},
+		{provider.GHA, "github.event_name == 'pull_request' && github.base_ref || github.ref_name"},
+	} {
+		t.Run(c.to, func(t *testing.T) {
+			files, rep := emitFiles(t, "drone", c.to, map[string]string{".drone.yml": droneBranchImage})
+			var all strings.Builder
+			for n, b := range files {
+				if !strings.HasPrefix(n, ".pipemaster/") {
+					all.Write(b)
+				}
+			}
+			if !strings.Contains(all.String(), c.want) {
+				t.Errorf("missing %q in\n%s", c.want, all.String())
+			}
+			if strings.Contains(all.String(), "pipemaster: lost") {
+				t.Errorf("a step stops although the value maps:\n%s", all.String())
+			}
+			for _, e := range rep.Entries {
+				if e.Level.String() == "lost" && strings.Contains(e.Detail, "DRONE_BRANCH") {
+					t.Errorf("reported as lost: %+v", e)
+				}
+			}
+		})
+	}
+}
+
+// A pipeline that runs on push only has no pull request where the two values differ.
+func TestPushOnlyPipelineMapsEventKeyedFieldsToTheBranch(t *testing.T) {
+	const doc = "kind: pipeline\nname: ci\ntrigger:\n  event:\n    - push\nsteps:\n  - name: build\n    image: alpine:${DRONE_BRANCH}\n    commands:\n      - echo hi\n"
+	files, _ := emitFiles(t, "drone", provider.Tekton, map[string]string{".drone.yml": doc})
+	var all strings.Builder
+	for n, b := range files {
+		if !strings.HasPrefix(n, ".pipemaster/") {
+			all.Write(b)
+		}
+	}
+	if strings.Contains(all.String(), "pipemaster: lost") {
+		t.Errorf("a push-only pipeline still loses the image variable:\n%s", all.String())
 	}
 }

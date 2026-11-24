@@ -217,7 +217,7 @@ func litText(l expr.Lit) string {
 }
 
 // convertParts joins the parts as Woodpecker text. lost holds the canonical text of each expression that has no spelling.
-func (e *emitter) convertParts(b *bindings, mode textMode, parts []expr.Part) (out string, lost []string) {
+func (e *emitter) convertParts(b *bindings, mode textMode, parts []expr.Part, ctx string) (out string, lost []string) {
 	var sb strings.Builder
 	for _, p := range parts {
 		switch x := p.Expr.(type) {
@@ -227,6 +227,9 @@ func (e *emitter) convertParts(b *bindings, mode textMode, parts []expr.Part) (o
 			sb.WriteString(esc(litText(x)))
 		case expr.Ref:
 			if t, ok := e.refText(b, mode, x.Path); ok {
+				if mode == commandText && strings.HasPrefix(t, "$$") && !boundRef(x.Path) {
+					t = vars.BreakOut(ctx, sb.String(), t)
+				}
 				sb.WriteString(t)
 			} else {
 				lost = append(lost, expr.String(x))
@@ -244,7 +247,7 @@ func (e *emitter) text(b *bindings, path string, f caps.Feature, mode textMode, 
 	if err != nil {
 		return "", err
 	}
-	out, lost := e.convertParts(b, mode, parts)
+	out, lost := e.convertParts(b, mode, parts, "")
 	for _, l := range lost {
 		e.lose(path, f, "no Woodpecker spelling for expression "+l)
 		e.comment(string(f) + " " + path + ": {{ " + l + " }}")
@@ -257,12 +260,12 @@ func (e *emitter) text(b *bindings, path string, f caps.Feature, mode textMode, 
 
 // command converts one script entry. lost names the expressions Woodpecker cannot spell; the caller comments
 // the entry out whole, because dropping the part could change what the command does.
-func (e *emitter) command(b *bindings, s string) (out string, lost []string, err error) {
+func (e *emitter) command(b *bindings, s, ctx string) (out string, lost []string, err error) {
 	parts, err := expr.ParseScriptTemplate(s)
 	if err != nil {
 		return "", nil, err
 	}
-	out, lost = e.convertParts(b, commandText, parts)
+	out, lost = e.convertParts(b, commandText, parts, ctx)
 	return out, lost, nil
 }
 
@@ -288,7 +291,7 @@ func (e *emitter) valueNode(path string, v ir.Value) (*yaml.Node, error) {
 				parts = mixed
 			}
 		}
-		out, lost := e.convertParts(nil, valueText, parts)
+		out, lost := e.convertParts(nil, valueText, parts, "")
 		for _, l := range lost {
 			e.lose(path, caps.ExprOpaque, "no Woodpecker spelling for expression "+l)
 			e.comment("expr.opaque " + path + ": " + l)
@@ -339,4 +342,13 @@ func noSpelling(lost []string) string {
 		return ""
 	}
 	return "no Woodpecker spelling for expression " + strings.Join(lost, ", ")
+}
+
+// boundRef reports whether path names a variable of the pipeline that a binding carries, not a predefined variable.
+func boundRef(path []string) bool {
+	switch path[0] {
+	case expr.PrefixEnv, expr.PrefixSecrets, expr.PrefixVars, expr.PrefixInputs, expr.PrefixMatrix:
+		return true
+	}
+	return false
 }

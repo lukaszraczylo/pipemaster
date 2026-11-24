@@ -166,11 +166,25 @@ func hashedKeyText(key string) (string, bool) {
 // env.x all print as $x, so the namespace cannot be read back from the text alone.
 func refPairs(pl *ir.Pipeline) []refPair {
 	var out []refPair
+	// Script lines of one statement share quote state, so a line converts with the lines before it.
+	var ctx lineCtx
+	var ctxBase string
 	text := func(pos, s string) {
-		if parts, err := expr.ParseScriptTemplate(s); err != nil || !flattens(parts) {
+		if base := pos[:strings.LastIndexByte(pos, '/')+1]; base != ctxBase || !linePosRE.MatchString(pos) {
+			ctx, ctxBase = lineCtx{}, base
+		}
+		parts, err := expr.ParseScriptTemplate(s)
+		if err != nil || !flattens(parts) {
+			ctx.add(s)
 			return
 		}
-		if t, lost, err := convert(s); err == nil && len(lost) == 0 && t != s {
+		t, lost, err := convertIn(s, ctx.prefix())
+		if err != nil || len(lost) > 0 {
+			ctx = lineCtx{}
+			return
+		}
+		ctx.add(t)
+		if t != s {
 			out = append(out, refPair{pairText, pos, t, s})
 		}
 	}

@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"fmt"
+	"github.com/lukaszraczylo/pipemaster/vars"
 	"slices"
 	"strings"
 
@@ -299,12 +300,23 @@ func wrapLines(st *ir.Step, sec string, lines []string, guard, dir string, expor
 	}
 	if !sub && guard == "" {
 		before := beforeLines(st, sec, len(lines))
+		// Lines that share an open quote or here-document are one shell statement, so they stay one block item.
+		var group string
 		for i, l := range lines {
 			t := sec
 			if i < before {
 				t = secBefore
 			}
-			items, targets = append(items, l), append(targets, t)
+			if group == "" {
+				group = l
+			} else {
+				group += "\n" + l
+			}
+			if vars.Open(group) && i+1 < len(lines) && (i+1 < before) == (i < before) {
+				continue
+			}
+			items, targets = append(items, group), append(targets, t)
+			group = ""
 		}
 		return items, targets
 	}
@@ -348,12 +360,18 @@ func (e *emitter) stepLines(sp string, st *ir.Step) ([]string, error) {
 	texts := make([]string, len(st.Script))
 	outs := make([]string, len(st.Script))
 	why := make([]string, len(st.Script))
+	var ctx lineCtx
 	for i, l := range st.Script {
 		texts[i] = emitkit.NeutralizeResultWrite(e.lose, sp, l)
 		var err error
-		if outs[i], why[i], err = e.scriptLine(texts[i]); err != nil {
+		if outs[i], why[i], err = e.scriptLine(texts[i], ctx.prefix()); err != nil {
 			return nil, err
 		}
+		if why[i] != "" {
+			ctx = lineCtx{}
+			continue
+		}
+		ctx.add(outs[i])
 	}
 	pieces := emitkit.ReplaceLost(texts, why, func(detail, text string) {
 		e.lose(sp, caps.ScriptInterpolation, detail)

@@ -1,2 +1,3 @@
 Loss report: woodpecker -> gitlab
+[emulated] pipeline/woodpecker/job/ci/step/build script.interpolation: variable prelude (the script reads CI_COMMIT_BRANCH, which gitlab does not set; a prelude defines them from the gitlab values)
 [emulated] pipeline/woodpecker/job/ci/step/build step.image: the shared image of the steps is the job image (every script step of the job runs in this image)

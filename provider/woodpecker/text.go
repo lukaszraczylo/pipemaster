@@ -127,10 +127,16 @@ func (x *texts) parts(s string, script bool) []expr.Part {
 			lit.Reset()
 		}
 	}
+	var mask []bool
+	if script {
+		mask = vars.Protected(s)
+	}
+	// quoted reports whether the shell expands nothing at s[i], as inside single quotes.
+	quoted := func(i int) bool { return mask != nil && mask[i] }
 	for i := 0; i < len(s); {
 		switch {
 		case strings.HasPrefix(s[i:], "$$"):
-			if name, n := shellName(s[i+2:]); n > 0 {
+			if name, n := shellName(s[i+2:]); n > 0 && !quoted(i) {
 				if r, ok := x.runtimeVar(name, script); ok {
 					flush()
 					parts = append(parts, expr.Part{Expr: r})
@@ -162,7 +168,7 @@ func (x *texts) parts(s string, script bool) []expr.Part {
 			}
 			i += end + 1
 		case s[i] == '$':
-			if name, n := shellName(s[i+1:]); n > 0 {
+			if name, n := shellName(s[i+1:]); n > 0 && !quoted(i) {
 				if r, ok := x.runtimeVar(name, script); ok {
 					flush()
 					parts = append(parts, expr.Part{Expr: r})
@@ -178,6 +184,23 @@ func (x *texts) parts(s string, script bool) []expr.Part {
 		}
 	}
 	flush()
+	if script {
+		parts = foldQuoteBreaks(parts)
+	}
+	return parts
+}
+
+// foldQuoteBreaks undoes the quote break that the emitter writes around a variable in single-quoted text.
+func foldQuoteBreaks(parts []expr.Part) []expr.Part {
+	for i := 1; i+1 < len(parts); i++ {
+		if parts[i].Expr == nil || parts[i-1].Expr != nil || parts[i+1].Expr != nil {
+			continue
+		}
+		if strings.HasSuffix(parts[i-1].Text, vars.QuoteBreakOpen) && strings.HasPrefix(parts[i+1].Text, vars.QuoteBreakClose) {
+			parts[i-1].Text = strings.TrimSuffix(parts[i-1].Text, vars.QuoteBreakOpen)
+			parts[i+1].Text = strings.TrimPrefix(parts[i+1].Text, vars.QuoteBreakClose)
+		}
+	}
 	return parts
 }
 
