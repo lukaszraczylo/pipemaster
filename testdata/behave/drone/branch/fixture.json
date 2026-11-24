@@ -1,0 +1,18 @@
+{
+  "features": [
+    "step.if",
+    "trigger.filter.branches",
+    "trigger.tag",
+    "trigger.pull_request",
+    "trigger.push"
+  ],
+  "events": [
+    "push-main",
+    "push-branch",
+    "tag",
+    "pr"
+  ],
+  "expect_failure": false,
+  "unordered": true,
+  "expect": []
+}

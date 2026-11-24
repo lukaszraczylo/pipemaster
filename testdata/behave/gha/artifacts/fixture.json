@@ -1,0 +1,17 @@
+{
+  "features": [
+    "job.artifacts",
+    "job.needs.artifacts",
+    "job.needs",
+    "step.action"
+  ],
+  "events": [
+    "push-main",
+    "push-branch"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": [
+    "artifacts.consume:payload"
+  ]
+}

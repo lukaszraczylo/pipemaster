@@ -1,0 +1,21 @@
+{
+  "features": [
+    "job.if",
+    "step.if",
+    "expr.opaque",
+    "trigger.filter.branches",
+    "trigger.filter.tags",
+    "trigger.tag",
+    "trigger.pull_request",
+    "trigger.push"
+  ],
+  "events": [
+    "push-main",
+    "push-branch",
+    "tag",
+    "pr"
+  ],
+  "expect_failure": false,
+  "unordered": true,
+  "expect": []
+}

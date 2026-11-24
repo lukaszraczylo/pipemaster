@@ -1,0 +1,12 @@
+{
+  "features": [
+    "step.action"
+  ],
+  "events": [
+    "push-main",
+    "push-branch"
+  ],
+  "expect_failure": true,
+  "unordered": false,
+  "expect": []
+}

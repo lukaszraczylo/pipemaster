@@ -1,0 +1,17 @@
+default:
+  image: alpine:3.20
+stages: [one, two]
+produce:
+  stage: one
+  script:
+    - echo payload > out.txt
+    - echo "MARK artifacts.produce" | tee -a trace.log
+  artifacts:
+    paths: [out.txt]
+consume:
+  stage: two
+  needs:
+    - job: produce
+      artifacts: true
+  script:
+    - echo "MARK artifacts.consume:$(cat out.txt)" | tee -a trace.log

@@ -1,0 +1,15 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  flaky:
+    runs-on: ubuntu-latest
+    steps:
+      - continue-on-error: true
+        run: |
+          echo "MARK allow_failure.flaky" | tee -a trace.log
+          false
+  after:
+    runs-on: ubuntu-latest
+    needs: flaky
+    steps:
+      - run: echo "MARK allow_failure.after" | tee -a trace.log

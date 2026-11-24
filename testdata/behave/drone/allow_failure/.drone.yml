@@ -1,0 +1,16 @@
+kind: pipeline
+type: docker
+trigger:
+  event: [push, tag, pull_request]
+name: default
+steps:
+  - name: flaky
+    image: alpine:3.20
+    failure: ignore
+    commands:
+      - echo "MARK allow_failure.flaky" | tee -a trace.log
+      - "false"
+  - name: after
+    image: alpine:3.20
+    commands:
+      - echo "MARK allow_failure.after" | tee -a trace.log

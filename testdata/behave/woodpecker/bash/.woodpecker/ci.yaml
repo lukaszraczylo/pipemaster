@@ -1,0 +1,9 @@
+when:
+  - event: [push, tag, pull_request]
+
+steps:
+  - name: b
+    image: bash:5.2
+    commands:
+      - |
+        bash -c 'arr=(a b c); if [[ $${#arr[@]} -eq 3 && $${arr[1]} == b ]]; then echo "MARK bash.ok:$${arr[2]}" | tee -a trace.log; fi'

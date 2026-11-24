@@ -1,0 +1,14 @@
+{
+  "features": [
+    "job.allow_failure",
+    "step.continue_on_error",
+    "job.needs"
+  ],
+  "events": [
+    "push-main",
+    "push-branch"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": []
+}

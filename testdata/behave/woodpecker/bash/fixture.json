@@ -1,0 +1,15 @@
+{
+  "features": [
+    "step.shell",
+    "step.script"
+  ],
+  "events": [
+    "push-main",
+    "push-branch"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": [
+    "bash.ok:c"
+  ]
+}

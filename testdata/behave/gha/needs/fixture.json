@@ -1,0 +1,12 @@
+{
+  "features": [
+    "job.needs"
+  ],
+  "events": [
+    "push-main",
+    "push-branch"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": []
+}

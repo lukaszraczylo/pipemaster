@@ -1,0 +1,15 @@
+{
+  "features": [
+    "expr.opaque",
+    "script.interpolation"
+  ],
+  "events": [
+    "push-main",
+    "push-branch"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": [
+    "env.foo:bar"
+  ]
+}
