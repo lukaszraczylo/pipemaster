@@ -89,8 +89,9 @@ func TestMatrixEditIsKept(t *testing.T) {
 		edited = strings.Replace(src, "1.22", "1.23", 1)
 	}
 	back, rep := parseFiles(t, map[string]string{"ci.yml": edited})
-	if back.Pipelines[0].Jobs[0].Matrix != nil {
-		t.Fatalf("an edited across was restored as the matrix")
+	mx := back.Pipelines[0].Jobs[0].Matrix
+	if mx == nil || len(mx.Axes) != 1 || strings.Join(mx.Axes[0].Values, ",") != "1.21,1.23" {
+		t.Fatalf("the edited across must be the matrix as the file says it, not the marker matrix: %+v", mx)
 	}
 	wantIgnored(t, rep, caps.JobMatrix, "across")
 }

@@ -17,7 +17,7 @@ import (
 // stepSkip lists the step Ext keys that the emitter writes itself.
 var stepSkip = map[string]bool{
 	"file": true, ExtConfig: true, ExtParams: true, ExtShellFlags: true, ExtBashDefault: true, ExtCommand: true, ExtArgs: true, ExtScriptLine: true,
-	ExtEntrypoint: true, ExtImageResource: true, ExtRun: true, ExtKind: true, ExtStep: true,
+	ExtEntrypoint: true, ExtImageResource: true, ExtRun: true, ExtKind: true, ExtStep: true, ExtTaskDigest: true, ExtFileParams: true,
 }
 
 // posixShells are the shells that run a script with -ec.
@@ -52,11 +52,17 @@ func (c *chain) step(st *ir.Step) []*yaml.Node {
 	}
 	switch st.Kind {
 	case ir.StepAction:
+		if n, ok := c.heldGet(st, path); ok {
+			return n
+		}
 		return c.action(st, path, at)
 	case ir.StepPipelineCall:
 		e.lose(path, caps.StepAction, "a call of another pipeline has no Concourse form; a placeholder task keeps its place")
 		return c.placeholder(st, path, actionArg{})
 	case ir.StepScript, "":
+		if n := c.taskFile(st, path); n != nil {
+			return []*yaml.Node{n}
+		}
 		return []*yaml.Node{c.script(st, path)}
 	case ir.StepResource, ir.StepPlugin, ir.StepTask:
 		if ext := extOf(st.Ext); !e.own || ext == nil {
@@ -139,8 +145,11 @@ func (c *chain) script(st *ir.Step, path string) *yaml.Node {
 	}
 	if ext != nil {
 		skip := stepSkip
+		if ext[ExtTaskDigest] != nil {
+			skip = withKey(skip, keyImage)
+		}
 		if !jx.ownInputs(ext) {
-			skip = withKey(stepSkip, "input_mapping")
+			skip = withKey(skip, "input_mapping")
 		}
 		if err := m.AddExtra(ext, skip); err != nil {
 			e.lose(path, caps.ExtPassthrough, "the Ext of the step cannot be written: "+err.Error())

@@ -20,6 +20,7 @@ var kindKeys = []string{"get", "put", "task", "run", "set_pipeline", "load_var",
 
 var (
 	wholeVar = regexp.MustCompile(`^\(\(([A-Za-z_][A-Za-z0-9_-]*)\)\)$`)
+	localVar = regexp.MustCompile(`^\(\(\.:([A-Za-z_][A-Za-z0-9_]*)\)\)$`)
 	identVar = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	shells   = map[string]bool{"sh": true, "bash": true, "dash": true, "ash": true, "zsh": true}
 )
@@ -32,6 +33,11 @@ func (jb *jobBuilder) step(raw any) []*ir.Step {
 	}
 	if _, has := m.Vals["across"]; has {
 		return []*ir.Step{jb.opaque(m, "across", "across is a matrix over a step", m.Lines["across"])}
+	}
+	if gets, ok := parallelGets(m); ok && len(gets) > 0 {
+		if co := jb.checkoutStep(m, gets, jb.used); co != nil {
+			return []*ir.Step{co}
+		}
 	}
 	var kinds []string
 	for _, key := range kindKeys {
@@ -169,13 +175,21 @@ func (jb *jobBuilder) taskStep(m *omap) *ir.Step {
 	var cfgParams *omap
 	if hasFile {
 		r.Take("file")
-		st.Kind = ir.StepTask
 		k.Out["file"] = file
-		k.Note(caps.StepScript, "task file "+file+" is referenced, not read; the step keeps the path in Ext", m.Lines["file"])
+		var resolved bool
+		cfgParams, resolved = jb.fileTask(st, k, file, written, m.Lines["file"])
+		jb.fresh[st] = resolved
 	} else {
 		r.Take("config")
 		st.Kind = ir.StepScript
 		cfgParams = jb.config(st, k, cfg, m.Lines["config"], form)
+	}
+	jb.stepImage(st, k, r)
+	if hasFile && st.Kind == ir.StepScript {
+		k.Out[ExtTaskDigest] = taskDigest(st, refOf(st.Image))
+		if cfgParams != nil && len(cfgParams.Order) > 0 {
+			k.Out[ExtFileParams] = paramList(cfgParams)
+		}
 	}
 	jb.env(st, k, cfgParams, r)
 	k.KeepRest(r)
@@ -227,6 +241,16 @@ func (jb *jobBuilder) config(st *ir.Step, k *sink, cfg *omap, line int, form boo
 		k.Keep(ExtConfig, rest, caps.ExtPassthrough, "task config keys "+strings.Join(rest.Order, ", ")+" have no IR field; kept in Ext", line)
 	}
 	return params
+}
+
+// paramList is the params of a task file as ordered name and value pairs, the form that Ext and the marker hold.
+func paramList(p *omap) []any {
+	out := make([]any, 0, len(p.Order))
+	for _, name := range p.Order {
+		v, _ := text(p.Vals[name])
+		out = append(out, map[string]any{"name": name, "value": v})
+	}
+	return out
 }
 
 func takeVal(r *reader, key string) any {
@@ -373,19 +397,22 @@ func plainStrings(l []string) []any {
 // image reads image_resource as an image reference when it is a registry-image with a literal repository and tag
 // and no other key; anything else stays in Ext.
 func (jb *jobBuilder) image(st *ir.Step, k *sink, v any, line int) {
-	if ref, ok := imageRef(v); ok {
+	if ref, ok := imageRef(v, jb.inFile); ok {
 		st.Image = &ir.Image{Ref: ref}
 		return
 	}
 	k.Keep(ExtImageResource, v, caps.StepImage, "image_resource is not a plain registry-image reference; kept in Ext", line)
 }
 
-func imageRef(v any) (string, bool) {
+// imageRef reads image_resource as repository[:tag][@digest]. A task file also takes docker-image and a source with
+// credential keys, which the task file keeps; an inline config keeps those forms in Ext.
+func imageRef(v any, file bool) (string, bool) {
 	m, ok := asMap(v)
 	if !ok {
 		return "", false
 	}
-	if typ, _ := text(m.Vals["type"]); typ != "registry-image" {
+	typ, _ := text(m.Vals["type"])
+	if typ != "registry-image" && (!file || typ != "docker-image") {
 		return "", false
 	}
 	for _, key := range m.Order {
@@ -397,25 +424,14 @@ func imageRef(v any) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	repo, ok := text(src.Vals["repository"])
-	if !ok || strings.Contains(repo, varOpen) {
-		return "", false
-	}
-	ref := repo
-	for _, key := range src.Order {
-		switch key {
-		case "repository":
-		case "tag":
-			t, ok := text(src.Vals[key])
-			if !ok || strings.Contains(t, varOpen) {
+	if !file {
+		for _, key := range src.Order {
+			if key != "repository" && key != "tag" && key != "digest" {
 				return "", false
 			}
-			ref += ":" + t
-		default:
-			return "", false
 		}
 	}
-	return ref, true
+	return refOfSource(src, "", nil)
 }
 
 // env merges the config params and the step params into the step env; step params win. A value with no Value
@@ -483,6 +499,9 @@ func (jb *jobBuilder) paramValue(v any) (ir.Value, bool) {
 	}
 	if !strings.Contains(t, varOpen) {
 		return ir.Value{Lit: t}, true
+	}
+	if lm := localVar.FindStringSubmatch(t); lm != nil && jb.axes[lm[1]] {
+		return ir.Value{Kind: ir.ValueExpr, Expr: expr.Ref{Path: []string{expr.PrefixMatrix, lm[1]}}}, true
 	}
 	mm := wholeVar.FindStringSubmatch(t)
 	if mm == nil {

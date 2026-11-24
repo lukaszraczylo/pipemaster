@@ -58,7 +58,7 @@ var siteSamples = []siteSample{
 	{Key: "argo", From: "argo", Title: "linclin/go-gin-rest-api", Repo: "https://github.com/linclin/go-gin-rest-api",
 		Commit: "8f326d8d6789fa8d5b486e7586ba8911b9da63a6", Licence: "Apache-2.0", dir: "../../testdata/corpus/73-argo-go-gin-rest-api"},
 	{Key: "concourse", From: "concourse", Title: "concourse/examples multi-branch", Repo: "https://github.com/concourse/examples",
-		Commit: "a3d23a6a73977baa2d4a8dbd24a3048f4f98b131", Licence: "Apache-2.0", dir: "../../testdata/corpus/80-concourse-examples-multi-branch"},
+		Commit: "a3d23a6a73977baa2d4a8dbd24a3048f4f98b131", Licence: "Apache-2.0", dir: "../../testdata/corpus/87-concourse-examples-multi-branch-tasks"},
 }
 
 type siteFile struct {

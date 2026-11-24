@@ -1,6 +1,7 @@
 package concourse
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -26,7 +27,7 @@ func (jx *jobEmitter) checkoutParams() map[string]any {
 	if jx.checkout == nil {
 		jx.checkout = &checkoutInfo{}
 		main, _ := jx.split()
-		if len(main) > 0 && main[0] != nil && main[0].Kind == ir.StepAction && main[0].Action != nil {
+		if len(main) > 0 && main[0] != nil && main[0].Kind == ir.StepAction && main[0].Action != nil && extOf(main[0].Ext)[ExtStep] == nil {
 			if t, ok := lookupAction(main[0]); ok && t.Kind == actions.KindImplicit && t.Support.Level != caps.Lost && len(t.Unmapped) == 0 {
 				jx.checkout = &checkoutInfo{step: main[0], ok: true, params: map[string]any{}}
 				if d, err := strconv.Atoi(strOf(t.With["depth"])); err == nil && d > 0 {
@@ -252,7 +253,7 @@ func (c *chain) verbatim(st *ir.Step, path string) *yaml.Node {
 	e := jx.pe.e
 	ext := extOf(st.Ext)
 	switch st.Kind {
-	case ir.StepPlugin:
+	case ir.StepPlugin, ir.StepAction:
 		raw, ok := ext[ExtStep]
 		raw = jx.addNestedPassed(raw)
 		if !ok {
@@ -273,6 +274,8 @@ func (c *chain) verbatim(st *ir.Step, path string) *yaml.Node {
 	name := jx.stepName(st, path)
 	sc := jx.newScope("")
 	sc.envParams(path, st.Env)
+	defaults := fileDefaultsOf(ext)
+	sc.params = slices.DeleteFunc(slices.Clone(sc.params), func(p param) bool { return defaults[p.name] == p.value && defaults[p.name] != "" })
 	m := newMap()
 	m.SetStr("task", name)
 	m.SetStr("file", file)
@@ -295,6 +298,9 @@ func (c *chain) verbatim(st *ir.Step, path string) *yaml.Node {
 		e.lose(path, caps.ExtPassthrough, "the Ext of the step cannot be written: "+err.Error())
 	}
 	jx.secretMarker(sc, name)
+	if st.Kind == ir.StepScript {
+		jx.taskMarker(st, name, file, ext)
+	}
 	return m.N
 }
 

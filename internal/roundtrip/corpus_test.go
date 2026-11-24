@@ -305,6 +305,7 @@ func checkPowershellReported(t *testing.T, files map[string][]byte, rep *report.
 // --strict, with the reason. No other entry may fail.
 var flyStrictExceptions = map[string]string{
 	"80-concourse-examples-multi-branch": "the source set_pipeline identifier ((instance_pipeline_name)) is a deprecation that the output keeps, as the source does",
+	"87-concourse-examples-multi-branch-tasks": "the source set_pipeline identifier ((instance_pipeline_name)) is a deprecation that the output keeps, as the source does",
 }
 
 // checkFlyStrict runs fly validate-pipeline --strict on the converted Concourse files of a corpus entry.

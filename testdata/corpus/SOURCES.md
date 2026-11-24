@@ -4,7 +4,7 @@ Real-world CI pipelines stored verbatim for `TestCorpus` (`internal/roundtrip/co
 The directory of an entry is `testdata/corpus/<#>-<gha, gitea, forgejo, gitlab, woodpecker, drone, tekton, argo or concourse>-<slug>`.
 Every file is byte-identical to the file at the pinned commit; the test run does not edit them.
 
-- Fetch date: 2026-11-18 for entries 01 to 27, 2026-11-19 for entries 28 to 40 and 2026-11-20 for entries 41 to 50 and 2026-11-21 for entries 51 to 71 and 2026-11-22 for entries 72 to 79 and 2026-11-23 for entries 81 to 86.
+- Fetch date: 2026-11-18 for entries 01 to 27, 2026-11-19 for entries 28 to 40 and 2026-11-20 for entries 41 to 50 and 2026-11-21 for entries 51 to 71 and 2026-11-22 for entries 72 to 79 and 2026-11-23 for entries 81 to 86 and 2026-11-24 for entry 87.
 - Each repository is public, and its licence was read before use: from the host API (GitHub `license.spdx_id`, GitLab `license.key`), or, for entries 28 to 40,
   from the `LICENSE` file of the repository at the pinned commit.
   Every licence is MIT, Apache-2.0, BSD-3-Clause or, for entry 60 only, MPL-2.0. Entries 63 to 71 are Apache-2.0. Entry 72 is BSD-3-Clause, entry 73, 74 and 75 are Apache-2.0, entries 76 and 78 are MIT, entry 77 is Apache-2.0 and entry 79 is BSD-3-Clause.
@@ -106,6 +106,7 @@ Every file is byte-identical to the file at the pinned commit; the test run does
 | 84 | setup-runtime-resource | Concourse | <https://github.com/SoluReal/setup-runtime-resource> | `30302fcc420a45abbd1488489087b116527ecd73` | MIT | `ci/pipeline.yml` (stored as `.concourse/pipeline.yml`) |
 | 85 | cli-ci | Concourse | <https://github.com/cloudfoundry/cli-ci> | `7f253f00b18907571ab18f16476d5431f8ddea3a` | Apache-2.0 | `ci/cli-release/pipeline.yml` (stored as `.concourse/cli-release.yml`)<br>`ci/cli-v8-toolsmiths/pipeline.yml` (stored as `.concourse/cli-v8-toolsmiths.yml`) |
 | 86 | capi-ci | Concourse | <https://github.com/cloudfoundry/capi-ci> | `889f7ae99544ba51a1b2a60f758a51b01c5a377b` | Apache-2.0 | `ci/cve-pipeline.yml` (stored as `.concourse/cve-pipeline.yml`) |
+| 87 | examples (with task files) | Concourse | <https://github.com/concourse/examples> | `a3d23a6a73977baa2d4a8dbd24a3048f4f98b131` | Apache-2.0 | `pipelines/multi-branch/parent.yml` (stored as `.concourse/parent.yml`)<br>`tasks/go-test.yml`<br>`tasks/go-build.yml`<br>`apps/golang/binary-test.yml` |
 
 Woodpecker entries (41 to 50):
 
@@ -149,3 +150,4 @@ Concourse entries (80 to 86):
 - The two files of entry 85 take distinct names because a pipeline ID is the file base name and both sources are called `pipeline.yml`.
 - Entries 80 (row 1) and 82 (row 3) fail `fly validate-pipeline --strict` as stored, and the plain command accepts both. Entry 80 names the set_pipeline identifier `((instance_pipeline_name))`, which fly 8.3.3 reports as a deprecation, and strict mode turns that into an error. The converted Concourse file keeps the identifier and fails for the same reason. Entry 82 holds top-level keys that only carry YAML anchors, and strict mode reports them as unknown fields. The converted Concourse file omits those keys, reports each one as lost, passes the schema and passes strict mode. Row 4 and the flagged rows are not used.
 - Entry 86 is also the file `testdata/concourse/capi-ci-cve-pipeline.yml`, which the parser tests read.
+- Entry 87 is entry 80 with the three task files that its jobs reference, at the paths of the upstream repository (`tasks/go-test.yml`, `tasks/go-build.yml` and `apps/golang/binary-test.yml`), so the parser reads the task files that `file: repo/...` names. The files were fetched with `gh api repos/concourse/examples/contents/<path>?ref=<commit>` and stored byte-identical. SHA-256: `.concourse/parent.yml` `952697266151e6c550fd13fd1cc5bbb45f01a4095811c54e2f586949f4ad6f1f`, `tasks/go-test.yml` `b1505d07371ebefb767a70b91c61472a63e7bd8a1a26bf2541b53335bc072ba4`, `tasks/go-build.yml` `4d9a8b3f3f7527e7f0cb965ff914bab486492f921272aeb4781dd2079eda3c87`, `apps/golang/binary-test.yml` `cbc5f3c2f1288104a47d222bb61c784b663331fd79622fba44ff4fd431a16b58`. The licence is Apache-2.0 (host API `license.spdx_id`), as for entry 80. Entry 87 fails `fly validate-pipeline --strict` for the same reason as entry 80.

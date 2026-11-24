@@ -50,15 +50,27 @@ type jobBuilder struct {
 	written map[*ir.Step]string
 	// tried holds the steps whose carry said continue_on_error; a try in the file must still say it.
 	tried map[*ir.Step]string
-	path  string
+	// gets holds the gets of the plan by artifact name; fresh holds the steps whose image or script a task file or
+	// an image get gave; axes holds the vars of the across that became the job matrix.
+	gets  map[string]getInfo
+	fresh map[*ir.Step]bool
+	axes  map[string]bool
+	used  map[string]bool
+	// outputs holds the task outputs that earlier file tasks of the job made as directories.
+	outputs map[string]bool
+	// credNoted holds the image resources whose credentials the report named for this job.
+	credNoted map[string]bool
+	path      string
 	// caches holds the paths that every inline task of the plan caches; the job reads them as its cache.
 	caches []string
+	// inFile is true while the config of a task file is read.
+	inFile bool
 }
 
 func (b *pipeBuilder) job(m *omap) *builtJob {
 	name, _ := text(m.Vals["name"])
 	j := &ir.Job{ID: name}
-	jb := &jobBuilder{b: b, job: j, ids: map[string]int{}, taken: map[string]bool{}, written: map[*ir.Step]string{}, path: b.path() + "/job/" + name}
+	jb := &jobBuilder{b: b, job: j, ids: map[string]int{}, taken: map[string]bool{}, written: map[*ir.Step]string{}, fresh: map[*ir.Step]bool{}, outputs: map[string]bool{}, credNoted: map[string]bool{}, path: b.path() + "/job/" + name}
 	jb.k = newSink(b.rep, b.file, jb.path)
 	b.present[jb.path] = true
 	r := newReader(m)
@@ -73,11 +85,16 @@ func (b *pipeBuilder) job(m *omap) *builtJob {
 	bj.hookDigest = digestOf(hookText)
 	plan, _ := r.Take(keyPlan)
 	steps, _ := plan.([]any)
+	jb.collectGets(plan)
+	jb.used = imageNames(plan)
 	jb.caches = commonCaches(steps)
 	steps = jb.allowFailure(steps)
 	steps = jb.unwrap(steps)
 	gets := jb.leadingGets(&steps)
-	steps, _ = jb.matrixMarker(steps)
+	steps, matrixed := jb.matrixMarker(steps)
+	if !matrixed {
+		steps = jb.acrossMatrix(steps)
+	}
 	if co := jb.checkoutMarker(gets); co != nil {
 		j.Steps = append(j.Steps, co)
 	}
@@ -89,6 +106,7 @@ func (b *pipeBuilder) job(m *omap) *builtJob {
 		j.Cache = []ir.Cache{{Paths: jb.caches}}
 	}
 	jb.hooks(r)
+	jb.hoistImage()
 	b.collect(bj, plan, m)
 	jb.serial(r, bj)
 	jb.needs(bj, plan)

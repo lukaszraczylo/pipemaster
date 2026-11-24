@@ -1,0 +1,77 @@
+resources:
+- name: branches
+  type: git
+  check_every: 30m
+  source:
+    version_type: branches
+    uri: https://github.com/concourse/examples
+    # Could use branch_regex instead if you want
+    branch_filters:
+      - feat/*
+      - feature/*
+
+- name: golang
+  type: registry-image
+  source:
+    repository: golang
+    tag: latest
+
+- name: repo
+  type: git
+  check_every: 30m
+  source:
+    uri: https://github.com/concourse/examples
+
+jobs:
+- name: set-feature-pipelines
+  public: true
+  plan:
+  - in_parallel:
+    - get: branches
+      trigger: true
+    - get: repo
+
+  # creates the ((.:branches)) var
+  - load_var: branches
+    file: branches/branches.json
+
+  - across:
+    # creates the ((.:branch)) var, set to the value of one branch
+    - var: branch
+      values: ((.:branches))
+    do:
+      - set_pipeline: ((instance_pipeline_name))
+        file: repo/pipelines/multi-branch/template.yml
+        instance_vars:
+          branch: ((.:branch))
+
+- name: test
+  public: true
+  plan:
+  - in_parallel:
+    - get: repo
+      trigger: true
+    - get: golang
+  - task: tests
+    image: golang
+    file: repo/tasks/go-test.yml
+    params: {MODULE: apps/golang}
+
+- name: build
+  public: true
+  plan:
+  - in_parallel:
+    - get: repo
+      passed: [test]
+      trigger: true
+    - get: golang
+  - task: build
+    image: golang
+    file: repo/tasks/go-build.yml
+    params:
+      MODULE: apps/golang
+      BINARY_NAME: ascii-banner
+  - task: run-binary
+    image: golang
+    file: repo/apps/golang/binary-test.yml
+  # Could then upload the tgz file somewhere like S3

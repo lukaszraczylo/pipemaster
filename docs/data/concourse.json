@@ -3,6 +3,18 @@
   {
    "path": ".concourse/parent.yml",
    "text": "resources:\n- name: branches\n  type: git\n  check_every: 30m\n  source:\n    version_type: branches\n    uri: https://github.com/concourse/examples\n    # Could use branch_regex instead if you want\n    branch_filters:\n      - feat/*\n      - feature/*\n\n- name: golang\n  type: registry-image\n  source:\n    repository: golang\n    tag: latest\n\n- name: repo\n  type: git\n  check_every: 30m\n  source:\n    uri: https://github.com/concourse/examples\n\njobs:\n- name: set-feature-pipelines\n  public: true\n  plan:\n  - in_parallel:\n    - get: branches\n      trigger: true\n    - get: repo\n\n  # creates the ((.:branches)) var\n  - load_var: branches\n    file: branches/branches.json\n\n  - across:\n    # creates the ((.:branch)) var, set to the value of one branch\n    - var: branch\n      values: ((.:branches))\n    do:\n      - set_pipeline: ((instance_pipeline_name))\n        file: repo/pipelines/multi-branch/template.yml\n        instance_vars:\n          branch: ((.:branch))\n\n- name: test\n  public: true\n  plan:\n  - in_parallel:\n    - get: repo\n      trigger: true\n    - get: golang\n  - task: tests\n    image: golang\n    file: repo/tasks/go-test.yml\n    params: {MODULE: apps/golang}\n\n- name: build\n  public: true\n  plan:\n  - in_parallel:\n    - get: repo\n      passed: [test]\n      trigger: true\n    - get: golang\n  - task: build\n    image: golang\n    file: repo/tasks/go-build.yml\n    params:\n      MODULE: apps/golang\n      BINARY_NAME: ascii-banner\n  - task: run-binary\n    image: golang\n    file: repo/apps/golang/binary-test.yml\n  # Could then upload the tgz file somewhere like S3\n"
+  },
+  {
+   "path": "apps/golang/binary-test.yml",
+   "text": "platform: linux\n\nimage_resource:\n  type: mock\n  source: {mirror_self: true}\n\ninputs:\n  - name: binary\n\nrun:\n  path: sh\n  args:\n    - -cex\n    - |\n      ./binary/ascii-banner -list\n      ./binary/ascii-banner concourse\n      ./binary/ascii-banner plane\n      ./binary/ascii-banner pilot\n"
+  },
+  {
+   "path": "tasks/go-build.yml",
+   "text": "platform: linux\n\nimage_resource:\n  type: registry-image\n  source: { repository: golang }\n\ninputs:\n- name: repo\n\noutputs:\n- name: binary\n\nparams:\n  MODULE:\n  BINARY_NAME:\n\nrun:\n  path: sh\n  args:\n  - -cex\n  - |\n    root=$(pwd)\n    cd \"repo/${MODULE}\"\n    go build -o \"${root}/binary/${BINARY_NAME}\"\n\n    timestamp=$(date '+%Y%m%d%H%M%S')\n    tar czf \"$root/binary/$BINARY_NAME-$timestamp.tgz\" \"${root}/binary/${BINARY_NAME}\"\n"
+  },
+  {
+   "path": "tasks/go-test.yml",
+   "text": "platform: linux\n\nimage_resource:\n  type: registry-image\n  source: { repository: golang }\n\ninputs:\n- name: repo\n\nparams:\n  MODULE:\n\nrun:\n  path: sh\n  args:\n  - -ce\n  - |\n    cd \"repo/${MODULE}\"\n    go test -v ./...\n"
   }
  ],
  "conversions": [
@@ -12,7 +24,7 @@
    "files": [
     {
      "path": ".github/workflows/parent.yml",
-     "text": "# pipemaster:emulated trigger.api pipeline/parent/trigger/0\n# pipemaster:emulated trigger.api pipeline/parent/trigger/1\n# pipemaster:emulated trigger.manual pipeline/parent\n# pipemaster:emulated job.runner pipeline/parent/job/build\n# pipemaster:emulated job.runner pipeline/parent/job/set-feature-pipelines\n# pipemaster:emulated job.runner pipeline/parent/job/test\non:\n  repository_dispatch:\n  # pipemaster:emulated job.manual pipeline/parent/job/set-feature-pipelines\n  workflow_dispatch:\njobs:\n  build:\n    needs:\n      - test\n    runs-on: ubuntu-latest\n    steps:\n      - id: in-parallel\n        run: \"true\"\n      - id: build\n        run: \"true\"\n        env:\n          MODULE: apps/golang\n          BINARY_NAME: ascii-banner\n      - id: run-binary\n        run: \"true\"\n  # pipemaster:emulated job.manual pipeline/parent/job/set-feature-pipelines\n  set-feature-pipelines:\n    if: github.event_name == 'workflow_dispatch'\n    runs-on: ubuntu-latest\n    steps:\n      - id: branches\n        run: \"true\"\n      - id: across\n        run: \"true\"\n  # pipemaster:emulated job.manual pipeline/parent/job/test\n  test:\n    if: github.event_name == 'workflow_dispatch'\n    runs-on: ubuntu-latest\n    steps:\n      - id: in-parallel\n        run: \"true\"\n      - id: tests\n        run: \"true\"\n        env:\n          MODULE: apps/golang\n"
+     "text": "# pipemaster:emulated trigger.api pipeline/parent/trigger/0\n# pipemaster:emulated trigger.api pipeline/parent/trigger/1\n# pipemaster:emulated trigger.manual pipeline/parent\n# pipemaster:emulated job.runner pipeline/parent/job/build\n# pipemaster:emulated job.runner pipeline/parent/job/set-feature-pipelines\n# pipemaster:emulated job.runner pipeline/parent/job/test\non:\n  repository_dispatch:\n  # pipemaster:emulated job.manual pipeline/parent/job/set-feature-pipelines\n  workflow_dispatch:\njobs:\n  build:\n    needs:\n      - test\n    runs-on: ubuntu-latest\n    container: golang:latest\n    steps:\n      - id: checkout\n        uses: actions/checkout@v7\n      - id: build\n        run: |\n          [ -e repo ] || ln -s \"$PWD\" repo\n          mkdir -p binary\n          root=$(pwd)\n          cd \"repo/${MODULE}\"\n          go build -o \"${root}/binary/${BINARY_NAME}\"\n\n          timestamp=$(date '+%Y%m%d%H%M%S')\n          tar czf \"$root/binary/$BINARY_NAME-$timestamp.tgz\" \"${root}/binary/${BINARY_NAME}\"\n        env:\n          MODULE: apps/golang\n          BINARY_NAME: ascii-banner\n      - id: run-binary\n        run: |\n          ./binary/ascii-banner -list\n          ./binary/ascii-banner concourse\n          ./binary/ascii-banner plane\n          ./binary/ascii-banner pilot\n  # pipemaster:emulated job.manual pipeline/parent/job/set-feature-pipelines\n  set-feature-pipelines:\n    if: github.event_name == 'workflow_dispatch'\n    runs-on: ubuntu-latest\n    steps:\n      - id: branches\n        run: \"true\"\n      - id: across\n        run: \"true\"\n  # pipemaster:emulated job.manual pipeline/parent/job/test\n  test:\n    if: github.event_name == 'workflow_dispatch'\n    runs-on: ubuntu-latest\n    container: golang:latest\n    steps:\n      - id: checkout\n        uses: actions/checkout@v7\n      - id: tests\n        run: |\n          [ -e repo ] || ln -s \"$PWD\" repo\n          cd \"repo/${MODULE}\"\n          go test -v ./...\n        env:\n          MODULE: apps/golang\n"
     }
    ],
    "report": [
@@ -62,13 +74,6 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
-     "detail": "step in-parallel: in_parallel has no IR step form; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/build",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
      "detail": "key public has no IR field; kept in Ext"
     },
     {
@@ -81,8 +86,8 @@
      "path": "pipeline/parent/job/build/step/build",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/tasks/go-build.yml: keys inputs, outputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/build/step/build",
@@ -91,36 +96,17 @@
      "detail": "Ext of provider concourse (file, image) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/build/step/build",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "a task reference has no GHA form; the step runs true"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/build",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/tasks/go-build.yml is referenced, not read; the step keeps the path in Ext"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/in-parallel",
+     "path": "pipeline/parent/job/build/step/checkout",
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider concourse (kind, step) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/build/step/in-parallel",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "a step of kind plugin has no GHA form; the step runs true"
-    },
-    {
      "path": "pipeline/parent/job/build/step/run-binary",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/apps/golang/binary-test.yml: keys inputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/build/step/run-binary",
@@ -130,16 +116,10 @@
     },
     {
      "path": "pipeline/parent/job/build/step/run-binary",
-     "feature": "step.action",
+     "feature": "step.image",
      "level": "lost",
-     "detail": "a task reference has no GHA form; the step runs true"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/run-binary",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/apps/golang/binary-test.yml is referenced, not read; the step keeps the path in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/apps/golang/binary-test.yml: image_resource is no plain registry-image reference; it stays in the task file"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -218,13 +198,6 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
-     "detail": "step in-parallel: in_parallel has no IR step form; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/test",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
      "detail": "key public has no IR field; kept in Ext"
     },
     {
@@ -241,42 +214,23 @@
      "detail": "job test triggers on repo only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
     },
     {
-     "path": "pipeline/parent/job/test/step/in-parallel",
+     "path": "pipeline/parent/job/test/step/checkout",
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider concourse (kind, step) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/test/step/in-parallel",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "a step of kind plugin has no GHA form; the step runs true"
-    },
-    {
      "path": "pipeline/parent/job/test/step/tests",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/tasks/go-test.yml: keys inputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/test/step/tests",
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider concourse (file, image) is not written to the GHA file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/parent/job/test/step/tests",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "a task reference has no GHA form; the step runs true"
-    },
-    {
-     "path": "pipeline/parent/job/test/step/tests",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/tasks/go-test.yml is referenced, not read; the step keeps the path in Ext"
     },
     {
      "path": "pipeline/parent/trigger/0",
@@ -304,6 +258,20 @@
      "detail": "the IR holds no runner label"
     },
     {
+     "path": "pipeline/parent/job/build/step/build",
+     "feature": "step.workdir",
+     "level": "emulated",
+     "strategy": "directories made by script lines",
+     "detail": "task file repo/tasks/go-build.yml: input repo, output binary are directories of the working directory in Concourse; the first script lines link the checkout or make the directory"
+    },
+    {
+     "path": "pipeline/parent/job/build/step/checkout",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step",
+     "detail": "the get of the repository resource is the checkout step; the other gets of the step give the image of the tasks"
+    },
+    {
      "path": "pipeline/parent/job/set-feature-pipelines",
      "feature": "job.manual",
      "level": "emulated",
@@ -328,6 +296,20 @@
      "level": "emulated",
      "strategy": "default runner label ubuntu-latest",
      "detail": "the IR holds no runner label"
+    },
+    {
+     "path": "pipeline/parent/job/test/step/checkout",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step",
+     "detail": "the get of the repository resource is the checkout step; the other gets of the step give the image of the tasks"
+    },
+    {
+     "path": "pipeline/parent/job/test/step/tests",
+     "feature": "step.workdir",
+     "level": "emulated",
+     "strategy": "directories made by script lines",
+     "detail": "task file repo/tasks/go-test.yml: input repo are directories of the working directory in Concourse; the first script lines link the checkout or make the directory"
     },
     {
      "path": "pipeline/parent/trigger/0",
@@ -344,7 +326,7 @@
    "files": [
     {
      "path": ".gitlab-ci.yml",
-     "text": "# pipemaster:emulated trigger.api pipeline/parent/trigger/0\n# pipemaster:arg {\"kind\":\"api\"}\n# pipemaster:emulated trigger.api pipeline/parent/trigger/1\n# pipemaster:arg {\"kind\":\"api\"}\nstages:\n  - stage-0\n  - stage-1\nworkflow:\n  rules:\n    - if: $CI_PIPELINE_SOURCE == \"api\"\n    - if: $CI_PIPELINE_SOURCE == \"api\"\nbuild:\n  stage: stage-1\n  needs:\n    - test\n  script:\n    # pipemaster:lost step in-parallel kind plugin\n    # pipemaster:lost step build kind task\n    # pipemaster:lost step run-binary kind task\n    - \"true\"\n    # pipemaster:step in-parallel\n    # pipemaster:step build\n    # pipemaster:step run-binary\nset-feature-pipelines:\n  stage: stage-0\n  needs: []\n  script:\n    # pipemaster:lost step branches kind plugin\n    # pipemaster:lost step across kind plugin\n    - \"true\"\n    # pipemaster:step branches\n    # pipemaster:step across\n  allow_failure: false\n  when: manual\ntest:\n  stage: stage-0\n  needs: []\n  script:\n    # pipemaster:lost step in-parallel kind plugin\n    # pipemaster:lost step tests kind task\n    - \"true\"\n    # pipemaster:step in-parallel\n    # pipemaster:step tests\n  allow_failure: false\n  when: manual\n"
+     "text": "# pipemaster:emulated trigger.api pipeline/parent/trigger/0\n# pipemaster:arg {\"kind\":\"api\"}\n# pipemaster:emulated trigger.api pipeline/parent/trigger/1\n# pipemaster:arg {\"kind\":\"api\"}\nstages:\n  - stage-0\n  - stage-1\nworkflow:\n  rules:\n    - if: $CI_PIPELINE_SOURCE == \"api\"\n    - if: $CI_PIPELINE_SOURCE == \"api\"\nbuild:\n  stage: stage-1\n  image: golang:latest\n  needs:\n    - test\n  script:\n    # pipemaster:step checkout\n    # pipemaster:step build\n    # pipemaster:emulated step.env pipeline/parent/job/build/step/build\n    - |\n      (\n      export MODULE=\"apps/golang\"\n      export BINARY_NAME=\"ascii-banner\"\n      [ -e repo ] || ln -s \"$PWD\" repo\n      mkdir -p binary\n      root=$(pwd)\n      cd \"repo/${MODULE}\"\n      go build -o \"${root}/binary/${BINARY_NAME}\"\n\n      timestamp=$(date '+%Y%m%d%H%M%S')\n      tar czf \"$root/binary/$BINARY_NAME-$timestamp.tgz\" \"${root}/binary/${BINARY_NAME}\"\n      )\n    # pipemaster:step run-binary\n    - ./binary/ascii-banner -list\n    - ./binary/ascii-banner concourse\n    - ./binary/ascii-banner plane\n    - ./binary/ascii-banner pilot\nset-feature-pipelines:\n  stage: stage-0\n  needs: []\n  script:\n    # pipemaster:lost step branches kind plugin\n    # pipemaster:lost step across kind plugin\n    - \"true\"\n    # pipemaster:step branches\n    # pipemaster:step across\n  allow_failure: false\n  when: manual\ntest:\n  stage: stage-0\n  image: golang:latest\n  needs: []\n  script:\n    # pipemaster:step checkout\n    # pipemaster:step tests\n    # pipemaster:emulated step.env pipeline/parent/job/test/step/tests\n    - |\n      (\n      export MODULE=\"apps/golang\"\n      [ -e repo ] || ln -s \"$PWD\" repo\n      cd \"repo/${MODULE}\"\n      go test -v ./...\n      )\n  allow_failure: false\n  when: manual\n"
     }
    ],
    "report": [
@@ -394,13 +376,6 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
-     "detail": "step in-parallel: in_parallel has no IR step form; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/build",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
      "detail": "key public has no IR field; kept in Ext"
     },
     {
@@ -413,8 +388,8 @@
      "path": "pipeline/parent/job/build/step/build",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/tasks/go-build.yml: keys inputs, outputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/build/step/build",
@@ -423,42 +398,17 @@
      "detail": "Ext of provider concourse (file, image) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/build/step/build",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "step kind task has no GitLab form"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/build",
-     "feature": "step.env",
-     "level": "lost",
-     "detail": "step env cannot attach to a job keyword: the step is lost"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/build",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/tasks/go-build.yml is referenced, not read; the step keeps the path in Ext"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/in-parallel",
+     "path": "pipeline/parent/job/build/step/checkout",
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider concourse (kind, step) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/build/step/in-parallel",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "step kind plugin has no GitLab form"
-    },
-    {
      "path": "pipeline/parent/job/build/step/run-binary",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/apps/golang/binary-test.yml: keys inputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/build/step/run-binary",
@@ -468,16 +418,10 @@
     },
     {
      "path": "pipeline/parent/job/build/step/run-binary",
-     "feature": "step.action",
+     "feature": "step.image",
      "level": "lost",
-     "detail": "step kind task has no GitLab form"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/run-binary",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/apps/golang/binary-test.yml is referenced, not read; the step keeps the path in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/apps/golang/binary-test.yml: image_resource is no plain registry-image reference; it stays in the task file"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -556,13 +500,6 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
-     "detail": "step in-parallel: in_parallel has no IR step form; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/test",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
      "detail": "key public has no IR field; kept in Ext"
     },
     {
@@ -579,23 +516,17 @@
      "detail": "job test triggers on repo only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
     },
     {
-     "path": "pipeline/parent/job/test/step/in-parallel",
+     "path": "pipeline/parent/job/test/step/checkout",
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider concourse (kind, step) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/test/step/in-parallel",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "step kind plugin has no GitLab form"
-    },
-    {
      "path": "pipeline/parent/job/test/step/tests",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/tasks/go-test.yml: keys inputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/test/step/tests",
@@ -604,49 +535,70 @@
      "detail": "Ext of provider concourse (file, image) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/test/step/tests",
-     "feature": "step.action",
+     "path": "pipeline/parent/trigger/0",
+     "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "step kind task has no GitLab form"
+     "detail": "Ext of provider concourse (resources, unreadable) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/parent/trigger/1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider concourse (resources, unreadable) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/parent/trigger/0",
+     "feature": "trigger.api",
+     "level": "external",
+     "strategy": "pipeline trigger token or API call",
+     "detail": "create a pipeline trigger token (Settings > CI/CD > Pipeline trigger tokens) or call the pipelines API"
+    },
+    {
+     "path": "pipeline/parent/trigger/1",
+     "feature": "trigger.api",
+     "level": "external",
+     "strategy": "pipeline trigger token or API call",
+     "detail": "create a pipeline trigger token (Settings > CI/CD > Pipeline trigger tokens) or call the pipelines API"
+    },
+    {
+     "path": "pipeline/parent/job/build/step/build",
+     "feature": "step.env",
+     "level": "emulated",
+     "strategy": "export lines inside a subshell around the step"
+    },
+    {
+     "path": "pipeline/parent/job/build/step/build",
+     "feature": "step.workdir",
+     "level": "emulated",
+     "strategy": "directories made by script lines",
+     "detail": "task file repo/tasks/go-build.yml: input repo, output binary are directories of the working directory in Concourse; the first script lines link the checkout or make the directory"
+    },
+    {
+     "path": "pipeline/parent/job/build/step/checkout",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step",
+     "detail": "the get of the repository resource is the checkout step; the other gets of the step give the image of the tasks"
+    },
+    {
+     "path": "pipeline/parent/job/test/step/checkout",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step",
+     "detail": "the get of the repository resource is the checkout step; the other gets of the step give the image of the tasks"
     },
     {
      "path": "pipeline/parent/job/test/step/tests",
      "feature": "step.env",
-     "level": "lost",
-     "detail": "step env cannot attach to a job keyword: the step is lost"
+     "level": "emulated",
+     "strategy": "export lines inside a subshell around the step"
     },
     {
      "path": "pipeline/parent/job/test/step/tests",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/tasks/go-test.yml is referenced, not read; the step keeps the path in Ext"
-    },
-    {
-     "path": "pipeline/parent/trigger/0",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the GitLab file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/parent/trigger/1",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the GitLab file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/parent/trigger/0",
-     "feature": "trigger.api",
-     "level": "external",
-     "strategy": "pipeline trigger token or API call",
-     "detail": "create a pipeline trigger token (Settings > CI/CD > Pipeline trigger tokens) or call the pipelines API"
-    },
-    {
-     "path": "pipeline/parent/trigger/1",
-     "feature": "trigger.api",
-     "level": "external",
-     "strategy": "pipeline trigger token or API call",
-     "detail": "create a pipeline trigger token (Settings > CI/CD > Pipeline trigger tokens) or call the pipelines API"
+     "feature": "step.workdir",
+     "level": "emulated",
+     "strategy": "directories made by script lines",
+     "detail": "task file repo/tasks/go-test.yml: input repo are directories of the working directory in Concourse; the first script lines link the checkout or make the directory"
     }
    ]
   },
@@ -656,7 +608,7 @@
    "files": [
     {
      "path": ".woodpecker/build.yaml",
-     "text": "# pipemaster:lost step pipeline/parent/job/build/step/in-parallel: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/build/step/in-parallel\n# pipemaster:arg {\"step\":\"id: in-parallel\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/build/step/build kind task\n# pipemaster:emulated step.action pipeline/parent/job/build/step/build\n# pipemaster:arg {\"step\":\"id: build\\nkind: task\\nenv:\\n    - name: MODULE\\n      value:\\n        lit: apps/golang\\n    - name: BINARY_NAME\\n      value:\\n        lit: ascii-banner\\n\",\"at\":1}\n# pipemaster:lost step pipeline/parent/job/build/step/run-binary kind task\n# pipemaster:emulated step.action pipeline/parent/job/build/step/run-binary\n# pipemaster:arg {\"step\":\"id: run-binary\\nkind: task\\n\",\"at\":2}\n# pipemaster:emulated step.script pipeline/parent/job/build\n# pipemaster:emulated job.container pipeline/parent/job/build\n# pipemaster:lost trigger.* pipeline/parent/job/build: no trigger of the pipeline has a Woodpecker event\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\n    evaluate: \"false\"\ndepends_on:\n  - test\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n"
+     "text": "# pipemaster:emulated job.container pipeline/parent/job/build\n# pipemaster:arg {\"Ref\":\"golang:latest\",\"Entrypoint\":null}\n# pipemaster:emulated step.action pipeline/parent/job/build/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:lost trigger.* pipeline/parent/job/build: no trigger of the pipeline has a Woodpecker event\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\n    evaluate: \"false\"\ndepends_on:\n  - test\nsteps:\n  - name: build\n    image: golang:latest\n    commands:\n      - '[ -e repo ] || ln -s \"$$PWD\" repo'\n      - mkdir -p binary\n      - root=$$(pwd)\n      - cd \"repo/$${MODULE}\"\n      - go build -o \"$${root}/binary/$${BINARY_NAME}\"\n      - \"\"\n      - timestamp=$$(date '+%Y%m%d%H%M%S')\n      - tar czf \"$$root/binary/$$BINARY_NAME-$$timestamp.tgz\" \"$${root}/binary/$${BINARY_NAME}\"\n    environment:\n      MODULE: apps/golang\n      BINARY_NAME: ascii-banner\n  - name: run-binary\n    image: golang:latest\n    commands:\n      - ./binary/ascii-banner -list\n      - ./binary/ascii-banner concourse\n      - ./binary/ascii-banner plane\n      - ./binary/ascii-banner pilot\n"
     },
     {
      "path": ".woodpecker/set-feature-pipelines.yaml",
@@ -664,7 +616,7 @@
     },
     {
      "path": ".woodpecker/test.yaml",
-     "text": "# pipemaster:lost step pipeline/parent/job/test/step/in-parallel: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/test/step/in-parallel\n# pipemaster:arg {\"step\":\"id: in-parallel\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/test/step/tests kind task\n# pipemaster:emulated step.action pipeline/parent/job/test/step/tests\n# pipemaster:arg {\"step\":\"id: tests\\nkind: task\\nenv:\\n    - name: MODULE\\n      value:\\n        lit: apps/golang\\n\",\"at\":1}\n# pipemaster:emulated step.script pipeline/parent/job/test\n# pipemaster:emulated job.container pipeline/parent/job/test\n# pipemaster:lost trigger.* pipeline/parent/job/test: no trigger of the pipeline has a Woodpecker event\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\n    evaluate: \"false\"\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n"
+     "text": "# pipemaster:emulated job.container pipeline/parent/job/test\n# pipemaster:arg {\"Ref\":\"golang:latest\",\"Entrypoint\":null}\n# pipemaster:emulated step.action pipeline/parent/job/test/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:lost trigger.* pipeline/parent/job/test: no trigger of the pipeline has a Woodpecker event\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\n    evaluate: \"false\"\nsteps:\n  - name: tests\n    image: golang:latest\n    commands:\n      - '[ -e repo ] || ln -s \"$$PWD\" repo'\n      - cd \"repo/$${MODULE}\"\n      - go test -v ./...\n    environment:\n      MODULE: apps/golang\n"
     }
    ],
    "report": [
@@ -714,13 +666,6 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
-     "detail": "step in-parallel: in_parallel has no IR step form; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/build",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
      "detail": "key public has no IR field; kept in Ext"
     },
     {
@@ -739,8 +684,8 @@
      "path": "pipeline/parent/job/build/step/build",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/tasks/go-build.yml: keys inputs, outputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/build/step/build",
@@ -749,42 +694,17 @@
      "detail": "Ext of provider concourse (file, image) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/build/step/build",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "step kind task has no Woodpecker form"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/build",
-     "feature": "step.env",
-     "level": "lost",
-     "detail": "step env has no step to attach to: the action is not written as a step"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/build",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/tasks/go-build.yml is referenced, not read; the step keeps the path in Ext"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/in-parallel",
+     "path": "pipeline/parent/job/build/step/checkout",
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider concourse (kind, step) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/build/step/in-parallel",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "a plugin step needs an image"
-    },
-    {
      "path": "pipeline/parent/job/build/step/run-binary",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/apps/golang/binary-test.yml: keys inputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/build/step/run-binary",
@@ -794,22 +714,10 @@
     },
     {
      "path": "pipeline/parent/job/build/step/run-binary",
-     "feature": "step.action",
+     "feature": "step.image",
      "level": "lost",
-     "detail": "step kind task has no Woodpecker form"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/run-binary",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/apps/golang/binary-test.yml is referenced, not read; the step keeps the path in Ext"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/script",
-     "feature": "step.script",
-     "level": "lost",
-     "detail": "the job has no steps; a no-op step keeps the workflow valid; not kept in round-trip metadata: no node at this path in the source project"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/apps/golang/binary-test.yml: image_resource is no plain registry-image reference; it stays in the task file"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -900,13 +808,6 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
-     "detail": "step in-parallel: in_parallel has no IR step form; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/test",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
      "detail": "key public has no IR field; kept in Ext"
     },
     {
@@ -929,29 +830,17 @@
      "detail": "job test triggers on repo only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
     },
     {
-     "path": "pipeline/parent/job/test/step/in-parallel",
+     "path": "pipeline/parent/job/test/step/checkout",
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider concourse (kind, step) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/test/step/in-parallel",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "a plugin step needs an image"
-    },
-    {
-     "path": "pipeline/parent/job/test/step/script",
-     "feature": "step.script",
-     "level": "lost",
-     "detail": "the job has no steps; a no-op step keeps the workflow valid; not kept in round-trip metadata: no node at this path in the source project"
-    },
-    {
      "path": "pipeline/parent/job/test/step/tests",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/tasks/go-test.yml: keys inputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/test/step/tests",
@@ -960,61 +849,42 @@
      "detail": "Ext of provider concourse (file, image) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/test/step/tests",
+     "path": "pipeline/parent/trigger/0",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/parent/trigger/0",
+     "feature": "trigger.api",
+     "level": "lost",
+     "detail": "Woodpecker starts API pipelines as manual events"
+    },
+    {
+     "path": "pipeline/parent/trigger/1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/parent/trigger/1",
+     "feature": "trigger.api",
+     "level": "lost",
+     "detail": "Woodpecker starts API pipelines as manual events"
+    },
+    {
+     "path": "pipeline/parent/job/build/step/build",
+     "feature": "step.workdir",
+     "level": "emulated",
+     "strategy": "directories made by script lines",
+     "detail": "task file repo/tasks/go-build.yml: input repo, output binary are directories of the working directory in Concourse; the first script lines link the checkout or make the directory"
+    },
+    {
+     "path": "pipeline/parent/job/build/step/checkout",
      "feature": "step.action",
-     "level": "lost",
-     "detail": "step kind task has no Woodpecker form"
-    },
-    {
-     "path": "pipeline/parent/job/test/step/tests",
-     "feature": "step.env",
-     "level": "lost",
-     "detail": "step env has no step to attach to: the action is not written as a step"
-    },
-    {
-     "path": "pipeline/parent/job/test/step/tests",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/tasks/go-test.yml is referenced, not read; the step keeps the path in Ext"
-    },
-    {
-     "path": "pipeline/parent/trigger/0",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Woodpecker file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/parent/trigger/0",
-     "feature": "trigger.api",
-     "level": "lost",
-     "detail": "Woodpecker starts API pipelines as manual events"
-    },
-    {
-     "path": "pipeline/parent/trigger/1",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Woodpecker file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/parent/trigger/1",
-     "feature": "trigger.api",
-     "level": "lost",
-     "detail": "Woodpecker starts API pipelines as manual events"
-    },
-    {
-     "path": "pipeline/parent/job/build",
-     "feature": "job.container",
      "level": "emulated",
-     "strategy": "default image ubuntu:latest",
-     "detail": "the job names no image, so steps without one run in ubuntu:latest"
-    },
-    {
-     "path": "pipeline/parent/job/build",
-     "feature": "step.script",
-     "level": "emulated",
-     "strategy": "no-op step",
-     "detail": "Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in"
+     "strategy": "checkout step",
+     "detail": "the get of the repository resource is the checkout step; the other gets of the step give the image of the tasks"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -1039,24 +909,24 @@
     },
     {
      "path": "pipeline/parent/job/test",
-     "feature": "job.container",
-     "level": "emulated",
-     "strategy": "default image ubuntu:latest",
-     "detail": "the job names no image, so steps without one run in ubuntu:latest"
-    },
-    {
-     "path": "pipeline/parent/job/test",
      "feature": "job.manual",
      "level": "emulated",
      "strategy": "when event manual; a person starts the workflow from the UI or API",
      "detail": "the workflow no longer runs on its normal events"
     },
     {
-     "path": "pipeline/parent/job/test",
-     "feature": "step.script",
+     "path": "pipeline/parent/job/test/step/checkout",
+     "feature": "step.action",
      "level": "emulated",
-     "strategy": "no-op step",
-     "detail": "Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in"
+     "strategy": "checkout step",
+     "detail": "the get of the repository resource is the checkout step; the other gets of the step give the image of the tasks"
+    },
+    {
+     "path": "pipeline/parent/job/test/step/tests",
+     "feature": "step.workdir",
+     "level": "emulated",
+     "strategy": "directories made by script lines",
+     "detail": "task file repo/tasks/go-test.yml: input repo are directories of the working directory in Concourse; the first script lines link the checkout or make the directory"
     }
    ]
   },
@@ -1066,7 +936,7 @@
    "files": [
     {
      "path": ".drone.yml",
-     "text": "# pipemaster:lost trigger.* pipeline/parent/job/build: the triggers of the pipeline have no single Drone condition\n# pipemaster:lost step pipeline/parent/job/build/step/in-parallel: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/build/step/in-parallel\n# pipemaster:arg {\"step\":\"id: in-parallel\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/build/step/build kind task\n# pipemaster:emulated step.action pipeline/parent/job/build/step/build\n# pipemaster:arg {\"step\":\"id: build\\nkind: task\\nenv:\\n    - name: MODULE\\n      value:\\n        lit: apps/golang\\n    - name: BINARY_NAME\\n      value:\\n        lit: ascii-banner\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/build/step/run-binary kind task\n# pipemaster:emulated step.action pipeline/parent/job/build/step/run-binary\n# pipemaster:arg {\"step\":\"id: run-binary\\nkind: task\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/parent/job/build\n# pipemaster:emulated job.container pipeline/parent/job/build\nkind: pipeline\ntype: docker\nname: build\ntrigger:\n  event:\n    exclude:\n      - '**'\ndepends_on:\n  - test\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n---\n# pipemaster:lost trigger.* pipeline/parent/job/set-feature-pipelines: the triggers of the pipeline have no single Drone condition\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/branches: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/across: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/parent/job/set-feature-pipelines\n# pipemaster:emulated job.container pipeline/parent/job/set-feature-pipelines\nkind: pipeline\ntype: docker\nname: set-feature-pipelines\ntrigger:\n  event:\n    exclude:\n      - '**'\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n---\n# pipemaster:lost trigger.* pipeline/parent/job/test: the triggers of the pipeline have no single Drone condition\n# pipemaster:lost step pipeline/parent/job/test/step/in-parallel: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/test/step/in-parallel\n# pipemaster:arg {\"step\":\"id: in-parallel\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/test/step/tests kind task\n# pipemaster:emulated step.action pipeline/parent/job/test/step/tests\n# pipemaster:arg {\"step\":\"id: tests\\nkind: task\\nenv:\\n    - name: MODULE\\n      value:\\n        lit: apps/golang\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/parent/job/test\n# pipemaster:emulated job.container pipeline/parent/job/test\nkind: pipeline\ntype: docker\nname: test\ntrigger:\n  event:\n    exclude:\n      - '**'\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n"
+     "text": "# pipemaster:lost trigger.* pipeline/parent/job/build: the triggers of the pipeline have no single Drone condition\n# pipemaster:emulated step.action pipeline/parent/job/build/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/parent/job/build\n# pipemaster:arg {\"Ref\":\"golang:latest\",\"Entrypoint\":null,\"taken\":2}\nkind: pipeline\ntype: docker\nname: build\ntrigger:\n  event:\n    exclude:\n      - '**'\ndepends_on:\n  - test\nsteps:\n  - name: build\n    image: golang:latest\n    commands:\n      - '[ -e repo ] || ln -s \"$$PWD\" repo'\n      - mkdir -p binary\n      - root=$$(pwd)\n      - cd \"repo/$${MODULE}\"\n      - |+\n        go build -o \"$${root}/binary/$${BINARY_NAME}\"\n\n      - timestamp=$$(date '+%Y%m%d%H%M%S')\n      - tar czf \"$$root/binary/$$BINARY_NAME-$$timestamp.tgz\" \"$${root}/binary/$${BINARY_NAME}\"\n    environment:\n      MODULE: apps/golang\n      BINARY_NAME: ascii-banner\n  - name: run-binary\n    image: golang:latest\n    commands:\n      - ./binary/ascii-banner -list\n      - ./binary/ascii-banner concourse\n      - ./binary/ascii-banner plane\n      - ./binary/ascii-banner pilot\n---\n# pipemaster:lost trigger.* pipeline/parent/job/set-feature-pipelines: the triggers of the pipeline have no single Drone condition\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/branches: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/set-feature-pipelines/step/across: plugin without an image\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:emulated step.script pipeline/parent/job/set-feature-pipelines\n# pipemaster:emulated job.container pipeline/parent/job/set-feature-pipelines\nkind: pipeline\ntype: docker\nname: set-feature-pipelines\ntrigger:\n  event:\n    exclude:\n      - '**'\nsteps:\n  - name: noop\n    image: ubuntu:latest\n    commands:\n      - \"true\"\n---\n# pipemaster:lost trigger.* pipeline/parent/job/test: the triggers of the pipeline have no single Drone condition\n# pipemaster:emulated step.action pipeline/parent/job/test/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"at\":0}\n# pipemaster:emulated job.container pipeline/parent/job/test\n# pipemaster:arg {\"Ref\":\"golang:latest\",\"Entrypoint\":null,\"taken\":1}\nkind: pipeline\ntype: docker\nname: test\ntrigger:\n  event:\n    exclude:\n      - '**'\nsteps:\n  - name: tests\n    image: golang:latest\n    commands:\n      - '[ -e repo ] || ln -s \"$$PWD\" repo'\n      - cd \"repo/$${MODULE}\"\n      - go test -v ./...\n    environment:\n      MODULE: apps/golang\n"
     }
    ],
    "report": [
@@ -1116,13 +986,6 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
-     "detail": "step in-parallel: in_parallel has no IR step form; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/build",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
      "detail": "key public has no IR field; kept in Ext"
     },
     {
@@ -1141,8 +1004,8 @@
      "path": "pipeline/parent/job/build/step/build",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/tasks/go-build.yml: keys inputs, outputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/build/step/build",
@@ -1151,42 +1014,17 @@
      "detail": "Ext of provider concourse (file, image) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/build/step/build",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "step kind task has no Drone form"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/build",
-     "feature": "step.env",
-     "level": "lost",
-     "detail": "step env has no step to attach to: the action is not written as a step"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/build",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/tasks/go-build.yml is referenced, not read; the step keeps the path in Ext"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/in-parallel",
+     "path": "pipeline/parent/job/build/step/checkout",
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider concourse (kind, step) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/build/step/in-parallel",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "a plugin step needs an image"
-    },
-    {
      "path": "pipeline/parent/job/build/step/run-binary",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/apps/golang/binary-test.yml: keys inputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/build/step/run-binary",
@@ -1196,22 +1034,10 @@
     },
     {
      "path": "pipeline/parent/job/build/step/run-binary",
-     "feature": "step.action",
+     "feature": "step.image",
      "level": "lost",
-     "detail": "step kind task has no Drone form"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/run-binary",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/apps/golang/binary-test.yml is referenced, not read; the step keeps the path in Ext"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/script",
-     "feature": "step.script",
-     "level": "lost",
-     "detail": "the job has no steps; a no-op step keeps the document valid; not kept in round-trip metadata: no node at this path in the source project"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/apps/golang/binary-test.yml: image_resource is no plain registry-image reference; it stays in the task file"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -1302,13 +1128,6 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
-     "detail": "step in-parallel: in_parallel has no IR step form; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/test",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
      "detail": "key public has no IR field; kept in Ext"
     },
     {
@@ -1331,29 +1150,17 @@
      "detail": "job test triggers on repo only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
     },
     {
-     "path": "pipeline/parent/job/test/step/in-parallel",
+     "path": "pipeline/parent/job/test/step/checkout",
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider concourse (kind, step) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/test/step/in-parallel",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "a plugin step needs an image"
-    },
-    {
-     "path": "pipeline/parent/job/test/step/script",
-     "feature": "step.script",
-     "level": "lost",
-     "detail": "the job has no steps; a no-op step keeps the document valid; not kept in round-trip metadata: no node at this path in the source project"
-    },
-    {
      "path": "pipeline/parent/job/test/step/tests",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/tasks/go-test.yml: keys inputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/test/step/tests",
@@ -1362,61 +1169,49 @@
      "detail": "Ext of provider concourse (file, image) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/test/step/tests",
+     "path": "pipeline/parent/trigger/0",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/parent/trigger/0",
+     "feature": "trigger.api",
+     "level": "lost",
+     "detail": "the document is disabled, so the trigger is not written"
+    },
+    {
+     "path": "pipeline/parent/trigger/1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/parent/trigger/1",
+     "feature": "trigger.api",
+     "level": "lost",
+     "detail": "the document is disabled, so the trigger is not written"
+    },
+    {
+     "path": "pipeline/parent/job/build/step/build",
+     "feature": "step.workdir",
+     "level": "emulated",
+     "strategy": "directories made by script lines",
+     "detail": "task file repo/tasks/go-build.yml: input repo, output binary are directories of the working directory in Concourse; the first script lines link the checkout or make the directory"
+    },
+    {
+     "path": "pipeline/parent/job/build/step/checkout",
      "feature": "step.action",
-     "level": "lost",
-     "detail": "step kind task has no Drone form"
-    },
-    {
-     "path": "pipeline/parent/job/test/step/tests",
-     "feature": "step.env",
-     "level": "lost",
-     "detail": "step env has no step to attach to: the action is not written as a step"
-    },
-    {
-     "path": "pipeline/parent/job/test/step/tests",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/tasks/go-test.yml is referenced, not read; the step keeps the path in Ext"
-    },
-    {
-     "path": "pipeline/parent/trigger/0",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Drone file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/parent/trigger/0",
-     "feature": "trigger.api",
-     "level": "lost",
-     "detail": "the document is disabled, so the trigger is not written"
-    },
-    {
-     "path": "pipeline/parent/trigger/1",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Drone file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/parent/trigger/1",
-     "feature": "trigger.api",
-     "level": "lost",
-     "detail": "the document is disabled, so the trigger is not written"
-    },
-    {
-     "path": "pipeline/parent/job/build",
-     "feature": "job.container",
      "level": "emulated",
-     "strategy": "default image ubuntu:latest",
-     "detail": "the job names no image, so steps without one run in ubuntu:latest"
+     "strategy": "checkout step",
+     "detail": "the get of the repository resource is the checkout step; the other gets of the step give the image of the tasks"
     },
     {
-     "path": "pipeline/parent/job/build",
-     "feature": "step.script",
+     "path": "pipeline/parent/job/build/step/checkout",
+     "feature": "step.action",
      "level": "emulated",
-     "strategy": "no-op step",
-     "detail": "Drone needs a step; no step of the job has a Drone form, so a no-op step stands in"
+     "strategy": "per actions.Lookup verdict; a plugin step with settings",
+     "detail": "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -1441,24 +1236,31 @@
     },
     {
      "path": "pipeline/parent/job/test",
-     "feature": "job.container",
-     "level": "emulated",
-     "strategy": "default image ubuntu:latest",
-     "detail": "the job names no image, so steps without one run in ubuntu:latest"
-    },
-    {
-     "path": "pipeline/parent/job/test",
      "feature": "job.manual",
      "level": "emulated",
      "strategy": "trigger event custom",
      "detail": "a person starts the build through the API or drone build create; the pipeline no longer runs on its normal events"
     },
     {
-     "path": "pipeline/parent/job/test",
-     "feature": "step.script",
+     "path": "pipeline/parent/job/test/step/checkout",
+     "feature": "step.action",
      "level": "emulated",
-     "strategy": "no-op step",
-     "detail": "Drone needs a step; no step of the job has a Drone form, so a no-op step stands in"
+     "strategy": "checkout step",
+     "detail": "the get of the repository resource is the checkout step; the other gets of the step give the image of the tasks"
+    },
+    {
+     "path": "pipeline/parent/job/test/step/checkout",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "per actions.Lookup verdict; a plugin step with settings",
+     "detail": "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"
+    },
+    {
+     "path": "pipeline/parent/job/test/step/tests",
+     "feature": "step.workdir",
+     "level": "emulated",
+     "strategy": "directories made by script lines",
+     "detail": "task file repo/tasks/go-test.yml: input repo are directories of the working directory in Concourse; the first script lines link the checkout or make the directory"
     }
    ]
   },
@@ -1472,7 +1274,7 @@
     },
     {
      "path": ".tekton/pipeline.yaml",
-     "text": "apiVersion: tekton.dev/v1\nkind: Pipeline\nmetadata:\n  name: parent\nspec:\n  tasks:\n    - name: build\n      taskRef:\n        name: parent-build\n      runAfter:\n        - test\n    - name: set-feature-pipelines\n      taskRef:\n        name: parent-set-feature-pipelines\n    - name: test\n      taskRef:\n        name: parent-test\n"
+     "text": "apiVersion: tekton.dev/v1\nkind: Pipeline\nmetadata:\n  name: parent\nspec:\n  params:\n    - name: ctx-sha\n      default: \"\"\n    - name: ctx-repo\n      default: \"\"\n  tasks:\n    - name: build\n      taskRef:\n        name: parent-build\n      params:\n        - name: ctx-repo\n          value: $(params.ctx-repo)\n        - name: ctx-sha\n          value: $(params.ctx-sha)\n      runAfter:\n        - test\n    - name: set-feature-pipelines\n      taskRef:\n        name: parent-set-feature-pipelines\n    - name: test\n      taskRef:\n        name: parent-test\n      params:\n        - name: ctx-repo\n          value: $(params.ctx-repo)\n        - name: ctx-sha\n          value: $(params.ctx-sha)\n"
     },
     {
      "path": ".tekton/rbac/triggers.yaml",
@@ -1480,7 +1282,7 @@
     },
     {
      "path": ".tekton/tasks/parent-build.yaml",
-     "text": "# pipemaster:lost step pipeline/parent/job/build/step/in-parallel has kind plugin\n# pipemaster:emulated step.action pipeline/parent/job/build/step/in-parallel\n# pipemaster:arg {\"step\":\"id: in-parallel\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/build/step/build has kind task\n# pipemaster:emulated step.action pipeline/parent/job/build/step/build\n# pipemaster:arg {\"step\":\"id: build\\nkind: task\\nenv:\\n    - name: MODULE\\n      value:\\n        lit: apps/golang\\n    - name: BINARY_NAME\\n      value:\\n        lit: ascii-banner\\n\",\"at\":0,\"seq\":1}\n# pipemaster:lost step pipeline/parent/job/build/step/run-binary has kind task\n# pipemaster:emulated step.action pipeline/parent/job/build/step/run-binary\n# pipemaster:arg {\"step\":\"id: run-binary\\nkind: task\\n\",\"at\":0,\"seq\":2}\n# pipemaster:emulated step.script pipeline/parent/job/build\n# pipemaster:arg {\"image\":\"alpine:3.22\"}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: parent-build\nspec:\n  steps:\n    - name: noop\n      image: alpine:3.22\n      script: \"true\"\n"
+     "text": "# pipemaster:emulated step.action pipeline/parent/job/build/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"wrote\":\"{\\\"name\\\":\\\"checkout\\\",\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/$(params.ctx-repo).git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"$(params.ctx-sha)\\\"},{\\\"name\\\":\\\"output-path\\\",\\\"value\\\":\\\"/workspace\\\"}],\\\"ref\\\":{\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/tektoncd-catalog/git-clone.git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"v1.7.1\\\"},{\\\"name\\\":\\\"pathInRepo\\\",\\\"value\\\":\\\"stepaction/git-clone/git-clone.yaml\\\"}],\\\"resolver\\\":\\\"git\\\"}}\",\"at\":0}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: parent-build\nspec:\n  params:\n    - name: ctx-repo\n    - name: ctx-sha\n  stepTemplate:\n    image: golang:latest\n    workingDir: /workspace\n  steps:\n    - name: checkout\n      ref:\n        resolver: git\n        params:\n          - name: url\n            value: https://github.com/tektoncd-catalog/git-clone.git\n          - name: revision\n            value: v1.7.1\n          - name: pathInRepo\n            value: stepaction/git-clone/git-clone.yaml\n      params:\n        - name: url\n          value: https://github.com/$(params.ctx-repo).git\n        - name: revision\n          value: $(params.ctx-sha)\n        - name: output-path\n          value: /workspace\n    - name: build\n      script: |-\n        [ -e repo ] || ln -s \"$PWD\" repo\n        mkdir -p binary\n        root=$(pwd)\n        cd \"repo/${MODULE}\"\n        go build -o \"${root}/binary/${BINARY_NAME}\"\n\n        timestamp=$(date '+%Y%m%d%H%M%S')\n        tar czf \"$root/binary/$BINARY_NAME-$timestamp.tgz\" \"${root}/binary/${BINARY_NAME}\"\n      env:\n        - name: MODULE\n          value: apps/golang\n        - name: BINARY_NAME\n          value: ascii-banner\n    - name: run-binary\n      script: |-\n        ./binary/ascii-banner -list\n        ./binary/ascii-banner concourse\n        ./binary/ascii-banner plane\n        ./binary/ascii-banner pilot\n"
     },
     {
      "path": ".tekton/tasks/parent-set-feature-pipelines.yaml",
@@ -1488,7 +1290,7 @@
     },
     {
      "path": ".tekton/tasks/parent-test.yaml",
-     "text": "# pipemaster:lost step pipeline/parent/job/test/step/in-parallel has kind plugin\n# pipemaster:emulated step.action pipeline/parent/job/test/step/in-parallel\n# pipemaster:arg {\"step\":\"id: in-parallel\\nkind: plugin\\n\",\"at\":0}\n# pipemaster:lost step pipeline/parent/job/test/step/tests has kind task\n# pipemaster:emulated step.action pipeline/parent/job/test/step/tests\n# pipemaster:arg {\"step\":\"id: tests\\nkind: task\\nenv:\\n    - name: MODULE\\n      value:\\n        lit: apps/golang\\n\",\"at\":0,\"seq\":1}\n# pipemaster:emulated step.script pipeline/parent/job/test\n# pipemaster:arg {\"image\":\"alpine:3.22\"}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: parent-test\nspec:\n  steps:\n    - name: noop\n      image: alpine:3.22\n      script: \"true\"\n"
+     "text": "# pipemaster:emulated step.action pipeline/parent/job/test/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"wrote\":\"{\\\"name\\\":\\\"checkout\\\",\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/$(params.ctx-repo).git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"$(params.ctx-sha)\\\"},{\\\"name\\\":\\\"output-path\\\",\\\"value\\\":\\\"/workspace\\\"}],\\\"ref\\\":{\\\"params\\\":[{\\\"name\\\":\\\"url\\\",\\\"value\\\":\\\"https://github.com/tektoncd-catalog/git-clone.git\\\"},{\\\"name\\\":\\\"revision\\\",\\\"value\\\":\\\"v1.7.1\\\"},{\\\"name\\\":\\\"pathInRepo\\\",\\\"value\\\":\\\"stepaction/git-clone/git-clone.yaml\\\"}],\\\"resolver\\\":\\\"git\\\"}}\",\"at\":0}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: parent-test\nspec:\n  params:\n    - name: ctx-repo\n    - name: ctx-sha\n  stepTemplate:\n    image: golang:latest\n    workingDir: /workspace\n  steps:\n    - name: checkout\n      ref:\n        resolver: git\n        params:\n          - name: url\n            value: https://github.com/tektoncd-catalog/git-clone.git\n          - name: revision\n            value: v1.7.1\n          - name: pathInRepo\n            value: stepaction/git-clone/git-clone.yaml\n      params:\n        - name: url\n          value: https://github.com/$(params.ctx-repo).git\n        - name: revision\n          value: $(params.ctx-sha)\n        - name: output-path\n          value: /workspace\n    - name: tests\n      script: |-\n        [ -e repo ] || ln -s \"$PWD\" repo\n        cd \"repo/${MODULE}\"\n        go test -v ./...\n      env:\n        - name: MODULE\n          value: apps/golang\n"
     },
     {
      "path": ".tekton/triggers/eventlistener.yaml",
@@ -1542,13 +1344,6 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
-     "detail": "step in-parallel: in_parallel has no IR step form; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/build",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
      "detail": "key public has no IR field; kept in Ext"
     },
     {
@@ -1561,53 +1356,22 @@
      "path": "pipeline/parent/job/build/step/build",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/build",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "step kind task has no Tekton form"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/build",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/tasks/go-build.yml is referenced, not read; the step keeps the path in Ext"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/in-parallel",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "step kind plugin has no Tekton form"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/tasks/go-build.yml: keys inputs, outputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/build/step/run-binary",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/apps/golang/binary-test.yml: keys inputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/build/step/run-binary",
-     "feature": "step.action",
+     "feature": "step.image",
      "level": "lost",
-     "detail": "step kind task has no Tekton form"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/run-binary",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/apps/golang/binary-test.yml is referenced, not read; the step keeps the path in Ext"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/script",
-     "feature": "step.script",
-     "level": "lost",
-     "detail": "the job has no steps; a no-op step keeps the Task valid; not kept in round-trip metadata: no node at this path in the source project"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/apps/golang/binary-test.yml: image_resource is no plain registry-image reference; it stays in the task file"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -1686,13 +1450,6 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
-     "detail": "step in-parallel: in_parallel has no IR step form; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/test",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
      "detail": "key public has no IR field; kept in Ext"
     },
     {
@@ -1715,36 +1472,11 @@
      "detail": "job test triggers on repo only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
     },
     {
-     "path": "pipeline/parent/job/test/step/in-parallel",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "step kind plugin has no Tekton form"
-    },
-    {
-     "path": "pipeline/parent/job/test/step/script",
-     "feature": "step.script",
-     "level": "lost",
-     "detail": "the job has no steps; a no-op step keeps the Task valid; not kept in round-trip metadata: no node at this path in the source project"
-    },
-    {
      "path": "pipeline/parent/job/test/step/tests",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/parent/job/test/step/tests",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "step kind task has no Tekton form"
-    },
-    {
-     "path": "pipeline/parent/job/test/step/tests",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/tasks/go-test.yml is referenced, not read; the step keeps the path in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/tasks/go-test.yml: keys inputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/trigger/0",
@@ -1771,11 +1503,25 @@
      "detail": "Tekton has no API trigger kind; only an EventListener entry of a Tekton file is kept"
     },
     {
-     "path": "pipeline/parent/job/build",
-     "feature": "step.script",
+     "path": "pipeline/parent/job/build/step/build",
+     "feature": "step.workdir",
      "level": "emulated",
-     "strategy": "placeholder step",
-     "detail": "the job has no step and a Task needs one; a step that runs true stands in"
+     "strategy": "directories made by script lines",
+     "detail": "task file repo/tasks/go-build.yml: input repo, output binary are directories of the working directory in Concourse; the first script lines link the checkout or make the directory"
+    },
+    {
+     "path": "pipeline/parent/job/build/step/checkout",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step",
+     "detail": "the get of the repository resource is the checkout step; the other gets of the step give the image of the tasks"
+    },
+    {
+     "path": "pipeline/parent/job/build/step/checkout",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "StepAction ref to the tektoncd-catalog git-clone through the git resolver",
+     "detail": "the ctx-repo and ctx-sha params carry the repository and the commit"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -1785,11 +1531,25 @@
      "detail": "the job has no step and a Task needs one; a step that runs true stands in"
     },
     {
-     "path": "pipeline/parent/job/test",
-     "feature": "step.script",
+     "path": "pipeline/parent/job/test/step/checkout",
+     "feature": "step.action",
      "level": "emulated",
-     "strategy": "placeholder step",
-     "detail": "the job has no step and a Task needs one; a step that runs true stands in"
+     "strategy": "checkout step",
+     "detail": "the get of the repository resource is the checkout step; the other gets of the step give the image of the tasks"
+    },
+    {
+     "path": "pipeline/parent/job/test/step/checkout",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "StepAction ref to the tektoncd-catalog git-clone through the git resolver",
+     "detail": "the ctx-repo and ctx-sha params carry the repository and the commit"
+    },
+    {
+     "path": "pipeline/parent/job/test/step/tests",
+     "feature": "step.workdir",
+     "level": "emulated",
+     "strategy": "directories made by script lines",
+     "detail": "task file repo/tasks/go-test.yml: input repo are directories of the working directory in Concourse; the first script lines link the checkout or make the directory"
     }
    ]
   },
@@ -1799,7 +1559,7 @@
    "files": [
     {
      "path": ".argo/workflows/parent.yaml",
-     "text": "# pipemaster:emulated step.action pipeline/parent/job/build/step/in-parallel\n# pipemaster:arg {\"step\":\"id: in-parallel\\nkind: plugin\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"in-parallel\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.action pipeline/parent/job/build/step/build\n# pipemaster:arg {\"step\":\"id: build\\nkind: task\\nenv:\\n    - name: MODULE\\n      value:\\n        lit: apps/golang\\n    - name: BINARY_NAME\\n      value:\\n        lit: ascii-banner\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"build\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\",\"seq\":1}\n# pipemaster:emulated step.action pipeline/parent/job/build/step/run-binary\n# pipemaster:arg {\"step\":\"id: run-binary\\nkind: task\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"run-binary\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\",\"seq\":2}\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"branches\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"across\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\",\"seq\":1}\n# pipemaster:emulated job.manual pipeline/parent/job/set-feature-pipelines\n# pipemaster:arg {\"manual\":true}\n# pipemaster:emulated step.action pipeline/parent/job/test/step/in-parallel\n# pipemaster:arg {\"step\":\"id: in-parallel\\nkind: plugin\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"in-parallel\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.action pipeline/parent/job/test/step/tests\n# pipemaster:arg {\"step\":\"id: tests\\nkind: task\\nenv:\\n    - name: MODULE\\n      value:\\n        lit: apps/golang\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"tests\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\",\"seq\":1}\n# pipemaster:emulated job.manual pipeline/parent/job/test\n# pipemaster:arg {\"manual\":true}\napiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata:\n  name: parent\nspec:\n  entrypoint: main\n  templates:\n    - name: main\n      dag:\n        tasks:\n          - name: build\n            template: build\n            dependencies:\n              - test\n          - name: set-feature-pipelines-gate\n            template: set-feature-pipelines-gate\n          - name: set-feature-pipelines\n            template: set-feature-pipelines\n            dependencies:\n              - set-feature-pipelines-gate\n          - name: test-gate\n            template: test-gate\n          - name: test\n            template: test\n            dependencies:\n              - test-gate\n    - name: build\n      containerSet:\n        containers:\n          - name: in-parallel\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n          - name: build\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n            dependencies:\n              - in-parallel\n          - name: run-binary\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n            dependencies:\n              - build\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: set-feature-pipelines-gate\n      suspend: {}\n    - name: set-feature-pipelines\n      containerSet:\n        containers:\n          - name: branches\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n          - name: across\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n            dependencies:\n              - branches\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: test-gate\n      suspend: {}\n    - name: test\n      containerSet:\n        containers:\n          - name: in-parallel\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n          - name: tests\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n            dependencies:\n              - in-parallel\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n"
+     "text": "# pipemaster:emulated step.action pipeline/parent/job/build/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.ctx-sha}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/branches\n# pipemaster:arg {\"step\":\"id: branches\\nkind: plugin\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"branches\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated step.action pipeline/parent/job/set-feature-pipelines/step/across\n# pipemaster:arg {\"step\":\"id: across\\nkind: plugin\\n\",\"hold\":\"{\\\"args\\\":[\\\"true\\\"],\\\"command\\\":[\\\"sh\\\",\\\"-ec\\\"],\\\"image\\\":\\\"alpine:3.22\\\",\\\"name\\\":\\\"across\\\",\\\"workingDir\\\":\\\"/workspace\\\"}\",\"seq\":1}\n# pipemaster:emulated job.manual pipeline/parent/job/set-feature-pipelines\n# pipemaster:arg {\"manual\":true}\n# pipemaster:emulated step.action pipeline/parent/job/test/step/checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: checkout\\nkind: action\\n\",\"wrote\":\"git-artifact\",\"kind\":\"implicit\",\"art\":\"{\\\"git\\\":{\\\"repo\\\":\\\"https://github.com/{{workflow.parameters.ctx-repo}}.git\\\",\\\"revision\\\":\\\"{{workflow.parameters.ctx-sha}}\\\"},\\\"name\\\":\\\"source\\\",\\\"path\\\":\\\"/workspace\\\"}\"}\n# pipemaster:emulated job.manual pipeline/parent/job/test\n# pipemaster:arg {\"manual\":true}\napiVersion: argoproj.io/v1alpha1\nkind: WorkflowTemplate\nmetadata:\n  name: parent\nspec:\n  entrypoint: main\n  arguments:\n    parameters:\n      - name: ctx-sha\n        value: \"\"\n      - name: ctx-repo\n        value: \"\"\n  templates:\n    - name: main\n      dag:\n        tasks:\n          - name: build\n            template: build\n            dependencies:\n              - test\n          - name: set-feature-pipelines-gate\n            template: set-feature-pipelines-gate\n          - name: set-feature-pipelines\n            template: set-feature-pipelines\n            dependencies:\n              - set-feature-pipelines-gate\n          - name: test-gate\n            template: test-gate\n          - name: test\n            template: test\n            dependencies:\n              - test-gate\n    - name: build\n      containerSet:\n        containers:\n          - name: build\n            image: golang:latest\n            command:\n              - sh\n              - -ec\n            args:\n              - |-\n                [ -e repo ] || ln -s \"$PWD\" repo\n                mkdir -p binary\n                root=$(pwd)\n                cd \"repo/${MODULE}\"\n                go build -o \"${root}/binary/${BINARY_NAME}\"\n\n                timestamp=$(date '+%Y%m%d%H%M%S')\n                tar czf \"$root/binary/$BINARY_NAME-$timestamp.tgz\" \"${root}/binary/${BINARY_NAME}\"\n            workingDir: /workspace\n            env:\n              - name: MODULE\n                value: apps/golang\n              - name: BINARY_NAME\n                value: ascii-banner\n          - # pipemaster:id run-binary\n            name: main\n            image: golang:latest\n            command:\n              - sh\n              - -ec\n            args:\n              - |-\n                ./binary/ascii-banner -list\n                ./binary/ascii-banner concourse\n                ./binary/ascii-banner plane\n                ./binary/ascii-banner pilot\n            workingDir: /workspace\n            dependencies:\n              - build\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.ctx-sha}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: set-feature-pipelines-gate\n      suspend: {}\n    - name: set-feature-pipelines\n      containerSet:\n        containers:\n          - name: branches\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n          - name: across\n            image: alpine:3.22\n            command:\n              - sh\n              - -ec\n            args:\n              - \"true\"\n            workingDir: /workspace\n            dependencies:\n              - branches\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      volumes:\n        - emptyDir: {}\n          name: workspace\n    - name: test-gate\n      suspend: {}\n    - name: test\n      containerSet:\n        containers:\n          - # pipemaster:id tests\n            name: main\n            image: golang:latest\n            command:\n              - sh\n              - -ec\n            args:\n              - |-\n                [ -e repo ] || ln -s \"$PWD\" repo\n                cd \"repo/${MODULE}\"\n                go test -v ./...\n            workingDir: /workspace\n            env:\n              - name: MODULE\n                value: apps/golang\n        volumeMounts:\n          - name: workspace\n            mountPath: /workspace\n      inputs:\n        artifacts:\n          - name: source\n            path: /workspace\n            git:\n              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git\n              revision: '{{workflow.parameters.ctx-sha}}'\n      volumes:\n        - emptyDir: {}\n          name: workspace\n"
     }
    ],
    "report": [
@@ -1849,13 +1609,6 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
-     "detail": "step in-parallel: in_parallel has no IR step form; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/build",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
      "detail": "key public has no IR field; kept in Ext"
     },
     {
@@ -1868,8 +1621,8 @@
      "path": "pipeline/parent/job/build/step/build",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/tasks/go-build.yml: keys inputs, outputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/build/step/build",
@@ -1878,36 +1631,17 @@
      "detail": "Ext of provider concourse (file, image) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/build/step/build",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "a task step has no Argo form; the step is dropped"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/build",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/tasks/go-build.yml is referenced, not read; the step keeps the path in Ext"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/in-parallel",
+     "path": "pipeline/parent/job/build/step/checkout",
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider concourse (kind, step) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/build/step/in-parallel",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "a plugin step has no Argo form; the step is dropped"
-    },
-    {
      "path": "pipeline/parent/job/build/step/run-binary",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/apps/golang/binary-test.yml: keys inputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/build/step/run-binary",
@@ -1917,16 +1651,10 @@
     },
     {
      "path": "pipeline/parent/job/build/step/run-binary",
-     "feature": "step.action",
+     "feature": "step.image",
      "level": "lost",
-     "detail": "a task step has no Argo form; the step is dropped"
-    },
-    {
-     "path": "pipeline/parent/job/build/step/run-binary",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/apps/golang/binary-test.yml is referenced, not read; the step keeps the path in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/apps/golang/binary-test.yml: image_resource is no plain registry-image reference; it stays in the task file"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
@@ -2005,13 +1733,6 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[concourse]",
-     "detail": "step in-parallel: in_parallel has no IR step form; the step is kept verbatim in Ext and the IR cannot run it"
-    },
-    {
-     "path": "pipeline/parent/job/test",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
      "detail": "key public has no IR field; kept in Ext"
     },
     {
@@ -2028,23 +1749,17 @@
      "detail": "job test triggers on repo only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext"
     },
     {
-     "path": "pipeline/parent/job/test/step/in-parallel",
+     "path": "pipeline/parent/job/test/step/checkout",
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider concourse (kind, step) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/test/step/in-parallel",
-     "feature": "step.action",
-     "level": "lost",
-     "detail": "a plugin step has no Argo form; the step is dropped"
-    },
-    {
      "path": "pipeline/parent/job/test/step/tests",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "key image has no IR field; kept in Ext"
+     "strategy": "kept in the task file",
+     "detail": "task file repo/tasks/go-test.yml: keys inputs, platform have no IR field; they stay in the task file"
     },
     {
      "path": "pipeline/parent/job/test/step/tests",
@@ -2053,41 +1768,70 @@
      "detail": "Ext of provider concourse (file, image) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/test/step/tests",
+     "path": "pipeline/parent/trigger/0",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/parent/trigger/0",
+     "feature": "trigger.api",
+     "level": "lost",
+     "detail": "an api trigger that no Argo file held has no Argo form; no Sensor trigger is written"
+    },
+    {
+     "path": "pipeline/parent/trigger/1",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Argo file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/parent/trigger/1",
+     "feature": "trigger.api",
+     "level": "lost",
+     "detail": "an api trigger that no Argo file held has no Argo form; no Sensor trigger is written"
+    },
+    {
+     "path": "pipeline/parent/job/build/step/checkout",
      "feature": "step.action",
-     "level": "lost",
-     "detail": "a task step has no Argo form; the step is dropped"
+     "level": "external",
+     "strategy": "input git artifact at /workspace",
+     "detail": "the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; a private repository needs usernameSecret and passwordSecret, or sshPrivateKeySecret, on the git artifact; the file names none"
+    },
+    {
+     "path": "pipeline/parent/job/test/step/checkout",
+     "feature": "step.action",
+     "level": "external",
+     "strategy": "input git artifact at /workspace",
+     "detail": "the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; a private repository needs usernameSecret and passwordSecret, or sshPrivateKeySecret, on the git artifact; the file names none"
+    },
+    {
+     "path": "pipeline/parent/job/build/step/build",
+     "feature": "step.workdir",
+     "level": "emulated",
+     "strategy": "directories made by script lines",
+     "detail": "task file repo/tasks/go-build.yml: input repo, output binary are directories of the working directory in Concourse; the first script lines link the checkout or make the directory"
+    },
+    {
+     "path": "pipeline/parent/job/build/step/checkout",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step",
+     "detail": "the get of the repository resource is the checkout step; the other gets of the step give the image of the tasks"
+    },
+    {
+     "path": "pipeline/parent/job/test/step/checkout",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "checkout step",
+     "detail": "the get of the repository resource is the checkout step; the other gets of the step give the image of the tasks"
     },
     {
      "path": "pipeline/parent/job/test/step/tests",
-     "feature": "step.script",
-     "level": "lost",
-     "strategy": "kept in Ext[concourse]",
-     "detail": "task file repo/tasks/go-test.yml is referenced, not read; the step keeps the path in Ext"
-    },
-    {
-     "path": "pipeline/parent/trigger/0",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Argo file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/parent/trigger/0",
-     "feature": "trigger.api",
-     "level": "lost",
-     "detail": "an api trigger that no Argo file held has no Argo form; no Sensor trigger is written"
-    },
-    {
-     "path": "pipeline/parent/trigger/1",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (resources, unreadable) is not written to the Argo file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/parent/trigger/1",
-     "feature": "trigger.api",
-     "level": "lost",
-     "detail": "an api trigger that no Argo file held has no Argo form; no Sensor trigger is written"
+     "feature": "step.workdir",
+     "level": "emulated",
+     "strategy": "directories made by script lines",
+     "detail": "task file repo/tasks/go-test.yml: input repo are directories of the working directory in Concourse; the first script lines link the checkout or make the directory"
     }
    ]
   }

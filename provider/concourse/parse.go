@@ -62,6 +62,7 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		}
 		byID[id] = src.name
 		pb := newPipelineBuilder(rep, src.name, id)
+		pb.fsys = fsys
 		pb.readMarks(src.data)
 		pb.anchorKeys = anchorHolders(src.data)
 		pl, err := pb.build(src.top)
@@ -155,6 +156,7 @@ type pipeBuilder struct {
 	// defaulted holds the names of the params that were read as secrets with no marker or vars entry to say otherwise.
 	defaulted map[string]bool
 	rep       *report.Report
+	fsys      fs.FS
 	res       map[string]*resource
 	types     map[string]bool
 	used      map[string]bool
