@@ -340,8 +340,14 @@ func (b *jobBuilder) checkout(rm *omap, t *catalogTask, list []any) error {
 		key := paramKey(name)
 		val, isText := text(m.Vals["value"])
 		if in, mapped := t.inputs[key]; mapped && isText {
-			with[in.To] = b.px.value(val)
-			bound[key] = true
+			if v, ok := b.checkoutValue(in.To, val); ok {
+				if v != nil {
+					with[in.To] = *v
+				}
+				bound[key] = true
+				continue
+			}
+			unmapped = append(unmapped, name)
 			continue
 		}
 		if want, same := t.same[key]; same && isText && val == want {
@@ -370,6 +376,41 @@ func (b *jobBuilder) checkout(rm *omap, t *catalogTask, list []any) error {
 		ID: fmt.Sprintf("%s-step-%d", b.job.ID, catalogStepIndex), Kind: ir.StepAction, Action: &ref, With: with,
 	})
 	return nil
+}
+
+// checkoutValue reads a bound param as the value of a checkout input. A nil value means the param has no effect.
+// A param that has no spelling returns false.
+func (b *jobBuilder) checkoutValue(input, val string) (*ir.Value, bool) {
+	var v ir.Value
+	switch input {
+	case checkoutRepository:
+		if val == "" {
+			return nil, true
+		}
+		repo, own, ok := cloneRepo(b.px, val)
+		if !ok || own {
+			return nil, ok
+		}
+		v = repo
+	case checkoutPath:
+		p, ok := clonePath(b.px, val)
+		if !ok {
+			return nil, true
+		}
+		v = p
+	case checkoutSparse:
+		if val == "" {
+			return nil, true
+		}
+		s, ok := cloneSparse(b.px, val)
+		if !ok {
+			return nil, false
+		}
+		v = s
+	default:
+		v = b.px.value(val)
+	}
+	return &v, true
 }
 
 // paramKey folds a param name, so the catalog spelling sslVerify and the OpenShift spelling SSL_VERIFY meet.

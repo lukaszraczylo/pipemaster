@@ -135,9 +135,11 @@ func (b *jobBuilder) command(st *ir.Step, k *sink, r *reader) error {
 	if v, ok := r.Take("ref"); ok {
 		st.Kind = ir.StepAction
 		k.Keep("ref", v, caps.StepAction, "a StepAction ref has no IR form; kept in Ext", r.Line("ref"))
-		if p, ok := r.Take("params"); ok {
+		p, hasParams := r.Take("params")
+		if hasParams {
 			k.Keep("params", p, caps.StepAction, "the params of a StepAction have no IR field; kept in Ext", r.Line("params"))
 		}
+		b.gitClone(st, v, p)
 		return b.env(st, k, r)
 	}
 	st.Kind = ir.StepScript

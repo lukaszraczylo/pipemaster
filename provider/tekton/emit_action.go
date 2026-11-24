@@ -145,7 +145,7 @@ func (tc *taskCtx) markAction(b *stepBook, sp string, st *ir.Step, image string,
 
 // actionStep maps an action step through the actions table. Every mapped action leaves a marker that holds the step.
 func (tc *taskCtx) actionStep(b *stepBook, st *ir.Step, sp, name string) (*wmap, error) {
-	if st.Action == nil || st.Kind == ir.StepPipelineCall {
+	if st.Action == nil || st.Kind == ir.StepPipelineCall || tc.e.own && extOf(st.Ext)["ref"] != nil {
 		m := tc.extAction(st, sp, name)
 		if m == nil {
 			return tc.failedAction(b, st, sp, name, "the step has no action reference and no Tekton ref")

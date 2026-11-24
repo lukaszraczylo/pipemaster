@@ -23,9 +23,12 @@ kind: Checkout
 metadata:
   name: git-clone
   annotations:
-    pipemaster.dev/caveat: the cluster or hub task version may differ from the mapped behaviour; the checkout clones the repository of the pipeline, so a url param has no effect
+    pipemaster.dev/caveat: the cluster or hub task version may differ from the mapped behaviour; only a github.com url maps to the repository input
 inputs:
+  url: repository
   revision: ref
+  subdirectory: path
+  sparseCheckoutDirectories: sparse-checkout
   depth: fetch-depth
   submodules:
     to: submodules
@@ -33,8 +36,6 @@ inputs:
 same:
   refspec: ""
   sslVerify: "true"
-  subdirectory: ""
-  sparseCheckoutDirectories: ""
   deleteExisting: "true"
   httpProxy: ""
   httpsProxy: ""

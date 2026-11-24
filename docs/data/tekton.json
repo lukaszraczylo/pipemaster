@@ -291,7 +291,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "mapped to the catalog task git-clone",
-     "detail": "the cluster or hub task version may differ from the mapped behaviour; the checkout clones the repository of the pipeline, so a url param has no effect"
+     "detail": "the cluster or hub task version may differ from the mapped behaviour; only a github.com url maps to the repository input"
     },
     {
      "path": "pipeline/build-and-deploy/job/update-deployment",
@@ -325,7 +325,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "mapped to the catalog task git-clone",
-     "detail": "the cluster or hub task version may differ from the mapped behaviour; the checkout clones the repository of the pipeline, so a url param has no effect"
+     "detail": "the cluster or hub task version may differ from the mapped behaviour; only a github.com url maps to the repository input"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
@@ -658,7 +658,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "mapped to the catalog task git-clone",
-     "detail": "the cluster or hub task version may differ from the mapped behaviour; the checkout clones the repository of the pipeline, so a url param has no effect"
+     "detail": "the cluster or hub task version may differ from the mapped behaviour; only a github.com url maps to the repository input"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1",
@@ -686,7 +686,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "mapped to the catalog task git-clone",
-     "detail": "the cluster or hub task version may differ from the mapped behaviour; the checkout clones the repository of the pipeline, so a url param has no effect"
+     "detail": "the cluster or hub task version may differ from the mapped behaviour; only a github.com url maps to the repository input"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch/step/fetch-step-1",
@@ -1026,7 +1026,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "mapped to the catalog task git-clone",
-     "detail": "the cluster or hub task version may differ from the mapped behaviour; the checkout clones the repository of the pipeline, so a url param has no effect"
+     "detail": "the cluster or hub task version may differ from the mapped behaviour; only a github.com url maps to the repository input"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr",
@@ -1040,7 +1040,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "mapped to the catalog task git-clone",
-     "detail": "the cluster or hub task version may differ from the mapped behaviour; the checkout clones the repository of the pipeline, so a url param has no effect"
+     "detail": "the cluster or hub task version may differ from the mapped behaviour; only a github.com url maps to the repository input"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
@@ -1367,7 +1367,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "mapped to the catalog task git-clone",
-     "detail": "the cluster or hub task version may differ from the mapped behaviour; the checkout clones the repository of the pipeline, so a url param has no effect"
+     "detail": "the cluster or hub task version may differ from the mapped behaviour; only a github.com url maps to the repository input"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr",
@@ -1381,7 +1381,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "mapped to the catalog task git-clone",
-     "detail": "the cluster or hub task version may differ from the mapped behaviour; the checkout clones the repository of the pipeline, so a url param has no effect"
+     "detail": "the cluster or hub task version may differ from the mapped behaviour; only a github.com url maps to the repository input"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
@@ -1678,7 +1678,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "mapped to the catalog task git-clone",
-     "detail": "the cluster or hub task version may differ from the mapped behaviour; the checkout clones the repository of the pipeline, so a url param has no effect"
+     "detail": "the cluster or hub task version may differ from the mapped behaviour; only a github.com url maps to the repository input"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -1699,7 +1699,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "mapped to the catalog task git-clone",
-     "detail": "the cluster or hub task version may differ from the mapped behaviour; the checkout clones the repository of the pipeline, so a url param has no effect"
+     "detail": "the cluster or hub task version may differ from the mapped behaviour; only a github.com url maps to the repository input"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
@@ -2030,7 +2030,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "mapped to the catalog task git-clone",
-     "detail": "the cluster or hub task version may differ from the mapped behaviour; the checkout clones the repository of the pipeline, so a url param has no effect"
+     "detail": "the cluster or hub task version may differ from the mapped behaviour; only a github.com url maps to the repository input"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -2065,7 +2065,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "mapped to the catalog task git-clone",
-     "detail": "the cluster or hub task version may differ from the mapped behaviour; the checkout clones the repository of the pipeline, so a url param has no effect"
+     "detail": "the cluster or hub task version may differ from the mapped behaviour; only a github.com url maps to the repository input"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",

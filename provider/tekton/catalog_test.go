@@ -124,19 +124,37 @@ func TestCatalogCheckoutParams(t *testing.T) {
 	if st.Action == nil || st.Action.Owner != "actions" || st.Action.Repo != "checkout" {
 		t.Fatalf("action = %+v", st.Action)
 	}
-	want := map[string]string{"ref": "v1", "fetch-depth": "0", "submodules": "false"}
+	want := map[string]string{"ref": "v1", "fetch-depth": "0", "submodules": "false", "path": "src"}
 	for k, v := range want {
 		if st.With[k].Lit != v {
 			t.Errorf("with[%s] = %+v, want %s", k, st.With[k], v)
 		}
 	}
-	for _, name := range []string{"URL", "SUBDIRECTORY"} {
-		if !hasEntry(rep, "param "+name+" of the catalog task git-clone has no checkout input") {
-			t.Errorf("unmapped param %s is not reported", name)
-		}
+	if !hasEntry(rep, "param URL of the catalog task git-clone has no checkout input") {
+		t.Error("a url outside github.com is not reported")
+	}
+	if hasEntry(rep, "param SUBDIRECTORY") {
+		t.Error("subdirectory maps to path")
 	}
 	if hasEntry(rep, "param DELETE_EXISTING") {
 		t.Error("a param at its catalog default needs no entry")
+	}
+}
+
+func TestCatalogCheckoutUrlAndSparse(t *testing.T) {
+	p, rep := parseFiles(t, map[string]string{"p.yaml": catalogPipeline(`    taskRef: {name: git-clone}
+    params:
+    - {name: url, value: https://github.com/o/r.git}
+    - {name: sparseCheckoutDirectories, value: "docs,cmd"}
+`)})
+	st := job(t, p.Pipelines[0], "t").Steps[0]
+	for k, v := range map[string]string{"repository": "o/r", "sparse-checkout": "docs\ncmd"} {
+		if st.With[k].Lit != v {
+			t.Errorf("with[%s] = %+v, want %q", k, st.With[k], v)
+		}
+	}
+	if hasEntry(rep, "has no checkout input") {
+		t.Errorf("every param has a spelling: %+v", rep.Entries)
 	}
 }
 
