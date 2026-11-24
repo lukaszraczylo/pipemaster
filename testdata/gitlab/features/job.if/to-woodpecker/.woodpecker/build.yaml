@@ -1,10 +1,11 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/build
-# pipemaster:lost job.if pipeline/gitlab-ci/job/build: (branch == 'main') || ((event == 'schedule') && !(branch == 'main'))
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:arg {"src":"(branch == 'main') || ((event == 'schedule') \u0026\u0026 !(branch == 'main'))","from":"gitlab","gate":false}
 when:
   - event: push
-    evaluate: "false"
+    evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "main" || CI_PIPELINE_EVENT matches "(?i)^cron$$" && !(!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "main")'
   - event: tag
-    evaluate: "false"
+    evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "main" || CI_PIPELINE_EVENT matches "(?i)^cron$$" && !(!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "main")'
 steps:
   - name: script
     image: ubuntu:latest

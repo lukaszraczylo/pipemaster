@@ -203,6 +203,35 @@ theorem woodpecker_event_rx {tA tB : Ev → String} (hA : TranslateClass.EvTab t
       simp [refV, ha', hb', matchV, modeTest, h1, h2]
   constructor <;> simp [holds, eval, truthy, key]
 
+/-- A GitLab-class event comparison `event == v` (or `!=`), where `v` is exactly the value the source table `tA` gives
+event `e`, keeps its result as the Woodpecker pattern test `event =~ /^w$/i` (or `!~`) with `w` the value the
+Woodpecker table `tB` gives `e`: the unset event is null in the source and "" in Woodpecker, and the tables are
+injective after lowering. This is the rewrite the translator makes for a target that reads no event equality
+(Mirrors expr.mapEventBinary (expr/lang.go)). -/
+theorem woodpecker_event_eq {tA tB : Ev → String} (hA : TranslateClass.EvTab tA) (hB : TranslateClass.EvTab tB)
+    (env : Env) {vA vB : View} (ha : vA .event = env.event.map tA)
+    (hb : vB .event = some ((env.event.map tB).getD ""))
+    {e : Ev} {l : String} (hl : l = tA e) :
+    holds .gitlab vB (.rx (.ref .event) .exact (tB e)) = holds .gitlab vA (.eq (.ref .event) (.str l)) ∧
+    holds .gitlab vB (.nrx (.ref .event) .exact (tB e)) = holds .gitlab vA (.ne (.ref .event) (.str l)) := by
+  subst hl
+  have key : matchV .exact (tB e) (refV vB .event) = eqV .gitlab (refV vA .event) (.str (tA e)) := by
+    cases hev : env.event with
+    | none =>
+      have ha' : vA .event = none := by rw [ha, hev]; rfl
+      have hb' : vB .event = some "" := by rw [hb, hev]; rfl
+      have hne : lower (tB e) ≠ "" := hB.ne e
+      have hA' : TranslateClass.foldS .gitlab (tA e) ≠ "" := TranslateClass.fold_ne hA .gitlab e
+      simp [refV, ha', hb', matchV, modeTest, lower_empty, Ne.symm hne, TranslateClass.eqV_null .gitlab hA']
+    | some e0 =>
+      have ha' : vA .event = some (tA e0) := by rw [ha, hev]; rfl
+      have hb' : vB .event = some (tB e0) := by rw [hb, hev]; rfl
+      have h1 := TranslateClass.fold_beq hA .gitlab e0 e
+      have h2 := TranslateClass.fold_beq hB .gha e0 e
+      simp only [TranslateClass.foldS] at h1 h2
+      simp [refV, ha', hb', matchV, modeTest, eqV, h1, h2]
+  constructor <;> simp [holds, eval, truthy, key]
+
 end ExprSubset
 
 /-! ## The adapter on the core subset

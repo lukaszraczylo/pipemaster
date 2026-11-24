@@ -28,6 +28,9 @@ type Dialect struct {
 	// PRFamily is true when the dialect reports a pull request under more than one event (Woodpecker:
 	// pull_request, pull_request_closed, pull_request_metadata), each named by the one event name as a prefix.
 	PRFamily bool
+	// EventRx is true when the dialect reads an event only as a pattern test (Woodpecker: the subset proof covers
+	// event =~ /^v$/i, lean4/Pipemaster/Woodpecker.lean woodpecker_event_eq), so a same-class event == or != becomes one.
+	EventRx bool
 }
 
 // caseFlag is the inline flag every translator-made pattern starts with.

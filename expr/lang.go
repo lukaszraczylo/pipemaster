@@ -170,9 +170,15 @@ func mapEventBinary(b Binary, from, to Dialect) (Expr, bool) {
 		if !ok {
 			return nil, false
 		}
-		t, ok := mapEventLit(from, to, s, from.Class == ClassGHA)
+		fold := from.Class == ClassGHA
+		t, ok := mapEventLit(from, to, s, fold)
 		if !ok {
 			return nil, false
+		}
+		if to.EventRx && from.Class == ClassGitLab {
+			// A GitLab-class == compares exactly, so the literal is a value of the source table (mapEventLit fold false)
+			// and the /i pattern of the target value names the same event: both tables are injective after lowercasing.
+			return rx(b.Op == OpNe, Ref{Path: []string{CtxEvent}}, ModeExact, t), true
 		}
 		*lit = Lit{Kind: LitStr, Str: t}
 		return Binary{Op: b.Op, L: l, R: r}, true

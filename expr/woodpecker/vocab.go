@@ -88,6 +88,7 @@ var Lang = expr.Dialect{
 	Class:      expr.ClassGitLab,
 	BranchOnPR: true,
 	PRFamily:   true,
+	EventRx:    true,
 	Vocab:      Vocab,
 	Sem:        Semantics,
 	Events:     Events,

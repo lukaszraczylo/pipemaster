@@ -389,7 +389,7 @@
 51-drone-parsr drone->gitea native=  27 emulated=  22 external=   0 lost=   4
 51-drone-parsr drone->gitlab native=  23 emulated=  14 external=   1 lost=  16
 51-drone-parsr drone->tekton native=  24 emulated=  26 external=   0 lost=  15
-51-drone-parsr drone->woodpecker native=  38 emulated=   0 external=   0 lost=  15
+51-drone-parsr drone->woodpecker native=  38 emulated=   0 external=   7 lost=   8
 52-drone-distribution drone->argo native= 205 emulated=  70 external=   0 lost= 165
 52-drone-distribution drone->concourse native= 198 emulated=  90 external=   0 lost= 155
 52-drone-distribution drone->forgejo native= 264 emulated= 123 external=   0 lost= 101
@@ -413,7 +413,7 @@
 54-drone-go-away drone->gitea native=  98 emulated=  38 external=   0 lost=  36
 54-drone-go-away drone->gitlab native=  45 emulated=  24 external=   0 lost=  58
 54-drone-go-away drone->tekton native=  90 emulated=   8 external=   0 lost=  30
-54-drone-go-away drone->woodpecker native=  66 emulated=   3 external=   0 lost=  57
+54-drone-go-away drone->woodpecker native=  66 emulated=   3 external=   1 lost=  56
 55-drone-geodns drone->argo native=  20 emulated=   5 external=   0 lost=  15
 55-drone-geodns drone->concourse native=  20 emulated=   2 external=   0 lost=  19
 55-drone-geodns drone->forgejo native=  17 emulated=  11 external=   0 lost=  14
@@ -445,7 +445,7 @@
 59-drone-casper-node drone->gitea native=  56 emulated=  32 external=   0 lost=  35
 59-drone-casper-node drone->gitlab native=  35 emulated=  19 external=   6 lost=  62
 59-drone-casper-node drone->tekton native=  68 emulated=  15 external=   0 lost=  35
-59-drone-casper-node drone->woodpecker native=  73 emulated=   4 external=   0 lost=  42
+59-drone-casper-node drone->woodpecker native=  73 emulated=   4 external=   1 lost=  41
 60-drone-go-markdown2confluence drone->argo native=   8 emulated=   4 external=   0 lost=   3
 60-drone-go-markdown2confluence drone->concourse native=   9 emulated=   2 external=   0 lost=   6
 60-drone-go-markdown2confluence drone->forgejo native=   8 emulated=   5 external=   0 lost=   4

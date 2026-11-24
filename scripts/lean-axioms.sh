@@ -78,6 +78,7 @@ required=(
   Pipemaster.Woodpecker.eval_woodpecker
   Pipemaster.Woodpecker.woodpecker_sound
   Pipemaster.Woodpecker.woodpecker_event_rx
+  Pipemaster.Woodpecker.woodpecker_event_eq
   Pipemaster.Woodpecker.rawWp_toWp
   Pipemaster.Woodpecker.rawWp_frag
   Pipemaster.Woodpecker.woodpecker_from_to
