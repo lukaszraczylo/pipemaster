@@ -330,7 +330,7 @@ func TestTargetPayloadsNeverRunAJobOnAWrongEvent(t *testing.T) {
 	gl, _ := gitlabFile(t, y)
 	const zero, old = "0000000000000000000000000000000000000000", "1111111111111111111111111111111111111111"
 	ghPush := func(branch, before string, deleted bool) condEnv {
-		return condEnv{"event": "push", "ref_type": "branch", "ref_name": branch, "before_sha": before, "deleted": deleted, "default_branch": "main"}
+		return condEnv{"event": "push", "ref_type": "branch", "ref_name": branch, "created": before == zero, "deleted": deleted, "default_branch": "main"}
 	}
 	glPush := func(branch, before string) condEnv {
 		return condEnv{"event": "push", "branch": branch, "before_sha": before, "default_branch": "main"}
@@ -345,7 +345,7 @@ func TestTargetPayloadsNeverRunAJobOnAWrongEvent(t *testing.T) {
 		{ghPush("feat/x", zero, true), nil, "deletion push of feat/x", false, false},
 		{ghPush("feat/x", zero, false), glPush("feat/x", zero), "creation of feat/x", false, true},
 		{ghPush("feat/x", old, false), glPush("feat/x", old), "push to feat/x", false, false},
-		{condEnv{"event": "push", "ref_type": "tag", "ref_name": "main", "before_sha": zero, "deleted": false, "default_branch": "main"}, condEnv{"event": "push", "tag": "main", "before_sha": zero, "default_branch": "main"}, "tag named like the default branch", false, false},
+		{condEnv{"event": "push", "ref_type": "tag", "ref_name": "main", "created": true, "deleted": false, "default_branch": "main"}, condEnv{"event": "push", "tag": "main", "before_sha": zero, "default_branch": "main"}, "tag named like the default branch", false, false},
 		{condEnv{"event": "pull_request", "ref_type": "branch", "ref_name": "1/merge", "default_branch": "main"}, condEnv{"event": "merge_request_event", "branch": "", "default_branch": "main"}, "pull request", false, false},
 		{condEnv{"event": "schedule", "ref_type": "branch", "ref_name": "main", "default_branch": "main"}, condEnv{"event": "schedule", "branch": "main", "before_sha": zero, "default_branch": "main"}, "schedule on the default branch", false, false},
 		{condEnv{"event": "workflow_dispatch", "ref_type": "branch", "ref_name": "main", "default_branch": "main"}, condEnv{"event": "web", "branch": "main", "before_sha": zero, "default_branch": "main"}, "manual start on the default branch", false, false},
@@ -431,5 +431,24 @@ func TestFanInOfDifferentConditionsIsLostAndManual(t *testing.T) {
 	same, _ := parseYAML(t, strings.Replace(fanProbe, "- name: b\n  plan:\n  - {get: d, trigger: true}", "- name: b\n  plan:\n  - {get: m, trigger: true}\n"+task+"- name: c\n  plan:\n  - {get: d, trigger: true}", 1))
 	if f := job(t, same, "fan"); f.Manual || f.If == nil {
 		t.Errorf("identical conditions must still be inherited: manual=%v if=%q", f.Manual, cond(f.If))
+	}
+}
+
+func TestBranchCreationIsTheCreatedFieldOnGHA(t *testing.T) {
+	zero := expr.Lit{Kind: expr.LitStr, Str: "0000000000000000000000000000000000000000"}
+	ref := expr.Ref{Path: []string{expr.CtxBeforeSHA}}
+	for _, c := range []struct {
+		in   expr.Expr
+		want string
+		ok   bool
+	}{
+		{expr.Binary{Op: expr.OpEq, L: ref, R: zero}, "created", true},
+		{expr.Binary{Op: expr.OpNe, L: ref, R: zero}, "!created", true},
+		{expr.Binary{Op: expr.OpEq, L: ref, R: expr.Lit{Kind: expr.LitStr, Str: "abc"}}, "", false},
+	} {
+		got, _, ok := expr.TranslateApprox(c.in, exprconcourse.Lang, exprgha.Lang)
+		if ok != c.ok || (ok && expr.String(got) != c.want) {
+			t.Errorf("%s: got %v, %v want %q, %v", expr.String(c.in), got, ok, c.want, c.ok)
+		}
 	}
 }

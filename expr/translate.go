@@ -772,6 +772,9 @@ func defaultBranchCmp(b Binary) bool {
 	return pathName(l) == CtxBranch && pathName(r) == CtxDefaultBranch || pathName(l) == CtxDefaultBranch && pathName(r) == CtxBranch
 }
 
+// zeroSHA is the commit a push replaces when it creates the ref.
+const zeroSHA = "0000000000000000000000000000000000000000"
+
 func approxCmp(b Binary, from Dialect, cav *caveats) (Expr, bool) {
 	if defaultBranchCmp(b) {
 		cav.add(ciCaveat)
@@ -797,13 +800,14 @@ func approxCmp(b Binary, from Dialect, cav *caveats) (Expr, bool) {
 			return nil, false
 		}
 		cav.add(ciCaveat)
-		eq := Binary{Op: b.Op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: canon}}
-		if b.Op == OpEq && canon == "push" {
-			// A GHA push event also fires for a branch deletion (payload field deleted); the source has no run for one.
-			return Binary{Op: OpAnd, L: eq, R: Unary{Op: OpNot, X: ctxRef(CtxDeleted)}}, true
+		return Binary{Op: b.Op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: canon}}, true
+	case CtxBeforeSHA:
+		// The all-zero before commit means the push created the ref; GHA names that in the payload field created.
+		if lit != zeroSHA {
+			return nil, false
 		}
-		return eq, true
-	case CtxRefName, CtxSHA, CtxBeforeSHA:
+		return negE(b.Op == OpNe, ctxRef(CtxCreated)), true
+	case CtxRefName, CtxSHA:
 		addAll(cav, litCaveats(lit))
 		return Binary{Op: b.Op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: lit}}, true
 	case CtxBranch, CtxTag:

@@ -253,6 +253,10 @@ func foreignLang(id string) (*expr.Dialect, bool) {
 // status guard such as `failure() && cond` on its own, so the status call stays and only the other side is
 // replaced. ok is false when the emitter would not have written parsed from src.
 func restoreCond(src, parsed expr.Expr, from expr.Dialect) (expr.Expr, bool) {
+	// The emitter ends every translated condition with the deletion guard; src stands for the part before it.
+	if b, ok := parsed.(expr.Binary); ok && b.Op == expr.OpAnd && expr.String(b.R) == expr.String(deletedGuard()) {
+		return restoreCond(src, b.L, from)
+	}
 	if b, ok := parsed.(expr.Binary); ok && b.Op == expr.OpAnd {
 		switch {
 		case isStatus(b.L) && !isStatus(b.R):

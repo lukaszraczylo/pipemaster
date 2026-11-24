@@ -21,7 +21,9 @@ const (
 	// CtxBeforeSHA is the commit a push replaced: all zeros when the push creates the ref.
 	CtxBeforeSHA = "before_sha"
 	// CtxDeleted is true on a push event that deletes the ref.
-	CtxDeleted   = "deleted"
+	CtxDeleted = "deleted"
+	// CtxCreated is true on a push event that creates the ref.
+	CtxCreated   = "created"
 	CtxPRBaseRef = "pr.base_ref"
 )
 
