@@ -1,6 +1,7 @@
 package tekton_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -307,6 +308,29 @@ func TestJobContainerEntrypointIsReported(t *testing.T) {
 	j.Container = &ir.Image{Ref: "golang:1.22", Entrypoint: []string{""}}
 	_, rep := emit(t, project(j))
 	wantEntry(t, rep, caps.JobContainer, caps.Lost, "entrypoint")
+}
+
+func TestServiceEntrypointBecomesSidecarCommand(t *testing.T) {
+	j := scriptJob("a", "true")
+	j.Services = []ir.Service{{Name: "docker", Image: ir.Image{Ref: "dind", Entrypoint: []string{"sh", "-c", "run"}}}}
+	files, _ := emit(t, project(j))
+	if !strings.Contains(joinFiles(files), "command:\n        - sh\n        - -c\n        - run") {
+		t.Fatalf("no sidecar command:\n%s", joinFiles(files))
+	}
+	back, _ := reparse(t, files)
+	if got := back.Pipelines[0].Jobs[0].Services[0].Image.Entrypoint; !slices.Equal(got, []string{"sh", "-c", "run"}) {
+		t.Fatalf("entrypoint = %v", got)
+	}
+}
+
+func TestEmptyServiceEntrypointIsReportedNotWritten(t *testing.T) {
+	j := scriptJob("a", "true")
+	j.Services = []ir.Service{{Name: "docker", Image: ir.Image{Ref: "dind", Entrypoint: []string{""}}}}
+	files, rep := emit(t, project(j))
+	if strings.Contains(joinFiles(files), "command:") {
+		t.Fatalf("an empty command was written:\n%s", joinFiles(files))
+	}
+	wantEntry(t, rep, caps.JobServices, caps.Lost, "entrypoint")
 }
 
 func renamedListener(t *testing.T, from, to string) (*ir.Project, *report.Report, map[string]string) {

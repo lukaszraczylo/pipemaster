@@ -501,6 +501,8 @@ func (tc *taskCtx) sidecars() (*yaml.Node, error) {
 			return nil, err
 		} else if ok {
 			m.Set("command", strSeq(cmd))
+		} else if len(sv.Image.Entrypoint) > 0 {
+			tc.e.lose(sp, caps.JobServices, "the service entrypoint has no Tekton sidecar command form")
 		}
 		env, err := tc.envList(sc, sp, sv.Env)
 		if err != nil {
@@ -520,11 +522,11 @@ func (tc *taskCtx) sidecars() (*yaml.Node, error) {
 	return out, nil
 }
 
-// commandText converts each entrypoint item; ok is false when there is none or an item has no Tekton form.
+// commandText converts each entrypoint item; ok is false when there is none, an item has no Tekton form or an item is empty (the docker way to clear an entrypoint, which a container command cannot say).
 func (tc *taskCtx) commandText(sc *stepScope, sp string, items []string) (out []string, ok bool, err error) {
 	for _, a := range items {
 		t, tok, err := tc.text(sc, sp, caps.JobServices, valueText, a)
-		if err != nil || !tok {
+		if err != nil || !tok || t == "" {
 			return nil, false, err
 		}
 		out = append(out, t)
