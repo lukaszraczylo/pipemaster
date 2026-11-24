@@ -18,7 +18,7 @@ import (
 
 // collapseMarkers undoes the emulations another provider's emitter marked in the file, so a pipeline that
 // travelled through GHA and came back carries no trace of the detour.
-func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string, rep *report.Report, restoreConds bool) (condsFrom, guardFrom string) {
+func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string, rep *report.Report, restoreConds bool) (condsFrom string, guarded []string) {
 	carriedDone := map[string]bool{}
 	finallyPaths := map[string]bool{}
 	for _, u := range uses {
@@ -26,7 +26,7 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			finallyPaths[u.IRPath] = true
 		}
 	}
-	guardFrom = stripGuards(pl, rep, uses, args)
+	guarded = stripGuards(pl, rep, uses, args)
 	// Condition markers run last: they compare against the condition once the guards are gone.
 	slices.SortStableFunc(uses, func(a, b ir.FeatureUse) int { return condRank(a.Feature) - condRank(b.Feature) })
 	for _, u := range uses {
@@ -91,7 +91,7 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			dropMatchAll(pl, ir.TriggerTag, func(t *ir.Trigger) *ir.Filter { return &t.Tags })
 		}
 	}
-	return condsFrom, guardFrom
+	return condsFrom, guarded
 }
 
 func markedJob(pl *ir.Pipeline, path string) *ir.Job {
@@ -229,9 +229,10 @@ func sourceCond(rep *report.Report, u ir.FeatureUse, args []string, parsed expr.
 }
 
 // stripGuards removes the deletion guard the emitter ANDed onto each marked job condition, before any other
-// marker reads the condition, and returns the source dialect the markers name. A guard without a marker is the
+// marker reads the condition, and returns the IR paths of the jobs it stripped. A guard without a marker is the
 // author's and stays.
-func stripGuards(pl *ir.Pipeline, rep *report.Report, uses []ir.FeatureUse, args map[ir.FeatureUse][]string) (from string) {
+func stripGuards(pl *ir.Pipeline, rep *report.Report, uses []ir.FeatureUse, args map[ir.FeatureUse][]string) (guarded []string) {
+	var from string
 	for _, u := range uses {
 		if u.Feature != caps.JobIf || !strings.HasPrefix(u.IRPath, "pipeline/"+pl.ID+"/job/") {
 			continue
@@ -254,13 +255,14 @@ func stripGuards(pl *ir.Pipeline, rep *report.Report, uses []ir.FeatureUse, args
 				if rest, ok := dropGuard(j.If); ok {
 					j.If = rest
 					from = src.ID
+					guarded = append(guarded, u.IRPath)
 					continue
 				}
 			}
 			rep.Add(ignoredMarker(u, "the deletion guard was edited after conversion, so the parsed condition stands"))
 		}
 	}
-	return from
+	return guarded
 }
 
 // dropGuard returns x without the deletion guard that ends it; ok is false when x does not end with one.

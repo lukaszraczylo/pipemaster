@@ -172,7 +172,7 @@ func (e *emitter) needIDs(c jobCtx, j *ir.Job) []string {
 // A condition GHA cannot state disables the job rather than running it unguarded.
 func (e *emitter) jobCondition(c jobCtx, jp string, j *ir.Job, call *ir.Step) (*yaml.Node, []string) {
 	cond := j.If
-	guard := !j.Manual && e.deletionGuarded(c.pl)
+	guard := !j.Manual && e.deletionGuarded(c.pl, jp)
 	e.guardJob, e.guardMarked = "", false
 	if guard {
 		e.guardJob = jp
@@ -537,12 +537,14 @@ func narrowsMatrix(j *ir.Job, id string) bool {
 	return inst || par
 }
 
-// deletionGuarded is true when jobs of pl need the deletion guard: GHA starts a push workflow when a branch is
-// deleted, and every other provider starts nothing, so a project from another provider must not run there.
-func (e *emitter) deletionGuarded(pl *ir.Pipeline) bool {
-	if e.from == nil {
-		return false
-	}
+// deletionGuarded is true when the job at jp needs the deletion guard: GHA starts a push workflow when a branch is
+// deleted, and every other provider starts nothing, so a job from another provider must not run there. A project the
+// GHA parser read guards exactly the jobs whose guard it stripped; a hand-written job never gains one.
+func (e *emitter) deletionGuarded(pl *ir.Pipeline, jp string) bool {
+	return (e.jobGuards[jp] || (e.from != nil && e.jobGuards == nil)) && e.pushes(pl)
+}
+
+func (e *emitter) pushes(pl *ir.Pipeline) bool {
 	if slices.ContainsFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerPush || t.Kind == ir.TriggerTag }) {
 		return true
 	}

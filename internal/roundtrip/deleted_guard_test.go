@@ -219,3 +219,76 @@ func TestDeletionGuardIsStrippedOnTheWayBack(t *testing.T) {
 		}
 	}
 }
+
+const (
+	ghaNativeIf = "on: push\njobs:\n  native:\n    runs-on: ubuntu-latest\n    if: ${{ github.ref_name == 'main' }}\n    steps:\n      - run: echo hi\n"
+	ghaNativeNo = "on: push\njobs:\n  native:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n"
+	glMain      = "job:\n  script: [echo hi]\n  rules:\n    - if: '$CI_COMMIT_BRANCH == \"main\"'\n"
+)
+
+// mixedDir holds a gitlab file converted to GHA beside a hand-written workflow.
+func mixedDir(t *testing.T, native string) fstest.MapFS {
+	t.Helper()
+	viaGHA, _ := convert(t, "gitlab", "gha", ".gitlab-ci.yml", glMain)
+	return fstest.MapFS{
+		".github/workflows/gitlab-ci.yml": &fstest.MapFile{Data: []byte(strings.TrimPrefix(viaGHA, "### .github/workflows/gitlab-ci.yml\n"))},
+		".github/workflows/native.yml":    &fstest.MapFile{Data: []byte(native)},
+	}
+}
+
+func reEmit(t *testing.T, fsys fstest.MapFS, from, to string) fstest.MapFS {
+	t.Helper()
+	proj, _, err := prov(t, from).Parse(fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, _, err := prov(t, to).Emit(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := fstest.MapFS{}
+	for n, b := range files {
+		out[n] = &fstest.MapFile{Data: b}
+	}
+	return out
+}
+
+// alone is how GHA to GHA writes a hand-written workflow with nothing beside it.
+func alone(t *testing.T, native string) string {
+	t.Helper()
+	out := reEmit(t, fstest.MapFS{".github/workflows/native.yml": &fstest.MapFile{Data: []byte(native)}}, "gha", "gha")
+	return string(out[".github/workflows/native.yml"].Data)
+}
+
+var mixedNatives = []struct{ name, native string }{{"native job with if", ghaNativeIf}, {"native job without if", ghaNativeNo}}
+
+// TestMixedDirectoryGuardsPerJob: the guard belongs to the job that carried it, whatever its sibling files hold.
+func TestMixedDirectoryGuardsPerJob(t *testing.T) {
+	for _, c := range mixedNatives {
+		out := reEmit(t, mixedDir(t, c.native), "gha", "gha")
+		conv := string(out[".github/workflows/gitlab-ci.yml"].Data)
+		if !strings.Contains(conv, "!github.event.deleted") {
+			t.Errorf("%s: converted job lost its deletion guard:\n%s", c.name, conv)
+		}
+		if got := string(out[".github/workflows/native.yml"].Data); strings.Contains(got, "deleted") {
+			t.Errorf("%s: hand-written job gained a guard:\n%s", c.name, got)
+		}
+		if c.native == ghaNativeIf {
+			if got, want := string(out[".github/workflows/native.yml"].Data), alone(t, c.native); got != want {
+				t.Errorf("%s: native workflow changed:\n--- want\n%s\n--- got\n%s", c.name, want, got)
+			}
+		}
+	}
+}
+
+// TestMixedDirectoryThroughGitLabAndBack: after GitLab the jobs are foreign and each guard is written once.
+func TestMixedDirectoryThroughGitLabAndBack(t *testing.T) {
+	for _, c := range mixedNatives {
+		back := reEmit(t, reEmit(t, mixedDir(t, c.native), "gha", "gitlab"), "gitlab", "gha")
+		for n, f := range back {
+			if strings.Count(string(f.Data), "!github.event.deleted") > 1 {
+				t.Errorf("%s: guard doubled in %s:\n%s", c.name, n, f.Data)
+			}
+		}
+	}
+}

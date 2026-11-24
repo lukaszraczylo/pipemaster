@@ -37,12 +37,6 @@ func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		return nil, nil, err
 	}
 	switch {
-	case !scan.restored():
-		// Only the deletion guards named a source: the project still reads as that dialect's, or a later emit to
-		// GHA would run its jobs on a branch deletion.
-		if g := scan.guardOrigins; len(g) > 0 && !scan.nativeConds && !slices.ContainsFunc(g, func(o string) bool { return o != g[0] }) {
-			proj.Origin.Provider, proj.Origin.Dialect = g[0], g[0]
-		}
 	case scan.mixed():
 		// Restored conditions read in their source dialect and native ones in GHA's, and the project holds one
 		// dialect, so no file restores its source conditions.
@@ -57,7 +51,7 @@ func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 				Detail:  scan.mixedDetail(f, a.d.ID),
 			})
 		}
-	default:
+	case scan.restored():
 		// A restored condition reads in its source dialect, so a later emit must translate it again.
 		proj.Origin.Provider, proj.Origin.Dialect = scan.origins[0], scan.origins[0]
 	}
@@ -68,10 +62,8 @@ func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 type condScan struct {
 	restoredFiles []string
 	// origins holds the source dialect of each restored file, in the order of restoredFiles.
-	origins []string
-	// guardOrigins holds the source dialect of each file whose deletion guard was stripped.
-	guardOrigins []string
-	nativeConds  bool
+	origins     []string
+	nativeConds bool
 }
 
 func (c condScan) restored() bool { return len(c.restoredFiles) > 0 }
@@ -91,7 +83,7 @@ func (c condScan) mixedDetail(file, dialect string) string {
 // parseFiles parses each file into one pipeline. With restoreConds false, source condition markers are ignored.
 func (a *adapter) parseFiles(fsys fs.FS, files []string, rep *report.Report, restoreConds bool) (*ir.Project, condScan, error) {
 	var scan condScan
-	proj := &ir.Project{Origin: ir.Origin{Provider: a.d.ID, Dialect: a.d.ID, Files: files}}
+	proj := &ir.Project{Origin: ir.Origin{Provider: a.d.ID, Dialect: a.d.ID, Files: files, Guarded: map[string]bool{}}}
 	byStem := map[string]string{}
 	lines := map[string]int{}
 	for _, f := range files {
@@ -109,9 +101,9 @@ func (a *adapter) parseFiles(fsys fs.FS, files []string, rep *report.Report, res
 		if err != nil {
 			return nil, scan, err
 		}
-		from, guardFrom := collapseMarkers(&emitter{d: a.d, led: emitkit.NewLedger("", a.d.ID, a.Caps())}, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src), rep, restoreConds)
-		if guardFrom != "" {
-			scan.guardOrigins = append(scan.guardOrigins, guardFrom)
+		from, guarded := collapseMarkers(&emitter{d: a.d, led: emitkit.NewLedger("", a.d.ID, a.Caps())}, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src), rep, restoreConds)
+		for _, g := range guarded {
+			proj.Origin.Guarded[g] = true
 		}
 		if from != "" {
 			scan.restoredFiles = append(scan.restoredFiles, f)

@@ -28,7 +28,8 @@ const (
 // through the ledger; Finish fails the call when one was never accounted for.
 func (a *adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
 	p, idRenames := withValidJobIDs(p)
-	e := &emitter{d: a.d, from: sourceDialect(originProvider(p)), led: emitkit.NewLedger("ir", a.d.ID, a.Caps())}
+	e := &emitter{d: a.d, from: sourceDialect(originProvider(p)), led: emitkit.NewLedger("ir", a.d.ID, a.Caps()),
+		jobGuards: p.Origin.Guarded}
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)

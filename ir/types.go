@@ -18,9 +18,12 @@ type Project struct {
 
 // Origin records where a project was parsed from.
 type Origin struct {
-	Provider string   `yaml:"provider,omitempty"`
-	Dialect  string   `yaml:"dialect,omitempty"`
-	Files    []string `yaml:"files,omitempty"`
+	// Guarded is set by the GHA parser, non-nil even when empty: Provider then names the dialect of restored
+	// conditions, not of every job, and the map holds the IR paths of the jobs whose deletion guard it stripped.
+	Guarded  map[string]bool `yaml:"-"`
+	Provider string          `yaml:"provider,omitempty"`
+	Dialect  string          `yaml:"dialect,omitempty"`
+	Files    []string        `yaml:"files,omitempty"`
 }
 
 // Pipeline is one workflow, pipeline or CI file.

@@ -31,6 +31,8 @@ type emitter struct {
 	pluginVars *yaml.Node
 	// guarded holds the pipelines whose deletion guard the report already names.
 	guarded map[string]bool
+	// jobGuards is the Origin.Guarded of the project.
+	jobGuards map[string]bool
 	// guardJob is the job path whose condition gets the deletion guard.
 	guardJob string
 	d        Dialect
