@@ -101,6 +101,9 @@ func (tc *taskCtx) scriptStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 		guardEnv(sc, guard)
 	}
 	if st.Shell != "" {
+		if strings.HasPrefix(shebangShell(st.Shell), envShebang) {
+			tc.e.emulate(sp, caps.StepShell, "env shebang", "the script starts with #!"+envShebang+st.Shell+"; the image must provide "+st.Shell+", else the step stops with env: can't execute '"+st.Shell+"' and exit code 127")
+		}
 		lines = append([]string{shebang + shebangShell(st.Shell)}, lines...)
 	} else if len(lines) > 0 && tc.bashDefault(st) {
 		tc.e.emulate(sp, caps.StepShell, "bash-if-present preamble in the script", "the source runs the step under bash when the image has it; the script starts with a line that re-runs it under bash -e when the image has bash, else it runs under sh -e, so bash-only syntax fails under sh")

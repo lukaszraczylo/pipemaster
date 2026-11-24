@@ -14,6 +14,8 @@ import (
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
+// A name whose canonical ref means something else on some event stays text in a script; the prelude of the
+// target spells it.
 func TestScriptsAreCanonicalTemplates(t *testing.T) {
 	pl, _ := pipeline(t, "j:\n  before_script:\n    - echo ${CI_COMMIT_BRANCH}\n  script:\n    - echo $CI_COMMIT_SHA $HOME ${HOME} $$CI_COMMIT_SHA\n    - echo '${{ x }}' $CI_COMMIT_SHA_SHORT\n    - |\n      if [ -n \"$CI_COMMIT_TAG\" ]; then\n        echo tagged\n      fi\n  after_script:\n    - echo done $GITLAB_USER_LOGIN\n")
 	j := job(t, pl, "j")
@@ -21,10 +23,10 @@ func TestScriptsAreCanonicalTemplates(t *testing.T) {
 		t.Fatalf("steps = %d, want before_script and script in one step plus after_script", len(j.Steps))
 	}
 	want := []string{
-		"echo ${{ branch }}",
+		"echo ${CI_COMMIT_BRANCH}",
 		"echo ${{ sha }} $HOME ${HOME} $$CI_COMMIT_SHA",
 		"echo '${{ '${{' }} x }}' $CI_COMMIT_SHA_SHORT",
-		`if [ -n "${{ tag }}" ]; then`,
+		`if [ -n "$CI_COMMIT_TAG" ]; then`,
 		"  echo tagged",
 		"fi",
 	}
@@ -36,7 +38,7 @@ func TestScriptsAreCanonicalTemplates(t *testing.T) {
 		t.Errorf("split index = %v, want 1", ext(s0.Ext)["before_lines"])
 	}
 	a := j.Steps[1]
-	if a.ID != "after_script" || !reflect.DeepEqual(a.Script, []string{"echo done ${{ actor }}"}) {
+	if a.ID != "after_script" || !reflect.DeepEqual(a.Script, []string{"echo done $GITLAB_USER_LOGIN"}) {
 		t.Errorf("after = %+v", a)
 	}
 	if got := expr.String(a.If); got != "always()" || !a.ContinueOnError {

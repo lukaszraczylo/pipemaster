@@ -1,3 +1,4 @@
 Loss report: drone -> argo
+[lost] pipeline/drone/job/ci/step/build script.interpolation (the script reads DRONE_BRANCH, which argo has no source for; the step stops with a message when it starts)
 [external] pipeline/drone/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/drone/trigger/0 trigger.filter.branches

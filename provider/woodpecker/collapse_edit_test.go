@@ -166,7 +166,7 @@ func TestRuntimeVariablesInScriptsBecomeReferencesOrAreReported(t *testing.T) {
 	got := j.Steps[0].Script
 	want := []string{
 		`gh pr merge "${{ pr.number }}" --repo "${{ repo }}"`,
-		`echo ${{ sha }} ${{ branch }} $HOME`,
+		`echo ${{ sha }} ${CI_COMMIT_BRANCH} $HOME`,
 		`echo $CI_PIPELINE_NUMBER $CI_STEP_NAME ${CI_BUILD_STATUS}`,
 	}
 	for i := range want {

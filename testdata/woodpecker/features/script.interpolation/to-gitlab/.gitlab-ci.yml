@@ -8,5 +8,5 @@ ci:
   needs: []
   script:
     # pipemaster:step build
-    - echo $CI_COMMIT_SHA on $CI_COMMIT_BRANCH
+    - echo $CI_COMMIT_SHA on ${CI_COMMIT_BRANCH}
     - 'echo "cost: $5"'

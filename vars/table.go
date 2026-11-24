@@ -38,21 +38,27 @@ type entry struct {
 	Literal map[string]string `yaml:"literal"`
 	Canon   string            `yaml:"canon"`
 	Values  string            `yaml:"values"`
+	// LostOnPR lists the providers whose value differs on a pull request from every other provider.
+	LostOnPR []string `yaml:"lost_on_pr"`
+	// ScriptText keeps the name as text in a script, so the prelude spells it, because the canonical ref
+	// has a different meaning on some event.
+	ScriptText bool `yaml:"script_text"`
 }
 
 type rawTable struct {
-	Docs     map[string]string            `yaml:"docs"`
-	Vars     map[string]entry             `yaml:"vars"`
-	Events   map[string]map[string]string `yaml:"events"`
-	Known    map[string][]string          `yaml:"known"`
-	Prefixes map[string][]string          `yaml:"prefixes"`
-	Skip     []string                     `yaml:"skip"`
+	Docs     map[string]string           `yaml:"docs"`
+	Vars     map[string]entry            `yaml:"vars"`
+	Events   map[string]map[string]names `yaml:"events"`
+	Known    map[string][]string         `yaml:"known"`
+	Prefixes map[string][]string         `yaml:"prefixes"`
+	Skip     []string                    `yaml:"skip"`
 }
 
 // Table is the parsed mapping table.
 type Table struct {
 	raw    rawTable
 	owner  map[string]owner
+	alt    map[string][]owner
 	skip   map[string]bool
 	known  map[string]map[string]bool
 	sorted []string
@@ -77,17 +83,30 @@ func Load() (*Table, error) {
 }
 
 func parse(data []byte) (*Table, error) {
-	t := &Table{owner: map[string]owner{}, skip: map[string]bool{}, known: map[string]map[string]bool{}}
+	t := &Table{owner: map[string]owner{}, alt: map[string][]owner{}, skip: map[string]bool{}, known: map[string]map[string]bool{}}
 	if err := yaml.Unmarshal(data, &t.raw); err != nil {
 		return nil, fmt.Errorf("vars table: %w", err)
 	}
-	for id, e := range t.raw.Vars {
+	ids := make([]string, 0, len(t.raw.Vars))
+	for id := range t.raw.Vars {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		e := t.raw.Vars[id]
 		for prov, ns := range e.Names {
 			for _, n := range ns {
+				o := owner{id: id, provider: prov}
+				// One name can mean different things on two providers (CI_COMMIT_BRANCH), so each meaning
+				// is an entry of its own and the origin of the project picks one.
 				if prev, dup := t.owner[n]; dup && prev.id != id {
-					return nil, fmt.Errorf("vars table: %s is listed for %s and %s", n, prev.id, id)
+					if prev.provider == prov {
+						return nil, fmt.Errorf("vars table: %s is listed for %s and %s on %s", n, prev.id, id, prov)
+					}
+					t.alt[n] = append(t.alt[n], o)
+					continue
 				}
-				t.owner[n] = owner{id: id, provider: prov}
+				t.owner[n] = o
 			}
 		}
 		if e.Values != "" && t.raw.Events == nil {
@@ -125,9 +144,29 @@ func (t *Table) Native(name, target string) bool {
 	if o, ok := t.owner[name]; ok {
 		// A name that an entry maps has the entry's meaning; a provider that documents the same name for
 		// something else does not set it here.
-		return slices.Contains(t.raw.Vars[o.id].Names[target], name)
+		for _, c := range append([]owner{o}, t.alt[name]...) {
+			if slices.Contains(t.raw.Vars[c.id].Names[target], name) {
+				return true
+			}
+		}
+		return false
 	}
 	return t.known[target][name]
+}
+
+// ownerFor picks the entry that gives name its meaning for a project from origin.
+func (t *Table) ownerFor(name, origin string) (owner, bool) {
+	o, ok := t.owner[name]
+	if !ok {
+		return o, false
+	}
+	origin = provider.Family(origin)
+	for _, c := range append([]owner{o}, t.alt[name]...) {
+		if c.provider == origin {
+			return c, true
+		}
+	}
+	return o, true
 }
 
 // foreign reports whether name is a predefined variable of another provider that target does not set. A
@@ -218,4 +257,33 @@ func (t *Table) Canon(id string) string { return t.raw.Vars[id].Canon }
 func (t *Table) Derives(id, target string) bool {
 	_, ok := t.spell(id, target, 0)
 	return ok
+}
+
+// ScriptText reports whether script text keeps name as a shell variable instead of a canonical ref.
+func ScriptText(name string) bool {
+	t, err := Load()
+	if err != nil {
+		return false
+	}
+	o, ok := t.owner[name]
+	return ok && t.raw.Vars[o.id].ScriptText
+}
+
+// ScriptRefLost reports whether the canonical ref path has no exact spelling in a script on target, because the
+// ref means something else on some event there. origin is the provider that the project came from.
+func ScriptRefLost(path []string, origin, target string) bool {
+	t, err := Load()
+	if err != nil || provider.Family(origin) == provider.Family(target) {
+		return false
+	}
+	canon := strings.Join(path, ".")
+	if canon == "tag" {
+		return false
+	}
+	for _, e := range t.raw.Vars {
+		if e.ScriptText && e.Canon == canon {
+			return true
+		}
+	}
+	return false
 }

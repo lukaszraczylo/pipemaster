@@ -1,3 +1,4 @@
 Loss report: woodpecker -> argo
+[lost] pipeline/woodpecker/job/ci/step/build script.interpolation (the script reads CI_COMMIT_BRANCH, which argo has no source for; the step stops with a message when it starts)
 [external] pipeline/woodpecker/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/woodpecker/trigger/0 trigger.filter.branches

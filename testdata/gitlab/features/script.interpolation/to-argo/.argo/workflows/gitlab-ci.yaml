@@ -38,16 +38,16 @@ spec:
               - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
               - pipemaster
               - |-
-                echo "building ${PM_CTX_SHA} on ${PM_CTX_BRANCH} for ${PM_CTX_ACTOR}"
+                export PIPEMASTER_VARS=2; export CI_COMMIT_BRANCH="${PM_CTX_BRANCH}"; export GITLAB_USER_LOGIN="${PM_CTX_ACTOR}"; : pipemaster-end; echo "building ${PM_CTX_SHA} on ${CI_COMMIT_BRANCH} for $GITLAB_USER_LOGIN"
                 echo "keeps $HOME and ${UNMAPPED}"
             workingDir: /workspace
             env:
-              - name: PM_CTX_SHA
-                value: '{{workflow.parameters.ctx-sha}}'
               - name: PM_CTX_BRANCH
                 value: '{{workflow.parameters.ctx-branch}}'
               - name: PM_CTX_ACTOR
                 value: '{{workflow.parameters.ctx-actor}}'
+              - name: PM_CTX_SHA
+                value: '{{workflow.parameters.ctx-sha}}'
         volumeMounts:
           - name: workspace
             mountPath: /workspace

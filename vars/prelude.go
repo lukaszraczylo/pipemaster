@@ -48,12 +48,16 @@ func Prepare(p *ir.Project, target string) (*ir.Project, *Result) {
 		return p, res
 	}
 	paths := map[*ir.Step]string{}
+	jobPaths := map[*ir.Job]string{}
 	for _, n := range ir.Nodes(p) {
-		if n.Step != nil {
+		switch {
+		case n.Step != nil:
 			paths[n.Step] = n.Path
+		case n.Job != nil:
+			jobPaths[n.Job] = n.Path
 		}
 	}
-	pr := &preparer{t: t, target: target, res: res, paths: paths}
+	pr := &preparer{stepLost: map[*ir.Step][]string{}, t: t, target: target, origin: p.Origin.Provider, res: res, paths: paths, jobPaths: jobPaths}
 	out := *p
 	out.Pipelines = make([]*ir.Pipeline, len(p.Pipelines))
 	for i, pl := range p.Pipelines {
@@ -63,10 +67,13 @@ func Prepare(p *ir.Project, target string) (*ir.Project, *Result) {
 }
 
 type preparer struct {
-	t      *Table
-	res    *Result
-	paths  map[*ir.Step]string
-	target string
+	t        *Table
+	res      *Result
+	stepLost map[*ir.Step][]string
+	paths    map[*ir.Step]string
+	jobPaths map[*ir.Job]string
+	target   string
+	origin   string
 }
 
 func (pr *preparer) pipeline(pl *ir.Pipeline) *ir.Pipeline {
@@ -89,9 +96,10 @@ func (pr *preparer) jobs(pl *ir.Pipeline, jobs []*ir.Job) []*ir.Job {
 			continue
 		}
 		cp := *j
+		jobLost := pr.jobFields(j, &cp)
 		cp.Steps = make([]*ir.Step, len(j.Steps))
 		for k, st := range j.Steps {
-			cp.Steps[k] = pr.step(st, append(slices.Clone(pl.Env), j.Env...))
+			cp.Steps[k] = pr.step(pr.stepFields(st), append(slices.Clone(pl.Env), j.Env...), jobLost)
 		}
 		out[i] = &cp
 	}
@@ -102,15 +110,20 @@ func scriptStep(st *ir.Step) bool {
 	return st != nil && len(st.Script) > 0 && st.Action == nil && !emitkit.IsFailLoud(st.Script)
 }
 
-func (pr *preparer) step(st *ir.Step, outer []ir.Var) *ir.Step {
+func (pr *preparer) step(st *ir.Step, outer []ir.Var, fieldLost []string) *ir.Step {
+	if st != nil && st.Image != nil {
+		fieldLost = append(slices.Clone(fieldLost), pr.stepLost[st]...)
+	}
 	if !scriptStep(st) {
 		return st
 	}
 	env, order := effective(outer, st.Env)
 	text := strings.Join(st.Script, "\n")
 	var names []string
-	for _, n := range Refs(text, true) {
-		names = appendNew(names, n)
+	bare := map[string]bool{}
+	for _, r := range ScanRefs(text, true) {
+		names = appendNew(names, r.Name)
+		bare[r.Name] = r.Bare
 	}
 	var reexport []string
 	expand := provider.Family(pr.target) != provider.GitLab
@@ -125,6 +138,7 @@ func (pr *preparer) step(st *ir.Step, outer []ir.Var) *ir.Step {
 		}
 		for _, n := range refs {
 			names = appendNew(names, n)
+			bare[n] = true
 		}
 		if expand {
 			reexport = append(reexport, name)
@@ -138,15 +152,25 @@ func (pr *preparer) step(st *ir.Step, outer []ir.Var) *ir.Step {
 		rhs, ok := pr.resolve(n)
 		switch {
 		case ok:
-			defs = append(defs, fmt.Sprintf("export %s=\"%s\"", n, rhs))
+			defs = append(defs, pr.define(n, rhs))
 			defined = append(defined, n)
+			if g, has := pr.prGuard(n); has {
+				guards = append(guards, g)
+				lost = append(lost, n+" on pull request events")
+			}
 		case pr.t.foreign(n, pr.target):
-			guards = append(guards, fmt.Sprintf(lostFormat, n, n, pr.target))
-			lost = append(lost, n)
+			// A script that sets a default for the name copes with it being unset, so it gets no guard.
+			if bare[n] {
+				guards = append(guards, fmt.Sprintf(lostFormat, n, n, pr.target))
+				lost = append(lost, n)
+			}
 		}
 	}
 	for _, name := range reexport {
 		defs = append(defs, fmt.Sprintf("export %s=\"%s\"", name, quoteValue(env[name].Lit)))
+	}
+	for _, l := range fieldLost {
+		guards = append(guards, fmt.Sprintf("printf '%%s\\n' 'pipemaster: lost: %s' >&2; exit 1", l))
 	}
 	if len(guards)+len(defs) == 0 {
 		return st
@@ -201,7 +225,7 @@ func (pr *preparer) note(st *ir.Step, level caps.Level, strategy, detail string)
 
 // resolve gives the shell text that holds the variable called name on the target.
 func (pr *preparer) resolve(name string) (string, bool) {
-	o, ok := pr.t.owner[name]
+	o, ok := pr.t.ownerFor(name, pr.origin)
 	if !ok {
 		return "", false
 	}
@@ -230,14 +254,20 @@ func (pr *preparer) eventValue(o owner) (string, bool) {
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		from, to := pr.t.raw.Events[k][o.provider], pr.t.raw.Events[k][col]
-		if from == "" || to == "" || seen[to] {
+		row := pr.t.raw.Events[k]
+		if len(row[o.provider]) == 0 {
 			continue
 		}
-		seen[to] = true
-		cases = append(cases, to+") printf %s "+from+";;")
+		from := row[o.provider][0]
+		for _, to := range row[col] {
+			if seen[to] {
+				continue
+			}
+			seen[to] = true
+			cases = append(cases, "("+to+") printf %s "+from+";;")
+		}
 	}
-	cases = append(cases, "*) printf %s "+cur+";;")
+	cases = append(cases, "(*) printf %s "+cur+";;")
 	return "`case " + cur + " in " + strings.Join(cases, " ") + " esac`", true
 }
 
@@ -313,4 +343,155 @@ func stripEntry(entry string) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// prGuard gives the run-time guard for a name whose value on a pull request has no equal on the target: the
+// step stops on that event with a message.
+func (pr *preparer) prGuard(name string) (string, bool) {
+	o, ok := pr.t.ownerFor(name, pr.origin)
+	if !ok {
+		return "", false
+	}
+	e := pr.t.raw.Vars[o.id]
+	in := func(p string) bool { return slices.Contains(e.LostOnPR, provider.Family(p)) }
+	if len(e.LostOnPR) == 0 || in(o.provider) == in(pr.target) {
+		return "", false
+	}
+	ev, ok := pr.t.spell("event", pr.target, 0)
+	if !ok {
+		return "", false
+	}
+	col := provider.Family(pr.target)
+	if templated[col] {
+		col = canonical
+	}
+	var vals []string
+	for _, v := range pr.t.raw.Events["pull_request"][col] {
+		vals = append(vals, v)
+	}
+	if len(vals) == 0 {
+		return "", false
+	}
+	return fmt.Sprintf("case %s in %s) printf '%%s\\n' 'pipemaster: lost: variable %s has no %s source on pull request events' >&2; exit 1;; esac",
+		ev, strings.Join(vals, "|"), name, pr.target), true
+}
+
+// fieldRefs rewrites the variable references of a field that no script runs in, such as an image or a cache
+// key. A name that has a canonical ref with one meaning on every event becomes that ref, which the emitter
+// spells; any other predefined name of another provider has no source in a field, so it is returned.
+func (pr *preparer) fieldRefs(text string) (string, []string) {
+	var lost []string
+	for _, n := range Refs(text, false) {
+		if !pr.t.foreign(n, pr.target) {
+			continue
+		}
+		if o, ok := pr.t.ownerFor(n, pr.origin); ok {
+			if e := pr.t.raw.Vars[o.id]; e.Canon != "" && !e.ScriptText && len(e.LostOnPR) == 0 {
+				text = strings.NewReplacer("${"+n+"}", "${{ "+e.Canon+" }}", "$"+n, "${{ "+e.Canon+" }}").Replace(text)
+				continue
+			}
+		}
+		lost = append(lost, n)
+	}
+	return text, lost
+}
+
+// field applies fieldRefs to one text and reports what is lost at path.
+func (pr *preparer) field(text, path string, f caps.Feature) (string, []string) {
+	out, lost := pr.fieldRefs(text)
+	var msgs []string
+	for _, n := range lost {
+		msg := fmt.Sprintf("%s variable %s has no %s source", f, n, pr.target)
+		msgs = append(msgs, msg)
+		pr.res.entries = append(pr.res.entries, report.Entry{
+			IRPath: path, Feature: f, Level: caps.Lost,
+			Detail: "the field reads " + n + ", which " + pr.target + " has no source for in a field; the steps that use it stop with a message",
+		})
+	}
+	return out, msgs
+}
+
+// jobFields rewrites the job-level fields of cp, which is a copy, and returns the messages for the steps.
+func (pr *preparer) jobFields(orig, cp *ir.Job) []string {
+	path := pr.jobPaths[orig]
+	var msgs []string
+	if cp.Container != nil {
+		c := *cp.Container
+		var m []string
+		c.Ref, m = pr.field(c.Ref, path, caps.JobContainer)
+		cp.Container, msgs = &c, append(msgs, m...)
+	}
+	if len(cp.Services) > 0 {
+		cp.Services = slices.Clone(cp.Services)
+		for i := range cp.Services {
+			var m []string
+			cp.Services[i].Image.Ref, m = pr.field(cp.Services[i].Image.Ref, path, caps.JobServices)
+			msgs = append(msgs, m...)
+		}
+	}
+	if len(cp.Cache) > 0 {
+		cp.Cache = slices.Clone(cp.Cache)
+		for i := range cp.Cache {
+			var m []string
+			cp.Cache[i].Key, m = pr.field(cp.Cache[i].Key, path, caps.JobCache)
+			msgs = append(msgs, m...)
+		}
+	}
+	if len(cp.Artifacts) > 0 {
+		cp.Artifacts = slices.Clone(cp.Artifacts)
+		for i := range cp.Artifacts {
+			paths := slices.Clone(cp.Artifacts[i].Paths)
+			for k := range paths {
+				var m []string
+				paths[k], m = pr.field(paths[k], path, caps.JobArtifacts)
+				msgs = append(msgs, m...)
+			}
+			cp.Artifacts[i].Paths = paths
+		}
+	}
+	return msgs
+}
+
+// stepFields rewrites the image of a step and keeps its messages for step.
+func (pr *preparer) stepFields(st *ir.Step) *ir.Step {
+	if st == nil || st.Image == nil {
+		return st
+	}
+	ref, msgs := pr.field(st.Image.Ref, pr.paths[st], caps.StepImage)
+	if ref == st.Image.Ref && len(msgs) == 0 {
+		return st
+	}
+	cp := *st
+	img := *st.Image
+	img.Ref = ref
+	cp.Image = &img
+	pr.paths[&cp] = pr.paths[st]
+	pr.stepLost[&cp] = msgs
+	return &cp
+}
+
+// define writes the assignment of name. A command substitution gets its own export, so that the shell does not
+// hide the exit status of the command, and the $( ) form unless the target reads $( as its own syntax.
+func (pr *preparer) define(name, rhs string) string {
+	if !strings.Contains(rhs, "`") {
+		return fmt.Sprintf("export %s=\"%s\"", name, rhs)
+	}
+	if provider.Family(pr.target) != provider.Tekton {
+		var b strings.Builder
+		open := true
+		for _, c := range rhs {
+			switch {
+			case c != '`':
+				b.WriteRune(c)
+			case open:
+				b.WriteString("$(")
+				open = false
+			default:
+				b.WriteByte(')')
+				open = true
+			}
+		}
+		rhs = b.String()
+	}
+	return fmt.Sprintf("%s=\"%s\"; export %s", name, rhs, name)
 }

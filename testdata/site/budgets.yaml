@@ -16,12 +16,12 @@ concourse:
   tekton: {placeholder: 2, lost_line: 0, disabled: 3}
   woodpecker: {placeholder: 2, lost_line: 0, disabled: 6}
 drone:
-  argo: {placeholder: 4, lost_line: 0, disabled: 0}
-  concourse: {placeholder: 4, lost_line: 0, disabled: 3}
-  gha: {placeholder: 0, lost_line: 0, disabled: 0}
-  gitlab: {placeholder: 4, lost_line: 0, disabled: 1}
-  tekton: {placeholder: 4, lost_line: 0, disabled: 0}
-  woodpecker: {placeholder: 0, lost_line: 0, disabled: 7}
+  argo: {placeholder: 6, lost_line: 0, disabled: 0}
+  concourse: {placeholder: 6, lost_line: 0, disabled: 3}
+  gha: {placeholder: 2, lost_line: 0, disabled: 0}
+  gitlab: {placeholder: 6, lost_line: 0, disabled: 1}
+  tekton: {placeholder: 6, lost_line: 0, disabled: 0}
+  woodpecker: {placeholder: 2, lost_line: 0, disabled: 7}
 gha:
   argo: {placeholder: 0, lost_line: 0, disabled: 0}
   concourse: {placeholder: 0, lost_line: 0, disabled: 0}

@@ -2,4 +2,5 @@ Loss report: concourse -> woodpecker
 [lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the Woodpecker file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build ext.passthrough (Ext of provider concourse (gets) is not written to the Woodpecker file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-run ext.passthrough (Ext of provider concourse (config, input_mapping) is not written to the Woodpecker file; it is kept in round-trip metadata)
+[lost] pipeline/ci/job/build/step/build-run script.interpolation (no Woodpecker spelling for expression branch; the line is replaced by a line that prints the loss and exits 1)
 [lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the Woodpecker file; it is kept in round-trip metadata)

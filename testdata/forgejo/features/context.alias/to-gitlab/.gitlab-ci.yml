@@ -9,9 +9,10 @@ build:
     # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-1
     # pipemaster:arg "(event !~ '(?i)^merge_request_event$') \u0026\u0026 (ref_name =~ '(?i)^main$')"
     # pipemaster:arg {"src":"ref_name == 'main'"}
+    # pipemaster:lost script.interpolation pipeline/ci/job/build/step/build-step-1: echo {{ ref_name }}
     - |
       if ! printf '%s\n' "$CI_PIPELINE_SOURCE" | grep -Eiq '^merge_request_event$' && printf '%s\n' "$CI_COMMIT_REF_NAME" | grep -Eiq '^main$'; then
-      echo $CI_COMMIT_REF_NAME
+      printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no GitLab variable for expression ref_name; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
       fi
     # pipemaster:step build-step-2
     # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2

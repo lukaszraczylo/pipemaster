@@ -90,12 +90,13 @@ func TestDroneCorpusSplitsGitLabJobsByImage(t *testing.T) {
 	jobs := gitlabJobs(t, files)
 
 	for _, p := range lostImagePaths(rep) {
-		if !strings.Contains(p, "Docker") && !strings.Contains(p, "Code analysis") {
+		// DRONE_BRANCH is the target branch on a pull request, so the image field cannot spell it on GitLab.
+		if !strings.Contains(p, "Docker") && !strings.Contains(p, "Code analysis") && !strings.Contains(p, "API") {
 			t.Errorf("a script step still loses its image: %s", p)
 		}
 	}
 	want := map[string]string{
-		"API-1": "alpine:latest", "API-2": "axarev/parsr-base:$CI_COMMIT_BRANCH", "API-3": "busybox",
+		"API-1": "alpine:latest", "API-2": "axarev/parsr-base:${DRONE_BRANCH}", "API-3": "busybox",
 		"UI-1": "alpine:latest", "UI-2": "registry.access.redhat.com/ubi8/nodejs-10", "UI-3": "busybox",
 		"baseimage": "busybox", "Sonarqube": "slallemand/slack-webhook:latest",
 	}
@@ -264,13 +265,13 @@ func TestMultiImageJobBecomesChainedGitLabJobsAndBack(t *testing.T) {
 	}
 }
 
-const ghaBranch = "${{ github.ref_type == 'branch' && github.ref_name || '' }}"
+const ghaSHA = "${{ github.sha }}"
 
 const droneVarImage = `kind: pipeline
 name: ci
 steps:
   - name: build
-    image: alpine:${DRONE_BRANCH}
+    image: alpine:${DRONE_COMMIT_SHA}
     environment:
       MODE: fast
     commands:
@@ -320,7 +321,7 @@ func TestGHAVariableImageRunsThroughDockerRun(t *testing.T) {
 		t.Fatalf("script text or an expression sits in the shell line:\n%s", run)
 	}
 	env, _ := st["env"].(map[string]any)
-	if got, _ := env["PIPEMASTER_IMAGE"].(string); got != "alpine:"+ghaBranch {
+	if got, _ := env["PIPEMASTER_IMAGE"].(string); got != "alpine:"+ghaSHA {
 		t.Errorf("image env = %q", got)
 	}
 	if !strings.Contains(run, "-e MODE") {
@@ -357,7 +358,7 @@ func TestGHAVariableImageScriptReachesTheContainerIntact(t *testing.T) {
 	cmd.Env = []string{"PATH=" + bin + ":/usr/bin:/bin", "GITHUB_WORKSPACE=" + dir, "ARGV_OUT=" + argv, "MODE=fast"}
 	for k, v := range env {
 		s, _ := v.(string)
-		cmd.Env = append(cmd.Env, k+"="+strings.ReplaceAll(s, ghaBranch, "main"))
+		cmd.Env = append(cmd.Env, k+"="+strings.ReplaceAll(s, ghaSHA, "main"))
 	}
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("step failed: %v\n%s", err, out)

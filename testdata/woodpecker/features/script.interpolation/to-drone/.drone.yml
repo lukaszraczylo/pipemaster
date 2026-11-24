@@ -8,5 +8,5 @@ steps:
   - name: build
     image: alpine:3.20
     commands:
-      - echo $${DRONE_COMMIT_SHA} on $${DRONE_BRANCH}
+      - 'export PIPEMASTER_VARS=1; export CI_COMMIT_BRANCH="$${DRONE_COMMIT_BRANCH}"; : pipemaster-end; echo $${DRONE_COMMIT_SHA} on $${CI_COMMIT_BRANCH}'
       - 'echo "cost: $$5"'

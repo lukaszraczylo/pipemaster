@@ -4,8 +4,6 @@ metadata:
   name: drone
 spec:
   params:
-    - name: ctx-branch
-      default: ""
     - name: ctx-sha
       default: ""
   tasks:
@@ -15,5 +13,3 @@ spec:
       params:
         - name: ctx-sha
           value: $(params.ctx-sha)
-        - name: ctx-branch
-          value: $(params.ctx-branch)

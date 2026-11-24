@@ -13,6 +13,7 @@ import (
 	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 var identRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -20,9 +21,10 @@ var identRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 // emitter carries the state of one Emit call: the ledger and the lost-text comments waiting for a node.
 type emitter struct {
 	// gated holds the action steps that a later step reads, which no target may drop.
-	gated map[*ir.Step]bool
-	led   *emitkit.Ledger
-	pl    *ir.Pipeline
+	gated    map[*ir.Step]bool
+	led      *emitkit.Ledger
+	originID string
+	pl       *ir.Pipeline
 	// wfGuard is the workflow condition that Parse ANDed into every job; the written workflow block already says it.
 	wfGuard expr.Expr
 	from    *expr.Dialect
@@ -173,6 +175,12 @@ func convert(s string) (out string, lost []string, err error) {
 	return convertParts(parts)
 }
 
+// A variable inside single quotes does not expand, so the text leaves the quotes around it.
+const (
+	quoteBreakOpen  = `'"`
+	quoteBreakClose = `"'`
+)
+
 func convertParts(parts []expr.Part) (string, []string, error) {
 	var sb strings.Builder
 	var lost []string
@@ -198,7 +206,11 @@ func convertParts(parts []expr.Part) (string, []string, error) {
 		if i+1 < len(parts) && parts[i+1].Expr == nil && parts[i+1].Text != "" {
 			next = parts[i+1].Text[0]
 		}
-		if next != 0 && identPart(next) {
+		cur := sb.String()
+		cur = cur[strings.LastIndexByte(cur, '\n')+1:]
+		if !strings.Contains(cur, "<<") && vars.Protected(cur + "$")[len(cur)] {
+			sb.WriteString(quoteBreakOpen + "$" + name + quoteBreakClose)
+		} else if next != 0 && identPart(next) {
 			sb.WriteString("${" + name + "}")
 		} else {
 			sb.WriteString("$" + name)
@@ -279,6 +291,7 @@ func (e *emitter) scriptLine(s string) (out, why string, err error) {
 	}
 	lost = append(lost, e.deadOutputRefs(s)...)
 	lost = append(lost, e.noVarRefs(s)...)
+	lost = append(lost, e.eventRefs(s)...)
 	if len(lost) == 0 && strings.Contains(out, rawExprOpen) {
 		return "", "the text holds a literal " + rawExprOpen + " that GitLab never expands", nil
 	}
@@ -593,4 +606,19 @@ func (e *emitter) flattenedNote(path string, f caps.Feature, s string) {
 	if parts, err := expr.ParseScriptTemplate(s); err == nil && flattens(parts) {
 		e.emulate(path, f, "namespace flattened", "namespace flattened; restored only with round-trip metadata")
 	}
+}
+
+// eventRefs lists the canonical refs of s that mean something else on some event on GitLab than at the source.
+func (e *emitter) eventRefs(s string) []string {
+	parts, err := expr.ParseScriptTemplate(s)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, p := range parts {
+		if r, ok := p.Expr.(expr.Ref); ok && vars.ScriptRefLost(r.Path, e.originID, dialect) {
+			out = append(out, expr.String(r))
+		}
+	}
+	return out
 }

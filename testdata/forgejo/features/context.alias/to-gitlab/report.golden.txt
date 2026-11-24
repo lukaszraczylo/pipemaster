@@ -1,3 +1,4 @@
 Loss report: forgejo -> gitlab
+[lost] pipeline/ci/job/build/step/build-step-1 script.interpolation (no GitLab variable for expression ref_name; the line is replaced by a line that prints the loss and exits 1)
 [lost] pipeline/ci/job/build/step/build-step-2 step.if (condition not expressible in GitLab CI; step disabled)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.if: shell guard around the step's lines (step reports success instead of skipped)

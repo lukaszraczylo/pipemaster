@@ -5,15 +5,12 @@ metadata:
 spec:
   params:
     - name: ctx-sha
-    - name: ctx-branch
   steps:
     - name: build
       image: alpine:3.20
       script: |-
-        echo ${PM_CTX_SHA} on ${PM_CTX_BRANCH}
+        export PIPEMASTER_VARS=1; : "${DRONE_BRANCH:?pipemaster: lost: variable DRONE_BRANCH has no tekton source}"; : pipemaster-end; echo ${PM_CTX_SHA} on ${DRONE_BRANCH}
         echo "cost: $5"
       env:
         - name: PM_CTX_SHA
           value: $(params.ctx-sha)
-        - name: PM_CTX_BRANCH
-          value: $(params.ctx-branch)

@@ -178,7 +178,8 @@ func TestNoRawGhaExprInOutput(t *testing.T) {
 
 func TestScriptInterpolationMapsCanonicalRefs(t *testing.T) {
 	doc := emitDoc(t, ghaFixture(t, "script.interpolation"))
-	for _, want := range []string{`echo "sha $CI_COMMIT_SHA on $CI_COMMIT_REF_NAME"`} {
+	// ref_name is lost: GHA gives <n>/merge on a pull request and GitLab gives the source branch.
+	for _, want := range []string{`# pipemaster:lost script.interpolation`, `echo "sha {{ sha }} on {{ ref_name }}"`} {
 		if !strings.Contains(doc, want) {
 			t.Errorf("missing %q in\n%s", want, doc)
 		}

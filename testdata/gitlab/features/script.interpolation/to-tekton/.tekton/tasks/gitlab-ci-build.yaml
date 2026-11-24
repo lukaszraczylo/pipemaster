@@ -7,9 +7,9 @@ metadata:
   name: gitlab-ci-build
 spec:
   params:
-    - name: ctx-sha
     - name: ctx-branch
     - name: ctx-actor
+    - name: ctx-sha
   steps:
     - name: script
       image: alpine:3.22
@@ -17,12 +17,12 @@ spec:
         #!/bin/sh
         if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
         set -e
-        echo "building ${PM_CTX_SHA} on ${PM_CTX_BRANCH} for ${PM_CTX_ACTOR}"
+        export PIPEMASTER_VARS=2; export CI_COMMIT_BRANCH="${PM_CTX_BRANCH}"; export GITLAB_USER_LOGIN="${PM_CTX_ACTOR}"; : pipemaster-end; echo "building ${PM_CTX_SHA} on ${CI_COMMIT_BRANCH} for $GITLAB_USER_LOGIN"
         echo "keeps $HOME and ${UNMAPPED}"
       env:
-        - name: PM_CTX_SHA
-          value: $(params.ctx-sha)
         - name: PM_CTX_BRANCH
           value: $(params.ctx-branch)
         - name: PM_CTX_ACTOR
           value: $(params.ctx-actor)
+        - name: PM_CTX_SHA
+          value: $(params.ctx-sha)

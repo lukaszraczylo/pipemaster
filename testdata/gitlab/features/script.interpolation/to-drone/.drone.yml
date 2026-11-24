@@ -11,5 +11,5 @@ steps:
     image: ubuntu:latest
     commands:
       - |-
-        sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo "building $${DRONE_COMMIT_SHA} on $${DRONE_BRANCH} for $${DRONE_COMMIT_AUTHOR}"
+        sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'export PIPEMASTER_VARS=2; : "$${GITLAB_USER_LOGIN:?pipemaster: lost: variable GITLAB_USER_LOGIN has no drone source}"; CI_COMMIT_BRANCH="$$(if [ -z "$${DRONE_TAG}" ] && [ "$${DRONE_BUILD_EVENT}" != pull_request ]; then printf %s "$${DRONE_COMMIT_BRANCH}"; fi)"; export CI_COMMIT_BRANCH; : pipemaster-end; echo "building $${DRONE_COMMIT_SHA} on $${CI_COMMIT_BRANCH} for $$GITLAB_USER_LOGIN"
         echo "keeps $$HOME and $${UNMAPPED}"'

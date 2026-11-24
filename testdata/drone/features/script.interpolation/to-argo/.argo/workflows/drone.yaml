@@ -1,7 +1,7 @@
 # pipemaster:emulated step.image pipeline/drone/job/ci
 # pipemaster:arg {"steps":{"build":"ref: alpine:3.20\n"},"wrote":{"build":"alpine:3.20"}}
 # pipemaster:emulated script.interpolation pipeline/drone/job/ci
-# pipemaster:arg {"vars":{"PM_CTX_BRANCH":"branch","PM_CTX_SHA":"sha"}}
+# pipemaster:arg {"vars":{"PM_CTX_SHA":"sha"}}
 # pipemaster:emulated trigger.filter.branches pipeline/drone/trigger/0
 # pipemaster:emulated trigger.push pipeline/drone/trigger/0
 apiVersion: argoproj.io/v1alpha1
@@ -12,8 +12,6 @@ spec:
   entrypoint: main
   arguments:
     parameters:
-      - name: ctx-branch
-        value: ""
       - name: ctx-sha
         value: ""
   templates:
@@ -32,14 +30,12 @@ spec:
               - -ec
             args:
               - |-
-                echo ${PM_CTX_SHA} on ${PM_CTX_BRANCH}
+                export PIPEMASTER_VARS=1; : "${DRONE_BRANCH:?pipemaster: lost: variable DRONE_BRANCH has no argo source}"; : pipemaster-end; echo ${PM_CTX_SHA} on ${DRONE_BRANCH}
                 echo "cost: $5"
             workingDir: /workspace
             env:
               - name: PM_CTX_SHA
                 value: '{{workflow.parameters.ctx-sha}}'
-              - name: PM_CTX_BRANCH
-                value: '{{workflow.parameters.ctx-branch}}'
         volumeMounts:
           - name: workspace
             mountPath: /workspace

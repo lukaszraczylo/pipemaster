@@ -12,6 +12,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 // reader tracks which keys of a mapping a parser consumed, so the rest can go to Ext.
@@ -169,8 +170,14 @@ func intNode(n *yaml.Node) (int, bool) {
 }
 
 // canonText rewrites known GitLab variables in s as canonical ${{ }} references and escapes a literal "${{".
-func canonText(s string) (string, error) {
-	parts := splitVars(s)
+func canonText(s string) (string, error) { return canonWith(s, false) }
+
+// canonScript is canonText for shell script text: a name whose canonical ref means another thing on some
+// event stays text, so the variable prelude spells it, and text in which no variable expands stays as it is.
+func canonScript(s string) (string, error) { return canonWith(s, true) }
+
+func canonWith(s string, script bool) (string, error) {
+	parts := splitVarsIn(s, script)
 	out, err := expr.PrintScriptTemplate(parts)
 	if err != nil {
 		return "", fmt.Errorf("script template: %w", err)
@@ -185,7 +192,13 @@ func isIdentStart(c byte) bool {
 func isIdentPart(c byte) bool { return isIdentStart(c) || (c >= '0' && c <= '9') }
 
 // splitVars cuts s into text and canonical refs for $NAME and ${NAME} where NAME is in the vocabulary; "$$" is left alone.
-func splitVars(s string) []expr.Part {
+func splitVars(s string) []expr.Part { return splitVarsIn(s, false) }
+
+func splitVarsIn(s string, script bool) []expr.Part {
+	var mask []bool
+	if script {
+		mask = vars.Protected(s)
+	}
 	var parts []expr.Part
 	var text strings.Builder
 	flush := func() {
@@ -206,6 +219,11 @@ func splitVars(s string) []expr.Part {
 			continue
 		}
 		name, end := varAt(s, i)
+		if script && (mask[i] || vars.ScriptText(name)) {
+			text.WriteByte('$')
+			i++
+			continue
+		}
 		if canon, ok := exprgitlab.Vocab.Canon([]string{name}); ok && name != "" {
 			flush()
 			parts = append(parts, expr.Part{Expr: expr.Ref{Path: canon}})
@@ -216,6 +234,23 @@ func splitVars(s string) []expr.Part {
 		i++
 	}
 	flush()
+	if script {
+		parts = foldQuoteBreaks(parts)
+	}
+	return parts
+}
+
+// foldQuoteBreaks undoes the quote break that the emitter writes around a variable in single-quoted text.
+func foldQuoteBreaks(parts []expr.Part) []expr.Part {
+	for i := 1; i+1 < len(parts); i++ {
+		if parts[i].Expr == nil || parts[i-1].Expr != nil || parts[i+1].Expr != nil {
+			continue
+		}
+		if strings.HasSuffix(parts[i-1].Text, quoteBreakOpen) && strings.HasPrefix(parts[i+1].Text, quoteBreakClose) {
+			parts[i-1].Text = strings.TrimSuffix(parts[i-1].Text, quoteBreakOpen)
+			parts[i+1].Text = strings.TrimPrefix(parts[i+1].Text, quoteBreakClose)
+		}
+	}
 	return parts
 }
 
@@ -263,7 +298,7 @@ func (s *state) eachScriptItem(n *yaml.Node, what string, fn func(item *yaml.Nod
 			return nil
 		case yaml.ScalarNode:
 			t, _ := scalarText(c)
-			canon, err := canonText(t)
+			canon, err := canonScript(t)
 			if err != nil {
 				return s.errf(c, "%v", err)
 			}

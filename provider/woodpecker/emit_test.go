@@ -59,12 +59,12 @@ func TestDollarParsedFromWoodpecker(t *testing.T) {
 
 func TestExpressionSpelling(t *testing.T) {
 	st := wpStep("s",
-		"echo ${{ matrix.GO }} ${{ branch }}",
+		"echo ${{ matrix.GO }} ${{ sha }}",
 		"echo ${{ env.NAME }} ${{ secrets.TOKEN }}",
 		"echo ${{ needs.a.outputs.x }}",
 	)
 	body, rep := one(t, wpProject(ghaOrigin, wpJob("ci", st)))
-	for _, want := range []string{"echo ${GO} ${CI_COMMIT_BRANCH}", "echo $${NAME} $${TOKEN}", "from_secret: TOKEN"} {
+	for _, want := range []string{"echo ${GO} ${CI_COMMIT_SHA}", "echo $${NAME} $${TOKEN}", "from_secret: TOKEN"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q in\n%s", want, body)
 		}

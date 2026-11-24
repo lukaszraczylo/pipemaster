@@ -178,7 +178,7 @@ steps:
 	got := step(t, j, "s").Script
 	want := []string{
 		"echo $HOME ${FOO}",
-		"echo ${{ branch }} ${{ matrix.GO }} ${{ env.CUSTOM }} ${{ woodpecker.CI_REPO_URL }}",
+		"echo ${CI_COMMIT_BRANCH} ${{ matrix.GO }} ${{ env.CUSTOM }} ${{ woodpecker.CI_REPO_URL }}",
 		"echo ${CI_COMMIT_TAG##v}",
 		"echo $PLAIN",
 	}
@@ -237,7 +237,7 @@ func TestServicesMapForm(t *testing.T) {
 
 func TestEscapedBuiltinVariableReadsAsReference(t *testing.T) {
 	_, j, _ := single(t, "steps:\n  - name: s\n    image: x\n    commands:\n      - 'echo $${CI_COMMIT_BRANCH} $${HOME} ${CI_COMMIT_SHA}'\n")
-	if got := j.Steps[0].Script[0]; got != "echo ${{ branch }} ${HOME} ${{ sha }}" {
+	if got := j.Steps[0].Script[0]; got != "echo ${CI_COMMIT_BRANCH} ${HOME} ${{ sha }}" {
 		t.Fatalf("script = %q", got)
 	}
 }

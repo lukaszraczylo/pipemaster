@@ -15,9 +15,9 @@ spec:
       taskRef:
         name: gitlab-ci-build
       params:
-        - name: ctx-sha
-          value: $(params.ctx-sha)
         - name: ctx-branch
           value: $(params.ctx-branch)
         - name: ctx-actor
           value: $(params.ctx-actor)
+        - name: ctx-sha
+          value: $(params.ctx-sha)

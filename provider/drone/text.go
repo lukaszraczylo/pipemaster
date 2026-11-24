@@ -8,6 +8,7 @@ import (
 	dexpr "github.com/lukaszraczylo/pipemaster/expr/drone"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
@@ -56,8 +57,8 @@ func shellName(s string) (name string, n int) {
 
 // builtin reads a shell variable that Drone sets in the step environment as its canonical reference. Any other
 // name stays text: the IR has no reference for a variable the pipeline does not define.
-func builtin(name string) (expr.Ref, bool) {
-	if !isIdent(name) {
+func builtin(name string, script bool) (expr.Ref, bool) {
+	if !isIdent(name) || script && vars.ScriptText(name) {
 		return expr.Ref{}, false
 	}
 	r := dexpr.Ref(name)
@@ -67,7 +68,8 @@ func builtin(name string) (expr.Ref, bool) {
 	return r, true
 }
 
-func (x *texts) parts(s string) []expr.Part {
+// parts splits s into text and refs. In a script, names whose value depends on the event stay text.
+func (x *texts) parts(s string, script bool) []expr.Part {
 	var parts []expr.Part
 	var lit strings.Builder
 	flush := func() {
@@ -77,7 +79,7 @@ func (x *texts) parts(s string) []expr.Part {
 		}
 	}
 	ref := func(name string) bool {
-		r, ok := builtin(name)
+		r, ok := builtin(name, script)
 		if ok {
 			flush()
 			parts = append(parts, expr.Part{Expr: r})
@@ -101,7 +103,7 @@ func (x *texts) parts(s string) []expr.Part {
 				break
 			}
 			whole, name := s[i:i+end+1], s[i+2:i+end]
-			if r, ok := builtin(name); ok {
+			if r, ok := builtin(name, script); ok {
 				flush()
 				parts = append(parts, expr.Part{Expr: r})
 			} else {
@@ -130,12 +132,12 @@ func (x *texts) template(s string) (string, error) {
 	if !strings.Contains(s, dollar) {
 		return s, nil
 	}
-	return expr.PrintScriptTemplate(x.parts(s))
+	return expr.PrintScriptTemplate(x.parts(s, true))
 }
 
 // value reads s as a literal, or as an expression when it holds a reference.
 func (x *texts) value(s string) ir.Value {
-	parts := x.parts(s)
+	parts := x.parts(s, false)
 	var lit strings.Builder
 	for _, p := range parts {
 		if p.Expr != nil {

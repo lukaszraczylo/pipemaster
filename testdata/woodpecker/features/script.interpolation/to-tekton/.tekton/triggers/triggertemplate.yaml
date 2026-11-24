@@ -5,8 +5,6 @@ metadata:
   name: woodpecker-run
 spec:
   params:
-    - name: ctx-branch
-      default: ""
     - name: ctx-sha
       default: ""
   resourcetemplates:
@@ -18,7 +16,5 @@ spec:
         pipelineRef:
           name: woodpecker
         params:
-          - name: ctx-branch
-            value: $(tt.params.ctx-branch)
           - name: ctx-sha
             value: $(tt.params.ctx-sha)

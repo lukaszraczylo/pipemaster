@@ -10,4 +10,5 @@ build:
   needs: []
   script:
     # pipemaster:step build-run
-    - echo on $CI_COMMIT_BRANCH
+    # pipemaster:lost script.interpolation pipeline/ci/job/build/step/build-run: echo on {{ branch }}
+    - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-run: no GitLab variable for expression branch; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'

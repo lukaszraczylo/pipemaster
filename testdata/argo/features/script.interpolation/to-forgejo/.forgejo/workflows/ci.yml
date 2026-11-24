@@ -15,5 +15,7 @@ jobs:
     steps:
       - id: build-step-1
         run: |
-          echo "sha ${{ github.sha }} on ${{ github.ref_name }}"
+          echo "sha ${{ github.sha }} on ${PIPEMASTER_REF_1}"
           echo "${{ github.workspace }}"
+        env:
+          PIPEMASTER_REF_1: ${{ github.ref_name }}

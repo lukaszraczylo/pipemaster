@@ -30,6 +30,7 @@ const (
 func (a *adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
 	p, idRenames := withValidJobIDs(p)
 	p, vres := vars.Prepare(p, a.d.ID)
+	p = bindRefEnv(p, a.d.ID)
 	e := &emitter{origin: originProvider(p), d: a.d, from: sourceDialect(originProvider(p)), led: emitkit.NewLedger("ir", a.d.ID, a.Caps()),
 		jobGuards: p.Origin.Guarded}
 	uses := ir.Features(p)

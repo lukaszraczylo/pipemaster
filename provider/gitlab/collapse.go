@@ -111,7 +111,7 @@ func unguard(st *ir.Step, lines []string, arg, src string) ([]string, bool) {
 	if !ok {
 		return nil, false
 	}
-	want, err := canonText("if " + guard + "; then")
+	want, err := canonScript("if " + guard + "; then")
 	if err != nil || lines[0] != want {
 		return nil, false
 	}
@@ -236,6 +236,13 @@ func unsub(st *ir.Step, lines []string, workdir, env bool) ([]string, bool) {
 // envValue reads an exported value back as the IR holds a variable: text, a secret reference, or an
 // expression when the canonical script text carries ${{ }} references. Text it cannot parse is not restored.
 func envValue(text string) (ir.Value, bool) {
+	// The emitter wrote the line from an IR value, so a GitLab name in it stands for the canonical ref even
+	// where script text keeps the name.
+	if !strings.Contains(text, "${{") {
+		if canon, err := canonText(text); err == nil {
+			text = canon
+		}
+	}
 	if !strings.Contains(text, "${{") {
 		return ir.Value{Lit: text}, true
 	}

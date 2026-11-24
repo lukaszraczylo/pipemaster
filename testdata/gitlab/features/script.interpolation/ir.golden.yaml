@@ -17,5 +17,5 @@ pipelines:
               id: script
               kind: script
               script:
-                - echo "building ${{ sha }} on ${{ branch }} for ${{ actor }}"
+                - echo "building ${{ sha }} on ${CI_COMMIT_BRANCH} for $GITLAB_USER_LOGIN"
                 - echo "keeps $HOME and ${UNMAPPED}"

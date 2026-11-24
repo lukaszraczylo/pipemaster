@@ -15,5 +15,5 @@ pipelines:
               id: build
               kind: script
               script:
-                - echo ${{ sha }} on ${{ branch }}
+                - echo ${{ sha }} on ${DRONE_BRANCH}
                 - 'echo "cost: $5"'

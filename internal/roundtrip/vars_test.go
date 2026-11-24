@@ -296,7 +296,7 @@ jobs:
 				all.WriteString(c + "\n")
 			}
 			text := all.String()
-			if !strings.Contains(text, "export GITHUB_SHA=") || !strings.Contains(text, "export GITHUB_REF_NAME=") {
+			if !strings.Contains(text, "GITHUB_SHA=") || !strings.Contains(text, "GITHUB_REF_NAME=") {
 				t.Errorf("no prelude for $GITHUB_SHA and $GITHUB_REF_NAME:\n%s", text)
 			}
 			for _, w := range want[to] {
@@ -429,6 +429,15 @@ var dashImages = []string{"debian:bookworm-slim", "mirror.gcr.io/library/debian:
 // dockerRun runs a shell command line in the dash image and skips the test when docker is not there.
 func dockerRun(t *testing.T, line string) (string, error) {
 	t.Helper()
+	return dockerRunIn(t, dashImages, line)
+}
+
+// noBashImages are the names of one image that has no bash.
+var noBashImages = []string{"alpine:3", "mirror.gcr.io/library/alpine:3"}
+
+// dockerRunIn runs a shell command line in the first of images that docker has or pulls.
+func dockerRunIn(t *testing.T, images []string, line string) (string, error) {
+	t.Helper()
 	if _, err := exec.LookPath("docker"); err != nil {
 		t.Skip("no docker")
 	}
@@ -445,7 +454,7 @@ func dockerRun(t *testing.T, line string) (string, error) {
 	if out, err := probe.CombinedOutput(); err != nil {
 		t.Skipf("docker is not available: %s", out)
 	}
-	for _, img := range dashImages {
+	for _, img := range images {
 		pull := exec.Command("docker", "image", "inspect", img) // #nosec G204 -- fixed arguments
 		pull.Env = env
 		if pull.Run() != nil {
@@ -562,4 +571,34 @@ func unwrapBashCommand(cmd string) string {
 		}
 	}
 	return cmd
+}
+
+// An image without bash runs the wrapped script under sh: the wrapper never fails on a missing bash.
+func TestWrappedScriptRunsOnAnImageWithoutBash(t *testing.T) {
+	const wf = "name: ci\non: [push]\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          echo \"MARK posix.ok:$((1+2))\"\n"
+	for _, to := range []string{provider.Drone, provider.Woodpecker} {
+		t.Run(to, func(t *testing.T) {
+			proj, _, err := prov(t, provider.GHA).Parse(toFS(map[string][]byte{".github/workflows/ci.yml": []byte(wf)}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			files, _, err := prov(t, to).Emit(proj)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var cmd string
+			for _, c := range scriptCandidates(t, files) {
+				if strings.HasPrefix(c, "sh -c ") {
+					cmd = strings.ReplaceAll(c, "$$", "$")
+				}
+			}
+			if cmd == "" {
+				t.Fatalf("no wrapper command in %v", scriptCandidates(t, files))
+			}
+			out, err := dockerRunIn(t, noBashImages, cmd)
+			if err != nil || !strings.Contains(out, "MARK posix.ok:3") {
+				t.Fatalf("run in the image without bash: %v\n%s", err, out)
+			}
+		})
+	}
 }

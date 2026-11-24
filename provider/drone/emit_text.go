@@ -13,6 +13,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
@@ -246,6 +247,9 @@ func (e *emitter) refText(b *bindings, mode textMode, path []string, off int) (s
 			}
 			return dollarEsc + "{" + path[1] + "}", true
 		}
+	}
+	if mode == commandText && vars.ScriptRefLost(path, e.origin, dialect) {
+		return "", false
 	}
 	if dp, ok := dexpr.Vocab.Dialect(path); ok && len(dp) == 1 {
 		if mode == commandText {

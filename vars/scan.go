@@ -1,13 +1,64 @@
 package vars
 
+import "strings"
+
+// Ref is one variable read in a text. Bare is false when every read of the name has a default or an error
+// operator, as in ${NAME:-x}, so the text copes with the name being unset.
+type Ref struct {
+	Name string
+	Bare bool
+}
+
 // Refs lists the variable names that text reads, in order of first use, as $NAME, ${NAME} or ${NAME:-x}. With
-// shell set, text is shell source: a reference inside single quotes, behind a backslash or in a comment does
-// not expand, so it is not listed. Without it, text is a variable value that the provider expands everywhere.
-// A doubled dollar is an escape and never starts a reference.
+// shell set, text is shell source: a reference inside single quotes, behind a backslash, in a comment or in a
+// quoted here-document does not expand, so it is not listed. Without it, text is a variable value that the
+// provider expands everywhere. A doubled dollar is an escape and never starts a reference.
 func Refs(text string, shell bool) []string {
-	var out []string
-	seen := map[string]bool{}
+	rs := ScanRefs(text, shell)
+	out := make([]string, len(rs))
+	for i, r := range rs {
+		out[i] = r.Name
+	}
+	return out
+}
+
+type heredoc struct {
+	word   string
+	quoted bool
+	tabs   bool
+}
+
+// Protected marks the bytes of shell text in which no variable expands: single-quoted text, quoted here-document
+// bodies and text behind a backslash.
+func Protected(text string) []bool {
+	mask := make([]bool, len(text))
+	scan(text, true, func(int, Ref) {}, mask)
+	return mask
+}
+
+// ScanRefs is Refs with the read kind of each name.
+func ScanRefs(text string, shell bool) []Ref {
+	var out []Ref
+	idx := map[string]int{}
+	scan(text, shell, func(_ int, r Ref) {
+		if i, seen := idx[r.Name]; seen {
+			out[i].Bare = out[i].Bare || r.Bare
+			return
+		}
+		idx[r.Name] = len(out)
+		out = append(out, r)
+	}, nil)
+	return out
+}
+
+func scan(text string, shell bool, found func(int, Ref), mask []bool) {
 	var single, double bool
+	var pending []heredoc
+	protect := func(from, to int) {
+		for k := from; k < to && k < len(mask); k++ {
+			mask[k] = true
+		}
+	}
 	for i := 0; i < len(text); i++ {
 		c := text[i]
 		switch {
@@ -15,20 +66,37 @@ func Refs(text string, shell bool) []string {
 			if c == '\'' {
 				single = false
 			}
+			protect(i, i+1)
+			continue
+		case c == '\n' && shell && len(pending) > 0:
+			i = heredocBodies(text, i+1, pending, found, protect) - 1
+			pending = nil
 			continue
 		case c == '\\' && shell:
+			protect(i, i+2)
 			i++
 			continue
 		case c == '\'' && shell && !double:
 			single = true
+			protect(i, i+1)
 			continue
 		case c == '"' && shell:
 			double = !double
+			continue
+		case c == '<' && shell && !double && strings.HasPrefix(text[i:], "<<<"):
+			i += 2
+			continue
+		case c == '<' && shell && !double && strings.HasPrefix(text[i:], "<<"):
+			if h, n := heredocStart(text, i); n > 0 {
+				pending = append(pending, h)
+				i += n - 1
+			}
 			continue
 		case c == '#' && shell && !double && (i == 0 || text[i-1] == ' ' || text[i-1] == '\t' || text[i-1] == '\n' || text[i-1] == ';'):
 			for i < len(text) && text[i] != '\n' {
 				i++
 			}
+			i--
 			continue
 		case c != '$':
 			continue
@@ -37,11 +105,13 @@ func Refs(text string, shell bool) []string {
 			break
 		}
 		start := i + 1
+		braced := false
 		switch text[start] {
 		case '$':
 			i++
 			continue
 		case '{':
+			braced = true
 			start++
 		}
 		end := start
@@ -49,14 +119,125 @@ func Refs(text string, shell bool) []string {
 			end++
 		}
 		if end > start {
-			if n := text[start:end]; !seen[n] {
-				seen[n] = true
-				out = append(out, n)
-			}
+			found(i, Ref{Name: text[start:end], Bare: !braced || bareAfter(text[end:])})
 		}
 		i = end - 1
 	}
-	return out
+}
+
+// bareAfter reports whether the text after a braced name leaves the name without a default or error operator.
+func bareAfter(rest string) bool {
+	if rest == "" {
+		return true
+	}
+	switch rest[0] {
+	case '-', '=', '+', '?':
+		return false
+	case ':':
+		if len(rest) > 1 && strings.ContainsRune("-=+?", rune(rest[1])) {
+			return false
+		}
+	}
+	return true
+}
+
+// heredocStart reads "<<[-]['"]WORD['"]" at text[i:] and returns the delimiter and the length of the operator.
+func heredocStart(text string, i int) (heredoc, int) {
+	j := i + 2
+	h := heredoc{}
+	if j < len(text) && text[j] == '-' {
+		h.tabs = true
+		j++
+	}
+	for j < len(text) && (text[j] == ' ' || text[j] == '\t') {
+		j++
+	}
+	if j < len(text) && (text[j] == '\'' || text[j] == '"') {
+		q := text[j]
+		k := strings.IndexByte(text[j+1:], q)
+		if k < 0 {
+			return h, 0
+		}
+		h.word, h.quoted = text[j+1:j+1+k], true
+		return h, j + 1 + k + 1 - i
+	}
+	k := j
+	for k < len(text) && (nameChar(text[k], false) || text[k] == '-' || text[k] == '.') {
+		k++
+	}
+	if k == j {
+		return h, 0
+	}
+	h.word = text[j:k]
+	return h, k - i
+}
+
+// heredocBodies reads the bodies that start at text[from:], one for each pending delimiter, scans an unquoted
+// body for references and returns the index after the last delimiter line.
+func heredocBodies(text string, from int, pending []heredoc, found func(int, Ref), protect func(int, int)) int {
+	at := from
+	for _, h := range pending {
+		bodyStart := at
+		for at < len(text) {
+			nl := strings.IndexByte(text[at:], '\n')
+			line := text[at:]
+			next := len(text)
+			if nl >= 0 {
+				line, next = text[at:at+nl], at+nl+1
+			}
+			if h.tabs {
+				line = strings.TrimLeft(line, "\t")
+			}
+			if line == h.word {
+				break
+			}
+			at = next
+		}
+		if h.quoted {
+			protect(bodyStart, at)
+		} else {
+			scanBody(text[bodyStart:at], bodyStart, found)
+		}
+		if nl := strings.IndexByte(text[min(at, len(text)):], '\n'); nl >= 0 {
+			at += nl + 1
+		} else {
+			at = len(text)
+		}
+	}
+	return at
+}
+
+// scanBody finds the references of an unquoted here-document body, where only a backslash or a doubled dollar
+// stops an expansion.
+func scanBody(body string, base int, found func(int, Ref)) {
+	for i := 0; i < len(body); i++ {
+		switch body[i] {
+		case '\\':
+			i++
+		case '$':
+			if i+1 >= len(body) {
+				return
+			}
+			start := i + 1
+			braced := false
+			switch body[start] {
+			case '$':
+				i++
+				continue
+			case '{':
+				braced = true
+				start++
+			}
+			end := start
+			for end < len(body) && nameChar(body[end], end == start) {
+				end++
+			}
+			if end > start {
+				found(base+i, Ref{Name: body[start:end], Bare: !braced || bareAfter(body[end:])})
+			}
+			i = end - 1
+		}
+	}
 }
 
 func nameChar(c byte, first bool) bool {

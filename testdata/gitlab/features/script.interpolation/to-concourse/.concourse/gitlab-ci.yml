@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
-# pipemaster:arg {"digest":"962460b2c6818ef46702603f3c175a25ef78f7ab889c8ab2d6ef4e1b7ce25c34","carry":"id: script\nkind: script\nscript:\n    - echo \"building $\u007b{ sha }} on $\u007b{ branch }} for $\u007b{ actor }}\"\n    - echo \"keeps $HOME and ${UNMAPPED}\"\n"}
+# pipemaster:arg {"digest":"a8874d57fcb4e77a3120a2e3ef5ab71c65f1e92a3906bace903450908a0d03e0","carry":"id: script\nkind: script\nscript:\n    - 'export PIPEMASTER_VARS=2; : \"${CI_COMMIT_BRANCH:?pipemaster: lost: variable CI_COMMIT_BRANCH has no concourse source}\"; : \"${GITLAB_USER_LOGIN:?pipemaster: lost: variable GITLAB_USER_LOGIN has no concourse source}\"; : pipemaster-end; echo \"building $\u007b{ sha }} on ${CI_COMMIT_BRANCH} for $GITLAB_USER_LOGIN\"'\n    - echo \"keeps $HOME and ${UNMAPPED}\"\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"fb62029cfd100c40f47f00713bdd86474c2154215315e34844f34ce02612dc76","carry":"id: build\n"}
+# pipemaster:arg {"digest":"898994842f51bceabab5de03a42e5c53c99fd27fbee6a02cfc396ec38512f22a","carry":"id: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -47,7 +47,7 @@ jobs:
               - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
               - pipemaster
               - |-
-                # pipemaster:lost echo "building {{ sha }} on {{ branch }} for {{ actor }}"
-                printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/gitlab-ci/job/build/step/script: no Concourse spelling for expression actor; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
+                PM_CTX_SHA="$(cat ../workspace/.git/commit)"; export PM_CTX_SHA # pipemaster:ctx
+                export PIPEMASTER_VARS=2; : "${CI_COMMIT_BRANCH:?pipemaster: lost: variable CI_COMMIT_BRANCH has no concourse source}"; : "${GITLAB_USER_LOGIN:?pipemaster: lost: variable GITLAB_USER_LOGIN has no concourse source}"; : pipemaster-end; echo "building ${PM_CTX_SHA} on ${CI_COMMIT_BRANCH} for $GITLAB_USER_LOGIN"
                 echo "keeps $HOME and ${UNMAPPED}"
             dir: workspace

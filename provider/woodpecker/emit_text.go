@@ -12,6 +12,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
@@ -195,6 +196,9 @@ func (e *emitter) refText(b *bindings, mode textMode, path []string) (string, bo
 			b.add(path[0], path[1])
 			return "$${" + path[1] + "}", true
 		}
+	}
+	if mode == commandText && vars.ScriptRefLost(path, e.origin, dialect) {
+		return "", false
 	}
 	if dp, ok := wpexpr.Vocab.Dialect(path); ok && len(dp) == 1 {
 		return "${" + dp[0] + "}", true

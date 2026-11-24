@@ -1,2 +1,2 @@
 Loss report: woodpecker -> drone
-No losses: every feature converted natively.
+[emulated] pipeline/woodpecker/job/ci/step/build script.interpolation: variable prelude (the script reads CI_COMMIT_BRANCH, which drone does not set; a prelude defines them from the drone values)
