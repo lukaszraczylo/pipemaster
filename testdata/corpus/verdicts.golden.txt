@@ -1,10 +1,10 @@
-01-gha-cli gha->argo native= 129 emulated=  74 external=  14 lost= 114
+01-gha-cli gha->argo native= 129 emulated=  75 external=  14 lost= 114
 01-gha-cli gha->concourse native= 174 emulated=  63 external=   0 lost= 101
 01-gha-cli gha->drone native=  99 emulated=  24 external=   3 lost= 262
 01-gha-cli gha->forgejo native= 248 emulated=   2 external=   0 lost=  17
 01-gha-cli gha->gitea native= 251 emulated=   0 external=   0 lost=   4
 01-gha-cli gha->gitlab native= 103 emulated=  10 external=   7 lost= 194
-01-gha-cli gha->tekton native= 117 emulated= 130 external=   9 lost= 123
+01-gha-cli gha->tekton native= 117 emulated= 129 external=   9 lost= 123
 01-gha-cli gha->woodpecker native= 159 emulated=  20 external=   5 lost= 203
 02-gha-django gha->argo native=  79 emulated=  51 external=   7 lost=  34
 02-gha-django gha->concourse native=  78 emulated=  59 external=   0 lost=  46

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/actions"
+	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
@@ -39,4 +40,15 @@ func ScriptStep(st *ir.Step, t actions.Target, path string, needsImage bool) *ir
 		cp.Image = &ir.Image{Ref: t.Image}
 	}
 	return &cp
+}
+
+// ValueParts reads an expression value as the parts that an emitter converts.
+func ValueParts(v ir.Value) []expr.Part {
+	parts := []expr.Part{{Expr: v.Expr}}
+	if c, ok := v.Expr.(expr.Call); ok {
+		if mixed, ok := UnmixFormat(c); ok {
+			parts = mixed
+		}
+	}
+	return parts
 }

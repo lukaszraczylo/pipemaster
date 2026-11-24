@@ -367,6 +367,9 @@ func (tc *taskCtx) cloneStep(st *ir.Step, sp, name string, t actions.Target) *wm
 	if d, ok := t.With["depth"].(string); ok {
 		params.Content = append(params.Content, nameValue("depth", d))
 	}
+	if sp, ok := t.With["sparseCheckoutDirectories"].(string); ok {
+		params.Content = append(params.Content, nameValue("sparseCheckoutDirectories", sp))
+	}
 	m := newMap()
 	m.SetStr("name", name)
 	m.Set("ref", stepRef.N)

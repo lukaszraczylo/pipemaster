@@ -389,6 +389,14 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool, at int) *cont
 		if len(sx.artIn) > nIn {
 			sx.act.Wrote = checkoutWrote
 			sx.act.Art = nodeCanon(sx.artIn[nIn])
+			if len(t.Script) > 0 {
+				// The git artifact cannot sparse-check-out; a container applies it after the clone.
+				cp := emitkit.ScriptStep(st, t, path, sx.image == "" && tc.jp.j.Container == nil)
+				if c := sx.containerFor(cp, name, last); c != nil {
+					sx.act.Hold = nodeCanon(c.m.N)
+					return c
+				}
+			}
 		}
 	case actions.KindUpload:
 		sx.upload(path, t)

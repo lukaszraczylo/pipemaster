@@ -102,7 +102,7 @@ func (e *emitter) runsContainer(st *ir.Step) bool {
 		return len(st.Script) > 0 || extOf(st.Ext)[ExtScriptLine] != nil
 	case ir.StepAction:
 		t, ok := actionTarget(st)
-		return ok && t.Kind == actions.KindScript && t.Support.Level != caps.Lost
+		return ok && (t.Kind == actions.KindScript || t.Kind == actions.KindImplicit && len(t.Script) > 0) && t.Support.Level != caps.Lost
 	}
 	return false
 }

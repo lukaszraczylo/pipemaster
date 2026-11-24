@@ -11,6 +11,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/ir"
@@ -415,9 +416,22 @@ func TestCheckoutInputsAreCarried(t *testing.T) {
 				}
 			}
 			switch to {
-			case "tekton", "argo":
-				if !slices.ContainsFunc(scriptCandidates(t, files), hasFailLoud) {
-					t.Errorf("sparse-checkout has no form here: want a failing script, files %v", names(files))
+			case "tekton":
+				all := scriptCandidates(t, files)
+				for _, want := range []string{"sparseCheckoutDirectories", "src,docs", "revision", "dev", "/workspace/sub"} {
+					if !slices.Contains(all, want) {
+						t.Errorf("tekton clone params lack %q: %v", want, all)
+					}
+				}
+				if slices.ContainsFunc(all, hasFailLoud) {
+					t.Errorf("tekton writes a failing step for a checkout it can spell")
+				}
+			case "argo":
+				if script == "" || !strings.Contains(script, "PIPEMASTER_CHECKOUT_SPARSE") {
+					t.Fatalf("argo: no sparse script in %v", names(files))
+				}
+				if slices.ContainsFunc(scriptCandidates(t, files), hasFailLoud) {
+					t.Errorf("argo writes a failing step for a checkout it can spell")
 				}
 			default:
 				if script == "" {
@@ -608,5 +622,48 @@ func TestUnmappedInputsAreAllListed(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+const tektonCloneAtParam = `apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: p
+spec:
+  params:
+    - {name: rev, default: main}
+  tasks:
+    - name: a
+      taskRef: {name: git-clone}
+      params:
+        - {name: revision, value: "$(params.rev)"}
+    - name: b
+      runAfter: [a]
+      taskSpec:
+        steps:
+          - {name: s, image: "alpine:3.22", script: "echo hi"}
+`
+
+// A Tekton clone whose revision is a pipeline parameter has no spelling on Drone and Woodpecker, which clone
+// before the first step. The report must say why, and the written step must stop with the same reason.
+func TestTektonRevisionParamIsExplainedOnDroneAndWoodpecker(t *testing.T) {
+	proj, _, err := prov(t, "tekton").Parse(toFS(map[string][]byte{".tekton/p.yaml": []byte(tektonCloneAtParam)}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, to := range []string{"drone", "woodpecker"} {
+		_, rep, err := prov(t, to).Emit(proj)
+		if err != nil {
+			t.Fatal(to, err)
+		}
+		var found bool
+		for _, e := range rep.Entries {
+			if e.Feature == caps.StepAction && strings.Contains(e.Detail, "input ref has no") && strings.Contains(e.Detail, "pipeline parameter") {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("%s: no report entry says why the ref cannot be spelled", to)
+		}
 	}
 }

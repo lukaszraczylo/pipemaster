@@ -1,6 +1,8 @@
 package drone
 
 import (
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -293,6 +295,7 @@ func (e *emitter) applyTarget(c *docCtx, sp string, st *ir.Step, t actions.Targe
 			c.depth = d
 		}
 		c.emul = emitkit.ScriptStep(st, t, sp, c.image == "")
+		e.explainUnspelled(sp, st, t)
 	case actions.KindCache:
 	case actions.KindUpload:
 		name, _ := t.With["name"].(string)
@@ -334,4 +337,18 @@ func (e *emitter) markStand(sp string, st *ir.Step, at int, script string) error
 		return err
 	}
 	return e.markArg(caps.StepAction, sp, actionArg{Step: body, At: at, Stand: script})
+}
+
+// explainUnspelled reports why an emulated step stops: an input whose value has no Drone spelling is not set,
+// and the guard of the step then fails before git runs.
+func (e *emitter) explainUnspelled(sp string, st *ir.Step, t actions.Target) {
+	for _, in := range slices.Sorted(maps.Values(t.Env)) {
+		v := st.With[in]
+		if v.Kind != ir.ValueExpr {
+			continue
+		}
+		if _, lost := e.convertParts(nil, valueText, emitkit.ValueParts(v)); len(lost) > 0 {
+			e.lose(sp, caps.StepAction, "input "+in+" has no value on this target: its value "+strings.Join(lost, ", ")+" is a pipeline parameter or an expression with no Drone spelling, so the step stops before it runs git")
+		}
+	}
 }
