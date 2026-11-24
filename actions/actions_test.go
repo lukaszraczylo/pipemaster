@@ -164,6 +164,7 @@ func TestParsePathAndDefaults(t *testing.T) {
 	r, err := parse([]byte(`
 actions:
   - match: acme/mono
+    inputs: [ver]
     path: sub
     targets:
       gitlab:
@@ -322,6 +323,7 @@ func TestUnknownTransformFailsParse(t *testing.T) {
 	_, err := parse([]byte(`
 actions:
   - match: a/b
+    inputs: [x]
     targets:
       gitlab:
         kind: cache
@@ -380,7 +382,7 @@ func TestNegatedPaths(t *testing.T) {
 func TestParseRejectsBadWithDoc(t *testing.T) {
 	tail := "\nreverse: {checkout: a/b@v1, cache: a/b@v1, upload: a/b@v1, download: a/b@v1}"
 	mk := func(with string) string {
-		return "actions:\n  - match: a/b\n    targets:\n      gitlab:\n        kind: cache\n        support: {level: native}\n        with: " + with + tail
+		return "actions:\n  - match: a/b\n    inputs: [x]\n    targets:\n      gitlab:\n        kind: cache\n        support: {level: native}\n        with: " + with + tail
 	}
 	bad := map[string]string{
 		"typo key":         mk("{x: {to: y, transfrom: days}}"),
@@ -455,9 +457,49 @@ func TestBadGatingEntryFailsLoad(t *testing.T) {
 		"empty value": "gating:\n      fail-on-cache-miss: []",
 		"no name":     "gating:\n      \"\": [x]",
 	} {
-		doc := "reverse: {checkout: a/b@v1, cache: a/b@v1, upload: a/b@v1, download: a/b@v1}\nactions:\n  - match: a/b\n    " + src + "\n    targets:\n      gha: {kind: passthrough, support: {level: native}}\n"
+		doc := "reverse: {checkout: a/b@v1, cache: a/b@v1, upload: a/b@v1, download: a/b@v1}\nactions:\n  - match: a/b\n    inputs: [fail-on-cache-miss, if-no-files-found]\n    " + src + "\n    targets:\n      gha: {kind: passthrough, support: {level: native}}\n"
 		if _, err := parse([]byte(doc)); err == nil {
 			t.Errorf("%s: loaded", name)
+		}
+	}
+}
+
+func TestWellFormedTypoFailsLoad(t *testing.T) {
+	doc := func(body string) string {
+		return "reverse: {checkout: a/b@v1, cache: a/b@v1, upload: a/b@v1, download: a/b@v1}\nactions:\n  - match: a/b\n    inputs: [if-no-files-found, name]\n" + body
+	}
+	gha := "      gha: {kind: passthrough, support: {level: native}}\n"
+	for name, src := range map[string]string{
+		"gating":   "    gating:\n      if-no-file-found: [error]\n    targets:\n" + gha,
+		"with":     "    targets:\n" + gha + "      gitlab:\n        kind: cache\n        with: {nmae: name}\n        support: {level: native}\n",
+		"defaults": "    targets:\n" + gha + "      gitlab:\n        kind: cache\n        defaults: {nmae: x}\n        support: {level: native}\n",
+		"template": "    targets:\n" + gha + "      gitlab:\n        kind: image\n        image: \"x:{{nmae}}\"\n        support: {level: native}\n",
+		"none":     "    gating:\n      name: [x]\n    targets:\n" + gha,
+	} {
+		_, err := parse([]byte(doc(src)))
+		if name == "none" {
+			if err != nil {
+				t.Errorf("valid entry rejected: %v", err)
+			}
+			continue
+		}
+		if err == nil || !strings.Contains(err.Error(), "is not an input") {
+			t.Errorf("%s: err = %v", name, err)
+		}
+	}
+}
+
+func TestEveryEntryLoadsAndPinsTheGitImage(t *testing.T) {
+	if err := Load(); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range loaded.entries {
+		if e.emulate == nil {
+			continue
+		}
+		img := e.emulate.Image
+		if !strings.Contains(img, ":v") || !strings.Contains(img, "@sha256:") || strings.Contains(img, ":latest") {
+			t.Errorf("%s/%s emulate image %q is not pinned to a tag and a digest", e.owner, e.repo, img)
 		}
 	}
 }
