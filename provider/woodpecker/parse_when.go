@@ -39,12 +39,12 @@ var triggerKinds = map[string]ir.TriggerKind{
 
 // itemInfo is one when entry: the part the expression package models, and what it does not.
 type itemInfo struct {
-	item wpexpr.Item
-	path wpexpr.Filter
-	// status is the entry's status list; hasStatus tells an absent list from an empty one.
-	status    []string
-	extras    []string
-	hasStatus bool
+	item        wpexpr.Item
+	path        wpexpr.Filter
+	status      []string
+	extras      []string
+	pathNoEmpty bool
+	hasStatus   bool
 }
 
 // whenSpec is a parsed when, kept as written so a lossy part can go to Ext whole.
@@ -113,7 +113,7 @@ func (s *whenSpec) stripChanges(a *changesArg) {
 	}
 	for i := range s.items {
 		if slices.Equal(s.items[i].path.Include, globs) && len(s.items[i].path.Exclude) == 0 {
-			s.items[i].path = wpexpr.Filter{}
+			s.items[i].path, s.items[i].pathNoEmpty = wpexpr.Filter{}, false
 		}
 	}
 }
@@ -231,6 +231,26 @@ func filterOf(v any) (wpexpr.Filter, bool) {
 	return f, true
 }
 
+// withoutOnEmpty splits on_empty: false off a path filter, the one form of that key the emitter writes.
+func withoutOnEmpty(v any) (any, bool) {
+	m, ok := asMap(v)
+	if !ok {
+		return v, false
+	}
+	b, has := m.vals["on_empty"]
+	on, isBool := boolOf(b)
+	if !has || !isBool || on {
+		return v, false
+	}
+	var rest []string
+	for _, k := range m.keys {
+		if k != "on_empty" {
+			rest = append(rest, k)
+		}
+	}
+	return m.subset(rest), true
+}
+
 func parseItem(m *omap) itemInfo {
 	var out itemInfo
 	for _, k := range m.keys {
@@ -266,6 +286,11 @@ func parseItem(m *omap) itemInfo {
 		default:
 			out.extras = append(out.extras, k)
 			continue
+		}
+		if k == "path" {
+			if rest, noEmpty := withoutOnEmpty(v); noEmpty {
+				v, out.pathNoEmpty = rest, true
+			}
 		}
 		f, ok := filterOf(v)
 		if !ok {
@@ -373,7 +398,7 @@ func (s *whenSpec) triggers() ([]ir.Trigger, bool) {
 		it := s.view(raw)
 		tagRef, tagOK := tagGlobs(it.item.Ref)
 		refBlocks := !it.item.Ref.Empty() && (!tagOK || !slices.Equal(it.item.Event.Include, []string{eventTag}))
-		if it.item.Evaluate != "" || refBlocks || !it.item.Repo.Empty() || !it.item.Instance.Empty() ||
+		if it.pathNoEmpty || it.item.Evaluate != "" || refBlocks || !it.item.Repo.Empty() || !it.item.Instance.Empty() ||
 			it.hasStatus || len(it.extras) > 0 || len(it.item.Event.Exclude) > 0 || len(it.item.Event.Include) == 0 {
 			return nil, false
 		}

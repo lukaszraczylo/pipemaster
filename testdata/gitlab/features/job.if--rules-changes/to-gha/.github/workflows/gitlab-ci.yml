@@ -55,11 +55,17 @@ jobs:
               all=true ;;
           esac
           emit() {
-            if [ "$all" = true ] || grep -zEq -e "$2" "$files"; then
-              echo "$1=true" >> "$GITHUB_OUTPUT"
+            # Each NUL-separated name is matched as a whole string: bash [[ =~ ]] anchors at the string ends, where grep
+            # would also anchor at a newline inside a name.
+            hit=false
+            if [ "$all" = true ]; then
+              hit=true
             else
-              echo "$1=false" >> "$GITHUB_OUTPUT"
+              while IFS= read -r -d '' name; do
+                if [[ $name =~ $2 ]]; then hit=true; break; fi
+              done < "$files"
             fi
+            echo "$1=$hit" >> "$GITHUB_OUTPUT"
           }
           emit c65065151 "$RE_c65065151"
           emit cd6c3e186 "$RE_cd6c3e186"

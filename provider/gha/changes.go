@@ -229,7 +229,7 @@ func atomERE(globs []string) (string, bool) {
 // commit before it, a merge request with the target branch, and a tag, a new branch, a schedule or a manual
 // run counts every path as changed. A diff that cannot be computed fails the job with a message, so no gated
 // job runs. The regexes come in as RE_<output> environment variables and never enter the script text. Paths are
-// NUL-separated, so a name with a quote, a backslash or a newline matches as it is.
+// NUL-separated and matched one by one as whole strings, so a name with a quote, a backslash or a newline matches as it is.
 func changesScript(atoms []changeAtom) string {
 	var sb strings.Builder
 	sb.WriteString(`set -eu
@@ -259,11 +259,17 @@ case "$EVENT" in
     all=true ;;
 esac
 emit() {
-  if [ "$all" = true ] || grep -zEq -e "$2" "$files"; then
-    echo "$1=true" >> "$GITHUB_OUTPUT"
+  # Each NUL-separated name is matched as a whole string: bash [[ =~ ]] anchors at the string ends, where grep
+  # would also anchor at a newline inside a name.
+  hit=false
+  if [ "$all" = true ]; then
+    hit=true
   else
-    echo "$1=false" >> "$GITHUB_OUTPUT"
+    while IFS= read -r -d '' name; do
+      if [[ $name =~ $2 ]]; then hit=true; break; fi
+    done < "$files"
   fi
+  echo "$1=$hit" >> "$GITHUB_OUTPUT"
 }
 `)
 	for _, a := range atoms {

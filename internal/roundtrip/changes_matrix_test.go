@@ -14,6 +14,7 @@ import (
 	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
 	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 const zeroSHA = "0000000000000000000000000000000000000000"
@@ -618,5 +619,61 @@ func TestGitlabChangesRunOnWoodpeckerNeverWhereGitLabSkips(t *testing.T) {
 				t.Errorf("runs = %d, native = %v:\n%s", runs, c.native, wf)
 			}
 		})
+	}
+}
+
+// TestChangesAnchorsAtTheNameEnds: a newline inside a name must not start a new match, and an empty commit changes
+// nothing.
+func TestChangesAnchorsAtTheNameEnds(t *testing.T) {
+	_, doc := ghaFor(t, "'src/**/*.go'")
+	verdict := func(files map[string]string) string {
+		dir, before, after := history(t, files)
+		got := runChanges(t, doc, pushMain, dir, before, after)
+		for _, v := range got {
+			return v
+		}
+		t.Fatalf("no output: %v", got)
+		return ""
+	}
+	if v := verdict(map[string]string{"zz\nsrc/q.go": "package a"}); v != "false" {
+		t.Errorf("a name with an embedded newline matched: %s", v)
+	}
+	if v := verdict(map[string]string{"src/q.go": "package a"}); v != "true" {
+		t.Errorf("src/q.go did not match: %s", v)
+	}
+	dir, _, _ := history(t, map[string]string{"README.md": "b"})
+	git(t, dir, "commit", "-q", "--allow-empty", "-m", "empty")
+	before, after := git(t, dir, "rev-parse", "HEAD~1"), git(t, dir, "rev-parse", "HEAD")
+	for _, v := range runChanges(t, doc, pushMain, dir, before, after) {
+		if v != "false" {
+			t.Errorf("an empty commit changed paths: %s", v)
+		}
+	}
+}
+
+// TestWoodpeckerPathFilterSkipsAnEmptyPush: GitLab finds no changed path in a push with no changes, so the filter
+// says on_empty: false.
+func TestWoodpeckerPathFilterSkipsAnEmptyPush(t *testing.T) {
+	out, rep := convert(t, provider.GitLab, provider.Woodpecker, gitlabCI, "j:\n  script: [echo hi]\n  rules:\n    - changes: ['**/*.go']\n")
+	if !strings.Contains(out, "on_empty: false") {
+		t.Fatalf("no on_empty: false:\n%s", out)
+	}
+	_, wf, _ := strings.Cut(out, "### .woodpecker/")
+	var doc struct {
+		When []struct {
+			Event any            `yaml:"event"`
+			Path  map[string]any `yaml:"path"`
+		} `yaml:"when"`
+	}
+	if err := yaml.Unmarshal([]byte(wf[strings.Index(wf, "\n")+1:]), &doc); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range doc.When {
+		if slices.Contains(anyList(e.Event), "push") && e.Path["on_empty"] != false {
+			t.Errorf("push entry path = %v, want on_empty false", e.Path)
+		}
+	}
+	if !slices.ContainsFunc(rep.Entries, func(e report.Entry) bool { return strings.Contains(e.Detail, "ignore_message") }) {
+		t.Errorf("the report does not name ignore_message: %+v", rep.Entries)
 	}
 }

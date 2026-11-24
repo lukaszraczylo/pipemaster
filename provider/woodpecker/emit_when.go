@@ -30,6 +30,8 @@ type whenEntry struct {
 	wpexpr.Item
 	path   wpexpr.Filter
 	status []string
+	// pathNoEmpty writes on_empty: false into the path filter, so a push with no changed paths does not match.
+	pathNoEmpty bool
 }
 
 func (w whenEntry) empty() bool {
@@ -60,6 +62,19 @@ func filterNode(f wpexpr.Filter) *yaml.Node {
 	return m.n
 }
 
+// pathNoEmptyNode writes a path filter in its object form with on_empty: false.
+func pathNoEmptyNode(f wpexpr.Filter) *yaml.Node {
+	m := newMap()
+	if len(f.Include) > 0 {
+		m.set("include", strSeq(f.Include))
+	}
+	if len(f.Exclude) > 0 {
+		m.set("exclude", strSeq(f.Exclude))
+	}
+	m.set("on_empty", boolNode(false))
+	return m.n
+}
+
 func (w whenEntry) node() *yaml.Node {
 	m := newMap()
 	for _, k := range []struct {
@@ -69,9 +84,14 @@ func (w whenEntry) node() *yaml.Node {
 		{wpexpr.KeyEvent, w.Event}, {wpexpr.KeyBranch, w.Branch}, {wpexpr.KeyRef, w.Ref},
 		{wpexpr.KeyRepo, w.Repo}, {wpexpr.KeyInstance, w.Instance}, {keyPath, w.path},
 	} {
-		if !k.f.Empty() {
-			m.set(k.key, filterNode(k.f))
+		if k.f.Empty() {
+			continue
 		}
+		if k.key == keyPath && w.pathNoEmpty {
+			m.set(k.key, pathNoEmptyNode(k.f))
+			continue
+		}
+		m.set(k.key, filterNode(k.f))
 	}
 	if len(w.status) > 0 {
 		m.set(keyStatus, strSeq(w.status))
@@ -745,7 +765,7 @@ func (e *emitter) changesWhen(j *ir.Job, jp string, finally bool, base []whenEnt
 		if len(with) > 0 {
 			w := ent
 			w.Event.Include = with
-			w.path = wpexpr.Filter{Include: slices.Clone(globs)}
+			w.path, w.pathNoEmpty = wpexpr.Filter{Include: slices.Clone(globs)}, true
 			out = append(out, w)
 		}
 		if len(without) > 0 {
@@ -754,7 +774,7 @@ func (e *emitter) changesWhen(j *ir.Job, jp string, finally bool, base []whenEnt
 			out = append(out, w)
 		}
 	}
-	e.emulate(jp, caps.JobIf, "when path", "the path filter applies to push and pull request events and every other event runs, as GitLab rules:changes does; a push that creates a branch is compared with its own commits")
+	e.emulate(jp, caps.JobIf, "when path", "the path filter applies to push and pull request events and every other event runs, as GitLab rules:changes does; a push that creates a branch is compared with its own commits; on_empty: false skips a push with no changed paths, as GitLab does; a project setting ignore_message can skip path conditions altogether")
 	if err := e.markArg(caps.JobIf, jp, gateArg{Paths: &changesArg{Src: expr.String(j.If), From: e.from.ID, Synth: synth}}); err != nil {
 		e.comment("job condition marker not carried: " + err.Error())
 	}
