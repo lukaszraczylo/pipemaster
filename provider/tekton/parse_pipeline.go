@@ -18,16 +18,14 @@ const pacPrefix = "pipelinesascode.tekton.dev/"
 
 // plCtx is the pipeline being read: the task names that references can point at.
 type plCtx struct {
-	// env holds the pipeline variables that the emitter copied into every Task, by name.
-	env  map[string]ir.Var
-	p    *project
-	k    *sink
-	ids  map[string]string
-	file string
-	plID string
-	// ws is true when a job restored the workspace marker.
-	ws bool
-	// envBad is true when a Task no longer holds the copied variables as written.
+	env    map[string]ir.Var
+	p      *project
+	k      *sink
+	ids    map[string]string
+	srcWS  map[string]bool
+	file   string
+	plID   string
+	ws     bool
 	envBad bool
 }
 

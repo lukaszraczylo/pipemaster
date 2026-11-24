@@ -18,6 +18,18 @@ const (
 	// ExtBoundParams is the job Ext key that maps each Task param that the Task text reads to the value that the
 	// PipelineTask binds, so the Tekton file keeps the Task param names.
 	ExtBoundParams = "bound_params"
+	// ExtWorkspaceDir is the step Ext key that keeps the workingDir text under the source workspace as written;
+	// ExtWorkspaceDirIR holds the relative directory that the IR got for it.
+	ExtWorkspaceDir = "workspace_dir"
+	// ExtWorkspaceDirIR holds the relative directory that the IR got for ExtWorkspaceDir.
+	ExtWorkspaceDirIR = "workspace_dir_ir"
+	// ExtScriptSource and ExtScriptIR keep the script lines of a step as written and as the IR holds them, when a
+	// workspace path of the source workspace was rewritten.
+	ExtScriptSource = "script_source"
+	// ExtScriptIR holds the script lines as the IR got them.
+	ExtScriptIR = "script_ir"
+	// ExtSourceCheckout marks the checkout step that the parser added for a Task that reads the source workspace.
+	ExtSourceCheckout = "source_checkout"
 	// ExtCommand is the step Ext key that keeps the command list of a step that the IR holds as one script line.
 	ExtCommand = "command"
 	// ExtArgs is the step Ext key that keeps the args list beside ExtCommand.

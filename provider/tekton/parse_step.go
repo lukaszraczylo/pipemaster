@@ -2,6 +2,8 @@ package tekton
 
 import (
 	"fmt"
+	"maps"
+	"path"
 	"slices"
 	"strings"
 
@@ -70,9 +72,14 @@ func (b *jobBuilder) step(m *omap, n int) (*ir.Step, error) {
 		if !isText {
 			return nil, fmt.Errorf("step %s: workingDir must be a string", id)
 		}
-		var err error
-		if st.WorkDir, err = b.tx.template(t); err != nil {
-			return nil, err
+		if rel, ok := b.sourceDir(t); ok {
+			st.WorkDir = rel
+			k.Out[ExtWorkspaceDir], k.Out[ExtWorkspaceDirIR] = t, rel
+		} else {
+			var err error
+			if st.WorkDir, err = b.tx.template(t); err != nil {
+				return nil, err
+			}
 		}
 	}
 	if v, ok := r.Take("timeout"); ok {
@@ -183,12 +190,22 @@ func (b *jobBuilder) script(st *ir.Step, k *sink, t string) ([]exprtekton.EnvVar
 		lines = rest
 		guardEnv, _ = exprtekton.GuardEnv(cond)
 	}
+	hits := b.tx.wsHits
+	b.tx.markWS = true
+	defer func() { b.tx.markWS = false }()
+	var undone []string
 	for _, l := range lines {
 		tl, err := b.tx.template(l)
 		if err != nil {
 			return nil, err
 		}
-		st.Script = append(st.Script, tl)
+		ir, file := splitWorkspaceMarks(tl)
+		st.Script = append(st.Script, ir)
+		undone = append(undone, file)
+	}
+	if b.tx.wsHits != hits {
+		k.Out[ExtScriptSource] = anyStrings(undone)
+		k.Out[ExtScriptIR] = strings.Join(st.Script, "\n")
 	}
 	return guardEnv, nil
 }
@@ -213,8 +230,9 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, cmd, args any) error {
 			words = append(words, q)
 		}
 	}
-	st.Script = []string{strings.Join(words, " ")}
-	k.Out[ExtScriptLine] = st.Script[0]
+	line := strings.Join(words, " ")
+	st.Script = strings.Split(line, "\n")
+	k.Out[ExtScriptLine] = line
 	k.Out[ExtCommand] = plain(cmd)
 	k.Out[ExtArgs] = plain(args)
 	k.Note(caps.StepScript, "command and args are written as one script line; both lists are kept in Ext", 0)
@@ -242,6 +260,10 @@ func (b *jobBuilder) envWithout(st *ir.Step, k *sink, r *reader, skip []exprtekt
 
 // envList reads a Kubernetes env list.
 func (b *jobBuilder) envList(v any, skip []exprtekton.EnvVar) ([]ir.Var, map[string]any, error) {
+	// A workspace path in an env value stays as written: the value has no spelling to restore it from.
+	saved := b.tx.srcWS
+	b.tx.srcWS = nil
+	defer func() { b.tx.srcWS = saved }()
 	list, ok := v.([]any)
 	if !ok {
 		return nil, nil, fmt.Errorf("env must be a list")
@@ -444,4 +466,41 @@ func (c ctxEnvs) restore(script string) string {
 		return script
 	}
 	return c.repl.Replace(script)
+}
+
+// sourceDir reads a working directory under a source workspace as a directory relative to the checkout.
+func (b *jobBuilder) sourceDir(t string) (string, bool) {
+	for _, ws := range slices.Sorted(maps.Keys(b.tx.srcWS)) {
+		for _, root := range []string{workspaceDir + "/" + ws, varOpen + "workspaces." + ws + ".path" + varClose} {
+			if rest, ok := strings.CutPrefix(t, root); ok && (rest == "" || strings.HasPrefix(rest, "/")) {
+				return strings.TrimPrefix(path.Clean("/"+rest), "/"), true
+			}
+		}
+	}
+	return "", false
+}
+
+func anyStrings(ss []string) []any {
+	out := make([]any, len(ss))
+	for i, s := range ss {
+		out[i] = s
+	}
+	return out
+}
+
+// splitWorkspaceMarks resolves the marks of a template into the IR text, where a workspace path is the checkout
+// directory, and the text that keeps the workspace path as the file wrote it.
+func splitWorkspaceMarks(t string) (ir, file string) {
+	parts := strings.Split(t, wsMark)
+	var a, f strings.Builder
+	for i, p := range parts {
+		if i%2 == 0 {
+			a.WriteString(p)
+			f.WriteString(p)
+			continue
+		}
+		a.WriteString(checkoutDir)
+		f.WriteString(varOpen + "workspaces." + p + ".path" + varClose)
+	}
+	return a.String(), f.String()
 }

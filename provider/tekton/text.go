@@ -14,6 +14,12 @@ import (
 // legacyParamPrefix starts the deprecated spelling of a param variable, which Tekton reads like params.x.
 const legacyParamPrefix = "inputs.params."
 
+// checkoutDir is the directory that a job starts in on a target with one clone per job.
+const checkoutDir = "."
+
+// wsMark brackets the name of a workspace in a template while script() splits the text into its two spellings.
+const wsMark = "\x00"
+
 const (
 	varOpen  = "$("
 	varClose = ")"
@@ -22,6 +28,8 @@ const (
 var (
 	// tektonVar is the first segment of every variable that Tekton substitutes; `$(date)` and the like are shell.
 	tektonVar = regexp.MustCompile(`^(inputs\.params|params|tasks|results|workspaces|context|steps|credentials|artifacts)\.`)
+	// workspacePath reads $(workspaces.name.path).
+	workspacePath = regexp.MustCompile(`^workspaces\.([A-Za-z0-9_.-]+)\.path$`)
 	// paramVar reads the three spellings of a param variable.
 	paramVar = regexp.MustCompile(`^params(?:\.([A-Za-z_][A-Za-z0-9_-]*)|\['([^']+)'\]|\["([^"]+)"\])$`)
 )
@@ -30,24 +38,19 @@ var (
 // becomes a canonical reference; any other Tekton variable stays shell text. A Task scope resolves $(params.x)
 // through what the PipelineTask binds to x.
 type texts struct {
-	// bind holds the parts that the PipelineTask binds to each Task param.
-	bind map[string][]expr.Part
-	// defaults holds the default of each Task param that has a string default.
+	legacy   map[string]bool
 	defaults map[string]string
-	// matrix names the Task params that a matrix axis binds.
-	matrix map[string]bool
-	// used names the bound params that a text read.
-	used map[string]bool
-	// needs names the tasks that a result reference points at, by Tekton name.
-	needs map[string]bool
-	// taskID maps a Tekton task name to the job ID; ok is false for a name that is no task of the pipeline.
-	taskID func(name string) (string, bool)
-	// legacy and modern name the Task params that a text reads as $(inputs.params.x) and as $(params.x).
-	legacy, modern map[string]bool
-	// kept lists the variables left as written.
-	kept []string
-	// task is true in a Task body, where a param name resolves through bind.
-	task bool
+	matrix   map[string]bool
+	used     map[string]bool
+	needs    map[string]bool
+	taskID   func(name string) (string, bool)
+	bind     map[string][]expr.Part
+	modern   map[string]bool
+	srcWS    map[string]bool
+	kept     []string
+	wsHits   int
+	markWS   bool
+	task     bool
 }
 
 func newTexts(taskID func(string) (string, bool), task bool) *texts {
@@ -91,6 +94,13 @@ func (x *texts) ref(word string) (expr.Ref, bool) {
 
 // variable reads the inside of one $(...) as parts; ok is false when the form stays text.
 func (x *texts) variable(inner string) ([]expr.Part, bool) {
+	if m := workspacePath.FindStringSubmatch(inner); m != nil && x.task && x.srcWS[m[1]] {
+		x.wsHits++
+		if x.markWS {
+			return []expr.Part{{Text: wsMark + m[1] + wsMark}}, true
+		}
+		return []expr.Part{{Text: checkoutDir}}, true
+	}
 	if rest, ok := strings.CutPrefix(inner, legacyParamPrefix); ok {
 		if !x.task {
 			return nil, false

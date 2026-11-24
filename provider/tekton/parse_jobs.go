@@ -2,6 +2,7 @@ package tekton
 
 import (
 	"fmt"
+	"github.com/lukaszraczylo/pipemaster/actions"
 	"maps"
 	"slices"
 	"sort"
@@ -24,6 +25,7 @@ func (c *plCtx) jobs(pl *ir.Pipeline, tasks, finally any) error {
 	if err != nil {
 		return err
 	}
+	c.srcWS = c.sourceWorkspaces(append(append([]*omap{}, regular...), fin...))
 	for _, m := range append(append([]*omap{}, regular...), fin...) {
 		name, ok := text(m.Vals["name"])
 		if !ok || name == "" {
@@ -107,6 +109,7 @@ func (c *plCtx) job(m *omap, finally bool) (*ir.Job, error) {
 	}
 	b.k = newSink(c.p.rep, c.file, b.path)
 	b.ws = c.p.workspaceOf(m, b.path)
+	b.tx.srcWS = c.taskSourceWorkspaces(m)
 	c.ws = c.ws || b.ws != nil
 	r := newReader(m)
 	r.Take("name")
@@ -116,6 +119,7 @@ func (c *plCtx) job(m *omap, finally bool) (*ir.Job, error) {
 	if err := b.taskBody(r); err != nil {
 		return nil, fmt.Errorf("task %s: %w", name, err)
 	}
+	b.addSourceCheckout()
 	b.k.KeepRest(r)
 	b.finish()
 	return b.job, nil
@@ -394,4 +398,78 @@ func (b *jobBuilder) boundParams() {
 func isPipelineParam(v string) bool {
 	rest, ok := strings.CutPrefix(v, paramPrefix)
 	return ok && strings.HasSuffix(rest, paramClose) && !strings.ContainsAny(strings.TrimSuffix(rest, paramClose), "()$")
+}
+
+// workspaceBindings lists the (task workspace, pipeline workspace) pairs of a PipelineTask.
+func workspaceBindings(pt *omap) [][2]string {
+	var out [][2]string
+	list, _ := pt.Vals["workspaces"].([]any)
+	for _, e := range list {
+		m := asMapOrNil(e)
+		name, _ := text(valueOf(m, "name"))
+		ws, _ := text(valueOf(m, "workspace"))
+		if name != "" && ws != "" {
+			out = append(out, [2]string{name, ws})
+		}
+	}
+	return out
+}
+
+// sourceWorkspaces finds the pipeline workspaces that a catalog git-clone task writes the clone to.
+func (c *plCtx) sourceWorkspaces(tasks []*omap) map[string]bool {
+	out := map[string]bool{}
+	for _, m := range tasks {
+		rm := asMapOrNil(m.Vals["taskRef"])
+		if rm == nil {
+			continue
+		}
+		name, _ := text(rm.Vals["name"])
+		_, resolver := rm.Vals["resolver"]
+		_, bundle := rm.Vals["bundle"]
+		if _, local := c.p.tasks[name]; local && !resolver && !bundle {
+			continue
+		}
+		if t, ok, err := catalogEntry(rm); err == nil && ok && t.isCheckout {
+			for _, b := range workspaceBindings(m) {
+				out[b[1]] = true
+			}
+		}
+	}
+	return out
+}
+
+// taskSourceWorkspaces names the Task workspaces that a PipelineTask binds to a source workspace.
+func (c *plCtx) taskSourceWorkspaces(pt *omap) map[string]bool {
+	out := map[string]bool{}
+	for _, b := range workspaceBindings(pt) {
+		if c.srcWS[b[1]] {
+			out[b[0]] = true
+		}
+	}
+	return out
+}
+
+// addSourceCheckout gives a job whose Task reads the source workspace its own checkout step. The workspace that
+// the clone filled is not shared between the jobs of a target with one runner per job. The Tekton emitter skips
+// the step, because the clone task of the pipeline already fills the workspace.
+func (b *jobBuilder) addSourceCheckout() {
+	if len(b.tx.srcWS) == 0 || b.k.Out[ExtCatalogRef] != nil || len(b.job.Steps) == 0 {
+		return
+	}
+	for _, st := range b.job.Steps {
+		if st.Kind == ir.StepTask {
+			return
+		}
+	}
+	ref, ok := actions.Reverse(actionCheckout)
+	if !ok {
+		return
+	}
+	id := b.job.ID + "-checkout"
+	st := &ir.Step{ID: id, Kind: ir.StepAction, Action: &ref, Ext: ir.Ext{dialect: map[string]any{ExtSourceCheckout: true}}}
+	b.job.Steps = append([]*ir.Step{st}, b.job.Steps...)
+	b.c.p.rep.Add(report.Entry{
+		IRPath: b.path, Feature: caps.StepAction, Level: caps.Emulated, Strategy: "checkout step in the job",
+		Detail: "the Task reads the workspace that the git-clone task filled, which is not shared between jobs, so the job clones the pipeline repository itself", SourceLoc: b.c.file,
+	})
 }

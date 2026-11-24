@@ -67,6 +67,9 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 		if st == nil {
 			continue
 		}
+		if tc.e.own && extOf(st.Ext)[ExtSourceCheckout] == true {
+			continue
+		}
 		m, err := tc.step(b, st, jp.path+"/step/"+st.ID)
 		if err != nil {
 			return nil, err

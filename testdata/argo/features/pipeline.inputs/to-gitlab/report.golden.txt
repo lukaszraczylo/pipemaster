@@ -1,2 +1,2 @@
 Loss report: argo -> gitlab
-[lost] pipeline/ci pipeline.inputs (input dry-run is not a unique variable name)
+[emulated] pipeline/ci pipeline.inputs: variables with description (input types and required flags are not enforced)

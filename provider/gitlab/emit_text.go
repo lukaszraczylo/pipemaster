@@ -103,13 +103,37 @@ func (e *emitter) drain() []string {
 
 func isIdent(s string) bool { return identRE.MatchString(s) }
 
+// inputVar names the variable that carries a pipeline input. A name with a character that a shell variable
+// cannot hold, such as the hyphen of git-url, gets an underscore in its place. The marker of the pipeline keeps
+// the input name for the return trip.
+func inputVar(name string) string {
+	if name == "" {
+		return ""
+	}
+	v := strings.Map(func(r rune) rune {
+		if r == '_' || (r >= '0' && r <= '9') || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') {
+			return r
+		}
+		return '_'
+	}, name)
+	if v[0] >= '0' && v[0] <= '9' {
+		v = "_" + v
+	}
+	return v
+}
+
 // refVar maps a canonical or gitlab-native ref to the GitLab variable that holds it.
 func refVar(path []string) (string, bool) {
 	if len(path) == 0 {
 		return "", false
 	}
 	switch path[0] {
-	case exprgitlab.Dialect, expr.PrefixEnv, expr.PrefixSecrets, expr.PrefixVars, expr.PrefixInputs, expr.PrefixMatrix:
+	case expr.PrefixInputs:
+		if len(path) != 2 || inputVar(path[1]) == "" {
+			return "", false
+		}
+		return inputVar(path[1]), true
+	case exprgitlab.Dialect, expr.PrefixEnv, expr.PrefixSecrets, expr.PrefixVars, expr.PrefixMatrix:
 		if len(path) != 2 || !isIdent(path[1]) {
 			return "", false
 		}

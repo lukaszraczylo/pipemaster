@@ -249,3 +249,79 @@ func TestLegacySpellingAndParamNamesSurviveTheTektonTrip(t *testing.T) {
 		}
 	}
 }
+
+const sourceWSPipeline = `apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  workspaces:
+  - name: ws
+  tasks:
+  - name: fetch
+    taskRef: {name: git-clone}
+    workspaces:
+    - {name: output, workspace: ws}
+  - name: use
+    runAfter: [fetch]
+    taskRef: {name: use-src}
+    workspaces:
+    - {name: src, workspace: ws}
+`
+
+const sourceWSTask = `apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: use-src
+spec:
+  workspaces:
+  - name: src
+  steps:
+  - name: a
+    image: alpine
+    workingDir: /workspace/src/sub
+    script: |
+      ls $(workspaces.src.path)/x
+  - name: b
+    image: alpine
+    workingDir: $(workspaces.src.path)
+    command: [ls]
+    args: ["$(workspaces.src.path)/y"]
+`
+
+func TestSourceWorkspaceMapsToTheCheckoutAndReturnsExactly(t *testing.T) {
+	p, _ := parseFiles(t, map[string]string{"p.yaml": sourceWSPipeline, "t.yaml": sourceWSTask})
+	j := job(t, p.Pipelines[0], "use")
+	if len(j.Steps) != 3 || j.Steps[0].Kind != ir.StepAction || j.Steps[0].Action.Repo != "checkout" {
+		t.Fatalf("steps = %+v", j.Steps)
+	}
+	a, b := step(t, j, "a"), step(t, j, "b")
+	if a.WorkDir != "sub" || b.WorkDir != "" || strings.Join(a.Script, "\n") != "ls ./x" {
+		t.Fatalf("a = %+v, b = %+v", a, b)
+	}
+	files, _, err := tekton.New().Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var all strings.Builder
+	for _, f := range files {
+		all.Write(f)
+	}
+	for _, want := range []string{"workingDir: /workspace/src/sub", "ls $(workspaces.src.path)/x", "workingDir: $(workspaces.src.path)"} {
+		if !strings.Contains(all.String(), want) {
+			t.Errorf("Tekton output lacks %q:\n%s", want, all.String())
+		}
+	}
+	if strings.Contains(all.String(), "name: use-checkout") {
+		t.Errorf("the synthetic checkout step reached the Tekton file:\n%s", all.String())
+	}
+}
+
+func TestWorkspaceWithoutACloneTaskIsNotMapped(t *testing.T) {
+	task := strings.Replace(sourceWSPipeline, "taskRef: {name: git-clone}", "taskRef: {name: other}", 1)
+	p, _ := parseFiles(t, map[string]string{"p.yaml": task, "t.yaml": sourceWSTask})
+	j := job(t, p.Pipelines[0], "use")
+	if len(j.Steps) != 2 || step(t, j, "a").WorkDir != "/workspace/src/sub" {
+		t.Fatalf("steps = %+v", j.Steps)
+	}
+}

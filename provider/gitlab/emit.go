@@ -260,18 +260,19 @@ func (e *emitter) pipelineVars(pp string, pl *ir.Pipeline, ext map[string]any) (
 	}
 	var kept []ir.Input
 	for _, in := range pl.Inputs {
-		if !isIdent(in.Name) || hasVar(vars, in.Name) {
-			e.lose(pp, caps.PipelineInputs, "input "+in.Name+" is not a unique variable name")
+		name := inputVar(in.Name)
+		if name == "" || hasVar(vars, name) {
+			e.lose(pp, caps.PipelineInputs, "input "+in.Name+" is not a unique variable name; the variable "+name+" is taken")
 			continue
 		}
-		vars = append(vars, ir.Var{Name: in.Name, Value: ir.Value{Lit: in.Default}})
+		vars = append(vars, ir.Var{Name: name, Value: ir.Value{Lit: in.Default}})
 		if in.Description != "" {
 			e.flattenedNote(pp+"/input/"+in.Name, caps.PipelineInputs, in.Description)
 			d, err := e.field(pp, caps.PipelineInputs, in.Description)
 			if err != nil {
 				return nil, nil, nil, err
 			}
-			extras[in.Name] = map[string]any{"description": d}
+			extras[name] = map[string]any{"description": d}
 		}
 		kept = append(kept, in)
 	}

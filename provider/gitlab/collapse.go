@@ -514,13 +514,13 @@ func collapseInputs(c *collapseCtx) bool {
 	}
 	extras, _ := extOf(c.pl.Ext)[extVariables].(map[string]any)
 	for _, in := range inputs {
-		if !varIs(c.pl.Env, in.Name, in.Default) || !extraIs(extras[in.Name], in.Description) {
+		if !varIs(c.pl.Env, inputVar(in.Name), in.Default) || !extraIs(extras[inputVar(in.Name)], in.Description) {
 			return false
 		}
 	}
 	for _, in := range inputs {
-		c.pl.Env = dropVar(c.pl.Env, in.Name)
-		dropExt(&c.pl.Ext, extVariables, in.Name)
+		c.pl.Env = dropVar(c.pl.Env, inputVar(in.Name))
+		dropExt(&c.pl.Ext, extVariables, inputVar(in.Name))
 	}
 	c.pl.Inputs = inputs
 	return true

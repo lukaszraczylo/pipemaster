@@ -111,7 +111,9 @@ func (tc *taskCtx) scriptStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 	if len(userEnv)+len(sc.env) > 0 {
 		m.Set("env", seqOf(append(userEnv, sc.env...)...))
 	}
-	if st.WorkDir != "" {
+	if orig, ok := tc.sourceWorkDir(st); ok {
+		m.SetStr("workingDir", orig)
+	} else if st.WorkDir != "" {
 		wd, ok, err := tc.text(sc, sp, caps.StepWorkdir, valueText, st.WorkDir)
 		if err != nil {
 			return nil, err
@@ -158,7 +160,7 @@ func (tc *taskCtx) stepExt(m *wmap, st *ir.Step) error {
 	if len(x) == 0 || !tc.e.own {
 		return nil
 	}
-	skip := map[string]bool{ExtCommand: true, ExtArgs: true, ExtScriptLine: true, ExtBashDefault: true, "ref": true, "params": true, "taskRef": true, "timeout": true, "onError": true}
+	skip := map[string]bool{ExtWorkspaceDir: true, ExtWorkspaceDirIR: true, ExtScriptSource: true, ExtScriptIR: true, ExtSourceCheckout: true, ExtCommand: true, ExtArgs: true, ExtScriptLine: true, ExtBashDefault: true, "ref": true, "params": true, "taskRef": true, "timeout": true, "onError": true}
 	for _, k := range sortedKeys(x) {
 		if skip[k] || m.Has(k) {
 			continue
@@ -184,20 +186,33 @@ func (tc *taskCtx) stepExt(m *wmap, st *ir.Step) error {
 // scriptLines converts the script of a step. A line with no spelling is commented out with the rest of its
 // statement, line by line, so the lines that stay are valid shell.
 func (tc *taskCtx) scriptLines(sc *stepScope, st *ir.Step, sp string) ([]string, error) {
-	outs := make([]string, len(st.Script))
-	why := make([]string, len(st.Script))
-	lost := make([]bool, len(st.Script))
-	for i, l := range st.Script {
+	script := st.Script
+	if x := extOf(st.Ext); tc.e.own && x[ExtScriptIR] == strings.Join(script, "\n") {
+		switch src := x[ExtScriptSource].(type) {
+		case []string:
+			script = src
+		case []any:
+			script = make([]string, 0, len(src))
+			for _, l := range src {
+				s, _ := l.(string)
+				script = append(script, s)
+			}
+		}
+	}
+	outs := make([]string, len(script))
+	why := make([]string, len(script))
+	lost := make([]bool, len(script))
+	for i, l := range script {
 		var err error
 		if outs[i], why[i], err = tc.scriptLine(sc, sp, l); err != nil {
 			return nil, err
 		}
 		lost[i] = why[i] != ""
 	}
-	for _, span := range emitkit.CommentSpans(st.Script, lost) {
+	for _, span := range emitkit.CommentSpans(script, lost) {
 		first := ""
 		for i := span.From; i <= span.To; i++ {
-			outs[i] = "# pipemaster:lost script.interpolation: " + commentSafe(st.Script[i])
+			outs[i] = "# pipemaster:lost script.interpolation: " + commentSafe(script[i])
 			if first == "" {
 				first = why[i]
 			}
@@ -364,4 +379,12 @@ func (tc *taskCtx) markShell(sc *stepScope, sp string, lines []string) error {
 		}
 	}
 	return tc.e.markArg(caps.ScriptInterpolation, sp, arg)
+}
+
+// sourceWorkDir returns the working directory text that the file held, while the IR directory is as parsed.
+func (tc *taskCtx) sourceWorkDir(st *ir.Step) (string, bool) {
+	x := extOf(st.Ext)
+	orig, ok := x[ExtWorkspaceDir].(string)
+	rel, _ := x[ExtWorkspaceDirIR].(string)
+	return orig, tc.e.own && ok && rel == st.WorkDir
 }

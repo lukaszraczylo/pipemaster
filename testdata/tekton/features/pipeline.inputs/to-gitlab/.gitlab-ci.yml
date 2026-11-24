@@ -1,9 +1,12 @@
 # pipemaster:emulated pipeline.inputs pipeline/ci
-# pipemaster:arg [{"Name":"environment","Type":"string","Default":"staging","Description":"Where to deploy","Required":false}]
+# pipemaster:arg [{"Name":"environment","Type":"string","Default":"staging","Description":"Where to deploy","Required":false},{"Name":"dry-run","Type":"string","Default":"false","Description":"Skip the push","Required":false}]
 variables:
   environment:
     value: staging
     description: Where to deploy
+  dry_run:
+    value: "false"
+    description: Skip the push
 workflow:
   name: inputs
   rules:

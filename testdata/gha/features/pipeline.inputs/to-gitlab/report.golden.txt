@@ -1,3 +1,3 @@
 Loss report: gha -> gitlab
-[lost] pipeline/ci pipeline.inputs (input dry-run is not a unique variable name)
 [lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider gha (inputs) is not written to the GitLab file; it is kept in round-trip metadata)
+[emulated] pipeline/ci pipeline.inputs: variables with description (input types and required flags are not enforced)

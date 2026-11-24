@@ -84,3 +84,50 @@ func TestCorpus69CatalogTasksHaveNoPlaceholder(t *testing.T) {
 		})
 	}
 }
+
+// block returns the text of one top-level GitLab job, or of one GHA job under jobs:.
+func block(t *testing.T, files, head string, indent int) string {
+	t.Helper()
+	i := strings.Index(files, "\n"+head+":\n")
+	if i < 0 {
+		t.Fatalf("no job %q in\n%s", head, files)
+	}
+	rest := files[i+1:]
+	pad := strings.Repeat(" ", indent)
+	lines := strings.Split(rest, "\n")
+	out := []string{lines[0]}
+	for _, l := range lines[1:] {
+		if l != "" && !strings.HasPrefix(l, pad+" ") && !strings.HasPrefix(l, "#") {
+			break
+		}
+		out = append(out, l)
+	}
+	return strings.Join(out, "\n")
+}
+
+func TestCorpus69LocalTaskJobsWork(t *testing.T) {
+	gha, _ := emitCorpus69(t, provider.GHA)
+	gl, _ := emitCorpus69(t, provider.GitLab)
+	jobs := map[string]string{
+		"gha apply-manifests":    block(t, gha, "  apply-manifests", 2),
+		"gha update-deployment":  block(t, gha, "  update-deployment", 2),
+		"gitlab apply-manifests": block(t, gl, "build-and-deploy:apply-manifests", 0),
+		"gitlab update":          block(t, gl, "build-and-deploy:update-deployment", 0),
+	}
+	for name, b := range jobs {
+		for _, bad := range []string{"/workspace/", "pipemaster:lost", `"true"`, "$(params.", "$(inputs."} {
+			if strings.Contains(b, bad) {
+				t.Errorf("%s holds %q:\n%s", name, bad, b)
+			}
+		}
+		if !strings.Contains(b, "oc apply -f k8s") && !strings.Contains(b, "oc patch deployment") {
+			t.Errorf("%s lacks its command:\n%s", name, b)
+		}
+	}
+	if !strings.Contains(jobs["gha apply-manifests"], "uses: actions/checkout@") {
+		t.Error("the GHA apply-manifests job needs its own checkout")
+	}
+	if !strings.Contains(jobs["gitlab update"], "$deployment_name") || !strings.Contains(jobs["gha update-deployment"], "${{ inputs.deployment-name }}") {
+		t.Error("update-deployment must read the hyphenated input in both targets")
+	}
+}

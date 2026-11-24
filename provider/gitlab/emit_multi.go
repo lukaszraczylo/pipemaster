@@ -183,11 +183,12 @@ func (e *emitter) foldPipelines(pls []*ir.Pipeline) (*ir.Pipeline, error) {
 func (e *emitter) foldShared(pp string, pl *ir.Pipeline) (vars []ir.Var, group string, inputs []ir.Input, err error) {
 	vars = append(vars, pl.Env...)
 	for _, in := range pl.Inputs {
-		if !isIdent(in.Name) || hasVar(vars, in.Name) {
-			e.lose(pp, caps.PipelineInputs, "input "+in.Name+" is not a unique variable name")
+		name := inputVar(in.Name)
+		if name == "" || hasVar(vars, name) {
+			e.lose(pp, caps.PipelineInputs, "input "+in.Name+" is not a unique variable name; the variable "+name+" is taken")
 			continue
 		}
-		vars = append(vars, ir.Var{Name: in.Name, Value: ir.Value{Lit: in.Default}})
+		vars = append(vars, ir.Var{Name: name, Value: ir.Value{Lit: in.Default}})
 		inputs = append(inputs, in)
 		e.emulate(pp, caps.PipelineInputs, "variable copied into every job of the pipeline", "the pipeline marker keeps the input list")
 	}
