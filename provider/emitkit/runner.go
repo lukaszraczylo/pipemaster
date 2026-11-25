@@ -79,6 +79,12 @@ func TagIsEvent(origin string) bool {
 	return false
 }
 
+// PRBranchIsTarget is true when a pipeline from origin reads the branch of a pull request run as the branch
+// that the pull request merges into. Drone and Woodpecker match a branch filter against that target.
+func PRBranchIsTarget(origin string) bool {
+	return origin == provider.Drone || origin == provider.Woodpecker
+}
+
 // Unplaced returns the labels that no hosted report covers: a label with a template expression, and a label that
 // is not hosted. A dialect with no form for them must report each as lost.
 func Unplaced(origin string, labels []string) []string {

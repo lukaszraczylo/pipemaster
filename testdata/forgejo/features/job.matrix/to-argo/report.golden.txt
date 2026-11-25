@@ -1,9 +1,8 @@
 Loss report: forgejo -> argo
 [lost] pipeline/ci/job/test job.runner (Argo schedules pods; a runner label has no form)
 [external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
-[external] pipeline/ci/trigger/1 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[external] pipeline/ci/trigger/1 trigger.tag: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/ci/job/test job.matrix: withItems over the expanded cells (the cells run as withItems of one task; fail-fast and max-parallel have no form on one task, so every cell runs and a failing cell fails the task)
 [emulated] pipeline/ci/job/test/step/test-step-1 step.shell: container command sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)
 [emulated] pipeline/ci/trigger/0 trigger.filter.branches
 [emulated] pipeline/ci/trigger/1 trigger.filter.branches
-[emulated] pipeline/ci/trigger/1 trigger.tag: EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only)

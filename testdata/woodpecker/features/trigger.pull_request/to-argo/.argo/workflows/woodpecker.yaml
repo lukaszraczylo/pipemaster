@@ -2,7 +2,6 @@
 # pipemaster:arg {"steps":{"build":"ref: golang:1.25\n"},"wrote":{"build":"golang:1.25"}}
 # pipemaster:emulated trigger.filter.branches pipeline/woodpecker/trigger/0
 # pipemaster:emulated trigger.pull_request pipeline/woodpecker/trigger/0
-# pipemaster:emulated trigger.push pipeline/woodpecker/trigger/0
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:

@@ -1,4 +1,4 @@
-01-gha-cli gha->argo native= 129 emulated=  77 external=  28 lost= 100
+01-gha-cli gha->argo native= 129 emulated=  75 external=  28 lost= 100
 01-gha-cli gha->concourse native= 174 emulated=  50 external=  14 lost= 103
 01-gha-cli gha->drone native=  99 emulated=  32 external=  17 lost= 194
 01-gha-cli gha->forgejo native= 248 emulated=   2 external=   0 lost=  17
@@ -6,7 +6,7 @@
 01-gha-cli gha->gitlab native=  88 emulated=  12 external=  22 lost= 194
 01-gha-cli gha->tekton native= 114 emulated= 139 external=  23 lost= 109
 01-gha-cli gha->woodpecker native= 159 emulated=  28 external=  19 lost= 135
-02-gha-django gha->argo native=  79 emulated=  51 external=  13 lost=  28
+02-gha-django gha->argo native=  79 emulated=  46 external=  13 lost=  28
 02-gha-django gha->concourse native=  78 emulated=  53 external=   6 lost=  46
 02-gha-django gha->drone native=  51 emulated=  28 external=  11 lost=  73
 02-gha-django gha->forgejo native= 121 emulated=   1 external=   0 lost=   5
@@ -14,7 +14,7 @@
 02-gha-django gha->gitlab native=  51 emulated=  11 external=   9 lost=  73
 02-gha-django gha->tekton native=  72 emulated=  57 external=  12 lost=  33
 02-gha-django gha->woodpecker native=  72 emulated=  27 external=  12 lost=  52
-03-gha-build-push-action gha->argo native= 470 emulated= 182 external= 104 lost= 146
+03-gha-build-push-action gha->argo native= 470 emulated= 178 external= 104 lost= 146
 03-gha-build-push-action gha->concourse native= 491 emulated= 207 external=  47 lost= 178
 03-gha-build-push-action gha->drone native= 328 emulated= 165 external=  47 lost= 412
 03-gha-build-push-action gha->forgejo native= 661 emulated=   2 external=   0 lost=   7
@@ -22,7 +22,7 @@
 03-gha-build-push-action gha->gitlab native= 306 emulated=  19 external=  50 lost= 419
 03-gha-build-push-action gha->tekton native= 468 emulated= 326 external=  56 lost= 172
 03-gha-build-push-action gha->woodpecker native= 520 emulated= 130 external=  49 lost= 207
-04-gha-gin gha->argo native=  48 emulated=  27 external=  19 lost=  19
+04-gha-gin gha->argo native=  48 emulated=  23 external=  19 lost=  19
 04-gha-gin gha->concourse native=  59 emulated=  27 external=   4 lost=  23
 04-gha-gin gha->drone native=  39 emulated=  19 external=   4 lost=  51
 04-gha-gin gha->forgejo native=  81 emulated=   4 external=   0 lost=   5
@@ -30,7 +30,7 @@
 04-gha-gin gha->gitlab native=  42 emulated=   6 external=   7 lost=  50
 04-gha-gin gha->tekton native=  49 emulated=  35 external=  12 lost=  23
 04-gha-gin gha->woodpecker native=  61 emulated=  16 external=   6 lost=  29
-05-gha-helm gha->argo native=  77 emulated=  39 external=  23 lost=  19
+05-gha-helm gha->argo native=  77 emulated=  34 external=  23 lost=  19
 05-gha-helm gha->concourse native=  85 emulated=  57 external=   5 lost=  24
 05-gha-helm gha->drone native=  57 emulated=  30 external=   6 lost=  64
 05-gha-helm gha->forgejo native= 116 emulated=   4 external=   0 lost=   6
@@ -38,7 +38,7 @@
 05-gha-helm gha->gitlab native=  63 emulated=   7 external=   7 lost=  58
 05-gha-helm gha->tekton native=  77 emulated=  54 external=  16 lost=  24
 05-gha-helm gha->woodpecker native=  91 emulated=  25 external=   7 lost=  31
-06-gha-flask gha->argo native=  45 emulated=  33 external=  14 lost=  37
+06-gha-flask gha->argo native=  45 emulated=  29 external=  14 lost=  37
 06-gha-flask gha->concourse native=  47 emulated=  35 external=   7 lost=  42
 06-gha-flask gha->drone native=  39 emulated=  25 external=   8 lost=  54
 06-gha-flask gha->forgejo native=  81 emulated=   0 external=   0 lost=   9
@@ -46,7 +46,7 @@
 06-gha-flask gha->gitlab native=  49 emulated=   7 external=   8 lost=  51
 06-gha-flask gha->tekton native=  43 emulated=  44 external=  14 lost=  39
 06-gha-flask gha->woodpecker native=  45 emulated=  24 external=   8 lost=  49
-07-gha-pandas gha->argo native=  56 emulated=  19 external=  17 lost=  49
+07-gha-pandas gha->argo native=  56 emulated=  17 external=  17 lost=  49
 07-gha-pandas gha->concourse native=  62 emulated=  26 external=  10 lost=  56
 07-gha-pandas gha->drone native=  46 emulated=  15 external=  10 lost=  76
 07-gha-pandas gha->forgejo native= 118 emulated=   3 external=   0 lost=  15
@@ -54,7 +54,7 @@
 07-gha-pandas gha->gitlab native=  42 emulated=   8 external=  12 lost=  75
 07-gha-pandas gha->tekton native=  67 emulated=  35 external=  15 lost=  42
 07-gha-pandas gha->woodpecker native=  59 emulated=  16 external=  13 lost=  59
-08-gha-node_exporter gha->argo native= 114 emulated= 103 external=  25 lost=  51
+08-gha-node_exporter gha->argo native= 114 emulated=  98 external=  25 lost=  51
 08-gha-node_exporter gha->concourse native= 146 emulated=  70 external=  16 lost=  53
 08-gha-node_exporter gha->drone native= 114 emulated=  51 external=  16 lost=  98
 08-gha-node_exporter gha->forgejo native= 200 emulated=   4 external=   0 lost=   9
@@ -62,7 +62,7 @@
 08-gha-node_exporter gha->gitlab native= 114 emulated=   7 external=  16 lost= 103
 08-gha-node_exporter gha->tekton native=  96 emulated= 133 external=  25 lost=  50
 08-gha-node_exporter gha->woodpecker native= 138 emulated=  51 external=  16 lost=  74
-09-gha-black gha->argo native= 221 emulated=  70 external=  17 lost=  92
+09-gha-black gha->argo native= 221 emulated=  67 external=  17 lost=  92
 09-gha-black gha->concourse native= 226 emulated=  71 external=  10 lost= 107
 09-gha-black gha->drone native= 147 emulated=  55 external=  10 lost= 193
 09-gha-black gha->forgejo native= 287 emulated=   3 external=   0 lost=  11
@@ -70,7 +70,7 @@
 09-gha-black gha->gitlab native= 127 emulated=  24 external=  13 lost= 193
 09-gha-black gha->tekton native= 218 emulated=  79 external=  16 lost=  98
 09-gha-black gha->woodpecker native= 198 emulated=  52 external=  14 lost= 139
-10-gha-kustomize gha->argo native=  69 emulated=  37 external=  24 lost=  20
+10-gha-kustomize gha->argo native=  69 emulated=  32 external=  24 lost=  20
 10-gha-kustomize gha->concourse native=  79 emulated=  48 external=   8 lost=  23
 10-gha-kustomize gha->drone native=  55 emulated=  32 external=   8 lost=  55
 10-gha-kustomize gha->forgejo native= 109 emulated=   4 external=   0 lost=   4
@@ -78,7 +78,7 @@
 10-gha-kustomize gha->gitlab native=  59 emulated=   6 external=  10 lost=  58
 10-gha-kustomize gha->tekton native=  70 emulated=  50 external=  16 lost=  22
 10-gha-kustomize gha->woodpecker native=  78 emulated=  24 external=   8 lost=  42
-11-gha-cobra gha->argo native=  26 emulated=  16 external=  12 lost=  16
+11-gha-cobra gha->argo native=  26 emulated=  13 external=  12 lost=  16
 11-gha-cobra gha->concourse native=  28 emulated=  20 external=   3 lost=  20
 11-gha-cobra gha->drone native=  26 emulated=  15 external=   3 lost=  23
 11-gha-cobra gha->forgejo native=  46 emulated=   2 external=   0 lost=   4
@@ -86,7 +86,7 @@
 11-gha-cobra gha->gitlab native=  33 emulated=   1 external=   4 lost=  21
 11-gha-cobra gha->tekton native=  29 emulated=  21 external=   8 lost=  15
 11-gha-cobra gha->woodpecker native=  30 emulated=  11 external=   3 lost=  23
-12-gha-tokio gha->argo native= 597 emulated= 190 external= 103 lost= 164
+12-gha-tokio gha->argo native= 597 emulated= 185 external= 103 lost= 164
 12-gha-tokio gha->concourse native= 614 emulated= 278 external=  41 lost= 183
 12-gha-tokio gha->drone native= 451 emulated= 140 external=  42 lost= 456
 12-gha-tokio gha->forgejo native= 841 emulated=   1 external=   0 lost=   7
@@ -94,7 +94,7 @@
 12-gha-tokio gha->gitlab native= 463 emulated=  81 external=  54 lost= 429
 12-gha-tokio gha->tekton native= 640 emulated= 368 external=  50 lost= 173
 12-gha-tokio gha->woodpecker native= 627 emulated=  73 external=  43 lost= 344
-13-gha-traefik gha->argo native=  77 emulated=  37 external=  11 lost=  30
+13-gha-traefik gha->argo native=  77 emulated=  33 external=  11 lost=  30
 13-gha-traefik gha->concourse native=  83 emulated=  39 external=   5 lost=  35
 13-gha-traefik gha->drone native=  54 emulated=  23 external=   8 lost=  69
 13-gha-traefik gha->forgejo native= 116 emulated=   4 external=   0 lost=   5
@@ -102,7 +102,7 @@
 13-gha-traefik gha->gitlab native=  52 emulated=  11 external=   7 lost=  70
 13-gha-traefik gha->tekton native=  79 emulated=  44 external=  10 lost=  32
 13-gha-traefik gha->woodpecker native=  75 emulated=  24 external=   9 lost=  45
-14-gha-fastapi gha->argo native= 117 emulated=  36 external=  14 lost=  52
+14-gha-fastapi gha->argo native= 117 emulated=  33 external=  14 lost=  52
 14-gha-fastapi gha->concourse native= 111 emulated=  58 external=   8 lost=  62
 14-gha-fastapi gha->drone native=  75 emulated=  31 external=  15 lost= 101
 14-gha-fastapi gha->forgejo native= 154 emulated=   3 external=   0 lost=  10
@@ -110,7 +110,7 @@
 14-gha-fastapi gha->gitlab native=  76 emulated=  10 external=  12 lost=  95
 14-gha-fastapi gha->tekton native= 113 emulated=  64 external=  13 lost=  57
 14-gha-fastapi gha->woodpecker native= 105 emulated=  32 external=  16 lost=  68
-15-gitlab-charts-gitlab gitlab->argo native=  89 emulated= 128 external=  16 lost= 193
+15-gitlab-charts-gitlab gitlab->argo native=  89 emulated= 127 external=  16 lost= 193
 15-gitlab-charts-gitlab gitlab->concourse native=  74 emulated= 151 external=  18 lost= 181
 15-gitlab-charts-gitlab gitlab->drone native= 104 emulated= 123 external=   2 lost= 192
 15-gitlab-charts-gitlab gitlab->forgejo native= 121 emulated= 177 external=   3 lost= 170
@@ -118,7 +118,7 @@
 15-gitlab-charts-gitlab gitlab->gitea native= 121 emulated= 176 external=   3 lost= 170
 15-gitlab-charts-gitlab gitlab->tekton native=  99 emulated= 140 external=   2 lost= 185
 15-gitlab-charts-gitlab gitlab->woodpecker native=  93 emulated= 129 external=   2 lost= 196
-16-gitlab-cli gitlab->argo native=  76 emulated= 102 external=  14 lost= 197
+16-gitlab-cli gitlab->argo native=  76 emulated= 101 external=  14 lost= 197
 16-gitlab-cli gitlab->concourse native=  83 emulated= 148 external=  43 lost= 112
 16-gitlab-cli gitlab->drone native= 106 emulated=  86 external=   0 lost= 186
 16-gitlab-cli gitlab->forgejo native= 148 emulated= 116 external=  31 lost= 112
@@ -126,7 +126,7 @@
 16-gitlab-cli gitlab->gitea native= 148 emulated= 115 external=  31 lost= 112
 16-gitlab-cli gitlab->tekton native=  96 emulated= 117 external=   2 lost= 188
 16-gitlab-cli gitlab->woodpecker native=  96 emulated=  98 external=   0 lost= 181
-17-gitlab-gitaly gitlab->argo native= 104 emulated= 151 external=   4 lost= 215
+17-gitlab-gitaly gitlab->argo native= 104 emulated= 150 external=   4 lost= 215
 17-gitlab-gitaly gitlab->concourse native=  87 emulated= 177 external=  35 lost= 175
 17-gitlab-gitaly gitlab->drone native= 134 emulated= 130 external=   1 lost= 176
 17-gitlab-gitaly gitlab->forgejo native= 240 emulated= 138 external=  35 lost= 121
@@ -134,7 +134,7 @@
 17-gitlab-gitaly gitlab->gitea native= 240 emulated= 137 external=  35 lost= 121
 17-gitlab-gitaly gitlab->tekton native= 114 emulated= 157 external=   2 lost= 215
 17-gitlab-gitaly gitlab->woodpecker native= 156 emulated= 139 external=   1 lost= 145
-18-gitlab-gitlab-docs gitlab->argo native=   1 emulated=   5 external=   2 lost=   0
+18-gitlab-gitlab-docs gitlab->argo native=   1 emulated=   4 external=   2 lost=   0
 18-gitlab-gitlab-docs gitlab->concourse native=   1 emulated=   6 external=   0 lost=   2
 18-gitlab-gitlab-docs gitlab->drone native=   3 emulated=   3 external=   0 lost=   1
 18-gitlab-gitlab-docs gitlab->forgejo native=   4 emulated=   2 external=   0 lost=   0
@@ -142,7 +142,7 @@
 18-gitlab-gitlab-docs gitlab->gitea native=   4 emulated=   1 external=   0 lost=   0
 18-gitlab-gitlab-docs gitlab->tekton native=   1 emulated=   1 external=   2 lost=   0
 18-gitlab-gitlab-docs gitlab->woodpecker native=   3 emulated=   3 external=   0 lost=   1
-19-gitlab-gitlab-pages gitlab->argo native=  46 emulated=  53 external=   4 lost=  60
+19-gitlab-gitlab-pages gitlab->argo native=  46 emulated=  52 external=   4 lost=  60
 19-gitlab-gitlab-pages gitlab->concourse native=  46 emulated=  55 external=  15 lost=  46
 19-gitlab-gitlab-pages gitlab->drone native=  57 emulated=  39 external=   1 lost=  53
 19-gitlab-gitlab-pages gitlab->forgejo native=  76 emulated=  41 external=  15 lost=  35
@@ -150,7 +150,7 @@
 19-gitlab-gitlab-pages gitlab->gitea native=  76 emulated=  40 external=  15 lost=  35
 19-gitlab-gitlab-pages gitlab->tekton native=  60 emulated=  39 external=   2 lost=  61
 19-gitlab-gitlab-pages gitlab->woodpecker native=  50 emulated=  48 external=   1 lost=  51
-20-gitlab-gitlab-runner gitlab->argo native= 239 emulated= 244 external=  50 lost= 538
+20-gitlab-gitlab-runner gitlab->argo native= 239 emulated= 243 external=  50 lost= 538
 20-gitlab-gitlab-runner gitlab->concourse native= 185 emulated= 384 external= 126 lost= 381
 20-gitlab-gitlab-runner gitlab->drone native= 278 emulated= 215 external=  33 lost= 534
 20-gitlab-gitlab-runner gitlab->forgejo native= 855 emulated= 311 external=  83 lost= 297
@@ -158,7 +158,7 @@
 20-gitlab-gitlab-runner gitlab->gitea native= 855 emulated= 310 external=  83 lost= 297
 20-gitlab-gitlab-runner gitlab->tekton native= 285 emulated= 303 external=   2 lost= 517
 20-gitlab-gitlab-runner gitlab->woodpecker native= 272 emulated= 260 external=  33 lost= 495
-21-gitlab-gitlab-shell gitlab->argo native=  75 emulated=  84 external=   6 lost=  67
+21-gitlab-gitlab-shell gitlab->argo native=  75 emulated=  82 external=   6 lost=  67
 21-gitlab-gitlab-shell gitlab->concourse native=  75 emulated=  73 external=  22 lost=  59
 21-gitlab-gitlab-shell gitlab->drone native=  91 emulated=  66 external=   0 lost=  54
 21-gitlab-gitlab-shell gitlab->forgejo native= 120 emulated=  75 external=  21 lost=  28
@@ -166,7 +166,7 @@
 21-gitlab-gitlab-shell gitlab->gitea native= 119 emulated=  74 external=  21 lost=  28
 21-gitlab-gitlab-shell gitlab->tekton native=  90 emulated=  70 external=   3 lost=  68
 21-gitlab-gitlab-shell gitlab->woodpecker native=  89 emulated=  71 external=   0 lost=  51
-22-gitlab-gitlab-vscode-extension gitlab->argo native= 111 emulated=  62 external=   6 lost=  87
+22-gitlab-gitlab-vscode-extension gitlab->argo native= 111 emulated=  61 external=   6 lost=  87
 22-gitlab-gitlab-vscode-extension gitlab->concourse native=  85 emulated=  82 external=  22 lost=  76
 22-gitlab-gitlab-vscode-extension gitlab->drone native= 103 emulated=  71 external=   0 lost=  89
 22-gitlab-gitlab-vscode-extension gitlab->forgejo native= 153 emulated=  87 external=  19 lost=  45
@@ -174,7 +174,7 @@
 22-gitlab-gitlab-vscode-extension gitlab->gitea native= 153 emulated=  86 external=  19 lost=  45
 22-gitlab-gitlab-vscode-extension gitlab->tekton native=  97 emulated=  71 external=   2 lost= 101
 22-gitlab-gitlab-vscode-extension gitlab->woodpecker native=  98 emulated=  76 external=   0 lost=  89
-24-gitlab-release-cli gitlab->argo native=  85 emulated=  83 external=  10 lost=  86
+24-gitlab-release-cli gitlab->argo native=  85 emulated=  82 external=  10 lost=  86
 24-gitlab-release-cli gitlab->concourse native=  91 emulated=  88 external=  10 lost=  76
 24-gitlab-release-cli gitlab->drone native= 107 emulated=  69 external=   0 lost=  85
 24-gitlab-release-cli gitlab->forgejo native= 133 emulated= 118 external=   1 lost=  79
@@ -182,7 +182,7 @@
 24-gitlab-release-cli gitlab->gitea native= 133 emulated= 117 external=   1 lost=  79
 24-gitlab-release-cli gitlab->tekton native= 100 emulated=  97 external=   2 lost=  78
 24-gitlab-release-cli gitlab->woodpecker native=  93 emulated=  85 external=   0 lost=  83
-25-gitlab-semgrep gitlab->argo native=  30 emulated=  20 external=   4 lost=   8
+25-gitlab-semgrep gitlab->argo native=  30 emulated=  19 external=   4 lost=   8
 25-gitlab-semgrep gitlab->concourse native=  29 emulated=  20 external=   2 lost=  12
 25-gitlab-semgrep gitlab->drone native=  34 emulated=  14 external=   1 lost=  10
 25-gitlab-semgrep gitlab->forgejo native=  41 emulated=  31 external=   1 lost=   7
@@ -190,7 +190,7 @@
 25-gitlab-semgrep gitlab->gitea native=  41 emulated=  30 external=   1 lost=   7
 25-gitlab-semgrep gitlab->tekton native=  32 emulated=  22 external=   2 lost=   7
 25-gitlab-semgrep gitlab->woodpecker native=  34 emulated=  16 external=   1 lost=  10
-26-gitlab-terraform-images gitlab->argo native=  17 emulated=  20 external=   2 lost=  15
+26-gitlab-terraform-images gitlab->argo native=  17 emulated=  19 external=   2 lost=  15
 26-gitlab-terraform-images gitlab->concourse native=  19 emulated=  18 external=   0 lost=  21
 26-gitlab-terraform-images gitlab->drone native=  20 emulated=  15 external=   0 lost=  16
 26-gitlab-terraform-images gitlab->forgejo native=  30 emulated=  23 external=   0 lost=  16
@@ -198,7 +198,7 @@
 26-gitlab-terraform-images gitlab->gitea native=  30 emulated=  22 external=   0 lost=  16
 26-gitlab-terraform-images gitlab->tekton native=  20 emulated=  14 external=   2 lost=  15
 26-gitlab-terraform-images gitlab->woodpecker native=  25 emulated=  12 external=   0 lost=  14
-27-gitlab-pipewire gitlab->argo native=  60 emulated=  55 external=   9 lost=  85
+27-gitlab-pipewire gitlab->argo native=  60 emulated=  54 external=   9 lost=  85
 27-gitlab-pipewire gitlab->concourse native=  59 emulated=  92 external=   6 lost=  69
 27-gitlab-pipewire gitlab->drone native=  80 emulated=  73 external=   0 lost=  76
 27-gitlab-pipewire gitlab->forgejo native=  90 emulated=  68 external=   0 lost=  68
@@ -206,7 +206,7 @@
 27-gitlab-pipewire gitlab->gitea native=  90 emulated=  67 external=   0 lost=  68
 27-gitlab-pipewire gitlab->tekton native=  87 emulated=  87 external=   2 lost=  68
 27-gitlab-pipewire gitlab->woodpecker native=  64 emulated=  91 external=   0 lost=  74
-28-gitea-docs gitea->argo native=  79 emulated=  55 external=  14 lost=  18
+28-gitea-docs gitea->argo native=  79 emulated=  53 external=  14 lost=  18
 28-gitea-docs gitea->concourse native=  92 emulated=  45 external=   5 lost=  28
 28-gitea-docs gitea->drone native=  64 emulated=  43 external=   7 lost=  49
 28-gitea-docs gitea->forgejo native= 118 emulated=   1 external=   0 lost=   0
@@ -214,7 +214,7 @@
 28-gitea-docs gitea->gitlab native=  62 emulated=  10 external=  16 lost=  45
 28-gitea-docs gitea->tekton native=  80 emulated=  58 external=  10 lost=  20
 28-gitea-docs gitea->woodpecker native=  84 emulated=  38 external=   7 lost=  29
-29-gitea-helm-actions gitea->argo native=  74 emulated=  43 external=  17 lost=   8
+29-gitea-helm-actions gitea->argo native=  74 emulated=  39 external=  17 lost=   8
 29-gitea-helm-actions gitea->concourse native=  89 emulated=  40 external=   5 lost=  14
 29-gitea-helm-actions gitea->drone native=  65 emulated=  32 external=   5 lost=  39
 29-gitea-helm-actions gitea->forgejo native= 107 emulated=   5 external=   0 lost=   0
@@ -222,7 +222,7 @@
 29-gitea-helm-actions gitea->gitlab native=  73 emulated=   7 external=   6 lost=  35
 29-gitea-helm-actions gitea->tekton native=  72 emulated=  55 external=  12 lost=  10
 29-gitea-helm-actions gitea->woodpecker native=  92 emulated=  27 external=   5 lost=  16
-30-gitea-runner-images gitea->argo native=  63 emulated=  24 external=  10 lost=  21
+30-gitea-runner-images gitea->argo native=  63 emulated=  23 external=  10 lost=  21
 30-gitea-runner-images gitea->concourse native=  65 emulated=  38 external=   3 lost=  26
 30-gitea-runner-images gitea->drone native=  47 emulated=  19 external=   5 lost=  55
 30-gitea-runner-images gitea->forgejo native=  89 emulated=   0 external=   0 lost=   1
@@ -230,7 +230,7 @@
 30-gitea-runner-images gitea->gitlab native=  45 emulated=   7 external=   5 lost=  52
 30-gitea-runner-images gitea->tekton native=  64 emulated=  38 external=   6 lost=  28
 30-gitea-runner-images gitea->woodpecker native=  68 emulated=  18 external=   6 lost=  31
-31-gitea-builder gitea->argo native=  13 emulated=   9 external=   5 lost=   0
+31-gitea-builder gitea->argo native=  13 emulated=   7 external=   5 lost=   0
 31-gitea-builder gitea->concourse native=  14 emulated=   8 external=   1 lost=   2
 31-gitea-builder gitea->drone native=  10 emulated=   5 external=   1 lost=   6
 31-gitea-builder gitea->forgejo native=  17 emulated=   1 external=   0 lost=   0
@@ -238,7 +238,7 @@
 31-gitea-builder gitea->gitlab native=  12 emulated=   1 external=   1 lost=   5
 31-gitea-builder gitea->tekton native=  13 emulated=   5 external=   4 lost=   0
 31-gitea-builder gitea->woodpecker native=  14 emulated=   4 external=   1 lost=   3
-32-gitea-terraform-provider-gitea gitea->argo native=  22 emulated=  15 external=   9 lost=   3
+32-gitea-terraform-provider-gitea gitea->argo native=  22 emulated=  14 external=   9 lost=   3
 32-gitea-terraform-provider-gitea gitea->concourse native=  28 emulated=  20 external=   2 lost=   4
 32-gitea-terraform-provider-gitea gitea->drone native=  21 emulated=  11 external=   2 lost=  16
 32-gitea-terraform-provider-gitea gitea->forgejo native=  37 emulated=   2 external=   0 lost=   0
@@ -246,7 +246,7 @@
 32-gitea-terraform-provider-gitea gitea->gitlab native=  20 emulated=   5 external=   4 lost=  13
 32-gitea-terraform-provider-gitea gitea->tekton native=  26 emulated=  19 external=   6 lost=   3
 32-gitea-terraform-provider-gitea gitea->woodpecker native=  29 emulated=   8 external=   3 lost=   9
-33-gitea-reverse gitea->argo native=  27 emulated=  16 external=   8 lost=   3
+33-gitea-reverse gitea->argo native=  27 emulated=  13 external=   8 lost=   3
 33-gitea-reverse gitea->concourse native=  29 emulated=  21 external=   2 lost=   8
 33-gitea-reverse gitea->drone native=  21 emulated=  12 external=   2 lost=  17
 33-gitea-reverse gitea->forgejo native=  36 emulated=   2 external=   0 lost=   0
@@ -254,7 +254,7 @@
 33-gitea-reverse gitea->gitlab native=  24 emulated=   1 external=   2 lost=  17
 33-gitea-reverse gitea->tekton native=  27 emulated=  20 external=   6 lost=   3
 33-gitea-reverse gitea->woodpecker native=  30 emulated=  10 external=   2 lost=  10
-34-gitea-gitea-vscode gitea->argo native= 135 emulated=  49 external=  15 lost=  17
+34-gitea-gitea-vscode gitea->argo native= 135 emulated=  46 external=  15 lost=  17
 34-gitea-gitea-vscode gitea->concourse native= 141 emulated=  79 external=   7 lost=  29
 34-gitea-gitea-vscode gitea->drone native=  95 emulated=  47 external=   7 lost=  79
 34-gitea-gitea-vscode gitea->forgejo native= 163 emulated=   3 external=   0 lost=   2
@@ -262,7 +262,7 @@
 34-gitea-gitea-vscode gitea->gitlab native=  90 emulated=   9 external=   9 lost=  72
 34-gitea-gitea-vscode gitea->tekton native= 137 emulated=  82 external=  12 lost=  17
 34-gitea-gitea-vscode gitea->woodpecker native= 137 emulated=  45 external=   7 lost=  38
-35-gitea-actionslib gitea->argo native=  41 emulated=  21 external=  13 lost=   5
+35-gitea-actionslib gitea->argo native=  41 emulated=  19 external=  13 lost=   5
 35-gitea-actionslib gitea->concourse native=  42 emulated=  36 external=   5 lost=  12
 35-gitea-actionslib gitea->drone native=  38 emulated=  24 external=   5 lost=  17
 35-gitea-actionslib gitea->forgejo native=  55 emulated=   1 external=   0 lost=   0
@@ -270,7 +270,7 @@
 35-gitea-actionslib gitea->gitlab native=  42 emulated=   4 external=   5 lost=  17
 35-gitea-actionslib gitea->tekton native=  40 emulated=  36 external=   8 lost=   8
 35-gitea-actionslib gitea->woodpecker native=  46 emulated=  19 external=   5 lost=  14
-36-forgejo-renovate-config forgejo->argo native=  18 emulated=  11 external=   2 lost=   7
+36-forgejo-renovate-config forgejo->argo native=  18 emulated=  10 external=   2 lost=   7
 36-forgejo-renovate-config forgejo->concourse native=  22 emulated=  12 external=   2 lost=   5
 36-forgejo-renovate-config forgejo->drone native=  18 emulated=   7 external=   0 lost=  12
 36-forgejo-renovate-config forgejo->gha native=  28 emulated=   2 external=   0 lost=   0
@@ -278,7 +278,7 @@
 36-forgejo-renovate-config forgejo->gitlab native=  19 emulated=   2 external=   3 lost=   7
 36-forgejo-renovate-config forgejo->tekton native=  19 emulated=  11 external=   2 lost=   7
 36-forgejo-renovate-config forgejo->woodpecker native=  24 emulated=   6 external=   0 lost=   7
-37-forgejo-helm forgejo->argo native=  93 emulated=  41 external=   6 lost=  31
+37-forgejo-helm forgejo->argo native=  93 emulated=  39 external=   6 lost=  31
 37-forgejo-helm forgejo->concourse native=  98 emulated=  63 external=   6 lost=  27
 37-forgejo-helm forgejo->drone native=  80 emulated=  37 external=   1 lost=  59
 37-forgejo-helm forgejo->gha native= 126 emulated=  10 external=   0 lost=   0
@@ -286,7 +286,7 @@
 37-forgejo-helm forgejo->gitlab native=  88 emulated=   3 external=   9 lost=  41
 37-forgejo-helm forgejo->tekton native=  93 emulated=  77 external=   6 lost=  31
 37-forgejo-helm forgejo->woodpecker native= 101 emulated=  38 external=   2 lost=  32
-38-forgejo-deb forgejo->argo native= 107 emulated=  65 external=  13 lost=  38
+38-forgejo-deb forgejo->argo native= 107 emulated=  62 external=  13 lost=  38
 38-forgejo-deb forgejo->concourse native= 126 emulated=  66 external=  10 lost=  33
 38-forgejo-deb forgejo->drone native= 113 emulated=  51 external=   0 lost=  54
 38-forgejo-deb forgejo->gha native= 143 emulated=  35 external=   0 lost=   0
@@ -294,7 +294,7 @@
 38-forgejo-deb forgejo->gitlab native= 123 emulated=   1 external=  11 lost=  43
 38-forgejo-deb forgejo->tekton native= 103 emulated=  98 external=   5 lost=  38
 38-forgejo-deb forgejo->woodpecker native= 127 emulated=  42 external=   0 lost=  49
-39-forgejo-renovate forgejo->argo native=  62 emulated=  36 external=  11 lost=  27
+39-forgejo-renovate forgejo->argo native=  62 emulated=  33 external=  11 lost=  27
 39-forgejo-renovate forgejo->concourse native=  73 emulated=  29 external=   5 lost=  29
 39-forgejo-renovate forgejo->drone native=  53 emulated=  23 external=   2 lost=  55
 39-forgejo-renovate forgejo->gha native= 100 emulated=  13 external=   0 lost=   2
@@ -302,7 +302,7 @@
 39-forgejo-renovate forgejo->gitlab native=  55 emulated=   6 external=  12 lost=  46
 39-forgejo-renovate forgejo->tekton native=  63 emulated=  29 external=   8 lost=  31
 39-forgejo-renovate forgejo->woodpecker native=  73 emulated=  17 external=   3 lost=  38
-40-forgejo-contrib-renovate-config forgejo->argo native=   6 emulated=   5 external=   2 lost=   3
+40-forgejo-contrib-renovate-config forgejo->argo native=   6 emulated=   4 external=   2 lost=   3
 40-forgejo-contrib-renovate-config forgejo->concourse native=   7 emulated=   5 external=   1 lost=   3
 40-forgejo-contrib-renovate-config forgejo->drone native=   7 emulated=   2 external=   0 lost=   4
 40-forgejo-contrib-renovate-config forgejo->gha native=  10 emulated=   1 external=   0 lost=   0
@@ -374,7 +374,7 @@
 49-woodpecker-contributions-web woodpecker->gitea native=   8 emulated=   5 external=   0 lost=   5
 49-woodpecker-contributions-web woodpecker->gitlab native=   3 emulated=   2 external=   1 lost=  13
 49-woodpecker-contributions-web woodpecker->tekton native=   3 emulated=   5 external=   0 lost=  10
-50-woodpecker-rust-confirm-email woodpecker->argo native=   5 emulated=   3 external=   1 lost=   2
+50-woodpecker-rust-confirm-email woodpecker->argo native=   5 emulated=   2 external=   1 lost=   2
 50-woodpecker-rust-confirm-email woodpecker->concourse native=   6 emulated=   2 external=   0 lost=   4
 50-woodpecker-rust-confirm-email woodpecker->drone native=   7 emulated=   0 external=   0 lost=   2
 50-woodpecker-rust-confirm-email woodpecker->forgejo native=   5 emulated=   4 external=   0 lost=   2
@@ -430,7 +430,7 @@
 56-drone-mysql-operator drone->gitlab native=  20 emulated=  18 external=   5 lost=  19
 56-drone-mysql-operator drone->tekton native=  35 emulated=  22 external=   0 lost=   9
 56-drone-mysql-operator drone->woodpecker native=  44 emulated=   4 external=   0 lost=  12
-58-drone-go-admin drone->argo native=  12 emulated=   5 external=   1 lost=   4
+58-drone-go-admin drone->argo native=  12 emulated=   4 external=   1 lost=   4
 58-drone-go-admin drone->concourse native=  12 emulated=   5 external=   0 lost=  12
 58-drone-go-admin drone->forgejo native=  12 emulated=   9 external=   0 lost=   4
 58-drone-go-admin drone->gha native=  12 emulated=   8 external=   0 lost=   4

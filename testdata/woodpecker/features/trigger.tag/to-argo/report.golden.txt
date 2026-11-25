@@ -1,4 +1,3 @@
 Loss report: woodpecker -> argo
-[external] pipeline/woodpecker/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[external] pipeline/woodpecker/trigger/0 trigger.tag: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/woodpecker/trigger/0 trigger.filter.branches
-[emulated] pipeline/woodpecker/trigger/0 trigger.tag: EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only)

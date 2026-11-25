@@ -1,7 +1,6 @@
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/test/step/script
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.pull_request pipeline/gitlab-ci/trigger/0
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:

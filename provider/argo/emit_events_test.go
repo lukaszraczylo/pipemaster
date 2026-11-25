@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
@@ -175,6 +176,36 @@ func TestPushBesideATagTriggerAdmitsBranchRefsOnly(t *testing.T) {
 			ir.Normalize(p)
 			if ok, diff := ir.Equal(p, back); !ok {
 				t.Fatalf("round trip differs:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestEventTriggersReportTheirOwnFeature(t *testing.T) {
+	for kind, want := range map[ir.TriggerKind]caps.Feature{ir.TriggerPush: caps.TriggerPush, ir.TriggerPR: caps.TriggerPullRequest, ir.TriggerTag: caps.TriggerTag} {
+		t.Run(string(kind), func(t *testing.T) {
+			p := project(scriptJob("build", "x"))
+			p.Pipelines[0].Triggers = []ir.Trigger{{Kind: kind}}
+			_, rep := emit(t, p)
+			for _, e := range rep.Entries {
+				if e.Feature == want && e.Level == caps.External && strings.Contains(e.Strategy, "webhook secret") {
+					return
+				}
+			}
+			t.Fatalf("no external %s entry for the webhook secret: %+v", want, rep.Entries)
+		})
+	}
+}
+
+func TestPullRequestBranchIsTheTargetForDroneAndWoodpecker(t *testing.T) {
+	for origin, want := range map[string]string{"drone": "dataKey: body.pull_request.base.ref", "woodpecker": "dataKey: body.pull_request.base.ref", "gha": "dataKey: body.pull_request.head.ref"} {
+		t.Run(origin, func(t *testing.T) {
+			p := project(scriptJob("build", "echo ${{ branch }}"))
+			p.Origin = ir.Origin{Provider: origin, Dialect: origin}
+			p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPR}}
+			files, _ := emit(t, p)
+			if s := files[".argo/events/sensor.yaml"]; !strings.Contains(s, want) {
+				t.Fatalf("sensor lacks %q:\n%s", want, s)
 			}
 		})
 	}

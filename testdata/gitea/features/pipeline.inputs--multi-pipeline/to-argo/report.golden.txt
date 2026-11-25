@@ -2,13 +2,12 @@ Loss report: gitea -> argo
 [lost] pipeline/deploy/trigger/0 ext.passthrough (Ext of provider gha (inputs) is not written to the Argo file; it is kept in round-trip metadata)
 [external] pipeline/ci/job/test job.runner: no node selector (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
-[external] pipeline/ci/trigger/1 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[external] pipeline/ci/trigger/1 trigger.tag: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [external] pipeline/deploy/job/deploy job.runner: no node selector (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [external] pipeline/deploy/trigger/0 trigger.manual: argo submit --from workflowtemplate/deploy (start a run with: argo submit --from workflowtemplate/deploy; the Workflow object needs a ServiceAccount with the rights in .argo/rbac/)
 [emulated] pipeline/ci/job/test/step/test-step-1 step.shell: container command sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)
 [emulated] pipeline/ci/trigger/0 trigger.filter.branches
 [emulated] pipeline/ci/trigger/1 trigger.filter.branches
-[emulated] pipeline/ci/trigger/1 trigger.tag: EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only)
 [emulated] pipeline/deploy pipeline.inputs: string parameter (input target has type choice, which Argo parameters lack; it is a string parameter and the type stays in the marker)
 [emulated] pipeline/deploy project.multi_pipeline: one WorkflowTemplate per IR pipeline (each pipeline gets its own trigger)
 [emulated] pipeline/deploy/job/deploy/step/deploy-step-1 step.shell: container command sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)
