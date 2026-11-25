@@ -9,6 +9,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
@@ -428,4 +429,14 @@ func (e *emitter) workflowRun(b *onBuilder, path string, t *ir.Trigger) error {
 	}
 	b.add(path, caps.TriggerPipelineDone, evWorkflowRn, m.n)
 	return nil
+}
+
+// noteDefaultEvents reports the events a source runs on when its file names no trigger and the workflow has no event
+// for: each is lost.
+func (e *emitter) noteDefaultEvents(noForm map[string][]provider.SourceEvent) {
+	for id, events := range noForm {
+		for _, g := range provider.GroupByFeature(events) {
+			e.lose("pipeline/"+id, g.Feature, "the source runs on the events "+strings.Join(g.Names, ", ")+" when its file names no trigger; "+e.d.title()+" has no event for them")
+		}
+	}
 }

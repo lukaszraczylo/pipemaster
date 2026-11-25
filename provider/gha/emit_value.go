@@ -21,6 +21,8 @@ const (
 
 // emitter carries the state of one Emit call: the ledger, and the lost-text comments waiting for a node.
 type emitter struct {
+	// injected names the pipelines whose triggers come from the default events of their source.
+	injected       map[string]bool
 	origin         string
 	jobGuards      map[string]bool
 	from           *expr.Dialect
@@ -141,6 +143,10 @@ func (e *emitter) disable(path string, f caps.Feature, x expr.Expr, what string)
 
 func (e *emitter) lose(path string, f caps.Feature, detail string) {
 	e.led.Note(ir.FeatureUse{IRPath: path, Feature: f}, caps.Support{Level: caps.Lost}, detail)
+}
+
+func (e *emitter) external(path string, f caps.Feature, strategy, detail string) {
+	e.led.Note(ir.FeatureUse{IRPath: path, Feature: f}, caps.Support{Level: caps.External, Strategy: strategy}, detail)
 }
 
 func (e *emitter) emulate(path string, f caps.Feature, strategy, detail string) {

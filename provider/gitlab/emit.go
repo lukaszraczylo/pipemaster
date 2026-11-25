@@ -9,6 +9,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
 	"github.com/lukaszraczylo/pipemaster/vars"
@@ -27,15 +28,22 @@ const (
 // merged them into the jobs, so the emitted file stands alone.
 func (adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
 	p, vres := vars.Prepare(p, dialect)
+	p, noForm, injected := provider.WithDefaultTriggers(p, dialect)
 	origin := ""
 	if p != nil {
 		origin = p.Origin.Provider
 	}
 	e := &emitter{originID: origin, splits: map[*ir.Job]splitPart{}, noSplit: map[string]string{}, from: sourceDialect(origin), led: emitkit.NewLedger("ir", dialect, adapter{}.Caps())}
 	e.gated = emitkit.GatedSteps(p)
+	e.injected = injected
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)
+	}
+	for id, events := range noForm {
+		for _, g := range provider.GroupByFeature(events) {
+			e.lose("pipeline/"+id, g.Feature, "the source runs on the events "+strings.Join(g.Names, ", ")+" when its file names no trigger; GitLab has no pipeline source for them")
+		}
 	}
 	files := map[string][]byte{}
 	if p != nil {

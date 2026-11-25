@@ -14,6 +14,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -27,6 +28,9 @@ const (
 )
 
 var globLiteral = regexp.MustCompile(`^[A-Za-z0-9_\-/]*$`)
+
+// defaultMarkIndex is the trigger index of the marker that tells a parser the triggers were synthesised.
+const defaultMarkIndex = 9999
 
 func triggerPath(pid string, i int) string { return "pipeline/" + pid + "/trigger/" + strconv.Itoa(i) }
 
@@ -319,6 +323,10 @@ var triggerFeatures = map[ir.TriggerKind]caps.Feature{
 
 // triggerMarks carries the pipeline's triggers in the file when workflow:rules would not read back as them.
 func (e *emitter) triggerMarks(pl *ir.Pipeline, w *yaml.Node) ([]string, error) {
+	if e.injected[pl.ID] {
+		line, err := markerArg(provider.DefaultTriggersArg{Default: true})
+		return []string{emitkit.Marker(caps.TriggerPush, triggerPath(pl.ID, defaultMarkIndex)), line}, err
+	}
 	if len(pl.Triggers) == 0 {
 		return nil, nil
 	}

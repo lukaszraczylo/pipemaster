@@ -25,14 +25,18 @@ func (p payload) Status() expr.Status { return expr.Success }
 
 var ghaIf = regexp.MustCompile(`(?m)^\s+if: (.+)$`)
 
-// ghaCondition reads the first emitted if back and parses it.
+// ghaCondition reads every emitted if back, the job's and its steps', and joins them: a run happens only when all hold.
 func ghaCondition(t *testing.T, out string) expr.Expr {
 	t.Helper()
-	m := ghaIf.FindStringSubmatch(out)
-	if m == nil {
+	ms := ghaIf.FindAllStringSubmatch(out, -1)
+	if len(ms) == 0 {
 		t.Fatalf("no if in the output:\n%s", out)
 	}
-	return parseIf(t, m[1])
+	x := parseIf(t, ms[0][1])
+	for _, m := range ms[1:] {
+		x = expr.Binary{Op: expr.OpAnd, L: x, R: parseIf(t, m[1])}
+	}
+	return x
 }
 
 // parseIf reads one if: scalar as YAML does, drops a ${{ }} wrapper and parses the expression.

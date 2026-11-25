@@ -54,3 +54,20 @@ func TestFoldedForeignPipelineWithoutTriggersIsDisabled(t *testing.T) {
 		t.Errorf("report does not name the event: %+v", rep.Entries)
 	}
 }
+
+func TestDroneSourceWithoutTriggerKeepsItsEventsOnGitLab(t *testing.T) {
+	p := &ir.Project{Origin: ir.Origin{Provider: "drone", Dialect: "drone"}, Pipelines: []*ir.Pipeline{noTriggerPipeline("d", nil)}}
+	files, rep := emitFiles(t, p)
+	doc := string(files[rootFile])
+	if strings.Contains(doc, "when: never") {
+		t.Errorf("the pipeline never starts:\n%s", doc)
+	}
+	for _, src := range []string{`"push"`, `"merge_request_event"`, `"web"`} {
+		if !strings.Contains(doc, src) {
+			t.Errorf("pipeline source %s missing:\n%s", src, doc)
+		}
+	}
+	if !hasEntry(rep, "rollback") {
+		t.Errorf("no entry names the events GitLab lacks: %+v", rep.Entries)
+	}
+}

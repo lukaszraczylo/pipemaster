@@ -49,6 +49,8 @@ type emitter struct {
 	lostWork []string
 	// said holds the strategy and detail last noted per emulated use.
 	said map[ir.FeatureUse][2]string
+	// eventsNoted holds the pipelines whose default source events the ledger already names.
+	eventsNoted map[string]bool
 	// matrixRefs lists the matrix names the workflow being written reads.
 	matrixRefs []string
 	// cut is set when an image, workdir or service field lost an expression; the step or service being written owns it.

@@ -159,3 +159,18 @@ func TestEmitCallJobStepIfFailsSafe(t *testing.T) {
 		t.Fatalf("call step if must disable the job:\n%s", data)
 	}
 }
+
+func TestDroneSourceWithoutTriggerStartsOnItsEvents(t *testing.T) {
+	pl := &ir.Pipeline{ID: "ci", Jobs: []*ir.Job{{ID: "build", Steps: []*ir.Step{{ID: "s", Kind: ir.StepScript, Script: []string{"make"}}}}}}
+	p := &ir.Project{Origin: ir.Origin{Provider: "drone", Dialect: "drone"}, Pipelines: []*ir.Pipeline{pl}}
+	_, files := emitFS(t, p)
+	var doc string
+	for _, f := range files {
+		doc = string(f)
+	}
+	for _, ev := range []string{"push:", "pull_request:", "workflow_dispatch:"} {
+		if !strings.Contains(doc, ev) {
+			t.Errorf("event %s missing:\n%s", ev, doc)
+		}
+	}
+}

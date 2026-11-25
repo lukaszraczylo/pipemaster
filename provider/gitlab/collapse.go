@@ -13,6 +13,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -604,6 +605,11 @@ func (s *state) restoreTriggers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[
 		m := triggerPathRE.FindStringSubmatch(u.IRPath)
 		if m == nil || !strings.HasPrefix(u.IRPath, "pipeline/"+pl.ID+"/") || len(args[u]) != 1 {
 			continue
+		}
+		var d provider.DefaultTriggersArg
+		if m[1] == strconv.Itoa(defaultMarkIndex) && json.Unmarshal([]byte(args[u][0]), &d) == nil && d.Default {
+			pl.Triggers = nil
+			return
 		}
 		var w wireTrigger
 		if json.Unmarshal([]byte(args[u][0]), &w) != nil {

@@ -94,6 +94,13 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 		case caps.TriggerAPI:
 			dropSynthEvent(pl, u.IRPath, provider.Family(e.d.ID))
 		case caps.TriggerPush:
+			var d provider.DefaultTriggersArg
+			if len(args[u]) == 1 && json.Unmarshal([]byte(args[u][0]), &d) == nil && d.Default {
+				if u.IRPath == "pipeline/"+pl.ID {
+					pl.Triggers = nil
+				}
+				break
+			}
 			dropMatchAll(pl, ir.TriggerPush, func(t *ir.Trigger) *ir.Filter { return &t.Branches })
 		case caps.TriggerTag:
 			dropMatchAll(pl, ir.TriggerTag, func(t *ir.Trigger) *ir.Filter { return &t.Tags })

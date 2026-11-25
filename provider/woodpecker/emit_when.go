@@ -599,6 +599,10 @@ func (e *emitter) tagRefs(tp string, in ir.Filter) (wpexpr.Filter, string) {
 func (e *emitter) jobWhen(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) ([]whenEntry, error) {
 	e.inexact = ""
 	base := e.triggerEntries(pl)
+	base, err := e.gitlabDefaultEvents(pl, base)
+	if err != nil {
+		return nil, err
+	}
 	if e.inexact != "" {
 		if err := e.markTriggers(e.inexact, "pipeline/"+pl.ID, pl.Triggers); err != nil {
 			return nil, err
@@ -745,14 +749,36 @@ func withStatus(entries []whenEntry, status []string) []whenEntry {
 	return out
 }
 
-// sourceEvents are the events a foreign source starts by itself when its file names none: a push, a pull request and
-// a tag. A Drone pipeline with no trigger:event runs for these and for cron, custom, promote and rollback
+// sourceEvents are the events a foreign source starts by itself when its file names none, as Woodpecker events. A
+// Drone pipeline with no trigger:event runs for push, pull_request, tag, cron, custom, promote and rollback
 // (https://docs.drone.io/pipeline/docker/syntax/trigger/), and a GitLab pipeline with no workflow:rules for every
-// pipeline source; the others need a schedule, a person or a deployment set up outside the file, and a source that has
-// one carries it as its own IR trigger. Woodpecker also has pull_request_closed, pull_request_metadata, release and
-// deployment (https://woodpecker-ci.org/docs/usage/workflow-syntax, event), which no foreign source fires, so a filter
-// that lists every Woodpecker event would run on four events the source never sees.
-var sourceEvents = []string{eventPush, eventPR, eventTag}
+// pipeline source. Woodpecker has pull_request_closed, pull_request_metadata and release as well
+// (https://woodpecker-ci.org/docs/usage/workflow-syntax, event), which no foreign source fires, so a filter that
+// lists every Woodpecker event would run on events the source never sees.
+func (e *emitter) sourceEvents() []string {
+	events, _, _ := provider.WoodpeckerEvents(e.origin)
+	return events
+}
+
+// noteSourceEvents reports, once per pipeline, the source events that Woodpecker only approximates or cannot start on.
+func (e *emitter) noteSourceEvents(pipelineID string) {
+	if e.eventsNoted[pipelineID] {
+		return
+	}
+	if e.eventsNoted == nil {
+		e.eventsNoted = map[string]bool{}
+	}
+	e.eventsNoted[pipelineID] = true
+	_, approx, lost := provider.WoodpeckerEvents(e.origin)
+	path := "pipeline/" + pipelineID
+	for _, g := range provider.GroupByFeature(approx) {
+		e.emulate(path, g.Feature, "manual or deployment event",
+			"the source runs on the events "+strings.Join(g.Names, ", ")+" when its file names no trigger; Woodpecker starts them as its nearest event")
+	}
+	for _, g := range provider.GroupByFeature(lost) {
+		e.noteLost(path, g.Feature, "the source runs on the events "+strings.Join(g.Names, ", ")+" when its file names no trigger; Woodpecker has no event for them")
+	}
+}
 
 // completeEvents gives every entry an event filter: woodpecker-cli lint --strict rejects a workflow whose
 // when entries lack one. A Woodpecker source keeps all events, because it named none. A source that can name none
@@ -761,7 +787,7 @@ var sourceEvents = []string{eventPush, eventPR, eventTag}
 func (e *emitter) completeEvents(entries []whenEntry, foreign bool) (out []whenEntry, filled bool) {
 	all := allEvents
 	if foreign {
-		all = sourceEvents
+		all = e.sourceEvents()
 	}
 	if len(entries) == 0 {
 		entries = []whenEntry{{}}
@@ -964,4 +990,35 @@ func (e *emitter) namesNoEvents() bool {
 // the filter back as no filter.
 type defaultEventsArg struct {
 	Events []string `json:"default_events"`
+}
+
+// gitlabDefaultEvents adds the events a GitLab pipeline with no workflow:rules also runs on. The IR holds only its push
+// and tag triggers, so the other events that map to a Woodpecker event join as one entry, and a marker keeps the
+// original triggers for the way back.
+func (e *emitter) gitlabDefaultEvents(pl *ir.Pipeline, base []whenEntry) ([]whenEntry, error) {
+	if e.origin != provider.GitLab || gitlabHasWorkflow(pl) || !isDefaultPushTag(pl.Triggers) {
+		return base, nil
+	}
+	e.noteSourceEvents(pl.ID)
+	var extra []string
+	for _, ev := range e.sourceEvents() {
+		if ev != eventPush && ev != eventPR && ev != eventTag {
+			extra = append(extra, ev)
+		}
+	}
+	if len(extra) == 0 {
+		return base, nil
+	}
+	if err := e.markTriggers(caps.TriggerManual, "pipeline/"+pl.ID, pl.Triggers); err != nil {
+		return nil, err
+	}
+	return append(base, whenEntry{Item: wpexpr.Item{Event: wpexpr.Filter{Include: extra}}}), nil
+}
+
+// isDefaultPushTag is true for the two bare triggers that the GitLab parser gives a pipeline with no workflow:rules.
+func isDefaultPushTag(ts []ir.Trigger) bool {
+	return len(ts) == 2 && ts[0].Kind == ir.TriggerPush && ts[1].Kind == ir.TriggerTag &&
+		!slices.ContainsFunc(ts, func(t ir.Trigger) bool {
+			return len(t.Branches.Include)+len(t.Branches.Exclude)+len(t.Tags.Include)+len(t.Tags.Exclude)+len(t.Paths.Include)+len(t.Paths.Exclude) > 0
+		})
 }
