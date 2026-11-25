@@ -3,6 +3,7 @@
 package behave
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -61,6 +62,26 @@ func TestJudge(t *testing.T) {
 			}
 			if got == StatusExplained && !strings.Contains(rules, "explains") {
 				t.Fatalf("rule not printed: %q", rules)
+			}
+		})
+	}
+}
+
+func TestTopoOrder(t *testing.T) {
+	for _, c := range []struct {
+		name  string
+		names []string
+		deps  map[string][]string
+		want  []string
+	}{
+		{"dependency first", []string{"after", "flaky"}, map[string][]string{"after": {"flaky"}}, []string{"flaky", "after"}},
+		{"keeps order", []string{"a", "b", "c"}, nil, []string{"a", "b", "c"}},
+		{"unknown dependency ignored", []string{"a"}, map[string][]string{"a": {"zzz"}}, []string{"a"}},
+		{"cycle keeps every name once", []string{"a", "b"}, map[string][]string{"a": {"b"}, "b": {"a"}}, []string{"b", "a"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if got := topoOrder(c.names, c.deps); !slices.Equal(got, c.want) {
+				t.Errorf("topoOrder = %v, want %v", got, c.want)
 			}
 		})
 	}

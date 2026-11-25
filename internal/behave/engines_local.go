@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,12 @@ func newTrace(out string, code int, lines []string, d time.Duration) *Trace {
 type actEngine struct{ env *Env }
 
 const actPortBase = 34600
+
+// A run that the engine filters out entirely creates no pipeline in a real service, which is an empty run and no failure.
+const (
+	actNoStages   = "could not find any stages to run"
+	wpNoWorkflows = "no workflows to execute"
+)
 
 var actLine = regexp.MustCompile(`^\[[^\]]+\]\s+\|\s?(.*)$`)
 
@@ -64,7 +71,13 @@ func (a *actEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newTrace(out, code, payloadLines(out, actLine), time.Since(start)), nil
+	none := code != 0 && strings.Contains(strings.ToLower(out), actNoStages)
+	if none {
+		code = 0
+	}
+	tr := newTrace(out, code, payloadLines(out, actLine), time.Since(start))
+	tr.NoPipeline = none
+	return tr, nil
 }
 
 // ---- Woodpecker
@@ -98,13 +111,77 @@ func (e *woodpeckerEngine) Run(ctx context.Context, w *Workspace) (*Trace, error
 		event, branch, ref = "pull_request", w.Ev.Target, prRefPath
 		args = append(args, "--commit-refspec", w.Ev.Branch+":"+w.Ev.Target)
 	}
-	args = append(args, "--pipeline-event", event, "--commit-branch", branch, "--commit-ref", ref, target)
+	args = append(args, "--pipeline-event", event, "--commit-branch", branch, "--commit-ref", ref)
+	targets, err := woodpeckerWorkflows(w.Dir, target)
+	if err != nil {
+		return nil, blocked("no usable Woodpecker workflows in the converted output: %v", err)
+	}
+	tr := &Trace{NoPipeline: true}
 	start := time.Now()
-	out, code, err := e.env.run(ctx, runOpts{Dir: w.Dir, Timeout: timeoutLocal}, bin, args...)
+	for _, t := range targets {
+		out, code, err := e.env.run(ctx, runOpts{Dir: w.Dir, Timeout: timeoutLocal}, bin, append(slices.Clone(args), t)...)
+		if err != nil {
+			return nil, err
+		}
+		if code != 0 && strings.Contains(out, wpNoWorkflows) {
+			code = 0
+		} else {
+			tr.NoPipeline = false
+		}
+		tr.Log += out
+		tr.Markers = append(tr.Markers, markers(payloadLines(out, wpLine))...)
+		if code != 0 {
+			tr.Exit = code
+			break
+		}
+	}
+	tr.Duration = time.Since(start)
+	return tr, nil
+}
+
+// woodpeckerWorkflows lists what to pass to woodpecker-cli exec, one file at a time in depends_on order:
+// the CLI runs the files of a directory in name order and ignores the dependencies. A single file is its own list.
+func woodpeckerWorkflows(dir, target string) ([]string, error) {
+	info, err := os.Stat(filepath.Join(dir, target))
 	if err != nil {
 		return nil, err
 	}
-	return newTrace(out, code, payloadLines(out, wpLine), time.Since(start)), nil
+	if !info.IsDir() {
+		return []string{target}, nil
+	}
+	entries, err := os.ReadDir(filepath.Join(dir, target))
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	files := map[string]string{}
+	deps := map[string][]string{}
+	for _, en := range entries {
+		ext := filepath.Ext(en.Name())
+		if en.IsDir() || (ext != ".yaml" && ext != ".yml") {
+			continue
+		}
+		rel := filepath.Join(target, en.Name())
+		raw, err := os.ReadFile(filepath.Join(dir, rel)) // #nosec G304 -- a workspace file of the harness
+		if err != nil {
+			return nil, err
+		}
+		var d struct {
+			DependsOn []string `yaml:"depends_on"`
+		}
+		if err := yaml.Unmarshal(raw, &d); err != nil {
+			return nil, fmt.Errorf("parse %s: %w", rel, err)
+		}
+		name := strings.TrimSuffix(en.Name(), ext)
+		names = append(names, name)
+		files[name] = rel
+		deps[name] = d.DependsOn
+	}
+	var out []string
+	for _, n := range topoOrder(names, deps) {
+		out = append(out, files[n])
+	}
+	return out, nil
 }
 
 // ---- Drone
@@ -113,25 +190,56 @@ type droneEngine struct{ env *Env }
 
 var droneLine = regexp.MustCompile(`^\[[^\]:]+:\d+\] (.*)$`)
 
+// dronePipelines lists the pipeline names of a Drone file in an order that follows depends_on, because drone exec
+// runs one named pipeline and ignores the dependencies.
 func dronePipelines(path string) ([]string, error) {
 	raw, err := os.ReadFile(path) // #nosec G304 -- the workspace file of the harness
 	if err != nil {
 		return nil, err
 	}
 	var names []string
+	deps := map[string][]string{}
 	for _, doc := range strings.Split(string(raw), "\n---") {
 		var d struct {
-			Kind string `yaml:"kind"`
-			Name string `yaml:"name"`
+			Kind      string   `yaml:"kind"`
+			Name      string   `yaml:"name"`
+			DependsOn []string `yaml:"depends_on"`
 		}
 		if err := yaml.Unmarshal([]byte(doc), &d); err != nil {
 			return nil, fmt.Errorf("parse %s: %w", path, err)
 		}
 		if d.Kind == "pipeline" {
 			names = append(names, d.Name)
+			deps[d.Name] = d.DependsOn
 		}
 	}
-	return names, nil
+	return topoOrder(names, deps), nil
+}
+
+// topoOrder puts each name after the names it depends on and otherwise keeps the given order. A dependency that
+// is no name is ignored, and a cycle leaves its members in the given order.
+func topoOrder(names []string, deps map[string][]string) []string {
+	done := map[string]bool{}
+	var out []string
+	var visit func(n string, path map[string]bool)
+	visit = func(n string, path map[string]bool) {
+		if done[n] || path[n] {
+			return
+		}
+		path[n] = true
+		for _, d := range deps[n] {
+			if slices.Contains(names, d) {
+				visit(d, path)
+			}
+		}
+		delete(path, n)
+		done[n] = true
+		out = append(out, n)
+	}
+	for _, n := range names {
+		visit(n, map[string]bool{})
+	}
+	return out
 }
 
 func (e *droneEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
@@ -348,6 +456,15 @@ func (e *gitlabEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	if err != nil {
 		return nil, fmt.Errorf("prepare images: %w", err)
 	}
+	if w.Ev.Kind == kindPR {
+		var active bool
+		if rewritten, active, err = mergeRequestJobs(rewritten); err != nil {
+			return nil, fmt.Errorf("apply the merge request rule: %w", err)
+		}
+		if !active {
+			return &Trace{Log: "GitLab creates no merge request pipeline: no job has a merge request rule", NoPipeline: true}, nil
+		}
+	}
 	if err := os.WriteFile(file, rewritten, 0o600); err != nil { // #nosec G703 -- a file of the harness workspace
 		return nil, err
 	}
@@ -370,5 +487,8 @@ func (e *gitlabEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newTrace(out, code, payloadLines(out, glLine), time.Since(start)), nil
+	tr := newTrace(out, code, payloadLines(out, glLine), time.Since(start))
+	// The rules of every job are false in a merge request pipeline, so GitLab creates none.
+	tr.NoPipeline = w.Ev.Kind == kindPR && code == 0 && len(tr.Markers) == 0
+	return tr, nil
 }

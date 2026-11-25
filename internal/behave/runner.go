@@ -206,7 +206,7 @@ func (r *Runner) runSources(ctx context.Context, fixtures []Fixture) map[string]
 					err = blocked("the source failed on its own engine (exit %d): %s", tr.Exit, diagnose(tr.Log))
 				case err == nil && missingMarker(fx.Expect, tr.Markers) != "":
 					err = blocked("the source engine did not reproduce marker %q: an engine limitation, not a converter result", missingMarker(fx.Expect, tr.Markers))
-				case err == nil && len(tr.Markers) == 0:
+				case err == nil && len(tr.Markers) == 0 && !tr.NoPipeline:
 					err = blocked("the source printed no marker on its own engine: %s", diagnose(tr.Log))
 				}
 				mu.Lock()

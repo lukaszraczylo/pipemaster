@@ -60,6 +60,8 @@ type Trace struct {
 	Markers  []string
 	Duration time.Duration
 	Exit     int
+	// NoPipeline is true when the engine created no pipeline for the event, which is an empty run and no failure.
+	NoPipeline bool
 }
 
 // BlockedError reports that an engine cannot run a pair, with the reason.
