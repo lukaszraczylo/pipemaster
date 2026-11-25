@@ -1,7 +1,5 @@
-# pipemaster:emulated step.image pipeline/drone/job/ci/step/publish
-# pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated step.action pipeline/drone/job/ci/step/publish
-# pipemaster:arg {"step":"image:\n    ref: woodpeckerci/plugin-docker-buildx\nwith:\n    repo:\n        lit: example/app\n    tags:\n        lit: latest\nid: publish\nkind: plugin\n","wrote":"{\"image\":\"alpine:3.22\",\"name\":\"publish\",\"script\":\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/drone/job/ci/step/publish: the step has no action reference and no Tekton ref' \\u003e\\u00262; exit 1\"}","at":1}
+# pipemaster:arg {"step":"image:\n    ref: woodpeckerci/plugin-docker-buildx\nwith:\n    repo:\n        lit: example/app\n    tags:\n        lit: latest\nid: publish\nkind: plugin\n","wrote":"{\"env\":[{\"name\":\"PLUGIN_REPO\",\"value\":\"example/app\"},{\"name\":\"PLUGIN_TAGS\",\"value\":\"latest\"}],\"image\":\"woodpeckerci/plugin-docker-buildx\",\"name\":\"publish\"}","at":1}
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -12,5 +10,9 @@ spec:
       image: rust:1.85
       script: cargo build --release
     - name: publish
-      image: alpine:3.22
-      script: 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/drone/job/ci/step/publish: the step has no action reference and no Tekton ref'' >&2; exit 1'
+      image: woodpeckerci/plugin-docker-buildx
+      env:
+        - name: PLUGIN_REPO
+          value: example/app
+        - name: PLUGIN_TAGS
+          value: latest

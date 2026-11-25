@@ -61,3 +61,41 @@ func TestBridgeJobFailsLoudly(t *testing.T) {
 		})
 	}
 }
+
+const pluginSource = `steps:
+  - name: notify
+    image: plugins/slack
+    settings:
+      channel: builds
+      tags: [a, b]
+      webhook:
+        from_secret: SLACK_WEBHOOK
+`
+
+// A plugin step runs its image entrypoint with the settings as PLUGIN_ variables, and a secret stays a reference.
+func TestPluginStepRunsTheImage(t *testing.T) {
+	for _, to := range []string{"tekton", "argo"} {
+		t.Run(to, func(t *testing.T) {
+			src := fstest.MapFS{".woodpecker/ci.yaml": {Data: []byte(pluginSource)}}
+			r := hops(t, src, prov(t, "woodpecker"), prov(t, to), false, true)
+			all := ""
+			for _, b := range r.toFiles {
+				all += string(b)
+			}
+			for _, want := range []string{"image: plugins/slack", "name: PLUGIN_CHANNEL", "value: builds", "name: PLUGIN_TAGS", "value: a,b", "name: PLUGIN_WEBHOOK", "secretKeyRef"} {
+				if !strings.Contains(all, want) {
+					t.Errorf("missing %q in\n%s", want, all)
+				}
+			}
+			if strings.Contains(all, "pipemaster: lost: step.action") {
+				t.Errorf("the plugin step still fails:\n%s", all)
+			}
+			if strings.Contains(all, "SLACK_WEBHOOK_VALUE") {
+				t.Errorf("a secret value is written")
+			}
+			for _, d := range diffNodes(r.src, r.back) {
+				t.Errorf("A->B->A: %s differs at %s", d.Field, d.Path)
+			}
+		})
+	}
+}

@@ -1,4 +1,4 @@
 Loss report: woodpecker -> argo
-[lost] pipeline/woodpecker/job/ci/step/publish step.action (a plugin step has no Argo form; the step is dropped)
 [external] pipeline/woodpecker/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[emulated] pipeline/woodpecker/job/ci/step/publish step.action: plugin image with PLUGIN_ variables (the settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a list of scalars is comma-joined, any other list or map is JSON; the image entrypoint runs and the container has no command)
 [emulated] pipeline/woodpecker/trigger/0 trigger.filter.branches

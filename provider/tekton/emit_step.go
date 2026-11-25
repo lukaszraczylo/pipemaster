@@ -44,9 +44,9 @@ func (tc *taskCtx) stepName(b *stepBook, sp string, st *ir.Step) (string, string
 // stepOutputs holds a written step; node is nil when the step is not written.
 func (tc *taskCtx) step(b *stepBook, st *ir.Step, sp string) (*wmap, error) {
 	name, comment := tc.stepName(b, sp, st)
-	var m *wmap
-	var err error
+	m, ok, err := tc.pluginStep(b, st, sp, name)
 	switch {
+	case err != nil || ok:
 	case st.Kind == ir.StepAction || st.Action != nil || len(st.With) > 0:
 		m, err = tc.actionStep(b, st, sp, name)
 	case st.Kind == ir.StepScript || st.Kind == "":

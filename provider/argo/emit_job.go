@@ -248,6 +248,12 @@ func (sx *stepCtx) containers(jx map[string]any) (conts []*container, taskStep *
 			conts = append(conts, sx.placeholder(st, true))
 			sx.markAction(st)
 		default:
+			sx.act, sx.disabled = actionArg{}, false
+			if c := sx.pluginContainer(st, names[st], last); c != nil {
+				conts = append(conts, c)
+				sx.markAction(st)
+				continue
+			}
 			e.lose(path, caps.StepAction, "a "+string(st.Kind)+" step has no Argo form; the step is dropped")
 			sx.act, sx.disabled = actionArg{}, false
 			conts = append(conts, sx.placeholder(st, true))
