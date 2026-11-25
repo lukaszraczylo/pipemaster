@@ -1,0 +1,13 @@
+when:
+  - event: [push, tag, pull_request]
+
+steps:
+  - name: s1
+    image: alpine:3.20
+    commands:
+      - echo data > shared.txt
+      - echo "MARK workspace.s1" | tee -a trace.log
+  - name: s2
+    image: alpine:3.20
+    commands:
+      - echo "MARK workspace.s2:$(cat shared.txt)" | tee -a trace.log

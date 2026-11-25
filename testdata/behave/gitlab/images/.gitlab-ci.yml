@@ -1,0 +1,11 @@
+stages: [one, two]
+a:
+  stage: one
+  image: alpine:3.20
+  script:
+    - if [ -e /etc/alpine-release ]; then echo MARK images.a:alpine; else echo MARK images.a:other; fi
+b:
+  stage: two
+  image: busybox:1.36
+  script:
+    - if [ -e /etc/alpine-release ]; then echo MARK images.b:alpine; else echo MARK images.b:busybox; fi

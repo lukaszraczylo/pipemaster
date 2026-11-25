@@ -1,0 +1,32 @@
+{
+  "features": [
+    "job.if",
+    "expr.opaque",
+    "trigger.filter.branches",
+    "trigger.filter.tags",
+    "trigger.tag",
+    "trigger.pull_request",
+    "trigger.push"
+  ],
+  "events": [
+    "push-main",
+    "push-branch",
+    "tag",
+    "pr"
+  ],
+  "expect_failure": false,
+  "unordered": true,
+  "expect": [],
+  "owners": {
+    "branch.main": [
+      "main-only"
+    ],
+    "branch.tag": [
+      "tag-only"
+    ],
+    "branch.always": [
+      "always"
+    ]
+  },
+  "requires": []
+}

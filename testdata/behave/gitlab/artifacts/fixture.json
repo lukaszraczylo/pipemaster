@@ -1,0 +1,28 @@
+{
+  "features": [
+    "job.artifacts",
+    "job.needs.artifacts",
+    "job.needs"
+  ],
+  "events": [
+    "push-main",
+    "push-branch"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": [
+    "artifacts.consume:payload"
+  ],
+  "owners": {
+    "artifacts.produce": [
+      "produce"
+    ],
+    "artifacts.consume": [
+      "consume",
+      "produce"
+    ]
+  },
+  "requires": [
+    "artifacts"
+  ]
+}

@@ -1,0 +1,10 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - shell: bash
+        run: |
+          arr=(a b c)
+          if [[ ${#arr[@]} -eq 3 && ${arr[1]} == b ]]; then echo "MARK bash.ok:${arr[2]}" | tee -a trace.log; fi

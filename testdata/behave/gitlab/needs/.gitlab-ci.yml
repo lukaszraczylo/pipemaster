@@ -1,0 +1,17 @@
+default:
+  image: alpine:3.20
+stages: [one, two, three]
+a:
+  stage: one
+  script:
+    - echo "MARK needs.a" | tee -a trace.log
+b:
+  stage: two
+  needs: [a]
+  script:
+    - echo "MARK needs.b" | tee -a trace.log
+c:
+  stage: three
+  needs: [b]
+  script:
+    - echo "MARK needs.c" | tee -a trace.log

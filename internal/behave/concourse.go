@@ -1,0 +1,419 @@
+//go:build behave
+
+package behave
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net"
+	"os"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+)
+
+const (
+	concImage    = "concourse/concourse:8.3.3"
+	concDBImage  = "postgres:16-alpine"
+	concGitImage = "alpine:3.20"
+	concNetwork  = "pm-conc"
+	concDB       = "pm-conc-db"
+	concWeb      = "pm-conc-web"
+	concWorker   = "pm-conc-worker"
+	concGit      = "pm-conc-git"
+	concTarget   = "pm"
+	concUser     = "test"
+	concPass     = "test"
+	concQuiet    = 15 * time.Second
+	concPoll     = 5 * time.Second
+	concMax      = 5 * time.Minute
+	concNoBuild  = 40 * time.Second
+)
+
+// Concourse manages the Concourse containers of one run: database, web, privileged worker and a git daemon that
+// serves the workspace repositories to the git resources.
+type Concourse struct {
+	env     *Env
+	gitRoot string
+	gitIP   string
+	url     string
+	flyHome string
+	counter int
+	mu      sync.Mutex
+	ready   bool
+}
+
+// NewConcourse returns a manager; Start brings the containers up.
+func NewConcourse(env *Env) *Concourse {
+	return &Concourse{env: env, gitRoot: filepath.Join(env.Work, "conc", "git"), flyHome: filepath.Join(env.Work, "conc", "flyhome")}
+}
+
+func (c *Concourse) docker(ctx context.Context, timeout time.Duration, args ...string) (string, error) {
+	out, code, err := c.env.Docker(ctx, timeout, "", args...)
+	if err != nil || code != 0 {
+		return out, fmt.Errorf("docker %s: %v %s", strings.Join(args[:min(2, len(args))], " "), err, tail(out, 400))
+	}
+	return out, nil
+}
+
+// Start creates the network and containers and logs fly in.
+func (c *Concourse) Start(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.ready {
+		return nil
+	}
+	if err := c.env.Require(c.env.Tool("fly")); err != nil {
+		return err
+	}
+	c.teardown(ctx)
+	port, err := freePort()
+	if err != nil {
+		return err
+	}
+	c.url = "http://localhost:" + strconv.Itoa(port)
+	keys := filepath.Join(c.env.Work, "conc", "keys")
+	for _, d := range []string{"conc/keys/web", "conc/keys/worker", "conc/git", "conc/flyhome"} {
+		if err := os.MkdirAll(filepath.Join(c.env.Work, d), 0o750); err != nil {
+			return err
+		}
+	}
+	gen := func(kind, file string) error {
+		_, err := c.docker(ctx, 3*time.Minute, "run", "--rm", "-v", keys+":/keys", concImage, "generate-key", "-t", kind, "-f", "/keys/"+file)
+		return err
+	}
+	if err := gen("rsa", "web/session_signing_key"); err != nil {
+		return err
+	}
+	if err := gen("ssh", "web/tsa_host_key"); err != nil {
+		return err
+	}
+	if err := gen("ssh", "worker/worker_key"); err != nil {
+		return err
+	}
+	if err := copyFile(filepath.Join(keys, "worker", "worker_key.pub"), filepath.Join(keys, "web", "authorized_worker_keys")); err != nil {
+		return err
+	}
+	if err := copyFile(filepath.Join(keys, "web", "tsa_host_key.pub"), filepath.Join(keys, "worker", "tsa_host_key.pub")); err != nil {
+		return err
+	}
+	steps := [][]string{
+		{"network", "create", concNetwork},
+		{"run", "-d", "--name", concDB, "--network", concNetwork, "-e", "POSTGRES_DB=concourse", "-e", "POSTGRES_USER=cu", "-e", "POSTGRES_PASSWORD=cp", concDBImage},
+		{"run", "-d", "--name", concGit, "--network", concNetwork, "-v", c.gitRoot + ":/srv", "--entrypoint", "sh", concGitImage,
+			"-c", "apk add -q git git-daemon && exec git daemon --reuseaddr --base-path=/srv --export-all --verbose /srv"},
+	}
+	for _, s := range steps {
+		if _, err := c.docker(ctx, 3*time.Minute, s...); err != nil {
+			return err
+		}
+	}
+	time.Sleep(8 * time.Second)
+	web := []string{"run", "-d", "--name", concWeb, "--network", concNetwork, "-p", strconv.Itoa(port) + ":8080", "-v", keys + "/web:/concourse-keys",
+		"-e", "CONCOURSE_EXTERNAL_URL=" + c.url, "-e", "CONCOURSE_POSTGRES_HOST=" + concDB, "-e", "CONCOURSE_POSTGRES_USER=cu",
+		"-e", "CONCOURSE_POSTGRES_PASSWORD=cp", "-e", "CONCOURSE_POSTGRES_DATABASE=concourse",
+		"-e", "CONCOURSE_ADD_LOCAL_USER=" + concUser + ":" + concPass, "-e", "CONCOURSE_MAIN_TEAM_LOCAL_USER=" + concUser, concImage, "web"}
+	worker := []string{"run", "-d", "--name", concWorker, "--network", concNetwork, "--privileged", "-v", keys + "/worker:/concourse-keys",
+		"-e", "CONCOURSE_TSA_HOST=" + concWeb + ":2222", "-e", "CONCOURSE_CONTAINERD_DNS_SERVER=1.1.1.1", "-e", "CONCOURSE_GARDEN_DNS_PROXY_ENABLE=true", concImage, "worker"}
+	for _, s := range [][]string{web, worker} {
+		if _, err := c.docker(ctx, 3*time.Minute, s...); err != nil {
+			return err
+		}
+	}
+	if err := c.login(ctx); err != nil {
+		return err
+	}
+	if err := c.waitGitDaemon(ctx); err != nil {
+		return err
+	}
+	out, err := c.docker(ctx, time.Minute, "inspect", "-f", `{{(index .NetworkSettings.Networks "`+concNetwork+`").IPAddress}}`, concGit)
+	if err != nil {
+		return err
+	}
+	c.gitIP = strings.TrimSpace(out)
+	c.ready = true
+	return nil
+}
+
+func copyFile(src, dst string) error {
+	raw, err := os.ReadFile(src) // #nosec G304 -- a key generated by the harness
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, raw, 0o600) // #nosec G703 -- harness-generated key paths
+}
+
+func (c *Concourse) fly(ctx context.Context, timeout time.Duration, args ...string) (string, int, error) {
+	return c.env.run(ctx, runOpts{Timeout: timeout, Env: []string{"HOME=" + c.flyHome}}, c.env.Tool("fly"), append([]string{"-t", concTarget}, args...)...)
+}
+
+func (c *Concourse) login(ctx context.Context) error {
+	deadline := time.Now().Add(3 * time.Minute)
+	for time.Now().Before(deadline) {
+		out, code, err := c.fly(ctx, time.Minute, "login", "-c", c.url, "-u", concUser, "-p", concPass)
+		if err == nil && code == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("fly login: %v %s", err, tail(out, 300))
+		}
+		time.Sleep(5 * time.Second)
+	}
+	for time.Now().Before(deadline) {
+		c.pruneStalled(ctx)
+		out, code, err := c.fly(ctx, time.Minute, "workers", "--json")
+		if err == nil && code == 0 && strings.Contains(out, `"state": "running"`) {
+			return nil
+		}
+		time.Sleep(5 * time.Second)
+	}
+	return fmt.Errorf("the Concourse worker did not register")
+}
+
+func (c *Concourse) pruneStalled(ctx context.Context) {
+	out, code, err := c.fly(ctx, time.Minute, "workers", "--json")
+	if err != nil || code != 0 {
+		return
+	}
+	var ws []struct {
+		Name  string `json:"name"`
+		State string `json:"state"`
+	}
+	if json.Unmarshal([]byte(out), &ws) != nil {
+		return
+	}
+	for _, w := range ws {
+		if w.State == "stalled" {
+			_, _, _ = c.fly(ctx, time.Minute, "prune-worker", "-w", w.Name) // best effort: a stalled worker only blocks scheduling
+		}
+	}
+}
+
+func (c *Concourse) teardown(ctx context.Context) {
+	for _, n := range []string{concWorker, concWeb, concGit, concDB} {
+		_, _, _ = c.env.Docker(ctx, time.Minute, "", "rm", "-f", "-v", n) // only the containers this harness names
+	}
+	_, _, _ = c.env.Docker(ctx, time.Minute, "", "network", "rm", concNetwork)
+}
+
+// Stop removes the containers and the network of this run.
+func (c *Concourse) Stop(ctx context.Context) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.ready {
+		c.teardown(ctx)
+		c.ready = false
+	}
+}
+
+// serveRepo clones the workspace into the git daemon root and returns its git:// URI.
+func (c *Concourse) serveRepo(ctx context.Context, w *Workspace) (string, string, error) {
+	c.mu.Lock()
+	c.counter++
+	n := fmt.Sprintf("run%d", c.counter)
+	c.mu.Unlock()
+	dst := filepath.Join(c.gitRoot, n+".git")
+	if err := os.RemoveAll(dst); err != nil {
+		return "", "", fmt.Errorf("clear repo: %w", err)
+	}
+	out, code, err := c.env.run(ctx, runOpts{Timeout: time.Minute}, "git", "clone", "-q", "--bare", w.Dir, dst)
+	if err != nil || code != 0 {
+		return "", "", fmt.Errorf("clone repo: %v %s", err, out)
+	}
+	if out, code, err := c.env.run(ctx, runOpts{Dir: dst, Timeout: time.Minute}, "git", "update-server-info"); err != nil || code != 0 {
+		return "", "", fmt.Errorf("update-server-info: %v %s", err, out)
+	}
+	return n, fmt.Sprintf("git://%s/%s.git", c.gitIP, n), nil
+}
+
+// ---- engine
+
+type concourseEngine struct {
+	env  *Env
+	conc *Concourse
+}
+
+type buildInfo struct {
+	JobName   string `json:"job_name"`
+	Status    string `json:"status"`
+	Name      string `json:"name"`
+	ID        int    `json:"id"`
+	StartTime int64  `json:"start_time"`
+}
+
+func (e *concourseEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
+	files, _ := filepath.Glob(filepath.Join(w.Dir, ".concourse", "*.y*ml"))
+	if len(files) != 1 {
+		return nil, fmt.Errorf("the output has %d files in .concourse, want one", len(files))
+	}
+	return e.runFile(ctx, w, files[0])
+}
+
+// runFile sets the pipeline file on Concourse, serves the workspace repository and collects the builds.
+func (e *concourseEngine) runFile(ctx context.Context, w *Workspace, file string) (*Trace, error) {
+	if err := e.conc.Start(ctx); err != nil {
+		return nil, blocked("Concourse is not available: %v", err)
+	}
+	pipe, uri, err := e.conc.serveRepo(ctx, w)
+	if err != nil {
+		return nil, err
+	}
+	c := e.conc
+	start := time.Now()
+	out, code, err := c.fly(ctx, 2*time.Minute, "set-pipeline", "-n", "-p", pipe, "-c", file, "-v", "git-uri="+uri)
+	if err != nil {
+		return nil, err
+	}
+	if code != 0 {
+		return nil, blocked("fly set-pipeline refused the converted pipeline: %s", tail(out, 300))
+	}
+	defer func() { _, _, _ = c.fly(context.Background(), time.Minute, "destroy-pipeline", "-n", "-p", pipe) }() // only our own pipeline
+	if _, code, err := c.fly(ctx, time.Minute, "unpause-pipeline", "-p", pipe); err != nil || code != 0 {
+		return nil, fmt.Errorf("unpause: %v", err)
+	}
+	for _, r := range e.resources(ctx, pipe) {
+		if out, code, _ := c.fly(ctx, 2*time.Minute, "check-resource", "-r", pipe+"/"+r); code != 0 {
+			return nil, blocked("the Concourse git resource check fails on the Kiri worker: %s", strings.Join(strings.Fields(tail(stripANSI(out), 120)), " "))
+		}
+	}
+	builds, err := e.settle(ctx, pipe)
+	if err != nil {
+		return nil, err
+	}
+	tr := &Trace{Duration: time.Since(start)}
+	for _, b := range builds {
+		if b.Status != "succeeded" {
+			tr.Exit = 1
+		}
+		log, _, err := c.fly(ctx, 2*time.Minute, "watch", "-b", strconv.Itoa(b.ID))
+		if err != nil {
+			return nil, err
+		}
+		tr.Log += log
+		tr.Markers = append(tr.Markers, markers(strings.Split(stripANSI(log), "\n"))...)
+	}
+	if len(builds) == 0 {
+		tr.Exit = 1
+		tr.Log = fmt.Sprintf("Concourse started no job build in %s. Resources with no version: %s", concNoBuild, e.emptyResources(ctx, pipe))
+	}
+	return tr, nil
+}
+
+func (e *concourseEngine) resources(ctx context.Context, pipe string) []string {
+	out, code, err := e.conc.fly(ctx, time.Minute, "resources", "-p", pipe, "--json")
+	if err != nil || code != 0 {
+		return nil
+	}
+	var rs []struct {
+		Name string `json:"name"`
+	}
+	if json.Unmarshal([]byte(out), &rs) != nil {
+		return nil
+	}
+	var names []string
+	for _, r := range rs {
+		names = append(names, r.Name)
+	}
+	return names
+}
+
+// settle waits until every build is final and no new build has started for concQuiet.
+func (e *concourseEngine) settle(ctx context.Context, pipe string) ([]buildInfo, error) {
+	begin := time.Now()
+	deadline := begin.Add(concMax)
+	lastCount, quietSince := -1, time.Now()
+	var builds []buildInfo
+	for time.Now().Before(deadline) {
+		out, code, err := e.conc.fly(ctx, time.Minute, "builds", "-p", pipe, "--json", "-c", "100")
+		if err == nil && code == 0 {
+			builds = nil
+			if json.Unmarshal([]byte(out), &builds) != nil {
+				return nil, fmt.Errorf("parse builds: %s", tail(out, 200))
+			}
+			builds = slices.DeleteFunc(builds, func(b buildInfo) bool { return b.JobName == "" }) // resource checks are builds without a job
+			running := false
+			for _, b := range builds {
+				running = running || b.Status == "started" || b.Status == "pending"
+			}
+			if len(builds) != lastCount || running {
+				lastCount, quietSince = len(builds), time.Now()
+			}
+			if !running && len(builds) > 0 && time.Since(quietSince) >= concQuiet {
+				break
+			}
+			if len(builds) == 0 && time.Since(begin) >= concNoBuild {
+				break
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(concPoll):
+		}
+	}
+	for i, j := 0, len(builds)-1; i < j; i, j = i+1, j-1 {
+		builds[i], builds[j] = builds[j], builds[i]
+	}
+	sortBuilds(builds)
+	return builds, nil
+}
+
+func sortBuilds(b []buildInfo) {
+	for i := 1; i < len(b); i++ {
+		for j := i; j > 0 && b[j].StartTime < b[j-1].StartTime; j-- {
+			b[j], b[j-1] = b[j-1], b[j]
+		}
+	}
+}
+
+const gitDaemonWait = 2 * time.Minute
+
+// waitGitDaemon waits until the git daemon container prints its ready line.
+func (c *Concourse) waitGitDaemon(ctx context.Context) error {
+	deadline := time.Now().Add(gitDaemonWait)
+	for time.Now().Before(deadline) {
+		out, _, _ := c.env.Docker(ctx, 30*time.Second, "", "logs", concGit)
+		if strings.Contains(out, "Ready to rumble") {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
+	return fmt.Errorf("the git daemon did not start")
+}
+
+// freePort asks the kernel for a free TCP port on the host.
+func freePort() (int, error) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, fmt.Errorf("find a free port: %w", err)
+	}
+	defer func() { _ = l.Close() }() // a probe listener; the close result does not matter
+	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+// emptyResources names the resources of the pipeline that have no version, which keeps a job with an input on it from starting.
+func (e *concourseEngine) emptyResources(ctx context.Context, pipe string) string {
+	var empty []string
+	for _, r := range e.resources(ctx, pipe) {
+		out, code, err := e.conc.fly(ctx, time.Minute, "resource-versions", "-r", pipe+"/"+r, "--json")
+		if err != nil || code != 0 {
+			continue
+		}
+		var vs []json.RawMessage
+		if json.Unmarshal([]byte(out), &vs) == nil && len(vs) == 0 {
+			empty = append(empty, r)
+		}
+	}
+	if len(empty) == 0 {
+		return "none"
+	}
+	return strings.Join(empty, ", ")
+}

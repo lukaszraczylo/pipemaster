@@ -1,0 +1,14 @@
+default:
+  image: alpine:3.20
+stages: [one, two]
+flaky:
+  stage: one
+  allow_failure: true
+  script:
+    - echo "MARK allow_failure.flaky" | tee -a trace.log
+    - "false"
+after:
+  stage: two
+  needs: [flaky]
+  script:
+    - echo "MARK allow_failure.after" | tee -a trace.log

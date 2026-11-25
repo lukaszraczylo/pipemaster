@@ -1,0 +1,9 @@
+when:
+  - event: [push, tag, pull_request]
+depends_on: [b]
+
+steps:
+  - name: s
+    image: alpine:3.20
+    commands:
+      - echo "MARK needs.c" | tee -a trace.log

@@ -1,0 +1,16 @@
+when:
+  - event: [push, tag, pull_request]
+
+steps:
+  - name: before
+    image: alpine:3.20
+    commands:
+      - echo "MARK noform.before" | tee -a trace.log
+  - name: plug
+    image: alpine:3.20
+    settings:
+      name: x
+  - name: after
+    image: alpine:3.20
+    commands:
+      - echo "MARK noform.after" | tee -a trace.log
