@@ -2,6 +2,8 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated step.image pipeline/ci/job/check/step/check-step-2
 # pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated step.workdir pipeline/ci/job/check
+# pipemaster:arg {"dir":"/workspace"}
 # pipemaster:emulated step.shell pipeline/ci/job/check/step/check-step-2
 # pipemaster:emulated step.shell pipeline/ci/job/check/step/meta
 apiVersion: tekton.dev/v1
@@ -11,6 +13,8 @@ metadata:
 spec:
   params:
     - name: ctx-event
+  stepTemplate:
+    workingDir: /workspace
   steps:
     - name: meta
       image: alpine:3.22

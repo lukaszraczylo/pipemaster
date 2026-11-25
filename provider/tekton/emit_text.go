@@ -93,6 +93,7 @@ type taskCtx struct {
 	image        string
 	containerRef string
 	params       []string
+	steps        int
 	checkout     bool
 	ws           bool
 }

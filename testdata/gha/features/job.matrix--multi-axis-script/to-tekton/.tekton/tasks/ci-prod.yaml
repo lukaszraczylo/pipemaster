@@ -2,12 +2,16 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated job.outputs pipeline/ci/job/prod
 # pipemaster:arg {"image":"alpine:3.22","script":"printf '%s' \"${PM_OUT_0}\" \u003e '$(results.ver.path)'","outputs":[{"name":"ver","env":"PM_OUT_0"}]}
+# pipemaster:emulated step.workdir pipeline/ci/job/prod
+# pipemaster:arg {"dir":"/workspace"}
 # pipemaster:emulated step.shell pipeline/ci/job/prod/step/prod-step-1
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: ci-prod
 spec:
+  stepTemplate:
+    workingDir: /workspace
   steps:
     - name: prod-step-1
       image: alpine:3.22

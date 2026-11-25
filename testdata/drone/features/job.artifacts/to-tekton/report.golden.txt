@@ -1,3 +1,4 @@
 Loss report: drone -> tekton
 [external] pipeline/drone/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [emulated] pipeline/drone/job/ci job.artifacts: workspace on a PVC from volumeClaimTemplate (tasks on different nodes need ReadWriteMany or the affinity assistant)
+[emulated] pipeline/drone/job/ci step.workdir: shared working directory (the steps run in /workspace, the volume that Tekton mounts in every step; the source runs its steps in one shared directory)

@@ -2,11 +2,15 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
 # pipemaster:arg {"workspace":"pipemaster-workspace","save":"set -e\nmkdir -p '/pipemaster/artifacts/compile'\ntar -cf - 'bin/' | tar -xf - -C '/pipemaster/artifacts/compile'","artifacts":[{"Name":"","Expire":"","Paths":["bin/"]}]}
+# pipemaster:emulated step.workdir pipeline/gitlab-ci/job/compile
+# pipemaster:arg {"dir":"/workspace"}
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: gitlab-ci-compile
 spec:
+  stepTemplate:
+    workingDir: /workspace
   steps:
     - name: script
       image: alpine:3.22

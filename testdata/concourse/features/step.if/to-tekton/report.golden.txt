@@ -5,5 +5,6 @@ Loss report: concourse -> tekton
 [lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider concourse (resources) is not written to the Tekton file; it is kept in round-trip metadata)
 [external] pipeline/ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [external] pipeline/ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[emulated] pipeline/ci/job/build step.workdir: shared working directory (the steps run in /workspace, the volume that Tekton mounts in every step; the source runs its steps in one shared directory)
 [emulated] pipeline/ci/trigger/0 trigger.filter.branches: CEL interceptor filter on the ref (the EventListener serves GitHub webhooks only)
 [emulated] pipeline/ci/trigger/1 trigger.filter.tags: CEL interceptor filter on the ref (the EventListener serves GitHub webhooks only)

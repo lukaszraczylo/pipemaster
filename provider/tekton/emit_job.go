@@ -347,6 +347,7 @@ func (tc *taskCtx) taskDoc(b *stepBook) (*outDoc, error) {
 	if tc.e.own {
 		x = extOf(j.Ext)
 	}
+	tc.steps = len(b.nodes)
 	tpl, err := tc.stepTemplate(x)
 	if err != nil {
 		return nil, err
@@ -487,6 +488,14 @@ func (tc *taskCtx) stepTemplate(x map[string]any) (*yaml.Node, error) {
 	}
 	if tc.checkout {
 		m.SetStr("workingDir", workspaceDir)
+	} else if tc.steps > 1 {
+		extra, _ := x["stepTemplate"].(map[string]any)
+		if _, own := extra["workingDir"]; !own {
+			m.SetStr("workingDir", workspaceDir)
+			if err := tc.sharedDirNote(); err != nil {
+				return nil, err
+			}
+		}
 	}
 	if extra, ok := x["stepTemplate"].(map[string]any); ok {
 		if err := m.AddExtra(extra, nil); err != nil {
@@ -672,4 +681,17 @@ func (tc *taskCtx) markJobGuard(path string, orig, guard expr.Expr) error {
 		back = expr.String(e)
 	}
 	return tc.e.markArg(caps.JobIf, path, guardArg{If: expr.String(orig), Back: back})
+}
+
+// sharedDirArg marks the working directory that the emitter gave to every step of a Task with no checkout.
+type sharedDirArg struct {
+	Dir string `json:"dir"`
+}
+
+// sharedDirNote reports the shared working directory. Each Tekton step is its own container, so a file that one
+// step writes in the working directory of its image is gone in the next step. The directory /workspace is a volume
+// that Tekton mounts in every step.
+func (tc *taskCtx) sharedDirNote() error {
+	tc.e.emulate(tc.jp.path, caps.StepWorkdir, "shared working directory", "the steps run in "+workspaceDir+", the volume that Tekton mounts in every step; the source runs its steps in one shared directory")
+	return tc.e.markArg(caps.StepWorkdir, tc.jp.path, sharedDirArg{Dir: workspaceDir})
 }

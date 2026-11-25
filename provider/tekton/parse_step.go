@@ -354,6 +354,14 @@ func (b *jobBuilder) stepTemplate(v any, line int) error {
 			b.k.Keep("valueFrom", from, caps.JobEnv, "stepTemplate env entries with valueFrom have no Value form; kept in Ext", r.Line("env"))
 		}
 	}
+	var shared sharedDirArg
+	if b.marks.arg(caps.StepWorkdir, b.path, &shared) && shared.Dir != "" {
+		if t, isText := text(m.Vals["workingDir"]); isText && t == shared.Dir {
+			r.Take("workingDir")
+		} else {
+			b.ignored(b.path, caps.StepWorkdir, "the shared working directory")
+		}
+	}
 	if rest := r.Rest(); len(rest) > 0 {
 		b.k.Keep("stepTemplate", m.Subset(rest), caps.ExtPassthrough, "stepTemplate."+strings.Join(rest, ", stepTemplate.")+" has no IR field; kept in Ext", line)
 	}

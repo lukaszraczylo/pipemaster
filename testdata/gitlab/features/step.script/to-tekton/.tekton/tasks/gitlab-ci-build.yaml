@@ -2,6 +2,8 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/after_script
 # pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated step.workdir pipeline/gitlab-ci/job/build
+# pipemaster:arg {"dir":"/workspace"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/after_script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/after_script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
@@ -10,6 +12,8 @@ kind: Task
 metadata:
   name: gitlab-ci-build
 spec:
+  stepTemplate:
+    workingDir: /workspace
   steps:
     - name: script
       image: alpine:3.22
