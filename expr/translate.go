@@ -2,6 +2,7 @@ package expr
 
 import (
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -37,6 +38,11 @@ type Dialect struct {
 	// PRStates is true when the dialect's pull request event also covers the closed and metadata activity of a pull
 	// request (GHA, GitLab), so a Woodpecker target states the event as the whole family.
 	PRStates bool
+	// TagEvent is true when the dialect reports a tag push as its own event named tag (Woodpecker, Drone).
+	TagEvent bool
+	// prPaired marks a source that variants rewrote so that each branch test is paired with the same test of the
+	// pull request target branch; the branch ref is then no risk on a pull request.
+	prPaired bool
 }
 
 // caseFlag is the inline flag every translator-made pattern starts with.
@@ -271,7 +277,14 @@ func native(t Expr, to Dialect) Expr {
 //   - Case folding is ASCII only.
 //   - Only the four modelled events (push, pull_request, schedule, workflow_dispatch) exist; an event
 //     literal without an entry in both dialects' Events tables is untranslatable.
-func Translate(e Expr, from, to Dialect) (Expr, bool) { return translate(e, from, to, true) }
+func Translate(e Expr, from, to Dialect) (Expr, bool) {
+	for _, v := range variants(e, from, to) {
+		if t, ok := translate(v.e, v.from, to, true); ok {
+			return v.finish(t), true
+		}
+	}
+	return nil, false
+}
 
 // translate is Translate; lists says whether a negated event test becomes a list of events (eventListsRx). TranslateFacts
 // turns it off for a condition that names no event, where the only event tests are its own pull request guards.
@@ -302,7 +315,9 @@ func translate(e Expr, from, to Dialect, lists bool) (Expr, bool) {
 
 // Translatable reports whether e translates exactly; it is true exactly when Translate succeeds. The class
 // rules are stated separately from Translate, as in the Lean model, so tests can hold the two together.
-func Translatable(e Expr, from, to Dialect) bool { return translatable(e, from, to, true) }
+func Translatable(e Expr, from, to Dialect) bool {
+	return slices.ContainsFunc(variants(e, from, to), func(v variant) bool { return translatable(v.e, v.from, to, true) })
+}
 
 func translatable(e Expr, from, to Dialect, lists bool) bool {
 	switch {
@@ -573,6 +588,9 @@ func guardE(t string, p Expr) Expr {
 	return Binary{Op: OpAnd, L: Binary{Op: OpEq, L: ctxRef(CtxRefType), R: typ}, R: p}
 }
 
+// anyValue is the pattern of a ref that is set to a non-empty value.
+const anyValue = caseFlag + "^.+$"
+
 const (
 	refTypeBranch = "branch"
 	refTypeTag    = "tag"
@@ -597,6 +615,9 @@ func toGHA(e Expr, from, to Dialect) (Expr, bool) {
 	case Binary:
 		switch v.Op {
 		case OpMatch, OpNoMatch:
+			if n, ok := anyTest(v); ok {
+				return negE(v.Op == OpNoMatch, Binary{Op: OpEq, L: ctxRef(CtxRefType), R: strLit(n)}), true
+			}
 			return rxToGHA(v, from)
 		case OpAnd, OpOr:
 			if !boolValued(v.L) {
@@ -668,6 +689,9 @@ func okRev(e Expr, from Dialect) bool {
 	case Binary:
 		switch v.Op {
 		case OpMatch, OpNoMatch:
+			if _, ok := anyTest(v); ok {
+				return true
+			}
 			ref, m, s, ok := rxParts(v)
 			return ok && rxOK(ref, m, s, from)
 		case OpAnd, OpOr:
@@ -704,10 +728,19 @@ func userRef(r Ref) bool {
 // by the Lean theorems: only Translate and Translatable are proved, and tests check this function in Go
 // alone. An exact translation returns no caveats.
 func TranslateApprox(e Expr, from, to Dialect) (Expr, []string, bool) {
+	for _, v := range variants(e, from, to) {
+		if t, cav, ok := translateApprox(v.e, v.from, to); ok {
+			return v.finish(t), cav, true
+		}
+	}
+	return nil, nil, false
+}
+
+func translateApprox(e Expr, from, to Dialect) (Expr, []string, bool) {
 	if _, ok := rewriteFacts(e, from, to, Facts{}); !ok {
 		return nil, nil, false
 	}
-	if t, ok := Translate(e, from, to); ok {
+	if t, ok := translate(e, from, to, true); ok {
 		return t, nil, true
 	}
 	if !reads(e, from) || from.Class != ClassGitLab || to.Class != ClassGHA {
@@ -831,7 +864,7 @@ func approxCmp(b Binary, from Dialect, cav *caveats) (Expr, bool) {
 			return nil, false
 		}
 		return negE(b.Op == OpNe, ctxRef(CtxCreated)), true
-	case CtxRefName, CtxSHA:
+	case CtxRefName, CtxSHA, CtxPRBaseRef:
 		addAll(cav, litCaveats(lit))
 		return Binary{Op: b.Op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: lit}}, true
 	case CtxBranch, CtxTag:
@@ -849,4 +882,13 @@ func approxCmp(b Binary, from Dialect, cav *caveats) (Expr, bool) {
 		return nil, false
 	}
 	return negE(b.Op == OpNe, cmp), true
+}
+
+// anyTest recognises tag =~ anyValue (or !~) and returns the ref type it asks for.
+func anyTest(b Binary) (string, bool) {
+	pat, ok := isStr(b.R)
+	if !ok || pat != anyValue || !isRef(b.L, CtxTag) {
+		return "", false
+	}
+	return refTypeTag, true
 }

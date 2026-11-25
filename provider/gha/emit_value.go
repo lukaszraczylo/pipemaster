@@ -35,6 +35,7 @@ type emitter struct {
 	changeAtoms    []changeAtom
 	d              Dialect
 	guardMarked    bool
+	inContainer    bool
 	changesNeeded  bool
 	changesBlocked bool
 }
@@ -65,6 +66,9 @@ func (e *emitter) source(path string, f caps.Feature, x expr.Expr) (expr.Expr, b
 	}
 	t, cav, ok := expr.TranslateApprox(x, *e.from, exprgha.Lang)
 	if !ok {
+		if expr.StatesFullRef(x) {
+			return x, true
+		}
 		return nil, false
 	}
 	e.emulate(path, f, "approximate expression translation", strings.Join(cav, "; "))

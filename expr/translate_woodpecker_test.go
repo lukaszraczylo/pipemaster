@@ -265,9 +265,9 @@ func TestWoodpeckerTranslateTable(t *testing.T) {
 		{"gitlab", "woodpecker", `$CI_COMMIT_BRANCH =~ /^v\d+/`, ``},
 		{"gitlab", "woodpecker", `$CI_PIPELINE_SOURCE =~ /^push$/i`, ``},
 		{"gitlab", "woodpecker", `$CI_COMMIT_REF_NAME =~ /^main$/i`, ``},
-		{"woodpecker", "gitlab", `CI_COMMIT_BRANCH matches "(?i)^main$"`, `$CI_COMMIT_BRANCH =~ /^main$/i`},
+		{"woodpecker", "gitlab", `CI_COMMIT_BRANCH matches "(?i)^main$"`, `$CI_COMMIT_BRANCH =~ /^main$/i || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^main$/i`},
 		{"woodpecker", "gitlab", `CI_PIPELINE_EVENT matches "(?i)^cron$"`, `$CI_PIPELINE_SOURCE =~ /^schedule$/i`},
-		{"woodpecker", "gitlab", `CI_COMMIT_BRANCH matches "(?i)^a" || !(CI_COMMIT_SHA matches "(?i)b$")`, `$CI_COMMIT_BRANCH =~ /^a/i || !($CI_COMMIT_SHA =~ /b$/i)`},
+		{"woodpecker", "gitlab", `CI_COMMIT_BRANCH matches "(?i)^a" || !(CI_COMMIT_SHA matches "(?i)b$")`, `$CI_COMMIT_BRANCH =~ /^a/i || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^a/i || !($CI_COMMIT_SHA =~ /b$/i)`},
 		{"woodpecker", "gha", `CI_PIPELINE_EVENT matches "(?i)^pull_request$"`, `github.event_name == 'pull_request'`},
 		{"woodpecker", "gha", `CI_COMMIT_SHA matches "(?i)^abc"`, `startsWith(github.sha, 'abc')`},
 		{"woodpecker", "gitlab", `CI_COMMIT_TAG == ""`, ``},
@@ -282,7 +282,7 @@ func TestWoodpeckerTranslateTable(t *testing.T) {
 		{"woodpecker", "gitlab", `CI_COMMIT_SHA != ""`, ``},
 		{"woodpecker", "gitlab", `CI_COMMIT_SHA contains "ab"`, ``},
 		{"woodpecker", "gitlab", `CI_COMMIT_BRANCH matches "^v\\d+"`, ``},
-		{"woodpecker", "gitlab", `CI_PIPELINE_EVENT matches "(?i)^tag$"`, ``},
+		{"woodpecker", "gitlab", `CI_PIPELINE_EVENT matches "(?i)^tag$"`, `$CI_COMMIT_TAG =~ /^.+$/i`},
 		{"woodpecker", "gitlab", `SKIP matches "(?i)^x$"`, ``},
 		{"woodpecker", "gitlab", `CI_COMMIT_BRANCH matches "(?i)^a" && CI_REPO_URL matches "(?i)^b"`, ``},
 	} {
@@ -340,7 +340,9 @@ func TestWoodpeckerRandomAgreement(t *testing.T) {
 		if isEventList(out) || strings.Contains(expr.String(e), "event ==") || strings.Contains(expr.String(e), "event !=") || strings.Contains(expr.String(e), "== event") || strings.Contains(expr.String(e), "!= event") {
 			return
 		}
-		if back, ok := expr.Translate(woodpecker.ReadIf(out), woodpecker.Lang, gitlab.Lang); !ok || !reflect.DeepEqual(back, e) {
+		back, ok := expr.Translate(woodpecker.ReadIf(out), woodpecker.Lang, gitlab.Lang)
+		// The way back also states the pull request target branch, which no GitLab view in this test sets.
+		if !ok || !reflect.DeepEqual(back, e) && holdsOf(t, back, env.gitlabView(), gitlab.Lang.Sem) != want {
 			t.Fatalf("%s did not return from Woodpecker: %v, %v", expr.String(e), back, ok)
 		}
 	})

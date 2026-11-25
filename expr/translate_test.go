@@ -243,7 +243,7 @@ func TestUntranslatableHashFiles(t *testing.T) {
 		`hashFiles('**/go.sum') == 'x'`, `success()`, `failure() && github.ref_name == 'a'`, `always()`, `cancelled()`,
 		`format('{0}', github.ref_name) == 'a'`, `join(github.ref_name, ',') == 'a'`, `toJSON(github.ref_name) == 'a'`,
 		`fromJSON('1') == 1`, `github.ref_name == 1`, `1`, `'a'`, `null`, `true`,
-		`github.run_id == 'x'`, `github.event.pull_request.number == '1'`, `github.ref == 'refs/heads/main'`,
+		`github.run_id == 'x'`, `github.event.pull_request.number == '1'`, `github.ref == 'main'`,
 		`github.ref_type == 'branch'`, `github.head_ref == 'x'`, `matrix.os == 'linux'`, `secrets.x`,
 		`github.ref_name == 'a' && failure()`,
 	} {

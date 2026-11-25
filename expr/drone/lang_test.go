@@ -20,7 +20,7 @@ func TestDroneConditionTranslates(t *testing.T) {
 		to     expr.Dialect
 		approx bool
 	}{
-		{"pull request on main to GitLab", `$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_BRANCH == "main"`, prPlain, exprgitlab.Lang, false},
+		{"pull request on main to GitLab", `$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_COMMIT_BRANCH == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main")`, prPlain, exprgitlab.Lang, false},
 		{"main to Woodpecker", `CI_COMMIT_BRANCH == "main"`, eq(branch, "main"), exprwp.Lang, false},
 		{"pull request on main to GHA", "", prPlain, exprgha.Lang, true},
 		{"push of a branch to GHA", "", pushBranch, exprgha.Lang, true},
@@ -62,6 +62,19 @@ func TestDroneGlobAndStatusDoNotTranslate(t *testing.T) {
 	} {
 		if got, ok := expr.Translate(e, drone.Lang, exprgitlab.Lang); ok {
 			t.Errorf("%s translated to %v", name, got)
+		}
+	}
+}
+
+// A Drone tag push is the tag event and a pull request holds the target branch in the branch: both translate to
+// a GitLab and a GHA that have neither (expr/variants.go).
+func TestDroneTagAndBranchVariants(t *testing.T) {
+	tag := eq(expr.Ref{Path: []string{expr.CtxEvent}}, "tag")
+	for name, c := range map[string]expr.Expr{"tag": tag, "tag or main": expr.Binary{Op: expr.OpOr, L: tag, R: eq(branch, "main")}} {
+		for _, to := range []expr.Dialect{exprgitlab.Lang, exprgha.Lang} {
+			if _, _, ok := expr.TranslateApprox(c, drone.Lang, to); !ok {
+				t.Errorf("%s -> %s: no translation", name, to.ID)
+			}
 		}
 	}
 }

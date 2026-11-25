@@ -748,7 +748,7 @@ func collapseStepIf(c *collapseCtx) bool {
 		return false
 	}
 	for _, st := range c.j.Steps {
-		if st.ID == id && st.If != nil && sameCondition(st.If, t) {
+		if st.ID == id && st.If != nil && (sameCondition(st.If, t) || sameCondition(st.If, wpexpr.ReadIf(t))) {
 			st.If = src
 			return true
 		}
@@ -784,7 +784,7 @@ func collapseJobIf(c *collapseCtx) bool {
 		return false
 	}
 	t, ok := expr.TranslateFacts(src, *from, wpexpr.Lang, expr.Facts{Branch: a.Branch})
-	if !ok || !sameCondition(c.j.If, t) {
+	if !ok || (!sameCondition(c.j.If, t) && !sameCondition(c.j.If, wpexpr.ReadIf(t))) {
 		return false
 	}
 	c.j.If = src

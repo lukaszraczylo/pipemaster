@@ -42,7 +42,7 @@ func (e *emitter) timing(jp string, j *ir.Job, finally bool) (jobTiming, error) 
 		case rest != nil:
 			c, ok := e.condition(jp, caps.JobIf, rest, "job")
 			cond, disabled = c, !ok
-			if ok && e.from != nil && st == "" {
+			if ok && st == "" && (e.from != nil || expr.StatesFullRef(rest)) {
 				srcIf, translated = rest, c
 			}
 		}
@@ -206,7 +206,11 @@ func foldRules(parts []foldPart, cond expr.Expr, base string) (*yaml.Node, error
 
 // srcMarks records the job condition in the source dialect, which the translated rule only approximates.
 func (e *emitter) srcMarks(jp string, src expr.Expr) ([]string, error) {
-	a, err := markerArg(srcArg{Src: expr.String(src), From: e.from.ID})
+	from := "gha" // a GitLab-origin project holds a full-ref test only when a GHA file wrote it
+	if e.from != nil {
+		from = e.from.ID
+	}
+	a, err := markerArg(srcArg{Src: expr.String(src), From: from})
 	if err != nil {
 		return nil, err
 	}

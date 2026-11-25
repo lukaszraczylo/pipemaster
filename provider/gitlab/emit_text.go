@@ -501,7 +501,27 @@ func (e *emitter) condition(path string, f caps.Feature, x expr.Expr, what strin
 		}
 	}
 	if _, err := exprgitlab.Print(t); err != nil {
+		if g, ok := e.fromRestoredGHA(x); ok {
+			return g, true
+		}
 		e.disable(path, f, x, what)
+		return nil, false
+	}
+	return t, true
+}
+
+// fromRestoredGHA translates a full-ref test that a GHA file wrote and a marker restored in a GitLab-origin project:
+// GitLab cannot write that test, so its source was GHA.
+func (e *emitter) fromRestoredGHA(x expr.Expr) (expr.Expr, bool) {
+	gha, ok := expr.LangOf("gha")
+	if !ok || e.from != nil || !expr.StatesFullRef(x) {
+		return nil, false
+	}
+	t, ok := expr.TranslateFacts(x, *gha, exprgitlab.Lang, expr.Facts{})
+	if !ok {
+		return nil, false
+	}
+	if _, err := exprgitlab.Print(t); err != nil {
 		return nil, false
 	}
 	return t, true

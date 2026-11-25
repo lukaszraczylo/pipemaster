@@ -89,6 +89,7 @@ var Lang = expr.Dialect{
 	ID:         Dialect,
 	Class:      expr.ClassGitLab,
 	BranchOnPR: true,
+	TagEvent:   true,
 	PRFamily:   true,
 	EventRx:    true,
 	PushEvents: []string{"push", "tag"},
