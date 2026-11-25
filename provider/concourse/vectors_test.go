@@ -11,6 +11,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/internal/vectors"
 	"github.com/lukaszraczylo/pipemaster/ir"
@@ -200,8 +201,11 @@ func decodeFile(name string, src []byte) (vDoc, error) {
 	d := vDoc{File: strings.TrimSuffix(path.Base(name), pipelineExt), Jobs: []vJob{}, FinTasks: []string{}}
 	pipe := "pipeline/" + d.File
 	cs, disp := carries{}, map[string]string{}
+	twins := map[string]bool{} // the tag twin of a job is outside the model; the parser folds it into its job
 	for _, m := range vectors.Marks(src) {
 		switch {
+		case m.Feature == string(caps.TriggerTag) && len(m.Args) > 0:
+			twins[m.Path] = true
 		case m.Feature == featCarry && strings.HasSuffix(m.Path, carryTail):
 			var a carryArg
 			if err := m.DecodeArg(&a); err != nil {
@@ -252,6 +256,9 @@ func decodeFile(name string, src []byte) (vDoc, error) {
 		}
 		j := vJob{Name: scalar(es, "name").Value, Passed: []string{}}
 		jp := pipe + jobSegment + j.Name
+		if twins[jp] {
+			continue
+		}
 		j.Disp = disp[jp]
 		cb, ok := cs[jp]
 		if !ok {

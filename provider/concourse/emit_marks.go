@@ -88,3 +88,11 @@ type finallyArg struct {
 	Digest string   `json:"digest"`
 	Tasks  []string `json:"tasks"`
 }
+
+// tagTwinSuffix ends the name of the twin of a job that follows the tag resources.
+const tagTwinSuffix = "-tag"
+
+// tagTwinArg marks a job as the tag twin of the job named Of.
+type tagTwinArg struct {
+	Of string `json:"twin_of"`
+}

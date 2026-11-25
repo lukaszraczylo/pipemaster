@@ -36,6 +36,8 @@ type source struct {
 	// trigger is true when the resource starts the jobs that have no needs.
 	trigger bool
 	used    bool
+	// tagOnly is true for a tag resource of a pipeline that also follows a push: only the tag twins of the jobs get it.
+	tagOnly bool
 }
 
 func (pe *pipeEmitter) add(s *source) *source {
@@ -91,12 +93,15 @@ func (pe *pipeEmitter) buildSources() {
 		case ir.TriggerPush:
 			pe.push(t, tp)
 		case ir.TriggerTag:
-			if pushes && !pe.e.own {
-				// A job waits for a version of every resource it gets, and a tag resource has none on a branch push.
-				pe.e.lose(tp, caps.TriggerTag, "a job cannot trigger on a push and on a tag: the tag resource has no version on a branch push, so the job would never start; the job runs on push only")
-				continue
-			}
+			before := len(pe.sources)
 			pe.tag(t, tp)
+			if pushes && !pe.e.own {
+				// A job waits for a version of every resource it gets, and a tag resource has none on a branch push,
+				// so the tag resource belongs to a twin of each job (tagTwins).
+				for _, s := range pe.sources[before:] {
+					s.tagOnly = true
+				}
+			}
 		case ir.TriggerSchedule:
 			pe.schedule(t, tp)
 		case ir.TriggerPR:

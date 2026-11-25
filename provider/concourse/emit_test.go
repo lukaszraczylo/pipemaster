@@ -1,6 +1,7 @@
 package concourse_test
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -787,19 +788,78 @@ func TestTwoTriggeringResourcesUseTheFirstAndSayIt(t *testing.T) {
 	}
 }
 
-func TestBranchAndTagTriggersSayWhichResourceTheWorkspaceFollows(t *testing.T) {
-	p := project(scriptJob("publish", "make publish"))
+// gets lists the source gets of a job as "resource", with "+" when the get triggers and "(passed)" when it has a passed list.
+func gets(t *testing.T, files map[string]string, job string) []string {
+	t.Helper()
+	var out []string
+	for _, s := range list(jobDoc(t, pipelineDoc(t, files), job)["plan"]) {
+		m := dict(s)
+		name, _ := m["get"].(string)
+		if name == "" {
+			continue
+		}
+		if m["trigger"] == true {
+			name += "+"
+		}
+		if m["passed"] != nil {
+			name += "(passed)"
+		}
+		out = append(out, name)
+	}
+	return out
+}
+
+// A job waits for a version of every get, and a tag resource has none on a branch push, so a source that triggers on
+// push and on tag gets a tag twin of each job: the job follows the push resource, the twin follows the tag resource.
+func TestPushAndTagSourceKeepsTagRunsInATwinJob(t *testing.T) {
+	p := project(scriptJob("build", "make"), scriptJob("publish", "make publish"))
+	p.Pipelines[0].Jobs[1].Needs = []ir.Need{{JobID: "build"}}
 	p.Pipelines[0].Triggers = []ir.Trigger{pushOn("main"), {Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{"v*"}}}}
 	files, rep := emit(t, p)
-	if got := workspaceSource(t, files, "publish"); got != "source" {
-		t.Fatalf("the workspace comes from %q", got)
+	want := map[string][]string{
+		"build":       {"source+"},
+		"build-tag":   {"source-tags+"},
+		"publish":     {"source+(passed)"},
+		"publish-tag": {"source-tags+(passed)"},
 	}
-	if !hasFeatureEntry(rep, "trigger.tag", "the job runs on push only") {
-		t.Fatalf("no entry says that the tag trigger is lost beside a push trigger: %v", rep.Entries)
-	}
-	for name, body := range files {
-		if strings.Contains(body, "source-tags") {
-			t.Fatalf("a tag resource without a version blocks the job on a push (%s):\n%s", name, body)
+	for job, w := range want {
+		if got := gets(t, files, job); !slices.Equal(got, w) {
+			t.Errorf("job %s gets %v, want %v", job, got, w)
 		}
+	}
+	passed := func(job string) any {
+		for _, s := range list(jobDoc(t, pipelineDoc(t, files), job)["plan"]) {
+			if m := dict(s); m["passed"] != nil {
+				return m["passed"]
+			}
+		}
+		return nil
+	}
+	if got := fmt.Sprint(passed("publish-tag")); got != "[build-tag]" {
+		t.Errorf("publish-tag passed = %s, want [build-tag]", got)
+	}
+	if got := fmt.Sprint(passed("publish")); got != "[build]" {
+		t.Errorf("publish passed = %s, want [build]", got)
+	}
+	if !hasFeatureEntry(rep, "trigger.tag", "a twin named") {
+		t.Errorf("no entry names the tag twin: %v", rep.Entries)
+	}
+	for _, e := range rep.Entries {
+		if e.Level == caps.Lost && e.Feature == caps.TriggerTag {
+			t.Errorf("the tag trigger is reported lost: %v", e)
+		}
+	}
+}
+
+// A source that triggers on a tag only has no twin.
+func TestTagOnlySourceHasNoTwin(t *testing.T) {
+	p := project(scriptJob("publish", "make publish"))
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{"v*"}}}}
+	files, _ := emit(t, p)
+	if got := gets(t, files, "publish"); !slices.Equal(got, []string{"source-tags+"}) {
+		t.Errorf("publish gets %v", got)
+	}
+	if strings.Contains(files[".concourse/ci.yml"], "publish-tag") {
+		t.Errorf("a tag-only source has a twin:\n%s", files[".concourse/ci.yml"])
 	}
 }

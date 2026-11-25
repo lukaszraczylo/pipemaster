@@ -171,6 +171,7 @@ func eqRef(ref, lit string) expr.Expr {
 func checkShellTasks(t *testing.T, src string, reported int) {
 	t.Helper()
 	failed := 0
+	seen := map[string]bool{} // a tag twin repeats the scripts of its job; the report names each once
 	var doc map[string]any
 	if err := yaml.Unmarshal([]byte(src), &doc); err != nil {
 		t.Fatal(err)
@@ -188,14 +189,18 @@ func checkShellTasks(t *testing.T, src string, reported int) {
 				args, _ := run["args"].([]any)
 				if (shell == "sh" || shell == "bash") && len(args) > 0 {
 					script, _ := args[len(args)-1].(string)
-					if wrapped := len(args) == 4 && args[1] == provider.BashOrShScript; wrapped {
+					wrapped := len(args) == 4 && args[1] == provider.BashOrShScript
+					switch {
+					case seen[script]:
+					case wrapped:
 						// The wrapper itself must parse under sh; the script runs under bash when the image has it.
 						if !passesSyntax("sh", provider.BashOrShScript) || !passesSyntax("bash", script) {
 							failed++
 						}
-					} else if !passesSyntax(shell, script) {
+					case !passesSyntax(shell, script):
 						failed++
 					}
+					seen[script] = true
 				}
 			}
 			for _, e := range x {

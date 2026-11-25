@@ -74,6 +74,9 @@ func countBudget(target string, files []siteFile) budget {
 	for _, f := range files {
 		lostLines, steps := 0, 0
 		var needles, failing []string
+		if target == "concourse" {
+			f.Text = withoutTagTwinText(f.Text)
+		}
 		for _, line := range strings.Split(f.Text, "\n") {
 			// A marker copy in a comment holds the same text as the line it describes: count what runs.
 			if text := strings.TrimSpace(line); strings.HasPrefix(text, "#") {
@@ -207,4 +210,35 @@ func TestBudgetMarksMatchTheEmitter(t *testing.T) {
 	if !strings.Contains(line, lostLineMark) || !strings.Contains(line, failLoudMark) {
 		t.Fatalf("emitter text %q does not carry the budget marks", line)
 	}
+}
+
+var (
+	jobNameLine = regexp.MustCompile(`^  - name: (\S+)$`)
+	topLevelKey = regexp.MustCompile(`^\S`)
+)
+
+// withoutTagTwinText drops the <job>-tag jobs of a Concourse file. A twin repeats the steps of its job, so the budget
+// counts each lost step once.
+func withoutTagTwinText(text string) string {
+	lines := strings.Split(text, "\n")
+	have := map[string]bool{}
+	for _, l := range lines {
+		if m := jobNameLine.FindStringSubmatch(l); m != nil {
+			have[m[1]] = true
+		}
+	}
+	var out []string
+	skip := false
+	for _, l := range lines {
+		if m := jobNameLine.FindStringSubmatch(l); m != nil {
+			base, twin := strings.CutSuffix(m[1], "-tag")
+			skip = twin && have[base]
+		} else if topLevelKey.MatchString(l) {
+			skip = false
+		}
+		if !skip {
+			out = append(out, l)
+		}
+	}
+	return strings.Join(out, "\n")
 }

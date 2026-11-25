@@ -774,3 +774,37 @@ func (b *pipeBuilder) finallyHooks(pl *ir.Pipeline, built []*builtJob) {
 	}
 	sink.job.Steps = slices.DeleteFunc(sink.job.Steps, func(st *ir.Step) bool { return taskSet[sink.written[st]] })
 }
+
+// mergeTagTwins folds each tag twin into the job it follows: the twin leaves the pipeline and its triggering
+// resources become triggers of that job, so the pair reads as one job with a push and a tag trigger.
+func (b *pipeBuilder) mergeTagTwins(pl *ir.Pipeline, built []*builtJob) []*builtJob {
+	byName := map[string]*builtJob{}
+	for _, bj := range built {
+		byName[bj.name] = bj
+	}
+	twins := map[*builtJob]bool{}
+	for _, bj := range built {
+		var a tagTwinArg
+		if !b.arg(b.path()+"/job/"+bj.name, caps.TriggerTag, &a) || a.Of == "" {
+			continue
+		}
+		orig := byName[a.Of]
+		if orig == nil || orig == bj {
+			b.ignored(b.path()+"/job/"+bj.name, caps.TriggerTag, "the job "+a.Of+" that this job follows a tag for is no longer in the file")
+			continue
+		}
+		for _, r := range bj.roots {
+			if !slices.Contains(orig.roots, r) {
+				orig.roots = append(orig.roots, r)
+			}
+		}
+		twins[bj] = true
+	}
+	if len(twins) == 0 {
+		return built
+	}
+	pl.Jobs = slices.DeleteFunc(pl.Jobs, func(j *ir.Job) bool {
+		return slices.ContainsFunc(built, func(bj *builtJob) bool { return bj.job == j && twins[bj] })
+	})
+	return slices.DeleteFunc(slices.Clone(built), func(bj *builtJob) bool { return twins[bj] })
+}

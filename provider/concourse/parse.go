@@ -220,6 +220,7 @@ func (b *pipeBuilder) build(top *omap) (*ir.Pipeline, error) {
 		built = append(built, bj)
 		pl.Jobs = append(pl.Jobs, bj.job)
 	}
+	built = b.mergeTagTwins(pl, built)
 	undoTriggers := b.triggers(pl, built)
 	b.concurrency(pl, built)
 	b.applyJobNames(pl)

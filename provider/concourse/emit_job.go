@@ -81,9 +81,60 @@ func (pe *pipeEmitter) jobs() []*yaml.Node {
 	}
 	pe.noteFinally()
 	var out []*yaml.Node
+	all := pe.sources
+	push := slices.DeleteFunc(slices.Clone(all), func(s *source) bool { return s.tagOnly })
+	tags := slices.DeleteFunc(slices.Clone(all), func(s *source) bool { return !s.tagOnly })
+	pe.tagSplit = len(tags) > 0 && len(push) > 0 && (len(pe.pl.Jobs) != 1 || pe.pl.Jobs[0].ID != placeholderJob) && slices.ContainsFunc(push, func(s *source) bool { return s.typ == typeGit })
+	if pe.tagSplit {
+		pe.sources = push
+		pe.primary = firstGit(push)
+	} else if len(tags) > 0 {
+		for _, s := range tags {
+			s.tagOnly = false
+		}
+	}
 	for _, j := range pe.pl.Jobs {
 		out = append(out, pe.job(j))
 	}
+	if pe.tagSplit {
+		out = append(out, pe.tagTwins(all, tags)...)
+	}
+	return out
+}
+
+func firstGit(l []*source) *source {
+	for _, s := range l {
+		if s.typ == typeGit {
+			return s
+		}
+	}
+	return l[0]
+}
+
+// tagTwins writes, for each job, a twin that follows the tag resources and the twins of the jobs it needs. A tag
+// run builds the twin; a branch push builds the job. The twin carries a marker so the parser reads the pair as one job.
+func (pe *pipeEmitter) tagTwins(all, tags []*source) []*yaml.Node {
+	e := pe.e
+	pushNames, pushPrimary, pushDoc := pe.jobName, pe.primary, len(pe.doc.Head)
+	twin := map[string]string{}
+	taken := map[string]bool{}
+	for _, n := range pe.jobName {
+		taken[n] = true
+	}
+	for _, j := range pe.pl.Jobs {
+		twin[j.ID] = unique(taken, pe.jobName[j.ID]+tagTwinSuffix)
+	}
+	pe.jobName, pe.sources, pe.primary = twin, tags, firstGit(tags)
+	var out []*yaml.Node
+	for _, j := range pe.pl.Jobs {
+		out = append(out, pe.job(j))
+	}
+	pe.doc.Head = pe.doc.Head[:pushDoc]
+	pe.jobName, pe.sources, pe.primary = pushNames, all, pushPrimary
+	for _, j := range pe.pl.Jobs {
+		e.markArg(caps.TriggerTag, pe.mpath+"/job/"+twin[j.ID], tagTwinArg{Of: pushNames[j.ID]})
+	}
+	e.emulate(pe.path, caps.TriggerTag, "tag twin of each job", "a job cannot wait on a branch push and on a tag, because a tag resource has no version on a push; each job has a twin named <job>"+tagTwinSuffix+" that follows the tag resource, and the twin of a needed job feeds the twin that needs it")
 	return out
 }
 
