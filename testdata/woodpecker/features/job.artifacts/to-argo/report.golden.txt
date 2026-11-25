@@ -1,4 +1,4 @@
 Loss report: woodpecker -> argo
-[lost] pipeline/woodpecker/job/ci job.artifacts (the expiry 7d has no form; the artifact repository sets retention)
+[lost] pipeline/woodpecker/job/ci job.artifacts (Argo saves and loads artifacts through an artifact repository, which the files do not configure; set one in the workflow-controller-configmap or with artifactRepositoryRef; the expiry 7d has no form; the artifact repository sets retention)
 [external] pipeline/woodpecker/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/woodpecker/trigger/0 trigger.filter.branches
