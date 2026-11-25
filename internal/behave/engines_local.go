@@ -43,6 +43,9 @@ func (a *actEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	if err := a.env.Require(a.env.Tool("act")); err != nil {
 		return nil, err
 	}
+	if why := actJobContinue(w.Dir); why != "" {
+		return nil, blocked("%s", why)
+	}
 	name, raw, err := a.payload(w)
 	if err != nil {
 		return nil, err
@@ -52,7 +55,7 @@ func (a *actEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 		return nil, err
 	}
 	art := filepath.Join(filepath.Dir(w.Dir), filepath.Base(w.Dir)+"-artifacts")
-	args := []string{name, "-e", evFile, "--container-architecture", "linux/arm64", "--concurrent-jobs", "1", "--artifact-server-path", art, "--artifact-server-port", strconv.FormatInt(actPortBase+a.env.ports.Add(1), 10)}
+	args := []string{name, "-e", evFile, "--container-architecture", "linux/arm64", "--concurrent-jobs", "1", "--rm", "--artifact-server-path", art, "--artifact-server-port", strconv.FormatInt(actPortBase+a.env.ports.Add(1), 10)}
 	for _, label := range []string{"ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04", "ubuntu-20.04"} {
 		args = append(args, "-P", label+"=node:20-bookworm-slim")
 	}
@@ -188,6 +191,19 @@ if [ "$1" = cp ] && [[ "$2" == *:*/. ]] && [[ "$2" != /* ]]; then
   "$D" cp "$src" "$tmp" || { rc=$?; rm -rf "$tmp"; exit $rc; }
   cp -a "$tmp/$(basename "${src#*:}")/." "$3"; rc=$?; rm -rf "$tmp"; exit $rc
 fi
+if [ "$1" = cp ] && [[ "$2" != *:* ]] && [[ "$3" == *:* ]]; then
+  ctr=${3%%:*}; dst=${3#*:}
+  while IFS='|' read -r vol dest; do
+    [ -n "$vol" ] || continue
+    case "$dst" in "$dest"|"$dest"/*)
+      rel=${dst#"$dest"}; src=${2%/.}
+      if [ -d "$src" ]; then
+        exec "$D" run --rm --entrypoint sh -v "$vol:/m" -v "$src:/s:ro" "$PM_HELPER_IMG" -c "mkdir -p /m$rel && cd /s && tar cf - --exclude=./.git . | tar xf - -C /m$rel"
+      fi
+      exec "$D" run --rm --entrypoint sh -v "$vol:/m" -v "$(dirname "$src"):/s:ro" "$PM_HELPER_IMG" -c "mkdir -p /m$rel && cp -a /s/$(basename "$src") /m$rel/";;
+    esac
+  done < <("$D" inspect -f '{{range .Mounts}}{{.Name}}|{{.Destination}}{{"\n"}}{{end}}' "$ctr")
+fi
 if [ "$1" = cp ] && [[ "$2" != *:* ]] && [[ "$2" == */. ]] && [[ "$3" == *:* ]]; then
   for e in "${2%/.}"/* "${2%/.}"/.[!.]*; do [ -e "$e" ] && [ "$(basename "$e")" != .git ] || continue; "$D" cp "$e" "$3/" || exit $?; done; exit 0
 fi
@@ -206,6 +222,10 @@ func (e *gitlabEngine) bake(ctx context.Context, image string) (string, error) {
 	e.env.bakeMu.Lock()
 	defer e.env.bakeMu.Unlock()
 	tag := "pm-behave/" + imageSafe.ReplaceAllString(strings.ToLower(image), "_") + ":baked"
+	if e.env.baked == nil {
+		e.env.baked = map[string]struct{}{}
+	}
+	e.env.baked[tag] = struct{}{}
 	if _, code, err := e.env.Docker(ctx, time.Minute, "", "image", "inspect", tag); err == nil && code == 0 {
 		return tag, nil
 	}
@@ -215,7 +235,7 @@ func (e *gitlabEngine) bake(ctx context.Context, image string) (string, error) {
 	if err == nil && code == 0 {
 		out, code, err = e.env.Docker(ctx, time.Minute, "", "commit", "--change", "ENTRYPOINT []", "--change", "CMD [\"sh\"]", ctr, tag)
 	}
-	_, _, _ = e.env.Docker(ctx, time.Minute, "", "rm", "-f", ctr) // only the container this function named
+	_, _, _ = e.env.Docker(ctx, time.Minute, "", "rm", "-f", "-v", ctr) // only the container this function named
 	if err != nil || code != 0 {
 		return "", fmt.Errorf("bake %s: %v %s", image, err, out)
 	}
@@ -339,10 +359,14 @@ func (e *gitlabEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	if err != nil {
 		return nil, fmt.Errorf("prepare helper image: %w", err)
 	}
+	base, err := e.bake(ctx, defaultImage)
+	if err != nil {
+		return nil, fmt.Errorf("prepare shim image: %w", err)
+	}
 	args := []string{"--helper-image", helper, "--container-executable", shim, "--pull-policy", "if-not-present", "--artifacts-to-source=false"}
 	args = append(args, e.variables(w)...)
 	start := time.Now()
-	out, code, err := e.env.run(ctx, runOpts{Dir: w.Dir, Timeout: timeoutLocal, Env: []string{"PM_SHIM_LOG=" + w.Dir + ".shim.log"}}, bin, args...)
+	out, code, err := e.env.run(ctx, runOpts{Dir: w.Dir, Timeout: timeoutLocal, Env: []string{"PM_SHIM_LOG=" + w.Dir + ".shim.log", "PM_HELPER_IMG=" + base}}, bin, args...)
 	if err != nil {
 		return nil, err
 	}

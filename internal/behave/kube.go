@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -49,20 +50,19 @@ func (k *Kube) Start(ctx context.Context) error {
 	if err := k.env.RequireKiriContext(ctx); err != nil {
 		return err
 	}
-	if _, code, err := k.env.Kubectl(ctx, kubeShort, "", "get", "nodes"); err != nil || code != 0 {
-		out, code, err := k.env.run(ctx, runOpts{Timeout: clusterStart}, "kiri", "k8s", "start")
-		if err != nil || code != 0 {
-			return fmt.Errorf("kiri k8s start: %v %s", err, out)
-		}
-		k.started = true
-		if err := k.env.RequireKiriContext(ctx); err != nil {
-			return err
-		}
+	if err := k.ensureCluster(ctx); err != nil {
+		return err
+	}
+	if err := k.checkDiskPressure(ctx); err != nil {
+		return err
 	}
 	if err := k.install(ctx, tektonCRD, tektonManifest, "", tektonNS); err != nil {
 		return err
 	}
 	if err := k.install(ctx, argoCRD, argoManifest, argoNS, argoNS); err != nil {
+		return err
+	}
+	if err := k.checkDiskPressure(ctx); err != nil {
 		return err
 	}
 	k.ready = true
@@ -165,6 +165,9 @@ func (k *Kube) waitStatus(ctx context.Context, ns, object, jsonpath string, done
 				return exit, nil
 			}
 		}
+		if err := k.checkDiskPressure(ctx); err != nil {
+			return -1, err
+		}
 		select {
 		case <-ctx.Done():
 			return -1, ctx.Err()
@@ -180,4 +183,59 @@ func tail(s string, n int) string {
 		return s[len(s)-n:]
 	}
 	return s
+}
+
+const (
+	clusterWaitTotal = 3 * time.Minute
+	clusterWaitStep  = 5 * time.Second
+)
+
+var clusterDownRe = regexp.MustCompile(`(?i)exited|stopped|not running|not started`)
+
+// ensureCluster uses a running cluster as it is, because another run can share it. It starts the cluster only when
+// `kiri k8s status` says the cluster is down, and then it owns the stop.
+func (k *Kube) ensureCluster(ctx context.Context) error {
+	up := func() bool {
+		_, code, err := k.env.Kubectl(ctx, kubeShort, "", "get", "nodes")
+		return err == nil && code == 0
+	}
+	if up() {
+		return nil
+	}
+	status, _, err := k.env.run(ctx, runOpts{Timeout: kubeShort}, "kiri", "k8s", "status")
+	if err != nil {
+		return fmt.Errorf("kiri k8s status: %w", err)
+	}
+	if clusterDownRe.MatchString(status) {
+		out, code, err := k.env.run(ctx, runOpts{Timeout: clusterStart}, "kiri", "k8s", "start")
+		if err != nil || code != 0 {
+			return fmt.Errorf("kiri k8s start: %v %s", err, out)
+		}
+		k.started = true
+		return k.env.RequireKiriContext(ctx)
+	}
+	deadline := time.Now().Add(clusterWaitTotal)
+	for time.Now().Before(deadline) {
+		if up() {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(clusterWaitStep):
+		}
+	}
+	return fmt.Errorf("the Kiri cluster is neither up nor down: %s", tail(status, 200))
+}
+
+// checkDiskPressure fails when the node carries the disk-pressure taint, because the scheduler then places no pod.
+func (k *Kube) checkDiskPressure(ctx context.Context) error {
+	out, code, err := k.env.Kubectl(ctx, kubeShort, "", "get", "nodes", "-o", "jsonpath={.items[*].spec.taints[*].key}")
+	if err != nil || code != 0 {
+		return fmt.Errorf("read the node taints: %v %s", err, tail(out, 200))
+	}
+	if strings.Contains(out, "disk-pressure") {
+		return fmt.Errorf("the Kiri node has the disk-pressure taint, so the scheduler places no pod; free disk on the Kiri VM")
+	}
+	return nil
 }

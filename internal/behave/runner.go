@@ -19,6 +19,11 @@ var engineSlots = map[string]int{
 	provGHA: 1, provGitLab: 2, provWoodpecker: 3, provDrone: 3, provTekton: 4, provArgo: 4, provConcourse: 2,
 }
 
+// maxParallel caps the cells that run at once, whatever the per-engine caps allow.
+const maxParallel = 8
+
+const markerSHA = "env.sha:"
+
 // Options narrows a run.
 type Options struct {
 	Only    *regexp.Regexp
@@ -33,6 +38,7 @@ type Runner struct {
 	conc  *Concourse
 	sem   map[string]chan struct{}
 	times map[string]*EngineTime
+	cap   chan struct{}
 	opts  Options
 	mu    sync.Mutex
 }
@@ -45,7 +51,7 @@ type EngineTime struct {
 
 // NewRunner builds a runner on env.
 func NewRunner(env *Env, opts Options) *Runner {
-	r := &Runner{env: env, kube: NewKube(env), conc: NewConcourse(env), opts: opts, sem: map[string]chan struct{}{}, times: map[string]*EngineTime{}}
+	r := &Runner{env: env, kube: NewKube(env), conc: NewConcourse(env), opts: opts, sem: map[string]chan struct{}{}, cap: make(chan struct{}, maxParallel), times: map[string]*EngineTime{}}
 	for p, n := range engineSlots {
 		r.sem[p] = make(chan struct{}, n)
 	}
@@ -58,6 +64,7 @@ func (r *Runner) Close() {
 	defer cancel()
 	r.conc.Stop(ctx)
 	r.kube.Stop(ctx)
+	r.env.RemoveBaked(ctx)
 }
 
 // Times returns the per-engine run times.
@@ -85,6 +92,8 @@ func (r *Runner) addTime(provider string, d time.Duration) {
 
 // exec runs one workspace on the engine of provider, under the engine's slot cap.
 func (r *Runner) exec(ctx context.Context, provider string, src, dst string, ev Event) (*Trace, error) {
+	r.cap <- struct{}{}
+	defer func() { <-r.cap }()
 	r.sem[provider] <- struct{}{}
 	defer func() { <-r.sem[provider] }()
 	eng := r.env.EngineFor(provider, r.kube, r.conc)
@@ -115,7 +124,7 @@ func (r *Runner) exec(ctx context.Context, provider string, src, dst string, ev 
 // flakeAttempts bounds the retries of a run that died of a known Kiri container runtime race.
 const flakeAttempts = 3
 
-var flakeRe = regexp.MustCompile(`network \S+ not found|layer sha256:\w+ is gone|No such container: \w+|address already in use|is already in use`)
+var flakeRe = regexp.MustCompile(`network \S+ not found|layer sha256:\w+ is gone|No such container: \w+|address already in use|is already in use|network with name \S+ already exists`)
 
 func flaky(log string) bool { return flakeRe.MatchString(log) }
 
@@ -148,23 +157,33 @@ func (r *Runner) Run(ctx context.Context, fixtures []Fixture) ([]Result, error) 
 		wg  sync.WaitGroup
 		out []Result
 	)
-	for _, fx := range picked {
-		for _, tgt := range Targets {
-			if tgt == fx.Source || !r.wantTarget(tgt) {
-				continue
+	// Concourse runs in a second wave, after the cluster stops: its privileged worker and the cluster share one VM, and
+	// the two together starve the cluster.
+	for _, wave := range [][]string{waveOne(), {provConcourse}} {
+		for _, fx := range picked {
+			for _, tgt := range wave {
+				if tgt == fx.Source || !r.wantTarget(tgt) {
+					continue
+				}
+				wg.Add(1)
+				go func(fx Fixture, tgt string) {
+					defer wg.Done()
+					res := r.runTarget(ctx, fx, tgt, srcs)
+					mu.Lock()
+					out = append(out, res...)
+					mu.Unlock()
+				}(fx, tgt)
 			}
-			wg.Add(1)
-			go func(fx Fixture, tgt string) {
-				defer wg.Done()
-				res := r.runTarget(ctx, fx, tgt, srcs)
-				mu.Lock()
-				out = append(out, res...)
-				mu.Unlock()
-			}(fx, tgt)
 		}
+		wg.Wait()
+		r.kube.Stop(ctx)
 	}
-	wg.Wait()
 	return out, nil
+}
+
+// waveOne lists every target but Concourse.
+func waveOne() []string {
+	return slices.DeleteFunc(slices.Clone(Targets), func(t string) bool { return t == provConcourse })
 }
 
 func srcKey(fx Fixture, ev string) string { return fx.Source + "/" + fx.Name + "/" + ev }
@@ -221,6 +240,8 @@ func (r *Runner) runTarget(ctx context.Context, fx Fixture, tgt string, srcs map
 			res.Status, res.Detail = StatusBlocked, "harness error: "+err.Error()
 		case conv.Exit != 0:
 			res.Status, res.Detail = StatusFail, "convert exit "+fmt.Sprint(conv.Exit)+": "+firstLine(conv.Stderr)
+		case !conv.wroteTarget(tgt):
+			res.Status, res.Detail = StatusFail, fmt.Sprintf("the converter wrote no %s file (files: %q); %s", tgt, conv.Files, conv.reportText())
 		case src.err != nil:
 			res.Status, res.Detail = StatusBlocked, src.err.Error()
 		default:
@@ -233,7 +254,7 @@ func (r *Runner) runTarget(ctx context.Context, fx Fixture, tgt string, srcs map
 }
 
 func (r *Runner) compareOne(ctx context.Context, fx Fixture, tgt, evName string, conv *Converted, src *Trace, res *Result) {
-	if why := engineLimit(tgt, fx.Name); why != "" {
+	if why := limit(fx, tgt, evName); why != "" {
 		res.Status, res.Detail = StatusBlocked, why
 		return
 	}
@@ -249,9 +270,8 @@ func (r *Runner) compareOne(ctx context.Context, fx Fixture, tgt, evName string,
 	}
 	res.SourceTime, res.TargetTime = src.Duration, tr.Duration
 	srcCmp, tgtCmp := src, tr
-	if tgt == provDrone || fx.Source == provDrone {
-		// drone exec sets no DRONE_COMMIT_SHA, so the sha length cannot agree with an engine that sets it.
-		srcCmp, tgtCmp = withoutPrefix(src, "env.sha:"), withoutPrefix(tr, "env.sha:")
+	if capsOf(tgt).noSHA || capsOf(fx.Source).noSHA {
+		srcCmp, tgtCmp = withoutPrefix(src, markerSHA), withoutPrefix(tr, markerSHA)
 	}
 	res.Status, res.Detail, res.Explained = Judge(fx, srcCmp, tgtCmp, conv.Report)
 	if res.Status != StatusPass {
@@ -295,17 +315,6 @@ func missingMarker(expect, got []string) string {
 		if !slices.Contains(got, e) {
 			return e
 		}
-	}
-	return ""
-}
-
-// engineLimit names a fixture class an engine cannot run on Kiri, so the cell reads blocked and not as a converter result.
-func engineLimit(target, fixture string) string {
-	if target == provGHA && fixture == "allow_failure" {
-		return "act ends a job that sets continue-on-error as failed and skips the jobs that need it"
-	}
-	if target == provGitLab && fixture == "artifacts" {
-		return "gitlab-ci-local on Kiri hands no artifact to the next job (the import into the job container stays empty)"
 	}
 	return ""
 }

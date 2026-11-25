@@ -18,14 +18,16 @@ const fixtureFile = "fixture.json"
 
 // Fixture is one synthetic pipeline of one source provider.
 type Fixture struct {
-	Name      string   `json:"-"`
-	Source    string   `json:"-"`
-	Dir       string   `json:"-"`
-	Features  []string `json:"features"`
-	Events    []string `json:"events"`
-	Expect    []string `json:"expect"`
-	Failure   bool     `json:"expect_failure"`
-	Unordered bool     `json:"unordered"`
+	Name      string              `json:"-"`
+	Source    string              `json:"-"`
+	Dir       string              `json:"-"`
+	Features  []string            `json:"features"`
+	Events    []string            `json:"events"`
+	Owners    map[string][]string `json:"owners"`
+	Expect    []string            `json:"expect"`
+	Requires  []string            `json:"requires"`
+	Failure   bool                `json:"expect_failure"`
+	Unordered bool                `json:"unordered"`
 }
 
 // LoadFixtures reads every testdata/behave/<source>/<fixture> directory, sorted.

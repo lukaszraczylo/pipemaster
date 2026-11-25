@@ -24,6 +24,7 @@ const (
 
 // Env holds the paths and the safe process environment of one harness run.
 type Env struct {
+	baked      map[string]struct{}
 	Root       string
 	Tools      string
 	PM         string
@@ -196,3 +197,12 @@ func (e *Env) RequireKiriContext(ctx context.Context) error {
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
 
 func stripANSI(s string) string { return ansiRe.ReplaceAllString(s, "") }
+
+// RemoveBaked removes the images that this run baked. Only tags the harness created are touched.
+func (e *Env) RemoveBaked(ctx context.Context) {
+	e.bakeMu.Lock()
+	defer e.bakeMu.Unlock()
+	for tag := range e.baked {
+		_, _, _ = e.Docker(ctx, time.Minute, "", "rmi", tag) // a tag still in use stays; the next run reuses it
+	}
+}

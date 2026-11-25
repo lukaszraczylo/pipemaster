@@ -49,7 +49,7 @@ func (k *Kube) applyDocs(ctx context.Context, ns string, docs []map[string]any, 
 }
 
 const (
-	webhookAttempts = 6
+	webhookAttempts = 18
 	webhookWait     = 10 * time.Second
 	imageMirror     = "mirror.gcr.io/"
 )

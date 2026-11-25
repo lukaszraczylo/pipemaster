@@ -6,8 +6,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,19 +19,19 @@ import (
 const (
 	concImage    = "concourse/concourse:8.3.3"
 	concDBImage  = "postgres:16-alpine"
-	concGitImage = "alpine/git:latest"
+	concGitImage = "alpine:3.20"
 	concNetwork  = "pm-conc"
 	concDB       = "pm-conc-db"
 	concWeb      = "pm-conc-web"
 	concWorker   = "pm-conc-worker"
 	concGit      = "pm-conc-git"
 	concTarget   = "pm"
-	concURL      = "http://localhost:8080"
 	concUser     = "test"
 	concPass     = "test"
-	concQuiet    = 25 * time.Second
+	concQuiet    = 15 * time.Second
 	concPoll     = 5 * time.Second
 	concMax      = 5 * time.Minute
+	concNoBuild  = 40 * time.Second
 )
 
 // Concourse manages the Concourse containers of one run: database, web, privileged worker and a git daemon that
@@ -38,6 +40,7 @@ type Concourse struct {
 	env     *Env
 	gitRoot string
 	gitIP   string
+	url     string
 	flyHome string
 	counter int
 	mu      sync.Mutex
@@ -68,6 +71,11 @@ func (c *Concourse) Start(ctx context.Context) error {
 		return err
 	}
 	c.teardown(ctx)
+	port, err := freePort()
+	if err != nil {
+		return err
+	}
+	c.url = "http://localhost:" + strconv.Itoa(port)
 	keys := filepath.Join(c.env.Work, "conc", "keys")
 	for _, d := range []string{"conc/keys/web", "conc/keys/worker", "conc/git", "conc/flyhome"} {
 		if err := os.MkdirAll(filepath.Join(c.env.Work, d), 0o750); err != nil {
@@ -96,8 +104,8 @@ func (c *Concourse) Start(ctx context.Context) error {
 	steps := [][]string{
 		{"network", "create", concNetwork},
 		{"run", "-d", "--name", concDB, "--network", concNetwork, "-e", "POSTGRES_DB=concourse", "-e", "POSTGRES_USER=cu", "-e", "POSTGRES_PASSWORD=cp", concDBImage},
-		{"run", "-d", "--name", concGit, "--network", concNetwork, "-v", c.gitRoot + ":/srv", "--entrypoint", "git", concGitImage,
-			"daemon", "--reuseaddr", "--base-path=/srv", "--export-all", "--verbose", "/srv"},
+		{"run", "-d", "--name", concGit, "--network", concNetwork, "-v", c.gitRoot + ":/srv", "--entrypoint", "sh", concGitImage,
+			"-c", "apk add -q git git-daemon && exec git daemon --reuseaddr --base-path=/srv --export-all --verbose /srv"},
 	}
 	for _, s := range steps {
 		if _, err := c.docker(ctx, 3*time.Minute, s...); err != nil {
@@ -105,8 +113,8 @@ func (c *Concourse) Start(ctx context.Context) error {
 		}
 	}
 	time.Sleep(8 * time.Second)
-	web := []string{"run", "-d", "--name", concWeb, "--network", concNetwork, "-p", "8080:8080", "-v", keys + "/web:/concourse-keys",
-		"-e", "CONCOURSE_EXTERNAL_URL=" + concURL, "-e", "CONCOURSE_POSTGRES_HOST=" + concDB, "-e", "CONCOURSE_POSTGRES_USER=cu",
+	web := []string{"run", "-d", "--name", concWeb, "--network", concNetwork, "-p", strconv.Itoa(port) + ":8080", "-v", keys + "/web:/concourse-keys",
+		"-e", "CONCOURSE_EXTERNAL_URL=" + c.url, "-e", "CONCOURSE_POSTGRES_HOST=" + concDB, "-e", "CONCOURSE_POSTGRES_USER=cu",
 		"-e", "CONCOURSE_POSTGRES_PASSWORD=cp", "-e", "CONCOURSE_POSTGRES_DATABASE=concourse",
 		"-e", "CONCOURSE_ADD_LOCAL_USER=" + concUser + ":" + concPass, "-e", "CONCOURSE_MAIN_TEAM_LOCAL_USER=" + concUser, concImage, "web"}
 	worker := []string{"run", "-d", "--name", concWorker, "--network", concNetwork, "--privileged", "-v", keys + "/worker:/concourse-keys",
@@ -117,6 +125,9 @@ func (c *Concourse) Start(ctx context.Context) error {
 		}
 	}
 	if err := c.login(ctx); err != nil {
+		return err
+	}
+	if err := c.waitGitDaemon(ctx); err != nil {
 		return err
 	}
 	out, err := c.docker(ctx, time.Minute, "inspect", "-f", `{{(index .NetworkSettings.Networks "`+concNetwork+`").IPAddress}}`, concGit)
@@ -143,7 +154,7 @@ func (c *Concourse) fly(ctx context.Context, timeout time.Duration, args ...stri
 func (c *Concourse) login(ctx context.Context) error {
 	deadline := time.Now().Add(3 * time.Minute)
 	for time.Now().Before(deadline) {
-		out, code, err := c.fly(ctx, time.Minute, "login", "-c", concURL, "-u", concUser, "-p", concPass)
+		out, code, err := c.fly(ctx, time.Minute, "login", "-c", c.url, "-u", concUser, "-p", concPass)
 		if err == nil && code == 0 {
 			break
 		}
@@ -184,7 +195,7 @@ func (c *Concourse) pruneStalled(ctx context.Context) {
 
 func (c *Concourse) teardown(ctx context.Context) {
 	for _, n := range []string{concWorker, concWeb, concGit, concDB} {
-		_, _, _ = c.env.Docker(ctx, time.Minute, "", "rm", "-f", n) // only the containers this harness names
+		_, _, _ = c.env.Docker(ctx, time.Minute, "", "rm", "-f", "-v", n) // only the containers this harness names
 	}
 	_, _, _ = c.env.Docker(ctx, time.Minute, "", "network", "rm", concNetwork)
 }
@@ -235,13 +246,15 @@ type buildInfo struct {
 }
 
 func (e *concourseEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
-	if w.Ev.Name != EvPushMain {
-		return nil, blocked("Concourse has no events: a run starts from resource versions, so only the push to the default branch is simulated")
+	files, _ := filepath.Glob(filepath.Join(w.Dir, ".concourse", "*.y*ml"))
+	if len(files) != 1 {
+		return nil, fmt.Errorf("the output has %d files in .concourse, want one", len(files))
 	}
-	file := filepath.Join(w.Dir, ".concourse", "ci.yml")
-	if !exists(w.Dir, ".concourse", "ci.yml") {
-		return nil, blocked("no .concourse/ci.yml in the converted output")
-	}
+	return e.runFile(ctx, w, files[0])
+}
+
+// runFile sets the pipeline file on Concourse, serves the workspace repository and collects the builds.
+func (e *concourseEngine) runFile(ctx context.Context, w *Workspace, file string) (*Trace, error) {
 	if err := e.conc.Start(ctx); err != nil {
 		return nil, blocked("Concourse is not available: %v", err)
 	}
@@ -284,7 +297,8 @@ func (e *concourseEngine) Run(ctx context.Context, w *Workspace) (*Trace, error)
 		tr.Markers = append(tr.Markers, markers(strings.Split(stripANSI(log), "\n"))...)
 	}
 	if len(builds) == 0 {
-		return nil, blocked("Concourse ran no build within %s: no resource version triggered a job", concMax)
+		tr.Exit = 1
+		tr.Log = fmt.Sprintf("Concourse started no job build in %s. Resources with no version: %s", concNoBuild, e.emptyResources(ctx, pipe))
 	}
 	return tr, nil
 }
@@ -309,7 +323,8 @@ func (e *concourseEngine) resources(ctx context.Context, pipe string) []string {
 
 // settle waits until every build is final and no new build has started for concQuiet.
 func (e *concourseEngine) settle(ctx context.Context, pipe string) ([]buildInfo, error) {
-	deadline := time.Now().Add(concMax)
+	begin := time.Now()
+	deadline := begin.Add(concMax)
 	lastCount, quietSince := -1, time.Now()
 	var builds []buildInfo
 	for time.Now().Before(deadline) {
@@ -319,6 +334,7 @@ func (e *concourseEngine) settle(ctx context.Context, pipe string) ([]buildInfo,
 			if json.Unmarshal([]byte(out), &builds) != nil {
 				return nil, fmt.Errorf("parse builds: %s", tail(out, 200))
 			}
+			builds = slices.DeleteFunc(builds, func(b buildInfo) bool { return b.JobName == "" }) // resource checks are builds without a job
 			running := false
 			for _, b := range builds {
 				running = running || b.Status == "started" || b.Status == "pending"
@@ -327,6 +343,9 @@ func (e *concourseEngine) settle(ctx context.Context, pipe string) ([]buildInfo,
 				lastCount, quietSince = len(builds), time.Now()
 			}
 			if !running && len(builds) > 0 && time.Since(quietSince) >= concQuiet {
+				break
+			}
+			if len(builds) == 0 && time.Since(begin) >= concNoBuild {
 				break
 			}
 		}
@@ -349,4 +368,52 @@ func sortBuilds(b []buildInfo) {
 			b[j], b[j-1] = b[j-1], b[j]
 		}
 	}
+}
+
+const gitDaemonWait = 2 * time.Minute
+
+// waitGitDaemon waits until the git daemon container prints its ready line.
+func (c *Concourse) waitGitDaemon(ctx context.Context) error {
+	deadline := time.Now().Add(gitDaemonWait)
+	for time.Now().Before(deadline) {
+		out, _, _ := c.env.Docker(ctx, 30*time.Second, "", "logs", concGit)
+		if strings.Contains(out, "Ready to rumble") {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
+	return fmt.Errorf("the git daemon did not start")
+}
+
+// freePort asks the kernel for a free TCP port on the host.
+func freePort() (int, error) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, fmt.Errorf("find a free port: %w", err)
+	}
+	defer func() { _ = l.Close() }() // a probe listener; the close result does not matter
+	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+// emptyResources names the resources of the pipeline that have no version, which keeps a job with an input on it from starting.
+func (e *concourseEngine) emptyResources(ctx context.Context, pipe string) string {
+	var empty []string
+	for _, r := range e.resources(ctx, pipe) {
+		out, code, err := e.conc.fly(ctx, time.Minute, "resource-versions", "-r", pipe+"/"+r, "--json")
+		if err != nil || code != 0 {
+			continue
+		}
+		var vs []json.RawMessage
+		if json.Unmarshal([]byte(out), &vs) == nil && len(vs) == 0 {
+			empty = append(empty, r)
+		}
+	}
+	if len(empty) == 0 {
+		return "none"
+	}
+	return strings.Join(empty, ", ")
 }
