@@ -2,12 +2,10 @@
 # pipemaster:arg {"name":"stepif","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
 # pipemaster:arg {"digest":"940fc408ab5e6d091897522ab470e5b677876c184d2af8d90f0f8c27291d9b5f","carry":"id: build-step-1\nkind: script\n"}
-# pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
-# pipemaster:arg {"if":"event == 'push'","script":"echo push"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-2/carry
-# pipemaster:arg {"digest":"351755f875d10286ee66e6b1bb73f6057dc19d59d210596924c748999e346342","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
+# pipemaster:arg {"digest":"9a679dce7762e62fdd1d5aa728686de17ae932e642fb585a74329e2e27c74052","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"c8aba2be15e51e65243f5095792174e78499665c3332145c1ecb21673669897c","carry":"id: build\n"}
+# pipemaster:arg {"digest":"9286425243146bdbe59dabd3d1ddfb54d982d147524b87343fd36ced262a7a23","carry":"id: build\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -15,6 +13,7 @@
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-2
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
@@ -68,9 +67,7 @@ jobs:
             path: sh
             args:
               - -ec
-              - |-
-                echo 'pipemaster: skipped: the step condition has no shell form'; exit 0 # pipemaster:guard the step condition has no shell form
-                echo push
+              - echo push
             dir: workspace
   - name: build-tag
     plan:

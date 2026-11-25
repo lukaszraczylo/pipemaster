@@ -2,12 +2,10 @@
 # pipemaster:arg {"name":"stepif","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
 # pipemaster:arg {"digest":"e58f980d1d5955fce2672992c195ad99ab1cc39e68be591affa16b4b8eb10d68","carry":"if: always()\nid: build-step-1\nkind: script\n"}
-# pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
-# pipemaster:arg {"if":"event == 'push'","script":"echo push"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-2/carry
-# pipemaster:arg {"digest":"ed169616a614822150a2cf634b22dc0f784c7e97ec0245e55f30bed123b7a512","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
+# pipemaster:arg {"digest":"f0bcb900979726db826ab833caa62bf7c24a9d3f1045fb8514dd42a28f35b65b","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"87fac4ebcf653bb27d62ef0e3a3aedd4385d71effaf74591b0ba140425af6dfe","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"d81103f234b023e1dbc63f7a9e3941849b554503dbd6de812e45c3707b445c69","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -17,6 +15,7 @@
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-2
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-2
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
@@ -77,9 +76,7 @@ jobs:
               - -c
               - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
               - pipemaster
-              - |-
-                echo 'pipemaster: skipped: the step condition has no shell form'; exit 0 # pipemaster:guard the step condition has no shell form
-                echo push
+              - echo push
             dir: workspace
         tags:
           - ubuntu-latest
