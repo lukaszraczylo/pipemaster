@@ -645,7 +645,10 @@ func decodeData(tr *vTrig, des []vectors.Entry) error {
 	case path == pathBase && tr.Kind == kindPR:
 		tr.Include, err = anchoredValues(val, "^")
 	case path == pathRef && tr.Kind == kindPush:
-		tr.Include, err = anchoredValues(val, refHeads)
+		// A push beside a tag trigger carries the filter of every branch ref, which the model holds as no filter.
+		if tr.Include, err = anchoredValues(val, refHeads); err == nil && len(tr.Include) == 1 && tr.Include[0] == "**" {
+			tr.Include = []string{}
+		}
 	case path == pathRef && tr.Kind == kindTag:
 		if tr.Include, err = anchoredValues(val, refTags); err == nil && len(tr.Include) == 1 && tr.Include[0] == "**" {
 			tr.Include = []string{}

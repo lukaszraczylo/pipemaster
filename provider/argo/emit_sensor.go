@@ -101,7 +101,7 @@ func (e *emitter) eventTrigger(pp *plan, path string, tr ir.Trigger, x map[strin
 	if len(tr.Paths.Include)+len(tr.Paths.Exclude) > 0 {
 		e.lose(path, caps.TriggerFilterPaths, "a Sensor data filter cannot test the changed files; the trigger runs on every change")
 	}
-	filters, event, why := triggerFilters(tr)
+	filters, event, why := triggerFilters(tr, slices.ContainsFunc(pp.pl.Triggers, func(o ir.Trigger) bool { return o.Kind == ir.TriggerTag }))
 	if why != "" {
 		e.lose(path, filterFeature(tr), "the trigger is not written: "+why)
 		return

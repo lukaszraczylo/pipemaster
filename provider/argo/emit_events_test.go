@@ -154,3 +154,28 @@ func TestTagTriggerSetsTheEventOfTheSourceDialect(t *testing.T) {
 		})
 	}
 }
+
+func TestPushBesideATagTriggerAdmitsBranchRefsOnly(t *testing.T) {
+	for name, tc := range map[string]struct {
+		triggers []ir.Trigger
+		want     bool
+	}{
+		"push and tag": {[]ir.Trigger{{Kind: ir.TriggerPush}, {Kind: ir.TriggerTag}}, true},
+		"push alone":   {[]ir.Trigger{{Kind: ir.TriggerPush}}, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := project(scriptJob("build", "x"))
+			p.Pipelines[0].Triggers = tc.triggers
+			files, _ := emit(t, p)
+			if got := strings.Contains(files[".argo/events/sensor.yaml"], "^refs/heads/.*$"); got != tc.want {
+				t.Fatalf("branch ref filter = %v, want %v:\n%s", got, tc.want, files[".argo/events/sensor.yaml"])
+			}
+			back := roundTrip(t, files)
+			stripExt(back)
+			ir.Normalize(p)
+			if ok, diff := ir.Equal(p, back); !ok {
+				t.Fatalf("round trip differs:\n%s", diff)
+			}
+		})
+	}
+}
