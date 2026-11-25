@@ -36,6 +36,8 @@ func TestFilterExpr(t *testing.T) {
 		{drone.GlobOpaque("branch", "release/*"), "glob stays opaque", "branch",
 			drone.Filter{Include: []string{"release/*"}}},
 		{eq(r("tag"), "v1"), "ref of a tag is tag equality", "ref", drone.Filter{Include: []string{"refs/tags/v1"}}},
+		{expr.Call{Name: "startsWith", Args: []expr.Expr{r("ref"), expr.Lit{Kind: expr.LitStr, Str: "refs/tags/"}}},
+			"every tag is a prefix test of the ref", "ref", drone.Filter{Include: []string{"refs/tags/**"}}},
 		{eq(r("ref"), "refs/heads/main"), "ref of a branch stays ref", "ref",
 			drone.Filter{Include: []string{"refs/heads/main"}}},
 		{eq(r("ref"), "refs/tags/"), "empty tag name stays ref", "ref", drone.Filter{Include: []string{"refs/tags/"}}},

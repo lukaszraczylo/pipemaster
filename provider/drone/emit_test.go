@@ -742,3 +742,16 @@ func TestBranchFilterCarriesThePullRequestCaveat(t *testing.T) {
 		})
 	}
 }
+
+func TestTagConditionIsANativeRefFilter(t *testing.T) {
+	j := gjob("tag-only", gstep("x", "1"))
+	j.If = expr.Call{Name: "startsWith", Args: []expr.Expr{expr.Ref{Path: []string{"ref"}}, expr.Lit{Kind: expr.LitStr, Str: "refs/tags/"}}}
+	out, rep := emitText(t, gproject(ghaOrigin, j))
+	trig, _ := docsOf(t, out)[0]["trigger"].(map[string]any)
+	if refs, _ := trig["ref"].([]any); len(refs) != 1 || refs[0] != "refs/tags/**" {
+		t.Fatalf("trigger = %v, want ref refs/tags/**", trig)
+	}
+	if lv, ok := levelOf(rep, caps.JobIf, "job/tag-only"); ok && lv == caps.Lost {
+		t.Fatalf("a tag condition has a Drone form, the report says lost: %v", rep.Entries)
+	}
+}
