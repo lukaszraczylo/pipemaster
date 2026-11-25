@@ -1,5 +1,10 @@
 package expr
 
+import (
+	"crypto/sha256"
+	"encoding/hex"
+)
+
 // ChangesCall names the canonical path predicate: changes('a', 'b') is true when any changed file matches
 // any glob. It is how a GitLab rules:changes list enters an IR condition; a dialect with no per-job path
 // filter does not translate it, so the condition stays unexpressible there.
@@ -111,4 +116,10 @@ func foldJoin(op string, l, r Expr) Expr {
 		return l
 	}
 	return Binary{Op: op, L: l, R: r}
+}
+
+// ChangesOut names the shell value of a path predicate: c and eight hex digits of the canonical text.
+func ChangesOut(a Expr) string {
+	sum := sha256.Sum256([]byte(String(a)))
+	return "c" + hex.EncodeToString(sum[:4])
 }

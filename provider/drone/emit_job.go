@@ -29,6 +29,7 @@ var platformRE = regexp.MustCompile(`^[a-z0-9]+/[a-z0-9]+(/v[0-9]+)?$`)
 // docCtx is the state of one pipeline document while it is written.
 type docCtx struct {
 	guard      expr.Expr
+	changes    []expr.Expr
 	pl         *ir.Pipeline
 	j          *ir.Job
 	plan       *docPlan
@@ -72,6 +73,7 @@ func (e *emitter) document(c *docCtx) (*yaml.Node, error) {
 		cond = jobCond{set: disabledSet(), has: true}
 	}
 	c.guard = cond.guard
+	c.changes = changesAtoms(c.guard, j.Steps)
 	e.cellNotes(c)
 	env, err := e.docEnv(c, ext)
 	if err != nil {

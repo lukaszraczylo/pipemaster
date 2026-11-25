@@ -9,6 +9,7 @@ import (
 	dexpr "github.com/lukaszraczylo/pipemaster/expr/drone"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
 )
 
@@ -38,6 +39,9 @@ func (d *doc) steps(v any) error {
 		name, _ := text(m.vals["name"])
 		if name == "" {
 			return fmt.Errorf("step %d needs a name", i+1)
+		}
+		if img, _ := text(m.vals[keyImage]); name == changesStepName && img == emitkit.ChangesImage {
+			continue
 		}
 		st, err := d.step(m, name)
 		if err != nil {

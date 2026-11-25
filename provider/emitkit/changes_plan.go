@@ -32,10 +32,7 @@ type ChangesPlan struct {
 }
 
 // ChangesAtomOut names the shell value of a path predicate.
-func ChangesAtomOut(a expr.Expr) string {
-	sum := sha256.Sum256([]byte(expr.String(a)))
-	return "c" + hex.EncodeToString(sum[:4])
-}
+func ChangesAtomOut(a expr.Expr) string { return expr.ChangesOut(a) }
 
 // DecomposeChanges splits x into a plan. ok is false when x has no path predicate, has more than MaxChangesAtom,
 // holds a glob that has no regular expression, or needs two different residual conditions under different

@@ -43,6 +43,10 @@ type Dialect struct {
 	Canon func(expr.Binary) (expr.Expr, bool)
 	// Group rewrites a parsed parenthesised group. Nil keeps it.
 	Group func(expr.Expr) expr.Expr
+	// Atom prints a call node as one test; handled false leaves the node unguardable. Nil means no call prints.
+	Atom func(expr.Call) (text string, handled bool)
+	// AtomRead reads the test that Atom printed at the head of s and returns the node and the bytes it used.
+	AtomRead func(s string) (e expr.Expr, n int, ok bool)
 	// Sem is the equality semantics of the source that wrote the condition.
 	Sem expr.Semantics
 }
@@ -138,6 +142,12 @@ func (d Dialect) node(e expr.Expr) (string, error) {
 		return "! " + x, err
 	case expr.Binary:
 		return d.binary(v)
+	case expr.Call:
+		if d.Atom != nil {
+			if t, ok := d.Atom(v); ok {
+				return t, nil
+			}
+		}
 	}
 	return "", fmt.Errorf("%w: %T", ErrNotGuardable, e)
 }
@@ -279,6 +289,12 @@ func (p *parser) primary() (expr.Expr, bool) {
 			e = p.d.Group(e)
 		}
 		return e, ok && p.eat(" )")
+	}
+	if p.d.AtomRead != nil {
+		if e, n, ok := p.d.AtomRead(p.s[p.i:]); ok {
+			p.i += n
+			return e, true
+		}
 	}
 	if !p.eat("[ ") {
 		return nil, false

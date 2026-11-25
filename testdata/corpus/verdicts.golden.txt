@@ -160,7 +160,7 @@
 20-gitlab-gitlab-runner gitlab->woodpecker native= 272 emulated= 260 external=  33 lost= 496
 21-gitlab-gitlab-shell gitlab->argo native=  78 emulated=  84 external=   3 lost=  67
 21-gitlab-gitlab-shell gitlab->concourse native=  75 emulated=  88 external=   1 lost=  55
-21-gitlab-gitlab-shell gitlab->drone native=  91 emulated=  57 external=   0 lost=  63
+21-gitlab-gitlab-shell gitlab->drone native=  91 emulated=  66 external=   0 lost=  54
 21-gitlab-gitlab-shell gitlab->forgejo native= 135 emulated=  58 external=   0 lost=  28
 21-gitlab-gitlab-shell gitlab->gha native= 135 emulated=  57 external=   0 lost=  28
 21-gitlab-gitlab-shell gitlab->gitea native= 134 emulated=  57 external=   0 lost=  28

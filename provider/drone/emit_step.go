@@ -154,6 +154,9 @@ func (e *emitter) steps(c *docCtx) (*yaml.Node, error) {
 	}
 	e.dependencies(c, done)
 	n := yseq()
+	if len(c.changes) > 0 {
+		n.Content = append(n.Content, e.changesStep(c.changes))
+	}
 	for _, d := range done {
 		n.Content = append(n.Content, d.m.n)
 	}

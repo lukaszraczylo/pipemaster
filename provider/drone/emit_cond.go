@@ -794,8 +794,12 @@ func (e *emitter) jobSet(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (j
 				return jobCond{set: disabledSet(), has: true}, nil
 			}
 			out.set, out.has, filtered = merged, true, true
-		case guardableSteps(j.Steps) && gok && !windowsJob(j):
-			e.emulate(jp, caps.JobIf, "shell guard on the first script line of every step", "the condition has no Drone filter; each step shows success instead of skipped")
+		case guardableSteps(j.Steps) && gok && !windowsJob(j) && (!expr.HasChanges(j.If) || !hasStepDeps(j.Steps)):
+			if expr.HasChanges(j.If) {
+				e.emulate(jp, caps.JobIf, "generated step "+changesStepName+" and a shell guard on the first script line of every step", changesDetail)
+			} else {
+				e.emulate(jp, caps.JobIf, "shell guard on the first script line of every step", "the condition has no Drone filter; each step shows success instead of skipped")
+			}
 			if gfolded {
 				e.noteFold(jp, caps.JobIf)
 			}
