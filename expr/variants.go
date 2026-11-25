@@ -38,7 +38,11 @@ func variants(e Expr, from, to Dialect) []variant {
 	for _, form := range []tagForm{tagMatch, tagBare} {
 		if x, ok := tagVariant(e, from, form); ok {
 			proxy, _ := tagVariant(e, from, tagProxy)
-			bases = append(bases, variant{e: x, from: readsAs(from, proxy), caveat: tagCaveat})
+			v := variant{e: x, from: readsAs(from, proxy)}
+			if !to.TagEvent {
+				v.caveat = tagCaveat
+			}
+			bases = append(bases, v)
 		}
 	}
 	if x, ok := refVariant(e); ok {
