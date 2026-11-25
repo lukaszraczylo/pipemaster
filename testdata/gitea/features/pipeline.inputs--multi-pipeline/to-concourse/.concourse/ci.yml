@@ -4,17 +4,26 @@
 # pipemaster:arg {"digest":"2de7cbf550b1867554d1bc7f4f0db0cc5037205e1874af173244e74086edb667","carry":"id: test-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
 # pipemaster:arg {"digest":"1483c9248897880ab07044ff1322dd1aecce59d9fe51e0d322aa2345b98d7616","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/test-tag
+# pipemaster:arg {"twin_of":"test"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: ci\nname: CI\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: CI\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/test
 # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: test
     plan:
@@ -23,6 +32,34 @@ jobs:
       - task: test-step-1
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo test
+            dir: workspace
+        tags:
+          - ubuntu-latest
+  - name: test-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: test-step-1
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

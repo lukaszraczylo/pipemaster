@@ -1,10 +1,16 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/release
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/release
 # pipemaster:arg {"src":"branch == 'dev'","from":"gitlab","gate":false}
 when:
   - event: push
     evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "dev"'
   - event: tag
+    evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "dev"'
+  - event:
+      - manual
+      - cron
     evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "dev"'
 steps:
   - name: script

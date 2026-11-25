@@ -6,15 +6,24 @@
 # pipemaster:arg {"digest":"35e0a8d842e07a13e44ca35b0bad7d3590ba916d08d6a381b77e3126ede078bd","carry":"id: build-step-1\nkind: script\nworkdir: ./cmd/app\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
 # pipemaster:arg {"digest":"b1cfd80258dedce6ca62cd8cbdf0d7e8dcdcbfce272bca8a2862606a4eb20fcd","carry":"id: build\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: ci\nname: workdir\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: workdir\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: build
     plan:
@@ -23,6 +32,30 @@ jobs:
       - task: build-step-1
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - ls
+            dir: workspace/cmd/app
+  - name: build-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

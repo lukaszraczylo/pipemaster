@@ -20,9 +20,18 @@
 # pipemaster:arg {"digest":"08917fa4c36d150ee75feb747f4feb128af9ce77cea5a702efe3a5261a6d9667","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/unit/carry
 # pipemaster:arg {"digest":"0a30a0b5cb3ec9cc87d3416eac398fd11bb90bef8dd417e72571b6ee7da24a0a","carry":"id: unit\nneeds:\n    - job: compile\n    - job: lint\n"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/compile-tag
+# pipemaster:arg {"twin_of":"compile"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/lint-tag
+# pipemaster:arg {"twin_of":"lint"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/summary-tag
+# pipemaster:arg {"twin_of":"summary"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/unit-tag
+# pipemaster:arg {"twin_of":"unit"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"899d151c3f6de974cb3f304fc705dd0b6fc7d17cde62d2bd6271effaab48c189","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nfinally:\n    - id: cleanup\n      needs:\n        - job: compile\n      steps:\n        - id: script\n          kind: script\n          script:\n            - make clean\n"}
+# pipemaster:arg {"digest":"a2ce0a5acbd9d50669f9faaadb594b261ce0a46b835dd40c047e8a499a72a97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nfinally:\n    - id: cleanup\n      needs:\n        - job: compile\n      steps:\n        - id: script\n          kind: script\n          script:\n            - make clean\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/cleanup/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/cleanup/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/cleanup/step/script
@@ -34,11 +43,17 @@
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/summary/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/unit/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/unit/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: compile
     plan:
@@ -155,6 +170,140 @@ jobs:
       - task: script
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make test
+            dir: workspace
+  - name: compile-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make build
+            dir: workspace
+  - name: lint-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make lint
+            dir: workspace
+  - name: summary-tag
+    plan:
+      - get: source-tags
+        passed:
+          - compile-tag
+          - lint-tag
+          - unit-tag
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make report
+            dir: workspace
+    ensure:
+      task: script-2
+      input_mapping:
+        workspace: source-tags
+      config:
+        platform: linux
+        image_resource:
+          type: registry-image
+          source:
+            repository: ubuntu
+            tag: latest
+        inputs:
+          - name: workspace
+        outputs:
+          - name: workspace
+        run:
+          path: sh
+          args:
+            - -c
+            - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+            - pipemaster
+            - make clean
+          dir: workspace
+  - name: unit-tag
+    plan:
+      - get: source-tags
+        passed:
+          - compile-tag
+          - lint-tag
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

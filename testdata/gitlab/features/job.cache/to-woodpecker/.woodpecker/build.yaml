@@ -1,9 +1,14 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
 # pipemaster:emulated job.cache pipeline/gitlab-ci/job/build
 # pipemaster:arg [{"Key":"$$\u007b{ hashFiles('go.sum') }}","Policy":"pull-push","Paths":[".cache/go-build"]}]
 when:
   - event: push
   - event: tag
+  - event:
+      - manual
+      - cron
 steps:
   - name: script
     image: ubuntu:latest

@@ -1,9 +1,14 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg [{"Name":"pkg-$$\u007b{ sha }}","Expire":"","Paths":["out/"]}]
 when:
   - event: push
   - event: tag
+  - event:
+      - manual
+      - cron
 steps:
   - name: script
     image: ubuntu:latest

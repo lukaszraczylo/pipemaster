@@ -1,10 +1,16 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/build
 # pipemaster:arg {"src":"(branch == 'main') || ((event == 'schedule') \u0026\u0026 !(branch == 'main'))","from":"gitlab","gate":false}
 when:
   - event: push
     evaluate: (CI_PIPELINE_EVENT matches "(?i)^push$$" || CI_PIPELINE_EVENT matches "(?i)^tag$$" || CI_PIPELINE_EVENT matches "(?i)^cron$$" || CI_PIPELINE_EVENT matches "(?i)^manual$$") && CI_COMMIT_BRANCH == "main" || CI_PIPELINE_EVENT matches "(?i)^cron$$" && !(!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "main")
   - event: tag
+    evaluate: (CI_PIPELINE_EVENT matches "(?i)^push$$" || CI_PIPELINE_EVENT matches "(?i)^tag$$" || CI_PIPELINE_EVENT matches "(?i)^cron$$" || CI_PIPELINE_EVENT matches "(?i)^manual$$") && CI_COMMIT_BRANCH == "main" || CI_PIPELINE_EVENT matches "(?i)^cron$$" && !(!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "main")
+  - event:
+      - manual
+      - cron
     evaluate: (CI_PIPELINE_EVENT matches "(?i)^push$$" || CI_PIPELINE_EVENT matches "(?i)^tag$$" || CI_PIPELINE_EVENT matches "(?i)^cron$$" || CI_PIPELINE_EVENT matches "(?i)^manual$$") && CI_COMMIT_BRANCH == "main" || CI_PIPELINE_EVENT matches "(?i)^cron$$" && !(!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "main")
 steps:
   - name: script

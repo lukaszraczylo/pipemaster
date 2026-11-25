@@ -1,5 +1,8 @@
 Loss report: gitlab -> woodpecker
 [lost] pipeline/gitlab-ci ext.passthrough (Ext of provider gitlab (include) is not written to the Woodpecker file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci trigger.api (Woodpecker starts API pipelines as manual events)
+[lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline when its file names no trigger; Woodpecker has no event for them)
+[lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat when its file names no trigger; Woodpecker has no event for them)
 [lost] pipeline/gitlab-ci/job/build ext.passthrough (Ext of provider gitlab (extends) is not written to the Woodpecker file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci/job/deploy expr.opaque (an opaque expression of another dialect has no Woodpecker form)
 [lost] pipeline/gitlab-ci/job/deploy ext.passthrough (Ext of provider gitlab (rules) is not written to the Woodpecker file; it is kept in round-trip metadata)

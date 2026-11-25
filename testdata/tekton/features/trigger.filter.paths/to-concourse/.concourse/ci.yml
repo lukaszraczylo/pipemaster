@@ -4,15 +4,27 @@
 # pipemaster:arg {"digest":"7780e75b493f4b5918d1171abda8c2821999f4188749c6e3daa2ada43a60719c","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
 # pipemaster:arg {"digest":"e6bfc13817fbedddcdc2fdb857a13ebbf41722ef870c15a580ae140946749156","carry":"id: build\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"34e31449a536fed76cd5dbd488fc41fffca29439fe29b700357bf781b7fdabc8","carry":"id: ci\nname: paths\ntriggers:\n    - kind: pr\n      paths:\n        exclude:\n            - '**.md'\n    - kind: push\n      paths:\n        include:\n            - src/**\n            - '!src/docs/**'\n    - kind: tag\n      paths:\n        include:\n            - src/**\n            - '!src/docs/**'\n"}
+# pipemaster:arg {"digest":"f0a32d5e719a2f78568f030bbd867aef5b9fa5327f8f09e725faa00ba01166f1","carry":"id: ci\nname: paths\ntriggers:\n    - kind: pr\n      paths:\n        exclude:\n            - '**.md'\n    - kind: push\n      paths:\n        include:\n            - src/**\n            - '!src/docs/**'\n    - kind: tag\n      paths:\n        include:\n            - src/**\n            - '!src/docs/**'\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/2
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+      paths:
+        - src/**
+        - '!src/docs/**'
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
       paths:
         - src/**
         - '!src/docs/**'
@@ -24,6 +36,30 @@ jobs:
       - task: build-step-1
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo ok
+            dir: workspace
+  - name: build-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

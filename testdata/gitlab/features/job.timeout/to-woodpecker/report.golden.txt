@@ -1,4 +1,7 @@
 Loss report: gitlab -> woodpecker
+[lost] pipeline/gitlab-ci trigger.api (Woodpecker starts API pipelines as manual events)
+[lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline when its file names no trigger; Woodpecker has no event for them)
+[lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat when its file names no trigger; Woodpecker has no event for them)
 [external] pipeline/gitlab-ci/job/build job.timeout: repo setting Timeout (set the repo timeout to 1h30m0s; Woodpecker limits the whole pipeline)
 [emulated] pipeline/gitlab-ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/gitlab-ci/job/build/step/script step.shell: bash-if-present wrapper command (the source runs the step under bash when the image has it; Woodpecker runs commands through /bin/sh -e of the image, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh)

@@ -1,10 +1,15 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/common
 # pipemaster:arg {"Ref":"alpine:3","Entrypoint":null}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:arg "- name: SHARED\n  value:\n    lit: \"1\"\n"
 when:
   - event: push
   - event: tag
+  - event:
+      - manual
+      - cron
 steps:
   - name: script
     image: alpine:3

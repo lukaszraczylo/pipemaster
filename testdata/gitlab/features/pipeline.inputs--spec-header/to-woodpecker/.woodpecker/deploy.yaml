@@ -1,9 +1,14 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/deploy
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:arg "- name: TAG\n  value:\n    lit: $$[[ inputs.image_tag ]]\n"
 when:
   - event: push
   - event: tag
+  - event:
+      - manual
+      - cron
 steps:
   - name: script
     image: ubuntu:latest

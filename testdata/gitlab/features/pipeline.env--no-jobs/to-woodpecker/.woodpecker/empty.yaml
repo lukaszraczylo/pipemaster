@@ -1,11 +1,16 @@
 # pipemaster:emulated step.script pipeline/gitlab-ci
 # pipemaster:emulated step.script pipeline/gitlab-ci/job/empty
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/empty
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:arg "- name: REGION\n  value:\n    lit: eu\n"
 when:
   - event: push
   - event: tag
+  - event:
+      - manual
+      - cron
 steps:
   - name: noop
     image: ubuntu:latest

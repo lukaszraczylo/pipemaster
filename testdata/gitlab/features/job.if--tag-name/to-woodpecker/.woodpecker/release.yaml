@@ -1,8 +1,14 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/release
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
 when:
   - event: push
     evaluate: CI_COMMIT_TAG != ""
   - event: tag
+    evaluate: CI_COMMIT_TAG != ""
+  - event:
+      - manual
+      - cron
     evaluate: CI_COMMIT_TAG != ""
 steps:
   - name: script

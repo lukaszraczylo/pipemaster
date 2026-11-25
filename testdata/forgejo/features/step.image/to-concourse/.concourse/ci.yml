@@ -8,19 +8,30 @@
 # pipemaster:arg {"digest":"31138b793d83a24da6a96c2d3b63dc6efa7b8dc0c050b51bb91601b4d8812044","carry":"id: deploy-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry
 # pipemaster:arg {"digest":"3301619a9163f8aa1822d1031721b812ada7d7df5905cf0f4d1ad115c7ae2e6c","carry":"id: deploy\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: build\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/deploy-tag
+# pipemaster:arg {"twin_of":"deploy"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"45ccad76918a30b965c250ae4114592623aed42b88890de31c892e091082be63","carry":"id: ci\nname: base\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"d0b624eb5280656600d77624a48f34b27c381f42c66c61d8a9958d51e5376e95","carry":"id: ci\nname: base\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated job.runner pipeline/ci/job/deploy
 # pipemaster:emulated step.image pipeline/ci/job/deploy/step/deploy-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/deploy/step/deploy-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: build
     plan:
@@ -59,6 +70,64 @@ jobs:
       - task: deploy-step-1
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make deploy
+            dir: workspace
+        tags:
+          - ubuntu-latest
+  - name: build-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: alpine
+              tag: "3.20"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make build
+            dir: workspace
+        tags:
+          - ubuntu-latest
+  - name: deploy-tag
+    plan:
+      - get: source-tags
+        passed:
+          - build-tag
+        trigger: true
+      - task: deploy-step-1
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

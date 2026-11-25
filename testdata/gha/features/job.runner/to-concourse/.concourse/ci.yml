@@ -8,20 +8,31 @@
 # pipemaster:arg {"digest":"51870da7a99c8c14bb5cea6ecbf28c15b43e495057d19ab8e9e7764f839c67fd","carry":"id: grouped-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/grouped/carry
 # pipemaster:arg {"digest":"3089e6749c0c12a28470a89418398834518a06d3b8689597bfa1c137e50e9b06","carry":"id: grouped\nrunner:\n    selector:\n        group: big-runners\n    labels:\n        - linux\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/grouped-tag
+# pipemaster:arg {"twin_of":"grouped"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"04aba9c259d5adf541106218612927f06f15156dee27eaa497d80fa0d89ef8bd","carry":"id: ci\nname: runner\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"5a1ca2760fa977435b6255efc6207df5e74d108a4dbc55c38e55cd894904e094","carry":"id: ci\nname: runner\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated job.runner pipeline/ci/job/grouped
 # pipemaster:emulated step.image pipeline/ci/job/grouped/step/grouped-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/grouped/step/grouped-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: build
     plan:
@@ -60,6 +71,64 @@ jobs:
       - task: grouped-step-1
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo ok
+            dir: workspace
+        tags:
+          - linux
+  - name: build-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo ok
+            dir: workspace
+        tags:
+          - linux
+          - self-hosted
+          - x64
+  - name: grouped-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: grouped-step-1
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

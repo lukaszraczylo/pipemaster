@@ -10,19 +10,32 @@
 # pipemaster:arg {"digest":"bad5b3f823b19a4509be4f9badcc60f42b894b55badfe50b2bfbd3799fd9c48a","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/unit/carry
 # pipemaster:arg {"digest":"6461d5eeb4ad53d7fbd5ec3d309ff4568e5e60fba24aea455a4875cc4fcbc672","carry":"id: unit\nneeds:\n    - job: compile\n      artifacts: true\n"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/compile-tag
+# pipemaster:arg {"twin_of":"compile"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/docs-tag
+# pipemaster:arg {"twin_of":"docs"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/unit-tag
+# pipemaster:arg {"twin_of":"unit"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"7aaa71cd942160b1a5fcfb90d9e716827c6f0cba860d6661a7a1dd9efa4762a5","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"6c6ccc6534557ddbfd9be3fa5152b1b6fe485e87501a01f8f32183e91c0b0e6c","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/docs/step/script
 # pipemaster:emulated job.needs.artifacts pipeline/gitlab-ci/job/unit
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/unit/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: compile
     plan:
@@ -83,6 +96,82 @@ jobs:
       - task: script
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make test
+            dir: workspace
+  - name: compile-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make
+            dir: workspace
+  - name: docs-tag
+    plan:
+      - get: source-tags
+        passed:
+          - compile-tag
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make docs
+            dir: workspace
+  - name: unit-tag
+    plan:
+      - get: source-tags
+        passed:
+          - compile-tag
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

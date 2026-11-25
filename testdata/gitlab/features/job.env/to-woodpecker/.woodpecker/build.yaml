@@ -1,9 +1,14 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
 # pipemaster:emulated job.env pipeline/gitlab-ci/job/build
 # pipemaster:arg "- name: CGO_ENABLED\n  value:\n    lit: \"0\"\n- name: TAG\n  value:\n    expr: tag\n"
 when:
   - event: push
   - event: tag
+  - event:
+      - manual
+      - cron
 steps:
   - name: script
     image: ubuntu:latest

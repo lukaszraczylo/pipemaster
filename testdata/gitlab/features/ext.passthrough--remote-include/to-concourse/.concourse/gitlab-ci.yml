@@ -8,17 +8,28 @@
 # pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/carry
 # pipemaster:arg {"digest":"29321430eaf728631cf654a12f79b666895fc57e382a459b9c114f496159aed4","carry":"if: |\n    opaque(gitlab): - changes: '!reference [.remote-patterns]'\n      if: $CI_COMMIT_TAG\nid: deploy\nneeds:\n    - job: build\n"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/deploy-tag
+# pipemaster:arg {"twin_of":"deploy"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"9846dfe4434c936cc021e17d49786bbcfcabf9d6ef0af85466bd6f2a220b1f7c","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"861708450c00cf03f4c7eb583c82133e092af5af6093be2a721c9418d903410a","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/deploy/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/deploy/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: build
     plan:
@@ -56,6 +67,61 @@ jobs:
       - task: script
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make deploy
+            dir: workspace
+  - name: build-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - |-
+                !reference [.remote-setup, script]
+                make
+            dir: workspace
+  - name: deploy-tag
+    plan:
+      - get: source-tags
+        passed:
+          - build-tag
+      - task: script
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

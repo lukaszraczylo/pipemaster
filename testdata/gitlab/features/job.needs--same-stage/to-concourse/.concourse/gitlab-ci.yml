@@ -10,20 +10,33 @@
 # pipemaster:arg {"digest":"7a97e027ba38e9ba6ba41e14dc1b27f8652c0b2ef34c7574e2682fcf29d02a44","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package/carry
 # pipemaster:arg {"digest":"27e3351c113b774b6e8ffe6f9f6f65e1a3bd606c72f843c0b63d3466bee3c5e4","carry":"id: package\nneeds:\n    - job: compile\n"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/check-tag
+# pipemaster:arg {"twin_of":"check"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/compile-tag
+# pipemaster:arg {"twin_of":"compile"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/package-tag
+# pipemaster:arg {"twin_of":"package"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"995d2574230b13d1876cc0061863bcd98cc7c94a258c96843b6e69be9d492c94","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"0fc5dcca591ec8f08354b8f7b3a7b27360f98bd27b3beef267bb754254f5be6f","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/check/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/check/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/package/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/package/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: check
     plan:
@@ -89,6 +102,89 @@ jobs:
       - task: script
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make package
+            dir: workspace
+  - name: check-tag
+    plan:
+      - get: source-tags
+        passed:
+          - compile-tag
+          - package-tag
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make check
+            dir: workspace
+  - name: compile-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make compile
+            dir: workspace
+  - name: package-tag
+    plan:
+      - get: source-tags
+        passed:
+          - compile-tag
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

@@ -12,17 +12,30 @@
 # pipemaster:arg {"digest":"e1ba9c3b3e1bf1a2f01c6fef58aa52889fff70241bfe03266553d7b53cc2577c","carry":"id: test-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
 # pipemaster:arg {"digest":"8c4bb44e93a76f377d56140bf7670821af40c4f54679c260a776bf80872b2437","carry":"id: test\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/lint-tag
+# pipemaster:arg {"twin_of":"lint"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/ship-tag
+# pipemaster:arg {"twin_of":"ship"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/test-tag
+# pipemaster:arg {"twin_of":"test"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"a05c43e8f6f3ce4536fae25167f53a8763d36113a68f445344d2ed9abb8f4dd4","carry":"id: ci\nname: needs\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"f3447d78b91bccddba1d44513e04ea86e2d8ac2ea9e9d35cbf6af9e38718b181","carry":"id: ci\nname: needs\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated step.image pipeline/ci/job/lint/step/lint-step-1
 # pipemaster:emulated step.image pipeline/ci/job/ship/step/ship-step-1
 # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: lint
     plan:
@@ -82,6 +95,81 @@ jobs:
       - task: test-step-1
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo test
+            dir: workspace
+  - name: lint-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: lint-step-1
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo lint
+            dir: workspace
+  - name: ship-tag
+    plan:
+      - get: source-tags
+        passed:
+          - lint-tag
+          - test-tag
+        trigger: true
+      - task: ship-step-1
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo ship
+            dir: workspace
+  - name: test-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: test-step-1
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

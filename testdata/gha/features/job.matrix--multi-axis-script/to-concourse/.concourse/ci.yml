@@ -10,20 +10,31 @@
 # pipemaster:arg {"matrix":"axes:\n    - name: os\n      values:\n        - linux\n        - mac\n    - name: go\n      values:\n        - \"1.24\"\n        - \"1.25\"\nexclude:\n    - - key: go\n        value: \"1.24\"\n      - key: os\n        value: mac\n","across":"[{\"max_in_flight\":\"all\",\"values\":[{\"go\":\"1.24\",\"os\":\"linux\"},{\"go\":\"1.25\",\"os\":\"linux\"},{\"go\":\"1.25\",\"os\":\"mac\"}],\"var\":\"matrix\"}]"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
 # pipemaster:arg {"digest":"8c0aea0a4cb5fe81d577aba82ca07bc2a810fe262a4e25008991cd440f9d75bc","carry":"matrix:\n    axes:\n        - name: os\n          values:\n            - linux\n            - mac\n        - name: go\n          values:\n            - \"1.24\"\n            - \"1.25\"\n    exclude:\n        - - key: go\n            value: \"1.24\"\n          - key: os\n            value: mac\nid: test\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: prod\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/prod-tag
+# pipemaster:arg {"twin_of":"prod"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/test-tag
+# pipemaster:arg {"twin_of":"test"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"d5bf506acfebb5c498b9c74ad50aae113620334165552d9a37cd2fd89e7ee7e5","carry":"id: ci\nname: matrix multi axis\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"8c79dca209d7ad47e7e0136b183933bb98c1b42828a38dc927416315f0acd6c9","carry":"id: ci\nname: matrix multi axis\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/prod
 # pipemaster:emulated step.image pipeline/ci/job/prod/step/prod-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/prod/step/prod-step-1
 # pipemaster:emulated job.runner pipeline/ci/job/test
 # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: prod
     plan:
@@ -63,6 +74,77 @@ jobs:
           - task: test-step-1
             input_mapping:
               workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: ubuntu
+                  tag: latest
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              run:
+                path: sh
+                args:
+                  - -c
+                  - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+                  - pipemaster
+                  - |-
+                    # pipemaster:lost echo {{ matrix.os }} {{ matrix.go }} {{ needs.prod.outputs.ver }}
+                    printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/test/step/test-step-1: no Concourse spelling for expression needs.prod.outputs.ver; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
+                dir: workspace
+            tags:
+              - ubuntu-latest
+        across:
+          - var: matrix
+            values:
+              - go: "1.24"
+                os: linux
+              - go: "1.25"
+                os: linux
+              - go: "1.25"
+                os: mac
+            max_in_flight: all
+  - name: prod-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: prod-step-1
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make
+            dir: workspace
+        tags:
+          - ubuntu-latest
+  - name: test-tag
+    plan:
+      - get: source-tags
+        passed:
+          - prod-tag
+        trigger: true
+      - do:
+          - task: test-step-1
+            input_mapping:
+              workspace: source-tags
             config:
               platform: linux
               image_resource:

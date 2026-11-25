@@ -5,15 +5,24 @@
 # pipemaster:emulated job.allow_failure pipeline/ci/job/flaky
 # pipemaster:emulated ext.passthrough pipeline/ci/job/flaky/carry
 # pipemaster:arg {"digest":"ce162837c2e330a109e884cade985b0b8eef55f0eaac5ceb5cc27237c89590e5","carry":"id: flaky\nallow_failure: true\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/flaky-tag
+# pipemaster:arg {"twin_of":"flaky"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"d4ea833bebabe36f6f0e50db004dd342e0d5c3824f45d4e79c63ed3526654a1d","carry":"id: ci\nname: allow\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: ci\nname: allow\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated step.image pipeline/ci/job/flaky/step/flaky-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: flaky
     plan:
@@ -24,6 +33,32 @@ jobs:
             - task: flaky-step-1
               input_mapping:
                 workspace: source
+              config:
+                platform: linux
+                image_resource:
+                  type: registry-image
+                  source:
+                    repository: ubuntu
+                    tag: latest
+                inputs:
+                  - name: workspace
+                outputs:
+                  - name: workspace
+                run:
+                  path: sh
+                  args:
+                    - -ec
+                    - echo ok
+                  dir: workspace
+  - name: flaky-tag
+    plan:
+      - try:
+          do:
+            - get: source-tags
+              trigger: true
+            - task: flaky-step-1
+              input_mapping:
+                workspace: source-tags
               config:
                 platform: linux
                 image_resource:

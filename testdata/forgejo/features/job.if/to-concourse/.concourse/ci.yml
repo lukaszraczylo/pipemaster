@@ -6,17 +6,26 @@
 # pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry
 # pipemaster:arg {"digest":"43790b00873aa06a823560d8d20047fcbe557b57e20c69bbed09214276549c84","carry":"if: (ref == 'refs/heads/main') \u0026\u0026 (event == 'push')\nid: deploy\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/deploy-tag
+# pipemaster:arg {"twin_of":"deploy"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"23421ff0998514f47173ea5b7668acb70c8af5e253b5c3264a1655012e26476f","carry":"id: ci\nname: cond\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: ci\nname: cond\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/deploy
 # pipemaster:emulated step.image pipeline/ci/job/deploy/step/deploy-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/deploy/step/deploy-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: deploy
     plan:
@@ -24,6 +33,33 @@ jobs:
       - task: deploy-step-1
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo deploy
+            dir: workspace
+        tags:
+          - ubuntu-latest
+  - name: deploy-tag
+    plan:
+      - get: source-tags
+      - task: deploy-step-1
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

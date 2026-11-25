@@ -6,16 +6,25 @@
 # pipemaster:arg {"digest":"47c4c35cc7dcf35755597d231c5f93a4809658a148e57fa0322399ff2af76b49","carry":"id: build-step-1\nkind: script\nshell: bash\nworkdir: app\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
 # pipemaster:arg {"digest":"fe89c16b18a74fc2f6b503cbc2f67133059b63694d35f90d7cf335a598098d97","carry":"id: build\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: ci\nname: ext\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: ext\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: build
     plan:
@@ -24,6 +33,30 @@ jobs:
       - task: build-step-1
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: bash
+            args:
+              - -ec
+              - echo ok
+            dir: workspace/app
+  - name: build-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

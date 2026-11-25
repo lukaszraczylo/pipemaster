@@ -1,4 +1,6 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/alert
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
 # pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}]}
 when:
@@ -6,6 +8,11 @@ when:
     status:
       - failure
   - event: tag
+    status:
+      - failure
+  - event:
+      - manual
+      - cron
     status:
       - failure
 depends_on:

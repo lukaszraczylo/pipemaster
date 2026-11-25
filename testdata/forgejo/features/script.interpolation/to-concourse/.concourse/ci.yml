@@ -4,17 +4,26 @@
 # pipemaster:arg {"digest":"3d29c50d1a984d5b82a0729674fc27f8343f9466760505cb703a7a1d23485075","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"sha $\u007b{ sha }} on $\u007b{ ref_name }}\"\n    - echo \"$\u007b{ gha.github.workspace }}\"\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
 # pipemaster:arg {"digest":"f1d31296444be84f8087a74fed4124ea48b08e3ad8834e2c37ab7abaa5e454fd","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: ci\nname: interp\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: interp\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: build
     plan:
@@ -23,6 +32,38 @@ jobs:
       - task: build-step-1
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - |-
+                # pipemaster:lost echo "sha {{ sha }} on {{ ref_name }}"
+                printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Concourse spelling for expression ref_name; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
+                # pipemaster:lost echo "{{ gha.github.workspace }}"
+                printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Concourse spelling for expression gha.github.workspace; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
+            dir: workspace
+        tags:
+          - ubuntu-latest
+  - name: build-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

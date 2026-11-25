@@ -1,9 +1,15 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/publish
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
 # pipemaster:lost job.if pipeline/gitlab-ci/job/publish: branch == default_branch
 when:
   - event: push
     evaluate: "false"
   - event: tag
+    evaluate: "false"
+  - event:
+      - manual
+      - cron
     evaluate: "false"
 steps:
   - name: script

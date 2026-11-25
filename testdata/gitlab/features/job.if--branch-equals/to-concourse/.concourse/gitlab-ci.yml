@@ -4,16 +4,25 @@
 # pipemaster:arg {"digest":"4b52e2242d14dd02e9649e0cd50d9146e9352c5a19ff4ead3efbfec2c02f50b8","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/carry
 # pipemaster:arg {"digest":"69306d82d237065ccc5f190a1e0fe79e80fb6cda4b8d9ed1d03e777f307be685","carry":"if: branch == 'main'\nid: deploy\n"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/deploy-tag
+# pipemaster:arg {"twin_of":"deploy"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"2ec1dcbc01c737771acd62a3d97bc835360b3443812a96f8981d095c821d1957","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/deploy/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/deploy/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: deploy
     plan:
@@ -43,4 +52,29 @@ jobs:
                 PM_CTX_BRANCH="$(cat ../workspace/.git/branch)"; export PM_CTX_BRANCH # pipemaster:ctx
                 if ! [ "$PM_CTX_BRANCH" = 'main' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard
                 make deploy
+            dir: workspace
+  - name: deploy-tag
+    plan:
+      - get: source-tags
+      - task: script
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make deploy
             dir: workspace

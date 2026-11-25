@@ -1,8 +1,8 @@
 Loss report: gitea -> concourse
 [lost] pipeline/gitlab-ci/trigger/0 trigger.filter.branches (the push trigger has no branch filter, and a git resource follows one branch; the resource follows the default branch of the repository)
-[lost] pipeline/gitlab-ci/trigger/1 trigger.tag (a job cannot trigger on a push and on a tag: the tag resource has no version on a branch push, so the job would never start; the job runs on push only)
 [emulated] pipeline/gitlab-ci ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
 [emulated] pipeline/gitlab-ci pipeline.finally: ensure hook on the sink job (the finally jobs run as hooks of the job build, the only job that no other job needs)
+[emulated] pipeline/gitlab-ci trigger.tag: tag twin of each job (a job cannot wait on a branch push and on a tag, because a tag resource has no version on a push; each job has a twin named <job>-tag that follows the tag resource, and the twin of a needed job feeds the twin that needs it)
 [emulated] pipeline/gitlab-ci/job/alert job.if: shared shell guard on script tasks; a status function becomes a job hook (on_failure or ensure) (a condition with no guard form leaves the job with no triggering get, so a person starts it, and adds a lost entry)
 [emulated] pipeline/gitlab-ci/job/alert/step/script ext.passthrough: step name changed (the step ID script is not a Concourse identifier or collides with another step or resource name; the task is script-2)
 [emulated] pipeline/gitlab-ci/job/alert/step/script step.image: default image (the task names no image, so it runs ubuntu:latest)
@@ -12,3 +12,4 @@ Loss report: gitea -> concourse
 [emulated] pipeline/gitlab-ci/job/report/step/script ext.passthrough: step name changed (the step ID script is not a Concourse identifier or collides with another step or resource name; the task is script-3)
 [emulated] pipeline/gitlab-ci/job/report/step/script step.image: default image (the task names no image, so it runs ubuntu:latest)
 [emulated] pipeline/gitlab-ci/job/report/step/script step.shell: run.path sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the task runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)
+[emulated] pipeline/gitlab-ci/trigger/1 trigger.tag: git resource with source.tag_filter (a tag trigger that also has a branch filter is lost, because one git resource cannot hold both sets)

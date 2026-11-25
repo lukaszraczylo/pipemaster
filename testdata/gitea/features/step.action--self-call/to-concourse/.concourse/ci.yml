@@ -6,17 +6,28 @@
 # pipemaster:arg {"digest":"a9122a9dfd1f81b5cd386c7e6930f0695dab54c1ba8db0dfe2f92361365067c4","carry":"id: plain-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/plain/carry
 # pipemaster:arg {"digest":"2d548209cc99c8795a81080fbee0fd54c12ab569d71fde192cc6a018b6444f96","carry":"id: plain\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/call-tag
+# pipemaster:arg {"twin_of":"call"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/plain-tag
+# pipemaster:arg {"twin_of":"plain"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"04aba9c259d5adf541106218612927f06f15156dee27eaa497d80fa0d89ef8bd","carry":"id: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"5a1ca2760fa977435b6255efc6207df5e74d108a4dbc55c38e55cd894904e094","carry":"id: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/plain
 # pipemaster:emulated step.image pipeline/ci/job/plain/step/plain-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/plain/step/plain-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: call
     plan:
@@ -42,6 +53,51 @@ jobs:
       - task: plain-step-1
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo ok
+            dir: workspace
+        tags:
+          - ubuntu-latest
+  - name: call-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: call-step-1
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          run:
+            path: sh
+            args:
+              - -ec
+              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/call/step/call-step-1: Concourse does not run the action org/shared/.gitea/workflows/build.yml@main'' >&2; exit 1'
+  - name: plain-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: plain-step-1
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

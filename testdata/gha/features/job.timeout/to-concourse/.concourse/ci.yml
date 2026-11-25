@@ -4,18 +4,27 @@
 # pipemaster:arg {"digest":"aca61d8f33873242bda7aea3433c48d7cdd689abc7380a408d47efbad948d46d","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
 # pipemaster:arg {"digest":"c4f9eaf83649cc3037ba380a8b4ce9cf0268a927c0af34ed265b5601f9f090b3","carry":"timeout: 15m0s\nid: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"d4ea833bebabe36f6f0e50db004dd342e0d5c3824f45d4e79c63ed3526654a1d","carry":"id: ci\nname: timeout\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: ci\nname: timeout\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated job.timeout pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: build
     plan:
@@ -25,6 +34,36 @@ jobs:
           - task: build-step-1
             input_mapping:
               workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: ubuntu
+                  tag: latest
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              run:
+                path: sh
+                args:
+                  - -c
+                  - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+                  - pipemaster
+                  - echo ok
+                dir: workspace
+            tags:
+              - ubuntu-latest
+        timeout: 15m0s
+  - name: build-tag
+    plan:
+      - do:
+          - get: source-tags
+            trigger: true
+          - task: build-step-1
+            input_mapping:
+              workspace: source-tags
             config:
               platform: linux
               image_resource:

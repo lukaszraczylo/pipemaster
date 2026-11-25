@@ -2,16 +2,25 @@
 # pipemaster:arg {"digest":"2cd4c0d2068af96d22756ce7ecdb8a331c207ace4d27ac11affb1524dc15dc1e","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
 # pipemaster:arg {"digest":"597ab1c5f41a2fd5ff71b19afbd10eb4975edb15416ddad43aa34da6626c372b","carry":"retry:\n    attempts: 3\nid: build\n"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"d4ea833bebabe36f6f0e50db004dd342e0d5c3824f45d4e79c63ed3526654a1d","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: build
     plan:
@@ -21,6 +30,32 @@ jobs:
           - task: script
             input_mapping:
               workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: ubuntu
+                  tag: latest
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              run:
+                path: sh
+                args:
+                  - -ec
+                  - make
+                dir: workspace
+        attempts: 3
+  - name: build-tag
+    plan:
+      - do:
+          - get: source-tags
+            trigger: true
+          - task: script
+            input_mapping:
+              workspace: source-tags
             config:
               platform: linux
               image_resource:

@@ -8,20 +8,31 @@
 # pipemaster:arg {"digest":"559fc337e2f3fcf90924154f3181280aa7cb4cbbb0a0fd844a986e116b1a65ea","carry":"id: tag\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/version/carry
 # pipemaster:arg {"digest":"1ab3b8384cfee61271bff0529c599df53dbd271e9547f8358f581532c6e29812","carry":"id: version\nrunner:\n    labels:\n        - ubuntu-latest\noutputs:\n    - name: tag\n      value: $\u007b{ steps.tag.outputs.value }}\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/use-tag
+# pipemaster:arg {"twin_of":"use"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/version-tag
+# pipemaster:arg {"twin_of":"version"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"4a0ee65012245994e9c2d3364e65a42e2e765f60f8a9d6c211182676c58e6b98","carry":"id: ci\nname: outputs\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"765b2f441b8fa28f0943518304aeee501d8547765d2583b0abe92c54727e483d","carry":"id: ci\nname: outputs\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/use
 # pipemaster:emulated step.image pipeline/ci/job/use/step/use-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/use/step/use-step-1
 # pipemaster:emulated job.runner pipeline/ci/job/version
 # pipemaster:emulated step.image pipeline/ci/job/version/step/tag
 # pipemaster:emulated step.shell pipeline/ci/job/version/step/tag
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: use
     plan:
@@ -62,6 +73,66 @@ jobs:
       - task: tag
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo "value=v1" >> "$GITHUB_OUTPUT"
+            dir: workspace
+        tags:
+          - ubuntu-latest
+  - name: use-tag
+    plan:
+      - get: source-tags
+        passed:
+          - version-tag
+        trigger: true
+      - task: use-step-1
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - |-
+                # pipemaster:lost echo {{ needs.version.outputs.tag }}
+                printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/use/step/use-step-1: no Concourse spelling for expression needs.version.outputs.tag; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
+            dir: workspace
+        tags:
+          - ubuntu-latest
+  - name: version-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: tag
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

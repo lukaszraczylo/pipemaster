@@ -1,10 +1,11 @@
 Loss report: forgejo -> concourse
 [lost] pipeline/ci/trigger/0 trigger.filter.branches (the push trigger has no branch filter, and a git resource follows one branch; the resource follows the default branch of the repository)
-[lost] pipeline/ci/trigger/1 trigger.tag (a job cannot trigger on a push and on a tag: the tag resource has no version on a branch push, so the job would never start; the job runs on push only)
 [emulated] pipeline/ci ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
+[emulated] pipeline/ci trigger.tag: tag twin of each job (a job cannot wait on a branch push and on a tag, because a tag resource has no version on a push; each job has a twin named <job>-tag that follows the tag resource, and the twin of a needed job feeds the twin that needs it)
 [emulated] pipeline/ci/job/build job.runner: worker tags of the task (the tasks carry the worker tags linux, self-hosted, x64; a build waits until a worker has them)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.image: default image (the task names no image, so it runs ubuntu:latest)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.shell: run.path sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the task runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)
 [emulated] pipeline/ci/job/grouped job.runner: worker tags of the task (the tasks carry the worker tags linux; a build waits until a worker has them)
 [emulated] pipeline/ci/job/grouped/step/grouped-step-1 step.image: default image (the task names no image, so it runs ubuntu:latest)
 [emulated] pipeline/ci/job/grouped/step/grouped-step-1 step.shell: run.path sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the task runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)
+[emulated] pipeline/ci/trigger/1 trigger.tag: git resource with source.tag_filter (a tag trigger that also has a branch filter is lost, because one git resource cannot hold both sets)

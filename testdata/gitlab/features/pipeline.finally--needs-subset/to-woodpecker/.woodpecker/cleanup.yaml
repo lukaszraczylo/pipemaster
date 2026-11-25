@@ -1,4 +1,6 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/cleanup
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
 # pipemaster:arg {"needs":[{"JobID":"compile","Artifacts":false,"Optional":false}],"noIf":true}
 when:
@@ -7,6 +9,12 @@ when:
       - success
       - failure
   - event: tag
+    status:
+      - success
+      - failure
+  - event:
+      - manual
+      - cron
     status:
       - success
       - failure

@@ -12,20 +12,33 @@
 # pipemaster:arg {"digest":"b69bc756879b85a3d60bd5879699b54b7d1d3a8baeb6a4218e29a0889d726fd9","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package-all/carry
 # pipemaster:arg {"digest":"9e8e6df592bc1143064faf77032e7d1fef4771ea2297fc69700b4bd28750c01f","carry":"id: package-all\nneeds:\n    - job: images\n"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/images-tag
+# pipemaster:arg {"twin_of":"images"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/package-tag
+# pipemaster:arg {"twin_of":"package"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/package-all-tag
+# pipemaster:arg {"twin_of":"package-all"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"6b6d4291befa56efb683eefca3f01d2b98ccccd254b3ca0738a9f6df98032674","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"3cb457ce578732bb5f7bbe5731021912c43dc843ce0f9f1c86b52e85a908fe4a","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/images/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/images/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/package-all/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/package-all/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/package/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/package/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: images
     plan:
@@ -97,6 +110,95 @@ jobs:
       - task: script
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make package-all
+            dir: workspace
+  - name: images-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - do:
+          - task: script
+            input_mapping:
+              workspace: source-tags
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: ubuntu
+                  tag: latest
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              run:
+                path: sh
+                args:
+                  - -c
+                  - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+                  - pipemaster
+                  - make images
+                dir: workspace
+        across:
+          - var: TARGET
+            values:
+              - alpine
+              - ubuntu
+            max_in_flight: all
+  - name: package-tag
+    plan:
+      - get: source-tags
+        passed:
+          - images-tag
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make package
+            dir: workspace
+  - name: package-all-tag
+    plan:
+      - get: source-tags
+        passed:
+          - images-tag
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

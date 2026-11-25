@@ -6,16 +6,25 @@
 # pipemaster:arg {"matrix":"include:\n    - - key: python\n        value: \"3.13\"\n    - - key: os\n        value: macos-latest\n      - key: python\n        value: \"3.14\"\n","across":"[{\"max_in_flight\":\"all\",\"values\":[{\"os\":\"\",\"python\":\"3.13\"},{\"os\":\"macos-latest\",\"python\":\"3.14\"}],\"var\":\"matrix\"}]"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
 # pipemaster:arg {"digest":"b705e38b094e20caaa1a215713f79b5819e72b9aa6240993f647739de9c7ca74","carry":"matrix:\n    include:\n        - - key: python\n            value: \"3.13\"\n        - - key: os\n            value: macos-latest\n          - key: python\n            value: \"3.14\"\nid: test\nrunner:\n    labels:\n        - $\u007b{ matrix.os || 'ubuntu-latest' }}\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/test-tag
+# pipemaster:arg {"twin_of":"test"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: ci\nname: expression label\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: expression label\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-1
+# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
 jobs:
   - name: test
     plan:
@@ -25,6 +34,41 @@ jobs:
           - task: test-step-1
             input_mapping:
               workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: ubuntu
+                  tag: latest
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              run:
+                path: sh
+                args:
+                  - -c
+                  - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+                  - pipemaster
+                  - echo test
+                dir: workspace
+        across:
+          - var: matrix
+            values:
+              - python: "3.13"
+                os: ""
+              - python: "3.14"
+                os: macos-latest
+            max_in_flight: all
+  - name: test-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - do:
+          - task: test-step-1
+            input_mapping:
+              workspace: source-tags
             config:
               platform: linux
               image_resource:
