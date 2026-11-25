@@ -199,7 +199,8 @@ func (b *jobBuilder) collapseNoop() {
 		return
 	}
 	last := len(b.job.Steps) - 1
-	if last < 0 || b.job.Steps[last].ID != mainStep || !slices.Equal(b.job.Steps[last].Script, []string{placeholderScript}) {
+	if last < 0 || b.job.Steps[last].ID != mainStep ||
+		!slices.Equal(b.job.Steps[last].Script, []string{placeholderScript}) && !emitkit.IsFailLoud(b.job.Steps[last].Script) {
 		b.c.ignored(b.path, caps.StepScript, "the no-op container was edited after pipemaster wrote it")
 		return
 	}

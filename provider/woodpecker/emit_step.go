@@ -511,7 +511,11 @@ func (e *emitter) settingNode(sp string, v ir.Value) (*yaml.Node, error) {
 // placeholder is the one step of a workflow that has none Woodpecker can run; Woodpecker rejects a workflow without steps.
 func (e *emitter) placeholder(c *wfCtx) (stepDone, error) {
 	script, why := noopScript, "the job has no steps; a no-op step keeps the workflow valid"
-	if e.lostStepWork(c.jp) {
+	if reason, ok := emitkit.BridgeWork(c.j); ok && len(c.j.Steps) == 0 {
+		script = emitkit.FailLoud(caps.StepScript, c.jp, reason)
+		why = reason + "; a step that prints the loss and exits 1 keeps the workflow valid and the pipeline honest"
+		e.emulate(c.jp, caps.StepScript, "failing step", "Woodpecker needs a step; "+reason+", so a step that prints the loss and exits 1 stands in")
+	} else if e.lostStepWork(c.jp) {
 		script = emitkit.FailLoud(caps.StepScript, c.jp, "no step of the job has a Woodpecker form")
 		why = "no step of the job has a Woodpecker form; a step that prints the loss and exits 1 keeps the workflow valid and the pipeline honest"
 		e.emulate(c.jp, caps.StepScript, "failing step", "Woodpecker needs a step; no step of the job has a Woodpecker form, so a step that prints the loss and exits 1 stands in")

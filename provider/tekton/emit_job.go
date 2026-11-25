@@ -105,7 +105,11 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 	}
 	if len(b.nodes) == 0 {
 		script := noopScript
-		if tc.e.lostStepWork(jp.path) {
+		if reason, ok := emitkit.BridgeWork(jp.j); ok && len(jp.j.Steps) == 0 {
+			script = emitkit.FailLoud(caps.StepScript, jp.path, reason)
+			tc.e.noteLost(jp.path+"/step/"+placeholderStepID, caps.StepScript, reason+"; a step that prints the loss and exits 1 keeps the Task valid and the pipeline honest")
+			tc.e.emulate(jp.path, caps.StepScript, "failing step", "the job has no step and a Task needs one; "+reason+", so a step that prints the loss and exits 1 stands in")
+		} else if tc.e.lostStepWork(jp.path) {
 			script = emitkit.FailLoud(caps.StepScript, jp.path, "no step of the job has a Tekton form")
 			tc.e.noteLost(jp.path+"/step/"+placeholderStepID, caps.StepScript, "no step of the job has a Tekton form; a step that prints the loss and exits 1 keeps the Task valid and the pipeline honest")
 			tc.e.emulate(jp.path, caps.StepScript, "failing step", "the job has no step with a Tekton form and a Task needs one; a step that prints the loss and exits 1 stands in")

@@ -27,4 +27,4 @@ steps:
   - name: noop
     image: ubuntu:latest
     commands:
-      - "true"
+      - 'printf ''%s\n'' ''pipemaster: lost: step.script pipeline/gitlab-ci/job/downstream: the job starts the pipeline of project group/other and the target has no cross-project trigger; start that pipeline by hand or with an API call'' >&2; exit 1'

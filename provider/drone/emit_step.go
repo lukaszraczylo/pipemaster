@@ -633,7 +633,12 @@ func (e *emitter) settingNode(sp string, v ir.Value) (*yaml.Node, error) {
 // placeholder is the one step of a document that has none Drone can run; Drone rejects a pipeline without steps.
 func (e *emitter) placeholder(c *docCtx) (stepDone, error) {
 	script := noopScript
-	if e.lostStepWork(c.jp) {
+	reason, bridge := emitkit.BridgeWork(c.j)
+	bridge = bridge && len(c.j.Steps) == 0
+	if bridge {
+		script = emitkit.FailLoud(caps.StepScript, c.jp, reason)
+		e.emulate(c.jp, caps.StepScript, "failing step", "Drone needs a step; "+reason+", so a step that prints the loss and exits 1 stands in")
+	} else if e.lostStepWork(c.jp) {
 		script = emitkit.FailLoud(caps.StepScript, c.jp, "no step of the job has a Drone form")
 		e.emulate(c.jp, caps.StepScript, "failing step", "Drone needs a step; no step of the job has a Drone form, so a step that prints the loss and exits 1 stands in")
 	} else {
@@ -641,7 +646,9 @@ func (e *emitter) placeholder(c *docCtx) (stepDone, error) {
 	}
 	e.mark(caps.StepScript, c.jp)
 	why := "the job has no steps; a no-op step keeps the document valid"
-	if script != noopScript {
+	if bridge {
+		why = reason + "; a step that prints the loss and exits 1 keeps the document valid and the pipeline honest"
+	} else if script != noopScript {
 		why = "no step of the job has a Drone form; a step that prints the loss and exits 1 keeps the document valid and the pipeline honest"
 	}
 	e.note(c.jp+"/step/script", caps.StepScript, caps.Lost, "", why)

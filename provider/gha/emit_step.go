@@ -484,9 +484,15 @@ func (e *emitter) jobSteps(c jobCtx, j *ir.Job) (*yaml.Node, error) {
 	if len(seq.Content) == 0 {
 		// A trigger job or an override of an included job has no script, and a GHA job needs a step.
 		n := newMap()
-		n.set("run", str(noopScript))
+		why := "the job has no steps; a no-op step keeps the workflow valid"
+		if reason, ok := emitkit.BridgeWork(j); ok {
+			n.set("run", str(emitkit.FailLoud(caps.StepScript, jp, reason)))
+			why = reason + "; a step that prints the loss and exits 1 keeps the workflow valid and the pipeline honest"
+		} else {
+			n.set("run", str(noopScript))
+		}
 		seq.Content = append(seq.Content, n.n)
-		e.lose(stepPath(jp, "script"), caps.StepScript, "the job has no steps; a no-op step keeps the workflow valid")
+		e.lose(stepPath(jp, "script"), caps.StepScript, why)
 		e.mark(caps.StepScript, jp)
 	}
 	return seq, nil

@@ -13,6 +13,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/actions"
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -273,13 +274,25 @@ func (e *emitter) containerTemplate(tc *jobCtx, tm *wmap, conts []*container, jx
 		c.m.SetStr("name", mainStep)
 		c.m.SetStr("image", tc.jobImage())
 		c.m.Set("command", strSeq([]string{shellCommand, shellFlags}))
-		c.m.Set("args", seqOf(str("true")))
+		reason, bridge := emitkit.BridgeWork(tc.jp.j)
+		bridge = bridge && len(tc.jp.j.Steps) == 0
+		if bridge {
+			c.m.Set("args", seqOf(str(emitkit.FailLoud(caps.StepScript, path, reason))))
+		} else {
+			c.m.Set("args", seqOf(str(placeholderScript)))
+		}
 		c.m.SetStr("workingDir", workspaceMount)
 		conts = append(conts, c)
-		if len(tc.jp.j.Steps) == 0 {
+		switch {
+		case bridge:
+			e.lose(path+"/step/"+placeholderStepID, caps.StepScript, reason+"; a container that prints the loss and exits 1 keeps the template valid and the pipeline honest")
+			e.emulate(path, caps.StepScript, "failing container", "the job runs no script, so a container named main prints the loss and exits 1")
+		case len(tc.jp.j.Steps) == 0:
 			e.lose(path+"/step/"+placeholderStepID, caps.StepScript, "the job has no steps; a no-op container keeps the template valid")
+			fallthrough
+		default:
+			e.emulate(path, caps.StepScript, "no-op container", "the job runs no script, so a container named main carries its inputs and outputs")
 		}
-		e.emulate(path, caps.StepScript, "no-op container", "the job runs no script, so a container named main carries its inputs and outputs")
 		if err := e.markArg(caps.StepScript, path, struct{}{}); err != nil {
 			e.lose(path, caps.StepScript, "the no-op marker cannot be written: "+err.Error())
 		}

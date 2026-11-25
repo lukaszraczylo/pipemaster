@@ -411,11 +411,12 @@ func readNames(p *ir.Project) map[string]bool {
 
 var scriptKeyRE = regexp.MustCompile(`(?m)^\s*script: (.*)$`)
 
-// onlyNoop reports whether every script key of a per-job file is the noop placeholder, so nothing reads a variable.
+// onlyNoop reports whether every script key of a per-job file is the noop placeholder or the failing placeholder of
+// a job with no steps, so nothing reads a variable.
 func onlyNoop(text string) bool {
 	m := scriptKeyRE.FindAllStringSubmatch(text, -1)
 	for _, x := range m {
-		if x[1] != `"true"` {
+		if x[1] != `"true"` && !strings.Contains(x[1], "pipemaster: lost: step.script ") {
 			return false
 		}
 	}

@@ -1,6 +1,6 @@
 Loss report: gitlab -> gha
 [lost] pipeline/gitlab-ci/job/downstream ext.passthrough (Ext of provider gitlab (trigger) is not written to the GHA file; it is kept in round-trip metadata)
-[lost] pipeline/gitlab-ci/job/downstream/step/script step.script (the job has no steps; a no-op step keeps the workflow valid)
+[lost] pipeline/gitlab-ci/job/downstream/step/script step.script (the job starts the pipeline of project group/other and the target has no cross-project trigger; start that pipeline by hand or with an API call; a step that prints the loss and exits 1 keeps the workflow valid and the pipeline honest)
 [emulated] pipeline/gitlab-ci job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/gitlab-ci/job/build job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/gitlab-ci/job/build step.action: actions/checkout step (GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs)

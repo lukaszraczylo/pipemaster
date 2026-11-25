@@ -13,6 +13,7 @@ import (
 	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
@@ -48,7 +49,7 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 				dropChangesJob(pl)
 				break
 			}
-			if j := markedJob(pl, u.IRPath); j != nil && len(j.Steps) == 1 && slices.Equal(j.Steps[0].Script, []string{noopScript}) {
+			if j := markedJob(pl, u.IRPath); j != nil && len(j.Steps) == 1 && (slices.Equal(j.Steps[0].Script, []string{noopScript}) || emitkit.IsFailLoud(j.Steps[0].Script)) {
 				j.Steps = nil
 			}
 		case caps.StepShell:
