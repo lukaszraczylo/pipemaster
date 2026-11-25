@@ -1,9 +1,9 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/release
 # pipemaster:arg {"if":"branch == 'dev'"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/release/step/script/carry
-# pipemaster:arg {"digest":"3c35e8dab9f10f9c8cff319ec285e9792f41cdad10075ef7398dafb30cd97536","carry":"id: script\nkind: script\n"}
+# pipemaster:arg {"digest":"2cb200b5e37600a9ef70a137e63508a7d26b75487cad52e53603950ba5875b6c","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/release/carry
-# pipemaster:arg {"digest":"fecd3e73e66d239e1b99a670473c0f0805727ef339b82c4c1e8ad8d63d3df0d2","carry":"if: branch == 'dev'\nid: release\n"}
+# pipemaster:arg {"digest":"dab35e8d898033f5b18cf981acc9b22fc0b37a57ad792b95e8c3d5a401a1451d","carry":"if: branch == 'dev'\nid: release\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -50,6 +50,6 @@ jobs:
               - pipemaster
               - |-
                 PM_CTX_BRANCH="$(cat ../workspace/.git/branch)"; export PM_CTX_BRANCH # pipemaster:ctx
-                if ! [ "$PM_CTX_BRANCH" = 'dev' ]; then exit 0; fi # pipemaster:guard
+                if ! [ "$PM_CTX_BRANCH" = 'dev' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard
                 make release
             dir: workspace

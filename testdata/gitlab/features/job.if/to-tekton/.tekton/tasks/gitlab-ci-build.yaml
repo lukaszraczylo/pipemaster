@@ -18,7 +18,7 @@ spec:
         #!/bin/sh
         if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
         set -e
-        if ! ( [ "$PM_CTX_BRANCH" = 'main' ] || ( [ "$PM_CTX_EVENT" = 'schedule' ] && ( ! [ "$PM_CTX_BRANCH" = 'main' ] ) ) ); then exit 0; fi # pipemaster:guard
+        if ! ( [ "$PM_CTX_BRANCH" = 'main' ] || ( [ "$PM_CTX_EVENT" = 'schedule' ] && ( ! [ "$PM_CTX_BRANCH" = 'main' ] ) ) ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard
         make
       env:
         - name: PM_CTX_BRANCH

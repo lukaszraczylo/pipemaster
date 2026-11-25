@@ -9,5 +9,5 @@ steps:
   - name: deploy
     image: alpine:3.20
     commands:
-      - 'if ! ( ( [ "$$DRONE_BUILD_EVENT" = ''tag'' ] || [ "$$DRONE_BRANCH" = ''main'' ] ) && [ "$$DRONE_COMMIT_AUTHOR" = ''release-bot'' ] ); then exit 0; fi # pipemaster:guard'
+      - 'if ! ( ( [ "$$DRONE_BUILD_EVENT" = ''tag'' ] || [ "$$DRONE_BRANCH" = ''main'' ] ) && [ "$$DRONE_COMMIT_AUTHOR" = ''release-bot'' ] ); then echo ''pipemaster: skipped: the condition of this step is false''; exit 0; fi # pipemaster:guard'
       - ./deploy.sh

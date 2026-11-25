@@ -22,5 +22,5 @@ steps:
   - name: build-step-2
     image: ubuntu:latest
     commands:
-      - 'if ! [ "$$DRONE_COMMIT_SHA" != '''' ]; then exit 0; fi # pipemaster:guard'
+      - 'if ! [ "$$DRONE_COMMIT_SHA" != '''' ]; then echo ''pipemaster: skipped: the condition of this step is false''; exit 0; fi # pipemaster:guard'
       - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo $${DRONE_COMMIT_SHA}'

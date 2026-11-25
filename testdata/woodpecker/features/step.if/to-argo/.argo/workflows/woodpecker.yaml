@@ -33,7 +33,7 @@ spec:
               - -ec
             args:
               - |-
-                if ! ( ( [ "$PM_CTX_EVENT" = 'tag' ] || [ "$PM_CTX_BRANCH" = 'main' ] ) && [ "$PM_CTX_ACTOR" = 'release-bot' ] ); then exit 0; fi # pipemaster:guard
+                if ! ( ( [ "$PM_CTX_EVENT" = 'tag' ] || [ "$PM_CTX_BRANCH" = 'main' ] ) && [ "$PM_CTX_ACTOR" = 'release-bot' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard
                 ./deploy.sh
             workingDir: /workspace
             env:

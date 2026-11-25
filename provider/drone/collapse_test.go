@@ -263,7 +263,7 @@ func TestStepGuardReturnsAsTheCondition(t *testing.T) {
 
 func TestEditedStepGuardStays(t *testing.T) {
 	p, rep := back(t, guardJobs(), func(s string) string {
-		return strings.Replace(s, "; then exit 0; fi # pipemaster:guard", "; then exit 1; fi # pipemaster:guard", 1)
+		return strings.Replace(s, "exit 0; fi # pipemaster:guard", "exit 1; fi # pipemaster:guard", 1)
 	})
 	j := jobOf(t, p, "b")
 	if j.Steps[0].If != nil || !ignored(rep, caps.StepIf) {

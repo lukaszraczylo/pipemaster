@@ -5,15 +5,15 @@
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
 # pipemaster:arg {"if":"failure()","script":"echo cleanup"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-2/carry
-# pipemaster:arg {"digest":"4e938e2463e0abec71cdd725ab95d07e3527a2c6066e0c0ed139007af09e2c0d","carry":"if: failure()\nid: build-step-2\nkind: script\n"}
+# pipemaster:arg {"digest":"574afc209a54c9a33c35c6fe6def13847a9db34945d5334d0dc58b82b3393fcf","carry":"if: failure()\nid: build-step-2\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/config/carry
 # pipemaster:arg {"digest":"32d7e15786e8252ffc80383f44aac5136ab5cda67b24d03b9289390acfe0dfe1","carry":"id: config\nkind: script\n"}
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-4
 # pipemaster:arg {"if":"steps.config.outputs.configured == 'true'","script":"echo configured"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-4/carry
-# pipemaster:arg {"digest":"aac614b51aaf10199b7398da6d0f5084843cf08fc75fcfb65091eafa3fccc128","carry":"if: steps.config.outputs.configured == 'true'\nid: build-step-4\nkind: script\n"}
+# pipemaster:arg {"digest":"471f24c85646b511d0ba6a8139ac048948d0d6a1ca7f7dae3748d067eb4a89af","carry":"if: steps.config.outputs.configured == 'true'\nid: build-step-4\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"3963f4f0021a39a9e5ec949d7d1989980eb3e129ba7250d534fcaa1191d091f6","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"ae30e0ec3846d0e626c11bbe1bc8cf5264544e126beca41106ae64922f846e45","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: lost status\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -88,7 +88,7 @@ jobs:
               - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
               - pipemaster
               - |-
-                exit 0 # pipemaster:guard the step condition has no shell form
+                echo 'pipemaster: skipped: the step condition has no shell form'; exit 0 # pipemaster:guard the step condition has no shell form
                 echo cleanup
             dir: workspace
         tags:
@@ -134,7 +134,7 @@ jobs:
               - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
               - pipemaster
               - |-
-                exit 0 # pipemaster:guard the step condition has no shell form
+                echo 'pipemaster: skipped: the step condition has no shell form'; exit 0 # pipemaster:guard the step condition has no shell form
                 echo configured
             dir: workspace
         tags:

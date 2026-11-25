@@ -84,10 +84,11 @@ func init() {
 
 // Lang is the GHA dialect for expr.Translate. GHA names events canonically, so its event table is the identity.
 var Lang = expr.Dialect{
-	ID:    Dialect,
-	Class: expr.ClassGHA,
-	Vocab: Vocab,
-	Sem:   Semantics,
+	ID:       Dialect,
+	Class:    expr.ClassGHA,
+	PRStates: true,
+	Vocab:    Vocab,
+	Sem:      Semantics,
 	Events: map[string]string{
 		"push": "push", "pull_request": "pull_request", "schedule": "schedule", "workflow_dispatch": "workflow_dispatch",
 	},

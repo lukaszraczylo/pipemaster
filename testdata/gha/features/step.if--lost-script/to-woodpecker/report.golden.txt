@@ -2,7 +2,6 @@ Loss report: gha -> woodpecker
 [lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
 [lost] pipeline/ci/job/check job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
 [lost] pipeline/ci/job/check/step/check-step-2 script.interpolation (no Woodpecker spelling for expression steps.meta.outputs.version; the line is replaced by a line that prints the loss and exits 1)
-[external] pipeline/ci/job/check/step/check-step-2 step.if: pull request test (Woodpecker holds the target branch in CI_COMMIT_BRANCH on a pull request, so the condition gains a pull request test; the source condition is kept in a marker)
 [emulated] pipeline/ci/job/check job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/ci/job/check/step/check-step-2 step.shell: bash-if-present wrapper command (the source runs the step under bash when the image has it; Woodpecker runs commands through /bin/sh -e of the image, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh)
 [emulated] pipeline/ci/job/check/step/meta step.shell: bash-if-present wrapper command (the source runs the step under bash when the image has it; Woodpecker runs commands through /bin/sh -e of the image, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh)

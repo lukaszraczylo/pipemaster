@@ -524,6 +524,16 @@ func collapseTriggers(rep *report.Report, wfs []*workflow, specs []*whenSpec) tr
 			}
 		}
 	}
+	for _, w := range wfs {
+		if u, ok := w.marks.markedWith(caps.TriggerManual, pipelinePth); ok && len(sel) > 0 {
+			orig, aok := triggersArg(w.marks.args[u])
+			if !aok || !isSubset(kindsOf(orig), kindsOf(out.list)) {
+				reportUncollapsed(rep, u, "the file edit removed a trigger event of the original list")
+				continue
+			}
+			out.list = representable(orig)
+		}
+	}
 	for _, w := range manual {
 		u, _ := w.marks.markedWith(caps.JobManual, "")
 		if orig, ok := triggersArg(w.marks.args[u]); ok {
@@ -533,6 +543,11 @@ func collapseTriggers(rep *report.Report, wfs []*workflow, specs []*whenSpec) tr
 		}
 	}
 	return out
+}
+
+// isSubset reports whether every kind of sub is in all.
+func isSubset(sub, all []ir.TriggerKind) bool {
+	return !slices.ContainsFunc(sub, func(k ir.TriggerKind) bool { return !slices.Contains(all, k) })
 }
 
 func triggersArg(args []string) ([]ir.Trigger, bool) {

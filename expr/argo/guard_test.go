@@ -2,6 +2,7 @@ package argo_test
 
 import (
 	"errors"
+	"github.com/lukaszraczylo/pipemaster/expr/internal/shguard"
 	"os/exec"
 	"reflect"
 	"testing"
@@ -16,16 +17,16 @@ func TestPrintGuard(t *testing.T) {
 		name string
 		want string
 	}{
-		{eq("branch", "main"), "context ref", `if ! [ "$PM_CTX_BRANCH" = 'main' ]; then exit 0; fi # pipemaster:guard`},
-		{bin(expr.OpNe, ref("pr", "number"), str("1")), "dotted context name", `if ! [ "$PM_CTX_PR_NUMBER" != '1' ]; then exit 0; fi # pipemaster:guard`},
-		{eq("ref_name", "x"), "underscore context name", `if ! [ "$PM_CTX_REF_NAME" = 'x' ]; then exit 0; fi # pipemaster:guard`},
-		{bin(expr.OpEq, ref("inputs", "deploy-env"), str("prod")), "input", `if ! [ "$PM_INPUT_DEPLOY_ENV" = 'prod' ]; then exit 0; fi # pipemaster:guard`},
-		{bin(expr.OpEq, ref("matrix", "os"), str("linux")), "matrix axis", `if ! [ "$PM_MATRIX_OS" = 'linux' ]; then exit 0; fi # pipemaster:guard`},
-		{eq("branch", "it's"), "single quote", `if ! [ "$PM_CTX_BRANCH" = 'it'\''s' ]; then exit 0; fi # pipemaster:guard`},
-		{eq("branch", "{ x }"), "single braces", `if ! [ "$PM_CTX_BRANCH" = '{ x }' ]; then exit 0; fi # pipemaster:guard`},
+		{eq("branch", "main"), "context ref", `if ! [ "$PM_CTX_BRANCH" = 'main' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{bin(expr.OpNe, ref("pr", "number"), str("1")), "dotted context name", `if ! [ "$PM_CTX_PR_NUMBER" != '1' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{eq("ref_name", "x"), "underscore context name", `if ! [ "$PM_CTX_REF_NAME" = 'x' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{bin(expr.OpEq, ref("inputs", "deploy-env"), str("prod")), "input", `if ! [ "$PM_INPUT_DEPLOY_ENV" = 'prod' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{bin(expr.OpEq, ref("matrix", "os"), str("linux")), "matrix axis", `if ! [ "$PM_MATRIX_OS" = 'linux' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{eq("branch", "it's"), "single quote", `if ! [ "$PM_CTX_BRANCH" = 'it'\''s' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{eq("branch", "{ x }"), "single braces", `if ! [ "$PM_CTX_BRANCH" = '{ x }' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
 		{or(and(eq("branch", "a"), eq("tag", "b")), ne("repo", "c")), "mixed operators group",
-			`if ! ( ( [ "$PM_CTX_BRANCH" = 'a' ] && [ "$PM_CTX_TAG" = 'b' ] ) || [ "$PM_CTX_REPO" != 'c' ] ); then exit 0; fi # pipemaster:guard`},
-		{not(eq("branch", "a")), "not", `if ! ( ! [ "$PM_CTX_BRANCH" = 'a' ] ); then exit 0; fi # pipemaster:guard`},
+			`if ! ( ( [ "$PM_CTX_BRANCH" = 'a' ] && [ "$PM_CTX_TAG" = 'b' ] ) || [ "$PM_CTX_REPO" != 'c' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{not(eq("branch", "a")), "not", `if ! ( ! [ "$PM_CTX_BRANCH" = 'a' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			got, err := argo.PrintGuard(c.e)
@@ -99,13 +100,13 @@ func TestParseGuardRejectsOtherText(t *testing.T) {
 	for name, line := range map[string]string{
 		"empty":           "",
 		"plain script":    "echo hi",
-		"no marker":       `if ! [ "$PM_CTX_BRANCH" = 'main' ]; then exit 0; fi`,
+		"no marker":       `if ! [ "$PM_CTX_BRANCH" = 'main' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi`,
 		"trailing text":   good + " && rm -rf /",
-		"unknown env":     `if ! [ "$HOME" = 'main' ]; then exit 0; fi # pipemaster:guard`,
-		"unknown context": `if ! [ "$PM_CTX_NOPE" = 'main' ]; then exit 0; fi # pipemaster:guard`,
-		"needs env":       `if ! [ "$PM_NEEDS_A__B" = 'main' ]; then exit 0; fi # pipemaster:guard`,
-		"template tag":    `if ! [ "$PM_CTX_BRANCH" = '{{workflow.name}}' ]; then exit 0; fi # pipemaster:guard`,
-		"lowercase input": `if ! [ "$PM_INPUT_a" = 'x' ]; then exit 0; fi # pipemaster:guard`,
+		"unknown env":     `if ! [ "$HOME" = 'main' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`,
+		"unknown context": `if ! [ "$PM_CTX_NOPE" = 'main' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`,
+		"needs env":       `if ! [ "$PM_NEEDS_A__B" = 'main' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`,
+		"template tag":    `if ! [ "$PM_CTX_BRANCH" = '{{workflow.name}}' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`,
+		"lowercase input": `if ! [ "$PM_INPUT_a" = 'x' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`,
 	} {
 		if e, ok := argo.ParseGuard(line); ok {
 			t.Errorf("%s: ParseGuard accepted %q as %#v", name, line, e)
@@ -190,7 +191,7 @@ func TestGuardRunsInShell(t *testing.T) {
 		cmd = exec.Command(sh, "-c", line+"\necho ran") //nolint:gosec // generated test script
 		cmd.Env = []string{"PM_CTX_BRANCH=other"}
 		out, err = cmd.Output()
-		if err != nil || string(out) != "" {
+		if err != nil || string(out) != shguard.SkipMessage+"\n" {
 			t.Errorf("%q: other value: out %q err %v", lit, out, err)
 		}
 	}

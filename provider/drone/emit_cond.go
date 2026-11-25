@@ -847,6 +847,8 @@ func triggerFeature(t *ir.Trigger) caps.Feature {
 }
 
 // guardableSteps reports whether every step that Drone runs has a script, the only step a guard line can open.
+// A plugin step has no shell, even when the IR holds a script for it, so it never takes a guard. An action or a
+// pipeline call is either not written or written as a script step (failingStep, standStep), which takes one.
 // windowsJob is true when the document runs on Windows, where the docker runner reads commands as PowerShell and
 // a POSIX guard line is a syntax error.
 func windowsJob(j *ir.Job) bool {
@@ -864,6 +866,9 @@ func guardableSteps(steps []*ir.Step) bool {
 	for _, st := range steps {
 		if st == nil || st.Action != nil || st.Kind == ir.StepAction || st.Kind == ir.StepPipelineCall {
 			continue
+		}
+		if st.Kind == ir.StepPlugin {
+			return false
 		}
 		if st.Kind != ir.StepScript && len(st.Script) == 0 {
 			return false

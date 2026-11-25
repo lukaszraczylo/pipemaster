@@ -41,7 +41,7 @@ spec:
               - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
               - pipemaster
               - |-
-                if ! [ "$PM_CTX_REF_NAME" = 'main' ]; then exit 0; fi # pipemaster:guard
+                if ! [ "$PM_CTX_REF_NAME" = 'main' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard
                 echo ${PM_CTX_REF_NAME}
             workingDir: /workspace
             env:
@@ -56,7 +56,7 @@ spec:
               - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
               - pipemaster
               - |-
-                if ! [ "$PM_CTX_SHA" != '' ]; then exit 0; fi # pipemaster:guard
+                if ! [ "$PM_CTX_SHA" != '' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard
                 echo ${PM_CTX_SHA}
             workingDir: /workspace
             env:

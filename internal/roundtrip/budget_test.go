@@ -65,7 +65,7 @@ var disabledMarks = map[string]*regexp.Regexp{
 	"drone":      regexp.MustCompile(`exclude:\s*\n\s*-\s+['"]?\*\*`),
 	"tekton":     regexp.MustCompile(`pipemaster-disabled`),
 	"argo":       regexp.MustCompile(`\{\{= false \}\}|exit 0 # pipemaster:lost`),
-	"concourse":  regexp.MustCompile(`exit 0 # pipemaster:guard`),
+	"concourse":  regexp.MustCompile(`echo 'pipemaster: skipped: the step condition has no shell form'; exit 0 # pipemaster:guard`),
 }
 
 // countBudget measures the files of one conversion.

@@ -18,10 +18,13 @@ type Dialect struct {
 	Native func(Expr) Expr
 	// Events maps canonical event values to this dialect's values.
 	Events map[string]string
-	ID     string
 	Vocab  Vocab
 	Sem    Semantics
-	Class  Class
+	ID     string
+	// PushEvents are the events that stand for canonical push when Events has no entry for it (Woodpecker: push and
+	// tag, as GHA and GitLab call a tag push a push).
+	PushEvents []string
+	Class      Class
 	// BranchOnPR is true when the branch ref holds the target branch in a pull request run (Woodpecker, Drone).
 	// GitLab leaves it unset in a merge request pipeline.
 	BranchOnPR bool
@@ -31,6 +34,9 @@ type Dialect struct {
 	// EventRx is true when the dialect reads an event only as a pattern test (Woodpecker: the subset proof covers
 	// event =~ /^v$/i, lean4/Pipemaster/Woodpecker.lean woodpecker_event_eq), so a same-class event == or != becomes one.
 	EventRx bool
+	// PRStates is true when the dialect's pull request event also covers the closed and metadata activity of a pull
+	// request (GHA, GitLab), so a Woodpecker target states the event as the whole family.
+	PRStates bool
 }
 
 // caseFlag is the inline flag every translator-made pattern starts with.
@@ -265,16 +271,23 @@ func native(t Expr, to Dialect) Expr {
 //   - Case folding is ASCII only.
 //   - Only the four modelled events (push, pull_request, schedule, workflow_dispatch) exist; an event
 //     literal without an entry in both dialects' Events tables is untranslatable.
-func Translate(e Expr, from, to Dialect) (Expr, bool) {
+func Translate(e Expr, from, to Dialect) (Expr, bool) { return translate(e, from, to, true) }
+
+// translate is Translate; lists says whether a negated event test becomes a list of events (eventListsRx). TranslateFacts
+// turns it off for a condition that names no event, where the only event tests are its own pull request guards.
+func translate(e Expr, from, to Dialect, lists bool) (Expr, bool) {
 	var t Expr
 	var ok bool
 	switch {
 	case from.Class == 0 || to.Class == 0 || !reads(e, from):
 		return nil, false
 	case from.Class == to.Class:
-		t, ok = renameClass(e, from, to)
+		t, ok = renameClass(e, from, to, lists)
 	case from.Class == ClassGHA:
 		t, ok = toGitLab(e, from, to)
+		if ok && lists {
+			t, ok = eventListsRx(t, from, to)
+		}
 		ok = ok && from.names(e) && to.names(t) && supported(t, to)
 		t = native(t, to)
 	default:
@@ -289,18 +302,26 @@ func Translate(e Expr, from, to Dialect) (Expr, bool) {
 
 // Translatable reports whether e translates exactly; it is true exactly when Translate succeeds. The class
 // rules are stated separately from Translate, as in the Lean model, so tests can hold the two together.
-func Translatable(e Expr, from, to Dialect) bool {
+func Translatable(e Expr, from, to Dialect) bool { return translatable(e, from, to, true) }
+
+func translatable(e Expr, from, to Dialect, lists bool) bool {
 	switch {
 	case from.Class == 0 || to.Class == 0 || !reads(e, from):
 		return false
 	case from.Class == to.Class:
-		_, ok := renameClass(e, from, to)
+		_, ok := renameClass(e, from, to, lists)
 		return ok
 	case from.Class == ClassGHA:
 		if !okFwd(e, from, to) || !from.names(e) {
 			return false
 		}
 		t, _ := toGitLab(e, from, to)
+		if lists {
+			var ok bool
+			if t, ok = eventListsRx(t, from, to); !ok {
+				return false
+			}
+		}
 		return to.names(t) && supported(t, to)
 	}
 	if !okRev(e, from) || !from.names(e) {

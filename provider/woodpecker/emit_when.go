@@ -272,11 +272,20 @@ func (e *emitter) sourceArg(x expr.Expr) (a srcArg, usedFacts, ok bool) {
 	return srcArg{Src: expr.String(x), From: e.from.ID, Branch: e.facts.Branch}, usedFacts, true
 }
 
-// jobSource carries a job condition in its source dialect only when the trigger facts shaped its translation:
-// without them the translation reads back as written.
-func (e *emitter) jobSource(x expr.Expr) (srcArg, bool) {
-	a, usedFacts, ok := e.sourceArg(x)
-	return a, ok && usedFacts
+// jobSource carries a job condition in its source dialect when the trigger facts shaped its translation or when
+// the translation does not read back as written (a complement of events becomes a list of them). Otherwise the
+// translation reads back as written. facts is true when the trigger facts shaped it.
+func (e *emitter) jobSource(x expr.Expr) (a srcArg, has, facts bool) {
+	a, facts, ok := e.sourceArg(x)
+	if !ok {
+		return a, false, false
+	}
+	if facts {
+		return a, true, true
+	}
+	t, _, _ := e.translate(x)
+	back, bok := expr.Translate(wpexpr.ReadIf(t), wpexpr.Lang, *e.from)
+	return a, !bok || expr.String(back) != expr.String(x), false
 }
 
 // notePullRequestTest reports a condition whose translation differs from the plain one: Woodpecker holds the
@@ -624,7 +633,56 @@ func (e *emitter) jobWhen(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (
 	if finally && status == nil {
 		status = []string{statusOK, statusFail}
 	}
-	return withStatus(e.mergeCond(jp, j.If, base, cond), status), nil
+	entries, err := e.reachable(pl, jp, e.mergeCond(jp, j.If, base, cond))
+	if err != nil {
+		return nil, err
+	}
+	return withStatus(entries, status), nil
+}
+
+// reachable checks that a condition can hold on some event of its entry. A GitLab pipeline with no workflow:rules
+// runs for every pipeline source, and the IR lists only push and tag for it, so an event the condition names (web
+// is manual) joins the entry, and a marker keeps the original triggers. Any other entry that no event can satisfy
+// never runs: the report says so.
+func (e *emitter) reachable(pl *ir.Pipeline, jp string, entries []whenEntry) ([]whenEntry, error) {
+	out := slices.Clone(entries)
+	widened, dead := false, 0
+	var last []string
+	for i, ent := range out {
+		if len(ent.Event.Include) == 0 || ent.Evaluate == "" {
+			continue
+		}
+		it := ent.Item
+		it.Event = wpexpr.Filter{}
+		cond, err := wpexpr.ItemExpr(it)
+		if err != nil || cond == nil || len(expr.EventsPossible(cond, ent.Event.Include)) > 0 {
+			continue
+		}
+		add := expr.EventsPossible(cond, allEvents)
+		if e.origin == "gitlab" && !gitlabHasWorkflow(pl) && len(add) > 0 {
+			out[i].Event.Include = append(slices.Clone(ent.Event.Include), add...)
+			widened = true
+			e.emulate(jp, caps.JobIf, "event "+strings.Join(add, ", "), "the condition names events that the default push and tag triggers lack; GitLab runs a pipeline with no workflow:rules for every source, so the entry lists them")
+			continue
+		}
+		dead++
+		last = ent.Event.Include
+	}
+	if dead == len(out) && dead > 0 {
+		e.lose(jp, caps.JobIf, "the condition holds on none of the events the workflow triggers on ("+strings.Join(last, ", ")+"); the workflow never runs")
+	}
+	if widened {
+		if err := e.markTriggers(caps.TriggerManual, "pipeline/"+pl.ID, pl.Triggers); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+func gitlabHasWorkflow(pl *ir.Pipeline) bool {
+	m, _ := pl.Ext["gitlab"].(map[string]any)
+	_, ok := m["workflow"]
+	return ok
 }
 
 // mergeCond ANDs the condition with every base entry. Two entries cannot be merged key by key, so the
@@ -638,8 +696,8 @@ func (e *emitter) mergeCond(jp string, orig expr.Expr, base []whenEntry, cond []
 		for i, it := range cond {
 			out[i] = whenEntry{Item: it}
 		}
-		if src, hasSrc := e.jobSource(orig); hasSrc {
-			e.notePullRequestTest(jp, caps.JobIf, true)
+		if src, hasSrc, facts := e.jobSource(orig); hasSrc {
+			e.notePullRequestTest(jp, caps.JobIf, facts)
 			if err := e.markArg(caps.JobIf, jp, gateArg{srcArg: src}); err != nil {
 				e.comment("job condition marker not carried: " + err.Error())
 			}
@@ -663,8 +721,8 @@ func (e *emitter) mergeCond(jp string, orig expr.Expr, base []whenEntry, cond []
 	for i := range out {
 		out[i].Evaluate = andText(out[i].Evaluate, text)
 	}
-	src, hasSrc := e.jobSource(orig)
-	e.notePullRequestTest(jp, caps.JobIf, hasSrc)
+	src, hasSrc, facts := e.jobSource(orig)
+	e.notePullRequestTest(jp, caps.JobIf, facts)
 	if len(out) == 1 || hasSrc {
 		if err := e.markArg(caps.JobIf, jp, gateArg{srcArg: src, Gate: len(out) == 1}); err != nil {
 			e.comment("job condition marker not carried: " + err.Error())

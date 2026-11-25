@@ -398,7 +398,7 @@ func TestStepGuardEditIsKept(t *testing.T) {
 	j := scriptJob("build", "make")
 	j.Steps[0].If = eqRef("branch", "main")
 	files, _ := emit(t, project(j))
-	edited := strings.Replace(files[".concourse/ci.yml"], "then exit 0; fi # pipemaster:guard", "then exit 3; fi # pipemaster:guard", 1)
+	edited := strings.Replace(files[".concourse/ci.yml"], "exit 0; fi # pipemaster:guard", "exit 3; fi # pipemaster:guard", 1)
 	if edited == files[".concourse/ci.yml"] {
 		t.Fatalf("guard text changed shape:\n%s", files[".concourse/ci.yml"])
 	}

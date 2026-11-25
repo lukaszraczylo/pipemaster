@@ -215,6 +215,12 @@ func isManualEvent(x expr.Expr) bool {
 	return rok && lok && len(r.Path) == 1 && r.Path[0] == "event" && l.Kind == expr.LitStr && l.Str == "manual"
 }
 
+// changesDetail says why a path predicate stays lost. The git resource paths filter
+// (https://github.com/concourse/git-resource, source.paths) tests each commit that check finds, while GitLab compares
+// the whole range of one push. A push whose later commit reverts an earlier one would run the job, and the source
+// would skip it. A task has no commit range to compare either, since Concourse hands it no before commit.
+const changesDetail = "a path predicate has no exact Concourse form: the git resource paths filter tests each commit, not the range of one push, so a push that reverts its own change would run a job the source skips, and a task gets no before commit to compare; the job has no triggering get, so a person starts it"
+
 // condition decides how the job condition is written: a status function that always holds is dropped, a
 // condition with a shell form guards every script task, and any other condition leaves the job with no triggering get.
 func (jx *jobEmitter) condition() {
@@ -226,6 +232,11 @@ func (jx *jobEmitter) condition() {
 		return
 	}
 	if st, ok := statusOf(j.If); ok && (st == "always" || st == "success") {
+		return
+	}
+	if expr.HasChanges(j.If) {
+		jx.manual, jx.condHeld = true, true
+		e.lose(jx.path, caps.JobIf, changesDetail)
 		return
 	}
 	refs, ok := guardRefs(j.If)

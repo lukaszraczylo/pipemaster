@@ -74,7 +74,7 @@ func TestAllowFailureEditIsKept(t *testing.T) {
 func TestJobConditionEditIsKept(t *testing.T) {
 	j := scriptJob("build", "make")
 	j.If = eqRef("branch", "main")
-	back, rep := editedParse(t, project(j), "then exit 0; fi # pipemaster:guard", "then exit 3; fi # pipemaster:guard")
+	back, rep := editedParse(t, project(j), "exit 0; fi # pipemaster:guard", "exit 3; fi # pipemaster:guard")
 	if back.Pipelines[0].Jobs[0].If != nil {
 		t.Fatal("an edited guard moved back to the job")
 	}

@@ -95,13 +95,18 @@ func (d Dialect) names(e Expr) bool {
 // renameClass is the same-class rule: both vocabularies name every ref, and the target can print the result.
 // The canonical name sits between the two, so refs keep their nodes. Event literals are native strings, so
 // they map through the Events tables. An Opaque node is dialect text that no vocabulary renames.
-func renameClass(e Expr, from, to Dialect) (Expr, bool) {
+func renameClass(e Expr, from, to Dialect, lists bool) (Expr, bool) {
 	if HasOpaque(e) || !from.names(e) || !to.names(e) {
 		return nil, false
 	}
 	t, ok := mapEvents(e, from, to)
 	if !ok {
 		return nil, false
+	}
+	if lists {
+		if t, ok = eventListsRx(t, from, to); !ok {
+			return nil, false
+		}
 	}
 	if to.Supports != nil && !to.Supports(t) {
 		return nil, false

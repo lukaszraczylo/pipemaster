@@ -368,7 +368,7 @@ func isDotsWorkspace(s string) bool {
 
 // disabled reads a task whose first line is exit 0 with the guard marker: the original lines follow it.
 func (jb *jobBuilder) disabled(st *ir.Step) {
-	if len(st.Script) == 0 || st.Script[0] != disabledScript {
+	if len(st.Script) == 0 || st.Script[0] != disabledScript && st.Script[0] != legacyDisabledScript {
 		return
 	}
 	path := jb.path + "/step/" + st.ID

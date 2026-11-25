@@ -29,10 +29,12 @@ const (
 	// placeholderCmd runs where the source holds no work and the file only needs a task.
 	placeholderCmd = "true"
 	placeholderJob = "placeholder"
-	disabledScript = "exit 0 " + disabledTag
-	disabledTag    = "# pipemaster:guard the step condition has no shell form"
-	lostPrefix     = "# pipemaster:lost "
-	markerIgnored  = "marker ignored: "
+	disabledScript = "echo 'pipemaster: skipped: the step condition has no shell form'; exit 0 " + disabledTag
+	// legacyDisabledScript is what an earlier version wrote; the parser still reads it.
+	legacyDisabledScript = "exit 0 " + disabledTag
+	disabledTag          = "# pipemaster:guard the step condition has no shell form"
+	lostPrefix           = "# pipemaster:lost "
+	markerIgnored        = "marker ignored: "
 )
 
 type (

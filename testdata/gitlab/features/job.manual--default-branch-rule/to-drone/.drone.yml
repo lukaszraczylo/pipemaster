@@ -1,16 +1,16 @@
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/publish
 # pipemaster:arg "- kind: push\n- kind: tag\n"
-# pipemaster:lost job.if pipeline/gitlab-ci/job/publish: branch == default_branch
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/publish
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/publish
 kind: pipeline
 type: docker
 name: publish
 trigger:
   event:
-    exclude:
-      - '**'
+    - custom
 steps:
   - name: script
     image: ubuntu:latest
     commands:
+      - 'if ! [ "$$DRONE_BRANCH" = "$$DRONE_REPO_BRANCH" ]; then echo ''pipemaster: skipped: the condition of this step is false''; exit 0; fi # pipemaster:guard'
       - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make publish'

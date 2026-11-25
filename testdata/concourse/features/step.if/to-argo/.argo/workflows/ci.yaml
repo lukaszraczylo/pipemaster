@@ -43,7 +43,7 @@ spec:
               - -ec
             args:
               - |-
-                if ! [ "$PM_CTX_EVENT" = 'push' ]; then exit 0; fi # pipemaster:guard
+                if ! [ "$PM_CTX_EVENT" = 'push' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard
                 echo push
             workingDir: /workspace
             env:

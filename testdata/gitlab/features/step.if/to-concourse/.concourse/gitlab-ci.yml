@@ -3,9 +3,9 @@
 # pipemaster:emulated step.if pipeline/gitlab-ci/job/build/step/build-step-2
 # pipemaster:arg {"if":"event == 'push'","script":"echo push"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/build-step-2/carry
-# pipemaster:arg {"digest":"ed5025e47b1d807880f2685ca40a549afd337272ed35883604524e0a6fd1a9d7","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
+# pipemaster:arg {"digest":"ed169616a614822150a2cf634b22dc0f784c7e97ec0245e55f30bed123b7a512","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"aed6c1034e831f9fb493c27a5c4067bb707c428b64c78f53615e50eac2be74f3","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"87fac4ebcf653bb27d62ef0e3a3aedd4385d71effaf74591b0ba140425af6dfe","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
@@ -67,7 +67,7 @@ jobs:
               - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
               - pipemaster
               - |-
-                exit 0 # pipemaster:guard the step condition has no shell form
+                echo 'pipemaster: skipped: the step condition has no shell form'; exit 0 # pipemaster:guard the step condition has no shell form
                 echo push
             dir: workspace
         tags:

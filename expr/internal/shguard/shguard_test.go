@@ -45,7 +45,7 @@ func TestRefusals(t *testing.T) {
 	if dialect.Guardable(eq(expr.OpEq, "a", "x\ny")) {
 		t.Error("newline literal guardable")
 	}
-	if _, ok := dialect.Parse(`if ! [ "$A" = 'x' ]; then exit 0; fi`); ok {
+	if _, ok := dialect.Parse(`if ! [ "$A" = 'x' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi`); ok {
 		t.Error("parsed a line without the marker")
 	}
 }

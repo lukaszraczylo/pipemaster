@@ -232,6 +232,88 @@ theorem woodpecker_event_eq {tA tB : Ev → String} (hA : TranslateClass.EvTab t
       simp [refV, ha', hb', matchV, modeTest, eqV, h1, h2]
   constructor <;> simp [holds, eval, truthy, key]
 
+/-! ### A complement as a list of events
+
+Woodpecker has events the source never reports (`pull_request_closed`, `release`, `deployment`, ...), so a
+complement `event != v` cannot be `event !~ /^v$/i`: that passes them all. The translator (expr.eventListsRx) writes
+the other events the source reports, each as its Woodpecker spelling, joined by `||`. An event with no spelling drops
+out, which only narrows the list. The theorems quantify over every Woodpecker event string `w`, so the events with no
+source twin are covered, not assumed away. -/
+
+/-- The Woodpecker events of the complement (Mirrors expr.eventListExcept (expr/event_rx.go)): one exact pattern per spelling. -/
+def anyOf : List String → E
+  | [] => .bool false
+  | x :: xs => .or (.rx (.ref .event) .exact x) (anyOf xs)
+
+/-- Every event the model names. -/
+def evAll : List Ev := [.push, .pullRequest, .schedule, .workflowDispatch]
+
+theorem mem_evAll (e : Ev) : e ∈ evAll := by cases e <;> simp [evAll]
+
+/-- The list holds exactly when the event equals one of its spellings, ignoring case. -/
+theorem anyOf_holds {vB : View} {w : String} (hb : vB .event = some w) (ws : List String) :
+    holds .gitlab vB (anyOf ws) = true ↔ ∃ x ∈ ws, lower w = lower x := by
+  induction ws with
+  | nil => simp [anyOf, holds, eval, truthy]
+  | cons x xs ih =>
+    have hx : matchV .exact x (refV vB .event) = (lower w == lower x) := by
+      simp [refV, hb, matchV, modeTest]
+    by_cases h : (lower w == lower x) = true
+    · have h' : lower w = lower x := by simpa using h
+      simp [anyOf, holds, eval, truthy, logicalTruthy, rubyTruthy, hx, h, h']
+    · have h' : ¬ lower w = lower x := by simpa using h
+      have h2 : (lower w == lower x) = false := by simpa using h
+      simp only [anyOf, holds, eval, truthy, logicalTruthy, rubyTruthy, hx, h2, Bool.false_eq_true, ite_false] at ih ⊢
+      simpa [h'] using ih
+
+/-- An event that no spelling of the list names never passes it: the target-only events are out. -/
+theorem woodpecker_event_ne_target_only {vB : View} {w : String} (hb : vB .event = some w) (ws : List String)
+    (h : ∀ x ∈ ws, lower w ≠ lower x) : holds .gitlab vB (anyOf ws) = false := by
+  cases hh : holds .gitlab vB (anyOf ws)
+  · rfl
+  · obtain ⟨x, hx, hxe⟩ := (anyOf_holds hb ws).1 hh
+    exact absurd hxe (h x hx)
+
+/-- On a run whose Woodpecker event `w` is a spelling of the source event `ev`, the list of the other events'
+spellings holds exactly when the source test `event != tA e0` does, and its negation exactly when `event == tA e0`
+does. `sp` gives the spellings of an event; no spelling serves two events. -/
+theorem woodpecker_event_ne_list {tA : Ev → String} (hA : TranslateClass.EvTab tA) (sp : Ev → List String)
+    (hsp : ∀ a b x y, x ∈ sp a → y ∈ sp b → lower x = lower y → a = b) (e0 : Ev)
+    {vA vB : View} {ev : Ev} (ha : vA .event = some (tA ev)) {w : String} (hb : vB .event = some w)
+    (hw : w ∈ sp ev) :
+    holds .gitlab vB (anyOf ((evAll.filter (· ≠ e0)).flatMap sp)) =
+        holds .gitlab vA (.ne (.ref .event) (.str (tA e0))) ∧
+    holds .gitlab vB (.not (anyOf ((evAll.filter (· ≠ e0)).flatMap sp))) =
+        holds .gitlab vA (.eq (.ref .event) (.str (tA e0))) := by
+  have key : holds .gitlab vB (anyOf ((evAll.filter (· ≠ e0)).flatMap sp)) = true ↔ ev ≠ e0 := by
+    rw [anyOf_holds hb]
+    constructor
+    · rintro ⟨x, hx, hxe⟩ rfl
+      simp only [List.mem_flatMap, List.mem_filter, decide_eq_true_eq] at hx
+      obtain ⟨b, ⟨_, hb0⟩, hxb⟩ := hx
+      exact hb0 (hsp _ _ _ _ hw hxb hxe).symm
+    · intro hne
+      exact ⟨w, by
+        simp only [List.mem_flatMap, List.mem_filter, decide_eq_true_eq]
+        exact ⟨ev, ⟨mem_evAll ev, hne⟩, hw⟩, rfl⟩
+  have src : eqV .gitlab (refV vA .event) (.str (tA e0)) = true ↔ ev = e0 := by
+    simp only [refV, ha, eqV, beq_iff_eq]
+    constructor
+    · intro h; exact hA.inj _ _ (by rw [h])
+    · rintro rfl; rfl
+  have hL : holds .gitlab vB (anyOf ((evAll.filter (· ≠ e0)).flatMap sp)) = decide (ev ≠ e0) := by
+    rw [Bool.eq_iff_iff]; simpa using key
+  have hE : eqV .gitlab (refV vA .event) (.str (tA e0)) = decide (ev = e0) := by
+    rw [Bool.eq_iff_iff]; simpa using src
+  have hnot : ∀ l, holds .gitlab vB (.not l) = !holds .gitlab vB l := fun l => rfl
+  have hne : ∀ l r, holds .gitlab vA (.ne l r) = !eqV .gitlab (eval .gitlab vA l) (eval .gitlab vA r) :=
+    fun l r => rfl
+  have heq : ∀ l r, holds .gitlab vA (.eq l r) = eqV .gitlab (eval .gitlab vA l) (eval .gitlab vA r) :=
+    fun l r => rfl
+  constructor
+  · rw [hL, hne]; simp only [eval, hE]; simp
+  · rw [hnot, hL, heq]; simp only [eval, hE]; simp
+
 end ExprSubset
 
 /-! ## The adapter on the core subset

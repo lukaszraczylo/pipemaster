@@ -5,9 +5,9 @@
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
 # pipemaster:arg {"if":"event == 'push'","script":"echo push"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-2/carry
-# pipemaster:arg {"digest":"b8fa1c0967ecc4e19f31161f8b0bd79bce5fe49a766a0ba655a238d10c04618d","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
+# pipemaster:arg {"digest":"351755f875d10286ee66e6b1bb73f6057dc19d59d210596924c748999e346342","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"c237094fae9ec6a40688b9dd1426e715364c81841bebff9048784a8500b7d004","carry":"id: build\n"}
+# pipemaster:arg {"digest":"4eaefbe2c3237b6ea3221a1defccac3d5a703cc1d3aedbcc0dd4a94939cf0378","carry":"id: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: stepif\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -69,6 +69,6 @@ jobs:
             args:
               - -ec
               - |-
-                exit 0 # pipemaster:guard the step condition has no shell form
+                echo 'pipemaster: skipped: the step condition has no shell form'; exit 0 # pipemaster:guard the step condition has no shell form
                 echo push
             dir: workspace

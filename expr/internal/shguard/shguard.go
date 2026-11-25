@@ -14,9 +14,14 @@ import (
 // Marker ends a guard line so Parse can tell it from a script line that the author wrote.
 const Marker = "# pipemaster:guard"
 
+// SkipMessage is what a guard prints before it exits, so a step that the guard skipped says so in the log.
+const SkipMessage = "pipemaster: skipped: the condition of this step is false"
+
 const (
 	guardOpen  = "if ! "
-	guardClose = "; then exit 0; fi " + Marker
+	guardClose = "; then echo '" + SkipMessage + "'; exit 0; fi " + Marker
+	// legacyClose ends a guard that an earlier version wrote, which printed nothing. Parse still reads it.
+	legacyClose = "; then exit 0; fi " + Marker
 )
 
 // ErrNotGuardable marks a condition that has no POSIX test form.
@@ -78,16 +83,24 @@ func (d Dialect) Parse(line string) (expr.Expr, bool) {
 	if !ok {
 		return nil, false
 	}
+	legacy := false
 	body, ok = strings.CutSuffix(body, guardClose)
 	if !ok {
-		return nil, false
+		if body, ok = strings.CutSuffix(body, legacyClose); !ok {
+			return nil, false
+		}
+		legacy = true
 	}
 	p := &parser{d: d, s: body}
 	e, ok := p.primary()
 	if !ok || p.i != len(p.s) {
 		return nil, false
 	}
-	if back, err := d.Print(e); err != nil || back != line {
+	back, err := d.Print(e)
+	if legacy {
+		back = strings.TrimSuffix(back, guardClose) + legacyClose
+	}
+	if err != nil || back != line {
 		return nil, false
 	}
 	return e, true

@@ -16,6 +16,7 @@ type Facts struct {
 
 const (
 	eventPR     = "pull_request"
+	eventPush   = "push"
 	refTypeName = "branch"
 )
 
@@ -66,9 +67,9 @@ func route(from, to Dialect) prRoute {
 //   - A target with several pull request events (Dialect.PRFamily) states each pull request test as a prefix test.
 func TranslateFacts(e Expr, from, to Dialect, f Facts) (Expr, bool) {
 	for _, x := range rewrites(e, from, to, f) {
-		if t, ok := Translate(x, from, to); ok {
+		if t, ok := translate(x, from, to, listsFor(e)); ok {
 			if to.PRFamily {
-				t = prFamily(t, to)
+				t = prFamily(t, to, from.PRStates, false)
 			}
 			return t, true
 		}
@@ -79,7 +80,7 @@ func TranslateFacts(e Expr, from, to Dialect, f Facts) (Expr, bool) {
 // TranslatableFacts reports whether TranslateFacts succeeds. It states the subset as the Lean model does:
 // guardOk, and the condition after the rewrite is Translatable (lean4/Pipemaster/TranslateFacts.lean).
 func TranslatableFacts(e Expr, from, to Dialect, f Facts) bool {
-	return slices.ContainsFunc(rewrites(e, from, to, f), func(x Expr) bool { return Translatable(x, from, to) })
+	return slices.ContainsFunc(rewrites(e, from, to, f), func(x Expr) bool { return translatable(x, from, to, listsFor(e)) })
 }
 
 // rewrites lists the conditions to try, best first. A GitLab-class source gets the pull request test in the
@@ -496,8 +497,11 @@ func nameLeaf(b Binary) (Mode, string, bool) {
 
 // prFamily (Mirrors fam: lean4/Pipemaster/TranslateFacts.lean) writes each test of the pull request event as a
 // prefix test, so that it holds for every pull request event of the dialect: pull_request_closed and
-// pull_request_metadata as well as pull_request.
-func prFamily(e Expr, to Dialect) Expr {
+// pull_request_metadata as well as pull_request. A source whose pull request event has no such states (Drone: it
+// never reports a closed pull request) keeps a test that a run must pass exact, since the prefix would admit events
+// the source never has; posFam says the source has them. A test that a run must fail (under a negation, or the
+// complement) takes the prefix whatever the source says: it excludes more. neg is true under an odd number of negations.
+func prFamily(e Expr, to Dialect, posFam, neg bool) Expr {
 	pr, ok := to.Events[eventPR]
 	if !ok {
 		return e
@@ -505,14 +509,15 @@ func prFamily(e Expr, to Dialect) Expr {
 	switch v := e.(type) {
 	case Unary:
 		if v.Op == OpNot {
-			return Unary{Op: OpNot, X: prFamily(v.X, to)}
+			return Unary{Op: OpNot, X: prFamily(v.X, to, posFam, !neg)}
 		}
 	case Binary:
 		switch v.Op {
 		case OpAnd, OpOr:
-			return Binary{Op: v.Op, L: prFamily(v.L, to), R: prFamily(v.R, to)}
+			return Binary{Op: v.Op, L: prFamily(v.L, to, posFam, neg), R: prFamily(v.R, to, posFam, neg)}
 		case OpEq, OpNe, OpMatch, OpNoMatch:
-			if t, ok := familyTest(v, pr); ok {
+			isA := v.Op == OpEq || v.Op == OpMatch
+			if t, ok := familyTest(v, pr); ok && (posFam || isA == neg) {
 				return t
 			}
 		}
@@ -548,4 +553,13 @@ func familyTest(b Binary, pr string) (Expr, bool) {
 		op = b.Op
 	}
 	return Binary{Op: op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: Pattern(ModePrefix, pr)}}, true
+}
+
+// listsFor is true when e names the event: its tests are the source's own, so a negated one must not pass the
+// events only the target has (eventListsRx). A condition with no event test gets only the pull request guards of
+// rewriteFacts, which exclude one event on purpose.
+func listsFor(e Expr) bool {
+	found := false
+	walkRefs(e, func(r Ref) bool { found = found || pathName(r) == CtxEvent; return !found })
+	return found
 }
