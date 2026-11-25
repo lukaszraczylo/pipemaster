@@ -141,3 +141,20 @@ func TestFullRefVariants(t *testing.T) {
 		}
 	}
 }
+
+// A tag name test also holds on a manual run on a tag ref, so only the approximate entry takes it and it says so.
+func TestTagVariantIsApproximateWithACaveat(t *testing.T) {
+	tagIs := srcCond(expr.OpEq, ref("event"), str("tag"))
+	for _, to := range []expr.Dialect{gha.Lang, gitlab.Lang} {
+		if _, ok := expr.TranslateFacts(tagIs, woodpecker.Lang, to, expr.Facts{}); ok {
+			t.Errorf("%s: the exact entry took the tag test", to.ID)
+		}
+		if expr.Translatable(tagIs, woodpecker.Lang, to) {
+			t.Errorf("%s: Translatable holds for the tag test", to.ID)
+		}
+		_, cav, ok := expr.TranslateApprox(tagIs, woodpecker.Lang, to)
+		if !ok || len(cav) == 0 {
+			t.Errorf("%s: approx = %v, %v; want a caveat", to.ID, cav, ok)
+		}
+	}
+}

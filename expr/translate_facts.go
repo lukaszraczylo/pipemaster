@@ -66,7 +66,7 @@ func route(from, to Dialect) prRoute {
 //     lowers the condition gains the exclusion for GHA (AssumeGitLabRef).
 //   - A target with several pull request events (Dialect.PRFamily) states each pull request test as a prefix test.
 func TranslateFacts(e Expr, from, to Dialect, f Facts) (Expr, bool) {
-	for _, v := range variants(e, from, to) {
+	for _, v := range exactVariants(e, from, to) {
 		for _, x := range rewrites(v.e, v.from, to, f) {
 			if t, ok := translate(x, v.from, to, listsFor(v.e)); ok {
 				if to.PRFamily {
@@ -82,7 +82,7 @@ func TranslateFacts(e Expr, from, to Dialect, f Facts) (Expr, bool) {
 // TranslatableFacts reports whether TranslateFacts succeeds. It states the subset as the Lean model does:
 // guardOk, and the condition after the rewrite is Translatable (lean4/Pipemaster/TranslateFacts.lean).
 func TranslatableFacts(e Expr, from, to Dialect, f Facts) bool {
-	return slices.ContainsFunc(variants(e, from, to), func(v variant) bool {
+	return slices.ContainsFunc(exactVariants(e, from, to), func(v variant) bool {
 		return slices.ContainsFunc(rewrites(v.e, v.from, to, f), func(x Expr) bool { return translatable(x, v.from, to, listsFor(v.e)) })
 	})
 }

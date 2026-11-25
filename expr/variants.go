@@ -1,15 +1,29 @@
 package expr
 
-import "maps"
+import (
+	"maps"
+	"slices"
+)
 
 // A variant is a rewrite of a condition that the exact translator refuses or states too narrowly. Each public
 // entry tries the condition as written first, so a condition that translated before translates the same way; a
 // variant only adds a result where there was none. No variant is covered by the Lean model: tests enumerate
 // the contexts of each one against the source evaluation instead (variants_test.go).
 type variant struct {
-	e    Expr
-	fix  func(Expr) Expr
-	from Dialect
+	e   Expr
+	fix func(Expr) Expr
+	// caveat is set when the variant holds on a run the source does not hold on, so only the approximate entry takes it.
+	caveat string
+	from   Dialect
+}
+
+// tagCaveat names the run that a tag name test adds: a manual or API run on a tag ref also sets the tag name, while
+// the source event there is not the tag event.
+const tagCaveat = "a manual or API run on a tag ref also matches; the source tag event holds on a tag push only"
+
+// exactVariants lists the variants that hold on exactly the runs of the source.
+func exactVariants(e Expr, from, to Dialect) []variant {
+	return slices.DeleteFunc(variants(e, from, to), func(v variant) bool { return v.caveat != "" })
 }
 
 func (v variant) finish(t Expr) Expr {
@@ -24,7 +38,7 @@ func variants(e Expr, from, to Dialect) []variant {
 	for _, form := range []tagForm{tagMatch, tagBare} {
 		if x, ok := tagVariant(e, from, form); ok {
 			proxy, _ := tagVariant(e, from, tagProxy)
-			bases = append(bases, variant{e: x, from: readsAs(from, proxy)})
+			bases = append(bases, variant{e: x, from: readsAs(from, proxy), caveat: tagCaveat})
 		}
 	}
 	if x, ok := refVariant(e); ok {

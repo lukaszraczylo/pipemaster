@@ -20,6 +20,8 @@ var identRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // emitter carries the state of one Emit call: the ledger and the lost-text comments waiting for a node.
 type emitter struct {
+	// injected names the pipelines whose triggers come from the default events of their source.
+	injected map[string]bool
 	// gated holds the action steps that a later step reads, which no target may drop.
 	gated    map[*ir.Step]bool
 	led      *emitkit.Ledger
@@ -496,8 +498,12 @@ func (e *emitter) condition(path string, f caps.Feature, x expr.Expr, what strin
 	if e.from != nil {
 		var ok bool
 		if t, ok = expr.TranslateFacts(x, *e.from, exprgitlab.Lang, expr.Facts{}); !ok {
-			e.disable(path, f, x, what)
-			return nil, false
+			var cav []string
+			if t, cav, ok = expr.TranslateApprox(x, *e.from, exprgitlab.Lang); !ok || len(cav) == 0 {
+				e.disable(path, f, x, what)
+				return nil, false
+			}
+			e.emulate(path, f, "approximate expression translation", strings.Join(cav, "; "))
 		}
 	}
 	if _, err := exprgitlab.Print(t); err != nil {
