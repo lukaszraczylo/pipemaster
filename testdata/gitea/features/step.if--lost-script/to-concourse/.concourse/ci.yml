@@ -1,13 +1,13 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"ci","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/check/step/meta/carry
-# pipemaster:arg {"digest":"d3eb09186c67bdfb96f64f5c903c9ae7d6a6be754e1c0f8aa7a8236d5f7f7687","carry":"id: meta\nkind: script\n"}
+# pipemaster:arg {"digest":"6e804da4b77a29cd3312b16c450cc8f2f8c0ffb148eef266bae6cd1f42c666de","carry":"id: meta\nkind: script\n"}
 # pipemaster:emulated display.name pipeline/ci/job/check/step/check-step-2
 # pipemaster:arg {"name":"Inspect","id":"check-step-2","written":"check-step-2","kind":"step"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/check/step/check-step-2/carry
-# pipemaster:arg {"digest":"3ad23cb348402fc84d1288d1fd778c3941f83f78ff44918c9737ed2851e0634e","carry":"if: event != 'pull_request'\nid: check-step-2\nname: Inspect\nkind: script\nscript:\n    - docker inspect $\u007b{ steps.meta.outputs.version }}\n"}
+# pipemaster:arg {"digest":"f33e88355c1c472553ceb0930e86b1f0be99b80925d61d72308e8fbd092228c6","carry":"if: event != 'pull_request'\nid: check-step-2\nname: Inspect\nkind: script\nscript:\n    - docker inspect $\u007b{ steps.meta.outputs.version }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/check/carry
-# pipemaster:arg {"digest":"180bad0ec0a52d42ff40fc3b8de594ee9f567f1493dcaddf68fb40c537568342","carry":"id: check\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"93821b46ab9af0e4494053252e58dce3a31ad469d83b062c8142cd5a1dc99b46","carry":"id: check\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/check-tag
 # pipemaster:arg {"twin_of":"check"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -58,8 +58,6 @@ jobs:
               - pipemaster
               - echo "version=1" >> "$GITHUB_OUTPUT"
             dir: workspace
-        tags:
-          - ubuntu-latest
       - task: check-step-2
         config:
           platform: linux
@@ -82,8 +80,6 @@ jobs:
                 # pipemaster:lost docker inspect {{ steps.meta.outputs.version }}
                 printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/check/step/check-step-2: no Concourse spelling for expression steps.meta.outputs.version; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: check-tag
     plan:
       - get: source-tags
@@ -110,8 +106,6 @@ jobs:
               - pipemaster
               - echo "version=1" >> "$GITHUB_OUTPUT"
             dir: workspace
-        tags:
-          - ubuntu-latest
       - task: check-step-2
         config:
           platform: linux
@@ -134,5 +128,3 @@ jobs:
                 # pipemaster:lost docker inspect {{ steps.meta.outputs.version }}
                 printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/check/step/check-step-2: no Concourse spelling for expression steps.meta.outputs.version; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
             dir: workspace
-        tags:
-          - ubuntu-latest

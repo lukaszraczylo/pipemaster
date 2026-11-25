@@ -2,9 +2,9 @@
 # pipemaster:arg {"name":"env","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:lost env LABEL: gha.github.run_number
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"50a18f76282f12303294f231b854ae32beae000007134805519fb1bf96b95bb9","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"bed34eee15fe045c0b3d7de1414483663ffe243938a30d2665018cb31336a435","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"aae0c59017f251c82d21104dd52da6e28a7c4fcdc8d51c1d60e6d7d81097964f","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"547674957b391cf51f3b495690340896cc367935d4f472d131dd4b8d4f36666f","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -57,8 +57,6 @@ jobs:
               - pipemaster
               - echo ok
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: build-tag
     plan:
       - get: source-tags
@@ -89,5 +87,3 @@ jobs:
               - pipemaster
               - echo ok
             dir: workspace
-        tags:
-          - ubuntu-latest

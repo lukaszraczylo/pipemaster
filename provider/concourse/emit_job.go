@@ -11,6 +11,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprconcourse "github.com/lukaszraczylo/pipemaster/expr/concourse"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 // jobSkip lists the job Ext keys that the emitter writes itself.
@@ -239,12 +240,7 @@ func (jx *jobEmitter) meta() {
 	if j.Environment != nil && j.Environment.Approval {
 		e.emulate(jx.path, caps.JobEnvironmentApproval, "job with no triggering get", "a person starts the job; the reviewer list is lost")
 	}
-	if tags := jx.workerTags(); len(tags) > 0 {
-		e.emulate(jx.path, caps.JobRunner, "worker tags of the task", "the tasks carry the worker tags "+strings.Join(tags, ", ")+"; a build waits until a worker has them")
-	}
-	if len(jx.workerTags()) < len(j.Runner.Labels) {
-		e.lose(jx.path, caps.JobRunner, "a runner label with an expression names no worker tag; the tasks do not carry it")
-	}
+	jx.runnerVerdicts()
 	if len(j.Cache) > 0 {
 		jx.cachePaths()
 	}
@@ -509,4 +505,19 @@ func taskNames(nodes []*yaml.Node) []string {
 		walk(n)
 	}
 	return out
+}
+
+// runnerVerdicts reports what the runner labels become: a hosted label names no worker tag, any other label
+// becomes a tag on every task.
+func (jx *jobEmitter) runnerVerdicts() {
+	e, j := jx.pe.e, jx.j
+	tags := emitkit.ReportHosted(e.origin, j.Runner.Labels, "worker tag",
+		func(st, d string) { e.external(jx.path, caps.JobRunner, st, d) },
+		func(d string) { e.lose(jx.path, caps.JobRunner, d) })
+	if len(tags) > 0 {
+		e.external(jx.path, caps.JobRunner, "worker tags of the task", "the tasks carry the worker tags "+strings.Join(tags, ", ")+"; configure workers with these tags, or a build waits")
+	}
+	if slices.ContainsFunc(j.Runner.Labels, func(l string) bool { return strings.Contains(l, "${{") }) {
+		e.lose(jx.path, caps.JobRunner, "a runner label with an expression names no worker tag; the tasks do not carry it")
+	}
 }

@@ -1,9 +1,9 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"services","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
-# pipemaster:arg {"digest":"03fc4382da4fc32e05c89d4c2de76d80b5a687465ae7a8a03b1105435f2ec14a","carry":"id: test-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"43dbc7ca652e3699c56f4a95ddc7d22e60f38a746e20805107ba1f8f5480ceee","carry":"id: test-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
-# pipemaster:arg {"digest":"b1a204d6084f449cd6c35a98d10ddd8830dfc6351940dde46659c039cd138bb1","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\nservices:\n    - name: db\n      image:\n        ref: postgres:16\n      env:\n        - name: POSTGRES_PASSWORD\n          value:\n            secret: DB_PASSWORD\n      ports:\n        - 5432:5432\n    - name: cache\n      image:\n        ref: redis:7\n"}
+# pipemaster:arg {"digest":"4a12de7eda3d8d296760128f926543cd4e46849a49e72e7d733f4e4cb82a65e3","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\nservices:\n    - name: db\n      image:\n        ref: postgres:16\n      env:\n        - name: POSTGRES_PASSWORD\n          value:\n            secret: DB_PASSWORD\n      ports:\n        - 5432:5432\n    - name: cache\n      image:\n        ref: redis:7\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/test-tag
 # pipemaster:arg {"twin_of":"test"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -51,8 +51,6 @@ jobs:
               - pipemaster
               - echo ok
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: test-tag
     plan:
       - get: source-tags
@@ -79,5 +77,3 @@ jobs:
               - pipemaster
               - echo ok
             dir: workspace
-        tags:
-          - ubuntu-latest

@@ -3,9 +3,9 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/job/call/carry
 # pipemaster:arg {"digest":"54c820a7443ebaceda01e692a7b678ca9a1a3ce9b8575bb4e10dc32eb85bd8cc","carry":"id: call\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/plain/step/plain-step-1/carry
-# pipemaster:arg {"digest":"a9122a9dfd1f81b5cd386c7e6930f0695dab54c1ba8db0dfe2f92361365067c4","carry":"id: plain-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"04bd094ac840a64273d9943357fb75f9ab9d0dc278c37ec43ae5fdceacc25ce7","carry":"id: plain-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/plain/carry
-# pipemaster:arg {"digest":"2d548209cc99c8795a81080fbee0fd54c12ab569d71fde192cc6a018b6444f96","carry":"id: plain\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"9129ae8bb4c2438b6e0e8eb0f5d672a51e8f94474e9941fe05b3026694d416fb","carry":"id: plain\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/call-tag
 # pipemaster:arg {"twin_of":"call"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/plain-tag
@@ -72,8 +72,6 @@ jobs:
               - pipemaster
               - echo ok
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: call-tag
     plan:
       - get: source-tags
@@ -117,5 +115,3 @@ jobs:
               - pipemaster
               - echo ok
             dir: workspace
-        tags:
-          - ubuntu-latest

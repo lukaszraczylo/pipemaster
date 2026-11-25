@@ -1,9 +1,9 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"CI","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"62d815bb1fa77742392532d69f3a00fcc736bef8a71b602f96516b486ba451fe","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"54fe40ae7605977b7f069a0cb3f9c78e7f800f25996310643cdf03a2b6347a47","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"83ab2eff1c5d8b0f7ab6e2e569ac7040232862bd5eca289c59645eb838e048c7","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"5a6b9a0d465c4d5157b0fcd3bc7645c7f216b991bee0bb1c94ceaf0d94790953","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -52,8 +52,6 @@ jobs:
               - pipemaster
               - echo build
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: build-tag
     plan:
       - get: source-tags
@@ -80,5 +78,3 @@ jobs:
               - pipemaster
               - echo build
             dir: workspace
-        tags:
-          - ubuntu-latest

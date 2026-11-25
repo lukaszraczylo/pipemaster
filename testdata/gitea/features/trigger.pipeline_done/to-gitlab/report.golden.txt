@@ -1,3 +1,4 @@
 Loss report: gitea -> gitlab
 [lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider gha (types, workflows) is not written to the GitLab file; it is kept in round-trip metadata)
 [lost] pipeline/ci/trigger/0 trigger.pipeline_done (GitLab starts a downstream pipeline from a trigger job in the upstream project, which this file cannot declare)
+[external] pipeline/ci/job/build job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)

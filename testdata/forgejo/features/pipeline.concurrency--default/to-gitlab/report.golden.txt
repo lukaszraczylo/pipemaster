@@ -1,2 +1,2 @@
 Loss report: forgejo -> gitlab
-No losses: every feature converted natively.
+[external] pipeline/ci/job/build job.runner: job tags (the job carries the tags docker; register a runner with these tags, or the job stays pending)

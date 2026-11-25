@@ -59,6 +59,8 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 		case caps.JobRunner:
 			if j := markedJob(pl, u.IRPath); j != nil && slices.Equal(j.Runner.Labels, []string{defaultRunner}) {
 				j.Runner.Labels = nil
+			} else if j != nil && len(j.Runner.Labels) > 1 && j.Runner.Labels[0] == selfHostedLabel {
+				j.Runner.Labels = j.Runner.Labels[1:]
 			}
 		case caps.JobCache, caps.JobArtifacts, caps.JobNeedsArtifacts:
 			if !carriedDone[u.IRPath] && len(args[u]) == 1 {

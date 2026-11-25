@@ -10,8 +10,6 @@ workflow:
 # pipemaster:emulated project.multi_pipeline pipeline/ci/job/test
 # pipemaster:arg {}
 ci:test:
-  tags:
-    - ubuntu-latest
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH || $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
@@ -21,8 +19,6 @@ ci:test:
 # pipemaster:emulated project.multi_pipeline pipeline/deploy/job/deploy
 # pipemaster:arg {}
 deploy:deploy:
-  tags:
-    - ubuntu-latest
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "web"

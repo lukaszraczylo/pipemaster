@@ -379,11 +379,39 @@
      "detail": "GitLab sets the image per job, not per step"
     },
     {
+     "path": "pipeline/drone/job/API",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "job tags",
+     "detail": "the job carries the tags linux/amd64; register a runner with these tags, or the job stays pending"
+    },
+    {
+     "path": "pipeline/drone/job/Sonarqube",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "job tags",
+     "detail": "the job carries the tags linux/amd64; register a runner with these tags, or the job stays pending"
+    },
+    {
      "path": "pipeline/drone/job/Sonarqube/step/Slack",
      "feature": "step.env",
      "level": "external",
      "strategy": "create slack_webhook, sonar_host as a masked CI/CD variable in the project settings, protected too for protected branches",
      "detail": "a GitLab file cannot mark a secret as one; it writes slack_webhook, sonar_host as plain variable references and the operator sets the values there"
+    },
+    {
+     "path": "pipeline/drone/job/UI",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "job tags",
+     "detail": "the job carries the tags linux/amd64; register a runner with these tags, or the job stays pending"
+    },
+    {
+     "path": "pipeline/drone/job/baseimage",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "job tags",
+     "detail": "the job carries the tags linux/amd64; register a runner with these tags, or the job stays pending"
     },
     {
      "path": "pipeline/drone/job/baseimage/step/Build Docker baseimage",
@@ -659,7 +687,7 @@
      "path": "pipeline/drone/job/API",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label linux/amd64 has no form"
     },
     {
      "path": "pipeline/drone/job/API",
@@ -704,7 +732,7 @@
      "path": "pipeline/drone/job/Sonarqube",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label linux/amd64 has no form"
     },
     {
      "path": "pipeline/drone/job/Sonarqube/step/Code analysis",
@@ -735,7 +763,7 @@
      "path": "pipeline/drone/job/UI",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label linux/amd64 has no form"
     },
     {
      "path": "pipeline/drone/job/UI/step/Build UI Docker image",
@@ -766,7 +794,7 @@
      "path": "pipeline/drone/job/baseimage",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label linux/amd64 has no form"
     },
     {
      "path": "pipeline/drone/job/baseimage/step/Build Docker baseimage",
@@ -1376,6 +1404,34 @@
      "detail": "the reference event has no spelling in a Concourse task; the step runs exit 0 first and does nothing"
     },
     {
+     "path": "pipeline/drone/job/API",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags linux/amd64; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/drone/job/Sonarqube",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags linux/amd64; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/drone/job/UI",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags linux/amd64; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/drone/job/baseimage",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags linux/amd64; configure workers with these tags, or a build waits"
+    },
+    {
      "path": "pipeline/drone",
      "feature": "ext.passthrough",
      "level": "emulated",
@@ -1395,13 +1451,6 @@
      "level": "emulated",
      "strategy": "shell guard on each script task",
      "detail": "every script task of the job starts with the guard of the condition"
-    },
-    {
-     "path": "pipeline/drone/job/API",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags linux/amd64; a build waits until a worker has them"
     },
     {
      "path": "pipeline/drone/job/API/step/Build Docker API image",
@@ -1439,13 +1488,6 @@
      "detail": "the job ID Sonarqube is not a Concourse identifier or collides after conversion; the job is sonarqube"
     },
     {
-     "path": "pipeline/drone/job/Sonarqube",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags linux/amd64; a build waits until a worker has them"
-    },
-    {
      "path": "pipeline/drone/job/Sonarqube/step/Slack",
      "feature": "ext.passthrough",
      "level": "emulated",
@@ -1465,13 +1507,6 @@
      "level": "emulated",
      "strategy": "shell guard on each script task",
      "detail": "every script task of the job starts with the guard of the condition"
-    },
-    {
-     "path": "pipeline/drone/job/UI",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags linux/amd64; a build waits until a worker has them"
     },
     {
      "path": "pipeline/drone/job/UI",
@@ -1507,13 +1542,6 @@
      "level": "emulated",
      "strategy": "step name changed",
      "detail": "the step ID Docker tag is not a Concourse identifier or collides with another step or resource name; the task is docker-tag"
-    },
-    {
-     "path": "pipeline/drone/job/baseimage",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags linux/amd64; a build waits until a worker has them"
     },
     {
      "path": "pipeline/drone/job/baseimage/step/Build Docker baseimage",

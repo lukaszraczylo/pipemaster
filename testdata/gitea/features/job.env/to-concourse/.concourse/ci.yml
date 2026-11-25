@@ -1,9 +1,9 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"jobenv","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"b49cc72c34ebd733fae8c7947bd52a706ed403f2c8ce35a0758a1134cdfeaf34","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"b24379b344b8b4bd6d9654cb79d78ec25d3a35f1aec13c3a9b32a425646356be","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"1580e7f081e1eda6a95b145dd84492c13375922691d1338b91562ac4ccbfbffe","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\nenv:\n    - name: GOFLAGS\n      value:\n        lit: -trimpath\n    - name: API\n      value:\n        secret: API_KEY\n"}
+# pipemaster:arg {"digest":"81fa5fa392b77c913f419417497c8eaf7db32ba18d5550e89c297be5dda20ea7","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\nenv:\n    - name: GOFLAGS\n      value:\n        lit: -trimpath\n    - name: API\n      value:\n        secret: API_KEY\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -55,8 +55,6 @@ jobs:
               - pipemaster
               - echo ok
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: build-tag
     plan:
       - get: source-tags
@@ -86,5 +84,3 @@ jobs:
               - pipemaster
               - echo ok
             dir: workspace
-        tags:
-          - ubuntu-latest

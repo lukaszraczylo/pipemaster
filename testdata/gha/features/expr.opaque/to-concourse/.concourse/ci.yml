@@ -1,11 +1,11 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"opaque","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"9d86fd9b68f7b5bfa6140355098ac96b52617a72f2929e4a4616d3bd5dae7217","carry":"id: build-step-1\nkind: script\nscript:\n    - 'echo $\u007b{ opaque(gha): env[github.job] }}'\n"}
+# pipemaster:arg {"digest":"bf314a577a2f062fdceee2d0fca7a5cfb3785d4e9db96d50c320d7c72420874f","carry":"id: build-step-1\nkind: script\nscript:\n    - 'echo $\u007b{ opaque(gha): env[github.job] }}'\n"}
 # pipemaster:emulated job.manual pipeline/ci/job/build
 # pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"ba906356c7c0ad6704e8d7f5ec4a7c9f4a3669e43897ec3c92750cc3d6548ea6","carry":"if: 'opaque(gha): fromJSON(''{\"a\":1}'').a == 1'\nid: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"9f2f4414780d4adc428553bf3e40fee10b60764bf42303ea8ee2b532ae8c05ab","carry":"if: 'opaque(gha): fromJSON(''{\"a\":1}'').a == 1'\nid: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -54,8 +54,6 @@ jobs:
                 # pipemaster:lost echo {{ opaque(gha): env[github.job] }}
                 printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Concourse spelling for expression opaque(gha): env[github.job]; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: build-tag
     plan:
       - get: source-tags
@@ -83,5 +81,3 @@ jobs:
                 # pipemaster:lost echo {{ opaque(gha): env[github.job] }}
                 printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Concourse spelling for expression opaque(gha): env[github.job]; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
             dir: workspace
-        tags:
-          - ubuntu-latest

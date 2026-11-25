@@ -1,11 +1,11 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"cond","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/step/deploy-step-1/carry
-# pipemaster:arg {"digest":"a862ffcfff0e05799fc37aa5bc4043854e1433db96f52e31c128321db85098e3","carry":"id: deploy-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"336d1cec38b0cec396b6ecba722bf300785a267940d9d907130fdd7e467d40e3","carry":"id: deploy-step-1\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/ci/job/deploy
 # pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry
-# pipemaster:arg {"digest":"43790b00873aa06a823560d8d20047fcbe557b57e20c69bbed09214276549c84","carry":"if: (ref == 'refs/heads/main') \u0026\u0026 (event == 'push')\nid: deploy\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"6506e3ba85c3989ac1401423853f5fdab383ad0e3610b1123989b9ef36294a29","carry":"if: (ref == 'refs/heads/main') \u0026\u0026 (event == 'push')\nid: deploy\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/deploy-tag
 # pipemaster:arg {"twin_of":"deploy"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -52,8 +52,6 @@ jobs:
               - pipemaster
               - echo deploy
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: deploy-tag
     plan:
       - get: source-tags
@@ -79,5 +77,3 @@ jobs:
               - pipemaster
               - echo deploy
             dir: workspace
-        tags:
-          - ubuntu-latest

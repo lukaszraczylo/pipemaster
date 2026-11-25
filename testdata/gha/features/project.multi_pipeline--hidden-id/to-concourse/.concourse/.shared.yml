@@ -1,11 +1,11 @@
 # pipemaster:emulated display.name pipeline/.shared
 # pipemaster:arg {"name":"shared","id":".shared","written":".shared","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/.shared/job/run/step/run-step-1/carry
-# pipemaster:arg {"digest":"35811e0e470596fbc5f7554aa7a1c860e69f4327e471a9c48c3b0f9ebb6a49f7","carry":"id: run-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"3e3ae79b5232c95a1f76ab482316f04eb4dbc01c64c35bd406d1e2def860c072","carry":"id: run-step-1\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/.shared/job/run
 # pipemaster:arg {"manual":false,"held":true}
 # pipemaster:emulated ext.passthrough pipeline/.shared/job/run/carry
-# pipemaster:arg {"digest":"796138b74f0159c0d743ff80ac7020203c92db4225c8623290d20ed58696f221","carry":"id: run\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"13aba4df7dcd41ca7cf388efc9dee69c1c5caf50af93e36aaef53cfd14ebf79e","carry":"id: run\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/.shared/carry
 # pipemaster:arg {"digest":"23421ff0998514f47173ea5b7668acb70c8af5e253b5c3264a1655012e26476f","carry":"id: .shared\nname: shared\ntriggers:\n    - kind: api\n"}
 # pipemaster:emulated ext.passthrough pipeline/.shared
@@ -44,5 +44,3 @@ jobs:
               - pipemaster
               - echo run
             dir: workspace
-        tags:
-          - ubuntu-latest

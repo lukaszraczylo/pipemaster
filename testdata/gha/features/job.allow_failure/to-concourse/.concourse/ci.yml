@@ -1,10 +1,10 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"allow","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/flaky/step/flaky-step-1/carry
-# pipemaster:arg {"digest":"78707bc608a804a1bce71465b4ad71a4785d7d6f97a84d55bc97b241c2510ceb","carry":"id: flaky-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"88f95ad609e1af5810b83c4bfdb2d9fe183acd04ae1fa48f93d0dacf646f1b50","carry":"id: flaky-step-1\nkind: script\n"}
 # pipemaster:emulated job.allow_failure pipeline/ci/job/flaky
 # pipemaster:emulated ext.passthrough pipeline/ci/job/flaky/carry
-# pipemaster:arg {"digest":"3d6ca96546d080f53d90834e19a0bc72ee8f855a5b63611ae61a353397940f58","carry":"id: flaky\nrunner:\n    labels:\n        - ubuntu-latest\nallow_failure: true\n"}
+# pipemaster:arg {"digest":"415b3879a751bc450b27941ff93303f4e98dde7585c69fc57f5944cf32679ff7","carry":"id: flaky\nrunner:\n    labels:\n        - ubuntu-latest\nallow_failure: true\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/flaky-tag
 # pipemaster:arg {"twin_of":"flaky"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -54,8 +54,6 @@ jobs:
                     - pipemaster
                     - echo ok
                   dir: workspace
-              tags:
-                - ubuntu-latest
   - name: flaky-tag
     plan:
       - try:
@@ -84,5 +82,3 @@ jobs:
                     - pipemaster
                     - echo ok
                   dir: workspace
-              tags:
-                - ubuntu-latest

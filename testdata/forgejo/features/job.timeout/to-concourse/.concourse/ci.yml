@@ -1,9 +1,9 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"timeout","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"aca61d8f33873242bda7aea3433c48d7cdd689abc7380a408d47efbad948d46d","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"f53bb9f75eff01d2c3a951e09d8d49e9e98aeb79d13e11d00a734abc6ebee6c7","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"c4f9eaf83649cc3037ba380a8b4ce9cf0268a927c0af34ed265b5601f9f090b3","carry":"timeout: 15m0s\nid: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"b8f29a43d843b0c2bd1c7b73d57b6869e3cb0a06a21b07900d5032eaf67eef8c","carry":"timeout: 15m0s\nid: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -53,8 +53,6 @@ jobs:
                   - pipemaster
                   - echo ok
                 dir: workspace
-            tags:
-              - ubuntu-latest
         timeout: 15m0s
   - name: build-tag
     plan:
@@ -83,6 +81,4 @@ jobs:
                   - pipemaster
                   - echo ok
                 dir: workspace
-            tags:
-              - ubuntu-latest
         timeout: 15m0s

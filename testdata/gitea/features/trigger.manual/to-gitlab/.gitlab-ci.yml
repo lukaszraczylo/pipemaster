@@ -3,8 +3,6 @@ workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "web"
 build:
-  tags:
-    - ubuntu-latest
   needs: []
   script:
     # pipemaster:step build-step-1

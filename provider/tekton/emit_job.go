@@ -54,6 +54,12 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 	tc := e.newTaskCtx(pp, jp)
 	tc.doc = &outDoc{}
 	e.owners[jp.path] = tc.doc
+	rest := emitkit.ReportHosted(e.origin, j.Runner.Labels, "node selector",
+		func(st, d string) { e.external(jp.path, caps.JobRunner, st, d) },
+		func(d string) { e.lose(jp.path, caps.JobRunner, d) })
+	if len(rest) > 0 {
+		e.lose(jp.path, caps.JobRunner, "Tekton schedules pods; the runner label "+strings.Join(rest, ", ")+" has no form")
+	}
 	jc, viaChanges := tc.changesCond(jp.path, j.If)
 	if !viaChanges {
 		jc = tc.cond(jp.path, caps.JobIf, j.If, pipelineScope)

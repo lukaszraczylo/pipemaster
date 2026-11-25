@@ -12,7 +12,7 @@
    "files": [
     {
      "path": ".github/workflows/gitlab-ci.yml",
-     "text": "# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/acceptance\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go')\",\"guard\":true}\n# pipemaster:emulated job.cache pipeline/gitlab-ci/job/acceptance\n# pipemaster:arg {\"cache\":[{\"Key\":\"golang-${GO_VERSION}-cache-$\\u007b{ hashFiles('go.mod', 'go.sum') }}\",\"Policy\":\"$POLICY\",\"Paths\":[\".GOPATH/pkg/mod/\"]}],\"pre\":2,\"post\":0}\n# pipemaster:emulated step.script pipeline/gitlab-ci/job/build-package-and-qa\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/check_gitaly_version\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/check_gitaly_version\n# pipemaster:arg {\"pre\":1,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/danger-review\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated job.needs.artifacts pipeline/gitlab-ci/job/danger-review\n# pipemaster:arg {\"needs\":[\"lint\"],\"pre\":2,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/gemnasium-dependency_scanning\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated step.script pipeline/gitlab-ci/job/gemnasium-dependency_scanning\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/gitlab-advanced-sast\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated step.script pipeline/gitlab-ci/job/gitlab-advanced-sast\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/lint\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/lint\n# pipemaster:arg {\"artifacts\":[{\"Name\":\"\",\"Expire\":\"\",\"Paths\":[\"gl-code-quality-report.json\"]}],\"pre\":1,\"post\":1}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/logging-field-validator\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go', '.labkit_logging_todo.yml')\",\"guard\":true}\n# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/logging-field-validator\n# pipemaster:arg {\"pre\":1,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/modules-download\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated job.cache pipeline/gitlab-ci/job/modules-download\n# pipemaster:arg {\"cache\":[{\"Key\":\"golang-${GO_VERSION}-cache-$\\u007b{ hashFiles('go.mod', 'go.sum') }}\",\"Policy\":\"$POLICY\",\"Paths\":[\".GOPATH/pkg/mod/\"]}],\"pre\":2,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/modules-tidy\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/modules-tidy\n# pipemaster:arg {\"pre\":1,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/nilaway\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go')\",\"guard\":true}\n# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/nilaway\n# pipemaster:arg {\"pre\":1,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/race\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go')\",\"guard\":true}\n# pipemaster:emulated job.cache pipeline/gitlab-ci/job/race\n# pipemaster:arg {\"cache\":[{\"Key\":\"golang-${GO_VERSION}-cache-$\\u007b{ hashFiles('go.mod', 'go.sum') }}\",\"Policy\":\"$POLICY\",\"Paths\":[\".GOPATH/pkg/mod/\"]}],\"pre\":2,\"post\":0}\n# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/release-prepare\n# pipemaster:arg {\"pre\":1,\"post\":0}\n# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/release-tag\n# pipemaster:arg {\"pre\":1,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/secret_detection\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated step.script pipeline/gitlab-ci/job/secret_detection\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/semgrep-sast\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated step.script pipeline/gitlab-ci/job/semgrep-sast\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/ssh-audit\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go') || (changes('Makefile', 'support/ssh-audit/**/*') \\u0026\\u0026 !changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go'))\",\"guard\":true}\n# pipemaster:emulated job.cache pipeline/gitlab-ci/job/ssh-audit\n# pipemaster:arg {\"cache\":[{\"Key\":\"golang-${GO_VERSION}-cache-$\\u007b{ hashFiles('go.mod', 'go.sum') }}\",\"Policy\":\"$POLICY\",\"Paths\":[\".GOPATH/pkg/mod/\"]},{\"Key\":\"ssh-audit-$\\u007b{ hashFiles('Makefile') }}\",\"Policy\":\"\",\"Paths\":[\"support/bin/ssh-audit-*\"]}],\"pre\":3,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/ssh-audit-fips\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go') || (changes('Makefile', 'support/ssh-audit/**/*') \\u0026\\u0026 !changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go'))\",\"guard\":true}\n# pipemaster:emulated job.cache pipeline/gitlab-ci/job/ssh-audit-fips\n# pipemaster:arg {\"cache\":[{\"Key\":\"golang-${GO_VERSION}-cache-$\\u007b{ hashFiles('go.mod', 'go.sum') }}\",\"Policy\":\"$POLICY\",\"Paths\":[\".GOPATH/pkg/mod/\"]},{\"Key\":\"ssh-audit-$\\u007b{ hashFiles('Makefile') }}\",\"Policy\":\"\",\"Paths\":[\"support/bin/ssh-audit-*\"]}],\"pre\":3,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/tests\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go')\",\"guard\":true}\n# pipemaster:emulated job.cache pipeline/gitlab-ci/job/tests\n# pipemaster:arg {\"cache\":[{\"Key\":\"golang-${GO_VERSION}-cache-$\\u007b{ hashFiles('go.mod', 'go.sum') }}\",\"Policy\":\"$POLICY\",\"Paths\":[\".GOPATH/pkg/mod/\"]}],\"artifacts\":[{\"Name\":\"\",\"Expire\":\"\",\"Paths\":[\"cover.xml\"]}],\"pre\":2,\"post\":1}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/tests-fips\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go')\",\"guard\":true}\n# pipemaster:emulated job.cache pipeline/gitlab-ci/job/tests-fips\n# pipemaster:arg {\"cache\":[{\"Key\":\"golang-${GO_VERSION}-cache-$\\u007b{ hashFiles('go.mod', 'go.sum') }}\",\"Policy\":\"$POLICY\",\"Paths\":[\".GOPATH/pkg/mod/\"]}],\"pre\":2,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/tests_without_cgo\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go')\",\"guard\":true}\n# pipemaster:emulated job.cache pipeline/gitlab-ci/job/tests_without_cgo\n# pipemaster:arg {\"cache\":[{\"Key\":\"golang-${GO_VERSION}-cache-$\\u007b{ hashFiles('go.mod', 'go.sum') }}\",\"Policy\":\"$POLICY\",\"Paths\":[\".GOPATH/pkg/mod/\"]}],\"pre\":2,\"post\":0}\n# pipemaster:emulated step.script pipeline/gitlab-ci/job/pipemaster-changes\non:\n  pull_request:\n  push:\n    branches:\n      - main\n    tags:\n      - '**'\nenv:\n  FF_USE_FASTZIP: \"true\"\n  TRANSFER_METER_FREQUENCY: 1s\n  GOPATH: $CI_PROJECT_DIR/.GOPATH\n  DEBIAN_VERSION: trixie\n  POLICY: pull\n  CI_DEBUG_SERVICES: \"true\"\n  GO_VERSION: \"1.26\"\n  NILAWAY_VERSION: v0.0.0-20260915140140-59aa42bdc591\n  UBI_VERSION: \"9.6\"\n  GITLAB_ADVANCED_SAST_ENABLED: \"true\"\n  IMAGE_TAG: latest\n  DEFAULT_IMAGE: registry.gitlab.com/gitlab-org/gitlab-build-images/debian-${DEBIAN_VERSION}-golang-${GO_VERSION}:${IMAGE_TAG}\n  FIPS_IMAGE_TAG: latest\n  FIPS_IMAGE: registry.gitlab.com/gitlab-org/gitlab-build-images/ubi-${UBI_VERSION}-golang-${GO_VERSION}:${FIPS_IMAGE_TAG}\n  GOTOOLCHAIN: local\n  GLAB_VERSION: v1.120.0\njobs:\n  pipemaster-changes:\n    if: '!github.event.deleted'\n    runs-on: ubuntu-latest\n    outputs:\n      c27af4a2a: ${{ steps.changes.outputs.c27af4a2a }}\n      c5083c033: ${{ steps.changes.outputs.c5083c033 }}\n      cd92799ed: ${{ steps.changes.outputs.cd92799ed }}\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 0\n      - id: changes\n        env:\n          EVENT: ${{ github.event_name }}\n          REF_TYPE: ${{ github.ref_type }}\n          BEFORE: ${{ github.event.before }}\n          AFTER: ${{ github.sha }}\n          BASE: ${{ github.event.pull_request.base.sha }}\n          HEAD: ${{ github.event.pull_request.head.sha }}\n          RE_c27af4a2a: ^(\\.gitlab-ci\\.yml|go\\.mod|go\\.sum|(.*/)?[^/]*\\.go)$\n          RE_c5083c033: ^(\\.gitlab-ci\\.yml|go\\.mod|go\\.sum|(.*/)?[^/]*\\.go|\\.labkit_logging_todo\\.yml)$\n          RE_cd92799ed: ^(Makefile|support/ssh-audit/(.*/)?[^/]*)$\n        run: |-\n          set -eu\n          files=\"$(mktemp)\"\n          all=false\n          for rev in \"${BEFORE:-}\" \"${AFTER:-}\" \"${BASE:-}\" \"${HEAD:-}\"; do\n            case \"$rev\" in -*) echo \"pipemaster-changes: refusing the commit value $rev, which starts with a dash\" >&2; exit 1 ;; esac\n          done\n          diff_paths() {\n            git -c core.quotepath=off diff -z --name-only --no-renames --end-of-options \"$@\" > \"$files\" ||\n              { echo \"pipemaster-changes: cannot compute the changed paths for $*\" >&2; exit 1; }\n          }\n          case \"$EVENT\" in\n            push)\n              if [ \"$REF_TYPE\" = tag ] || [ \"$BEFORE\" = 0000000000000000000000000000000000000000 ]; then\n                all=true\n              else\n                if ! git cat-file -e \"$BEFORE^{commit}\" 2>/dev/null; then\n                  git fetch --no-tags --quiet origin --end-of-options \"$BEFORE\" || echo \"pipemaster-changes: git fetch failed for $BEFORE\" >&2\n                fi\n                if ! git cat-file -e \"$BEFORE^{commit}\" 2>/dev/null; then\n                  echo \"pipemaster-changes: the commit before the push ($BEFORE) is not in the clone, as after a force push; GitLab documents no verdict for this\" >&2\n                  exit 1\n                fi\n                diff_paths \"$BEFORE\" \"$AFTER\"\n              fi ;;\n            pull_request)\n              diff_paths \"$BASE...$HEAD\" ;;\n            *)\n              all=true ;;\n          esac\n          emit() {\n            # Each NUL-separated name is matched as a whole string: bash [[ =~ ]] anchors at the string ends, where grep\n            # would also anchor at a newline inside a name.\n            hit=false\n            if [ \"$all\" = true ]; then\n              hit=true\n            else\n              while IFS= read -r -d '' name; do\n                if [[ $name =~ $2 ]]; then hit=true; break; fi\n              done < \"$files\"\n            fi\n            echo \"$1=$hit\" >> \"$GITHUB_OUTPUT\"\n          }\n          emit c27af4a2a \"$RE_c27af4a2a\"\n          emit c5083c033 \"$RE_c5083c033\"\n          emit cd92799ed \"$RE_cd92799ed\"\n  acceptance:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: (needs.pipemaster-changes.outputs.c27af4a2a == 'true') && !github.event.deleted\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    strategy:\n      matrix:\n        GO_VERSION:\n          - \"1.26\"\n          - \"1.27\"\n    env:\n      CACHE_COMPRESSION_LEVEL: fastest\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/acceptance\n      - uses: actions/cache@v6\n        with:\n          path: .GOPATH/pkg/mod/\n          key: golang-${GO_VERSION}-cache-${{ hashFiles('go.mod', 'go.sum') }}\n      - id: script\n        run: 'export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; make acceptance-test'\n  # pipemaster:lost job.if pipeline/gitlab-ci/job/build-package-and-qa: opaque(gitlab): - allow_failure: false\\n  changes:\\n    - go.sum\\n  if: $CI_MERGE_REQUEST_IID\\n  variables:\\n    BUILD_ON_ALL_OS: \"true\"\\n    MANUAL_QA_TEST: \"true\"\\n- allow_failure: true\\n  if: $CI_MERGE_REQUEST_IID\\n  when: manual\\n\n  build-package-and-qa:\n    if: false\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    env:\n      GITLAB_SHELL_VERSION: $CI_MERGE_REQUEST_SOURCE_BRANCH_SHA\n      TOP_UPSTREAM_SOURCE_PROJECT: ${{ github.repository }}\n      TOP_UPSTREAM_SOURCE_REF: ${{ github.ref_name }}\n      TOP_UPSTREAM_SOURCE_JOB: $CI_JOB_URL\n      ee: \"true\"\n    steps:\n      - run: 'printf ''%s\\n'' ''pipemaster: lost: step.script pipeline/gitlab-ci/job/build-package-and-qa: the job starts the pipeline of project gitlab-org/build/omnibus-gitlab-mirror and the target has no cross-project trigger; start that pipeline by hand or with an API call'' >&2; exit 1'\n  check_gitaly_version:\n    needs:\n      - modules-download\n    if: '!github.event.deleted'\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    continue-on-error: true\n    steps:\n      - uses: actions/checkout@v7\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; chmod +x ./support/lint_gitaly_version.sh\n          ./support/lint_gitaly_version.sh\n  danger-review:\n    needs:\n      - check_gitaly_version\n      - gemnasium-dependency_scanning\n      - gitlab-advanced-sast\n      - lint\n      - modules-download\n      - modules-tidy\n      - nilaway\n      - secret_detection\n      - semgrep-sast\n    if: '!github.event.deleted'\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.needs.artifacts pipeline/gitlab-ci/job/danger-review\n      - uses: actions/download-artifact@v8\n        with:\n          name: lint\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; bundle init\n          bundle add git --version \"< 6\"\n          bundle add gitlab-dangerfiles --version \"~> 4.9.2\"\n          bundle install\n  gemnasium-dependency_scanning:\n    needs:\n      - modules-download\n    if: '!github.event.deleted'\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - run: 'printf ''%s\\n'' ''pipemaster: lost: step.script pipeline/gitlab-ci/job/gemnasium-dependency_scanning: the job has no script here; its script comes from an include or extends that the converter did not read, so add the script by hand'' >&2; exit 1'\n  gitlab-advanced-sast:\n    needs:\n      - modules-download\n    if: '!github.event.deleted'\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - run: 'printf ''%s\\n'' ''pipemaster: lost: step.script pipeline/gitlab-ci/job/gitlab-advanced-sast: the job has no script here; its script comes from an include or extends that the converter did not read, so add the script by hand'' >&2; exit 1'\n  lint:\n    needs:\n      - modules-download\n    if: '!github.event.deleted'\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - uses: actions/checkout@v7\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; apt update && apt install -y jq\n          make lint GOLANGCI_LINT_ARGS=\"--output.code-climate.path=gl-code-quality-report-temp.json --output.text.path=stdout\"\n          cat gl-code-quality-report-temp.json | jq '[ .[] | select(.severity == \"warning\").severity |= \"minor\" ]' > gl-code-quality-report.json\n          rm -f gl-code-quality-report-temp.json\n      # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/lint\n      - uses: actions/upload-artifact@v7\n        with:\n          name: lint\n          path: gl-code-quality-report.json\n  logging-field-validator:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: (needs.pipemaster-changes.outputs.c5083c033 == 'true') && !github.event.deleted\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - uses: actions/checkout@v7\n      - id: script\n        run: 'export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; make validate-log-fields'\n  modules-download:\n    if: '!github.event.deleted'\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    strategy:\n      matrix:\n        GO_VERSION:\n          - \"1.26\"\n          - \"1.27\"\n    env:\n      CACHE_COMPRESSION_LEVEL: fastest\n      POLICY: pull-push\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/modules-download\n      - uses: actions/cache@v6\n        with:\n          path: .GOPATH/pkg/mod/\n          key: golang-${GO_VERSION}-cache-${{ hashFiles('go.mod', 'go.sum') }}\n      - id: script\n        run: 'export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; go mod download'\n  modules-tidy:\n    needs:\n      - modules-download\n    if: '!github.event.deleted'\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - uses: actions/checkout@v7\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; go mod tidy\n          git diff --exit-code go.mod go.sum\n  nilaway:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: (needs.pipemaster-changes.outputs.c27af4a2a == 'true') && !github.event.deleted\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - uses: actions/checkout@v7\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; go install go.uber.org/nilaway/cmd/nilaway@${NILAWAY_VERSION}\n          NILAWAY_EXIT_CODE=$(${GOPATH}/bin/nilaway -include-pkgs=\"gitlab.com/gitlab-org/gitlab-shell/v14\" ./... > /tmp/out.txt 2>&1 ; echo $?) || true\n          cat /tmp/out.txt\n          exit ${NILAWAY_EXIT_CODE}\n  race:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: (needs.pipemaster-changes.outputs.c27af4a2a == 'true') && !github.event.deleted\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    services:\n      gitaly:\n        image: registry.gitlab.com/gitlab-org/build/cng/gitaly:master\n    strategy:\n      matrix:\n        GO_VERSION:\n          - \"1.26\"\n          - \"1.27\"\n    env:\n      CACHE_COMPRESSION_LEVEL: fastest\n      GITALY_CONNECTION_INFO: '{\"address\":\"tcp://gitaly:8075\", \"storage\":\"default\"}'\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/race\n      - uses: actions/cache@v6\n        with:\n          path: .GOPATH/pkg/mod/\n          key: golang-${GO_VERSION}-cache-${{ hashFiles('go.mod', 'go.sum') }}\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; make build\n          cp config.yml.example config.yml\n          go version\n          make test_race\n  release-prepare:\n    if: false\n    runs-on: gitlab-org\n    container: registry.gitlab.com/gitlab-org/cli:${GLAB_VERSION}\n    env:\n      GIT_DEPTH: \"0\"\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 0\n      # pipemaster:lost job.if pipeline/gitlab-ci/job/release-prepare: (branch == default_branch) && (event == 'schedule') && gitlab.RELEASE_BUMP && !((gitlab.CI_SERVER_HOST != 'gitlab.com') || (repo != 'gitlab-org/gitlab-shell'))\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; apk add --no-cache bash\n          support/release.sh prepare\n  release-tag:\n    if: false\n    runs-on: gitlab-org\n    container: registry.gitlab.com/gitlab-org/cli:${GLAB_VERSION}\n    env:\n      GIT_DEPTH: \"0\"\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 0\n      # pipemaster:lost job.if pipeline/gitlab-ci/job/release-tag: (branch == default_branch) && (event == 'push') && changes('VERSION') && !((gitlab.CI_SERVER_HOST != 'gitlab.com') || (repo != 'gitlab-org/gitlab-shell'))\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; apk add --no-cache bash\n          support/release.sh tag\n  secret_detection:\n    needs:\n      - modules-download\n    if: '!github.event.deleted'\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - run: 'printf ''%s\\n'' ''pipemaster: lost: step.script pipeline/gitlab-ci/job/secret_detection: the job has no script here; its script comes from an include or extends that the converter did not read, so add the script by hand'' >&2; exit 1'\n  semgrep-sast:\n    needs:\n      - modules-download\n    if: '!github.event.deleted'\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - run: 'printf ''%s\\n'' ''pipemaster: lost: step.script pipeline/gitlab-ci/job/semgrep-sast: the job has no script here; its script comes from an include or extends that the converter did not read, so add the script by hand'' >&2; exit 1'\n  ssh-audit:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: ((needs.pipemaster-changes.outputs.c27af4a2a == 'true') || (needs.pipemaster-changes.outputs.c27af4a2a == 'false') && (needs.pipemaster-changes.outputs.cd92799ed == 'true')) && !github.event.deleted\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    env:\n      CACHE_COMPRESSION_LEVEL: fastest\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/ssh-audit\n      - uses: actions/cache@v6\n        with:\n          path: .GOPATH/pkg/mod/\n          key: golang-${GO_VERSION}-cache-${{ hashFiles('go.mod', 'go.sum') }}\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/ssh-audit\n      - uses: actions/cache@v6\n        with:\n          path: support/bin/ssh-audit-*\n          key: ssh-audit-${{ hashFiles('Makefile') }}\n      - id: script\n        run: 'export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; make ssh-audit-test'\n  ssh-audit-fips:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: ((needs.pipemaster-changes.outputs.c27af4a2a == 'true') || (needs.pipemaster-changes.outputs.c27af4a2a == 'false') && (needs.pipemaster-changes.outputs.cd92799ed == 'true')) && !github.event.deleted\n    runs-on: gitlab-org\n    container: ${FIPS_IMAGE}\n    env:\n      CACHE_COMPRESSION_LEVEL: fastest\n      FIPS_MODE: \"1\"\n      GOLANG_FIPS: \"1\"\n      SSH_AUDIT_HOST_KEY_TYPES: rsa ecdsa\n      SSH_AUDIT_POLICY: support/ssh-audit/gitlab-sshd-fips.policy\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/ssh-audit-fips\n      - uses: actions/cache@v6\n        with:\n          path: .GOPATH/pkg/mod/\n          key: golang-${GO_VERSION}-cache-${{ hashFiles('go.mod', 'go.sum') }}\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/ssh-audit-fips\n      - uses: actions/cache@v6\n        with:\n          path: support/bin/ssh-audit-*\n          key: ssh-audit-${{ hashFiles('Makefile') }}\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; dnf install -y openssh python3\n          make ssh-audit-test\n  tests:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: (needs.pipemaster-changes.outputs.c27af4a2a == 'true') && !github.event.deleted\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    services:\n      gitaly:\n        image: registry.gitlab.com/gitlab-org/build/cng/gitaly:master\n    strategy:\n      matrix:\n        GO_VERSION:\n          - \"1.26\"\n          - \"1.27\"\n    env:\n      GITALY_CONNECTION_INFO: '{\"address\":\"tcp://gitaly:8075\", \"storage\":\"default\"}'\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/tests\n      - uses: actions/cache@v6\n        with:\n          path: .GOPATH/pkg/mod/\n          key: golang-${GO_VERSION}-cache-${{ hashFiles('go.mod', 'go.sum') }}\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; make build\n          cp config.yml.example config.yml\n          go version\n          make verify test_fancy\n      - id: after_script\n        if: always()\n        run: 'export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; make coverage'\n        continue-on-error: true\n      # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/tests\n      - uses: actions/upload-artifact@v7\n        with:\n          name: tests\n          path: cover.xml\n  tests-fips:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: (needs.pipemaster-changes.outputs.c27af4a2a == 'true') && !github.event.deleted\n    runs-on: gitlab-org\n    container: ${FIPS_IMAGE}\n    services:\n      gitaly:\n        image: registry.gitlab.com/gitlab-org/build/cng/gitaly:master\n    env:\n      FIPS_MODE: \"1\"\n      GITALY_CONNECTION_INFO: '{\"address\":\"tcp://gitaly:8075\", \"storage\":\"default\"}'\n      GOLANG_FIPS: \"1\"\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/tests-fips\n      - uses: actions/cache@v6\n        with:\n          path: .GOPATH/pkg/mod/\n          key: golang-${GO_VERSION}-cache-${{ hashFiles('go.mod', 'go.sum') }}\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; dnf install -y git\n          make build\n          cp config.yml.example config.yml\n          go version\n          make test_fancy\n  tests_without_cgo:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: (needs.pipemaster-changes.outputs.c27af4a2a == 'true') && !github.event.deleted\n    runs-on: gitlab-org\n    container: ${DEFAULT_IMAGE}\n    services:\n      gitaly:\n        image: registry.gitlab.com/gitlab-org/build/cng/gitaly:master\n    strategy:\n      matrix:\n        GO_VERSION:\n          - \"1.26\"\n          - \"1.27\"\n    env:\n      CGO_ENABLED: \"0\"\n      GITALY_CONNECTION_INFO: '{\"address\":\"tcp://gitaly:8075\", \"storage\":\"default\"}'\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/tests_without_cgo\n      - uses: actions/cache@v6\n        with:\n          path: .GOPATH/pkg/mod/\n          key: golang-${GO_VERSION}-cache-${{ hashFiles('go.mod', 'go.sum') }}\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; make build\n          cp config.yml.example config.yml\n          go version\n          make verify test_fancy\n"
+     "text": "# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/acceptance\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go')\",\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/acceptance\n# pipemaster:emulated job.cache pipeline/gitlab-ci/job/acceptance\n# pipemaster:arg {\"cache\":[{\"Key\":\"golang-${GO_VERSION}-cache-$\\u007b{ hashFiles('go.mod', 'go.sum') }}\",\"Policy\":\"$POLICY\",\"Paths\":[\".GOPATH/pkg/mod/\"]}],\"pre\":2,\"post\":0}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build-package-and-qa\n# pipemaster:emulated step.script pipeline/gitlab-ci/job/build-package-and-qa\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/check_gitaly_version\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/check_gitaly_version\n# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/check_gitaly_version\n# pipemaster:arg {\"pre\":1,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/danger-review\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/danger-review\n# pipemaster:emulated job.needs.artifacts pipeline/gitlab-ci/job/danger-review\n# pipemaster:arg {\"needs\":[\"lint\"],\"pre\":2,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/gemnasium-dependency_scanning\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/gemnasium-dependency_scanning\n# pipemaster:emulated step.script pipeline/gitlab-ci/job/gemnasium-dependency_scanning\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/gitlab-advanced-sast\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/gitlab-advanced-sast\n# pipemaster:emulated step.script pipeline/gitlab-ci/job/gitlab-advanced-sast\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/lint\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/lint\n# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/lint\n# pipemaster:arg {\"artifacts\":[{\"Name\":\"\",\"Expire\":\"\",\"Paths\":[\"gl-code-quality-report.json\"]}],\"pre\":1,\"post\":1}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/logging-field-validator\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go', '.labkit_logging_todo.yml')\",\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/logging-field-validator\n# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/logging-field-validator\n# pipemaster:arg {\"pre\":1,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/modules-download\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/modules-download\n# pipemaster:emulated job.cache pipeline/gitlab-ci/job/modules-download\n# pipemaster:arg {\"cache\":[{\"Key\":\"golang-${GO_VERSION}-cache-$\\u007b{ hashFiles('go.mod', 'go.sum') }}\",\"Policy\":\"$POLICY\",\"Paths\":[\".GOPATH/pkg/mod/\"]}],\"pre\":2,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/modules-tidy\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/modules-tidy\n# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/modules-tidy\n# pipemaster:arg {\"pre\":1,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/nilaway\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go')\",\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/nilaway\n# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/nilaway\n# pipemaster:arg {\"pre\":1,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/race\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go')\",\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/race\n# pipemaster:emulated job.cache pipeline/gitlab-ci/job/race\n# pipemaster:arg {\"cache\":[{\"Key\":\"golang-${GO_VERSION}-cache-$\\u007b{ hashFiles('go.mod', 'go.sum') }}\",\"Policy\":\"$POLICY\",\"Paths\":[\".GOPATH/pkg/mod/\"]}],\"pre\":2,\"post\":0}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/release-prepare\n# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/release-prepare\n# pipemaster:arg {\"pre\":1,\"post\":0}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/release-tag\n# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/release-tag\n# pipemaster:arg {\"pre\":1,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/secret_detection\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/secret_detection\n# pipemaster:emulated step.script pipeline/gitlab-ci/job/secret_detection\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/semgrep-sast\n# pipemaster:arg {\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/semgrep-sast\n# pipemaster:emulated step.script pipeline/gitlab-ci/job/semgrep-sast\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/ssh-audit\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go') || (changes('Makefile', 'support/ssh-audit/**/*') \\u0026\\u0026 !changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go'))\",\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/ssh-audit\n# pipemaster:emulated job.cache pipeline/gitlab-ci/job/ssh-audit\n# pipemaster:arg {\"cache\":[{\"Key\":\"golang-${GO_VERSION}-cache-$\\u007b{ hashFiles('go.mod', 'go.sum') }}\",\"Policy\":\"$POLICY\",\"Paths\":[\".GOPATH/pkg/mod/\"]},{\"Key\":\"ssh-audit-$\\u007b{ hashFiles('Makefile') }}\",\"Policy\":\"\",\"Paths\":[\"support/bin/ssh-audit-*\"]}],\"pre\":3,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/ssh-audit-fips\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go') || (changes('Makefile', 'support/ssh-audit/**/*') \\u0026\\u0026 !changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go'))\",\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/ssh-audit-fips\n# pipemaster:emulated job.cache pipeline/gitlab-ci/job/ssh-audit-fips\n# pipemaster:arg {\"cache\":[{\"Key\":\"golang-${GO_VERSION}-cache-$\\u007b{ hashFiles('go.mod', 'go.sum') }}\",\"Policy\":\"$POLICY\",\"Paths\":[\".GOPATH/pkg/mod/\"]},{\"Key\":\"ssh-audit-$\\u007b{ hashFiles('Makefile') }}\",\"Policy\":\"\",\"Paths\":[\"support/bin/ssh-audit-*\"]}],\"pre\":3,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/tests\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go')\",\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/tests\n# pipemaster:emulated job.cache pipeline/gitlab-ci/job/tests\n# pipemaster:arg {\"cache\":[{\"Key\":\"golang-${GO_VERSION}-cache-$\\u007b{ hashFiles('go.mod', 'go.sum') }}\",\"Policy\":\"$POLICY\",\"Paths\":[\".GOPATH/pkg/mod/\"]}],\"artifacts\":[{\"Name\":\"\",\"Expire\":\"\",\"Paths\":[\"cover.xml\"]}],\"pre\":2,\"post\":1}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/tests-fips\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go')\",\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/tests-fips\n# pipemaster:emulated job.cache pipeline/gitlab-ci/job/tests-fips\n# pipemaster:arg {\"cache\":[{\"Key\":\"golang-${GO_VERSION}-cache-$\\u007b{ hashFiles('go.mod', 'go.sum') }}\",\"Policy\":\"$POLICY\",\"Paths\":[\".GOPATH/pkg/mod/\"]}],\"pre\":2,\"post\":0}\n# pipemaster:emulated job.if pipeline/gitlab-ci/job/tests_without_cgo\n# pipemaster:arg {\"src\":\"changes('.gitlab-ci.yml', 'go.mod', 'go.sum', '**/*.go')\",\"guard\":true}\n# pipemaster:emulated job.runner pipeline/gitlab-ci/job/tests_without_cgo\n# pipemaster:emulated job.cache pipeline/gitlab-ci/job/tests_without_cgo\n# pipemaster:arg {\"cache\":[{\"Key\":\"golang-${GO_VERSION}-cache-$\\u007b{ hashFiles('go.mod', 'go.sum') }}\",\"Policy\":\"$POLICY\",\"Paths\":[\".GOPATH/pkg/mod/\"]}],\"pre\":2,\"post\":0}\n# pipemaster:emulated step.script pipeline/gitlab-ci/job/pipemaster-changes\non:\n  pull_request:\n  push:\n    branches:\n      - main\n    tags:\n      - '**'\nenv:\n  FF_USE_FASTZIP: \"true\"\n  TRANSFER_METER_FREQUENCY: 1s\n  GOPATH: $CI_PROJECT_DIR/.GOPATH\n  DEBIAN_VERSION: trixie\n  POLICY: pull\n  CI_DEBUG_SERVICES: \"true\"\n  GO_VERSION: \"1.26\"\n  NILAWAY_VERSION: v0.0.0-20260915140140-59aa42bdc591\n  UBI_VERSION: \"9.6\"\n  GITLAB_ADVANCED_SAST_ENABLED: \"true\"\n  IMAGE_TAG: latest\n  DEFAULT_IMAGE: registry.gitlab.com/gitlab-org/gitlab-build-images/debian-${DEBIAN_VERSION}-golang-${GO_VERSION}:${IMAGE_TAG}\n  FIPS_IMAGE_TAG: latest\n  FIPS_IMAGE: registry.gitlab.com/gitlab-org/gitlab-build-images/ubi-${UBI_VERSION}-golang-${GO_VERSION}:${FIPS_IMAGE_TAG}\n  GOTOOLCHAIN: local\n  GLAB_VERSION: v1.120.0\njobs:\n  pipemaster-changes:\n    if: '!github.event.deleted'\n    runs-on: ubuntu-latest\n    outputs:\n      c27af4a2a: ${{ steps.changes.outputs.c27af4a2a }}\n      c5083c033: ${{ steps.changes.outputs.c5083c033 }}\n      cd92799ed: ${{ steps.changes.outputs.cd92799ed }}\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 0\n      - id: changes\n        env:\n          EVENT: ${{ github.event_name }}\n          REF_TYPE: ${{ github.ref_type }}\n          BEFORE: ${{ github.event.before }}\n          AFTER: ${{ github.sha }}\n          BASE: ${{ github.event.pull_request.base.sha }}\n          HEAD: ${{ github.event.pull_request.head.sha }}\n          RE_c27af4a2a: ^(\\.gitlab-ci\\.yml|go\\.mod|go\\.sum|(.*/)?[^/]*\\.go)$\n          RE_c5083c033: ^(\\.gitlab-ci\\.yml|go\\.mod|go\\.sum|(.*/)?[^/]*\\.go|\\.labkit_logging_todo\\.yml)$\n          RE_cd92799ed: ^(Makefile|support/ssh-audit/(.*/)?[^/]*)$\n        run: |-\n          set -eu\n          files=\"$(mktemp)\"\n          all=false\n          for rev in \"${BEFORE:-}\" \"${AFTER:-}\" \"${BASE:-}\" \"${HEAD:-}\"; do\n            case \"$rev\" in -*) echo \"pipemaster-changes: refusing the commit value $rev, which starts with a dash\" >&2; exit 1 ;; esac\n          done\n          diff_paths() {\n            git -c core.quotepath=off diff -z --name-only --no-renames --end-of-options \"$@\" > \"$files\" ||\n              { echo \"pipemaster-changes: cannot compute the changed paths for $*\" >&2; exit 1; }\n          }\n          case \"$EVENT\" in\n            push)\n              if [ \"$REF_TYPE\" = tag ] || [ \"$BEFORE\" = 0000000000000000000000000000000000000000 ]; then\n                all=true\n              else\n                if ! git cat-file -e \"$BEFORE^{commit}\" 2>/dev/null; then\n                  git fetch --no-tags --quiet origin --end-of-options \"$BEFORE\" || echo \"pipemaster-changes: git fetch failed for $BEFORE\" >&2\n                fi\n                if ! git cat-file -e \"$BEFORE^{commit}\" 2>/dev/null; then\n                  echo \"pipemaster-changes: the commit before the push ($BEFORE) is not in the clone, as after a force push; GitLab documents no verdict for this\" >&2\n                  exit 1\n                fi\n                diff_paths \"$BEFORE\" \"$AFTER\"\n              fi ;;\n            pull_request)\n              diff_paths \"$BASE...$HEAD\" ;;\n            *)\n              all=true ;;\n          esac\n          emit() {\n            # Each NUL-separated name is matched as a whole string: bash [[ =~ ]] anchors at the string ends, where grep\n            # would also anchor at a newline inside a name.\n            hit=false\n            if [ \"$all\" = true ]; then\n              hit=true\n            else\n              while IFS= read -r -d '' name; do\n                if [[ $name =~ $2 ]]; then hit=true; break; fi\n              done < \"$files\"\n            fi\n            echo \"$1=$hit\" >> \"$GITHUB_OUTPUT\"\n          }\n          emit c27af4a2a \"$RE_c27af4a2a\"\n          emit c5083c033 \"$RE_c5083c033\"\n          emit cd92799ed \"$RE_cd92799ed\"\n  acceptance:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: (needs.pipemaster-changes.outputs.c27af4a2a == 'true') && !github.event.deleted\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    strategy:\n      matrix:\n        GO_VERSION:\n          - \"1.26\"\n          - \"1.27\"\n    env:\n      CACHE_COMPRESSION_LEVEL: fastest\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/acceptance\n      - uses: actions/cache@v6\n        with:\n          path: .GOPATH/pkg/mod/\n          key: golang-${GO_VERSION}-cache-${{ hashFiles('go.mod', 'go.sum') }}\n      - id: script\n        run: 'export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; make acceptance-test'\n  # pipemaster:lost job.if pipeline/gitlab-ci/job/build-package-and-qa: opaque(gitlab): - allow_failure: false\\n  changes:\\n    - go.sum\\n  if: $CI_MERGE_REQUEST_IID\\n  variables:\\n    BUILD_ON_ALL_OS: \"true\"\\n    MANUAL_QA_TEST: \"true\"\\n- allow_failure: true\\n  if: $CI_MERGE_REQUEST_IID\\n  when: manual\\n\n  build-package-and-qa:\n    if: false\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    env:\n      GITLAB_SHELL_VERSION: $CI_MERGE_REQUEST_SOURCE_BRANCH_SHA\n      TOP_UPSTREAM_SOURCE_PROJECT: ${{ github.repository }}\n      TOP_UPSTREAM_SOURCE_REF: ${{ github.ref_name }}\n      TOP_UPSTREAM_SOURCE_JOB: $CI_JOB_URL\n      ee: \"true\"\n    steps:\n      - run: 'printf ''%s\\n'' ''pipemaster: lost: step.script pipeline/gitlab-ci/job/build-package-and-qa: the job starts the pipeline of project gitlab-org/build/omnibus-gitlab-mirror and the target has no cross-project trigger; start that pipeline by hand or with an API call'' >&2; exit 1'\n  check_gitaly_version:\n    needs:\n      - modules-download\n    if: '!github.event.deleted'\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    continue-on-error: true\n    steps:\n      - uses: actions/checkout@v7\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; chmod +x ./support/lint_gitaly_version.sh\n          ./support/lint_gitaly_version.sh\n  danger-review:\n    needs:\n      - check_gitaly_version\n      - gemnasium-dependency_scanning\n      - gitlab-advanced-sast\n      - lint\n      - modules-download\n      - modules-tidy\n      - nilaway\n      - secret_detection\n      - semgrep-sast\n    if: '!github.event.deleted'\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.needs.artifacts pipeline/gitlab-ci/job/danger-review\n      - uses: actions/download-artifact@v8\n        with:\n          name: lint\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; bundle init\n          bundle add git --version \"< 6\"\n          bundle add gitlab-dangerfiles --version \"~> 4.9.2\"\n          bundle install\n  gemnasium-dependency_scanning:\n    needs:\n      - modules-download\n    if: '!github.event.deleted'\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - run: 'printf ''%s\\n'' ''pipemaster: lost: step.script pipeline/gitlab-ci/job/gemnasium-dependency_scanning: the job has no script here; its script comes from an include or extends that the converter did not read, so add the script by hand'' >&2; exit 1'\n  gitlab-advanced-sast:\n    needs:\n      - modules-download\n    if: '!github.event.deleted'\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - run: 'printf ''%s\\n'' ''pipemaster: lost: step.script pipeline/gitlab-ci/job/gitlab-advanced-sast: the job has no script here; its script comes from an include or extends that the converter did not read, so add the script by hand'' >&2; exit 1'\n  lint:\n    needs:\n      - modules-download\n    if: '!github.event.deleted'\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - uses: actions/checkout@v7\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; apt update && apt install -y jq\n          make lint GOLANGCI_LINT_ARGS=\"--output.code-climate.path=gl-code-quality-report-temp.json --output.text.path=stdout\"\n          cat gl-code-quality-report-temp.json | jq '[ .[] | select(.severity == \"warning\").severity |= \"minor\" ]' > gl-code-quality-report.json\n          rm -f gl-code-quality-report-temp.json\n      # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/lint\n      - uses: actions/upload-artifact@v7\n        with:\n          name: lint\n          path: gl-code-quality-report.json\n  logging-field-validator:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: (needs.pipemaster-changes.outputs.c5083c033 == 'true') && !github.event.deleted\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - uses: actions/checkout@v7\n      - id: script\n        run: 'export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; make validate-log-fields'\n  modules-download:\n    if: '!github.event.deleted'\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    strategy:\n      matrix:\n        GO_VERSION:\n          - \"1.26\"\n          - \"1.27\"\n    env:\n      CACHE_COMPRESSION_LEVEL: fastest\n      POLICY: pull-push\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/modules-download\n      - uses: actions/cache@v6\n        with:\n          path: .GOPATH/pkg/mod/\n          key: golang-${GO_VERSION}-cache-${{ hashFiles('go.mod', 'go.sum') }}\n      - id: script\n        run: 'export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; go mod download'\n  modules-tidy:\n    needs:\n      - modules-download\n    if: '!github.event.deleted'\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - uses: actions/checkout@v7\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; go mod tidy\n          git diff --exit-code go.mod go.sum\n  nilaway:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: (needs.pipemaster-changes.outputs.c27af4a2a == 'true') && !github.event.deleted\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - uses: actions/checkout@v7\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; go install go.uber.org/nilaway/cmd/nilaway@${NILAWAY_VERSION}\n          NILAWAY_EXIT_CODE=$(${GOPATH}/bin/nilaway -include-pkgs=\"gitlab.com/gitlab-org/gitlab-shell/v14\" ./... > /tmp/out.txt 2>&1 ; echo $?) || true\n          cat /tmp/out.txt\n          exit ${NILAWAY_EXIT_CODE}\n  race:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: (needs.pipemaster-changes.outputs.c27af4a2a == 'true') && !github.event.deleted\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    services:\n      gitaly:\n        image: registry.gitlab.com/gitlab-org/build/cng/gitaly:master\n    strategy:\n      matrix:\n        GO_VERSION:\n          - \"1.26\"\n          - \"1.27\"\n    env:\n      CACHE_COMPRESSION_LEVEL: fastest\n      GITALY_CONNECTION_INFO: '{\"address\":\"tcp://gitaly:8075\", \"storage\":\"default\"}'\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/race\n      - uses: actions/cache@v6\n        with:\n          path: .GOPATH/pkg/mod/\n          key: golang-${GO_VERSION}-cache-${{ hashFiles('go.mod', 'go.sum') }}\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; make build\n          cp config.yml.example config.yml\n          go version\n          make test_race\n  release-prepare:\n    if: false\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: registry.gitlab.com/gitlab-org/cli:${GLAB_VERSION}\n    env:\n      GIT_DEPTH: \"0\"\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 0\n      # pipemaster:lost job.if pipeline/gitlab-ci/job/release-prepare: (branch == default_branch) && (event == 'schedule') && gitlab.RELEASE_BUMP && !((gitlab.CI_SERVER_HOST != 'gitlab.com') || (repo != 'gitlab-org/gitlab-shell'))\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; apk add --no-cache bash\n          support/release.sh prepare\n  release-tag:\n    if: false\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: registry.gitlab.com/gitlab-org/cli:${GLAB_VERSION}\n    env:\n      GIT_DEPTH: \"0\"\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 0\n      # pipemaster:lost job.if pipeline/gitlab-ci/job/release-tag: (branch == default_branch) && (event == 'push') && changes('VERSION') && !((gitlab.CI_SERVER_HOST != 'gitlab.com') || (repo != 'gitlab-org/gitlab-shell'))\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; apk add --no-cache bash\n          support/release.sh tag\n  secret_detection:\n    needs:\n      - modules-download\n    if: '!github.event.deleted'\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - run: 'printf ''%s\\n'' ''pipemaster: lost: step.script pipeline/gitlab-ci/job/secret_detection: the job has no script here; its script comes from an include or extends that the converter did not read, so add the script by hand'' >&2; exit 1'\n  semgrep-sast:\n    needs:\n      - modules-download\n    if: '!github.event.deleted'\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    steps:\n      - run: 'printf ''%s\\n'' ''pipemaster: lost: step.script pipeline/gitlab-ci/job/semgrep-sast: the job has no script here; its script comes from an include or extends that the converter did not read, so add the script by hand'' >&2; exit 1'\n  ssh-audit:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: ((needs.pipemaster-changes.outputs.c27af4a2a == 'true') || (needs.pipemaster-changes.outputs.c27af4a2a == 'false') && (needs.pipemaster-changes.outputs.cd92799ed == 'true')) && !github.event.deleted\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    env:\n      CACHE_COMPRESSION_LEVEL: fastest\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/ssh-audit\n      - uses: actions/cache@v6\n        with:\n          path: .GOPATH/pkg/mod/\n          key: golang-${GO_VERSION}-cache-${{ hashFiles('go.mod', 'go.sum') }}\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/ssh-audit\n      - uses: actions/cache@v6\n        with:\n          path: support/bin/ssh-audit-*\n          key: ssh-audit-${{ hashFiles('Makefile') }}\n      - id: script\n        run: 'export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; make ssh-audit-test'\n  ssh-audit-fips:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: ((needs.pipemaster-changes.outputs.c27af4a2a == 'true') || (needs.pipemaster-changes.outputs.c27af4a2a == 'false') && (needs.pipemaster-changes.outputs.cd92799ed == 'true')) && !github.event.deleted\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${FIPS_IMAGE}\n    env:\n      CACHE_COMPRESSION_LEVEL: fastest\n      FIPS_MODE: \"1\"\n      GOLANG_FIPS: \"1\"\n      SSH_AUDIT_HOST_KEY_TYPES: rsa ecdsa\n      SSH_AUDIT_POLICY: support/ssh-audit/gitlab-sshd-fips.policy\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/ssh-audit-fips\n      - uses: actions/cache@v6\n        with:\n          path: .GOPATH/pkg/mod/\n          key: golang-${GO_VERSION}-cache-${{ hashFiles('go.mod', 'go.sum') }}\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/ssh-audit-fips\n      - uses: actions/cache@v6\n        with:\n          path: support/bin/ssh-audit-*\n          key: ssh-audit-${{ hashFiles('Makefile') }}\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; dnf install -y openssh python3\n          make ssh-audit-test\n  tests:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: (needs.pipemaster-changes.outputs.c27af4a2a == 'true') && !github.event.deleted\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    services:\n      gitaly:\n        image: registry.gitlab.com/gitlab-org/build/cng/gitaly:master\n    strategy:\n      matrix:\n        GO_VERSION:\n          - \"1.26\"\n          - \"1.27\"\n    env:\n      GITALY_CONNECTION_INFO: '{\"address\":\"tcp://gitaly:8075\", \"storage\":\"default\"}'\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/tests\n      - uses: actions/cache@v6\n        with:\n          path: .GOPATH/pkg/mod/\n          key: golang-${GO_VERSION}-cache-${{ hashFiles('go.mod', 'go.sum') }}\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; make build\n          cp config.yml.example config.yml\n          go version\n          make verify test_fancy\n      - id: after_script\n        if: always()\n        run: 'export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; make coverage'\n        continue-on-error: true\n      # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/tests\n      - uses: actions/upload-artifact@v7\n        with:\n          name: tests\n          path: cover.xml\n  tests-fips:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: (needs.pipemaster-changes.outputs.c27af4a2a == 'true') && !github.event.deleted\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${FIPS_IMAGE}\n    services:\n      gitaly:\n        image: registry.gitlab.com/gitlab-org/build/cng/gitaly:master\n    env:\n      FIPS_MODE: \"1\"\n      GITALY_CONNECTION_INFO: '{\"address\":\"tcp://gitaly:8075\", \"storage\":\"default\"}'\n      GOLANG_FIPS: \"1\"\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/tests-fips\n      - uses: actions/cache@v6\n        with:\n          path: .GOPATH/pkg/mod/\n          key: golang-${GO_VERSION}-cache-${{ hashFiles('go.mod', 'go.sum') }}\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; dnf install -y git\n          make build\n          cp config.yml.example config.yml\n          go version\n          make test_fancy\n  tests_without_cgo:\n    needs:\n      - modules-download\n      - pipemaster-changes\n    if: (needs.pipemaster-changes.outputs.c27af4a2a == 'true') && !github.event.deleted\n    runs-on:\n      - self-hosted\n      - gitlab-org\n    container: ${DEFAULT_IMAGE}\n    services:\n      gitaly:\n        image: registry.gitlab.com/gitlab-org/build/cng/gitaly:master\n    strategy:\n      matrix:\n        GO_VERSION:\n          - \"1.26\"\n          - \"1.27\"\n    env:\n      CGO_ENABLED: \"0\"\n      GITALY_CONNECTION_INFO: '{\"address\":\"tcp://gitaly:8075\", \"storage\":\"default\"}'\n    steps:\n      - uses: actions/checkout@v7\n      # pipemaster:emulated job.cache pipeline/gitlab-ci/job/tests_without_cgo\n      - uses: actions/cache@v6\n        with:\n          path: .GOPATH/pkg/mod/\n          key: golang-${GO_VERSION}-cache-${{ hashFiles('go.mod', 'go.sum') }}\n      - id: script\n        run: |\n          export PIPEMASTER_VARS=2; export CI_PROJECT_DIR=\"${GITHUB_WORKSPACE}\"; export GOPATH=\"$CI_PROJECT_DIR/.GOPATH\"; : pipemaster-end; make build\n          cp config.yml.example config.yml\n          go version\n          make verify test_fancy\n"
     }
    ],
    "report": [
@@ -484,6 +484,153 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider gitlab (cache, extends, rules, services) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/acceptance",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/build-package-and-qa",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/check_gitaly_version",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/danger-review",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/gemnasium-dependency_scanning",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/gitlab-advanced-sast",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/lint",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/logging-field-validator",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/modules-download",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/modules-tidy",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/nilaway",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/race",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/release-prepare",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/release-tag",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/secret_detection",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/semgrep-sast",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/ssh-audit",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/ssh-audit-fips",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/tests",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/tests-fips",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/tests_without_cgo",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "runs-on self-hosted",
+     "detail": "the tags gitlab-org name self-managed runners; register GitHub runners with the labels self-hosted, gitlab-org"
     },
     {
      "path": "pipeline/gitlab-ci",
@@ -3403,7 +3550,7 @@
      "path": "pipeline/gitlab-ci/job/acceptance",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/acceptance/step/script",
@@ -3461,7 +3608,7 @@
      "path": "pipeline/gitlab-ci/job/build-package-and-qa",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/build-package-and-qa/env/GITLAB_SHELL_VERSION",
@@ -3500,7 +3647,7 @@
      "path": "pipeline/gitlab-ci/job/check_gitaly_version",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/check_gitaly_version/step/script",
@@ -3512,7 +3659,7 @@
      "path": "pipeline/gitlab-ci/job/danger-review",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/danger-review/step/script",
@@ -3537,7 +3684,7 @@
      "path": "pipeline/gitlab-ci/job/gemnasium-dependency_scanning",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/gemnasium-dependency_scanning/step/script",
@@ -3562,7 +3709,7 @@
      "path": "pipeline/gitlab-ci/job/gitlab-advanced-sast",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/gitlab-advanced-sast/step/script",
@@ -3587,7 +3734,7 @@
      "path": "pipeline/gitlab-ci/job/lint",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/lint/step/script",
@@ -3612,7 +3759,7 @@
      "path": "pipeline/gitlab-ci/job/logging-field-validator",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/logging-field-validator/step/script",
@@ -3630,7 +3777,7 @@
      "path": "pipeline/gitlab-ci/job/modules:download",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/modules:download/step/script",
@@ -3642,7 +3789,7 @@
      "path": "pipeline/gitlab-ci/job/modules:tidy",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/modules:tidy/step/script",
@@ -3667,7 +3814,7 @@
      "path": "pipeline/gitlab-ci/job/nilaway",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/nilaway/step/script",
@@ -3692,7 +3839,7 @@
      "path": "pipeline/gitlab-ci/job/race",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/race/step/script",
@@ -3730,7 +3877,7 @@
      "path": "pipeline/gitlab-ci/job/release:prepare",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/release:prepare",
@@ -3775,7 +3922,7 @@
      "path": "pipeline/gitlab-ci/job/release:tag",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/release:tag",
@@ -3814,7 +3961,7 @@
      "path": "pipeline/gitlab-ci/job/secret_detection",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/secret_detection/step/script",
@@ -3839,7 +3986,7 @@
      "path": "pipeline/gitlab-ci/job/semgrep-sast",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/semgrep-sast/step/script",
@@ -3864,7 +4011,7 @@
      "path": "pipeline/gitlab-ci/job/ssh-audit",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/ssh-audit/step/script",
@@ -3889,7 +4036,7 @@
      "path": "pipeline/gitlab-ci/job/ssh-audit:fips",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/ssh-audit:fips/step/script",
@@ -3935,7 +4082,7 @@
      "path": "pipeline/gitlab-ci/job/tests",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/tests/step/after_script",
@@ -3972,7 +4119,7 @@
      "path": "pipeline/gitlab-ci/job/tests:fips",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/tests:fips/step/script",
@@ -3997,7 +4144,7 @@
      "path": "pipeline/gitlab-ci/job/tests_without_cgo",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods, not runner labels"
+     "detail": "Tekton schedules pods; the runner label gitlab-org has no form"
     },
     {
      "path": "pipeline/gitlab-ci/job/tests_without_cgo/step/script",
@@ -6495,11 +6642,158 @@
      "level": "lost"
     },
     {
+     "path": "pipeline/gitlab-ci/job/acceptance",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/build-package-and-qa",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/check_gitaly_version",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
      "path": "pipeline/gitlab-ci/job/danger-review",
      "feature": "job.needs.artifacts",
      "level": "external",
      "strategy": "s3 or registry-image resource between the jobs",
      "detail": "the operator sets up the s3 or registry resource and its credentials; Concourse passes no artifact between jobs by itself"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/danger-review",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/gemnasium-dependency_scanning",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/gitlab-advanced-sast",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/lint",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/logging-field-validator",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/modules:download",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/modules:tidy",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/nilaway",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/race",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/release:prepare",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/release:tag",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/secret_detection",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/semgrep-sast",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/ssh-audit",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/ssh-audit:fips",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/tests",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/tests:fips",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
+    },
+    {
+     "path": "pipeline/gitlab-ci/job/tests_without_cgo",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "worker tags of the task",
+     "detail": "the tasks carry the worker tags gitlab-org; configure workers with these tags, or a build waits"
     },
     {
      "path": "pipeline/gitlab-ci",
@@ -6537,13 +6831,6 @@
      "detail": "the tasks run once per cell inside one across step; the outputs of the cells are not visible after it"
     },
     {
-     "path": "pipeline/gitlab-ci/job/acceptance",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
-    },
-    {
      "path": "pipeline/gitlab-ci/job/acceptance/step/script",
      "feature": "script.interpolation",
      "level": "emulated",
@@ -6566,13 +6853,6 @@
     },
     {
      "path": "pipeline/gitlab-ci/job/build-package-and-qa",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/build-package-and-qa",
      "feature": "step.script",
      "level": "emulated",
      "strategy": "failing task",
@@ -6586,13 +6866,6 @@
      "detail": "the job shows success when the plan fails"
     },
     {
-     "path": "pipeline/gitlab-ci/job/check_gitaly_version",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
-    },
-    {
      "path": "pipeline/gitlab-ci/job/check_gitaly_version/step/script",
      "feature": "script.interpolation",
      "level": "emulated",
@@ -6607,13 +6880,6 @@
      "detail": "the source runs the step under bash when the image has it; the task runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh"
     },
     {
-     "path": "pipeline/gitlab-ci/job/danger-review",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
-    },
-    {
      "path": "pipeline/gitlab-ci/job/danger-review/step/script",
      "feature": "script.interpolation",
      "level": "emulated",
@@ -6626,13 +6892,6 @@
      "level": "emulated",
      "strategy": "run.path sh with a bash-if-present wrapper",
      "detail": "the source runs the step under bash when the image has it; the task runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/gemnasium-dependency_scanning",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
     },
     {
      "path": "pipeline/gitlab-ci/job/gemnasium-dependency_scanning",
@@ -6640,13 +6899,6 @@
      "level": "emulated",
      "strategy": "failing task",
      "detail": "the job has no script here; its script comes from an include or extends that the converter did not read, so add the script by hand; a task that prints the loss and exits 1 stands in"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/gitlab-advanced-sast",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
     },
     {
      "path": "pipeline/gitlab-ci/job/gitlab-advanced-sast",
@@ -6663,13 +6915,6 @@
      "detail": "only within one job; a job with no script step writes no workspace"
     },
     {
-     "path": "pipeline/gitlab-ci/job/lint",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
-    },
-    {
      "path": "pipeline/gitlab-ci/job/lint/step/script",
      "feature": "script.interpolation",
      "level": "emulated",
@@ -6682,13 +6927,6 @@
      "level": "emulated",
      "strategy": "run.path sh with a bash-if-present wrapper",
      "detail": "the source runs the step under bash when the image has it; the task runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/logging-field-validator",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
     },
     {
      "path": "pipeline/gitlab-ci/job/logging-field-validator/step/script",
@@ -6724,13 +6962,6 @@
      "level": "emulated",
      "strategy": "across over the axes",
      "detail": "the tasks run once per cell inside one across step; the outputs of the cells are not visible after it"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/modules:download",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
     },
     {
      "path": "pipeline/gitlab-ci/job/modules:download/step/script",
@@ -6754,13 +6985,6 @@
      "detail": "the job ID modules:tidy is not a Concourse identifier or collides after conversion; the job is modules-tidy"
     },
     {
-     "path": "pipeline/gitlab-ci/job/modules:tidy",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
-    },
-    {
      "path": "pipeline/gitlab-ci/job/modules:tidy/step/script",
      "feature": "script.interpolation",
      "level": "emulated",
@@ -6773,13 +6997,6 @@
      "level": "emulated",
      "strategy": "run.path sh with a bash-if-present wrapper",
      "detail": "the source runs the step under bash when the image has it; the task runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/nilaway",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
     },
     {
      "path": "pipeline/gitlab-ci/job/nilaway/step/script",
@@ -6815,13 +7032,6 @@
      "level": "emulated",
      "strategy": "across over the axes",
      "detail": "the tasks run once per cell inside one across step; the outputs of the cells are not visible after it"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/race",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
     },
     {
      "path": "pipeline/gitlab-ci/job/race/step/script",
@@ -6852,13 +7062,6 @@
      "detail": "the condition is false on every push run, so this job has no triggering get; the other job of the pair runs the source condition; the condition is false on every tag run, so this job has no triggering get; the other job of the pair runs the source condition"
     },
     {
-     "path": "pipeline/gitlab-ci/job/release:prepare",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
-    },
-    {
      "path": "pipeline/gitlab-ci/job/release:prepare/step/script",
      "feature": "script.interpolation",
      "level": "emulated",
@@ -6880,13 +7083,6 @@
      "detail": "a step variable of the same name wins"
     },
     {
-     "path": "pipeline/gitlab-ci/job/release:tag",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
-    },
-    {
      "path": "pipeline/gitlab-ci/job/release:tag/step/script",
      "feature": "script.interpolation",
      "level": "emulated",
@@ -6902,24 +7098,10 @@
     },
     {
      "path": "pipeline/gitlab-ci/job/secret_detection",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/secret_detection",
      "feature": "step.script",
      "level": "emulated",
      "strategy": "failing task",
      "detail": "the job has no script here; its script comes from an include or extends that the converter did not read, so add the script by hand; a task that prints the loss and exits 1 stands in"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/semgrep-sast",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
     },
     {
      "path": "pipeline/gitlab-ci/job/semgrep-sast",
@@ -6941,13 +7123,6 @@
      "level": "emulated",
      "strategy": "copied into the params of every task",
      "detail": "a step variable of the same name wins"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/ssh-audit",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
     },
     {
      "path": "pipeline/gitlab-ci/job/ssh-audit/step/script",
@@ -6976,13 +7151,6 @@
      "level": "emulated",
      "strategy": "copied into the params of every task",
      "detail": "a step variable of the same name wins"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/ssh-audit:fips",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
     },
     {
      "path": "pipeline/gitlab-ci/job/ssh-audit:fips/step/script",
@@ -7025,13 +7193,6 @@
      "level": "emulated",
      "strategy": "across over the axes",
      "detail": "the tasks run once per cell inside one across step; the outputs of the cells are not visible after it"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/tests",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
     },
     {
      "path": "pipeline/gitlab-ci/job/tests/step/after_script",
@@ -7090,13 +7251,6 @@
      "detail": "a step variable of the same name wins"
     },
     {
-     "path": "pipeline/gitlab-ci/job/tests:fips",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
-    },
-    {
      "path": "pipeline/gitlab-ci/job/tests:fips/step/script",
      "feature": "script.interpolation",
      "level": "emulated",
@@ -7130,13 +7284,6 @@
      "level": "emulated",
      "strategy": "across over the axes",
      "detail": "the tasks run once per cell inside one across step; the outputs of the cells are not visible after it"
-    },
-    {
-     "path": "pipeline/gitlab-ci/job/tests_without_cgo",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags gitlab-org; a build waits until a worker has them"
     },
     {
      "path": "pipeline/gitlab-ci/job/tests_without_cgo/step/script",

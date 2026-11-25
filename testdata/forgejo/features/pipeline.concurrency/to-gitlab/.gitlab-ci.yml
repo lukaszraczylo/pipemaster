@@ -6,8 +6,6 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 # pipemaster:lost script.interpolation pipeline/ci: {{ ref }}
 build:
-  tags:
-    - ubuntu-latest
   needs: []
   script:
     # pipemaster:step build-step-1

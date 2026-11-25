@@ -1,11 +1,11 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"stepif","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"e58f980d1d5955fce2672992c195ad99ab1cc39e68be591affa16b4b8eb10d68","carry":"if: always()\nid: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"d2b00c9ea6e3d2d885905624e2fff304bb08506ba55015b074ef173990ee5ce4","carry":"if: always()\nid: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-2/carry
-# pipemaster:arg {"digest":"f0bcb900979726db826ab833caa62bf7c24a9d3f1045fb8514dd42a28f35b65b","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
+# pipemaster:arg {"digest":"77aa86a0f16ec1c02b15049dece6b69665ca91c30425d1a9891b0c5576239d7e","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"d81103f234b023e1dbc63f7a9e3941849b554503dbd6de812e45c3707b445c69","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"23f9cf09fb494dff52e463ba13fdcb00e4112deb079a358b5179add0437d2024","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -56,8 +56,6 @@ jobs:
               - pipemaster
               - echo cleanup
             dir: workspace
-        tags:
-          - ubuntu-latest
       - task: build-step-2
         config:
           platform: linux
@@ -78,8 +76,6 @@ jobs:
               - pipemaster
               - echo push
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: build-tag
     plan:
       - get: source-tags
@@ -106,8 +102,6 @@ jobs:
               - pipemaster
               - echo cleanup
             dir: workspace
-        tags:
-          - ubuntu-latest
       - task: build-step-2
         config:
           platform: linux
@@ -130,5 +124,3 @@ jobs:
                 echo 'pipemaster: skipped: the step condition has no shell form'; exit 0 # pipemaster:guard the step condition has no shell form
                 echo push
             dir: workspace
-        tags:
-          - ubuntu-latest

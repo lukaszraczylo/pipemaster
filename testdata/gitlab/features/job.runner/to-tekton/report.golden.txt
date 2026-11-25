@@ -1,5 +1,5 @@
 Loss report: gitlab -> tekton
-[lost] pipeline/gitlab-ci/job/build job.runner (Tekton schedules pods, not runner labels)
+[lost] pipeline/gitlab-ci/job/build job.runner (Tekton schedules pods; the runner label docker, linux has no form)
 [external] pipeline/gitlab-ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [external] pipeline/gitlab-ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [emulated] pipeline/gitlab-ci/job/build/step/script step.image: default image (the step names no image and Tekton requires one; alpine:3.22 runs it)

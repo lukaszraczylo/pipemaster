@@ -3,9 +3,9 @@
 # pipemaster:emulated config.name pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"vars":["REGION"]}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"55ba24af219d39262893dbce9ba720d2833a0150581ac5cdb174294848c3b5eb","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.REGION }}\"\nenv:\n    - name: KEY\n      value:\n        secret: DEPLOY_KEY\n"}
+# pipemaster:arg {"digest":"05df337da6279186474ac88d4905e7089af38ab7a154b819352345f9b6795395","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.REGION }}\"\nenv:\n    - name: KEY\n      value:\n        secret: DEPLOY_KEY\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"fd9c44b1b345032f38defd45e7bcdcb4cd1ea09300eb0ccb01865734459380cd","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"a307a1c4fe9f873479cab8bbe3bad9c0b0e8b6e67c6b468562a3606cbb5bb999","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -58,8 +58,6 @@ jobs:
               - pipemaster
               - echo "${REGION}"
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: build-tag
     plan:
       - get: source-tags
@@ -90,5 +88,3 @@ jobs:
               - pipemaster
               - echo "${REGION}"
             dir: workspace
-        tags:
-          - ubuntu-latest

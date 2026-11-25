@@ -1,5 +1,5 @@
 Loss report: gha -> argo
-[lost] pipeline/ci/job/check job.runner (Argo schedules pods; a runner label has no form)
+[lost] pipeline/ci/job/check job.runner (Argo schedules pods; only a platform label can carry a node selector)
 [lost] pipeline/ci/job/check/step/check-step-2 script.interpolation (no Argo spelling for expression steps.meta.outputs.version; the line is replaced by a line that prints the loss and exits 1)
 [external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [external] pipeline/ci/trigger/1 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)

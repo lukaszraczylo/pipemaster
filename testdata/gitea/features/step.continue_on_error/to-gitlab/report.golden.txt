@@ -1,2 +1,3 @@
 Loss report: gitea -> gitlab
+[external] pipeline/ci/job/build job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.continue_on_error: || true after each line of the step

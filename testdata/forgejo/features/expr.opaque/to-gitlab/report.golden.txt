@@ -1,3 +1,4 @@
 Loss report: forgejo -> gitlab
 [lost] pipeline/ci/job/build expr.opaque (condition not expressible in GitLab CI; job disabled)
 [lost] pipeline/ci/job/build/step/build-step-1 script.interpolation (no GitLab variable for expression opaque(gha): env[github.job]; the line is replaced by a line that prints the loss and exits 1)
+[external] pipeline/ci/job/build job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)

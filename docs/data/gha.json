@@ -12,16 +12,30 @@
    "files": [
     {
      "path": ".gitlab-ci.yml",
-     "text": "# pipemaster:emulated trigger.pull_request pipeline/ci/trigger/0\n# pipemaster:arg {\"kind\":\"pr\",\"branches\":{\"Include\":[\"main\"],\"Exclude\":null}}\n# pipemaster:emulated trigger.push pipeline/ci/trigger/1\n# pipemaster:arg {\"kind\":\"push\",\"branches\":{\"Include\":[\"main\"],\"Exclude\":null}}\n# pipemaster:emulated script.interpolation pipeline/ci\n# pipemaster:arg [{\"k\":\"t\",\"p\":\"job/test/step/test-step-3/script/0\",\"g\":\"GOARCH=$arch go test ./...\",\"s\":\"GOARCH=$\\u007b{ matrix.arch }} go test ./...\"}]\nstages:\n  - stage-0\n  - stage-1\nworkflow:\n  name: ci\n  rules:\n    - if: $CI_PIPELINE_SOURCE == \"merge_request_event\" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == \"main\"\n    - if: $CI_PIPELINE_SOURCE == \"push\" && $CI_COMMIT_BRANCH == \"main\"\n# pipemaster:emulated job.if pipeline/ci/job/deploy\n# pipemaster:arg {\"src\":\"ref_name == 'main'\",\"from\":\"gha\"}\ndeploy:\n  stage: stage-1\n  image: alpine:3.22\n  tags:\n    - ubuntu-latest\n  needs:\n    - test\n  rules:\n    - if: $CI_PIPELINE_SOURCE !~ /^merge_request_event$/i && $CI_COMMIT_REF_NAME =~ /^main$/i\n  script:\n    # pipemaster:step deploy-step-1\n    # pipemaster:step deploy-step-2\n    # pipemaster:emulated step.env pipeline/ci/job/deploy/step/deploy-step-2\n    - |\n      (\n      export TOKEN=\"$DEPLOY_TOKEN\"\n      ./scripts/deploy.sh\n      )\n  environment: production\ntest:\n  stage: stage-0\n  image: golang:1.27\n  tags:\n    - ubuntu-latest\n  needs: []\n  script:\n    # pipemaster:step test-step-1\n    # pipemaster:step test-step-2\n    - go vet ./...\n    # pipemaster:step test-step-3\n    - GOARCH=$arch go test ./...\n  parallel:\n    matrix:\n      - arch:\n          - amd64\n          - arm64\n"
+     "text": "# pipemaster:emulated trigger.pull_request pipeline/ci/trigger/0\n# pipemaster:arg {\"kind\":\"pr\",\"branches\":{\"Include\":[\"main\"],\"Exclude\":null}}\n# pipemaster:emulated trigger.push pipeline/ci/trigger/1\n# pipemaster:arg {\"kind\":\"push\",\"branches\":{\"Include\":[\"main\"],\"Exclude\":null}}\n# pipemaster:emulated script.interpolation pipeline/ci\n# pipemaster:arg [{\"k\":\"t\",\"p\":\"job/test/step/test-step-3/script/0\",\"g\":\"GOARCH=$arch go test ./...\",\"s\":\"GOARCH=$\\u007b{ matrix.arch }} go test ./...\"}]\nstages:\n  - stage-0\n  - stage-1\nworkflow:\n  name: ci\n  rules:\n    - if: $CI_PIPELINE_SOURCE == \"merge_request_event\" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == \"main\"\n    - if: $CI_PIPELINE_SOURCE == \"push\" && $CI_COMMIT_BRANCH == \"main\"\n# pipemaster:emulated job.if pipeline/ci/job/deploy\n# pipemaster:arg {\"src\":\"ref_name == 'main'\",\"from\":\"gha\"}\ndeploy:\n  stage: stage-1\n  image: alpine:3.22\n  needs:\n    - test\n  rules:\n    - if: $CI_PIPELINE_SOURCE !~ /^merge_request_event$/i && $CI_COMMIT_REF_NAME =~ /^main$/i\n  script:\n    # pipemaster:step deploy-step-1\n    # pipemaster:step deploy-step-2\n    # pipemaster:emulated step.env pipeline/ci/job/deploy/step/deploy-step-2\n    - |\n      (\n      export TOKEN=\"$DEPLOY_TOKEN\"\n      ./scripts/deploy.sh\n      )\n  environment: production\ntest:\n  stage: stage-0\n  image: golang:1.27\n  needs: []\n  script:\n    # pipemaster:step test-step-1\n    # pipemaster:step test-step-2\n    - go vet ./...\n    # pipemaster:step test-step-3\n    - GOARCH=$arch go test ./...\n  parallel:\n    matrix:\n      - arch:\n          - amd64\n          - arm64\n"
     }
    ],
    "report": [
+    {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "no tag",
+     "detail": "the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present"
+    },
     {
      "path": "pipeline/ci/job/deploy/step/deploy-step-2",
      "feature": "step.env",
      "level": "external",
      "strategy": "create DEPLOY_TOKEN as a masked CI/CD variable in the project settings, protected too for protected branches",
      "detail": "a GitLab file cannot mark a secret as one; it writes DEPLOY_TOKEN as plain variable references and the operator sets the values there"
+    },
+    {
+     "path": "pipeline/ci/job/test",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "no tag",
+     "detail": "the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present"
     }
    ]
   },
@@ -342,13 +356,13 @@
      "path": "pipeline/ci/job/deploy",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Argo schedules pods; a runner label has no form"
+     "detail": "Argo schedules pods; only a platform label can carry a node selector"
     },
     {
      "path": "pipeline/ci/job/test",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Argo schedules pods; a runner label has no form"
+     "detail": "Argo schedules pods; only a platform label can carry a node selector"
     },
     {
      "path": "pipeline/ci/job/deploy/step/deploy-step-1",
@@ -437,7 +451,7 @@
    "files": [
     {
      "path": ".concourse/ci.yml",
-     "text": "# pipemaster:emulated display.name pipeline/ci\n# pipemaster:arg {\"name\":\"ci\",\"id\":\"ci\",\"written\":\"ci\",\"kind\":\"pipeline\"}\n# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\next:\\n    gha:\\n        _derived_id: true\\nid: deploy-step-1\\nkind: action\\n\",\"get\":\"source\",\"params\":\"null\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/step/deploy-step-2/carry\n# pipemaster:arg {\"digest\":\"242295e2a1e69dc539292d193b3af78f4d944ebc31fa8c3739be1173460703e0\",\"carry\":\"id: deploy-step-2\\nkind: script\\nenv:\\n    - name: TOKEN\\n      value:\\n        secret: DEPLOY_TOKEN\\n\"}\n# pipemaster:emulated job.manual pipeline/ci/job/deploy\n# pipemaster:arg {\"environment\":{\"Name\":\"production\",\"URL\":\"\",\"Approval\":false},\"manual\":false,\"held\":true,\"cond\":true}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry\n# pipemaster:arg {\"digest\":\"76a3c36d58dc16969501fcf4024b401f5ee3fd4eb9f8bd98281d09427f5351f0\",\"carry\":\"if: ref_name == 'main'\\ncontainer:\\n    ref: alpine:3.22\\nenvironment:\\n    name: production\\nid: deploy\\nrunner:\\n    labels:\\n        - ubuntu-latest\\nneeds:\\n    - job: test\\n\"}\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\next:\\n    gha:\\n        _derived_id: true\\nid: test-step-1\\nkind: action\\n\",\"get\":\"source\",\"params\":\"null\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-2/carry\n# pipemaster:arg {\"digest\":\"4ab96f96fdc1144a86bd176570501c1fc3a39dd9e166a394fc1d211419376e27\",\"carry\":\"id: test-step-2\\nkind: script\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-3/carry\n# pipemaster:arg {\"digest\":\"dbb04fb6f47b67f7808644f8a187a9c47374acf6e7deec9ff1b474c8a8b08997\",\"carry\":\"id: test-step-3\\nkind: script\\nscript:\\n    - GOARCH=$\\u007b{ matrix.arch }} go test ./...\\n\"}\n# pipemaster:emulated job.matrix pipeline/ci/job/test\n# pipemaster:arg {\"matrix\":\"axes:\\n    - name: arch\\n      values:\\n        - amd64\\n        - arm64\\n\",\"across\":\"[{\\\"max_in_flight\\\":\\\"all\\\",\\\"values\\\":[\\\"amd64\\\",\\\"arm64\\\"],\\\"var\\\":\\\"arch\\\"}]\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry\n# pipemaster:arg {\"digest\":\"a8e2f157c723c67aeae52705ef9248265a564d02105c943e39a8dd14e5c63b6d\",\"carry\":\"container:\\n    ref: golang:1.27\\nmatrix:\\n    axes:\\n        - name: arch\\n          values:\\n            - amd64\\n            - arm64\\nid: test\\nrunner:\\n    labels:\\n        - ubuntu-latest\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/carry\n# pipemaster:arg {\"digest\":\"7e65c0d6306019efcea48966df45f029402721064756678d11489339a02e833a\",\"carry\":\"id: ci\\nname: ci\\ntriggers:\\n    - kind: pr\\n      branches:\\n        include:\\n            - main\\n    - kind: push\\n      branches:\\n        include:\\n            - main\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/ci\n# pipemaster:emulated job.runner pipeline/ci/job/deploy\n# pipemaster:emulated step.shell pipeline/ci/job/deploy/step/deploy-step-2\n# pipemaster:emulated job.runner pipeline/ci/job/test\n# pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-2\n# pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-3\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\n      branch: main\njobs:\n  - name: deploy\n    plan:\n      - get: source\n        passed:\n          - test\n      - task: deploy-step-2\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: alpine\n              tag: \"3.22\"\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          params:\n            TOKEN: ((DEPLOY_TOKEN))\n          run:\n            path: sh\n            args:\n              - -c\n              - if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$1\"; fi; exec sh -e -c \"$1\"\n              - pipemaster\n              - ./scripts/deploy.sh\n            dir: workspace\n        tags:\n          - ubuntu-latest\n  - name: test\n    plan:\n      - get: source\n        trigger: true\n      - do:\n          - task: test-step-2\n            input_mapping:\n              workspace: source\n            config:\n              platform: linux\n              image_resource:\n                type: registry-image\n                source:\n                  repository: golang\n                  tag: \"1.27\"\n              inputs:\n                - name: workspace\n              outputs:\n                - name: workspace\n              run:\n                path: sh\n                args:\n                  - -c\n                  - if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$1\"; fi; exec sh -e -c \"$1\"\n                  - pipemaster\n                  - go vet ./...\n                dir: workspace\n            tags:\n              - ubuntu-latest\n          - task: test-step-3\n            config:\n              platform: linux\n              image_resource:\n                type: registry-image\n                source:\n                  repository: golang\n                  tag: \"1.27\"\n              inputs:\n                - name: workspace\n              outputs:\n                - name: workspace\n              params:\n                PM_MATRIX_ARCH: ((.:arch))\n              run:\n                path: sh\n                args:\n                  - -c\n                  - if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$1\"; fi; exec sh -e -c \"$1\"\n                  - pipemaster\n                  - GOARCH=${PM_MATRIX_ARCH} go test ./...\n                dir: workspace\n            tags:\n              - ubuntu-latest\n        across:\n          - var: arch\n            values:\n              - amd64\n              - arm64\n            max_in_flight: all\n"
+     "text": "# pipemaster:emulated display.name pipeline/ci\n# pipemaster:arg {\"name\":\"ci\",\"id\":\"ci\",\"written\":\"ci\",\"kind\":\"pipeline\"}\n# pipemaster:emulated step.action pipeline/ci/job/deploy/step/deploy-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\next:\\n    gha:\\n        _derived_id: true\\nid: deploy-step-1\\nkind: action\\n\",\"get\":\"source\",\"params\":\"null\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/step/deploy-step-2/carry\n# pipemaster:arg {\"digest\":\"8f4c09469898dd6269dfedd5d0b6d1c73da6d798df43b0aa5602275c1089a53b\",\"carry\":\"id: deploy-step-2\\nkind: script\\nenv:\\n    - name: TOKEN\\n      value:\\n        secret: DEPLOY_TOKEN\\n\"}\n# pipemaster:emulated job.manual pipeline/ci/job/deploy\n# pipemaster:arg {\"environment\":{\"Name\":\"production\",\"URL\":\"\",\"Approval\":false},\"manual\":false,\"held\":true,\"cond\":true}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry\n# pipemaster:arg {\"digest\":\"97f29b1252d783850bf1252b99fea48551518b6c37e7176ad5e4363de87f5acd\",\"carry\":\"if: ref_name == 'main'\\ncontainer:\\n    ref: alpine:3.22\\nenvironment:\\n    name: production\\nid: deploy\\nrunner:\\n    labels:\\n        - ubuntu-latest\\nneeds:\\n    - job: test\\n\"}\n# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v4\\next:\\n    gha:\\n        _derived_id: true\\nid: test-step-1\\nkind: action\\n\",\"get\":\"source\",\"params\":\"null\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-2/carry\n# pipemaster:arg {\"digest\":\"a7413e498fbec34f5fd3241f32db290c7fec8dcc7d52fa4bab680640cca4c86c\",\"carry\":\"id: test-step-2\\nkind: script\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-3/carry\n# pipemaster:arg {\"digest\":\"5e5d79ab1ae5be3998e65a4ce3086e6ee141a69fad9dd60f4b1ebd07abfed463\",\"carry\":\"id: test-step-3\\nkind: script\\nscript:\\n    - GOARCH=$\\u007b{ matrix.arch }} go test ./...\\n\"}\n# pipemaster:emulated job.matrix pipeline/ci/job/test\n# pipemaster:arg {\"matrix\":\"axes:\\n    - name: arch\\n      values:\\n        - amd64\\n        - arm64\\n\",\"across\":\"[{\\\"max_in_flight\\\":\\\"all\\\",\\\"values\\\":[\\\"amd64\\\",\\\"arm64\\\"],\\\"var\\\":\\\"arch\\\"}]\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry\n# pipemaster:arg {\"digest\":\"e3666d4a8f495d85e5138f138155959233235480a9e57b5e751007af6a8c77b8\",\"carry\":\"container:\\n    ref: golang:1.27\\nmatrix:\\n    axes:\\n        - name: arch\\n          values:\\n            - amd64\\n            - arm64\\nid: test\\nrunner:\\n    labels:\\n        - ubuntu-latest\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/ci/carry\n# pipemaster:arg {\"digest\":\"7e65c0d6306019efcea48966df45f029402721064756678d11489339a02e833a\",\"carry\":\"id: ci\\nname: ci\\ntriggers:\\n    - kind: pr\\n      branches:\\n        include:\\n            - main\\n    - kind: push\\n      branches:\\n        include:\\n            - main\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/ci\n# pipemaster:emulated job.runner pipeline/ci/job/deploy\n# pipemaster:emulated step.shell pipeline/ci/job/deploy/step/deploy-step-2\n# pipemaster:emulated job.runner pipeline/ci/job/test\n# pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-2\n# pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-3\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\n      branch: main\njobs:\n  - name: deploy\n    plan:\n      - get: source\n        passed:\n          - test\n      - task: deploy-step-2\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: alpine\n              tag: \"3.22\"\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          params:\n            TOKEN: ((DEPLOY_TOKEN))\n          run:\n            path: sh\n            args:\n              - -c\n              - if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$1\"; fi; exec sh -e -c \"$1\"\n              - pipemaster\n              - ./scripts/deploy.sh\n            dir: workspace\n  - name: test\n    plan:\n      - get: source\n        trigger: true\n      - do:\n          - task: test-step-2\n            input_mapping:\n              workspace: source\n            config:\n              platform: linux\n              image_resource:\n                type: registry-image\n                source:\n                  repository: golang\n                  tag: \"1.27\"\n              inputs:\n                - name: workspace\n              outputs:\n                - name: workspace\n              run:\n                path: sh\n                args:\n                  - -c\n                  - if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$1\"; fi; exec sh -e -c \"$1\"\n                  - pipemaster\n                  - go vet ./...\n                dir: workspace\n          - task: test-step-3\n            config:\n              platform: linux\n              image_resource:\n                type: registry-image\n                source:\n                  repository: golang\n                  tag: \"1.27\"\n              inputs:\n                - name: workspace\n              outputs:\n                - name: workspace\n              params:\n                PM_MATRIX_ARCH: ((.:arch))\n              run:\n                path: sh\n                args:\n                  - -c\n                  - if command -v bash >/dev/null 2>&1; then exec bash -e -c \"$1\"; fi; exec sh -e -c \"$1\"\n                  - pipemaster\n                  - GOARCH=${PM_MATRIX_ARCH} go test ./...\n                dir: workspace\n        across:\n          - var: arch\n            values:\n              - amd64\n              - arm64\n            max_in_flight: all\n"
     }
    ],
    "report": [
@@ -459,18 +473,25 @@
      "level": "lost"
     },
     {
+     "path": "pipeline/ci/job/deploy",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "no worker tag",
+     "detail": "the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present"
+    },
+    {
+     "path": "pipeline/ci/job/test",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "no worker tag",
+     "detail": "the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present"
+    },
+    {
      "path": "pipeline/ci",
      "feature": "ext.passthrough",
      "level": "emulated",
      "strategy": "git-uri variable",
      "detail": "the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager"
-    },
-    {
-     "path": "pipeline/ci/job/deploy",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags ubuntu-latest; a build waits until a worker has them"
     },
     {
      "path": "pipeline/ci/job/deploy/step/deploy-step-1",
@@ -492,13 +513,6 @@
      "level": "emulated",
      "strategy": "across over the axes",
      "detail": "the tasks run once per cell inside one across step; the outputs of the cells are not visible after it"
-    },
-    {
-     "path": "pipeline/ci/job/test",
-     "feature": "job.runner",
-     "level": "emulated",
-     "strategy": "worker tags of the task",
-     "detail": "the tasks carry the worker tags ubuntu-latest; a build waits until a worker has them"
     },
     {
      "path": "pipeline/ci/job/test/step/test-step-1",

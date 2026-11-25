@@ -1,4 +1,5 @@
 Loss report: gitea -> gitlab
 [lost] pipeline/ci/job/check/step/check-step-2 display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [lost] pipeline/ci/job/check/step/check-step-2 script.interpolation (no GitLab variable for expression steps.meta.outputs.version; the line is replaced by a line that prints the loss and exits 1)
+[external] pipeline/ci/job/check job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [emulated] pipeline/ci/job/check/step/check-step-2 step.if: shell guard around the step's lines (step reports success instead of skipped)

@@ -3,4 +3,5 @@ Loss report: forgejo -> gitlab
 [lost] pipeline/ci/job/build/step/build-step-2 ext.passthrough (the action reference actions/setup-go@v5 is not in the GitLab file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (no GitLab mapping for action docker://alpine:3.20)
 [lost] pipeline/ci/job/build/step/local step.action (no GitLab mapping for action ./.github/actions/setup)
+[external] pipeline/ci/job/build job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [emulated] pipeline/ci/job/build/step/build-step-2 step.action: image selection (job image replaced)

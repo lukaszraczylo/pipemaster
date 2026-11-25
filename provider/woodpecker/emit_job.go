@@ -12,6 +12,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -250,6 +251,9 @@ func (e *emitter) labels(m *wmap, c *wfCtx, ext map[string]any) error {
 			platform = l
 		}
 	}
+	emitkit.ReportHosted(e.origin, r.Labels, "backend label",
+		func(st, d string) { e.external(c.jp, caps.JobRunner, st, d) },
+		func(d string) { e.lose(c.jp, caps.JobRunner, d) })
 	n := newMap()
 	if platform != "" {
 		v, err := e.text(nil, c.jp, caps.JobRunner, valueText, platform)

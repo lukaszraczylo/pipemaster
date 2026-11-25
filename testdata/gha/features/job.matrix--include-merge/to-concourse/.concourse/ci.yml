@@ -1,11 +1,11 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"ci","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
-# pipemaster:arg {"digest":"7b27016f2b622377fe3b7e407c62b3b49cb8df5d521dff8c2b41fa1bfcdabb2c","carry":"id: test-step-1\nkind: script\nscript:\n    - go test $\u007b{ matrix.go }}\n"}
+# pipemaster:arg {"digest":"9cc2e801704e0dd8d855bf2801c5d023ce163cc1750572647969b8f3c4c4ca48","carry":"id: test-step-1\nkind: script\nscript:\n    - go test $\u007b{ matrix.go }}\n"}
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"matrix":"axes:\n    - name: go\n      values:\n        - \"1.21\"\n        - \"1.22\"\ninclude:\n    - - key: experimental\n        value: \"true\"\n      - key: go\n        value: \"1.22\"\n","across":"[{\"max_in_flight\":\"all\",\"values\":[{\"experimental\":\"\",\"go\":\"1.21\"},{\"experimental\":\"true\",\"go\":\"1.22\"}],\"var\":\"matrix\"}]"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
-# pipemaster:arg {"digest":"4b2275edf29e1b95437cbd3151c43492ae90840340db198bb65ce24b001e306c","carry":"matrix:\n    axes:\n        - name: go\n          values:\n            - \"1.21\"\n            - \"1.22\"\n    include:\n        - - key: experimental\n            value: \"true\"\n          - key: go\n            value: \"1.22\"\nid: test\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"139818033f027da09b56b294dfa39daa454564448d19e9ff0bc80b541d4d89cc","carry":"matrix:\n    axes:\n        - name: go\n          values:\n            - \"1.21\"\n            - \"1.22\"\n    include:\n        - - key: experimental\n            value: \"true\"\n          - key: go\n            value: \"1.22\"\nid: test\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/test-tag
 # pipemaster:arg {"twin_of":"test"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -56,8 +56,6 @@ jobs:
                   - pipemaster
                   - go test ${PM_MATRIX_GO}
                 dir: workspace
-            tags:
-              - ubuntu-latest
         across:
           - var: matrix
             values:
@@ -95,8 +93,6 @@ jobs:
                   - pipemaster
                   - go test ${PM_MATRIX_GO}
                 dir: workspace
-            tags:
-              - ubuntu-latest
         across:
           - var: matrix
             values:

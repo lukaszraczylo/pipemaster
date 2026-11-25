@@ -1,15 +1,15 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"matrix multi axis","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/prod/step/prod-step-1/carry
-# pipemaster:arg {"digest":"70b62e473b4f067cbae16877a9220f7771979b59db7e759dc4b2ceed0ef2edc3","carry":"id: prod-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"82b91fe526fbd2d15f63587ea394a17c952edeaa37bbcb839049f0623d2bc976","carry":"id: prod-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/prod/carry
-# pipemaster:arg {"digest":"d262615cef0c8aa34ca9b8d788d106293a624c8d1577d2fdb2141428e5dcfb08","carry":"id: prod\nrunner:\n    labels:\n        - ubuntu-latest\noutputs:\n    - name: ver\n      value: v1\n"}
+# pipemaster:arg {"digest":"119f15ba0b2c8b92ed951402d73a40062839817e76b960b0e5dc9867415952f2","carry":"id: prod\nrunner:\n    labels:\n        - ubuntu-latest\noutputs:\n    - name: ver\n      value: v1\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
-# pipemaster:arg {"digest":"d72d3b1a2ea74e3cd4b0f7fec6f7a959c68b950a38b7319ef05f4c80830b42e1","carry":"id: test-step-1\nkind: script\nscript:\n    - echo $\u007b{ matrix.os }} $\u007b{ matrix.go }} $\u007b{ needs.prod.outputs.ver }}\n"}
+# pipemaster:arg {"digest":"2de32e35b015fa1a0c91a84afec3f9d2f68c6225fe5fb72f05cda49d840a791b","carry":"id: test-step-1\nkind: script\nscript:\n    - echo $\u007b{ matrix.os }} $\u007b{ matrix.go }} $\u007b{ needs.prod.outputs.ver }}\n"}
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"matrix":"axes:\n    - name: os\n      values:\n        - linux\n        - mac\n    - name: go\n      values:\n        - \"1.24\"\n        - \"1.25\"\nexclude:\n    - - key: go\n        value: \"1.24\"\n      - key: os\n        value: mac\n","across":"[{\"max_in_flight\":\"all\",\"values\":[{\"go\":\"1.24\",\"os\":\"linux\"},{\"go\":\"1.25\",\"os\":\"linux\"},{\"go\":\"1.25\",\"os\":\"mac\"}],\"var\":\"matrix\"}]"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
-# pipemaster:arg {"digest":"8c0aea0a4cb5fe81d577aba82ca07bc2a810fe262a4e25008991cd440f9d75bc","carry":"matrix:\n    axes:\n        - name: os\n          values:\n            - linux\n            - mac\n        - name: go\n          values:\n            - \"1.24\"\n            - \"1.25\"\n    exclude:\n        - - key: go\n            value: \"1.24\"\n          - key: os\n            value: mac\nid: test\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: prod\n"}
+# pipemaster:arg {"digest":"516643fe15bc674c11abaf93710c0d46bd558a0ce35b63d082f07b09569d51a5","carry":"matrix:\n    axes:\n        - name: os\n          values:\n            - linux\n            - mac\n        - name: go\n          values:\n            - \"1.24\"\n            - \"1.25\"\n    exclude:\n        - - key: go\n            value: \"1.24\"\n          - key: os\n            value: mac\nid: test\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: prod\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/prod-tag
 # pipemaster:arg {"twin_of":"prod"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/test-tag
@@ -62,8 +62,6 @@ jobs:
               - pipemaster
               - make
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: test
     plan:
       - get: source
@@ -95,8 +93,6 @@ jobs:
                     # pipemaster:lost echo {{ matrix.os }} {{ matrix.go }} {{ needs.prod.outputs.ver }}
                     printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/test/step/test-step-1: no Concourse spelling for expression needs.prod.outputs.ver; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
                 dir: workspace
-            tags:
-              - ubuntu-latest
         across:
           - var: matrix
             values:
@@ -133,8 +129,6 @@ jobs:
               - pipemaster
               - make
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: test-tag
     plan:
       - get: source-tags
@@ -166,8 +160,6 @@ jobs:
                     # pipemaster:lost echo {{ matrix.os }} {{ matrix.go }} {{ needs.prod.outputs.ver }}
                     printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/test/step/test-step-1: no Concourse spelling for expression needs.prod.outputs.ver; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
                 dir: workspace
-            tags:
-              - ubuntu-latest
         across:
           - var: matrix
             values:

@@ -1,5 +1,5 @@
 Loss report: gitea -> argo
-[lost] pipeline/ci/job/build job.runner (Argo schedules pods; a runner label has no form)
+[lost] pipeline/ci/job/build job.runner (Argo schedules pods; only a platform label can carry a node selector)
 [lost] pipeline/ci/trigger/0 trigger.filter.paths (a Sensor data filter cannot test the changed files; the trigger runs on every change)
 [lost] pipeline/ci/trigger/1 trigger.filter.paths (a Sensor data filter cannot test the changed files; the trigger runs on every change)
 [lost] pipeline/ci/trigger/2 trigger.filter.paths (a Sensor data filter cannot test the changed files; the trigger runs on every change)

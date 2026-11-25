@@ -11,8 +11,6 @@ workflow:
 # pipemaster:emulated project.multi_pipeline pipeline/.shared/job/run
 # pipemaster:arg {}
 shared:run-job:
-  tags:
-    - ubuntu-latest
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "api"
@@ -22,8 +20,6 @@ shared:run-job:
 # pipemaster:emulated project.multi_pipeline pipeline/ci/job/build
 # pipemaster:arg {}
 ci:build:
-  tags:
-    - ubuntu-latest
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH || $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG

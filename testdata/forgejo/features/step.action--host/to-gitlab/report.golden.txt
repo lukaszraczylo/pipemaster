@@ -1,3 +1,4 @@
 Loss report: forgejo -> gitlab
 [lost] pipeline/ci/job/build/step/build-step-2 step.action: image selection (missing input go-version)
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (no GitLab mapping for action org/tool/sub@v2)
+[external] pipeline/ci/job/build job.runner: job tags (the job carries the tags docker; register a runner with these tags, or the job stays pending)

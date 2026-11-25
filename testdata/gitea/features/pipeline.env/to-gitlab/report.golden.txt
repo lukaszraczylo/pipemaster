@@ -1,3 +1,4 @@
 Loss report: gitea -> gitlab
 [lost] pipeline/ci expr.opaque (no GitLab variable for expression gha.github.run_number)
 [external] pipeline/ci pipeline.env: create DEPLOY_TOKEN as a masked CI/CD variable in the project settings, protected too for protected branches (a GitLab file cannot mark a secret as one; it writes DEPLOY_TOKEN as plain variable references and the operator sets the values there)
+[external] pipeline/ci/job/build job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)

@@ -1,9 +1,9 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"interp","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"3d29c50d1a984d5b82a0729674fc27f8343f9466760505cb703a7a1d23485075","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"sha $\u007b{ sha }} on $\u007b{ ref_name }}\"\n    - echo \"$\u007b{ gha.github.workspace }}\"\n"}
+# pipemaster:arg {"digest":"ab1494b7bb1e7c69cb5f51027ebf375885e444453deb427fffce4d0c877caffd","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"sha $\u007b{ sha }} on $\u007b{ ref_name }}\"\n    - echo \"$\u007b{ gha.github.workspace }}\"\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"f1d31296444be84f8087a74fed4124ea48b08e3ad8834e2c37ab7abaa5e454fd","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"9bcab5cad7c60845b1b27fe168d8d68aa175366ef0bdd2c921c673c2f9e6b614","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -55,8 +55,6 @@ jobs:
                 # pipemaster:lost echo "{{ gha.github.workspace }}"
                 printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Concourse spelling for expression gha.github.workspace; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: build-tag
     plan:
       - get: source-tags
@@ -87,5 +85,3 @@ jobs:
                 # pipemaster:lost echo "{{ gha.github.workspace }}"
                 printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Concourse spelling for expression gha.github.workspace; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
             dir: workspace
-        tags:
-          - ubuntu-latest

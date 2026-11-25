@@ -2,3 +2,4 @@ Loss report: gitea -> gitlab
 [lost] pipeline/ci/job/build/step/build-step-2 step.action (no GitLab mapping for action org/tool@v2)
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (no GitLab mapping for action org/local-action@main)
 [lost] pipeline/ci/job/build/step/build-step-4 step.action (no GitLab mapping for action /checkout)
+[external] pipeline/ci/job/build job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)

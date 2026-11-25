@@ -1,5 +1,5 @@
 Loss report: forgejo -> argo
-[lost] pipeline/ci/job/build job.runner (Argo schedules pods; a runner label has no form)
+[lost] pipeline/ci/job/build job.runner (Argo schedules pods; only a platform label can carry a node selector)
 [lost] pipeline/ci/job/build/step/build-step-2 step.if (the condition has no shell test form; the step is disabled)
 [lost] pipeline/ci/job/build/step/build-step-4 step.if (the condition has no shell test form; the step is disabled)
 [external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)

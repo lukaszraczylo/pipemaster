@@ -1,13 +1,13 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"base","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"c3c03e9a3e9e7ae4b4ab70d5b6b8306c1bd631862027691f5d1408c6ab431090","carry":"image:\n    ref: alpine:3.20\n    entrypoint:\n        - \"\"\nid: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"2fd6127264ab6bf7d1bc56a3ac232e41d17ac0fef10f19a4ddc7682c9e709000","carry":"image:\n    ref: alpine:3.20\n    entrypoint:\n        - \"\"\nid: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"bd0d041faf1b847b632922e2935c62be6e7d30d60ae5ae4f6505e59bd20fdd20","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"5ddd25d49c04258ae525307a2d2f82aab1bdf09d3f38f12f81835817cdad0137","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/step/deploy-step-1/carry
-# pipemaster:arg {"digest":"31138b793d83a24da6a96c2d3b63dc6efa7b8dc0c050b51bb91601b4d8812044","carry":"id: deploy-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"081c281e8e841115a59069d09f5cdaa5c9ea1f8cdc59e05f9f35940a39293417","carry":"id: deploy-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry
-# pipemaster:arg {"digest":"3301619a9163f8aa1822d1031721b812ada7d7df5905cf0f4d1ad115c7ae2e6c","carry":"id: deploy\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: build\n"}
+# pipemaster:arg {"digest":"b6ee4c71bd1ecd49e4150102a07de4ae40142dd9e6b92c3b03a67bc301cb1d04","carry":"id: deploy\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: build\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/deploy-tag
@@ -59,8 +59,6 @@ jobs:
               - pipemaster
               - make build
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: deploy
     plan:
       - get: source
@@ -89,8 +87,6 @@ jobs:
               - pipemaster
               - make deploy
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: build-tag
     plan:
       - get: source-tags
@@ -117,8 +113,6 @@ jobs:
               - pipemaster
               - make build
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: deploy-tag
     plan:
       - get: source-tags
@@ -147,5 +141,3 @@ jobs:
               - pipemaster
               - make deploy
             dir: workspace
-        tags:
-          - ubuntu-latest

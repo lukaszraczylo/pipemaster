@@ -1,5 +1,5 @@
 Loss report: gitea -> argo
-[lost] pipeline/ci/job/build job.runner (Argo schedules pods; a runner label has no form)
+[lost] pipeline/ci/job/build job.runner (Argo schedules pods; only a platform label can carry a node selector)
 [lost] pipeline/ci/job/build/step/build-step-2 step.action (the action org/tool@v2 has no Argo mapping; Argo does not run the step, and the marker and a comment keep the reference)
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (the action org/local-action@main has no Argo mapping; Argo does not run the step, and the marker and a comment keep the reference)
 [lost] pipeline/ci/job/build/step/build-step-4 step.action (the action /checkout has no Argo mapping; Argo does not run the step, and the marker and a comment keep the reference)

@@ -5,9 +5,9 @@
 # pipemaster:emulated trigger.schedule pipeline/ci/trigger/1
 # pipemaster:arg {"cron":"30 5 * * 1-5","resource":"schedule-2","source":"{\"days\":[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"],\"start\":\"05:30\",\"stop\":\"05:35\"}"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"aca61d8f33873242bda7aea3433c48d7cdd689abc7380a408d47efbad948d46d","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"f53bb9f75eff01d2c3a951e09d8d49e9e98aeb79d13e11d00a734abc6ebee6c7","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"27c180b2776657b86d7102f7c8863a2c822ff4fed8c99d591b8961ab6473b661","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"ee102845b5cb28b319f593d7371d627b277f52bb4c9ad063998b74910ebf2a64","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"0c57d0563eb6c31d4b7bae1f2cf1f081e301cedc8e89f9bb84d3b97b38dcfe43","carry":"id: ci\nname: nightly\ntriggers:\n    - kind: schedule\n      cron: 0 0 * * 0\n    - kind: schedule\n      cron: 30 5 * * 1-5\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
@@ -67,5 +67,3 @@ jobs:
               - pipemaster
               - echo ok
             dir: workspace
-        tags:
-          - ubuntu-latest

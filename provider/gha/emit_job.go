@@ -5,6 +5,7 @@ import (
 	"math"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -15,7 +16,10 @@ import (
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
-const defaultRunner = "ubuntu-latest"
+const (
+	defaultRunner   = "ubuntu-latest"
+	selfHostedLabel = "self-hosted"
+)
 
 // jobCtx tells jobNode how the job sits in its pipeline.
 type jobCtx struct {
@@ -325,6 +329,7 @@ func (e *emitter) runsOn(m *omap, jp string, j *ir.Job, ext map[string]any, cons
 			return err
 		}
 	}
+	labels = e.selfHosted(jp, labels)
 	rest, _ := ext[extRunsOn].(map[string]any)
 	switch {
 	case group == "" && len(labels) == 0:
@@ -574,4 +579,23 @@ func (e *emitter) guardMarker(pl *ir.Pipeline, jp string) {
 	if err := e.markArg(caps.JobIf, jp, srcArg{Guard: true, From: markFrom(e.from)}); err != nil {
 		e.comment("deletion guard not carried: " + err.Error())
 	}
+}
+
+// tagOrigins lists the dialects whose runner labels are tags of a self-managed worker, not names of a hosted image.
+var tagOrigins = map[string]bool{"gitlab": true, "concourse": true}
+
+// selfHosted puts the self-hosted label before worker tags from another dialect, so a tag never reads as a
+// GitHub-hosted image such as ubuntu-latest.
+func (e *emitter) selfHosted(jp string, labels []string) []string {
+	if !tagOrigins[e.origin] || len(labels) == 0 {
+		return labels
+	}
+	for _, l := range labels {
+		if l == selfHostedLabel || emitkit.HostedRunner(l) != emitkit.NotHosted {
+			return labels
+		}
+	}
+	e.external(jp, caps.JobRunner, "runs-on self-hosted", "the tags "+strings.Join(labels, ", ")+" name self-managed runners; register GitHub runners with the labels self-hosted, "+strings.Join(labels, ", "))
+	e.mark(caps.JobRunner, jp)
+	return append([]string{selfHostedLabel}, labels...)
 }

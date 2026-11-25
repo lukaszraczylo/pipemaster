@@ -8,8 +8,6 @@ workflow:
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"Axes":[{"Name":"go","Values":["1.21","1.22"]}],"Include":[[{"Key":"experimental","Value":"true"},{"Key":"go","Value":"1.22"}]],"Exclude":null,"lines":["go test $go"]}
 test:
-  tags:
-    - ubuntu-latest
   needs: []
   script:
     # pipemaster:step test-step-1

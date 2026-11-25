@@ -1,5 +1,5 @@
 Loss report: forgejo -> argo
-[lost] pipeline/ci/job/build job.runner (Argo schedules pods; a runner label has no form)
+[lost] pipeline/ci/job/build job.runner (Argo schedules pods; only a platform label can carry a node selector)
 [lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider gha (types, workflows) is not written to the Argo file; it is kept in round-trip metadata)
 [lost] pipeline/ci/trigger/0 trigger.pipeline_done (Argo has no pipeline-completion trigger)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.shell: container command sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)

@@ -1,5 +1,5 @@
 Loss report: gitlab -> tekton
-[lost] pipeline/gitlab-ci/job/build job.runner (Tekton schedules pods, not runner labels)
+[lost] pipeline/gitlab-ci/job/build job.runner (Tekton schedules pods; the runner label ubuntu-latest has no form)
 [lost] pipeline/gitlab-ci/trigger/1 trigger.filter.paths (a glob has no exact CEL regex, so the filter is false and the trigger never fires; the globs stay in the marker)
 [external] pipeline/gitlab-ci/trigger/0 trigger.pull_request: same-repository pull requests only; Secret pipemaster-github-webhook (the filter admits only pull requests from this repository, because the code of a fork would run with every secret of the Task; GitHub Actions withholds secrets from fork runs. Remove the head.repo term of the filter to accept forks; create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [external] pipeline/gitlab-ci/trigger/1 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)

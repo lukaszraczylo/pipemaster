@@ -1,6 +1,6 @@
 Loss report: gitea -> concourse
+[external] pipeline/ci/job/build job.runner: no worker tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [emulated] pipeline/ci ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
-[emulated] pipeline/ci/job/build job.runner: worker tags of the task (the tasks carry the worker tags ubuntu-latest; a build waits until a worker has them)
 [emulated] pipeline/ci/job/build trigger.manual: get with no trigger (no trigger starts the job, so a person starts it)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.image: default image (the task names no image, so it runs ubuntu:latest)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.shell: run.path sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the task runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)

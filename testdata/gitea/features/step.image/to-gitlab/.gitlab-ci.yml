@@ -14,16 +14,12 @@ build:
     name: alpine:3.20
     entrypoint:
       - ""
-  tags:
-    - ubuntu-latest
   needs: []
   script:
     # pipemaster:step build-step-1
     - make build
 deploy:
   stage: stage-1
-  tags:
-    - ubuntu-latest
   needs:
     - build
   script:

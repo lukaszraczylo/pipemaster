@@ -2,9 +2,9 @@
 # pipemaster:arg {"name":"stepenv","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:lost env GREETING: actor
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"73f41081c849bdbaaed6278e0bfeda6e5cdf44f9f83035ae3943a744104c2500","carry":"id: build-step-1\nkind: script\nenv:\n    - name: GREETING\n      value:\n        expr: format('hello {0}', actor)\n    - name: KEY\n      value:\n        secret: KEY\n"}
+# pipemaster:arg {"digest":"dc3ee907892373d805c7018b7e70665e91286a574bf85f868bc018cda1b36aed","carry":"id: build-step-1\nkind: script\nenv:\n    - name: GREETING\n      value:\n        expr: format('hello {0}', actor)\n    - name: KEY\n      value:\n        secret: KEY\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"d651fd29fdc84fe4022757f0fad73aa7c521de716b9e4b20969393f0072ef8c4","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"f75d9fb0776faf708d902b46920d8577c3bc521eabfba8edfca3026336517710","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -54,8 +54,6 @@ jobs:
               - pipemaster
               - echo "$GREETING"
             dir: workspace
-        tags:
-          - ubuntu-latest
   - name: build-tag
     plan:
       - get: source-tags
@@ -84,5 +82,3 @@ jobs:
               - pipemaster
               - echo "$GREETING"
             dir: workspace
-        tags:
-          - ubuntu-latest

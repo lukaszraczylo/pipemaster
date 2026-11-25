@@ -659,15 +659,10 @@ func (jx *jobEmitter) mixed() bool {
 	return ps && other
 }
 
-// workerTags returns the runner labels that a worker can carry. A label with an expression names no worker.
+// workerTags returns the runner labels that a worker can carry. A label with an expression names no worker, and a
+// hosted label names a GitHub image, not a worker tag.
 func (jx *jobEmitter) workerTags() []string {
-	var out []string
-	for _, l := range jx.j.Runner.Labels {
-		if !strings.Contains(l, "${{") {
-			out = append(out, l)
-		}
-	}
-	return out
+	return emitkit.WorkerTags(jx.pe.e.origin, jx.j.Runner.Labels)
 }
 
 type runVerdict int
