@@ -45,3 +45,26 @@ func TestPluginTableIsComplete(t *testing.T) {
 		}
 	}
 }
+
+func TestPluginShell(t *testing.T) {
+	tests := map[string]bool{
+		"plugins/s3": false, "woodpeckerci/plugin-s3": false, "woodpeckerci/plugin-github-release": false,
+		"plugins/slack": true, "plugins/docker": true, "appleboy/drone-ssh": true,
+	}
+	for image, want := range tests {
+		t.Run(image, func(t *testing.T) {
+			p, ok := LookupPlugin(image)
+			if !ok || p.HasShell() != want {
+				t.Fatalf("%s: found %v, HasShell %v, want %v", image, ok, p.HasShell(), want)
+			}
+		})
+	}
+}
+
+func TestLookupPluginRefusesLookalikes(t *testing.T) {
+	for _, ref := range []string{"ghcr.io/plugins/docker", "myorg/plugins-docker", "plugins/docker-extra", "x/plugins/docker"} {
+		if _, ok := LookupPlugin(ref); ok {
+			t.Errorf("%s matched", ref)
+		}
+	}
+}

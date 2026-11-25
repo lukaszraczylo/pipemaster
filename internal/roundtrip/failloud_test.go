@@ -86,6 +86,27 @@ func runScript(t *testing.T, script string) (stdout, stderr string, code int) {
 	return o.String(), e.String(), code
 }
 
+// runScriptIn runs script under sh in dir with a fixed environment.
+func runScriptIn(t *testing.T, dir, script string) (stdout, stderr string, code int) {
+	t.Helper()
+	file := filepath.Join(t.TempDir(), "step.sh")
+	if err := os.WriteFile(file, []byte(script), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("sh", file) // #nosec G204 -- fixed binary, generated script
+	cmd.Dir = dir
+	cmd.Env = []string{"HOME=/nonexistent-home", "PATH=" + os.Getenv("PATH")}
+	var o, e bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &o, &e
+	err := cmd.Run()
+	if ee, ok := err.(*exec.ExitError); ok {
+		code = ee.ExitCode()
+	} else if err != nil {
+		t.Fatalf("run sh: %v", err)
+	}
+	return o.String(), e.String(), code
+}
+
 func hasFailLoud(script string) bool {
 	return slices.ContainsFunc(strings.Split(script, "\n"), emitkit.IsFailLoudLine)
 }

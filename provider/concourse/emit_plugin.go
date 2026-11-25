@@ -15,26 +15,32 @@ import (
 const (
 	pluginStrategy = "plugin image as the task image, entrypoint command as run.path"
 	pluginCaveat   = "the entrypoint command comes from pipemaster's plugin table (%s); the settings are PLUGIN_ variables in the task params, the Woodpecker convention"
-	pluginPrivMsg  = "; the plugin starts a Docker daemon, so the task needs a privileged container, which the task file cannot request"
+	pluginPrivMsg  = "; the plugin starts a Docker daemon, so the task step sets privileged: true, and the workers must allow privileged tasks"
 )
 
 // pluginTask writes a plugin step as a task that runs the entrypoint command of the plugin image. It returns nil,
 // writing nothing, when the plugin is not in the table, the job has a guard or a setting has no spelling: the
 // caller then writes the failing task.
-func (c *chain) pluginTask(st *ir.Step, path string) []*yaml.Node {
+func (c *chain) pluginTask(st *ir.Step, path string) ([]*yaml.Node, string) {
 	jx := c.jx
 	e := jx.pe.e
-	if st.If != nil || !emitkit.PluginRuns(st) || jx.guard != nil || strings.Contains(st.Image.Ref, varOpen) {
-		return nil
+	if st.Image == nil {
+		return nil, ""
 	}
 	pl, ok := actions.LookupPlugin(st.Image.Ref)
-	if !ok {
-		return nil
+	switch {
+	case !ok || !emitkit.PluginRuns(st):
+		return nil, ""
+	case st.If != nil:
+		return nil, "the step has a condition that a plugin task cannot carry; the step fails with a message"
+	case jx.guard != nil:
+		return nil, "the job has a guard that a plugin task cannot carry; the step fails with a message"
+	case strings.Contains(st.Image.Ref, varOpen):
+		return nil, "the image reference holds ((, which Concourse reads as a variable; the step fails with a message"
 	}
 	vars, why := emitkit.PluginEnv(st)
 	if why != "" {
-		e.lose(path, caps.StepAction, why+"; the step fails with a message")
-		return nil
+		return nil, why + "; the step fails with a message"
 	}
 	name := jx.stepName(st, path)
 	dir := jx.runDir(st, path, name, nil)
@@ -42,7 +48,7 @@ func (c *chain) pluginTask(st *ir.Step, path string) []*yaml.Node {
 	all := slices.Concat(vars, st.Env)
 	sc.envParams(path, all)
 	if len(sc.params) != len(all) {
-		return nil
+		return nil, "a setting has no Concourse param spelling; the step fails with a message"
 	}
 	repo, tag, digest := splitImage(st.Image.Ref)
 	cfg := newMap()
@@ -74,6 +80,16 @@ func (c *chain) pluginTask(st *ir.Step, path string) []*yaml.Node {
 	m := newMap()
 	m.SetStr("task", name)
 	m.Set("config", cfg.N)
+	if !c.mapped && jx.workspaceSource().name != workspaceName {
+		im := newMap()
+		im.SetStr(workspaceName, jx.ws.name)
+		m.Set("input_mapping", im.N)
+		jx.noteWorkspace()
+	}
+	c.mapped = true
+	if pl.Privileged {
+		m.Set("privileged", boolNode(true))
+	}
 	if st.Timeout != nil {
 		m.SetStr("timeout", durationText(st.Timeout))
 	}
@@ -82,8 +98,7 @@ func (c *chain) pluginTask(st *ir.Step, path string) []*yaml.Node {
 	held.Ext = withoutBookkeeping(st.Ext)
 	body, err := carryYAML(&held)
 	if err != nil {
-		e.lose(path, caps.StepAction, "the action marker cannot be written: "+err.Error())
-		return nil
+		return nil, "the action marker cannot be written: " + err.Error()
 	}
 	arg := actionArg{Step: body, Task: name, Hold: nodeCanon(m.N)}
 	e.markArg(caps.StepAction, jx.sm(name), arg)
@@ -92,7 +107,7 @@ func (c *chain) pluginTask(st *ir.Step, path string) []*yaml.Node {
 		caveat += pluginPrivMsg
 	}
 	e.emulate(path, caps.StepAction, pluginStrategy, caveat)
-	return []*yaml.Node{m.N}
+	return []*yaml.Node{m.N}, ""
 }
 
 // bridgeArg is the marker argument of the failing task that stands for a job with no steps.

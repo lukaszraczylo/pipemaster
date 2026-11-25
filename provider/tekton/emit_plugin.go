@@ -3,6 +3,7 @@ package tekton
 import (
 	"slices"
 
+	"github.com/lukaszraczylo/pipemaster/actions"
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
@@ -48,7 +49,18 @@ func (tc *taskCtx) pluginStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 	if len(env) > 0 {
 		m.Set("env", seqOf(env...))
 	}
+	priv := ""
+	if pl, ok := actions.LookupPlugin(st.Image.Ref); ok && pl.Privileged {
+		sec := newMap()
+		sec.Set("privileged", boolNode(true))
+		m.Set("securityContext", sec.N)
+		priv = "; the plugin starts a Docker daemon, so it sets securityContext.privileged: true and the cluster policy must admit privileged pods"
+	}
 	tc.stepTail(m, st, cond)
-	tc.e.emulate(sp, caps.StepAction, pluginStrategy, "the settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a list of scalars is comma-joined, any other list or map is JSON; the image entrypoint runs and the step has no script")
+	level := tc.e.emulate
+	if priv != "" {
+		level = tc.e.external
+	}
+	level(sp, caps.StepAction, pluginStrategy, "the settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a list of scalars is comma-joined, any other list or map is JSON; the image entrypoint runs and the step has no script"+priv)
 	return m, true, tc.markAction(b, sp, st, "", m)
 }

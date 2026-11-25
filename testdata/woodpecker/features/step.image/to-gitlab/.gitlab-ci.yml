@@ -31,12 +31,11 @@ ci-2:
     - ci-1
   script:
     # pipemaster:step publish
-    # pipemaster:emulated step.env pipeline/woodpecker/job/ci/step/publish
     - |
       (
-      export PLUGIN_REPO="example/app"
-      export PLUGIN_TAGS="latest"
+      export PLUGIN_REPO='example/app'
+      export PLUGIN_TAGS='latest'
       '/usr/local/bin/dockerd-entrypoint.sh' 'plugin-docker-buildx'
       )
     # pipemaster:emulated step.action pipeline/woodpecker/job/ci/step/publish
-    # pipemaster:arg {"step":{"with":{"repo":{"l":"example/app"},"tags":{"l":"latest"}},"id":"publish","image":"woodpeckerci/plugin-docker-buildx"},"kind":"script","script":"'/usr/local/bin/dockerd-entrypoint.sh' 'plugin-docker-buildx'","pos":-1}
+    # pipemaster:arg {"step":{"with":{"repo":{"l":"example/app"},"tags":{"l":"latest"}},"id":"publish","image":"woodpeckerci/plugin-docker-buildx"},"kind":"script","script":"(\nexport PLUGIN_REPO='example/app'\nexport PLUGIN_TAGS='latest'\n'/usr/local/bin/dockerd-entrypoint.sh' 'plugin-docker-buildx'\n)","pos":-1}

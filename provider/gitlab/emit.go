@@ -33,7 +33,7 @@ func (adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
 	if p != nil {
 		origin = p.Origin.Provider
 	}
-	e := &emitter{originID: origin, splits: map[*ir.Job]splitPart{}, plugins: map[string]pluginUse{}, noSplit: map[string]string{}, from: sourceDialect(origin), led: emitkit.NewLedger("ir", dialect, adapter{}.Caps())}
+	e := &emitter{originID: origin, splits: map[*ir.Job]splitPart{}, plugins: map[string]pluginUse{}, pluginWhy: map[string]string{}, noSplit: map[string]string{}, from: sourceDialect(origin), led: emitkit.NewLedger("ir", dialect, adapter{}.Caps())}
 	e.gated = emitkit.GatedSteps(p)
 	e.injected = injected
 	uses := ir.Features(p)

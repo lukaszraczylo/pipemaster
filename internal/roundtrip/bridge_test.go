@@ -90,8 +90,9 @@ func TestPluginStepRunsTheImage(t *testing.T) {
 			if strings.Contains(all, "pipemaster: lost: step.action") {
 				t.Errorf("the plugin step still fails:\n%s", all)
 			}
-			if strings.Contains(all, "SLACK_WEBHOOK_VALUE") {
-				t.Errorf("a secret value is written")
+			i := strings.Index(all, "name: PLUGIN_WEBHOOK")
+			if i < 0 || !strings.Contains(all[i:min(len(all), i+200)], "valueFrom") || !strings.Contains(all, "SLACK_WEBHOOK") {
+				t.Errorf("the webhook is not a reference to the secret SLACK_WEBHOOK:\n%s", all)
 			}
 			for _, d := range diffNodes(r.src, r.back) {
 				t.Errorf("A->B->A: %s differs at %s", d.Field, d.Path)
@@ -126,6 +127,10 @@ func TestPluginEntrypointFromTable(t *testing.T) {
 				if !strings.Contains(all, want) {
 					t.Errorf("missing %q in\n%s", want, all)
 				}
+			}
+			secret := map[string]string{"gitlab": `export PLUGIN_WEBHOOK="$SLACK_WEBHOOK"`, "concourse": "PLUGIN_WEBHOOK: ((SLACK_WEBHOOK))"}[to]
+			if !strings.Contains(all, secret) {
+				t.Errorf("the secret is not %q:\n%s", secret, all)
 			}
 			if strings.Contains(all, "pipemaster: lost: step.action") {
 				t.Errorf("the plugin step still fails:\n%s", all)

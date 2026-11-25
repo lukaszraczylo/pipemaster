@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"regexp"
 	"slices"
 	"strings"
 
+	"github.com/lukaszraczylo/pipemaster/actions"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
@@ -17,6 +19,8 @@ const (
 	fromSecretKey   = "from_secret"
 	listSeparator   = ","
 )
+
+var envName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // PluginRuns reports whether a step is a plugin that runs its image entrypoint: an image, settings and no script.
 // The condition of the step is the caller's concern.
@@ -43,6 +47,9 @@ func PluginEnv(st *ir.Step) ([]ir.Var, string) {
 	owner := map[string]string{}
 	add := func(setting string, v ir.Value) string {
 		name := PluginEnvName(setting)
+		if !envName.MatchString(name) {
+			return "the setting " + setting + " maps to " + name + ", which is not a variable name"
+		}
 		if first, dup := owner[name]; dup {
 			return "the settings " + first + " and " + setting + " both map to " + name
 		}
@@ -134,10 +141,13 @@ func hasReference(v any) bool {
 	return false
 }
 
-// NoEntrypointReason is the text of the failing step for a plugin image whose entrypoint command is not known: the
-// target has no form that runs the image entrypoint by itself.
+// NoEntrypointReason is the text of the failing step for a plugin image that is not in the plugin table: the
+// target has no form that runs the image entrypoint by itself. It is empty for a known image.
 func NoEntrypointReason(st *ir.Step) string {
 	if st.Kind != ir.StepPlugin || st.Image == nil {
+		return ""
+	}
+	if _, known := actions.LookupPlugin(st.Image.Ref); known {
 		return ""
 	}
 	return "the plugin image " + st.Image.Ref + " has no entrypoint command in the plugin table and the target cannot run an image entrypoint; set the entrypoint command of the image in the step"

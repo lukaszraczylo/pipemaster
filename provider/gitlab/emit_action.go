@@ -129,6 +129,8 @@ func (e *emitter) actionStep(p *jobPrep, st *ir.Step) error {
 		why := "the step kind has no GitLab form"
 		if r := emitkit.NoEntrypointReason(st); r != "" {
 			why = r
+		} else if r := e.pluginWhy[pluginKey(p.j.ID, st.ID)]; r != "" {
+			why = r
 		}
 		return e.lostStep(p, st, "kind "+string(st.Kind), why)
 	}

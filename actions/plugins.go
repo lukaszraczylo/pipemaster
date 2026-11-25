@@ -14,11 +14,16 @@ var pluginsEmbedded []byte
 
 // Plugin is a plugin image with the command its entrypoint runs.
 type Plugin struct {
+	// Shell is false for an image that holds no shell (FROM scratch), so no script can run in it.
+	Shell      *bool    `yaml:"shell"`
 	Image      string   `yaml:"image"`
 	Source     string   `yaml:"source"`
 	Entrypoint []string `yaml:"entrypoint"`
 	Privileged bool     `yaml:"privileged"`
 }
+
+// HasShell is false only when the table says the image holds no shell.
+func (p Plugin) HasShell() bool { return p.Shell == nil || *p.Shell }
 
 var (
 	pluginOnce  sync.Once

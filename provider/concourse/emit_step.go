@@ -27,6 +27,7 @@ var posixShells = []string{"sh", "bash", "dash", "zsh", "ash"}
 // chain is a run of tasks that pass the workspace along: the first task maps it from the source.
 type chain struct {
 	jx     *jobEmitter
+	why    string
 	mapped bool
 	pos    int
 }
@@ -66,21 +67,29 @@ func (c *chain) step(st *ir.Step) []*yaml.Node {
 		}
 		return []*yaml.Node{c.script(st, path)}
 	case ir.StepResource, ir.StepPlugin, ir.StepTask:
+		pluginWhy := ""
 		if ext := extOf(st.Ext); !e.own || ext == nil {
 			feature := caps.ExtPassthrough
 			if st.Kind == ir.StepPlugin {
 				feature = caps.StepAction
 			}
 			if st.Kind == ir.StepPlugin {
-				if n := c.pluginTask(st, path); n != nil {
+				n, reason := c.pluginTask(st, path)
+				if n != nil {
 					return n
 				}
+				pluginWhy = reason
 			}
 			why := "the " + string(st.Kind) + " step has no Concourse form outside a Concourse file; a placeholder task keeps its place"
 			if r := emitkit.NoEntrypointReason(st); r != "" {
 				why = r
+			} else if pluginWhy != "" {
+				why = pluginWhy
 			}
 			e.lose(path, feature, why)
+			if st.Kind == ir.StepPlugin {
+				c.why = why
+			}
 			return c.placeholder(st, path, actionArg{}, true)
 		}
 		n := c.verbatim(st, path)
@@ -530,7 +539,8 @@ func (jx *jobEmitter) imageNode(sc *scope, ref string) (*yaml.Node, bool) {
 // splitImage splits a reference into repository, tag and digest.
 func splitImage(ref string) (repo, tag, digest string) {
 	if i := strings.Index(ref, "@"); i >= 0 {
-		return ref[:i], "", ref[i+1:]
+		repo, tag, _ = splitImage(ref[:i])
+		return repo, tag, ref[i+1:]
 	}
 	slash := strings.LastIndex(ref, "/")
 	if i := strings.LastIndex(ref, ":"); i > slash {

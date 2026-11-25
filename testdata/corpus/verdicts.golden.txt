@@ -340,7 +340,7 @@
 44-woodpecker-monitor woodpecker->forgejo native=   9 emulated=   5 external=   0 lost=   7
 44-woodpecker-monitor woodpecker->gha native=   9 emulated=   5 external=   0 lost=   7
 44-woodpecker-monitor woodpecker->gitea native=   9 emulated=   5 external=   0 lost=   7
-44-woodpecker-monitor woodpecker->gitlab native=   6 emulated=   5 external=   3 lost=   8
+44-woodpecker-monitor woodpecker->gitlab native=   6 emulated=   3 external=   2 lost=   9
 44-woodpecker-monitor woodpecker->tekton native=  12 emulated=   3 external=   0 lost=   5
 46-woodpecker-go-starter woodpecker->argo native=  42 emulated=  21 external=   0 lost=  29
 46-woodpecker-go-starter woodpecker->concourse native=  39 emulated=   4 external=   0 lost=  55
@@ -366,13 +366,13 @@
 48-woodpecker-aiocoap woodpecker->gitea native=  24 emulated=  21 external=   0 lost=  18
 48-woodpecker-aiocoap woodpecker->gitlab native=  19 emulated=  22 external=   0 lost=  20
 48-woodpecker-aiocoap woodpecker->tekton native=  46 emulated=  11 external=   1 lost=   3
-49-woodpecker-contributions-web woodpecker->argo native=   5 emulated=   7 external=   0 lost=   6
+49-woodpecker-contributions-web woodpecker->argo native=   5 emulated=   5 external=   0 lost=   7
 49-woodpecker-contributions-web woodpecker->concourse native=   7 emulated=   4 external=   0 lost=   7
 49-woodpecker-contributions-web woodpecker->drone native=   8 emulated=   4 external=   0 lost=   5
 49-woodpecker-contributions-web woodpecker->forgejo native=   8 emulated=   5 external=   0 lost=   5
 49-woodpecker-contributions-web woodpecker->gha native=   8 emulated=   5 external=   0 lost=   5
 49-woodpecker-contributions-web woodpecker->gitea native=   8 emulated=   5 external=   0 lost=   5
-49-woodpecker-contributions-web woodpecker->gitlab native=   3 emulated=   2 external=   0 lost=  14
+49-woodpecker-contributions-web woodpecker->gitlab native=   3 emulated=   2 external=   1 lost=  13
 49-woodpecker-contributions-web woodpecker->tekton native=   3 emulated=   4 external=   0 lost=  10
 50-woodpecker-rust-confirm-email woodpecker->argo native=   5 emulated=   3 external=   1 lost=   2
 50-woodpecker-rust-confirm-email woodpecker->concourse native=   6 emulated=   2 external=   0 lost=   4
@@ -382,12 +382,12 @@
 50-woodpecker-rust-confirm-email woodpecker->gitea native=   4 emulated=   3 external=   0 lost=   2
 50-woodpecker-rust-confirm-email woodpecker->gitlab native=   4 emulated=   2 external=   1 lost=   2
 50-woodpecker-rust-confirm-email woodpecker->tekton native=   6 emulated=   1 external=   1 lost=   1
-51-drone-parsr drone->argo native=  30 emulated=  25 external=   0 lost=  10
+51-drone-parsr drone->argo native=  30 emulated=  24 external=   1 lost=  10
 51-drone-parsr drone->concourse native=  30 emulated=  23 external=   0 lost=  14
 51-drone-parsr drone->forgejo native=  27 emulated=  24 external=   0 lost=   6
 51-drone-parsr drone->gha native=  27 emulated=  23 external=   0 lost=   6
 51-drone-parsr drone->gitea native=  27 emulated=  23 external=   0 lost=   6
-51-drone-parsr drone->gitlab native=  23 emulated=  16 external=   2 lost=  15
+51-drone-parsr drone->gitlab native=  23 emulated=  16 external=   3 lost=  15
 51-drone-parsr drone->tekton native=  24 emulated=  26 external=   0 lost=  15
 51-drone-parsr drone->woodpecker native=  45 emulated=   1 external=   0 lost=   8
 52-drone-distribution drone->argo native= 205 emulated=  70 external=   0 lost= 165
@@ -419,7 +419,7 @@
 55-drone-geodns drone->forgejo native=  17 emulated=  14 external=   0 lost=  15
 55-drone-geodns drone->gha native=  17 emulated=  13 external=   0 lost=  15
 55-drone-geodns drone->gitea native=  17 emulated=  13 external=   0 lost=  15
-55-drone-geodns drone->gitlab native=  14 emulated=  10 external=   4 lost=  15
+55-drone-geodns drone->gitlab native=  14 emulated=   6 external=   2 lost=  19
 55-drone-geodns drone->tekton native=  27 emulated=   6 external=   0 lost=   7
 55-drone-geodns drone->woodpecker native=  22 emulated=   1 external=   0 lost=  18
 56-drone-mysql-operator drone->argo native=  36 emulated=  17 external=   0 lost=  11
@@ -443,7 +443,7 @@
 59-drone-casper-node drone->forgejo native=  56 emulated=  35 external=   0 lost=  36
 59-drone-casper-node drone->gha native=  56 emulated=  34 external=   0 lost=  36
 59-drone-casper-node drone->gitea native=  56 emulated=  34 external=   0 lost=  36
-59-drone-casper-node drone->gitlab native=  35 emulated=  16 external=   6 lost=  66
+59-drone-casper-node drone->gitlab native=  35 emulated=  16 external=   7 lost=  66
 59-drone-casper-node drone->tekton native=  73 emulated=  20 external=   0 lost=  25
 59-drone-casper-node drone->woodpecker native=  75 emulated=   4 external=   0 lost=  40
 60-drone-go-markdown2confluence drone->argo native=   8 emulated=   4 external=   0 lost=   3
@@ -460,7 +460,7 @@
 61-drone-pinmonl drone->gha native=   9 emulated=   7 external=   0 lost=   5
 61-drone-pinmonl drone->gitea native=   9 emulated=   7 external=   0 lost=   5
 61-drone-pinmonl drone->gitlab native=   6 emulated=   4 external=   1 lost=   8
-61-drone-pinmonl drone->tekton native=  10 emulated=   7 external=   0 lost=   2
+61-drone-pinmonl drone->tekton native=  10 emulated=   6 external=   1 lost=   2
 61-drone-pinmonl drone->woodpecker native=  13 emulated=   1 external=   0 lost=   4
 62-drone-elasticsearch-test-data drone->argo native=   4 emulated=   6 external=   0 lost=   6
 62-drone-elasticsearch-test-data drone->concourse native=   6 emulated=   4 external=   0 lost=   8

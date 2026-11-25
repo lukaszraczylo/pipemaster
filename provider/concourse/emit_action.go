@@ -205,8 +205,8 @@ func (c *chain) placeholder(st *ir.Step, path string, arg actionArg, lost bool) 
 	script := placeholderCmd
 	if lost {
 		why := "Concourse does not run the action" + refSuffix(st)
-		if r := emitkit.NoEntrypointReason(st); r != "" {
-			why = r
+		if c.why != "" {
+			why, c.why = c.why, ""
 		}
 		script = emitkit.FailLoud(caps.StepAction, path, why)
 	}

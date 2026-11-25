@@ -141,6 +141,10 @@ func (e *emitter) emulate(path string, f caps.Feature, strategy, detail string) 
 	e.note(path, f, caps.Emulated, strategy, detail)
 }
 
+func (e *emitter) external(path string, f caps.Feature, strategy, detail string) {
+	e.note(path, f, caps.External, strategy, detail)
+}
+
 func (e *emitter) note(path string, f caps.Feature, lv caps.Level, strategy, detail string) {
 	u := use(path, f)
 	if prev, ok := e.said[u]; ok {

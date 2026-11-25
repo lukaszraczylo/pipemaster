@@ -1,5 +1,5 @@
 # pipemaster:emulated step.action pipeline/drone/job/ci/step/publish
-# pipemaster:arg {"step":"image:\n    ref: woodpeckerci/plugin-docker-buildx\nwith:\n    repo:\n        lit: example/app\n    tags:\n        lit: latest\nid: publish\nkind: plugin\n","hold":"{\"env\":[{\"name\":\"PLUGIN_REPO\",\"value\":\"example/app\"},{\"name\":\"PLUGIN_TAGS\",\"value\":\"latest\"}],\"image\":\"woodpeckerci/plugin-docker-buildx\",\"name\":\"publish\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:arg {"step":"image:\n    ref: woodpeckerci/plugin-docker-buildx\nwith:\n    repo:\n        lit: example/app\n    tags:\n        lit: latest\nid: publish\nkind: plugin\n","hold":"{\"env\":[{\"name\":\"PLUGIN_REPO\",\"value\":\"example/app\"},{\"name\":\"PLUGIN_TAGS\",\"value\":\"latest\"}],\"image\":\"woodpeckerci/plugin-docker-buildx\",\"name\":\"publish\",\"securityContext\":{\"privileged\":true},\"workingDir\":\"/workspace\"}"}
 # pipemaster:emulated trigger.filter.branches pipeline/drone/trigger/0
 # pipemaster:emulated trigger.push pipeline/drone/trigger/0
 apiVersion: argoproj.io/v1alpha1
@@ -33,6 +33,8 @@ spec:
                 value: example/app
               - name: PLUGIN_TAGS
                 value: latest
+            securityContext:
+              privileged: true
             dependencies:
               - build
         volumeMounts:

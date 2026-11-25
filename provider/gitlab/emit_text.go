@@ -28,13 +28,14 @@ type emitter struct {
 	originID string
 	pl       *ir.Pipeline
 	// wfGuard is the workflow condition that Parse ANDed into every job; the written workflow block already says it.
-	wfGuard expr.Expr
-	from    *expr.Dialect
-	fold    *folded
-	splits  map[*ir.Job]splitPart
-	plugins map[string]pluginUse
-	noSplit map[string]string
-	deadOut map[string]bool
+	wfGuard   expr.Expr
+	from      *expr.Dialect
+	fold      *folded
+	splits    map[*ir.Job]splitPart
+	plugins   map[string]pluginUse
+	pluginWhy map[string]string
+	noSplit   map[string]string
+	deadOut   map[string]bool
 	// noVar holds the inputs that got no variable, because another input owns the name.
 	noVar    map[string]bool
 	secrets  map[ir.FeatureUse][]string
