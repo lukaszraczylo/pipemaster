@@ -89,6 +89,9 @@ func (pe *pipeEmitter) jobs() []*yaml.Node {
 		pe.sources = push
 		pe.primary = firstGit(push)
 	} else if len(tags) > 0 {
+		if len(push) > 0 {
+			e.lose(pe.path, caps.TriggerTag, "the pipeline has no job to copy for a tag run, and a job waits for a version of every get; with a push trigger beside the tag trigger the job never starts")
+		}
 		for _, s := range tags {
 			s.tagOnly = false
 		}

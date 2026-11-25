@@ -879,3 +879,17 @@ func TestTagOnlyStepRunsOnlyInTheTwin(t *testing.T) {
 		t.Errorf("the twin does not run the tag step: %s", script("publish-tag"))
 	}
 }
+
+// A pipeline with no job has only the placeholder, which has no twin: the lost tag run is reported.
+func TestPushAndTagSourceWithNoJobReportsTheLostTagRun(t *testing.T) {
+	p := project()
+	p.Pipelines[0].Triggers = []ir.Trigger{pushOn("main"), {Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{"v*"}}}}
+	_, rep := emit(t, p)
+	found := false
+	for _, e := range rep.Entries {
+		found = found || e.Level == caps.Lost && e.Feature == caps.TriggerTag
+	}
+	if !found {
+		t.Errorf("no lost trigger.tag entry: %v", rep.Entries)
+	}
+}
