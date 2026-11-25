@@ -32,14 +32,19 @@ func fullRun(name, srcEvent, srcBranch, srcTag, base string) run {
 	r := run{name: name, src: varEnv{"event": srcEvent, "branch": srcBranch, "tag": srcTag, "pr.base_ref": base}}
 	switch srcEvent {
 	case "tag":
-		r.gha = varEnv{"ref_type": "tag", "ref_name": srcTag, "tag": srcTag, "branch": "", "pr.base_ref": "", "ref": "refs/tags/" + srcTag}
-		r.gl = varEnv{"tag": srcTag, "branch": nil, "pr.base_ref": nil}
+		r.gha = varEnv{"event": "push", "ref_type": "tag", "ref_name": srcTag, "tag": srcTag, "branch": "", "pr.base_ref": "", "ref": "refs/tags/" + srcTag}
+		r.gl = varEnv{"event": "push", "tag": srcTag, "branch": nil, "pr.base_ref": nil}
+	case "manual":
+		// A manual run on a tag ref sets the tag name, and its event is not the tag event.
+		r.src = varEnv{"event": "manual", "branch": nil, "tag": srcTag, "pr.base_ref": nil}
+		r.gha = varEnv{"event": "workflow_dispatch", "ref_type": "tag", "ref_name": srcTag, "tag": srcTag, "branch": "", "pr.base_ref": "", "ref": "refs/tags/" + srcTag}
+		r.gl = varEnv{"event": "web", "tag": srcTag, "branch": nil, "pr.base_ref": nil}
 	case "pull_request":
-		r.gha = varEnv{"ref_type": "branch", "ref_name": "5/merge", "pr.base_ref": base, "ref": "refs/pull/5/merge"}
-		r.gl = varEnv{"tag": nil, "branch": nil, "pr.base_ref": base}
+		r.gha = varEnv{"event": "pull_request", "ref_type": "branch", "ref_name": "5/merge", "pr.base_ref": base, "ref": "refs/pull/5/merge"}
+		r.gl = varEnv{"event": "merge_request_event", "tag": nil, "branch": nil, "pr.base_ref": base}
 	default:
-		r.gha = varEnv{"ref_type": "branch", "ref_name": srcBranch, "pr.base_ref": "", "ref": "refs/heads/" + srcBranch}
-		r.gl = varEnv{"tag": nil, "branch": srcBranch, "pr.base_ref": nil}
+		r.gha = varEnv{"event": "push", "ref_type": "branch", "ref_name": srcBranch, "pr.base_ref": "", "ref": "refs/heads/" + srcBranch}
+		r.gl = varEnv{"event": "push", "tag": nil, "branch": srcBranch, "pr.base_ref": nil}
 	}
 	return r
 }
@@ -89,6 +94,7 @@ func TestTagAndPRBranchVariants(t *testing.T) {
 		fullRun("tag", "tag", "", "v1", ""),
 		fullRun("pr to main", "pull_request", "main", "", "main"),
 		fullRun("pr to dev", "pull_request", "dev", "", "dev"),
+		fullRun("manual on a tag ref", "manual", "", "v1", ""),
 	}
 	froms := map[string]expr.Dialect{"woodpecker": woodpecker.Lang}
 	for fname, from := range froms {
@@ -138,23 +144,6 @@ func TestFullRefVariants(t *testing.T) {
 			if s, g := ev(t, c, r.gha, gha.Lang.Sem), ev(t, got, r.gl, gitlab.Lang.Sem); s != g {
 				t.Errorf("%s on %s: source %v, target %v (%v)", cname, r.name, s, g, got)
 			}
-		}
-	}
-}
-
-// A tag name test also holds on a manual run on a tag ref, so only the approximate entry takes it and it says so.
-func TestTagVariantIsApproximateWithACaveat(t *testing.T) {
-	tagIs := srcCond(expr.OpEq, ref("event"), str("tag"))
-	for _, to := range []expr.Dialect{gha.Lang, gitlab.Lang} {
-		if _, ok := expr.TranslateFacts(tagIs, woodpecker.Lang, to, expr.Facts{}); ok {
-			t.Errorf("%s: the exact entry took the tag test", to.ID)
-		}
-		if expr.Translatable(tagIs, woodpecker.Lang, to) {
-			t.Errorf("%s: Translatable holds for the tag test", to.ID)
-		}
-		_, cav, ok := expr.TranslateApprox(tagIs, woodpecker.Lang, to)
-		if !ok || len(cav) == 0 {
-			t.Errorf("%s: approx = %v, %v; want a caveat", to.ID, cav, ok)
 		}
 	}
 }

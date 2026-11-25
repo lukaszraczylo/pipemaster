@@ -1,29 +1,15 @@
 package expr
 
-import (
-	"maps"
-	"slices"
-)
+import "maps"
 
 // A variant is a rewrite of a condition that the exact translator refuses or states too narrowly. Each public
 // entry tries the condition as written first, so a condition that translated before translates the same way; a
 // variant only adds a result where there was none. No variant is covered by the Lean model: tests enumerate
 // the contexts of each one against the source evaluation instead (variants_test.go).
 type variant struct {
-	e   Expr
-	fix func(Expr) Expr
-	// caveat is set when the variant holds on a run the source does not hold on, so only the approximate entry takes it.
-	caveat string
-	from   Dialect
-}
-
-// tagCaveat names the run that a tag name test adds: a manual or API run on a tag ref also sets the tag name, while
-// the source event there is not the tag event.
-const tagCaveat = "a manual or API run on a tag ref also matches; the source tag event holds on a tag push only"
-
-// exactVariants lists the variants that hold on exactly the runs of the source.
-func exactVariants(e Expr, from, to Dialect) []variant {
-	return slices.DeleteFunc(variants(e, from, to), func(v variant) bool { return v.caveat != "" })
+	e    Expr
+	fix  func(Expr) Expr
+	from Dialect
 }
 
 func (v variant) finish(t Expr) Expr {
@@ -35,13 +21,15 @@ func (v variant) finish(t Expr) Expr {
 
 func variants(e Expr, from, to Dialect) []variant {
 	bases := []variant{{e: e, from: from}}
-	for _, form := range []tagForm{tagMatch, tagBare} {
-		if x, ok := tagVariant(e, from, form); ok {
-			proxy, _ := tagVariant(e, from, tagProxy)
-			v := variant{e: x, from: readsAs(from, proxy)}
-			if !to.TagEvent {
-				v.caveat = tagCaveat
-			}
+	form := tagExact
+	if to.TagEvent {
+		form = tagEventOnly
+	}
+	if x, ok := tagVariant(e, from, form); ok {
+		proxy, _ := tagVariant(e, from, tagProxy)
+		v := variant{e: x, from: readsAs(from, proxy)}
+		if fix, ok := tagEventFix(v.from, to); ok {
+			v.fix = fix
 			bases = append(bases, v)
 		}
 	}
@@ -90,8 +78,9 @@ func rebuild(e Expr, leaf func(Expr) (Expr, bool)) (Expr, bool) {
 type tagForm uint8
 
 const (
-	tagMatch tagForm = iota
-	tagBare
+	tagExact tagForm = iota
+	// tagEventOnly is the sentinel alone, for a target that has the tag event.
+	tagEventOnly
 	// tagProxy puts a test of the branch in place of the tag test, so a dialect can judge the rest of the
 	// condition by its own subset: both are a test of a ref against a literal.
 	tagProxy
@@ -129,22 +118,54 @@ func tagVariant(e Expr, from Dialect, form tagForm) (Expr, bool) {
 				return nil, false
 			}
 		}
-		set := Ref{Path: []string{CtxTag}}
 		if form == tagProxy {
 			return negE(neg, Binary{Op: OpEq, L: ctxRef(CtxBranch), R: strLit("x")}), true
 		}
-		if form == tagMatch {
-			op := OpMatch
-			if neg {
-				op = OpNoMatch
-			}
-			return Binary{Op: op, L: set, R: Lit{Kind: LitStr, Str: anyValue}}, true
+		if form == tagEventOnly {
+			return negE(neg, tagSentinel()), true
 		}
-		if neg {
-			return Unary{Op: OpNot, X: set}, true
-		}
-		return set, true
+		leaf := Binary{Op: OpAnd, L: Binary{Op: OpMatch, L: Ref{Path: []string{CtxTag}}, R: Lit{Kind: LitStr, Str: anyValue}},
+			R: tagSentinel()}
+		return negE(neg, leaf), true
 	})
+}
+
+// tagEventSentinel stands in a variant for the event test of the target: a tag name test that no run satisfies, which
+// every dialect translates, and which tagEventFix then replaces by the event test.
+const tagEventSentinel = "pipemaster-tag-event"
+
+func tagSentinel() Expr {
+	return Binary{Op: OpMatch, L: Ref{Path: []string{CtxTag}}, R: strLit("(?i)^" + tagEventSentinel + "$")}
+}
+
+// tagEventFix writes the tag event test of the target in place of the sentinel. A target with a tag event of its own
+// (Woodpecker, Drone) tests that event. Any other target tests the push event on a tag ref, which holds on a tag
+// push only and not on a manual, API or schedule run on a tag ref.
+func tagEventFix(from, to Dialect) (func(Expr) Expr, bool) {
+	got, ok := translate(tagSentinel(), from, to, true)
+	if !ok {
+		return nil, false
+	}
+	var event Expr
+	if to.TagEvent {
+		event = Binary{Op: OpEq, L: ctxRef(CtxEvent), R: strLit("tag")}
+	} else if event, ok = translate(Binary{Op: OpEq, L: ctxRef(CtxEvent), R: strLit("push")}, to, to, true); !ok {
+		return nil, false
+	}
+	want := String(got)
+	return func(t Expr) Expr {
+		out, _ := rebuild(t, func(x Expr) (Expr, bool) {
+			if u, ok := x.(Unary); ok && u.Op == OpNot && String(u.X) == want && to.TagEvent {
+				// The target reads a != test of the event, not a negated ==.
+				return Binary{Op: OpNe, L: ctxRef(CtxEvent), R: strLit("tag")}, true
+			}
+			if String(x) == want {
+				return event, true
+			}
+			return nil, false
+		})
+		return out
+	}, true
 }
 
 // StatesFullRef reports a condition that compares the full ref with a refs/heads/ or refs/tags/ literal. Only a GHA-class

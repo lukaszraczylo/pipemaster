@@ -282,6 +282,7 @@ func TestWoodpeckerTranslateTable(t *testing.T) {
 		{"woodpecker", "gitlab", `CI_COMMIT_SHA != ""`, ``},
 		{"woodpecker", "gitlab", `CI_COMMIT_SHA contains "ab"`, ``},
 		{"woodpecker", "gitlab", `CI_COMMIT_BRANCH matches "^v\\d+"`, ``},
+		{"woodpecker", "gitlab", `CI_PIPELINE_EVENT matches "(?i)^tag$"`, `$CI_COMMIT_TAG =~ /^.+$/i && $CI_PIPELINE_SOURCE == "push"`},
 		{"woodpecker", "gitlab", `SKIP matches "(?i)^x$"`, ``},
 		{"woodpecker", "gitlab", `CI_COMMIT_BRANCH matches "(?i)^a" && CI_REPO_URL matches "(?i)^b"`, ``},
 	} {

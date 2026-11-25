@@ -278,7 +278,7 @@ func native(t Expr, to Dialect) Expr {
 //   - Only the four modelled events (push, pull_request, schedule, workflow_dispatch) exist; an event
 //     literal without an entry in both dialects' Events tables is untranslatable.
 func Translate(e Expr, from, to Dialect) (Expr, bool) {
-	for _, v := range exactVariants(e, from, to) {
+	for _, v := range variants(e, from, to) {
 		if t, ok := translate(v.e, v.from, to, true); ok {
 			return v.finish(t), true
 		}
@@ -316,7 +316,7 @@ func translate(e Expr, from, to Dialect, lists bool) (Expr, bool) {
 // Translatable reports whether e translates exactly; it is true exactly when Translate succeeds. The class
 // rules are stated separately from Translate, as in the Lean model, so tests can hold the two together.
 func Translatable(e Expr, from, to Dialect) bool {
-	return slices.ContainsFunc(exactVariants(e, from, to), func(v variant) bool { return translatable(v.e, v.from, to, true) })
+	return slices.ContainsFunc(variants(e, from, to), func(v variant) bool { return translatable(v.e, v.from, to, true) })
 }
 
 func translatable(e Expr, from, to Dialect, lists bool) bool {
@@ -730,9 +730,6 @@ func userRef(r Ref) bool {
 func TranslateApprox(e Expr, from, to Dialect) (Expr, []string, bool) {
 	for _, v := range variants(e, from, to) {
 		if t, cav, ok := translateApprox(v.e, v.from, to); ok {
-			if v.caveat != "" {
-				cav = append(cav, v.caveat)
-			}
 			return v.finish(t), cav, true
 		}
 	}

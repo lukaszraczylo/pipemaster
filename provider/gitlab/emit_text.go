@@ -498,12 +498,8 @@ func (e *emitter) condition(path string, f caps.Feature, x expr.Expr, what strin
 	if e.from != nil {
 		var ok bool
 		if t, ok = expr.TranslateFacts(x, *e.from, exprgitlab.Lang, expr.Facts{}); !ok {
-			var cav []string
-			if t, cav, ok = expr.TranslateApprox(x, *e.from, exprgitlab.Lang); !ok || len(cav) == 0 {
-				e.disable(path, f, x, what)
-				return nil, false
-			}
-			e.emulate(path, f, "approximate expression translation", strings.Join(cav, "; "))
+			e.disable(path, f, x, what)
+			return nil, false
 		}
 	}
 	if _, err := exprgitlab.Print(t); err != nil {
