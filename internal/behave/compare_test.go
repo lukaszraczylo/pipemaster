@@ -43,6 +43,10 @@ func TestJudge(t *testing.T) {
 			rep: rep(entry(caps.Lost, caps.DisplayName, "pipeline/ci")), status: StatusFail},
 		{name: "value change by lost shell", src: tr(0, "bash.ok:c"), tgt: tr(0, "bash.ok:"),
 			rep: rep(entry(caps.Lost, caps.StepShell, "pipeline/ci/job/build/step/s")), status: StatusExplained},
+		{name: "lost runner label cannot change a value", src: tr(0, "workspace.s2:data"), tgt: tr(0, "workspace.s2:"),
+			rep: rep(entry(caps.Lost, caps.JobRunner, "pipeline/ci/job/build")), status: StatusFail},
+		{name: "external runner label explains a job that never starts", src: tr(0, "a", "b"), tgt: tr(1, "a"),
+			rep: rep(entry(caps.External, caps.JobRunner, "pipeline/ci/job/b")), status: StatusExplained},
 		{name: "exit alone without fact", src: tr(0, "a"), tgt: tr(2, "a"),
 			rep: rep(entry(caps.Lost, caps.StepShell, "pipeline/ci/job/build/step/s")), status: StatusFail},
 		{name: "fail loud explains missing and exit", src: tr(0, "a", "b"), tgt: tr(1, "a"),
@@ -84,5 +88,17 @@ func TestTopoOrder(t *testing.T) {
 				t.Errorf("topoOrder = %v, want %v", got, c.want)
 			}
 		})
+	}
+}
+
+func TestHasVerdictNeedsAReportedEntry(t *testing.T) {
+	if hasVerdict(nil, caps.TriggerPullRequest) {
+		t.Fatal("a missing report holds no verdict")
+	}
+	if hasVerdict(rep(entry(caps.Lost, caps.TriggerPush, "pipeline/ci/trigger/0")), caps.TriggerPullRequest) {
+		t.Fatal("an entry for another trigger is no verdict")
+	}
+	if !hasVerdict(rep(entry(caps.Lost, caps.TriggerPullRequest, "pipeline/ci/trigger/0")), caps.TriggerPullRequest) {
+		t.Fatal("a lost pull request entry is the verdict")
 	}
 }

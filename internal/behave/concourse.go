@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -28,7 +29,7 @@ const (
 	concTarget   = "pm"
 	concUser     = "test"
 	concPass     = "test"
-	concQuiet    = 15 * time.Second
+	concStuck    = 2 * time.Minute
 	concPoll     = 5 * time.Second
 	concMax      = 5 * time.Minute
 	concNoBuild  = 40 * time.Second
@@ -298,6 +299,9 @@ func (e *concourseEngine) runFile(ctx context.Context, w *Workspace, file string
 		}
 		tr.Log += log
 		tr.Markers = append(tr.Markers, markers(strings.Split(stripANSI(log), "\n"))...)
+		if b.Status != "succeeded" && registryFailure(stripANSI(log)) {
+			return nil, blocked("registry: Docker Hub cannot be reached from the Kiri worker: %s", tail(strings.Join(strings.Fields(stripANSI(log)), " "), 160))
+		}
 	}
 	if len(builds) == 0 {
 		tr.Exit = 1
@@ -365,11 +369,91 @@ func (e *concourseEngine) resources(ctx context.Context, pipe string) []string {
 	return names
 }
 
-// settle waits until every build is final and no new build has started for concQuiet.
+// jobState is the part of fly jobs --json that tells whether a job still has work to start.
+type jobState struct {
+	NextBuild     *struct{} `json:"next_build"`
+	FinishedBuild *struct {
+		Status string `json:"status"`
+	} `json:"finished_build"`
+	Name   string `json:"name"`
+	Inputs []struct {
+		Resource string   `json:"resource"`
+		Passed   []string `json:"passed"`
+		Trigger  bool     `json:"trigger"`
+	} `json:"inputs"`
+	HasNewInputs bool `json:"has_new_inputs"`
+}
+
+// triggered is true when a job starts on a new version of an input.
+func (j jobState) triggered() bool {
+	for _, in := range j.Inputs {
+		if in.Trigger {
+			return true
+		}
+	}
+	return false
+}
+
+// passedJobs lists the jobs that the triggering inputs of a job wait for.
+func (j jobState) passedJobs() []string {
+	var out []string
+	for _, in := range j.Inputs {
+		if in.Trigger {
+			out = append(out, in.Passed...)
+		}
+	}
+	return out
+}
+
+// pipelineSettled is true when no build is pending or started and no job that a version can start is waiting
+// for its build: a job with new inputs has none, or every job it passes through succeeded and it has no build yet.
+func pipelineSettled(jobs []jobState, builds []buildInfo) bool {
+	for _, b := range builds {
+		if b.Status == "started" || b.Status == "pending" {
+			return false
+		}
+	}
+	built := map[string]bool{}
+	for _, b := range builds {
+		built[b.JobName] = true
+	}
+	byName := map[string]jobState{}
+	for _, j := range jobs {
+		byName[j.Name] = j
+	}
+	for _, j := range jobs {
+		if j.NextBuild != nil {
+			return false
+		}
+		if !j.triggered() {
+			continue
+		}
+		if j.HasNewInputs {
+			return false
+		}
+		up := j.passedJobs()
+		if built[j.Name] || len(up) == 0 {
+			continue
+		}
+		allOK := true
+		for _, u := range up {
+			f := byName[u].FinishedBuild
+			allOK = allOK && f != nil && f.Status == "succeeded"
+		}
+		if allOK {
+			return false
+		}
+	}
+	return true
+}
+
+// settle waits on the state of the pipeline: every build is final and every job that a version can start has a
+// build. concStuck bounds a state that never settles, and concMax bounds the whole wait.
 func (e *concourseEngine) settle(ctx context.Context, pipe string) ([]buildInfo, error) {
 	begin := time.Now()
 	deadline := begin.Add(concMax)
-	lastCount, quietSince := -1, time.Now()
+	lastCount, changedAt := -1, time.Now()
+	settledPolls := 0
 	var builds []buildInfo
 	for time.Now().Before(deadline) {
 		out, code, err := e.conc.fly(ctx, time.Minute, "builds", "-p", pipe, "--json", "-c", "100")
@@ -379,15 +463,19 @@ func (e *concourseEngine) settle(ctx context.Context, pipe string) ([]buildInfo,
 				return nil, fmt.Errorf("parse builds: %s", tail(out, 200))
 			}
 			builds = slices.DeleteFunc(builds, func(b buildInfo) bool { return b.JobName == "" }) // resource checks are builds without a job
-			running := false
-			for _, b := range builds {
-				running = running || b.Status == "started" || b.Status == "pending"
+			if len(builds) != lastCount {
+				lastCount, changedAt = len(builds), time.Now()
 			}
-			if len(builds) != lastCount || running {
-				lastCount, quietSince = len(builds), time.Now()
-			}
-			if !running && len(builds) > 0 && time.Since(quietSince) >= concQuiet {
-				break
+			if len(builds) > 0 {
+				if pipelineSettled(e.jobStates(ctx, pipe), builds) {
+					settledPolls++
+				} else {
+					settledPolls = 0
+				}
+				stuck := time.Since(changedAt) >= concStuck && !slices.ContainsFunc(builds, func(b buildInfo) bool { return b.Status == "started" || b.Status == "pending" })
+				if settledPolls >= 2 || stuck {
+					break
+				}
 			}
 			if len(builds) == 0 && time.Since(begin) >= concNoBuild {
 				break
@@ -404,6 +492,19 @@ func (e *concourseEngine) settle(ctx context.Context, pipe string) ([]buildInfo,
 	}
 	sortBuilds(builds)
 	return builds, nil
+}
+
+// jobStates reads the jobs of the pipeline. A failed read gives no state, which settles on the builds alone.
+func (e *concourseEngine) jobStates(ctx context.Context, pipe string) []jobState {
+	out, code, err := e.conc.fly(ctx, time.Minute, "jobs", "-p", pipe, "--json")
+	if err != nil || code != 0 {
+		return nil
+	}
+	var js []jobState
+	if json.Unmarshal([]byte(out), &js) != nil {
+		return nil
+	}
+	return js
 }
 
 func sortBuilds(b []buildInfo) {
@@ -461,3 +562,9 @@ func (e *concourseEngine) emptyResources(ctx context.Context, pipe string) strin
 	}
 	return strings.Join(empty, ", ")
 }
+
+// dockerHubRE matches a failed pull from Docker Hub that the network or the rate limit caused.
+var dockerHubRE = regexp.MustCompile(`(index|registry-1)\.docker\.io.*(dial tcp|i/o timeout|TLS handshake timeout|connection refused|connection reset|toomanyrequests|no such host|EOF)`)
+
+// registryFailure is true when the log of a failed build shows that Docker Hub could not be reached.
+func registryFailure(log string) bool { return dockerHubRE.MatchString(log) }

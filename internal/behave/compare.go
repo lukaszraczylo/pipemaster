@@ -143,6 +143,8 @@ func effects(level caps.Level, f caps.Feature) ([]string, string) {
 		return []string{kindOrder, kindExit}, "an emulated failure rule changes order and exit"
 	case failureFeatures[f]:
 		return []string{kindMissing, kindExit}, "a lost failure rule stops later work"
+	case f == caps.JobRunner:
+		return []string{kindMissing, kindExit}, "a runner label decides where a job runs and whether it starts, not what a step prints"
 	}
 	switch level {
 	case caps.Lost:

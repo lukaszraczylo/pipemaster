@@ -12,6 +12,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 // engineSlots caps the parallel runs per engine. Kiri has one VM, so the caps stay small.
@@ -255,6 +258,10 @@ func (r *Runner) runTarget(ctx context.Context, fx Fixture, tgt string, srcs map
 
 func (r *Runner) compareOne(ctx context.Context, fx Fixture, tgt, evName string, conv *Converted, src *Trace, res *Result) {
 	if why := limit(fx, tgt, evName); why != "" {
+		if f, ok := eventTrigger[evName]; ok && !hasVerdict(conv.Report, f) {
+			res.Status, res.Detail = StatusFail, why+"; the converted file carries no verdict for "+string(f)
+			return
+		}
 		res.Status, res.Detail = StatusBlocked, why
 		return
 	}
@@ -323,4 +330,12 @@ func withoutPrefix(t *Trace, prefix string) *Trace {
 	c := *t
 	c.Markers = slices.DeleteFunc(slices.Clone(t.Markers), func(m string) bool { return strings.HasPrefix(m, prefix) })
 	return &c
+}
+
+// eventTrigger names the trigger feature that a converted file must report when its engine cannot run an event.
+var eventTrigger = map[string]caps.Feature{EvPR: caps.TriggerPullRequest}
+
+// hasVerdict is true when the report holds a lost, external or emulated entry for the feature.
+func hasVerdict(rep *report.Report, f caps.Feature) bool {
+	return rep != nil && slices.ContainsFunc(rep.Entries, func(e report.Entry) bool { return e.Feature == f && e.Level != caps.Native })
 }

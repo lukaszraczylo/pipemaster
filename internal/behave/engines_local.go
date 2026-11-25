@@ -119,11 +119,16 @@ func (e *woodpeckerEngine) Run(ctx context.Context, w *Workspace) (*Trace, error
 	tr := &Trace{NoPipeline: true}
 	start := time.Now()
 	for _, t := range targets {
-		out, code, err := e.env.run(ctx, runOpts{Dir: w.Dir, Timeout: timeoutLocal}, bin, append(slices.Clone(args), t)...)
+		run, err := woodpeckerRunCopy(w.Dir, t)
+		if err != nil {
+			return nil, err
+		}
+		out, code, err := e.env.run(ctx, runOpts{Dir: w.Dir, Timeout: timeoutLocal}, bin, append(slices.Clone(args), run)...)
 		if err != nil {
 			return nil, err
 		}
 		if code != 0 && strings.Contains(out, wpNoWorkflows) {
+			// With depends_on stripped, only the when filter of the file can leave nothing to run.
 			code = 0
 		} else {
 			tr.NoPipeline = false
@@ -137,6 +142,50 @@ func (e *woodpeckerEngine) Run(ctx context.Context, w *Workspace) (*Trace, error
 	}
 	tr.Duration = time.Since(start)
 	return tr, nil
+}
+
+// wpRunDir holds the copies of the workflow files that run without depends_on.
+const wpRunDir = ".pm-woodpecker-run"
+
+// woodpeckerRunCopy writes the workflow file as a copy with the depends_on key removed and returns the copy path.
+// woodpecker-cli exec loads only the file it gets, so a workflow that depends on another file is filtered out as
+// "all filtered out" and the run looks empty; the harness runs the files in dependency order instead.
+func woodpeckerRunCopy(dir, rel string) (string, error) {
+	raw, err := os.ReadFile(filepath.Join(dir, rel)) // #nosec G304 -- a workspace file of the harness
+	if err != nil {
+		return "", err
+	}
+	stripped, err := stripDependsOn(raw)
+	if err != nil {
+		return "", fmt.Errorf("strip depends_on of %s: %w", rel, err)
+	}
+	out := filepath.Join(wpRunDir, filepath.Base(rel))
+	if err := os.MkdirAll(filepath.Join(dir, wpRunDir), 0o750); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(filepath.Join(dir, out), stripped, 0o600); err != nil { // #nosec G703 -- a workspace path of the harness
+		return "", err
+	}
+	return out, nil
+}
+
+// stripDependsOn removes the top-level depends_on key of a workflow file.
+func stripDependsOn(raw []byte) ([]byte, error) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return nil, err
+	}
+	if doc.Kind != yaml.DocumentNode || len(doc.Content) != 1 || doc.Content[0].Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("the workflow is not a mapping")
+	}
+	m := doc.Content[0]
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == "depends_on" {
+			m.Content = slices.Delete(m.Content, i, i+2)
+			break
+		}
+	}
+	return yaml.Marshal(&doc)
 }
 
 // woodpeckerWorkflows lists what to pass to woodpecker-cli exec, one file at a time in depends_on order:

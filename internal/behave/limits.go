@@ -49,7 +49,12 @@ func limit(fx Fixture, target, event string) string {
 	return ""
 }
 
-const jobContinueWhy = "act does not count a failed job with continue-on-error as a success for the jobs that need it"
+// jobContinueWhy cites the act source: setJobResult in pkg/runner/job_executor.go of nektos/act v0.2.90 sets the
+// job result to failure from the job error alone and never reads the job-level continue-on-error, so the jobs that
+// need the job are skipped. GitHub counts such a job as a success. A run of act 0.2.90 on the allow_failure
+// fixture skipped the dependent job.
+const jobContinueWhy = "act 0.2.90 does not count a failed job with continue-on-error as a success for the jobs that need it " +
+	"(nektos/act v0.2.90 pkg/runner/job_executor.go setJobResult reads the job error only, not continue-on-error)"
 
 // actJobContinue reports a workflow in dir where a job with continue-on-error has a dependent job.
 func actJobContinue(dir string) string {
