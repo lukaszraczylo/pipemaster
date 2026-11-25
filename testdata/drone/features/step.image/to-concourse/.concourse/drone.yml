@@ -1,9 +1,9 @@
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/step/build/carry
 # pipemaster:arg {"digest":"3bf514f95aaa56ba57108861bd66e3622a44856a51cfdc04334f227a432bb90c","carry":"image:\n    ref: rust:1.85\nid: build\nkind: script\n"}
 # pipemaster:emulated step.action pipeline/drone/job/ci/step/publish
-# pipemaster:arg {"step":"image:\n    ref: woodpeckerci/plugin-docker-buildx\nwith:\n    repo:\n        lit: example/app\n    tags:\n        lit: latest\nid: publish\nkind: plugin\n","task":"publish","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/drone/job/ci/step/publish: Concourse does not run the action' \\u003e\\u00262; exit 1\"],\"path\":\"sh\"}},\"task\":\"publish\"}"}
+# pipemaster:arg {"step":"image:\n    ref: woodpeckerci/plugin-docker-buildx\nwith:\n    repo:\n        lit: example/app\n    tags:\n        lit: latest\nid: publish\nkind: plugin\n","task":"publish","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"woodpeckerci/plugin-docker-buildx\"},\"type\":\"registry-image\"},\"inputs\":[{\"name\":\"workspace\"}],\"outputs\":[{\"name\":\"workspace\"}],\"params\":{\"PLUGIN_REPO\":\"example/app\",\"PLUGIN_TAGS\":\"latest\"},\"platform\":\"linux\",\"run\":{\"args\":[\"plugin-docker-buildx\"],\"dir\":\"workspace\",\"path\":\"/usr/local/bin/dockerd-entrypoint.sh\"}},\"task\":\"publish\"}"}
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/carry
-# pipemaster:arg {"digest":"0ec43987d8e1da2b7ea44ae498cb13210bd540f70ba2901a7da73b423321294c","carry":"id: ci\n"}
+# pipemaster:arg {"digest":"8be59425d1fe48fabcc5d1ca1b4b955e956b532f8ca0efa4913525d706785ccd","carry":"id: ci\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: drone\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone
@@ -43,10 +43,16 @@ jobs:
           image_resource:
             type: registry-image
             source:
-              repository: ubuntu
-              tag: latest
+              repository: woodpeckerci/plugin-docker-buildx
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          params:
+            PLUGIN_REPO: example/app
+            PLUGIN_TAGS: latest
           run:
-            path: sh
+            path: /usr/local/bin/dockerd-entrypoint.sh
             args:
-              - -ec
-              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/drone/job/ci/step/publish: Concourse does not run the action'' >&2; exit 1'
+              - plugin-docker-buildx
+            dir: workspace

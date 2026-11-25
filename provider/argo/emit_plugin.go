@@ -16,7 +16,7 @@ const pluginStrategy = "plugin image with PLUGIN_ variables"
 func (sx *stepCtx) pluginContainer(st *ir.Step, name string, last bool) *container {
 	tc, e := sx.tc, sx.tc.e
 	path := tc.jp.path + "/step/" + st.ID
-	if last || !emitkit.PluginRuns(st) || e.gated[st] {
+	if last || st.If != nil || !emitkit.PluginRuns(st) || e.gated[st] {
 		return nil
 	}
 	vars, why := emitkit.PluginEnv(st)

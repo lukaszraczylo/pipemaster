@@ -11,8 +11,9 @@ import (
 const pluginStrategy = "plugin image with PLUGIN_ variables"
 
 // pluginStep writes a plugin step as a step that runs the image entrypoint with the settings as PLUGIN_ variables.
-// It reports false, writing nothing, when the step has a condition, a guard or a setting with no Tekton spelling:
-// the caller then writes the failing step.
+// A step condition with a Tekton when form becomes the when of the step. It reports false, writing nothing, when a
+// job or step condition needs a shell guard or a setting has no Tekton spelling: a guard needs a shell, which a
+// plugin image may lack, so the caller writes the failing step.
 func (tc *taskCtx) pluginStep(b *stepBook, st *ir.Step, sp, name string) (*wmap, bool, error) {
 	if !emitkit.PluginRuns(st) || b.guard != nil || tc.e.gated[st] {
 		return nil, false, nil
@@ -23,6 +24,10 @@ func (tc *taskCtx) pluginStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 		return nil, false, nil
 	}
 	sc := newScope()
+	cond := tc.cond(sp, caps.StepIf, st.If, taskScope)
+	if cond.guard != nil || cond.disabled {
+		return nil, false, nil
+	}
 	env, err := tc.envList(sc, sp, slices.Concat(vars, st.Env))
 	if err != nil {
 		return nil, false, err
@@ -43,7 +48,7 @@ func (tc *taskCtx) pluginStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 	if len(env) > 0 {
 		m.Set("env", seqOf(env...))
 	}
-	tc.stepTail(m, st, condition{})
+	tc.stepTail(m, st, cond)
 	tc.e.emulate(sp, caps.StepAction, pluginStrategy, "the settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a list of scalars is comma-joined, any other list or map is JSON; the image entrypoint runs and the step has no script")
 	return m, true, tc.markAction(b, sp, st, "", m)
 }

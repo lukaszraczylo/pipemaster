@@ -12,6 +12,7 @@ import (
 	exprconcourse "github.com/lukaszraczylo/pipemaster/expr/concourse"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 // stepSkip lists the step Ext keys that the emitter writes itself.
@@ -70,7 +71,16 @@ func (c *chain) step(st *ir.Step) []*yaml.Node {
 			if st.Kind == ir.StepPlugin {
 				feature = caps.StepAction
 			}
-			e.lose(path, feature, "the "+string(st.Kind)+" step has no Concourse form outside a Concourse file; a placeholder task keeps its place")
+			if st.Kind == ir.StepPlugin {
+				if n := c.pluginTask(st, path); n != nil {
+					return n
+				}
+			}
+			why := "the " + string(st.Kind) + " step has no Concourse form outside a Concourse file; a placeholder task keeps its place"
+			if r := emitkit.NoEntrypointReason(st); r != "" {
+				why = r
+			}
+			e.lose(path, feature, why)
 			return c.placeholder(st, path, actionArg{}, true)
 		}
 		n := c.verbatim(st, path)

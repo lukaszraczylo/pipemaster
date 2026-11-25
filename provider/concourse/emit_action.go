@@ -204,7 +204,11 @@ func (c *chain) placeholder(st *ir.Step, path string, arg actionArg, lost bool) 
 	run.SetStr("path", shellCommand)
 	script := placeholderCmd
 	if lost {
-		script = emitkit.FailLoud(caps.StepAction, path, "Concourse does not run the action"+refSuffix(st))
+		why := "Concourse does not run the action" + refSuffix(st)
+		if r := emitkit.NoEntrypointReason(st); r != "" {
+			why = r
+		}
+		script = emitkit.FailLoud(caps.StepAction, path, why)
 	}
 	run.Set("args", strSeq([]string{defaultFlags, script}))
 	cfg.Set("run", run.N)

@@ -1,14 +1,42 @@
+stages:
+  - stage-0
+  - stage-1
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
-# pipemaster:emulated step.image pipeline/drone/job/ci
-# pipemaster:arg {"job":"ci","parts":["ci"],"own":["build"]}
-ci:
+# pipemaster:emulated step.image pipeline/drone/job/ci-1
+# pipemaster:arg {"job":"ci","parts":["ci-1","ci-2"],"own":["build"]}
+ci-1:
+  stage: stage-0
   image: rust:1.85
   needs: []
   script:
     # pipemaster:step build
     - cargo build --release
+  artifacts:
+    exclude:
+      - .git/**/*
+    expire_in: 1 day
+    paths:
+      - .
+# pipemaster:emulated step.image pipeline/drone/job/ci-2
+# pipemaster:arg {"job":"ci","parts":["ci-1","ci-2"],"own":["publish"]}
+ci-2:
+  stage: stage-1
+  image:
+    name: woodpeckerci/plugin-docker-buildx
+    entrypoint:
+      - ""
+  needs:
+    - ci-1
+  script:
     # pipemaster:step publish
-    # pipemaster:lost step publish kind plugin
-    - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/drone/job/ci/step/publish: the step kind has no GitLab form'' >&2; exit 1'
+    # pipemaster:emulated step.env pipeline/drone/job/ci/step/publish
+    - |
+      (
+      export PLUGIN_REPO="example/app"
+      export PLUGIN_TAGS="latest"
+      '/usr/local/bin/dockerd-entrypoint.sh' 'plugin-docker-buildx'
+      )
+    # pipemaster:emulated step.action pipeline/drone/job/ci/step/publish
+    # pipemaster:arg {"step":{"with":{"repo":{"l":"example/app"},"tags":{"l":"latest"}},"id":"publish","image":"woodpeckerci/plugin-docker-buildx"},"kind":"script","script":"'/usr/local/bin/dockerd-entrypoint.sh' 'plugin-docker-buildx'","pos":-1}

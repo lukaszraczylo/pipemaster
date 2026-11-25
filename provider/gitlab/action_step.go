@@ -40,6 +40,7 @@ type wireStep struct {
 	Timeout         *ir.Duration         `json:"timeout,omitempty"`
 	ID              string               `json:"id"`
 	Name            string               `json:"name,omitempty"`
+	Image           string               `json:"image,omitempty"`
 	If              string               `json:"if,omitempty"`
 	Shell           string               `json:"shell,omitempty"`
 	WorkDir         string               `json:"workdir,omitempty"`
@@ -70,6 +71,9 @@ func (w wireValue) value() (ir.Value, bool) {
 func toWireStep(st *ir.Step) wireStep {
 	w := wireStep{Action: st.Action, Timeout: st.Timeout, ID: st.ID, Name: st.Name, Shell: st.Shell,
 		WorkDir: st.WorkDir, ContinueOnError: st.ContinueOnError}
+	if st.Kind == ir.StepPlugin && st.Image != nil {
+		w.Image = st.Image.Ref
+	}
 	if st.If != nil {
 		w.If = expr.String(st.If)
 	}
@@ -88,6 +92,9 @@ func toWireStep(st *ir.Step) wireStep {
 func (w wireStep) step() (*ir.Step, bool) {
 	st := &ir.Step{Kind: ir.StepAction, Action: w.Action, Timeout: w.Timeout, ID: w.ID, Name: w.Name, Shell: w.Shell,
 		WorkDir: w.WorkDir, ContinueOnError: w.ContinueOnError}
+	if w.Image != "" {
+		st.Kind, st.Image = ir.StepPlugin, &ir.Image{Ref: w.Image}
+	}
 	if w.If != "" {
 		x, err := expr.ParseCanonical(w.If)
 		if err != nil {

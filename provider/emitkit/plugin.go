@@ -19,9 +19,10 @@ const (
 )
 
 // PluginRuns reports whether a step is a plugin that runs its image entrypoint: an image, settings and no script.
+// The condition of the step is the caller's concern.
 func PluginRuns(st *ir.Step) bool {
 	return st.Kind == ir.StepPlugin && st.Action == nil && len(st.Script) == 0 &&
-		st.Image != nil && st.Image.Ref != "" && len(st.Image.Entrypoint) == 0 && st.WorkDir == "" && st.If == nil
+		st.Image != nil && st.Image.Ref != "" && len(st.Image.Entrypoint) == 0 && st.WorkDir == ""
 }
 
 // PluginEnvName is the variable that carries a setting: the upper-case name with dots and dashes as underscores.
@@ -131,4 +132,13 @@ func hasReference(v any) bool {
 		}
 	}
 	return false
+}
+
+// NoEntrypointReason is the text of the failing step for a plugin image whose entrypoint command is not known: the
+// target has no form that runs the image entrypoint by itself.
+func NoEntrypointReason(st *ir.Step) string {
+	if st.Kind != ir.StepPlugin || st.Image == nil {
+		return ""
+	}
+	return "the plugin image " + st.Image.Ref + " has no entrypoint command in the plugin table and the target cannot run an image entrypoint; set the entrypoint command of the image in the step"
 }

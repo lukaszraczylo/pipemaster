@@ -126,7 +126,11 @@ func (e *emitter) actionStep(p *jobPrep, st *ir.Step) error {
 	if st.Action == nil || st.Kind == ir.StepPipelineCall {
 		e.lose(sp, caps.StepAction, "step kind "+string(st.Kind)+" has no GitLab form")
 		e.unappliedFields(sp, st, "the step is lost")
-		return e.lostStep(p, st, "kind "+string(st.Kind), "the step kind has no GitLab form")
+		why := "the step kind has no GitLab form"
+		if r := emitkit.NoEntrypointReason(st); r != "" {
+			why = r
+		}
+		return e.lostStep(p, st, "kind "+string(st.Kind), why)
 	}
 	with := map[string]string{}
 	for k, v := range st.With {

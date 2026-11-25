@@ -163,8 +163,9 @@ func (e *emitter) splitImages(pl *ir.Pipeline) *ir.Pipeline {
 	last := map[string]string{}
 	changed := false
 	for _, j := range pl.Jobs {
-		parts := e.planSplit(pl, j, taken)
+		parts := e.planSplit(pl, e.lowerPlugins(j), taken)
 		if parts == nil {
+			e.dropPlugins(j.ID)
 			jobs = append(jobs, j)
 			continue
 		}

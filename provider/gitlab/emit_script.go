@@ -185,7 +185,10 @@ func (e *emitter) scriptStep(p *jobPrep, st *ir.Step) error {
 	if err != nil {
 		return err
 	}
-	return e.placeLines(p, st, lines)
+	if err := e.placeLines(p, st, lines); err != nil {
+		return err
+	}
+	return e.pluginMark(p, st)
 }
 
 // movedArg is the marker argument of an always() step that moved to after_script: where its lines start in

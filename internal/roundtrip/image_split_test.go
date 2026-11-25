@@ -97,7 +97,7 @@ func TestDroneCorpusSplitsGitLabJobsByImage(t *testing.T) {
 	want := map[string]string{
 		"API-1": "alpine:latest", "API-2": "axarev/parsr-base:${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}${CI_COMMIT_BRANCH}", "API-3": "busybox",
 		"UI-1": "alpine:latest", "UI-2": "registry.access.redhat.com/ubi8/nodejs-10", "UI-3": "busybox",
-		"baseimage": "busybox", "Sonarqube": "slallemand/slack-webhook:latest",
+		"baseimage-1": "busybox", "baseimage-2": "plugins/docker", "Sonarqube": "slallemand/slack-webhook:latest",
 	}
 	for id, img := range want {
 		j, ok := jobs[id]
@@ -109,13 +109,13 @@ func TestDroneCorpusSplitsGitLabJobsByImage(t *testing.T) {
 			t.Errorf("job %s image = %q, want %q", id, got, img)
 		}
 	}
-	for _, id := range []string{"API", "UI"} {
+	for _, id := range []string{"API", "UI", "baseimage"} {
 		if _, ok := jobs[id]; ok {
 			t.Errorf("job %s should have been split", id)
 		}
 	}
-	if got := strList(jobs["API-1"]["needs"]); !slices.Equal(got, []string{"baseimage"}) {
-		t.Errorf("API-1 needs = %v, want the source needs", got)
+	if got := strList(jobs["API-1"]["needs"]); !slices.Equal(got, []string{"baseimage-2"}) {
+		t.Errorf("API-1 needs = %v, want the last part of the source need", got)
 	}
 	for _, c := range []struct{ id, prev string }{{"API-2", "API-1"}, {"API-3", "API-2"}, {"UI-2", "UI-1"}, {"UI-3", "UI-2"}} {
 		if got := needNames(jobs[c.id]["needs"]); !slices.Equal(got, []string{c.prev}) {
@@ -151,7 +151,8 @@ func TestDroneCorpusSplitsGitLabJobsByImage(t *testing.T) {
 		t.Errorf("API-1 runs a step of another image:\n%s", body)
 	}
 	// A job whose steps share one image is one job, with the image on the job.
-	for _, id := range []string{"baseimage", "Sonarqube"} {
+	// The plugin step of baseimage runs in its own image, so that job splits and the last part passes nothing on.
+	for _, id := range []string{"baseimage-2", "Sonarqube"} {
 		if jobs[id]["artifacts"] != nil {
 			t.Errorf("%s is not split but writes artifacts", id)
 		}

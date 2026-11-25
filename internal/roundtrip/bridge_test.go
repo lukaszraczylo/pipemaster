@@ -99,3 +99,83 @@ func TestPluginStepRunsTheImage(t *testing.T) {
 		})
 	}
 }
+
+const entrypointSource = `steps:
+  - name: build
+    image: alpine:3.20
+    commands: [echo before]
+  - name: notify
+    image: plugins/slack:1.4
+    settings:
+      channel: builds
+      webhook:
+        from_secret: SLACK_WEBHOOK
+`
+
+// GitLab and Concourse have no entrypoint form, so a known plugin runs its entrypoint command from the plugin table.
+func TestPluginEntrypointFromTable(t *testing.T) {
+	for _, to := range []string{"gitlab", "concourse"} {
+		t.Run(to, func(t *testing.T) {
+			src := fstest.MapFS{".woodpecker/ci.yaml": {Data: []byte(entrypointSource)}}
+			r := hops(t, src, prov(t, "woodpecker"), prov(t, to), false, true)
+			all := ""
+			for _, b := range r.toFiles {
+				all += string(b)
+			}
+			for _, want := range []string{"plugins/slack:1.4", "/bin/drone-slack", "PLUGIN_CHANNEL", "builds"} {
+				if !strings.Contains(all, want) {
+					t.Errorf("missing %q in\n%s", want, all)
+				}
+			}
+			if strings.Contains(all, "pipemaster: lost: step.action") {
+				t.Errorf("the plugin step still fails:\n%s", all)
+			}
+			for _, d := range diffNodes(r.src, r.back) {
+				t.Errorf("A->B->A: %s differs at %s", d.Field, d.Path)
+			}
+		})
+	}
+}
+
+// A plugin image that is not in the table fails loudly and names the image and the missing command.
+func TestUnknownPluginNamesTheImage(t *testing.T) {
+	const unknown = "steps:\n  - name: x\n    image: acme/plugin-x:2\n    settings:\n      a: b\n"
+	for _, to := range []string{"gitlab", "concourse"} {
+		t.Run(to, func(t *testing.T) {
+			src := fstest.MapFS{".woodpecker/ci.yaml": {Data: []byte(unknown)}}
+			r := hops(t, src, prov(t, "woodpecker"), prov(t, to), false, true)
+			found := false
+			for _, s := range scriptCandidates(t, r.toFiles) {
+				found = found || hasFailLoud(s) && strings.Contains(s, "acme/plugin-x") && strings.Contains(s, "entrypoint")
+			}
+			if !found {
+				t.Errorf("no failing script that names the image and the entrypoint")
+			}
+			for _, d := range diffNodes(r.src, r.back) {
+				t.Errorf("A->B->A: %s differs at %s", d.Field, d.Path)
+			}
+		})
+	}
+}
+
+// A step condition that Tekton states as a when entry keeps the plugin step without a script.
+func TestPluginStepKeepsItsWhenOnTekton(t *testing.T) {
+	const withWhen = "steps:\n  - name: notify\n    image: plugins/slack\n    settings:\n      channel: builds\n    when:\n      - evaluate: \"CI_COMMIT_BRANCH == 'main'\"\n"
+	src := fstest.MapFS{".woodpecker/ci.yaml": {Data: []byte(withWhen)}}
+	r := hops(t, src, prov(t, "woodpecker"), prov(t, "tekton"), false, true)
+	all := ""
+	for _, b := range r.toFiles {
+		all += string(b)
+	}
+	for _, want := range []string{"image: plugins/slack", "name: PLUGIN_CHANNEL", "when:"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("missing %q in\n%s", want, all)
+		}
+	}
+	if strings.Contains(all, "pipemaster: lost: step.action") {
+		t.Errorf("the plugin step still fails:\n%s", all)
+	}
+	for _, d := range diffNodes(r.src, r.back) {
+		t.Errorf("A->B->A: %s differs at %s", d.Field, d.Path)
+	}
+}

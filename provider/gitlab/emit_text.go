@@ -32,6 +32,7 @@ type emitter struct {
 	from    *expr.Dialect
 	fold    *folded
 	splits  map[*ir.Job]splitPart
+	plugins map[string]pluginUse
 	noSplit map[string]string
 	deadOut map[string]bool
 	// noVar holds the inputs that got no variable, because another input owns the name.
