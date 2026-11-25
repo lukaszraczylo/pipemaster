@@ -771,9 +771,14 @@ func (e *emitter) noteSourceEvents(pipelineID string) {
 	e.eventsNoted[pipelineID] = true
 	_, approx, lost := provider.WoodpeckerEvents(e.origin)
 	path := "pipeline/" + pipelineID
-	for _, g := range provider.GroupByFeature(approx) {
-		e.emulate(path, g.Feature, "manual or deployment event",
-			"the source runs on the events "+strings.Join(g.Names, ", ")+" when its file names no trigger; Woodpecker starts them as its nearest event")
+	// The nearest event is the manual or deployment event, so the entry sits on the manual trigger, not the API one.
+	var names []string
+	for _, ev := range approx {
+		names = append(names, ev.Name+" as "+ev.Woodpecker)
+	}
+	if len(names) > 0 {
+		e.emulate(path, caps.TriggerManual, "manual or deployment event",
+			"the source runs on these events when its file names no trigger; Woodpecker starts each as its nearest event: "+strings.Join(names, ", "))
 	}
 	for _, g := range provider.GroupByFeature(lost) {
 		e.noteLost(path, g.Feature, "the source runs on the events "+strings.Join(g.Names, ", ")+" when its file names no trigger; Woodpecker has no event for them")
