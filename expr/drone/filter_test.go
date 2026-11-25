@@ -593,3 +593,18 @@ func TestEventExcludeOfPushAndTagRoundTrips(t *testing.T) {
 		}
 	}
 }
+
+func TestFromExprReadsATagRunAsTheTagRefGlob(t *testing.T) {
+	want := drone.Conditions{Ref: drone.Filter{Include: []string{"refs/tags/**"}}}
+	for name, e := range map[string]expr.Expr{
+		"truthy tag":      r("tag"),
+		"prefix of a ref": expr.Call{Name: "startsWith", Args: []expr.Expr{r("ref"), expr.Lit{Kind: expr.LitStr, Str: "refs/tags/"}}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, ok := drone.FromExpr(e, exact)
+			if !ok || !reflect.DeepEqual(got, want) {
+				t.Fatalf("FromExpr = %#v, %v; want %#v", got, ok, want)
+			}
+		})
+	}
+}

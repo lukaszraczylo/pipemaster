@@ -332,6 +332,10 @@ func (rd reader) valueOf(e expr.Expr) (key string, vs []string, ok bool) {
 	case expr.Opaque:
 		k, p, ok := ParseGlob(x)
 		return k, []string{p}, ok
+	case expr.Ref:
+		if slices.Equal(x.Path, tagRef.Path) {
+			return KeyRef, []string{anyTagGlob}, true
+		}
 	case expr.Call:
 		if reflect.DeepEqual(x, anyTag()) {
 			return KeyRef, []string{anyTagGlob}, rd.opt.exact(tagRefPrefix, rd.sem)

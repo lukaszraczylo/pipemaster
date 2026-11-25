@@ -1,12 +1,15 @@
-# pipemaster:lost job.if pipeline/gitlab-ci/job/release: tag
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/release
+# pipemaster:arg {"if":"tag","back":"(event == 'push') \u0026\u0026 startsWith(ref, 'refs/tags/')","triggers":"- kind: push\n- kind: tag\n"}
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/release
 kind: pipeline
 type: docker
 name: release
 trigger:
   event:
-    exclude:
-      - '**'
+    - push
+    - tag
+  ref:
+    - refs/tags/**
 steps:
   - name: script
     image: ubuntu:latest
