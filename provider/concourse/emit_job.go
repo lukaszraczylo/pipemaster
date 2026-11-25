@@ -84,13 +84,14 @@ func (pe *pipeEmitter) jobs() []*yaml.Node {
 	all := pe.sources
 	push := slices.DeleteFunc(slices.Clone(all), func(s *source) bool { return s.tagOnly })
 	tags := slices.DeleteFunc(slices.Clone(all), func(s *source) bool { return !s.tagOnly })
-	pe.tagSplit = len(tags) > 0 && len(push) > 0 && (len(pe.pl.Jobs) != 1 || pe.pl.Jobs[0].ID != placeholderJob) && slices.ContainsFunc(push, func(s *source) bool { return s.typ == typeGit })
+	hasJobs := len(pe.pl.Jobs) != 1 || pe.pl.Jobs[0].ID != placeholderJob
+	pe.tagSplit = len(tags) > 0 && len(push) > 0 && hasJobs && slices.ContainsFunc(push, func(s *source) bool { return s.typ == typeGit })
 	if pe.tagSplit {
 		pe.sources = push
 		pe.primary = firstGit(push)
 	} else if len(tags) > 0 {
 		if len(push) > 0 {
-			e.lose(pe.path, caps.TriggerTag, "the pipeline has no job to copy for a tag run, and a job waits for a version of every get; with a push trigger beside the tag trigger the job never starts")
+			e.lose(pe.path, caps.TriggerTag, "no job copy can wait for a tag version, because the pipeline has no job or its push trigger is not a git resource; a job waits for a version of every get, so with a push trigger beside the tag trigger the job never starts")
 		}
 		for _, s := range tags {
 			s.tagOnly = false
