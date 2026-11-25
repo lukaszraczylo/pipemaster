@@ -54,8 +54,8 @@ Totals: 62 pass, 16 diff (explained by the loss report), 6 FAIL (unexplained), 4
 ## Unexplained differences (FAIL)
 
 - gha -> concourse, fixture branch, event push-branch: marker 0: source has "branch.always", target ends / no verdict explains missing: "branch.always" is missing, exit: exit 0 became 1 / target log: errored
-- gha -> concourse, fixture branch, event push-main: marker 0: source has "branch.always", target ends / no verdict explains missing: "branch.always" is missing, missing: "branch.main" is missing, exit: exit 0 became 1 / target log: errored
-- gha -> concourse, fixture branch, event tag: marker 0: source has "branch.always", target ends / no verdict explains missing: "branch.always" is missing, missing: "branch.tag" is missing, exit: exit 0 became 1 / target log: errored
+- gha -> concourse, fixture branch, event push-main: marker 0: source has "branch.always", target ends / no verdict explains missing: "branch.main" is missing, missing: "branch.always" is missing, exit: exit 0 became 1 / target log: errored
+- gha -> concourse, fixture branch, event tag: marker 0: source has "branch.always", target ends / no verdict explains missing: "branch.tag" is missing, missing: "branch.always" is missing, exit: exit 0 became 1 / target log: errored
 - gha -> concourse, fixture noform, event push-branch: marker 0: source has "noform.before", target ends / no verdict explains missing: "noform.before" is missing, missing: "noform.after" is missing, exit: exit 0 became 1 / target log: errored
 - gha -> concourse, fixture noform, event push-main: marker 0: source has "noform.before", target ends / no verdict explains missing: "noform.before" is missing, missing: "noform.after" is missing, exit: exit 0 became 1 / target log: errored
 - woodpecker -> concourse, fixture branch, event push-main: marker 1: source has "branch.main", target ends / no verdict explains missing: "branch.main" is missing / target exit 0, markers ["branch.always"]
@@ -94,10 +94,10 @@ Totals: 62 pass, 16 diff (explained by the loss report), 6 FAIL (unexplained), 4
 
 | engine | runs | total | mean |
 |---|---|---|---|
-| concourse | 18 | 8m21s | 27.8s |
-| drone | 22 | 8s | 400ms |
-| gha | 22 | 18s | 800ms |
-| gitlab | 22 | 17s | 800ms |
-| woodpecker | 24 | 7s | 300ms |
+| concourse | 18 | 8m37s | 28.7s |
+| drone | 22 | 7s | 300ms |
+| gha | 22 | 19s | 900ms |
+| gitlab | 22 | 15s | 700ms |
+| woodpecker | 22 | 6s | 300ms |
 
 Run times vary with the machine and are the only part of this file that changes between identical runs.
