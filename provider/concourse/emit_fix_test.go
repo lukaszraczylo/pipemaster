@@ -11,7 +11,7 @@ import (
 
 func TestJobConditionWithAnUnspellableRefIsAFailSafe(t *testing.T) {
 	j := scriptJob("test", "make")
-	j.If = eqRef("event", "push")
+	j.If = eqRef("actor", "octocat")
 	d := scriptJob("deploy", "make deploy")
 	d.Needs = []ir.Need{{JobID: "test"}}
 	p := project(j, d)

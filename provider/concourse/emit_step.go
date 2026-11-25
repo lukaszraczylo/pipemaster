@@ -247,36 +247,33 @@ func (jx *jobEmitter) guarded(sc *scope, path, name string, st *ir.Step, body []
 			cond = nil
 		}
 	}
-	if cond != nil && jx.pe.tagSplit {
-		// A job of a split source runs on one event only, so a condition on the event is decided here.
-		ev := "push"
-		if jx.pe.twinPass {
-			ev = "tag"
-		}
-		switch decideRun(cond, ev, ev == "tag") {
+	stepCond := cond
+	if cond != nil {
+		f, v := jx.foldRun(cond)
+		switch v {
 		case runNever:
 			e.markArg(caps.StepIf, jx.sm(name), disabledArg{If: expr.String(cond), Script: strings.Join(body, "\n")})
 			return append([]string{disabledScript}, body...), true
 		case runAlways:
 			cond = nil
+		default:
+			cond = f
 		}
 	}
-	if jx.guard != nil && cond != nil {
-		cond = expr.Binary{Op: expr.OpAnd, L: jx.guard, R: cond}
-	} else if jx.guard != nil {
-		cond = jx.guard
-	}
+	orig := andGuard(jx.guard, stepCond)
+	cond = andGuard(jx.guard, cond)
 	if cond == nil {
+		jx.foldMark(name, orig, nil)
 		return body, false
 	}
 	if sc.ps && cond != nil {
 		e.lose(path, caps.StepIf, "the condition has no PowerShell guard form; the step runs exit 0 first and does nothing")
-		e.markArg(caps.StepIf, jx.sm(name), disabledArg{If: expr.String(cond), Script: strings.Join(body, "\n")})
+		e.markArg(caps.StepIf, jx.sm(name), disabledArg{If: expr.String(orig), Script: strings.Join(body, "\n")})
 		return append([]string{disabledScript}, body...), true
 	}
 	fail := func(why string) ([]string, bool) {
 		e.lose(path, caps.StepIf, why+"; the step runs exit 0 first and does nothing")
-		e.markArg(caps.StepIf, jx.sm(name), disabledArg{If: expr.String(cond), Script: strings.Join(body, "\n")})
+		e.markArg(caps.StepIf, jx.sm(name), disabledArg{If: expr.String(orig), Script: strings.Join(body, "\n")})
 		return append([]string{disabledScript}, body...), true
 	}
 	refs, ok := guardRefs(cond)
@@ -296,6 +293,7 @@ func (jx *jobEmitter) guarded(sc *scope, path, name string, st *ir.Step, body []
 	if st.If != nil {
 		e.emulate(path, caps.StepIf, "shell guard", "the script starts with a guard line, so the task shows success when the condition is false")
 	}
+	jx.foldMark(name, orig, cond)
 	return append([]string{line}, body...), false
 }
 

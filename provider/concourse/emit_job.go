@@ -290,39 +290,37 @@ func (jx *jobEmitter) condition() {
 		e.lose(jx.path, caps.JobIf, changesDetail)
 		return
 	}
-	if jx.pe.tagSplit {
-		// The job of a split source runs on one event, so a condition on the event or the tag is decided here.
-		ev := "push"
-		if jx.pe.twinPass {
-			ev = "tag"
-		}
-		switch decideRun(j.If, ev, ev == "tag") {
-		case runAlways:
-			return
-		case runNever:
-			jx.manual, jx.condHeld = true, true
-			e.emulate(jx.path, caps.JobIf, "no triggering get", "the condition is false on every "+ev+" run, so this job has no triggering get; the other job of the pair runs the source condition")
-			return
-		}
-	}
-	refs, ok := guardRefs(j.If)
-	if !ok || !guardable(j.If) {
+	cond, v := jx.foldRun(j.If)
+	switch v {
+	case runAlways:
+		jx.pe.e.markArg(caps.JobIf, jx.mpath, ifArg{If: expr.String(j.If), Folded: true})
+		return
+	case runNever:
 		jx.manual, jx.condHeld = true, true
-		e.lose(jx.path, caps.JobIf, "the condition has no shell test form; the job has no triggering get, so a person starts it")
+		why := "the condition is false on every run that starts this job, so the job has no triggering get"
+		if jx.pe.tagSplit {
+			why += "; the other job of the pair runs the source condition"
+		}
+		e.emulate(jx.path, caps.JobIf, "no triggering get", why)
 		return
 	}
-	probe := jx.newScope("")
-	for _, r := range refs {
-		env, spelled := probe.refVar(r)
-		if want, named := exprconcourse.EnvName(r); !spelled || !named || env != want {
-			jx.manual, jx.condHeld = true, true
-			e.lose(jx.path, caps.JobIf, "the reference "+expr.String(r)+" has no spelling in a Concourse task; the job has no triggering get, so a person starts it")
-			return
-		}
+	if why := jx.unspelled(cond); why != "" {
+		jx.manual, jx.condHeld = true, true
+		e.lose(jx.path, caps.JobIf, why+"; the job has no triggering get, so a person starts it")
+		return
 	}
-	jx.guard = j.If
+	if jx.hasPluginTask() && jx.unspelled(j.If) != "" {
+		jx.manual, jx.condHeld = true, true
+		e.lose(jx.path, caps.JobIf, "the condition holds only after the event of the run is known, and a plugin task cannot carry a guard; the job has no triggering get, so a person starts it")
+		return
+	}
+	jx.guard = cond
 	e.emulate(jx.path, caps.JobIf, "shell guard on each script task", "every script task of the job starts with the guard of the condition")
-	e.markArg(caps.JobIf, jx.mpath, ifArg{If: expr.String(j.If)})
+	a := ifArg{If: expr.String(j.If)}
+	if expr.String(cond) != a.If {
+		a.Guard, a.Folded = expr.String(cond), true
+	}
+	e.markArg(caps.JobIf, jx.mpath, a)
 }
 
 // cachePaths turns the job caches into task cache paths; a path that a task cannot cache is lost.
@@ -520,4 +518,20 @@ func (jx *jobEmitter) runnerVerdicts() {
 	if slices.ContainsFunc(j.Runner.Labels, func(l string) bool { return strings.Contains(l, "${{") }) {
 		e.lose(jx.path, caps.JobRunner, "a runner label with an expression names no worker tag; the tasks do not carry it")
 	}
+}
+
+// unspelled says why a condition cannot be a guard of the job tasks, or "" when it can.
+func (jx *jobEmitter) unspelled(c expr.Expr) string {
+	refs, ok := guardRefs(c)
+	if !ok || !guardable(c) {
+		return "the condition has no shell test form"
+	}
+	probe := jx.newScope("")
+	for _, r := range refs {
+		env, spelled := probe.refVar(r)
+		if want, named := exprconcourse.EnvName(r); !spelled || !named || env != want {
+			return "the reference " + expr.String(r) + " has no spelling in a Concourse task"
+		}
+	}
+	return ""
 }

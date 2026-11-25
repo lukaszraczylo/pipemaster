@@ -698,7 +698,7 @@
      "path": "pipeline/woodpecker/job/build-latest-image",
      "feature": "job.if",
      "level": "lost",
-     "detail": "the reference event has no spelling in a Concourse task; the job has no triggering get, so a person starts it"
+     "detail": "the condition holds only after the event of the run is known, and a plugin task cannot carry a guard; the job has no triggering get, so a person starts it"
     },
     {
      "path": "pipeline/woodpecker/job/build-latest-image/step/build-latest-image",

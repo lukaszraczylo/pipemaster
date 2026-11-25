@@ -2,6 +2,8 @@
 # pipemaster:arg {"name":"stepif","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
 # pipemaster:arg {"digest":"d2b00c9ea6e3d2d885905624e2fff304bb08506ba55015b074ef173990ee5ce4","carry":"if: always()\nid: build-step-1\nkind: script\n"}
+# pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
+# pipemaster:arg {"if":"event == 'push'","fold":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-2/carry
 # pipemaster:arg {"digest":"77aa86a0f16ec1c02b15049dece6b69665ca91c30425d1a9891b0c5576239d7e","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
@@ -15,7 +17,6 @@
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
-# pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-2
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-2
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1

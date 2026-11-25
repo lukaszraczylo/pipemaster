@@ -7059,7 +7059,7 @@
      "feature": "job.if",
      "level": "emulated",
      "strategy": "no triggering get",
-     "detail": "the condition is false on every push run, so this job has no triggering get; the other job of the pair runs the source condition; the condition is false on every tag run, so this job has no triggering get; the other job of the pair runs the source condition"
+     "detail": "the condition is false on every run that starts this job, so the job has no triggering get; the other job of the pair runs the source condition"
     },
     {
      "path": "pipeline/gitlab-ci/job/release:prepare/step/script",

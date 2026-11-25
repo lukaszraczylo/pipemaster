@@ -4,6 +4,8 @@
 # pipemaster:arg {"digest":"6e804da4b77a29cd3312b16c450cc8f2f8c0ffb148eef266bae6cd1f42c666de","carry":"id: meta\nkind: script\n"}
 # pipemaster:emulated display.name pipeline/ci/job/check/step/check-step-2
 # pipemaster:arg {"name":"Inspect","id":"check-step-2","written":"check-step-2","kind":"step"}
+# pipemaster:emulated step.if pipeline/ci/job/check/step/check-step-2
+# pipemaster:arg {"if":"event != 'pull_request'","fold":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/check/step/check-step-2/carry
 # pipemaster:arg {"digest":"f33e88355c1c472553ceb0930e86b1f0be99b80925d61d72308e8fbd092228c6","carry":"if: event != 'pull_request'\nid: check-step-2\nname: Inspect\nkind: script\nscript:\n    - docker inspect $\u007b{ steps.meta.outputs.version }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/check/carry
@@ -15,7 +17,6 @@
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/check
-# pipemaster:emulated step.if pipeline/ci/job/check/step/check-step-2
 # pipemaster:emulated step.image pipeline/ci/job/check/step/check-step-2
 # pipemaster:emulated step.shell pipeline/ci/job/check/step/check-step-2
 # pipemaster:emulated step.image pipeline/ci/job/check/step/meta

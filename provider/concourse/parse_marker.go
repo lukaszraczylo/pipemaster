@@ -143,6 +143,19 @@ func (jb *jobBuilder) ifMarker() {
 		jb.b.ignored(jb.path, caps.JobIf, "the condition of the marker cannot be read")
 		return
 	}
+	strip := cond
+	if a.Folded {
+		if a.Guard == "" {
+			jb.job.If = cond
+			return
+		}
+		g, gerr := expr.ParseCanonical(a.Guard)
+		if gerr != nil {
+			jb.b.ignored(jb.path, caps.JobIf, "the guard of the marker cannot be read")
+			return
+		}
+		strip = g
+	}
 	var scripts []*ir.Step
 	for _, st := range jb.job.Steps {
 		if st.Kind == ir.StepScript {
@@ -151,8 +164,9 @@ func (jb *jobBuilder) ifMarker() {
 	}
 	rest := make([]expr.Expr, len(scripts))
 	for i, st := range scripts {
-		x, ok := stripLead(st.If, cond)
+		x, ok := stripLead(st.If, strip)
 		if !ok {
+
 			jb.b.ignored(jb.path, caps.JobIf, "a script task no longer starts with the guard of the job condition; the guards stay in the tasks")
 			return
 		}
@@ -316,6 +330,7 @@ func (jb *jobBuilder) guardLines(st *ir.Step) {
 	body := script[i:]
 	if len(pre) == 0 && cond == nil {
 		jb.disabled(st)
+		jb.folded(st, nil)
 		return
 	}
 	body = refsBack(pre, body)
@@ -323,6 +338,26 @@ func (jb *jobBuilder) guardLines(st *ir.Step) {
 	if cond != nil {
 		st.If = cond
 	}
+	jb.folded(st, cond)
+}
+
+// folded puts back the condition that the emitter folded by the event of the job, when the guard of the task is
+// still the folded one.
+func (jb *jobBuilder) folded(st *ir.Step, guard expr.Expr) {
+	var a foldArg
+	if !jb.b.arg(jb.path+"/step/"+st.ID, caps.StepIf, &a) || !a.Fold {
+		return
+	}
+	cond, err := expr.ParseCanonical(a.If)
+	if err != nil {
+		jb.b.ignored(jb.path+"/step/"+st.ID, caps.StepIf, "the condition of the marker cannot be read")
+		return
+	}
+	if (guard == nil && a.Guard == "") || (guard != nil && expr.String(guard) == a.Guard) {
+		st.If = cond
+		return
+	}
+	jb.b.ignored(jb.path+"/step/"+st.ID, caps.StepIf, "the guard of the task was edited after pipemaster wrote it; the guard stays")
 }
 
 // preludeVar is the variable that a prelude line fills, or "" when the line is no prelude line.
@@ -502,7 +537,7 @@ func (jb *jobBuilder) carryStep(m *omap, written string, st *ir.Step) {
 		script = c.Script
 	}
 	c.Script, c.Ext = script, st.Ext
-	if _, bare := statusOf(c.If); bare {
+	if _, bare := statusOf(c.If); bare || c.If == nil || guardLeads(st.If, c.If) {
 		c.If = st.If
 	}
 	if c.ContinueOnError {
@@ -518,6 +553,13 @@ func (jb *jobBuilder) carryStep(m *omap, written string, st *ir.Step) {
 		st.ID = id
 		jb.b.ignored(jb.path+"/step/"+written, caps.ExtPassthrough, "the carry ID "+c.ID+" is already used by another step of the job")
 	}
+}
+
+// guardLeads is true when the condition read from the guard of a task is the step condition of its carry with
+// another condition before it, the guard of the job.
+func guardLeads(guard, step expr.Expr) bool {
+	b, ok := guard.(expr.Binary)
+	return ok && b.Op == expr.OpAnd && expr.String(b.R) == expr.String(step)
 }
 
 // untried reports the steps whose carry held continue_on_error and that no try wraps any more.

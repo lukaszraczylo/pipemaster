@@ -1,13 +1,13 @@
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:arg {"if":"(branch == 'main') || ((event == 'schedule') \u0026\u0026 !(branch == 'main'))","guard":"branch == 'main'","folded":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
-# pipemaster:arg {"digest":"b9bec7956d311173f9195fd3354a67c5bf54d1ea6dffb0863ddd8cbc23eda611","carry":"id: script\nkind: script\n"}
-# pipemaster:emulated job.manual pipeline/gitlab-ci/job/build
-# pipemaster:arg {"manual":false,"held":true,"cond":true}
+# pipemaster:arg {"digest":"a0784aead2522d06e02feba448e839b4acd702860612aa6e418aaf281873a6bc","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"1e2046754521489d8f2b1fb90f6d80f39f6112755fe4f4bd7a81a65db825a7bb","carry":"if: (branch == 'main') || ((event == 'schedule') \u0026\u0026 !(branch == 'main'))\nid: build\n"}
+# pipemaster:arg {"digest":"4097801aa9bc53c48af183d07911515687c1b7f23e1c6431b427800e459c72ad","carry":"if: (branch == 'main') || ((event == 'schedule') \u0026\u0026 !(branch == 'main'))\nid: build\n"}
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"2ec1dcbc01c737771acd62a3d97bc835360b3443812a96f8981d095c821d1957","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
@@ -27,6 +27,7 @@ jobs:
   - name: build
     plan:
       - get: source
+        trigger: true
       - task: script
         input_mapping:
           workspace: source
@@ -47,7 +48,10 @@ jobs:
               - -c
               - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
               - pipemaster
-              - make
+              - |-
+                PM_CTX_BRANCH="$(cat ../workspace/.git/branch)"; export PM_CTX_BRANCH # pipemaster:ctx
+                if ! [ "$PM_CTX_BRANCH" = 'main' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard
+                make
             dir: workspace
   - name: build-tag
     plan:

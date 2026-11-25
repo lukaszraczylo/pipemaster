@@ -123,7 +123,7 @@ func strOfAny(v any) string { s, _ := v.(string); return s }
 // A plugin step with a condition names the real cause, not a missing entrypoint.
 func TestConcoursePluginReasonNamesTheCause(t *testing.T) {
 	st := pluginStep("plugins/slack", map[string]ir.Value{"channel": lit("c")})
-	st.If = expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{"event"}}, R: expr.Lit{Kind: expr.LitStr, Str: "push"}}
+	st.If = expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{"branch"}}, R: expr.Lit{Kind: expr.LitStr, Str: "main"}}
 	files, rep, err := prov(t, "concourse").Emit(oneJob(st))
 	if err != nil {
 		t.Fatal(err)

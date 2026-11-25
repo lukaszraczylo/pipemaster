@@ -31,7 +31,7 @@ func (c *chain) pluginTask(st *ir.Step, path string) ([]*yaml.Node, string) {
 	switch {
 	case !ok || !emitkit.PluginRuns(st):
 		return nil, ""
-	case st.If != nil:
+	case st.If != nil && !jx.alwaysHolds(st.If):
 		return nil, "the step has a condition that a plugin task cannot carry; the step fails with a message"
 	case jx.guard != nil:
 		return nil, "the job has a guard that a plugin task cannot carry; the step fails with a message"
@@ -143,4 +143,15 @@ func (jx *jobEmitter) bridgeTask() []*yaml.Node {
 	e.emulate(jx.path, caps.StepScript, "failing task", reason+"; a task that prints the loss and exits 1 stands in")
 	e.markArg(caps.StepScript, jx.mpath, bridgeArg{Task: name})
 	return []*yaml.Node{m.N}
+}
+
+// hasPluginTask is true when a step of the job is a plugin that runs as a task, which cannot carry a guard.
+func (jx *jobEmitter) hasPluginTask() bool {
+	return slices.ContainsFunc(jx.j.Steps, func(st *ir.Step) bool {
+		if st.Image == nil {
+			return false
+		}
+		_, ok := actions.LookupPlugin(st.Image.Ref)
+		return ok && emitkit.PluginRuns(st)
+	})
 }

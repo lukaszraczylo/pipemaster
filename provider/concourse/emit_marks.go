@@ -70,9 +70,20 @@ type workdirArg struct {
 	Wrote   string `json:"wrote"`
 }
 
-// ifArg carries the condition of a job whose guard is in every script task.
+// ifArg carries the condition of a job whose guard is in every script task. Guard is the folded condition that the
+// tasks hold when it differs from If; Folded with no Guard says the tasks hold no guard.
 type ifArg struct {
-	If string `json:"if"`
+	If     string `json:"if"`
+	Guard  string `json:"guard,omitempty"`
+	Folded bool   `json:"folded,omitempty"`
+}
+
+// foldArg carries the condition of a step whose guard holds the condition folded by the event of the job. Guard
+// is empty when the step holds no guard.
+type foldArg struct {
+	If    string `json:"if"`
+	Guard string `json:"guard,omitempty"`
+	Fold  bool   `json:"fold"`
 }
 
 // disabledArg carries the condition and the script of a step that runs exit 0 first.

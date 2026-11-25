@@ -1,13 +1,13 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"alias","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-1
-# pipemaster:arg {"if":"ref_name == 'main'","script":"# pipemaster:lost echo {{ ref_name }}\nprintf '%s\\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Concourse spelling for expression ref_name; the line is replaced by a line that prints the loss and exits 1' \u003e\u00262; exit 1"}
+# pipemaster:arg {"if":"ref_name == 'main'","guard":"branch == 'main'","fold":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"8b7439514b577439ddea926143b71c01c5b7b99e25c815734badbcabaa488191","carry":"if: ref_name == 'main'\nid: build-step-1\nkind: script\nscript:\n    - echo $\u007b{ ref_name }}\n"}
+# pipemaster:arg {"digest":"fd1af86ba069a817c233aa0beeba7328337cd3e2cccdf522ea762ac5ef43f89e","carry":"if: ref_name == 'main'\nid: build-step-1\nkind: script\nscript:\n    - echo $\u007b{ ref_name }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-2/carry
 # pipemaster:arg {"digest":"880bafd9981b77f1d8c4d9363492c948f885551d4dd0896abcf0edc21bf90106","carry":"if: sha != ''\nid: build-step-2\nkind: script\nscript:\n    - echo $\u007b{ sha }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"40744216225a2b4b052b2aa5407a4a228b968a554692aa532ae1f83eb885acd6","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
+# pipemaster:arg {"digest":"54e0de95b2cdc5985edbf6adb23efc9dd6bff80c0239603a804594857ca8f092","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
 # pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
@@ -57,7 +57,8 @@ jobs:
               - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
               - pipemaster
               - |-
-                echo 'pipemaster: skipped: the step condition has no shell form'; exit 0 # pipemaster:guard the step condition has no shell form
+                PM_CTX_BRANCH="$(cat ../workspace/.git/branch)"; export PM_CTX_BRANCH # pipemaster:ctx
+                if ! [ "$PM_CTX_BRANCH" = 'main' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard
                 # pipemaster:lost echo {{ ref_name }}
                 printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Concourse spelling for expression ref_name; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
             dir: workspace
@@ -113,7 +114,8 @@ jobs:
               - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
               - pipemaster
               - |-
-                echo 'pipemaster: skipped: the step condition has no shell form'; exit 0 # pipemaster:guard the step condition has no shell form
+                PM_CTX_TAG="$(cat ../workspace/.git/tags)"; export PM_CTX_TAG # pipemaster:ctx
+                if ! [ "$PM_CTX_TAG" = 'main' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard
                 # pipemaster:lost echo {{ ref_name }}
                 printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Concourse spelling for expression ref_name; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
             dir: workspace

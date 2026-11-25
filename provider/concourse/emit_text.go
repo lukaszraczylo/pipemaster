@@ -23,8 +23,10 @@ var (
 	nameRE  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
 )
 
-// ctxFiles maps the canonical context values that the git resource writes into its checkout to the file.
-var ctxFiles = map[string]string{expr.CtxBranch: gitDir + "branch", expr.CtxSHA: gitDir + "commit"}
+// ctxFiles maps the canonical context values that the git resource writes into its checkout to the file. The tag
+// file holds the tags that point at the checked-out commit, joined with commas
+// (assets/common.sh add_git_metadata_tags and assets/in_commits.sh of git-resource v1.24.1).
+var ctxFiles = map[string]string{expr.CtxBranch: gitDir + "branch", expr.CtxSHA: gitDir + "commit", expr.CtxTag: gitDir + "tags"}
 
 type param struct{ name, value string }
 
@@ -50,15 +52,18 @@ func (jx *jobEmitter) newScope(dir string) *scope {
 	return s
 }
 
-// ctxOK reports whether the task can read a context file: the directory has a place, and a branch file exists
-// only when the workspace source follows a branch.
+// ctxOK reports whether the task can read a context file: the directory has a place, a branch file exists only
+// when the workspace source follows a branch, and a tag file only when it follows tags.
 func (s *scope) ctxOK(file string) bool {
 	if !s.prefixOK || s.ps {
 		return false
 	}
-	if file == ctxFiles[expr.CtxBranch] {
-		_, tagged := srcOf(s.jx.workspaceSource().def)["tag_filter"]
+	_, tagged := srcOf(s.jx.workspaceSource().def)["tag_filter"]
+	switch file {
+	case ctxFiles[expr.CtxBranch]:
 		return !tagged
+	case ctxFiles[expr.CtxTag]:
+		return tagged
 	}
 	return true
 }
