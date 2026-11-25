@@ -794,7 +794,12 @@ func TestBranchAndTagTriggersSayWhichResourceTheWorkspaceFollows(t *testing.T) {
 	if got := workspaceSource(t, files, "publish"); got != "source" {
 		t.Fatalf("the workspace comes from %q", got)
 	}
-	if !hasFeatureEntry(rep, "trigger.push", "a push to source-tags") {
-		t.Fatalf("no entry says that a tag push builds the first resource: %v", rep.Entries)
+	if !hasFeatureEntry(rep, "trigger.tag", "the job runs on push only") {
+		t.Fatalf("no entry says that the tag trigger is lost beside a push trigger: %v", rep.Entries)
+	}
+	for name, body := range files {
+		if strings.Contains(body, "source-tags") {
+			t.Fatalf("a tag resource without a version blocks the job on a push (%s):\n%s", name, body)
+		}
 	}
 }

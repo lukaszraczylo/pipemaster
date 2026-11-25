@@ -82,6 +82,7 @@ func isGlob(s string) bool { return strings.ContainsAny(s, globChars) }
 // first git resource, or a generated one when no trigger gives a git resource, so every job gets one source and
 // a passed list can order jobs.
 func (pe *pipeEmitter) buildSources() {
+	pushes := slices.ContainsFunc(pe.pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerPush })
 	for i := range pe.pl.Triggers {
 		t := &pe.pl.Triggers[i]
 		tp := fmt.Sprintf("%s/trigger/%d", pe.path, i)
@@ -90,6 +91,11 @@ func (pe *pipeEmitter) buildSources() {
 		case ir.TriggerPush:
 			pe.push(t, tp)
 		case ir.TriggerTag:
+			if pushes && !pe.e.own {
+				// A job waits for a version of every resource it gets, and a tag resource has none on a branch push.
+				pe.e.lose(tp, caps.TriggerTag, "a job cannot trigger on a push and on a tag: the tag resource has no version on a branch push, so the job would never start; the job runs on push only")
+				continue
+			}
 			pe.tag(t, tp)
 		case ir.TriggerSchedule:
 			pe.schedule(t, tp)
