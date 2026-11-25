@@ -163,6 +163,9 @@ func (e *emitter) foldPipelines(pls []*ir.Pipeline) (*ir.Pipeline, error) {
 			merged.Finally = append(merged.Finally, f.add(pl, j, shared, group, folded1{cond: cond, parts: parts, disabled: disabled}, true))
 		}
 		arg := foldPipelineArg{Name: pl.Name, Triggers: pl.Triggers, Concurrency: pl.Concurrency}
+		if e.injected[pl.ID] {
+			arg.Triggers = nil
+		}
 		arg.Inputs = inputs
 		for _, v := range pl.Env {
 			arg.EnvNames = append(arg.EnvNames, v.Name)

@@ -71,3 +71,18 @@ func TestDroneSourceWithoutTriggerKeepsItsEventsOnGitLab(t *testing.T) {
 		t.Errorf("no entry names the events GitLab lacks: %+v", rep.Entries)
 	}
 }
+
+func TestDroneSourcesWithoutTriggerReadBackWithoutTrigger(t *testing.T) {
+	p := &ir.Project{Origin: ir.Origin{Provider: "drone", Dialect: "drone"},
+		Pipelines: []*ir.Pipeline{noTriggerPipeline("a", nil), noTriggerPipeline("b", nil)}}
+	files, _ := emitFiles(t, p)
+	got, _ := parseFiles(t, map[string]string{rootFile: string(files[rootFile])})
+	if len(got.Pipelines) != 2 {
+		t.Fatalf("pipelines = %d, want 2", len(got.Pipelines))
+	}
+	for _, pl := range got.Pipelines {
+		if len(pl.Triggers) != 0 {
+			t.Errorf("pipeline %s has triggers %+v, want none", pl.ID, pl.Triggers)
+		}
+	}
+}
