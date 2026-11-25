@@ -165,8 +165,39 @@ func TestDroneEventFiltersAgainstGHAEvents(t *testing.T) {
 	}
 }
 
-// TestNoEventFilterOnWoodpeckerStartsOnlySourceEvents: a source with no event filter gives Woodpecker its default events and
-// none of the four that only Woodpecker has.
+// TestDroneEventFiltersAgainstTektonAndArgoTriggers: the Tekton trigger and the Argo sensor name no push, tag or pull
+// request test for an event the Drone filter leaves out. A Drone event with no webhook form (cron, custom, promote,
+// rollback) starts nothing there.
+func TestDroneEventFiltersAgainstTektonAndArgoTriggers(t *testing.T) {
+	// A job condition that excludes an event also names it, so each signature is the trigger side only.
+	sigs := map[string]map[string]string{
+		provider.Tekton: {"push": "refs/heads/", "tag": "refs/tags/", "pull_request": "body.pull_request"},
+		provider.Argo:   {"push": "refs/heads/", "tag": "refs/tags/", "pull_request": "eventName: pull_request"},
+	}
+	for _, target := range []string{provider.Tekton, provider.Argo} {
+		tests := sigs[target]
+		for _, f := range droneForms {
+			t.Run(target+"/"+f.name, func(t *testing.T) {
+				out, _ := convert(t, "drone", target, ".drone.yml", droneSource(f.include, f.exclude))
+				var live []string
+				for _, line := range strings.Split(out, "\n") {
+					if !strings.HasPrefix(strings.TrimSpace(line), "#") {
+						live = append(live, line)
+					}
+				}
+				body := strings.Join(live, "\n")
+				for ev, sig := range tests {
+					if !droneFilterRuns(f.include, f.exclude, ev) && strings.Contains(body, sig) {
+						t.Errorf("%s names %q although Drone does not fire %s\n%s", target, sig, ev, out)
+					}
+				}
+			})
+		}
+	}
+}
+
+// TestNoEventFilterOnWoodpeckerStartsOnlySourceEvents: a source with no event filter gives Woodpecker the events it
+// fires, with a Woodpecker form where there is one, and none that only Woodpecker has.
 func TestNoEventFilterOnWoodpeckerStartsOnlySourceEvents(t *testing.T) {
 	// GitLab creates no merge request pipeline for a job without merge request rules
 	// (https://docs.gitlab.com/ci/pipelines/merge_request_pipelines/), so its default is push and tag.
@@ -174,8 +205,8 @@ func TestNoEventFilterOnWoodpeckerStartsOnlySourceEvents(t *testing.T) {
 		from, name, text string
 		fires            []string
 	}{
-		"drone":  {"drone", ".drone.yml", droneSource(nil, nil), []string{"push", "pull_request", "tag"}},
-		"gitlab": {"gitlab", ".gitlab-ci.yml", "job:\n  image: alpine\n  script: [echo hi]\n", []string{"push", "tag"}},
+		"drone":  {"drone", ".drone.yml", droneSource(nil, nil), []string{"push", "pull_request", "tag", "cron", "manual", "deployment"}},
+		"gitlab": {"gitlab", ".gitlab-ci.yml", "job:\n  image: alpine\n  script: [echo hi]\n", []string{"push", "tag", "cron", "manual"}},
 	}
 	for name, s := range sources {
 		t.Run(name, func(t *testing.T) {
@@ -188,12 +219,12 @@ func TestNoEventFilterOnWoodpeckerStartsOnlySourceEvents(t *testing.T) {
 					}
 				}
 			}
-			for _, ev := range []string{"pull_request_closed", "pull_request_metadata", "release", "deployment"} {
+			for _, ev := range []string{"pull_request_closed", "pull_request_metadata", "release"} {
 				if wpAdmits(file.When, ev) {
 					t.Errorf("Woodpecker event %s runs, the source never fires it\n%s", ev, out)
 				}
 			}
-			for _, ev := range []string{"push", "pull_request", "tag"} {
+			for _, ev := range []string{"push", "pull_request", "tag", "cron", "manual", "deployment"} {
 				if got, want := wpAdmits(file.When, ev), slices.Contains(s.fires, ev); got != want {
 					t.Errorf("Woodpecker event %s runs = %v, source fires = %v\n%s", ev, got, want, out)
 				}
