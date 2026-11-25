@@ -120,12 +120,22 @@ func TestDroneEventFiltersAgainstEveryGitLabSource(t *testing.T) {
 			}
 			for _, r := range glRuns {
 				want := r.drone != "" && droneFilterRuns(f.include, f.exclude, r.drone)
+				if gatedByJobCondition(f.exclude, r.source) {
+					continue
+				}
 				if got := glAdmits(t, doc, r.source, r.branch, r.tag); got && !want {
 					t.Errorf("GitLab starts a pipeline for %s, Drone (%q) does not\n%s", r.name, r.drone, out)
 				}
 			}
 		})
 	}
+}
+
+// gatedByJobCondition is true for the push source or event of a filter that excludes push or tag. The default events
+// keep the push start, because a GHA push or a GitLab push source also carries a tag push, and the condition of
+// each step or job then rules out the excluded run. A job-less start creates no GitLab pipeline.
+func gatedByJobCondition(exclude []string, source string) bool {
+	return (source == "push") && (slices.Contains(exclude, "push") || slices.Contains(exclude, "tag"))
 }
 
 // ghaEvents are the events a GHA workflow file can name that no source here fires.
@@ -154,6 +164,9 @@ func TestDroneEventFiltersAgainstGHAEvents(t *testing.T) {
 				}
 			}
 			for ev := range wf.On {
+				if gatedByJobCondition(f.exclude, ev) {
+					continue
+				}
 				if slices.Contains(ghaOnlyEvents, ev) && !slices.Contains(fired, ev) {
 					t.Errorf("the GHA file runs on %s, which Drone does not fire here\n%s", ev, out)
 				}
@@ -230,5 +243,59 @@ func TestNoEventFilterOnWoodpeckerStartsOnlySourceEvents(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// stepWhenOf is the when of the first step of the Woodpecker file in an emission.
+func stepWhenOf(t *testing.T, out string) wpWhen {
+	t.Helper()
+	var file wpFile
+	for name, body := range sections(out) {
+		if strings.HasPrefix(name, ".woodpecker/") {
+			if err := yaml.Unmarshal([]byte(body), &file); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	return file.Steps[0].When
+}
+
+// TestTagStepOfANoTriggerSourceRunsOnATagPushOnly: a Drone step on the tag event does not run on a manual, cron or
+// deployment run, even when such a run sits on a tag ref and the workflow starts on those events.
+func TestTagStepOfANoTriggerSourceRunsOnATagPushOnly(t *testing.T) {
+	src := "kind: pipeline\ntype: docker\nname: p\nsteps:\n- name: s\n  image: alpine\n  commands: [echo hi]\n  when:\n    event: [tag]\n"
+	out, _ := convert(t, "drone", provider.Woodpecker, ".drone.yml", src)
+	when := stepWhenOf(t, out)
+	for ev, want := range map[string]bool{"tag": true, "push": false, "manual": false, "cron": false, "deployment": false, "pull_request": false} {
+		if got := wpAdmits(when, ev); got != want {
+			t.Errorf("Woodpecker event %s: step runs = %v, want %v\n%s", ev, got, want, out)
+		}
+	}
+}
+
+// TestPushStepOfANoTriggerSourceStartsOnPush: a Drone step on the push event gives the workflow a push start on GHA and
+// on GitLab, and the file never starts nothing.
+func TestPushStepOfANoTriggerSourceStartsOnPush(t *testing.T) {
+	src := "kind: pipeline\ntype: docker\nname: p\nsteps:\n- name: s\n  image: alpine\n  commands: [echo hi]\n  when:\n    event: [push]\n"
+	out, _ := convert(t, "drone", provider.GHA, ".drone.yml", src)
+	var wf struct {
+		On map[string]any `yaml:"on"`
+	}
+	for name, body := range sections(out) {
+		if strings.HasPrefix(name, ".github/workflows/") {
+			if err := yaml.Unmarshal([]byte(body), &wf); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if _, ok := wf.On["push"]; !ok {
+		t.Errorf("the GHA file has no push start: %v\n%s", wf.On, out)
+	}
+	if _, ok := wf.On["pull_request"]; ok {
+		t.Errorf("the GHA file starts on pull_request, which no step runs on\n%s", out)
+	}
+	gl, _ := convert(t, "drone", provider.GitLab, ".drone.yml", src)
+	if strings.Contains(gl, "when: never") {
+		t.Errorf("the GitLab file never starts\n%s", gl)
 	}
 }

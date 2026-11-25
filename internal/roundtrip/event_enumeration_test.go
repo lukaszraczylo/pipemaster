@@ -17,7 +17,7 @@ import (
 // mapped to the Drone event of the same meaning. An empty name marks an event Drone has no counterpart for.
 var woodpeckerEvents = map[string]string{
 	"push": "push", "pull_request": "pull_request", "tag": "tag", "cron": "cron", "manual": "custom",
-	"pull_request_closed": "", "pull_request_metadata": "", "release": "", "deployment": "",
+	"pull_request_closed": "", "pull_request_metadata": "", "release": "", "deployment": "promote",
 }
 
 // wpAdmits is true when some entry of the emitted when list lets a run of the event start: its event list names
@@ -95,13 +95,14 @@ func TestDroneEventFiltersAgainstEveryWoodpeckerEvent(t *testing.T) {
 						}
 					}
 				}
-				when := file.When
-				if level == "step" {
-					when = file.Steps[0].When
-				}
 				for wp, drone := range woodpeckerEvents {
 					want := drone != "" && droneFilterRuns(f.include, f.exclude, drone)
-					if got := wpAdmits(when, wp); got && !want {
+					// A step runs only when its workflow starts, so both when lists must admit the event.
+					got := wpAdmits(file.When, wp)
+					if level == "step" {
+						got = got && wpAdmits(file.Steps[0].When, wp)
+					}
+					if got && !want {
 						t.Errorf("Woodpecker event %s runs, Drone (%q) skips\n%s", wp, drone, out)
 					}
 				}

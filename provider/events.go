@@ -57,37 +57,52 @@ func DefaultEvents(pl *ir.Pipeline, origin string) []SourceEvent {
 	}
 	switch origin {
 	case Drone:
-		if eventsConstrained(pl, droneEvents) {
-			return nil
-		}
-		return droneEvents
+		return firedEvents(pl, droneEvents)
 	case GitLab:
 		if m, _ := pl.Ext[GitLab].(map[string]any); m != nil {
 			if _, has := m["workflow"]; has {
 				return nil
 			}
 		}
-		if eventsConstrained(pl, gitlabEvents) {
-			return nil
-		}
-		return gitlabEvents
+		return firedEvents(pl, gitlabEvents)
 	}
 	return nil
 }
 
-// eventsConstrained is true when a job condition already limits the events, which an event filter of the source with
-// no positive list becomes. The emitters read the events from that condition.
-func eventsConstrained(pl *ir.Pipeline, events []SourceEvent) bool {
-	var names []string
-	for _, ev := range events {
-		if ev.Kind == ir.TriggerPush || ev.Kind == ir.TriggerPR || ev.Kind == ir.TriggerTag {
-			names = append(names, ev.Name)
-		}
+// firedEvents keeps the events on which a job can run: the condition of a job and of its steps can rule an event out,
+// as an event filter of the source with no positive list does. A condition that names no event keeps every event.
+func firedEvents(pl *ir.Pipeline, events []SourceEvent) []SourceEvent {
+	names := make([]string, len(events))
+	for i, ev := range events {
+		names[i] = ev.Name
 	}
-	narrows := func(c expr.Expr) bool { return c != nil && len(expr.EventsPossible(c, names)) < len(names) }
-	return slices.ContainsFunc(pl.Jobs, func(j *ir.Job) bool {
-		return j != nil && (narrows(j.If) || slices.ContainsFunc(j.Steps, func(s *ir.Step) bool { return s != nil && narrows(s.If) }))
-	})
+	possible := func(c expr.Expr, from []string) []string {
+		if c == nil {
+			return from
+		}
+		return expr.EventsPossible(c, from)
+	}
+	var allowed []string
+	for _, j := range pl.Jobs {
+		if j == nil {
+			continue
+		}
+		jobEvents := possible(j.If, names)
+		var stepEvents []string
+		for _, st := range j.Steps {
+			if st != nil {
+				stepEvents = append(stepEvents, possible(st.If, jobEvents)...)
+			}
+		}
+		if len(j.Steps) == 0 {
+			stepEvents = jobEvents
+		}
+		allowed = append(allowed, stepEvents...)
+	}
+	if len(pl.Jobs) == 0 {
+		allowed = names
+	}
+	return slices.DeleteFunc(slices.Clone(events), func(ev SourceEvent) bool { return !slices.Contains(allowed, ev.Name) })
 }
 
 // DefaultTriggersArg is the marker argument that tells a parser the triggers of the pipeline were synthesised from
