@@ -352,3 +352,23 @@ func TestPullRequestFilterRejectsForks(t *testing.T) {
 		t.Fatalf("the gated filter must read back: %+v %v", back.Pipelines[0].Triggers, brep.Entries)
 	}
 }
+
+func TestTagTriggerSetsTheEventOfTheSourceDialect(t *testing.T) {
+	for origin, want := range map[string]string{"gha": "'push'", "woodpecker": "'tag'", "drone": "'tag'", "gitlab": "'tag'"} {
+		t.Run(origin, func(t *testing.T) {
+			p := withTriggers(ir.Trigger{Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{"v*"}}})
+			p.Origin = ir.Origin{Provider: origin, Dialect: origin}
+			p.Pipelines[0].Jobs[0].Steps[0].Script = []string{"echo ${{ event }}"}
+			files, _ := emit(t, p)
+			var got string
+			for _, o := range list(celParams(t, listenerTriggers(t, files)[0])["overlays"]) {
+				if o.(doc)["key"] == "ctx_event" {
+					got = o.(doc)["expression"].(string)
+				}
+			}
+			if got != want {
+				t.Fatalf("ctx_event = %s, want %s", got, want)
+			}
+		})
+	}
+}

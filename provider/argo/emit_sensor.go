@@ -8,6 +8,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -22,7 +23,7 @@ const (
 // eventParams maps a context parameter to the event data it reads, per event class. A value entry is a literal.
 type eventSrc struct{ key, tmpl, value string }
 
-func ctxSource(name, event string, tag bool) (eventSrc, bool) {
+func ctxSource(name, event string, tag, tagEvent bool) (eventSrc, bool) {
 	push := event == eventPush
 	switch name {
 	case "ctx-ref":
@@ -43,6 +44,9 @@ func ctxSource(name, event string, tag bool) (eventSrc, bool) {
 			return eventSrc{tmpl: trimTags}, true
 		}
 	case "ctx-event":
+		if tag && tagEvent {
+			return eventSrc{value: "tag"}, true
+		}
 		return eventSrc{value: event}, true
 	case "ctx-sha":
 		if push {
@@ -187,7 +191,7 @@ func (e *emitter) addSensorTrigger(pp *plan, path string, tr ir.Trigger, dn, eve
 		if !a.ctx {
 			continue
 		}
-		src, ok := ctxSource(a.name, event, tr.Kind == ir.TriggerTag)
+		src, ok := ctxSource(a.name, event, tr.Kind == ir.TriggerTag, emitkit.TagIsEvent(e.origin))
 		if !ok {
 			continue
 		}

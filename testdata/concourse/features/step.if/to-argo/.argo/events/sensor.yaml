@@ -57,7 +57,7 @@ spec:
             - dest: spec.arguments.parameters.0.value
               src:
                 dependencyName: ci-tag
-                value: push
+                value: tag
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1

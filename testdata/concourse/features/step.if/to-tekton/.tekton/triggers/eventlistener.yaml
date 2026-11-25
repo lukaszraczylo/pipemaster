@@ -56,7 +56,7 @@ spec:
             - name: overlays
               value:
                 - key: ctx_event
-                  expression: '''push'''
+                  expression: '''tag'''
       bindings:
         - ref: ci-github
       template:

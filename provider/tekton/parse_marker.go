@@ -97,7 +97,8 @@ func overlaysMatch(in interceptor, kind ir.TriggerKind) bool {
 		key, _ := text(valueOf(m, "key"))
 		ex, _ := text(valueOf(m, "expression"))
 		path, ok := ctxparam.Ref(strings.ReplaceAll(key, "_", "-"))
-		if !ok || ctxOverlay(kind, strings.Join(path, ".")) != ex {
+		name := strings.Join(path, ".")
+		if !ok || (ctxOverlay(kind, name, false) != ex && ctxOverlay(kind, name, true) != ex) {
 			return false
 		}
 	}

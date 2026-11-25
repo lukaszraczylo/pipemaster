@@ -139,3 +139,18 @@ func TestCronParseBack(t *testing.T) {
 		t.Errorf("the cron holds the schedule key:\n%s", cron)
 	}
 }
+
+func TestTagTriggerSetsTheEventOfTheSourceDialect(t *testing.T) {
+	for origin, want := range map[string]string{"gha": "value: push", "woodpecker": "value: tag", "gitlab": "value: tag"} {
+		t.Run(origin, func(t *testing.T) {
+			p := project(scriptJob("build", "echo ${{ event }}"))
+			p.Origin = ir.Origin{Provider: origin, Dialect: origin}
+			p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{"v1.*"}}}}
+			files, _ := emit(t, p)
+			s := files[".argo/events/sensor.yaml"]
+			if !strings.Contains(s, want) {
+				t.Fatalf("sensor lacks %q:\n%s", want, s)
+			}
+		})
+	}
+}

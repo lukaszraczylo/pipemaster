@@ -68,6 +68,17 @@ func WorkerTags(origin string, labels []string) []string {
 	return out
 }
 
+// TagIsEvent is true when a pipeline from origin tests a tag run as the event tag. Drone, GitLab, Woodpecker
+// and Concourse name a tag event. A GHA-family, Tekton or Argo push event also covers a tag push, so those
+// projects test it as push.
+func TagIsEvent(origin string) bool {
+	switch origin {
+	case provider.Drone, provider.GitLab, provider.Woodpecker, provider.Concourse:
+		return true
+	}
+	return false
+}
+
 // Unplaced returns the labels that no hosted report covers: a label with a template expression, and a label that
 // is not hosted. A dialect with no form for them must report each as lost.
 func Unplaced(origin string, labels []string) []string {

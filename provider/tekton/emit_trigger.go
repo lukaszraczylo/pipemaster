@@ -11,6 +11,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -171,7 +172,7 @@ var kindFeature = map[ir.TriggerKind]caps.Feature{ir.TriggerPush: caps.TriggerPu
 func overlayKey(param string) string { return strings.ReplaceAll(param, "-", "_") }
 
 // ctxOverlay is the CEL expression that computes a context value for one trigger kind.
-func ctxOverlay(kind ir.TriggerKind, ctx string) string {
+func ctxOverlay(kind ir.TriggerKind, ctx string, tagEvent bool) string {
 	q := expr.QuoteSingle
 	push := kind == ir.TriggerPush
 	tag := kind == ir.TriggerTag
@@ -183,6 +184,10 @@ func ctxOverlay(kind ir.TriggerKind, ctx string) string {
 			return q("pull_request")
 		case ir.TriggerSchedule:
 			return q("schedule")
+		case ir.TriggerTag:
+			if tagEvent {
+				return q("tag")
+			}
 		}
 		return q("push")
 	case expr.CtxBranch:
@@ -337,7 +342,7 @@ func (e *emitter) triggerEntry(name string, kind ir.TriggerKind, filter string, 
 		p, _ := ctxparam.Param(strings.Split(c, "."))
 		o := newMap()
 		o.SetStr("key", overlayKey(p))
-		o.SetStr("expression", ctxOverlay(kind, c))
+		o.SetStr("expression", ctxOverlay(kind, c, emitkit.TagIsEvent(e.origin)))
 		overlays.Content = append(overlays.Content, o.N)
 	}
 	cel := newMap()
