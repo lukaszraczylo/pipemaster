@@ -577,3 +577,17 @@ func TestAllowFoldReadsRefName(t *testing.T) {
 		t.Errorf("ref_name guard = %q, %v", line, err)
 	}
 }
+
+// The pair push and tag is the canonical push, so an exclude of both reads back as both, never as push alone.
+func TestEventExcludeOfPushAndTagRoundTrips(t *testing.T) {
+	for _, exclude := range [][]string{{"push", "tag"}, {"pull_request", "tag"}, {"push"}, {"tag"}} {
+		e, err := drone.FilterExpr("event", drone.Filter{Exclude: exclude})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c, ok := drone.FromExpr(e, drone.Semantics)
+		if !ok || !slices.Equal(c.Event.Exclude, exclude) || len(c.Event.Include) != 0 {
+			t.Errorf("exclude %v read back as %+v (ok=%v)", exclude, c.Event, ok)
+		}
+	}
+}
