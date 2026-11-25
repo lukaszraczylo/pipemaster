@@ -258,11 +258,7 @@ func (r *Runner) runTarget(ctx context.Context, fx Fixture, tgt string, srcs map
 
 func (r *Runner) compareOne(ctx context.Context, fx Fixture, tgt, evName string, conv *Converted, src *Trace, res *Result) {
 	if why := limit(fx, tgt, evName); why != "" {
-		if evName == EvPR && !hasTriggerVerdict(conv.Report) {
-			res.Status, res.Detail = StatusFail, why+"; the converted file carries no verdict for any trigger"
-			return
-		}
-		res.Status, res.Detail = StatusBlocked, why
+		r.limited(fx, tgt, evName, why, conv, src, res)
 		return
 	}
 	dst := filepath.Join(r.env.Work, "ws", fx.Source, fx.Name, tgt+"-"+evName)
@@ -280,6 +276,7 @@ func (r *Runner) compareOne(ctx context.Context, fx Fixture, tgt, evName string,
 	if capsOf(tgt).noSHA || capsOf(fx.Source).noSHA {
 		srcCmp, tgtCmp = withoutPrefix(src, markerSHA), withoutPrefix(tr, markerSHA)
 	}
+	fx.Run = events[evName].Kind
 	res.Status, res.Detail, res.Explained = Judge(fx, srcCmp, tgtCmp, conv.Report)
 	if res.Status != StatusPass {
 		if len(tr.Markers) == 0 {
@@ -332,14 +329,28 @@ func withoutPrefix(t *Trace, prefix string) *Trace {
 	return &c
 }
 
-// triggerFeaturePrefix starts the name of every trigger feature in the loss report.
-const triggerFeaturePrefix = "trigger."
+// limited settles a cell that the target engine cannot run. A pull request cell has three outcomes. The file
+// reports the lost pull request trigger, so the cell stays blocked. The source ran nothing on the event, so it has
+// no pull request trigger to report and the target runs nothing either, which the comparison judges. Otherwise
+// the source ran work that the file neither runs nor reports, which fails the cell.
+func (r *Runner) limited(fx Fixture, tgt, evName, why string, conv *Converted, src *Trace, res *Result) {
+	if evName != EvPR || !eventUnsupported(tgt, evName) {
+		res.Status, res.Detail = StatusBlocked, why
+		return
+	}
+	switch {
+	case hasVerdict(conv.Report, caps.TriggerPullRequest):
+		res.Status, res.Detail = StatusBlocked, why
+	case len(src.Markers) == 0:
+		none := &Trace{Log: "the target engine has no event for this run", NoPipeline: true}
+		res.SourceTime = src.Duration
+		res.Status, res.Detail, res.Explained = Judge(fx, src, none, conv.Report)
+	default:
+		res.Status, res.Detail = StatusFail, why+"; the source ran on the event but the converted file carries no verdict for "+string(caps.TriggerPullRequest)
+	}
+}
 
-// hasTriggerVerdict is true when the report holds a lost, external or emulated entry for a trigger. A source with
-// a pull request trigger reports that one. A source with only a push trigger reports how the file follows the
-// push, and the pull request cell then rests on that verdict.
-func hasTriggerVerdict(rep *report.Report) bool {
-	return rep != nil && slices.ContainsFunc(rep.Entries, func(e report.Entry) bool {
-		return strings.HasPrefix(string(e.Feature), triggerFeaturePrefix) && e.Level != caps.Native
-	})
+// hasVerdict is true when the report holds a lost, external or emulated entry for the feature.
+func hasVerdict(rep *report.Report, f caps.Feature) bool {
+	return rep != nil && slices.ContainsFunc(rep.Entries, func(e report.Entry) bool { return e.Feature == f && e.Level != caps.Native })
 }

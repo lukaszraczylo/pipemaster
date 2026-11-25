@@ -114,10 +114,15 @@ var conditionFeatures = map[caps.Feature]bool{
 	caps.TriggerFilterBranch: true, caps.TriggerFilterPaths: true, caps.TriggerFilterTags: true,
 }
 
-// inertFeatures never change what a run does.
+// triggerRun names the kind of run that each trigger feature starts.
+var triggerRun = map[caps.Feature]string{caps.TriggerPush: kindPush, caps.TriggerPullRequest: kindPR, caps.TriggerTag: kindTag}
+
+// inertFeatures never change what a run does. A runner label is one of them here: every engine of the harness runs a
+// job on its one worker, so a label cannot change the markers of a run.
 var inertFeatures = map[caps.Feature]bool{
 	caps.DisplayName: true, caps.ConfigName: true, caps.PipelinePermissions: true, caps.PipelineConcurrency: true,
-	caps.ProjectMultiPipeline: true, caps.JobEnvironment: true, caps.JobEnvironmentApproval: true,
+	caps.ProjectMultiPipeline: true, caps.JobEnvironment: true, caps.JobEnvironmentApproval: true, caps.JobRunner: true,
+	caps.ExtPassthrough: true,
 }
 
 // handoffFeatures order or feed jobs.
@@ -126,11 +131,22 @@ var handoffFeatures = map[caps.Feature]bool{caps.JobNeeds: true, caps.JobNeedsAr
 // failureFeatures change how a failure counts.
 var failureFeatures = map[caps.Feature]bool{caps.JobAllowFailure: true, caps.StepContinueOnError: true}
 
+// disableWords mark a loss detail of an emitter that turns a condition it cannot state into work that never runs.
+var disableWords = []string{"never runs", "disabled"}
+
+func disablesWork(detail string) bool {
+	return slices.ContainsFunc(disableWords, func(w string) bool { return strings.Contains(detail, w) })
+}
+
 // effects returns the kinds of difference a verdict can cause, with the reason for the choice.
 func effects(level caps.Level, f caps.Feature) ([]string, string) {
 	switch {
 	case inertFeatures[f]:
 		return nil, "does not change a run"
+	case f == caps.StepShell && level == caps.Emulated:
+		return []string{kindMissing, kindValue, kindExit}, "an image without the shell stops the step, and the work after it is missing"
+	case f == caps.StepAction && level == caps.External:
+		return []string{kindMissing, kindValue, kindExit}, "an action that the operator wires outside the file leaves its output out"
 	case conditionFeatures[f] && level == caps.Lost:
 		return []string{kindExtra}, "a lost condition runs more work"
 	case conditionFeatures[f] && level == caps.Emulated:
@@ -143,8 +159,6 @@ func effects(level caps.Level, f caps.Feature) ([]string, string) {
 		return []string{kindOrder, kindExit}, "an emulated failure rule changes order and exit"
 	case failureFeatures[f]:
 		return []string{kindMissing, kindExit}, "a lost failure rule stops later work"
-	case f == caps.JobRunner:
-		return []string{kindMissing, kindExit}, "a runner label decides where a job runs and whether it starts, not what a step prints"
 	}
 	switch level {
 	case caps.Lost:
@@ -179,17 +193,45 @@ func owns(irPath string, owners map[string][]string, marker string) bool {
 	return false
 }
 
+// printsLoud is true when the target log holds the fail-loud line of the entry, the strongest evidence of a cause.
+func printsLoud(tgtLog string, e report.Entry) bool {
+	return strings.Contains(tgtLog, failLoudMark+string(e.Feature)+" "+e.IRPath)
+}
+
+// cmpBool orders true before false.
+func cmpBool(a, b bool) int {
+	switch {
+	case a == b:
+		return 0
+	case a:
+		return -1
+	}
+	return 1
+}
+
 // explainFact returns the rule that explains the fact, or an empty string.
 func explainFact(fx Fixture, rep *report.Report, tgtLog string, f Fact, explainedOwners []string) string {
 	if rep == nil {
 		return ""
 	}
-	for _, e := range rep.Entries {
+	entries := slices.SortedStableFunc(slices.Values(rep.Entries), func(a, b report.Entry) int {
+		return cmpBool(printsLoud(tgtLog, a), printsLoud(tgtLog, b))
+	})
+	for _, e := range entries {
 		if e.Level == caps.Native {
 			continue
 		}
 		ef, why := effects(e.Level, e.Feature)
-		loud := strings.Contains(tgtLog, failLoudMark+string(e.Feature)+" "+e.IRPath)
+		if conditionFeatures[e.Feature] && e.Level == caps.Lost && disablesWork(e.Detail) {
+			ef, why = []string{kindMissing}, "a lost condition that the emitter fails safe removes the work it guards"
+		}
+		if kind, isTrigger := triggerRun[e.Feature]; isTrigger && e.Level == caps.External {
+			ef, why = nil, "the harness starts the run itself, so a trigger that the operator sets up changes no other run"
+			if kind == fx.Run {
+				ef, why = []string{kindMissing, kindExtra}, "the trigger of this event is set up outside the file"
+			}
+		}
+		loud := printsLoud(tgtLog, e)
 		if loud {
 			ef, why = []string{kindMissing, kindValue, kindExit, kindOrder}, "the target prints the fail-loud line of this entry"
 		}

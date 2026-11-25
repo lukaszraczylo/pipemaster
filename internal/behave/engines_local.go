@@ -240,24 +240,25 @@ type droneEngine struct{ env *Env }
 var droneLine = regexp.MustCompile(`^\[[^\]:]+:\d+\] (.*)$`)
 
 // dronePipelines lists the pipeline names of a Drone file in an order that follows depends_on, because drone exec
-// runs one named pipeline and ignores the dependencies.
-func dronePipelines(path string) ([]string, error) {
+// runs one named pipeline and ignores the dependencies. It keeps only the pipelines whose trigger admits the run,
+// because drone exec ignores the trigger too.
+func dronePipelines(path string, run droneRun) ([]string, error) {
 	raw, err := os.ReadFile(path) // #nosec G304 -- the workspace file of the harness
 	if err != nil {
 		return nil, err
 	}
+	docs, err := parseDroneDocs(string(raw))
+	if err != nil {
+		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
 	var names []string
 	deps := map[string][]string{}
-	for _, doc := range strings.Split(string(raw), "\n---") {
-		var d struct {
-			Kind      string   `yaml:"kind"`
-			Name      string   `yaml:"name"`
-			DependsOn []string `yaml:"depends_on"`
+	for _, d := range docs {
+		ok, err := run.triggerMatches(d.Trigger)
+		if err != nil {
+			return nil, fmt.Errorf("pipeline %s: %w", d.Name, err)
 		}
-		if err := yaml.Unmarshal([]byte(doc), &d); err != nil {
-			return nil, fmt.Errorf("parse %s: %w", path, err)
-		}
-		if d.Kind == "pipeline" {
+		if ok {
 			names = append(names, d.Name)
 			deps[d.Name] = d.DependsOn
 		}
@@ -297,16 +298,19 @@ func (e *droneEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 		return nil, err
 	}
 	file := filepath.Join(w.Dir, ".drone.yml")
-	names, err := dronePipelines(file)
-	if err != nil {
-		return nil, blocked("no usable .drone.yml in the converted output: %v", err)
-	}
 	branch, event := w.Ev.Branch, "push"
 	switch w.Ev.Kind {
 	case kindTag:
 		event, branch = "tag", ""
 	case kindPR:
 		event, branch = "pull_request", w.Ev.Target
+	}
+	names, err := dronePipelines(file, droneRun{event: event, branch: branch, ref: w.Ev.Ref()})
+	if err != nil {
+		return nil, blocked("no usable .drone.yml in the converted output: %v", err)
+	}
+	if len(names) == 0 {
+		return &Trace{Log: "Drone runs no pipeline: no trigger admits the event " + event, NoPipeline: true}, nil
 	}
 	envFile := filepath.Join(filepath.Dir(w.Dir), filepath.Base(w.Dir)+".env")
 	vars := fmt.Sprintf("DRONE_COMMIT_SHA=%s\nDRONE_COMMIT=%s\nDRONE_COMMIT_REF=%s\nDRONE_COMMIT_BRANCH=%s\nDRONE_TAG=%s\n", w.SHA, w.SHA, w.Ev.Ref(), branch, w.Ev.Tag)

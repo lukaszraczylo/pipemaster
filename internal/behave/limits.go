@@ -29,10 +29,18 @@ func capsOf(provider string) engineCap {
 	switch provider {
 	case provDrone:
 		return engineCap{noSHA: true}
+	case provArgo:
+		return engineCap{unsupported: map[string]string{reqArtifacts: argoArtifactsWhy}}
 	case provConcourse:
 		return engineCap{events: []string{EvPushMain, EvPushBranch, EvTag}, eventWhy: "Concourse has no pull request event: the converted file has no pull request resource, so no resource version stands for it"}
 	}
 	return engineCap{}
+}
+
+// eventUnsupported is true when the engine of the target has no way to start a run for the event.
+func eventUnsupported(target, event string) bool {
+	c := capsOf(target)
+	return c.events != nil && !slices.Contains(c.events, event)
 }
 
 // limit returns the reason a pair cannot be judged on the target engine, or an empty string.
@@ -53,6 +61,12 @@ func limit(fx Fixture, target, event string) string {
 // job result to failure from the job error alone and never reads the job-level continue-on-error, so the jobs that
 // need the job are skipped. GitHub counts such a job as a success. A run of act 0.2.90 on the allow_failure
 // fixture skipped the dependent job.
+// argoArtifactsWhy cites the Argo Workflows rule: "To run Argo workflows that use artifacts, you must configure
+// and use an artifact repository." (https://argo-workflows.readthedocs.io/en/latest/configure-artifact-repository/).
+// The Kiri cluster of the harness holds none, and the converted file names none.
+const argoArtifactsWhy = "Argo needs an artifact repository for artifacts, and the harness cluster has none " +
+	"(https://argo-workflows.readthedocs.io/en/latest/configure-artifact-repository/)"
+
 const jobContinueWhy = "act 0.2.90 does not count a failed job with continue-on-error as a success for the jobs that need it " +
 	"(nektos/act v0.2.90 pkg/runner/job_executor.go setJobResult reads the job error only, not continue-on-error)"
 
