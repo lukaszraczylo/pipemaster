@@ -258,8 +258,8 @@ func (r *Runner) runTarget(ctx context.Context, fx Fixture, tgt string, srcs map
 
 func (r *Runner) compareOne(ctx context.Context, fx Fixture, tgt, evName string, conv *Converted, src *Trace, res *Result) {
 	if why := limit(fx, tgt, evName); why != "" {
-		if f, ok := eventTrigger[evName]; ok && !hasVerdict(conv.Report, f) {
-			res.Status, res.Detail = StatusFail, why+"; the converted file carries no verdict for "+string(f)
+		if evName == EvPR && !hasTriggerVerdict(conv.Report) {
+			res.Status, res.Detail = StatusFail, why+"; the converted file carries no verdict for any trigger"
 			return
 		}
 		res.Status, res.Detail = StatusBlocked, why
@@ -332,10 +332,14 @@ func withoutPrefix(t *Trace, prefix string) *Trace {
 	return &c
 }
 
-// eventTrigger names the trigger feature that a converted file must report when its engine cannot run an event.
-var eventTrigger = map[string]caps.Feature{EvPR: caps.TriggerPullRequest}
+// triggerFeaturePrefix starts the name of every trigger feature in the loss report.
+const triggerFeaturePrefix = "trigger."
 
-// hasVerdict is true when the report holds a lost, external or emulated entry for the feature.
-func hasVerdict(rep *report.Report, f caps.Feature) bool {
-	return rep != nil && slices.ContainsFunc(rep.Entries, func(e report.Entry) bool { return e.Feature == f && e.Level != caps.Native })
+// hasTriggerVerdict is true when the report holds a lost, external or emulated entry for a trigger. A source with
+// a pull request trigger reports that one. A source with only a push trigger reports how the file follows the
+// push, and the pull request cell then rests on that verdict.
+func hasTriggerVerdict(rep *report.Report) bool {
+	return rep != nil && slices.ContainsFunc(rep.Entries, func(e report.Entry) bool {
+		return strings.HasPrefix(string(e.Feature), triggerFeaturePrefix) && e.Level != caps.Native
+	})
 }

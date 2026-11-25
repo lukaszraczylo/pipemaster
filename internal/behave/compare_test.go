@@ -91,14 +91,20 @@ func TestTopoOrder(t *testing.T) {
 	}
 }
 
-func TestHasVerdictNeedsAReportedEntry(t *testing.T) {
-	if hasVerdict(nil, caps.TriggerPullRequest) {
+func TestHasTriggerVerdictNeedsAReportedTrigger(t *testing.T) {
+	if hasTriggerVerdict(nil) {
 		t.Fatal("a missing report holds no verdict")
 	}
-	if hasVerdict(rep(entry(caps.Lost, caps.TriggerPush, "pipeline/ci/trigger/0")), caps.TriggerPullRequest) {
-		t.Fatal("an entry for another trigger is no verdict")
+	if hasTriggerVerdict(rep(entry(caps.Lost, caps.JobIf, "pipeline/ci/job/a"))) {
+		t.Fatal("an entry for another feature is no verdict")
 	}
-	if !hasVerdict(rep(entry(caps.Lost, caps.TriggerPullRequest, "pipeline/ci/trigger/0")), caps.TriggerPullRequest) {
+	if hasTriggerVerdict(rep(entry(caps.Native, caps.TriggerPush, "pipeline/ci/trigger/0"))) {
+		t.Fatal("a native entry is no verdict")
+	}
+	if !hasTriggerVerdict(rep(entry(caps.Lost, caps.TriggerPullRequest, "pipeline/ci/trigger/0"))) {
 		t.Fatal("a lost pull request entry is the verdict")
+	}
+	if !hasTriggerVerdict(rep(entry(caps.Emulated, caps.TriggerTag, "pipeline/ci"))) {
+		t.Fatal("an emulated trigger entry is a verdict")
 	}
 }
