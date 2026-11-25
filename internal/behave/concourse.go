@@ -284,6 +284,9 @@ func (e *concourseEngine) runFile(ctx context.Context, w *Workspace, file string
 	if err != nil {
 		return nil, err
 	}
+	if w.Ev.Kind == kindTag {
+		builds = e.onlyTagJobs(ctx, pipe, builds)
+	}
 	tr := &Trace{Duration: time.Since(start)}
 	for _, b := range builds {
 		if b.Status != "succeeded" {
@@ -301,6 +304,47 @@ func (e *concourseEngine) runFile(ctx context.Context, w *Workspace, file string
 		tr.Log = fmt.Sprintf("Concourse started no job build in %s. Resources with no version: %s", concNoBuild, e.emptyResources(ctx, pipe))
 	}
 	return tr, nil
+}
+
+// onlyTagJobs keeps the builds of the jobs that get a tag resource. The harness serves one repository that holds the
+// branch and the tag, so a branch job also builds; on Concourse a tag on an existing commit starts no branch build.
+// A pipeline with no job on a tag resource keeps every build, so a lost tag trigger still shows.
+func (e *concourseEngine) onlyTagJobs(ctx context.Context, pipe string, builds []buildInfo) []buildInfo {
+	out, code, err := e.conc.fly(ctx, time.Minute, "get-pipeline", "-p", pipe, "--json")
+	if err != nil || code != 0 {
+		return builds
+	}
+	var cfg struct {
+		Resources []struct {
+			Source map[string]any `json:"source"`
+			Name   string         `json:"name"`
+		} `json:"resources"`
+		Jobs []struct {
+			Name string           `json:"name"`
+			Plan []map[string]any `json:"plan"`
+		} `json:"jobs"`
+	}
+	if json.Unmarshal([]byte(out), &cfg) != nil {
+		return builds
+	}
+	tagRes := map[string]bool{}
+	for _, r := range cfg.Resources {
+		if _, ok := r.Source["tag_filter"]; ok {
+			tagRes[r.Name] = true
+		}
+	}
+	tagJobs := map[string]bool{}
+	for _, j := range cfg.Jobs {
+		for _, st := range j.Plan {
+			if g, _ := st["get"].(string); tagRes[g] {
+				tagJobs[j.Name] = true
+			}
+		}
+	}
+	if len(tagJobs) == 0 {
+		return builds
+	}
+	return slices.DeleteFunc(builds, func(b buildInfo) bool { return !tagJobs[b.JobName] })
 }
 
 func (e *concourseEngine) resources(ctx context.Context, pipe string) []string {
