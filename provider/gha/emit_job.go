@@ -364,6 +364,7 @@ func anyMap(m map[string]string) map[string]any {
 }
 
 func (e *emitter) containerKey(m *omap, jp string, j *ir.Job, ext map[string]any, consumed map[string]bool) error {
+	e.inContainer = j.Container != nil
 	if j.Container == nil {
 		return nil
 	}

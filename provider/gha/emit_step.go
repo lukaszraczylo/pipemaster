@@ -280,7 +280,8 @@ func (e *emitter) shellName(sp, shell string) string {
 }
 
 func (e *emitter) stepTail(m *omap, sp string, st *ir.Step, ext map[string]any) error {
-	if st.Shell == "" && st.Image == nil && len(st.Script) > 0 && m.has("run") && provider.BashDefault(e.origin) && !provider.SameFamily(e.origin, e.d.ID) {
+	// In a container image the unset shell is bash when the image has it and sh when not, as the source runner does.
+	if st.Shell == "" && st.Image == nil && !e.inContainer && len(st.Script) > 0 && m.has("run") && provider.BashDefault(e.origin) && !provider.SameFamily(e.origin, e.d.ID) {
 		// A runner without a shell setting may pick sh, and the source ran the script under bash.
 		m.set("shell", str(shellBash))
 		e.mark(caps.StepShell, sp)

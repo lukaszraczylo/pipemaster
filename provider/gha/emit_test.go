@@ -530,3 +530,28 @@ func TestShellPathIsWrittenAsTheShellNameAndReportedLost(t *testing.T) {
 		t.Fatalf("no lost step.shell entry: %v", rep.Entries)
 	}
 }
+
+// A job in a container image keeps the shell unset: the runner picks bash when the image has it and sh when not
+// (https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax, jobs.<job_id>.steps[*].shell),
+// whereas a pinned bash fails on an image without it.
+func TestGitLabScriptInContainerKeepsShellUnset(t *testing.T) {
+	cases := []struct {
+		container *ir.Image
+		name      string
+		wantShell bool
+	}{
+		{name: "container image", container: &ir.Image{Ref: "alpine:3"}},
+		{name: "no container", wantShell: true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p := &ir.Project{Origin: ir.Origin{Provider: "gitlab", Dialect: "gitlab"}, Pipelines: []*ir.Pipeline{{ID: "ci", Triggers: []ir.Trigger{{Kind: ir.TriggerPush}}, Jobs: []*ir.Job{{
+				ID: "b", Container: c.container, Steps: []*ir.Step{{ID: "s", Kind: ir.StepScript, Script: []string{"echo hi"}}},
+			}}}}}
+			out, _ := emitText(t, gha.GHA, p)
+			if got := strings.Contains(out, "shell: bash"); got != c.wantShell {
+				t.Fatalf("shell: bash present = %v, want %v\n%s", got, c.wantShell, out)
+			}
+		})
+	}
+}
