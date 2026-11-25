@@ -411,9 +411,9 @@
 54-drone-go-away drone->forgejo native=  98 emulated=  40 external=   0 lost=  37
 54-drone-go-away drone->gha native=  98 emulated=  39 external=   0 lost=  37
 54-drone-go-away drone->gitea native=  98 emulated=  39 external=   0 lost=  37
-54-drone-go-away drone->gitlab native=  45 emulated=  24 external=   0 lost=  58
+54-drone-go-away drone->gitlab native=  48 emulated=  24 external=   0 lost=  55
 54-drone-go-away drone->tekton native=  90 emulated=   8 external=   0 lost=  30
-54-drone-go-away drone->woodpecker native=  67 emulated=   4 external=   0 lost=  56
+54-drone-go-away drone->woodpecker native=  70 emulated=   4 external=   0 lost=  53
 55-drone-geodns drone->argo native=  20 emulated=   5 external=   0 lost=  15
 55-drone-geodns drone->concourse native=  20 emulated=   2 external=   0 lost=  19
 55-drone-geodns drone->forgejo native=  17 emulated=  14 external=   0 lost=  15
@@ -443,9 +443,9 @@
 59-drone-casper-node drone->forgejo native=  56 emulated=  35 external=   0 lost=  36
 59-drone-casper-node drone->gha native=  56 emulated=  34 external=   0 lost=  36
 59-drone-casper-node drone->gitea native=  56 emulated=  34 external=   0 lost=  36
-59-drone-casper-node drone->gitlab native=  35 emulated=  19 external=   6 lost=  63
+59-drone-casper-node drone->gitlab native=  35 emulated=  20 external=   6 lost=  62
 59-drone-casper-node drone->tekton native=  68 emulated=  15 external=   0 lost=  35
-59-drone-casper-node drone->woodpecker native=  74 emulated=   4 external=   0 lost=  41
+59-drone-casper-node drone->woodpecker native=  75 emulated=   4 external=   0 lost=  40
 60-drone-go-markdown2confluence drone->argo native=   8 emulated=   4 external=   0 lost=   3
 60-drone-go-markdown2confluence drone->concourse native=   9 emulated=   2 external=   0 lost=   6
 60-drone-go-markdown2confluence drone->forgejo native=   9 emulated=   7 external=   0 lost=   5
@@ -467,9 +467,9 @@
 62-drone-elasticsearch-test-data drone->forgejo native=   6 emulated=  10 external=   0 lost=   4
 62-drone-elasticsearch-test-data drone->gha native=   6 emulated=   9 external=   0 lost=   4
 62-drone-elasticsearch-test-data drone->gitea native=   6 emulated=   9 external=   0 lost=   4
-62-drone-elasticsearch-test-data drone->gitlab native=   3 emulated=   1 external=   0 lost=  12
+62-drone-elasticsearch-test-data drone->gitlab native=   3 emulated=   2 external=   0 lost=  11
 62-drone-elasticsearch-test-data drone->tekton native=   5 emulated=   4 external=   0 lost=   7
-62-drone-elasticsearch-test-data drone->woodpecker native=   9 emulated=   1 external=   0 lost=   7
+62-drone-elasticsearch-test-data drone->woodpecker native=  11 emulated=   1 external=   0 lost=   5
 63-tekton-pipeline tekton->argo native= 100 emulated=   6 external=   0 lost=  49
 63-tekton-pipeline tekton->concourse native=  77 emulated=  21 external=   0 lost=  75
 63-tekton-pipeline tekton->drone native=  76 emulated=   8 external=   2 lost=  71

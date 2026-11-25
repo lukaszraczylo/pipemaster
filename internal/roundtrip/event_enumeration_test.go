@@ -30,6 +30,9 @@ func wpAdmits(w wpWhen, event string) bool {
 		if ev := anyList(e.Event); len(ev) > 0 && !slices.Contains(ev, event) {
 			continue
 		}
+		if m, ok := e.Event.(map[string]any); ok && slices.Contains(anyList(m["exclude"]), event) {
+			continue
+		}
 		if e.Evaluate != "" {
 			x, err := wpexpr.Parse(e.Evaluate)
 			if err != nil {

@@ -1,6 +1,7 @@
 package roundtrip_test
 
 import (
+	"os/exec"
 	"slices"
 	"strings"
 	"testing"
@@ -120,22 +121,12 @@ func TestDroneEventFiltersAgainstEveryGitLabSource(t *testing.T) {
 			}
 			for _, r := range glRuns {
 				want := r.drone != "" && droneFilterRuns(f.include, f.exclude, r.drone)
-				if gatedByJobCondition(f.exclude, r.source) {
-					continue
-				}
 				if got := glAdmits(t, doc, r.source, r.branch, r.tag); got && !want {
 					t.Errorf("GitLab starts a pipeline for %s, Drone (%q) does not\n%s", r.name, r.drone, out)
 				}
 			}
 		})
 	}
-}
-
-// gatedByJobCondition is true for the push source or event of a filter that excludes push or tag. The default events
-// keep the push start, because a GHA push or a GitLab push source also carries a tag push, and the condition of
-// each step or job then rules out the excluded run. A job-less start creates no GitLab pipeline.
-func gatedByJobCondition(exclude []string, source string) bool {
-	return (source == "push") && (slices.Contains(exclude, "push") || slices.Contains(exclude, "tag"))
 }
 
 // ghaEvents are the events a GHA workflow file can name that no source here fires.
@@ -164,9 +155,6 @@ func TestDroneEventFiltersAgainstGHAEvents(t *testing.T) {
 				}
 			}
 			for ev := range wf.On {
-				if gatedByJobCondition(f.exclude, ev) {
-					continue
-				}
 				if slices.Contains(ghaOnlyEvents, ev) && !slices.Contains(fired, ev) {
 					t.Errorf("the GHA file runs on %s, which Drone does not fire here\n%s", ev, out)
 				}
@@ -297,5 +285,59 @@ func TestPushStepOfANoTriggerSourceStartsOnPush(t *testing.T) {
 	gl, _ := convert(t, "drone", provider.GitLab, ".drone.yml", src)
 	if strings.Contains(gl, "when: never") {
 		t.Errorf("the GitLab file never starts\n%s", gl)
+	}
+}
+
+const dronePushStep = "kind: pipeline\ntype: docker\nname: p\nsteps:\n- name: s\n  image: alpine\n  commands: [echo ran]\n  when:\n    event: [push]\n"
+
+// TestPushStepRunsOnABranchPushOnWoodpecker: a Drone step on the push event is a branch push, so Woodpecker keeps its
+// push event and the step does not run on a tag, pull request or manual run.
+func TestPushStepRunsOnABranchPushOnWoodpecker(t *testing.T) {
+	out, _ := convert(t, "drone", provider.Woodpecker, ".drone.yml", dronePushStep)
+	if strings.Contains(out, "[lost]") && strings.Contains(out, "step.if") {
+		t.Errorf("the push step is lost\n%s", out)
+	}
+	when := stepWhenOf(t, out)
+	for ev, want := range map[string]bool{"push": true, "tag": false, "pull_request": false, "manual": false} {
+		if got := wpAdmits(when, ev); got != want {
+			t.Errorf("Woodpecker event %s: step runs = %v, want %v\n%s", ev, got, want, out)
+		}
+	}
+}
+
+// TestPushStepRunsOnABranchPushOnGitLab: the converted step guard holds on a branch push only.
+func TestPushStepRunsOnABranchPushOnGitLab(t *testing.T) {
+	out, _ := convert(t, "drone", provider.GitLab, ".drone.yml", dronePushStep)
+	_, body, ok := strings.Cut(out, "- |\n")
+	if !ok {
+		t.Fatalf("no guarded step\n%s", out)
+	}
+	var script []string
+	for _, l := range strings.Split(body, "\n") {
+		if !strings.HasPrefix(l, "      ") {
+			break
+		}
+		script = append(script, strings.TrimPrefix(l, "      "))
+	}
+	runs := []struct {
+		name string
+		env  []string
+		want bool
+	}{
+		{"branch push", []string{"CI_PIPELINE_SOURCE=push", "CI_COMMIT_BRANCH=main"}, true},
+		{"tag push", []string{"CI_PIPELINE_SOURCE=push", "CI_COMMIT_TAG=v1"}, false},
+		{"merge request", []string{"CI_PIPELINE_SOURCE=merge_request_event", "CI_MERGE_REQUEST_TARGET_BRANCH_NAME=main"}, false},
+		{"web", []string{"CI_PIPELINE_SOURCE=web", "CI_COMMIT_BRANCH=main"}, false},
+	}
+	for _, r := range runs {
+		cmd := exec.Command("sh", "-c", strings.Join(script, "\n")) //nolint:gosec // runs the guard the converter emitted, in a fixed environment
+		cmd.Env = append([]string{"PATH=/usr/bin:/bin"}, r.env...)
+		got, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("%s: %v\n%s", r.name, err, out)
+		}
+		if ran := strings.Contains(string(got), "ran"); ran != r.want {
+			t.Errorf("GitLab %s: step runs = %v, want %v\n%s", r.name, ran, r.want, out)
+		}
 	}
 }

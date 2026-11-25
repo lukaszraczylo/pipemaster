@@ -33,6 +33,9 @@ func variants(e Expr, from, to Dialect) []variant {
 			bases = append(bases, v)
 		}
 	}
+	if v, ok := branchPushVariant(e, from, to); ok {
+		bases = append(bases, v)
+	}
 	if x, ok := refVariant(e); ok {
 		bases = append(bases, variant{e: x, from: readsAs(from, e), fix: anyTagFix})
 	}
@@ -331,4 +334,67 @@ func anyTagFix(t Expr) Expr {
 		return Binary{Op: b.Op, L: b.L, R: strLit(anyValue)}, true
 	})
 	return r
+}
+
+// branchPushSentinel stands in a variant for the push of a branch, as tagEventSentinel does for the tag event.
+const branchPushSentinel = "pipemaster-branch-push"
+
+func branchPushLeaf() Expr {
+	return Binary{Op: OpEq, L: Ref{Path: []string{CtxBranch}}, R: strLit(branchPushSentinel)}
+}
+
+// branchPushVariant states the push event of a Drone source with the ref type branch for a target that cannot read the
+// ref type. A target with a tag event of its own has a push event of a branch alone, so one event test says it.
+func branchPushVariant(e Expr, from, to Dialect) (variant, bool) {
+	if !from.TagEvent {
+		return variant{}, false
+	}
+	isTest := func(x Expr, name, lit string) bool {
+		b, ok := x.(Binary)
+		if !ok || b.Op != OpEq {
+			return false
+		}
+		r, s, ok := refSide(b.L, b.R)
+		return ok && pathName(r) == name && s == lit
+	}
+	if !to.TagEvent {
+		// The push event of the target covers a tag push, so the branch test carries the restriction: a branch name is set.
+		x, ok := rebuild(e, func(x Expr) (Expr, bool) {
+			if isTest(x, CtxRefType, "branch") {
+				return Binary{Op: OpMatch, L: ctxRef(CtxBranch), R: strLit(anyValue)}, true
+			}
+			return nil, false
+		})
+		return variant{e: x, from: readsAs(from, e)}, ok
+	}
+	x, ok := rebuild(e, func(x Expr) (Expr, bool) {
+		b, ok := x.(Binary)
+		if !ok || b.Op != OpAnd {
+			return nil, false
+		}
+		if (isTest(b.L, CtxEvent, "push") && isTest(b.R, CtxRefType, "branch")) ||
+			(isTest(b.R, CtxEvent, "push") && isTest(b.L, CtxRefType, "branch")) {
+			return branchPushLeaf(), true
+		}
+		return nil, false
+	})
+	if !ok {
+		return variant{}, false
+	}
+	got, ok := translate(branchPushLeaf(), from, to, true)
+	if !ok {
+		return variant{}, false
+	}
+	want := String(got)
+	event := Binary{Op: OpEq, L: ctxRef(CtxEvent), R: strLit("push")}
+	fix := func(t Expr) Expr {
+		out, _ := rebuild(t, func(x Expr) (Expr, bool) {
+			if String(x) == want {
+				return event, true
+			}
+			return nil, false
+		})
+		return out
+	}
+	return variant{e: x, from: readsAs(from, e), fix: fix}, true
 }
