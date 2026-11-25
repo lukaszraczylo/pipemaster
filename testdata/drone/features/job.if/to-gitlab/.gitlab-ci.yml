@@ -1,6 +1,8 @@
+# pipemaster:emulated trigger.push pipeline/drone/trigger/9999
+# pipemaster:arg {"default_triggers":true}
 workflow:
   rules:
-    - when: never
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
 # pipemaster:emulated step.image pipeline/drone/job/ci
 # pipemaster:arg {"job":"ci","parts":["ci"],"own":["build"]}
 # pipemaster:lost job.if pipeline/drone/job/ci: (event == 'push') && (actor == 'release-bot')

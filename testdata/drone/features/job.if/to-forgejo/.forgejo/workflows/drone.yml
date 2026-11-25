@@ -1,9 +1,17 @@
+# pipemaster:emulated trigger.push pipeline/drone
+# pipemaster:arg {"default_triggers":true}
+# pipemaster:emulated trigger.push pipeline/drone/trigger/0
+# pipemaster:emulated pipeline.concurrency pipeline/drone
 # pipemaster:emulated job.runner pipeline/drone/job/ci
 # pipemaster:emulated step.image pipeline/drone/job/ci/step/build
 # pipemaster:arg {"kind":"script","image":{"Ref":"golang:1.25","Entrypoint":null},"script":["go build ./..."]}
 on:
-  # pipemaster:emulated trigger.manual pipeline/drone
-  workflow_dispatch:
+  push:
+    branches:
+      - '**'
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
 jobs:
   ci:
     if: false
