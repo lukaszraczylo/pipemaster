@@ -74,3 +74,45 @@ func TestGitLabTagsBecomeSelfHostedRunsOn(t *testing.T) {
 		t.Fatalf("no external runner verdict:\n%s", msg)
 	}
 }
+
+const bashContainerJob = `build:
+  image: bash:5.2
+  script:
+    - arr=(a b)
+    - echo "${arr[0]}"
+`
+
+func TestGitLabBashScriptInContainerRunsUnderBashOnGHA(t *testing.T) {
+	out, msg := convertText(t, "gitlab", "gha", ".gitlab-ci.yml", bashContainerJob)
+	for _, want := range []string{"command -v bash", "exec bash -e", "arr=(a b)"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("workflow lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "shell: bash") {
+		t.Fatalf("a pinned bash fails on an image with no bash:\n%s", out)
+	}
+	if !strings.Contains(msg, "step.shell") {
+		t.Fatalf("no step.shell verdict:\n%s", msg)
+	}
+}
+
+func TestBashWrapperOnGHAComesBackAsTheScript(t *testing.T) {
+	in, mid, back := t.TempDir(), t.TempDir(), t.TempDir()
+	if err := os.WriteFile(filepath.Join(in, ".gitlab-ci.yml"), []byte(bashContainerJob), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, hop := range [][3]string{{in, "gha", mid}, {mid, "gitlab", back}} {
+		from := "gitlab"
+		if hop[1] == "gitlab" {
+			from = "gha"
+		}
+		if code, _, msg := runOut("convert", hop[0], "--from", from, "--to", hop[1], "-o", hop[2]); code != 0 {
+			t.Fatalf("convert to %s = %d\n%s", hop[1], code, msg)
+		}
+	}
+	got := string(outputFiles(t, back)[".gitlab-ci.yml"])
+	if strings.Contains(got, "command -v bash") || !strings.Contains(got, "arr=(a b)") {
+		t.Fatalf("the wrapper did not collapse:\n%s", got)
+	}
+}

@@ -184,6 +184,11 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 		}
 		var ts []string
 		if ts, err = e.templates(sp, lines); err == nil {
+			if attempts == 0 && e.bashWrap(st) {
+				ts = strings.Split(provider.BashWrapCommand(provider.BashOrShScript, strings.Join(ts, "\n")), "\n")
+				e.emulate(sp, caps.StepShell, "bash-if-present wrapper", "the source runs the step under bash when the image has it, and a runner such as act runs a step with no shell under sh; the script re-executes under bash when the image has bash, else under sh -e")
+				markers = append(markers, emitkit.Marker(caps.StepShell, sp))
+			}
 			m.set("run", block(ts))
 		}
 	case (st.Kind == ir.StepAction || st.Kind == ir.StepPipelineCall) && st.Action != nil:
@@ -496,4 +501,10 @@ func (e *emitter) jobSteps(c jobCtx, j *ir.Job) (*yaml.Node, error) {
 		e.mark(caps.StepScript, jp)
 	}
 	return seq, nil
+}
+
+// bashWrap is true for a script step in a container job whose source ran it under bash when the image has it.
+// The step has no shell setting there, because a pinned bash fails on an image without bash.
+func (e *emitter) bashWrap(st *ir.Step) bool {
+	return e.inContainer && st.Shell == "" && provider.BashDefault(e.origin) && !provider.SameFamily(e.origin, e.d.ID)
 }
