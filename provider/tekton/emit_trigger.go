@@ -2,6 +2,7 @@ package tekton
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -171,8 +172,16 @@ var kindFeature = map[ir.TriggerKind]caps.Feature{ir.TriggerPush: caps.TriggerPu
 // overlayKey is the extensions key that carries a ctx param.
 func overlayKey(param string) string { return strings.ReplaceAll(param, "-", "_") }
 
+// overlayDialect holds what a source dialect means by the event and the branch of a run.
+// prTarget makes the branch of a pull request its base branch, when no other value carries the base.
+type overlayDialect struct{ tagEvent, prTarget bool }
+
+// overlayDialects lists every spelling that the emitter writes, so the parser accepts each one.
+var overlayDialects = []overlayDialect{{}, {tagEvent: true}, {prTarget: true}, {tagEvent: true, prTarget: true}}
+
 // ctxOverlay is the CEL expression that computes a context value for one trigger kind.
-func ctxOverlay(kind ir.TriggerKind, ctx string, tagEvent bool) string {
+func ctxOverlay(kind ir.TriggerKind, ctx string, d overlayDialect) string {
+	tagEvent := d.tagEvent
 	q := expr.QuoteSingle
 	push := kind == ir.TriggerPush
 	tag := kind == ir.TriggerTag
@@ -193,6 +202,9 @@ func ctxOverlay(kind ir.TriggerKind, ctx string, tagEvent bool) string {
 	case expr.CtxBranch:
 		if push {
 			return trimRef(refHeads)
+		}
+		if pr && d.prTarget {
+			return "body.pull_request.base.ref"
 		}
 	case expr.CtxTag:
 		if tag {
@@ -342,7 +354,10 @@ func (e *emitter) triggerEntry(name string, kind ir.TriggerKind, filter string, 
 		p, _ := ctxparam.Param(strings.Split(c, "."))
 		o := newMap()
 		o.SetStr("key", overlayKey(p))
-		o.SetStr("expression", ctxOverlay(kind, c, emitkit.TagIsEvent(e.origin)))
+		o.SetStr("expression", ctxOverlay(kind, c, overlayDialect{
+			tagEvent: emitkit.TagIsEvent(e.origin),
+			prTarget: emitkit.PRBranchIsTarget(e.origin) && !slices.Contains(ctxs, expr.CtxPRBaseRef),
+		}))
 		overlays.Content = append(overlays.Content, o.N)
 	}
 	cel := newMap()

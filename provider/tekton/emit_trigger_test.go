@@ -372,3 +372,23 @@ func TestTagTriggerSetsTheEventOfTheSourceDialect(t *testing.T) {
 		})
 	}
 }
+
+func TestPullRequestBranchIsTheTargetForDroneAndWoodpecker(t *testing.T) {
+	for origin, want := range map[string]string{"drone": "body.pull_request.base.ref", "woodpecker": "body.pull_request.base.ref", "gha": "''"} {
+		t.Run(origin, func(t *testing.T) {
+			p := withTriggers(ir.Trigger{Kind: ir.TriggerPR})
+			p.Origin = ir.Origin{Provider: origin, Dialect: origin}
+			p.Pipelines[0].Jobs[0].Steps[0].Script = []string{"echo ${{ branch }}"}
+			files, _ := emit(t, p)
+			var got string
+			for _, o := range list(celParams(t, listenerTriggers(t, files)[0])["overlays"]) {
+				if o.(doc)["key"] == "ctx_branch" {
+					got = o.(doc)["expression"].(string)
+				}
+			}
+			if got != want {
+				t.Fatalf("ctx_branch = %s, want %s", got, want)
+			}
+		})
+	}
+}
