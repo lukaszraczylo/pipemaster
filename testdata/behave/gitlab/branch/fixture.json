@@ -16,5 +16,17 @@
   ],
   "expect_failure": false,
   "unordered": true,
-  "expect": []
+  "expect": [],
+  "owners": {
+    "branch.main": [
+      "main-only"
+    ],
+    "branch.tag": [
+      "tag-only"
+    ],
+    "branch.always": [
+      "always"
+    ]
+  },
+  "requires": []
 }

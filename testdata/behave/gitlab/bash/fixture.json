@@ -11,5 +11,7 @@
   "unordered": false,
   "expect": [
     "bash.ok:c"
-  ]
+  ],
+  "owners": {},
+  "requires": []
 }

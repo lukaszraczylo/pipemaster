@@ -13,5 +13,17 @@
   "unordered": false,
   "expect": [
     "artifacts.consume:payload"
+  ],
+  "owners": {
+    "artifacts.produce": [
+      "produce"
+    ],
+    "artifacts.consume": [
+      "consume",
+      "produce"
+    ]
+  },
+  "requires": [
+    "artifacts"
   ]
 }

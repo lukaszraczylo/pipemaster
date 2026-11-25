@@ -12,5 +12,7 @@
   "expect": [
     "env.sha:40",
     "env.foo:bar"
-  ]
+  ],
+  "owners": {},
+  "requires": []
 }

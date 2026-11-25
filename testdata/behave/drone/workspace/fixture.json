@@ -11,5 +11,7 @@
   "unordered": false,
   "expect": [
     "workspace.s2:data"
-  ]
+  ],
+  "owners": {},
+  "requires": []
 }

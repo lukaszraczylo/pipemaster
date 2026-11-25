@@ -8,5 +8,19 @@
   ],
   "expect_failure": false,
   "unordered": false,
-  "expect": []
+  "expect": [],
+  "owners": {
+    "needs.a": [
+      "a"
+    ],
+    "needs.b": [
+      "b",
+      "a"
+    ],
+    "needs.c": [
+      "c",
+      "b"
+    ]
+  },
+  "requires": []
 }

@@ -9,5 +9,17 @@
   ],
   "expect_failure": false,
   "unordered": false,
-  "expect": []
+  "expect": [],
+  "owners": {
+    "allow_failure.flaky": [
+      "flaky"
+    ],
+    "allow_failure.after": [
+      "after",
+      "flaky"
+    ]
+  },
+  "requires": [
+    "allow_failure"
+  ]
 }

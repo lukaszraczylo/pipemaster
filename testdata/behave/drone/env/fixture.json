@@ -11,5 +11,7 @@
   "unordered": false,
   "expect": [
     "env.foo:bar"
-  ]
+  ],
+  "owners": {},
+  "requires": []
 }

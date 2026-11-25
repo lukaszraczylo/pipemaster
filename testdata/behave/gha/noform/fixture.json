@@ -9,5 +9,7 @@
   ],
   "expect_failure": true,
   "unordered": false,
-  "expect": []
+  "expect": [],
+  "owners": {},
+  "requires": []
 }
