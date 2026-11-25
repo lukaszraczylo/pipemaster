@@ -80,7 +80,12 @@ func firedEvents(pl *ir.Pipeline, events []SourceEvent) []SourceEvent {
 		if c == nil {
 			return from
 		}
-		return expr.EventsPossible(c, from)
+		out := expr.EventsPossible(c, from)
+		// A tag run is a push of a tag, so the condition must admit that run, not only the name tag.
+		if i := slices.Index(out, "tag"); i >= 0 && len(expr.EventsPossible(c, []string{expr.TagPush})) == 0 {
+			out = slices.Delete(slices.Clone(out), i, i+1)
+		}
+		return out
 	}
 	var allowed []string
 	for _, j := range pl.Jobs {

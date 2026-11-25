@@ -10,6 +10,10 @@ const (
 	triUnknown
 )
 
+// TagPush is the pseudo event of a tag push on a target whose push event also covers it: a test of the event ref
+// holds for push and for tag, and the ref type is tag.
+const TagPush = "tag push"
+
 // EventsPossible returns the events of the list on which e can hold. It reads only the tests of the event ref
 // (== != =~ !~ with a string or an exact, prefix, suffix or substring pattern) under !, && and ||, and treats every
 // other test as unknown, so an event is dropped only when e is false on it whatever the other refs say.
@@ -61,8 +65,14 @@ func eventTriBinary(b Binary, ev string) tri {
 		}
 	case OpEq, OpNe:
 		x, lit, ok := refLit(b.L, b.R)
+		if ok && ev == TagPush && isRef(x, CtxRefType) {
+			return triOf((lit == "tag") == (b.Op == OpEq))
+		}
 		if !ok || !isRef(x, CtxEvent) {
 			return triUnknown
+		}
+		if ev == TagPush {
+			return triOf((lit == "push" || lit == "tag") == (b.Op == OpEq))
 		}
 		return triOf((lit == ev) == (b.Op == OpEq))
 	case OpMatch, OpNoMatch:
@@ -73,6 +83,10 @@ func eventTriBinary(b Binary, ev string) tri {
 		m, lit, pok := ParsePattern(s)
 		if !pok {
 			return triUnknown
+		}
+		if ev == TagPush {
+			held := modeHolds(m, "push", asciiLower(lit)) || modeHolds(m, "tag", asciiLower(lit))
+			return triOf(held == (b.Op == OpMatch))
 		}
 		return triOf(modeHolds(m, asciiLower(ev), asciiLower(lit)) == (b.Op == OpMatch))
 	}
