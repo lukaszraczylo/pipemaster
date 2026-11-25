@@ -1,31 +1,22 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
 # pipemaster:arg {"digest":"b5d716d4a133ea83d749f4190b1f77c496e97406257d277387df4bf490b09f22","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"d1540077d598d91a915b7e5614502a3c2c74ab307980c6171022089c022e8743","carry":"id: build\ncache:\n    - key: $\u007b{ hashFiles('go.sum') }}\n      policy: pull-push\n      paths:\n        - .cache/go-build\n"}
+# pipemaster:arg {"digest":"6c906d9a3c81476b6c819cb0c30d818e551027d26eff6ff695e4274e6b22a4a5","carry":"id: build\ncache:\n    - key: $\u007b{ hashFiles('go.sum') }}\n      policy: pull-push\n      paths:\n        - .cache/go-build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated job.cache pipeline/gitlab-ci/job/build
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/build
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: build
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: script
         input_mapping:

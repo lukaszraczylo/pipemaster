@@ -5,8 +5,8 @@
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "api"
-    - if: $CI_COMMIT_BRANCH
-    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 # pipemaster:jobid .shared:run
 # pipemaster:emulated project.multi_pipeline pipeline/.shared/job/run
 # pipemaster:arg {}
@@ -26,7 +26,7 @@ ci:build:
     - ubuntu-latest
   needs: []
   rules:
-    - if: $CI_COMMIT_BRANCH || $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH || $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
   script:
     # pipemaster:step build-step-1
     - echo build

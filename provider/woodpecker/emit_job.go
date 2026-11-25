@@ -116,7 +116,13 @@ func (e *emitter) workflowHeader(m *wmap, c *wfCtx, ext map[string]any) error {
 		if err != nil {
 			return err
 		}
-		m.set(keyWhen, whenNode(completeEvents(entries)))
+		completed, filled := e.completeEvents(entries, e.namesNoEvents())
+		m.set(keyWhen, whenNode(completed))
+		if filled {
+			if err := e.markArg(caps.TriggerPush, c.jp, defaultEventsArg{Events: sourceEvents}); err != nil {
+				return err
+			}
+		}
 	}
 	if c.j.Matrix != nil {
 		n, err := e.matrix(c.jp, c.j.Matrix, ext)

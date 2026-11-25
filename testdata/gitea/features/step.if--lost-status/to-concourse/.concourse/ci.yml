@@ -13,12 +13,11 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-4/carry
 # pipemaster:arg {"digest":"471f24c85646b511d0ba6a8139ac048948d0d6a1ca7f7dae3748d067eb4a89af","carry":"if: steps.config.outputs.configured == 'true'\nid: build-step-4\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"ae30e0ec3846d0e626c11bbe1bc8cf5264544e126beca41106ae64922f846e45","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"c3846fe6350e616db2c1416bf2abc31fc0b7973dce5794a860c186db97416953","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: lost status\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: ci\nname: lost status\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
-# pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-2
@@ -27,23 +26,15 @@
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-4
 # pipemaster:emulated step.image pipeline/ci/job/build/step/config
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/config
-# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: build
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: build-step-1
         input_mapping:

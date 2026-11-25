@@ -1,31 +1,22 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/step/script/carry
 # pipemaster:arg {"digest":"b031fe97ca33ecbd3ab02ef7b3daed552051b278e3a390168ad1737b473f6423","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/carry
-# pipemaster:arg {"digest":"ee4abe74686313acd28a1438ee7b31c7b69864639ba96b8c240485c3c3a56464","carry":"id: compile\n"}
+# pipemaster:arg {"digest":"c9a5373e536354afe6f575cd27e618fed7f5e0fa5eb226aff4e8893c1ffd6d8d","carry":"id: compile\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nfinally:\n    - if: |\n        opaque(gitlab): - if: $PIPELINE_TYPE =~ /_MR_PIPELINE$/\n      id: cleanup\n      needs:\n        - job: compile\n      steps:\n        - id: script\n          kind: script\n          script:\n            - make clean\n"}
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nfinally:\n    - if: |\n        opaque(gitlab): - if: $PIPELINE_TYPE =~ /_MR_PIPELINE$/\n      id: cleanup\n      needs:\n        - job: compile\n      steps:\n        - id: script\n          kind: script\n          script:\n            - make clean\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/compile
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: compile
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: script
         input_mapping:

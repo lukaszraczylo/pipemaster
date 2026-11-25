@@ -3,46 +3,36 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/job/lint/step/lint-step-1/carry
 # pipemaster:arg {"digest":"bbeefefc5b74b57c0c467d522467868b7636d8feee8256aa1850eeac87d0cb9c","carry":"id: lint-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/lint/carry
-# pipemaster:arg {"digest":"95f85b09777abc5bb826ad4c0dc683647de586fca406d58df187268adf183e8d","carry":"id: lint\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"6d4ccc22952d1970ec1e0f3e136e204a15bfed572bbe27e2c536f6ba8a66e177","carry":"id: lint\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/ship/step/ship-step-1/carry
 # pipemaster:arg {"digest":"10a70724d16acd5545de54080c856bd061aae88d0d581d06d94aa790a1d32ca1","carry":"id: ship-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/ship/carry
-# pipemaster:arg {"digest":"7692fb6936ef8f2b0bc2cffd9fd330bbd62eba2109c821974c655d36056cf9b7","carry":"id: ship\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: lint\n    - job: test\n"}
+# pipemaster:arg {"digest":"b36e32854e6e1ec5f337dbf0ffb27028c90ca3540e75cf4f25fab9a9dfad0728","carry":"id: ship\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: lint\n    - job: test\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
 # pipemaster:arg {"digest":"2de7cbf550b1867554d1bc7f4f0db0cc5037205e1874af173244e74086edb667","carry":"id: test-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
-# pipemaster:arg {"digest":"9d7071bce6c1eca339b5f1f8942cc6bd54c3fb4fc926b2ee0f5f73824f708f73","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"1483c9248897880ab07044ff1322dd1aecce59d9fe51e0d322aa2345b98d7616","carry":"id: test\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"118728fcc00220d3b4f3c4532f56a42ecf11cec63d03c7fac4a3b80c66b8a9a1","carry":"id: ci\nname: needs\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"a05c43e8f6f3ce4536fae25167f53a8763d36113a68f445344d2ed9abb8f4dd4","carry":"id: ci\nname: needs\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/lint
-# pipemaster:emulated trigger.push pipeline/ci/job/lint
 # pipemaster:emulated step.image pipeline/ci/job/lint/step/lint-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/lint/step/lint-step-1
 # pipemaster:emulated job.runner pipeline/ci/job/ship
 # pipemaster:emulated step.image pipeline/ci/job/ship/step/ship-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/ship/step/ship-step-1
 # pipemaster:emulated job.runner pipeline/ci/job/test
-# pipemaster:emulated trigger.push pipeline/ci/job/test
 # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-1
-# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: lint
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: lint-step-1
         input_mapping:
@@ -75,7 +65,6 @@ jobs:
           - lint
           - test
         trigger: true
-      - get: source-tags
       - task: ship-step-1
         input_mapping:
           workspace: source
@@ -103,8 +92,6 @@ jobs:
   - name: test
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: test-step-1
         input_mapping:

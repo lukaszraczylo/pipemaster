@@ -87,11 +87,25 @@ func (s *whenSpec) configure(m *marks) {
 			s.lenient = s.lenient || g.Paths != nil
 			s.stripChanges(g.Paths)
 		}
+		var d defaultEventsArg
+		if u.Feature == caps.TriggerPush && decodeArg(m.args[u], &d) && len(d.Events) > 0 {
+			s.dropDefaultEvents(d.Events)
+		}
 		switch u.Feature {
 		case caps.TriggerFilterBranch, caps.TriggerFilterPaths, caps.TriggerFilterTags:
 			s.lenient = s.lenient || u.IRPath == pipelinePth
 		case caps.PipelineFinally:
 			s.ignoreStatus = true
+		}
+	}
+}
+
+// dropDefaultEvents reads the event list that the emitter wrote for a source with no event filter as no filter.
+func (s *whenSpec) dropDefaultEvents(events []string) {
+	for i := range s.items {
+		ev := s.items[i].item.Event
+		if ev.Exclude == nil && len(ev.Include) == len(events) && !slices.ContainsFunc(events, func(x string) bool { return !slices.Contains(ev.Include, x) }) {
+			s.items[i].item.Event = wpexpr.Filter{}
 		}
 	}
 }

@@ -3,32 +3,23 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
 # pipemaster:arg {"digest":"b49cc72c34ebd733fae8c7947bd52a706ed403f2c8ce35a0758a1134cdfeaf34","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"802a342b23ebe9c313444d8a43b018978818deb37081ab99c437e29da5b63641","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\nenv:\n    - name: GOFLAGS\n      value:\n        lit: -trimpath\n    - name: API\n      value:\n        secret: API_KEY\n"}
+# pipemaster:arg {"digest":"1580e7f081e1eda6a95b145dd84492c13375922691d1338b91562ac4ccbfbffe","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\nenv:\n    - name: GOFLAGS\n      value:\n        lit: -trimpath\n    - name: API\n      value:\n        secret: API_KEY\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: jobenv\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: ci\nname: jobenv\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.env pipeline/ci/job/build
 # pipemaster:emulated job.runner pipeline/ci/job/build
-# pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
-# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: build
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: build-step-1
         input_mapping:

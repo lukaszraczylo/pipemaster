@@ -5,30 +5,21 @@
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"matrix":"include:\n    - - key: os\n        value: ubuntu-latest\n","across":"[{\"max_in_flight\":\"all\",\"values\":[{\"os\":\"ubuntu-latest\"}],\"var\":\"matrix\"}]"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
-# pipemaster:arg {"digest":"d5f469826c2abe9036287515e68c06efbe806e64af41e7bd6acf76a492ae6d35","carry":"matrix:\n    include:\n        - - key: os\n            value: ubuntu-latest\nid: test\nrunner:\n    labels:\n        - $\u007b{ matrix.os }}\n"}
+# pipemaster:arg {"digest":"77a68e6581a56eb7ce8c741788fe375bdfd507a8d3eaba50b797a2fee464eae8","carry":"matrix:\n    include:\n        - - key: os\n            value: ubuntu-latest\nid: test\nrunner:\n    labels:\n        - $\u007b{ matrix.os }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: ci\nname: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
-# pipemaster:emulated trigger.push pipeline/ci/job/test
 # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-1
-# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: test
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - do:
           - task: test-step-1

@@ -1,5 +1,8 @@
 workflow:
   name: env
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 deploy:
   tags:
     - ubuntu-latest

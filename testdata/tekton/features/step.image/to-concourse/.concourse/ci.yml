@@ -3,33 +3,24 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
 # pipemaster:arg {"digest":"7c2aa75c04d50ac58748cd235bdf418d0600ff43b4bf73f48af6d7c4bfdbe7d9","carry":"image:\n    ref: alpine:3.20\nid: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"25a605c2ef82bbde17bb04b8b0d1c0c0370a33ba503a9dfad390af26f6afd2da","carry":"id: build\n"}
+# pipemaster:arg {"digest":"f66d761e9d38cf8cf4e2c1c6c549e0368040295f0a0416eabe5f4435ceb3c381","carry":"id: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/step/deploy-step-1/carry
 # pipemaster:arg {"digest":"54b8b25afe523a1af6c747486885dc8a0442b8db5ab1d1c985aed50d5c13f5c8","carry":"id: deploy-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry
-# pipemaster:arg {"digest":"ba9ba07acb3643276f33011de8a8a89cf1906b65883a208b3e73f7984274c7d5","carry":"id: deploy\nneeds:\n    - job: build\n"}
+# pipemaster:arg {"digest":"4ae51c9fac56f7c29917601652502e26675ada2d5b212ce20e41d2215ce1ec1a","carry":"id: deploy\nneeds:\n    - job: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"31077445882a502d3384a2cd30d749931d715d733c6d3bef3336333bf597ef4e","carry":"id: ci\nname: base\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"45ccad76918a30b965c250ae4114592623aed42b88890de31c892e091082be63","carry":"id: ci\nname: base\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
-# pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/deploy/step/deploy-step-1
-# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: build
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: build-step-1
         input_mapping:
@@ -57,7 +48,6 @@ jobs:
         passed:
           - build
         trigger: true
-      - get: source-tags
       - task: deploy-step-1
         input_mapping:
           workspace: source

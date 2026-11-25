@@ -5,31 +5,22 @@
 # pipemaster:emulated job.manual pipeline/ci/job/deploy
 # pipemaster:arg {"environment":{"Name":"production","URL":"","Approval":false},"manual":false,"held":false}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry
-# pipemaster:arg {"digest":"1cb5ff7d63f6352e33e5faa25a5e16541544b7138783dda80b9e8cf2289ac3e2","carry":"environment:\n    name: production\nid: deploy\nrunner:\n    labels:\n        - docker\n"}
+# pipemaster:arg {"digest":"8ec04bc0e8afff54f4047d917196907be044eb5661c96c9f3dabeaae2570e7f5","carry":"environment:\n    name: production\nid: deploy\nrunner:\n    labels:\n        - docker\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: env\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: ci\nname: env\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/deploy
-# pipemaster:emulated trigger.push pipeline/ci/job/deploy
 # pipemaster:emulated step.image pipeline/ci/job/deploy/step/deploy-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/deploy/step/deploy-step-1
-# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: deploy
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: deploy-step-1
         input_mapping:

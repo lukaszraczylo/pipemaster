@@ -8,8 +8,8 @@ stages:
 workflow:
   name: base
   rules:
-    - if: $CI_COMMIT_BRANCH
-    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 # pipemaster:emulated step.image pipeline/ci/job/build
 # pipemaster:arg {"job":"build","parts":["build"],"own":["build-step-1"]}
 build:

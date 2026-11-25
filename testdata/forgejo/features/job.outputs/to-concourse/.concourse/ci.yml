@@ -3,32 +3,25 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/job/use/step/use-step-1/carry
 # pipemaster:arg {"digest":"3c9ae4822c3801e26a0f292189ec8daed71c6a52b8c5d731ee0b83635b3534d8","carry":"id: use-step-1\nkind: script\nscript:\n    - echo $\u007b{ needs.version.outputs.tag }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/use/carry
-# pipemaster:arg {"digest":"c6867fd60fe9c5a1dff62b23d5949b5da0fba1a31ab3d6caf20f3b75834048ae","carry":"id: use\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: version\n"}
+# pipemaster:arg {"digest":"4fce2ecbf4614bed1d4e932ff2dfce7b21f96d79245959b05beb186fa4441ad3","carry":"id: use\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: version\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/version/step/tag/carry
 # pipemaster:arg {"digest":"559fc337e2f3fcf90924154f3181280aa7cb4cbbb0a0fd844a986e116b1a65ea","carry":"id: tag\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/version/carry
-# pipemaster:arg {"digest":"0f461b3b7563df4ed1f81395e8bbed710ffa9c485d237a0961135144f8c1cdc5","carry":"id: version\nrunner:\n    labels:\n        - ubuntu-latest\noutputs:\n    - name: tag\n      value: $\u007b{ steps.tag.outputs.value }}\n"}
+# pipemaster:arg {"digest":"1ab3b8384cfee61271bff0529c599df53dbd271e9547f8358f581532c6e29812","carry":"id: version\nrunner:\n    labels:\n        - ubuntu-latest\noutputs:\n    - name: tag\n      value: $\u007b{ steps.tag.outputs.value }}\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"460cb7f788627675abb4989267d447b54c68f62becb6f6e15e95e649c2453e3a","carry":"id: ci\nname: outputs\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"4a0ee65012245994e9c2d3364e65a42e2e765f60f8a9d6c211182676c58e6b98","carry":"id: ci\nname: outputs\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/use
 # pipemaster:emulated step.image pipeline/ci/job/use/step/use-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/use/step/use-step-1
 # pipemaster:emulated job.runner pipeline/ci/job/version
-# pipemaster:emulated trigger.push pipeline/ci/job/version
 # pipemaster:emulated step.image pipeline/ci/job/version/step/tag
 # pipemaster:emulated step.shell pipeline/ci/job/version/step/tag
-# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: use
     plan:
@@ -36,7 +29,6 @@ jobs:
         passed:
           - version
         trigger: true
-      - get: source-tags
       - task: use-step-1
         input_mapping:
           workspace: source
@@ -66,8 +58,6 @@ jobs:
   - name: version
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: tag
         input_mapping:

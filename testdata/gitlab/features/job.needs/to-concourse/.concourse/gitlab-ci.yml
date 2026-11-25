@@ -1,49 +1,39 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/step/script/carry
 # pipemaster:arg {"digest":"b9bec7956d311173f9195fd3354a67c5bf54d1ea6dffb0863ddd8cbc23eda611","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/carry
-# pipemaster:arg {"digest":"c7244e58f32853963937bdc914340a9bc5bef1971718f46ee9593efa5daa1bba","carry":"id: compile\n"}
+# pipemaster:arg {"digest":"262c9ebb3dcedec7c7d8a987bf0ae306f14e5be742b295a979bf0114c3947f38","carry":"id: compile\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/lint/step/script/carry
 # pipemaster:arg {"digest":"2b361671be300ae92bb4adb49b8fb23179f1533d6fa8b83c9ba43893542793f2","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/lint/carry
-# pipemaster:arg {"digest":"7166a7300d5f49095ca548fa82069c2932e60e370ee84be967b94ccf1c72fa97","carry":"id: lint\n"}
+# pipemaster:arg {"digest":"9ba4bd9a2ddc8e1739c4091e3d4d6b5a5e7e09099fcfe930529e6a1904ce86d6","carry":"id: lint\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/ship/step/script/carry
 # pipemaster:arg {"digest":"5ee2e7fed670ca90d8459bb75f4a259284592a9eb608e9d651fa09bd081ee7a0","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/ship/carry
-# pipemaster:arg {"digest":"9a5a0ff142232047c3d001f4edd89462eff2d5bdc3cb0cd6d5a5ee985da34ce3","carry":"id: ship\nneeds:\n    - job: compile\n    - job: lint\n    - job: unit\n"}
+# pipemaster:arg {"digest":"01c57d209576d5e8215967b63f369c57d5b8e9dc98906e33e6b5a83974e02164","carry":"id: ship\nneeds:\n    - job: compile\n    - job: lint\n    - job: unit\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/unit/step/script/carry
 # pipemaster:arg {"digest":"08917fa4c36d150ee75feb747f4feb128af9ce77cea5a702efe3a5261a6d9667","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/unit/carry
-# pipemaster:arg {"digest":"510d319721b1aee4bace56eb26daf58adc0aec70a9358d8bc8a197111b2392bf","carry":"id: unit\nneeds:\n    - job: compile\n"}
+# pipemaster:arg {"digest":"cae88742dcf9dd2b0c5683bd41d272a161692f0563d3ebaa046f7a0fcbc00252","carry":"id: unit\nneeds:\n    - job: compile\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"bd64638926ab360df344fca6092f50fbebcf6656836fcb5e35dd6ece94b6b273","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"289460bff5164f9be49d992233e30db62583151af2edf163d943a3d9171ed966","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/compile
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/lint
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/lint/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/lint/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/ship/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/ship/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/unit/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/unit/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: compile
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: script
         input_mapping:
@@ -70,8 +60,6 @@ jobs:
   - name: lint
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: script
         input_mapping:
@@ -103,7 +91,6 @@ jobs:
           - lint
           - unit
         trigger: true
-      - get: source-tags
       - task: script
         input_mapping:
           workspace: source
@@ -132,7 +119,6 @@ jobs:
         passed:
           - compile
         trigger: true
-      - get: source-tags
       - task: script
         input_mapping:
           workspace: source

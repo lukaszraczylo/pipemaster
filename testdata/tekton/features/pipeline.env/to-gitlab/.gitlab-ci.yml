@@ -5,6 +5,9 @@ variables:
   LABEL: build-
 workflow:
   name: env
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 # pipemaster:lost expr.opaque pipeline/ci: gha.github.run_number
 build:
   needs: []

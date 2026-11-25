@@ -505,12 +505,14 @@ func TestChangesRefusesOptionLikeCommitsOnGHA(t *testing.T) {
 	}
 }
 
-type wpWhen []struct {
+type wpEntry = struct {
 	Event    any    `yaml:"event"`
 	Branch   any    `yaml:"branch"`
 	Path     any    `yaml:"path"`
 	Evaluate string `yaml:"evaluate"`
 }
+
+type wpWhen []wpEntry
 
 func anyList(v any) []string {
 	switch x := v.(type) {

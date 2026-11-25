@@ -1,5 +1,8 @@
 workflow:
   name: stepto
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 build:
   tags:
     - ubuntu-latest

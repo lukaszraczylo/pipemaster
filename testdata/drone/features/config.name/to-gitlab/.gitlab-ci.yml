@@ -2,7 +2,7 @@
 # pipemaster:arg [{"k":"t","p":"job/ci/step/build/script/0","g":"curl -H \"Authorization: Bearer $TOKEN\" \"https://$REGION.example.org\"","s":"curl -H \"Authorization: Bearer $\u007b{ secrets.TOKEN }}\" \"https://$\u007b{ vars.REGION }}.example.org\""}]
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
 # pipemaster:emulated step.image pipeline/drone/job/ci
 # pipemaster:arg {"job":"ci","parts":["ci"],"own":["build"]}
 ci:

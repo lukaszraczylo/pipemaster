@@ -2,7 +2,6 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/test
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/test
-# pipemaster:emulated step.shell pipeline/gitlab-ci/job/test/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/test
 # pipemaster:arg {"pre":1,"post":0}
 on:
@@ -24,4 +23,3 @@ jobs:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make test
-        shell: bash

@@ -1,35 +1,26 @@
 # pipemaster:emulated step.action pipeline/ci/job/call/step/call-step-1
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'self:'\n    owner: org\n    repo: shared\n    path: .gitea/workflows/build.yml\n    ref: main\next:\n    gha:\n        _derived_id: true\nid: call-step-1\nkind: pipeline_call\n","task":"call-step-1","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/call/step/call-step-1: Concourse does not run the action org/shared/.gitea/workflows/build.yml@main' \\u003e\\u00262; exit 1\"],\"path\":\"sh\"}},\"task\":\"call-step-1\"}"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/call/carry
-# pipemaster:arg {"digest":"f5987ccb7cfefd78148750c7e3743fc8f4a7a3444d58a9316f1a980d1e150915","carry":"id: call\n"}
+# pipemaster:arg {"digest":"54c820a7443ebaceda01e692a7b678ca9a1a3ce9b8575bb4e10dc32eb85bd8cc","carry":"id: call\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/plain/step/plain-step-1/carry
 # pipemaster:arg {"digest":"a9122a9dfd1f81b5cd386c7e6930f0695dab54c1ba8db0dfe2f92361365067c4","carry":"id: plain-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/plain/carry
-# pipemaster:arg {"digest":"cf47054b032c25b7748112408b401a53fd9ba4344ea140c49fa8277e433250ea","carry":"id: plain\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"2d548209cc99c8795a81080fbee0fd54c12ab569d71fde192cc6a018b6444f96","carry":"id: plain\nrunner:\n    labels:\n        - ubuntu-latest\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"42516277b815005ac96966b3b0f0c44c8d2d03296ba9d6d69ba87d78b52281ef","carry":"id: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"04aba9c259d5adf541106218612927f06f15156dee27eaa497d80fa0d89ef8bd","carry":"id: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/plain
-# pipemaster:emulated trigger.push pipeline/ci/job/plain
 # pipemaster:emulated step.image pipeline/ci/job/plain/step/plain-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/plain/step/plain-step-1
-# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: call
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: call-step-1
         config:
@@ -47,8 +38,6 @@ jobs:
   - name: plain
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: plain-step-1
         input_mapping:

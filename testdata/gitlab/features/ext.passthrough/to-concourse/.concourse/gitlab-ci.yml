@@ -1,44 +1,34 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
 # pipemaster:arg {"digest":"746284e6caaac39707df8564f17167cffacc4ff5be1ed03ed91de27e81c30817","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"232485cec7c010de22c73047739aa5f844f67b37a3312aed008b54a21ebf06c7","carry":"container:\n    ref: alpine:3\nretry:\n    attempts: 2\nid: build\n"}
+# pipemaster:arg {"digest":"661a818e8e390d720ad167dde9f9792924c8dd76c1cdc13b83f55c8bdb5b62d2","carry":"container:\n    ref: alpine:3\nretry:\n    attempts: 2\nid: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/common/step/script/carry
 # pipemaster:arg {"digest":"af5a94ba6d492f624994b4498c35001fff0608d7cc32785cbe904b3207f9c6ad","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/common/carry
-# pipemaster:arg {"digest":"740bca90d848d23c07e5f094658aa542a74305276db0e3722308e7f61e47742c","carry":"container:\n    ref: alpine:3\nretry:\n    attempts: 2\nid: common\n"}
+# pipemaster:arg {"digest":"d4af73602be238e0ac22c6c48e8ee7a0fd931c679dec55c02057c69d7d87a50a","carry":"container:\n    ref: alpine:3\nretry:\n    attempts: 2\nid: common\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/prod/step/script/carry
 # pipemaster:arg {"digest":"bc193f4593316c18f2dac65629c70fecafc7919e893328ddf43c8a3453dc22ad","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/prod/carry
-# pipemaster:arg {"digest":"652ed62a6d0206994f71b045edb966433e450e7bdc97027e1a7e08da1c59b5d5","carry":"container:\n    ref: alpine:3\nretry:\n    attempts: 2\nid: prod\nneeds:\n    - job: build\n    - job: common\n"}
+# pipemaster:arg {"digest":"537267b1bfb88380432570ee1a56c88c01a5e340978c237f8ba2831c8365c12f","carry":"container:\n    ref: alpine:3\nretry:\n    attempts: 2\nid: prod\nneeds:\n    - job: build\n    - job: common\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: SHARED\n      value:\n        lit: \"1\"\n"}
+# pipemaster:arg {"digest":"d4ea833bebabe36f6f0e50db004dd342e0d5c3824f45d4e79c63ed3526654a1d","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: SHARED\n      value:\n        lit: \"1\"\n"}
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/build
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/common
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/common
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/common/step/script
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/prod
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/prod/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: build
     plan:
       - do:
           - get: source
-            trigger: true
-          - get: source-tags
             trigger: true
           - task: script
             input_mapping:
@@ -69,8 +59,6 @@ jobs:
     plan:
       - do:
           - get: source
-            trigger: true
-          - get: source-tags
             trigger: true
           - task: script
             input_mapping:
@@ -105,7 +93,6 @@ jobs:
               - build
               - common
             trigger: true
-          - get: source-tags
           - task: script
             input_mapping:
               workspace: source

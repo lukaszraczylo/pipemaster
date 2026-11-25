@@ -214,6 +214,10 @@ func TestDeletionGuardIsStrippedOnTheWayBack(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// A GHA push never fires on web, api or schedule, so the way back scopes the default to the push source.
+		if got := string(files[".gitlab-ci.yml"]); strings.HasPrefix(got, "workflow:") {
+			direct = strings.Replace(direct, "job:", "workflow:\n  rules:\n    - if: $CI_PIPELINE_SOURCE == \"push\" && $CI_COMMIT_BRANCH\n    - if: $CI_PIPELINE_SOURCE == \"push\" && $CI_COMMIT_TAG\njob:", 1)
+		}
 		if got := "### .gitlab-ci.yml\n" + string(files[".gitlab-ci.yml"]); got != direct {
 			t.Errorf("not exact for %q:\n--- direct\n%s\n--- via gha\n%s", doc, direct, got)
 		}

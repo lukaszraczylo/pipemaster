@@ -238,7 +238,7 @@
     },
     {
      "path": ".woodpecker/git-clone.yaml",
-     "text": "# pipemaster:emulated job.container pipeline/buildkit/job/git-clone\n# pipemaster:arg {\"Ref\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\",\"Entrypoint\":null}\n# pipemaster:emulated script.interpolation pipeline/buildkit/job/git-clone/step/main\n# pipemaster:arg {\"refs\":[\"inputs.repo\",\"inputs.branch\",\"inputs.path\"],\"pos\":0}\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\nsteps:\n  - name: main\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n    commands:\n      - git-clone-pull.sh \"$${repo}\" \"$${branch}\" \"$${path}\"\n"
+     "text": "# pipemaster:emulated job.container pipeline/buildkit/job/git-clone\n# pipemaster:arg {\"Ref\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\",\"Entrypoint\":null}\n# pipemaster:emulated script.interpolation pipeline/buildkit/job/git-clone/step/main\n# pipemaster:arg {\"refs\":[\"inputs.repo\",\"inputs.branch\",\"inputs.path\"],\"pos\":0}\n# pipemaster:emulated trigger.push pipeline/buildkit/job/git-clone\n# pipemaster:arg {\"default_events\":[\"push\",\"pull_request\",\"tag\"]}\nwhen:\n  - event:\n      - push\n      - pull_request\n      - tag\nsteps:\n  - name: main\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n    commands:\n      - git-clone-pull.sh \"$${repo}\" \"$${branch}\" \"$${path}\"\n"
     }
    ],
    "report": [

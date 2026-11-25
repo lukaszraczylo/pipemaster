@@ -97,10 +97,10 @@ func (e *emitter) foldJobMarkers(j *ir.Job) []string {
 }
 
 // triggerParts lists the condition and path filter of each trigger that has a GitLab form.
-func triggerParts(pl *ir.Pipeline) []foldPart {
+func triggerParts(pl *ir.Pipeline, scoped bool) []foldPart {
 	var out []foldPart
 	for i := range pl.Triggers {
-		c, ok := triggerRule(&pl.Triggers[i])
+		c, ok := triggerRule(&pl.Triggers[i], scoped)
 		if !ok {
 			continue
 		}
@@ -143,12 +143,12 @@ func (e *emitter) foldPipelines(pls []*ir.Pipeline) (*ir.Pipeline, error) {
 		if err != nil {
 			return nil, err
 		}
-		parts := triggerParts(pl)
+		parts := triggerParts(pl, e.from != nil)
 		cond, plain := partsCond(parts)
 		if plain {
 			parts = nil
 		}
-		disabled := (len(pl.Triggers) > 0 || e.noTriggers(pl)) && len(triggerParts(pl)) == 0
+		disabled := (len(pl.Triggers) > 0 || e.noTriggers(pl)) && len(triggerParts(pl, e.from != nil)) == 0
 		if e.noTriggers(pl) {
 			e.loseNoTriggers(pl)
 		}

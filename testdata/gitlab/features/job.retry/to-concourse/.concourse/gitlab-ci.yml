@@ -1,32 +1,23 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
 # pipemaster:arg {"digest":"b9bec7956d311173f9195fd3354a67c5bf54d1ea6dffb0863ddd8cbc23eda611","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"09e6bb18111afead2b97ec861f7cad6f95669bfd6b2f4f198e4c82cc4e01bfb2","carry":"retry:\n    \"on\":\n        - runner_system_failure\n    attempts: 3\nid: build\n"}
+# pipemaster:arg {"digest":"d46fd45112a1a3fd175f13214f467c3bd6e4683913f71f10cc380b6888412e1d","carry":"retry:\n    \"on\":\n        - runner_system_failure\n    attempts: 3\nid: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"d4ea833bebabe36f6f0e50db004dd342e0d5c3824f45d4e79c63ed3526654a1d","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/build
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: build
     plan:
       - do:
           - get: source
-            trigger: true
-          - get: source-tags
             trigger: true
           - task: script
             input_mapping:

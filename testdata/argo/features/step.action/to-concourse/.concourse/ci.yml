@@ -11,27 +11,19 @@
 # pipemaster:emulated step.action pipeline/ci/job/build/step/local
 # pipemaster:arg {"step":"action:\n    kind: local\n    path: ./.github/actions/setup\nid: local\nkind: action\n","task":"local","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/local: Concourse does not run the action ./.github/actions/setup' \\u003e\\u00262; exit 1\"],\"path\":\"sh\"}},\"task\":\"local\"}"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"ec8852094120ca418a2ab72c80c98a0a056374d7bb35bd07c4fab2b25567975b","carry":"id: build\n"}
+# pipemaster:arg {"digest":"3398c93b12e05523a4c0339da6ae91f5ecef7147e0c5958d3ac67bb69782ee76","carry":"id: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: action\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: ci\nname: action\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
-# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: build
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: build-step-1
         config:

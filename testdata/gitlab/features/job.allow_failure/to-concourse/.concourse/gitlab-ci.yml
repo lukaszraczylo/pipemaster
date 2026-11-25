@@ -2,32 +2,23 @@
 # pipemaster:arg {"digest":"dab632eae724420df80f2eadc35a1fb0bc9231d10794122412bf329173b281e8","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated job.allow_failure pipeline/gitlab-ci/job/experimental
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/experimental/carry
-# pipemaster:arg {"digest":"9c8732015fcb7b9e009de4fb480a552e3dfe35d375b674877d24b1ab4c5b6b39","carry":"id: experimental\nallow_failure: true\n"}
+# pipemaster:arg {"digest":"8504ee911c75163d52246fffccbfb6ac64dd752c79d5ec53c473f5a77a169e60","carry":"id: experimental\nallow_failure: true\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"d4ea833bebabe36f6f0e50db004dd342e0d5c3824f45d4e79c63ed3526654a1d","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/experimental
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/experimental/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/experimental/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: experimental
     plan:
       - try:
           do:
             - get: source
-              trigger: true
-            - get: source-tags
               trigger: true
             - task: script
               input_mapping:

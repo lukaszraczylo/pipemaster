@@ -1,36 +1,29 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/check/step/script/carry
 # pipemaster:arg {"digest":"00efbd3d548fb9268d350d068671aabb237ccc674864a213674de668e68ce78c","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/check/carry
-# pipemaster:arg {"digest":"a1ebd1ed6cae6786ac4d372af7890a0e144a1ff26eec3756ecfbdb7c6e395cbf","carry":"id: check\nneeds:\n    - job: compile\n    - job: package\n"}
+# pipemaster:arg {"digest":"776a6922eb935960fb810b04d49b4f11ae555559774ea4aff145da573d2e94df","carry":"id: check\nneeds:\n    - job: compile\n    - job: package\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/step/script/carry
 # pipemaster:arg {"digest":"d6b00335c10e9dfe660276086fa724ea2de0d77ff8171b69ad5727ea74e35a77","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/carry
-# pipemaster:arg {"digest":"5468b80d8134687f1d163628eb0b9b7c4dbdc0e7c1e822866453ff24588c5109","carry":"id: compile\n"}
+# pipemaster:arg {"digest":"48e7671e1e2318e5b21eae11859bba6ad2d62292ac15e3fc1e6d4432e9e559bf","carry":"id: compile\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package/step/script/carry
 # pipemaster:arg {"digest":"7a97e027ba38e9ba6ba41e14dc1b27f8652c0b2ef34c7574e2682fcf29d02a44","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/package/carry
-# pipemaster:arg {"digest":"3a08a2541fc85c546e5ce62a1707ca6aea754c78205857be5057a8096a2c9994","carry":"id: package\nneeds:\n    - job: compile\n"}
+# pipemaster:arg {"digest":"27e3351c113b774b6e8ffe6f9f6f65e1a3bd606c72f843c0b63d3466bee3c5e4","carry":"id: package\nneeds:\n    - job: compile\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"add971fd9586cfd52d8452aa85abfd6191adbbc1fad8c596312d2c5a4d5ff3ca","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"995d2574230b13d1876cc0061863bcd98cc7c94a258c96843b6e69be9d492c94","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/check/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/check/step/script
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/compile
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/package/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/package/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: check
     plan:
@@ -39,7 +32,6 @@ jobs:
           - compile
           - package
         trigger: true
-      - get: source-tags
       - task: script
         input_mapping:
           workspace: source
@@ -65,8 +57,6 @@ jobs:
   - name: compile
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: script
         input_mapping:
@@ -96,7 +86,6 @@ jobs:
         passed:
           - compile
         trigger: true
-      - get: source-tags
       - task: script
         input_mapping:
           workspace: source

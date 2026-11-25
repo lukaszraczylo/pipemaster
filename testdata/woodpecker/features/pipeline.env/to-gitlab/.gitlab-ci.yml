@@ -2,7 +2,7 @@ variables:
   CGO_ENABLED: "0"
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
 # pipemaster:emulated step.image pipeline/woodpecker/job/ci
 # pipemaster:arg {"job":"ci","parts":["ci"],"own":["build"]}
 ci:

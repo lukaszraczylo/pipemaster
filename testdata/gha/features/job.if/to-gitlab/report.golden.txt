@@ -1,2 +1,2 @@
 Loss report: gha -> gitlab
-[lost] pipeline/ci/job/deploy job.if (condition not expressible in GitLab CI; job disabled)
+No losses: every feature converted natively.

@@ -169,6 +169,10 @@ func condTriggers(e expr.Expr) ([]ir.Trigger, bool) {
 			return mergeTriggers(l, r), lok && rok
 		case expr.OpEq, expr.OpMatch:
 			return compareTrigger(v)
+		case expr.OpAnd:
+			if isPushSource(v.L) {
+				return condTriggers(v.R)
+			}
 		}
 	case expr.Ref:
 		if strings.Join(v.Path, ".") == expr.CtxPRNumber {
@@ -182,6 +186,17 @@ func condTriggers(e expr.Expr) ([]ir.Trigger, bool) {
 		}
 	}
 	return nil, false
+}
+
+// isPushSource reports the test that scopes a branch or tag rule to a push (triggerRule, scoped).
+func isPushSource(e expr.Expr) bool {
+	b, ok := e.(expr.Binary)
+	if !ok || b.Op != expr.OpEq {
+		return false
+	}
+	ref, rok := b.L.(expr.Ref)
+	lit, lok := b.R.(expr.Lit)
+	return rok && lok && len(ref.Path) == 1 && ref.Path[0] == expr.CtxEvent && lit.Kind == expr.LitStr && lit.Str == sourcePush
 }
 
 func compareTrigger(b expr.Binary) ([]ir.Trigger, bool) {

@@ -5,27 +5,20 @@
 # pipemaster:emulated job.manual pipeline/ci/job/build
 # pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"d44fcfcf923655909b4c9c89fc5cfa4c9b3c983ec1934006b426b0d7a43e8386","carry":"if: 'opaque(tekton): {\"input\":\"pipemaster-disabled\",\"operator\":\"in\",\"values\":[\"never\"]}'\nid: build\n"}
+# pipemaster:arg {"digest":"da14613dcee4dad0d8e0dc8e8480eaca944612db4534abce86486aef8a215001","carry":"if: 'opaque(tekton): {\"input\":\"pipemaster-disabled\",\"operator\":\"in\",\"values\":[\"never\"]}'\nid: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: ci\nname: opaque\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"23421ff0998514f47173ea5b7668acb70c8af5e253b5c3264a1655012e26476f","carry":"id: ci\nname: opaque\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
-# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: build
     plan:
       - get: source
-      - get: source-tags
       - task: build-step-1
         input_mapping:
           workspace: source

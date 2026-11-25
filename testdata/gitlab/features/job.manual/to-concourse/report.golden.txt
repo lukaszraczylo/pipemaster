@@ -1,8 +1,8 @@
 Loss report: gitlab -> concourse
 [lost] pipeline/gitlab-ci/trigger/0 trigger.filter.branches (the push trigger has no branch filter, and a git resource follows one branch; the resource follows the default branch of the repository)
+[lost] pipeline/gitlab-ci/trigger/1 trigger.tag (a job cannot trigger on a push and on a tag: the tag resource has no version on a branch push, so the job would never start; the job runs on push only)
 [emulated] pipeline/gitlab-ci ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
 [emulated] pipeline/gitlab-ci/job/deploy job.allow_failure: try around the plan (the job shows success when the plan fails)
 [emulated] pipeline/gitlab-ci/job/deploy job.manual: job with no triggering get (a person starts the job; Concourse has no approver identity)
 [emulated] pipeline/gitlab-ci/job/deploy/step/script step.image: default image (the task names no image, so it runs ubuntu:latest)
 [emulated] pipeline/gitlab-ci/job/deploy/step/script step.shell: run.path sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the task runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)
-[emulated] pipeline/gitlab-ci/trigger/1 trigger.tag: git resource with source.tag_filter (a tag trigger that also has a branch filter is lost, because one git resource cannot hold both sets)

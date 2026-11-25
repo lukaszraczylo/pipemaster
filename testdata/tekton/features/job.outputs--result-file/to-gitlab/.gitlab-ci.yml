@@ -5,6 +5,9 @@ stages:
   - stage-1
 workflow:
   name: outputs
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 use:
   stage: stage-1
   needs:

@@ -4,6 +4,9 @@ variables:
   API_TOKEN: $API_TOKEN
 workflow:
   name: config
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 build:
   needs: []
   script:

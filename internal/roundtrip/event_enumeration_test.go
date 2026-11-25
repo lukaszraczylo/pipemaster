@@ -141,23 +141,28 @@ func TestWoodpeckerEntriesCanHold(t *testing.T) {
 					whens = append(whens, s.When)
 				}
 				for _, w := range whens {
-					for _, e := range w {
-						events := anyList(e.Event)
-						if len(events) == 0 || e.Evaluate == "" || e.Evaluate == "false" {
-							continue
-						}
-						x, err := wpexpr.Parse(e.Evaluate)
-						if err != nil {
-							t.Fatalf("%s: %v", name, err)
-						}
-						if len(expr.EventsPossible(x, events)) == 0 {
-							t.Errorf("%s: no event of %v can satisfy %s", name, events, e.Evaluate)
-						}
+					// A list that has one runnable entry still runs; a dead entry beside it only keeps the trigger readable.
+					if !slices.ContainsFunc(w, func(e wpEntry) bool { return entryCanHold(t, name, e) }) && len(w) > 0 {
+						t.Errorf("%s: no entry of the when list can hold", name)
 					}
 				}
 			}
 		})
 	}
+}
+
+// entryCanHold is false when the entry lists events and holds an evaluate test that none of them satisfies.
+func entryCanHold(t *testing.T, name string, e wpEntry) bool {
+	t.Helper()
+	events := anyList(e.Event)
+	if len(events) == 0 || e.Evaluate == "" || e.Evaluate == "false" {
+		return true
+	}
+	x, err := wpexpr.Parse(e.Evaluate)
+	if err != nil {
+		t.Fatalf("%s: %v", name, err)
+	}
+	return len(expr.EventsPossible(x, events)) > 0
 }
 
 // TestGitLabWebRunsOnWoodpeckerManual: a rule on the web pipeline source needs the manual event in the trigger set;

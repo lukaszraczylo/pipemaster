@@ -3,40 +3,31 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/job/prod/step/prod-step-1/carry
 # pipemaster:arg {"digest":"70b62e473b4f067cbae16877a9220f7771979b59db7e759dc4b2ceed0ef2edc3","carry":"id: prod-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/prod/carry
-# pipemaster:arg {"digest":"212a53627426321d3abc04823d7991cb03709bb7d79dbcb3652ea9893e4888d4","carry":"id: prod\nrunner:\n    labels:\n        - ubuntu-latest\noutputs:\n    - name: ver\n      value: v1\n"}
+# pipemaster:arg {"digest":"d262615cef0c8aa34ca9b8d788d106293a624c8d1577d2fdb2141428e5dcfb08","carry":"id: prod\nrunner:\n    labels:\n        - ubuntu-latest\noutputs:\n    - name: ver\n      value: v1\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
 # pipemaster:arg {"digest":"d72d3b1a2ea74e3cd4b0f7fec6f7a959c68b950a38b7319ef05f4c80830b42e1","carry":"id: test-step-1\nkind: script\nscript:\n    - echo $\u007b{ matrix.os }} $\u007b{ matrix.go }} $\u007b{ needs.prod.outputs.ver }}\n"}
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"matrix":"axes:\n    - name: os\n      values:\n        - linux\n        - mac\n    - name: go\n      values:\n        - \"1.24\"\n        - \"1.25\"\nexclude:\n    - - key: go\n        value: \"1.24\"\n      - key: os\n        value: mac\n","across":"[{\"max_in_flight\":\"all\",\"values\":[{\"go\":\"1.24\",\"os\":\"linux\"},{\"go\":\"1.25\",\"os\":\"linux\"},{\"go\":\"1.25\",\"os\":\"mac\"}],\"var\":\"matrix\"}]"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
-# pipemaster:arg {"digest":"ba90bac31add501d7ce96f599e7a47d6e881289021b692670ab767e13e2f13c4","carry":"matrix:\n    axes:\n        - name: os\n          values:\n            - linux\n            - mac\n        - name: go\n          values:\n            - \"1.24\"\n            - \"1.25\"\n    exclude:\n        - - key: go\n            value: \"1.24\"\n          - key: os\n            value: mac\nid: test\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: prod\n"}
+# pipemaster:arg {"digest":"8c0aea0a4cb5fe81d577aba82ca07bc2a810fe262a4e25008991cd440f9d75bc","carry":"matrix:\n    axes:\n        - name: os\n          values:\n            - linux\n            - mac\n        - name: go\n          values:\n            - \"1.24\"\n            - \"1.25\"\n    exclude:\n        - - key: go\n            value: \"1.24\"\n          - key: os\n            value: mac\nid: test\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: prod\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"679d95435dfb91da2a4c7011b70236d262e33cd721e8e60f8e278420d8e54597","carry":"id: ci\nname: matrix multi axis\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"d5bf506acfebb5c498b9c74ad50aae113620334165552d9a37cd2fd89e7ee7e5","carry":"id: ci\nname: matrix multi axis\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/prod
-# pipemaster:emulated trigger.push pipeline/ci/job/prod
 # pipemaster:emulated step.image pipeline/ci/job/prod/step/prod-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/prod/step/prod-step-1
 # pipemaster:emulated job.runner pipeline/ci/job/test
 # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-1
-# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: prod
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: prod-step-1
         input_mapping:
@@ -68,7 +59,6 @@ jobs:
         passed:
           - prod
         trigger: true
-      - get: source-tags
       - do:
           - task: test-step-1
             input_mapping:

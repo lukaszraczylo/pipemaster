@@ -2,6 +2,9 @@
 # pipemaster:arg [{"k":"t","p":"job/build/step/build-step-1/script/0","g":"echo \"$CI_MODE\"","s":"echo \"$\u007b{ vars.CI_MODE }}\""}]
 workflow:
   name: config
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 build:
   tags:
     - ubuntu-latest

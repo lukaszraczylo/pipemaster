@@ -1,5 +1,8 @@
 workflow:
   name: opaque
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 # pipemaster:lost expr.opaque pipeline/ci/job/build: opaque(gha): fromJSON('{"a":1}').a == 1
 build:
   tags:

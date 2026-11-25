@@ -1,11 +1,11 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/step/script/carry
 # pipemaster:arg {"digest":"b031fe97ca33ecbd3ab02ef7b3daed552051b278e3a390168ad1737b473f6423","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/carry
-# pipemaster:arg {"digest":"ee4abe74686313acd28a1438ee7b31c7b69864639ba96b8c240485c3c3a56464","carry":"id: compile\n"}
+# pipemaster:arg {"digest":"c9a5373e536354afe6f575cd27e618fed7f5e0fa5eb226aff4e8893c1ffd6d8d","carry":"id: compile\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/lint/step/script/carry
 # pipemaster:arg {"digest":"2b361671be300ae92bb4adb49b8fb23179f1533d6fa8b83c9ba43893542793f2","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/lint/carry
-# pipemaster:arg {"digest":"7166a7300d5f49095ca548fa82069c2932e60e370ee84be967b94ccf1c72fa97","carry":"id: lint\n"}
+# pipemaster:arg {"digest":"9ba4bd9a2ddc8e1739c4091e3d4d6b5a5e7e09099fcfe930529e6a1904ce86d6","carry":"id: lint\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/summary/step/script/carry
 # pipemaster:arg {"digest":"a286740e167e176f59384075afed5de6ce8cc9740fd2bea0c5539e4129068981","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated display.name pipeline/gitlab-ci/job/summary/step/script-2
@@ -15,44 +15,34 @@
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
 # pipemaster:arg {"job":"summary","digest":"98e19bce9076f1b9616033db6d5bf9cb124ee7a088f1569e0932451dc5c6c652","tasks":["script-2"]}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/summary/carry
-# pipemaster:arg {"digest":"d13233d5adcb696d48c3dd9e686a4ae4e766275842d8783c45ae0d632b41d0d0","carry":"id: summary\nneeds:\n    - job: compile\n    - job: lint\n    - job: unit\n"}
+# pipemaster:arg {"digest":"97cd9e613c34b0832b01d85152defcc757a0a8d0d44dddcb8138e22499c4f00f","carry":"id: summary\nneeds:\n    - job: compile\n    - job: lint\n    - job: unit\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/unit/step/script/carry
 # pipemaster:arg {"digest":"08917fa4c36d150ee75feb747f4feb128af9ce77cea5a702efe3a5261a6d9667","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/unit/carry
-# pipemaster:arg {"digest":"4c23c791ff8dbda775780940d140244c50b2628402644ed9666036f3588e6401","carry":"id: unit\nneeds:\n    - job: compile\n    - job: lint\n"}
+# pipemaster:arg {"digest":"0a30a0b5cb3ec9cc87d3416eac398fd11bb90bef8dd417e72571b6ee7da24a0a","carry":"id: unit\nneeds:\n    - job: compile\n    - job: lint\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"5b03eb3bbe0ef4b389553aa33337ffd761377aadd1e808c311391cd8919804c0","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nfinally:\n    - id: cleanup\n      needs:\n        - job: compile\n      steps:\n        - id: script\n          kind: script\n          script:\n            - make clean\n"}
+# pipemaster:arg {"digest":"899d151c3f6de974cb3f304fc705dd0b6fc7d17cde62d2bd6271effaab48c189","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nfinally:\n    - id: cleanup\n      needs:\n        - job: compile\n      steps:\n        - id: script\n          kind: script\n          script:\n            - make clean\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/cleanup/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/cleanup/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/cleanup/step/script
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/compile
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/lint
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/lint/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/lint/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/summary/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/summary/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/unit/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/unit/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: compile
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: script
         input_mapping:
@@ -79,8 +69,6 @@ jobs:
   - name: lint
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: script
         input_mapping:
@@ -112,7 +100,6 @@ jobs:
           - lint
           - unit
         trigger: true
-      - get: source-tags
       - task: script
         input_mapping:
           workspace: source
@@ -165,7 +152,6 @@ jobs:
           - compile
           - lint
         trigger: true
-      - get: source-tags
       - task: script
         input_mapping:
           workspace: source

@@ -1,6 +1,6 @@
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
 # pipemaster:emulated step.image pipeline/woodpecker/job/ci
 # pipemaster:arg {"job":"ci","parts":["ci"],"own":["deploy"]}
 ci:
@@ -9,9 +9,9 @@ ci:
   script:
     # pipemaster:step deploy
     # pipemaster:emulated step.if pipeline/woodpecker/job/ci/step/deploy
-    # pipemaster:arg "false"
-    # pipemaster:lost step.if pipeline/woodpecker/job/ci/step/deploy: ((event == 'tag') || (branch == 'main')) && (actor == 'release-bot')
+    # pipemaster:arg "((tag =~ '(?i)^.+$') || ((branch == 'main') || (pr.base_ref == 'main'))) \u0026\u0026 (actor == 'release-bot')"
+    # pipemaster:arg {"src":"((event == 'tag') || (branch == 'main')) \u0026\u0026 (actor == 'release-bot')"}
     - |
-      if false; then
+      if { printf '%s\n' "$CI_COMMIT_TAG" | grep -Eiq '^.+$' || [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" = "main" ]; } && [ "$GITLAB_USER_LOGIN" = "release-bot" ]; then
       ./deploy.sh
       fi

@@ -745,19 +745,44 @@ func withStatus(entries []whenEntry, status []string) []whenEntry {
 	return out
 }
 
+// sourceEvents are the events a foreign source starts by itself when its file names none: a push, a pull request and
+// a tag. A Drone pipeline with no trigger:event runs for these and for cron, custom, promote and rollback
+// (https://docs.drone.io/pipeline/docker/syntax/trigger/), and a GitLab pipeline with no workflow:rules for every
+// pipeline source; the others need a schedule, a person or a deployment set up outside the file, and a source that has
+// one carries it as its own IR trigger. Woodpecker also has pull_request_closed, pull_request_metadata, release and
+// deployment (https://woodpecker-ci.org/docs/usage/workflow-syntax, event), which no foreign source fires, so a filter
+// that lists every Woodpecker event would run on four events the source never sees.
+var sourceEvents = []string{eventPush, eventPR, eventTag}
+
 // completeEvents gives every entry an event filter: woodpecker-cli lint --strict rejects a workflow whose
-// when entries lack one. Listing all events keeps the run condition, because a run has exactly one of them.
-func completeEvents(entries []whenEntry) []whenEntry {
+// when entries lack one. A Woodpecker source keeps all events, because it named none. A source that can name none
+// (namesNoEvents) gets the events it fires (sourceEvents), and an entry that only excludes events gets the positive
+// list without them.
+func (e *emitter) completeEvents(entries []whenEntry, foreign bool) (out []whenEntry, filled bool) {
+	all := allEvents
+	if foreign {
+		all = sourceEvents
+	}
 	if len(entries) == 0 {
 		entries = []whenEntry{{}}
 	}
-	out := slices.Clone(entries)
+	out = slices.Clone(entries)
 	for i := range out {
-		if out[i].Event.Empty() {
-			out[i].Event.Include = slices.Clone(allEvents)
+		list := all
+		if out[i].Evaluate == "false" {
+			list = allEvents // the workflow never runs; every event keeps it readable as no trigger
+		}
+		switch {
+		case out[i].Event.Empty():
+			out[i].Event.Include = slices.Clone(list)
+			filled = filled || foreign && out[i].Evaluate != "false"
+		case foreign && len(out[i].Event.Include) == 0:
+			out[i].Event.Include = slices.DeleteFunc(slices.Clone(all), func(ev string) bool { return slices.Contains(out[i].Event.Exclude, ev) })
+			out[i].Event.Exclude = nil
+			filled = true
 		}
 	}
-	return out
+	return out, filled
 }
 
 // changesArg marks a workflow whose job condition is a path predicate that the file states as a path filter on its
@@ -926,4 +951,17 @@ func onlyBit(t []bool, i int) bool {
 		}
 	}
 	return true
+}
+
+// namesNoEvents is true when the source can leave a pipeline without a trigger. A GHA workflow always names its
+// events, so for that family an entry with no event is the core subset that lean4/Pipemaster/Woodpecker.lean models
+// and keeps every event (allEvents).
+func (e *emitter) namesNoEvents() bool {
+	return e.from != nil && provider.Family(e.origin) != provider.GHA
+}
+
+// defaultEventsArg marks a workflow whose event filter the emitter wrote for a source with none, so the parser reads
+// the filter back as no filter.
+type defaultEventsArg struct {
+	Events []string `json:"default_events"`
 }

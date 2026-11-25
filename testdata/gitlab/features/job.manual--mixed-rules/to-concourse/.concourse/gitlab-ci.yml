@@ -3,30 +3,21 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/release/step/script/carry
 # pipemaster:arg {"digest":"2cb200b5e37600a9ef70a137e63508a7d26b75487cad52e53603950ba5875b6c","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/release/carry
-# pipemaster:arg {"digest":"dab35e8d898033f5b18cf981acc9b22fc0b37a57ad792b95e8c3d5a401a1451d","carry":"if: branch == 'dev'\nid: release\n"}
+# pipemaster:arg {"digest":"be856e3f077a130fa972bd19fe3ff854ae360ed2a6527e180fe102046f277ec2","carry":"if: branch == 'dev'\nid: release\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/release
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/release/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/release/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: release
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: script
         input_mapping:

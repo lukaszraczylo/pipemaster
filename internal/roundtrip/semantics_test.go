@@ -137,7 +137,7 @@ func onBlock(doc string) string {
 	return strings.Join(out, "\n")
 }
 
-func TestUnfilteredGHAPushKeepsTagsInGitlab(t *testing.T) {
+func TestUnfilteredGHAPushKeepsTagsInGitlabAndNothingElse(t *testing.T) {
 	const src = `on: push
 jobs:
   build:
@@ -146,8 +146,10 @@ jobs:
       - run: make
 `
 	doc, _ := convert(t, provider.GHA, provider.GitLab, ghaWorkflow, src)
-	if strings.Contains(doc, "workflow:") {
-		t.Errorf("a push without filters must run on branches and tags; GitLab's default does, a workflow rule would narrow it:\n%s", doc)
+	for _, want := range []string{`$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH`, `$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG`} {
+		if !strings.Contains(doc, want) {
+			t.Errorf("a push without filters must run on branches and tags, and on no other pipeline source (web, api, schedule): want rule %s\n%s", want, doc)
+		}
 	}
 }
 

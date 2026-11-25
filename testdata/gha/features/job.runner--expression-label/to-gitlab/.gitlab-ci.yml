@@ -1,5 +1,8 @@
 workflow:
   name: expression label
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 # pipemaster:lost script.interpolation pipeline/ci/job/test: {{ matrix.os || 'ubuntu-latest' }}
 test:
   needs: []

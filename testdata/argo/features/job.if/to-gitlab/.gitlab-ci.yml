@@ -5,8 +5,8 @@
 workflow:
   name: cond
   rules:
-    - if: $CI_COMMIT_BRANCH
-    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 # pipemaster:lost job.if pipeline/ci/job/deploy: (ref == 'refs/heads/main') && (event == 'push')
 deploy:
   needs: []

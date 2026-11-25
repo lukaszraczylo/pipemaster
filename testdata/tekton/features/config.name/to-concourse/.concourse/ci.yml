@@ -5,30 +5,21 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
 # pipemaster:arg {"digest":"69f2cf9970b0477bdcd5427b81b2c442d9349182de12f9cc3ad1595845bb180e","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.REGION }}\"\nenv:\n    - name: KEY\n      value:\n        secret: DEPLOY_KEY\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"89e1d0ae715d2ffc68e035be90b6d93ac7c9096c46218ba0c14e268fc39ec182","carry":"id: build\n"}
+# pipemaster:arg {"digest":"5e001eeb09cf8be38bc8e4a7ca079d6abc49e74f4b0bec701bb2c948aa2eefd0","carry":"id: build\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: config\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: API_TOKEN\n      value:\n        secret: API_TOKEN\n"}
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: ci\nname: config\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: API_TOKEN\n      value:\n        secret: API_TOKEN\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated pipeline.env pipeline/ci
-# pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
-# pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
     type: git
     source:
       uri: ((git-uri))
-  - name: source-tags
-    type: git
-    source:
-      uri: ((git-uri))
-      tag_filter: '*'
 jobs:
   - name: build
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: build-step-1
         input_mapping:

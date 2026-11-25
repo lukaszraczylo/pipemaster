@@ -4,8 +4,8 @@
 # pipemaster:arg {"name":"Deploy","inputs":[{"Name":"target","Type":"choice","Default":"staging","Description":"Where to deploy","Required":true}],"triggers":[{"Resource":null,"Ext":{"gha":{"inputs":{"target":{"options":["staging","production"]}}}},"Kind":"manual","Cron":"","Branches":{"Include":null,"Exclude":null},"Tags":{"Include":null,"Exclude":null},"Paths":{"Include":null,"Exclude":null}}]}
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH
-    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "web"
 # pipemaster:emulated project.multi_pipeline pipeline/ci/job/test
 # pipemaster:arg {}
@@ -14,7 +14,7 @@ ci:test:
     - ubuntu-latest
   needs: []
   rules:
-    - if: $CI_COMMIT_BRANCH || $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH || $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
   script:
     # pipemaster:step test-step-1
     - echo test

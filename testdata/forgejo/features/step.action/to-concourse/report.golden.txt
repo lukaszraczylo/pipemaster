@@ -3,7 +3,7 @@ Loss report: forgejo -> concourse
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (the action docker://alpine:3.20 has no Concourse form; a placeholder task keeps its place)
 [lost] pipeline/ci/job/build/step/local step.action (the action ./.github/actions/setup has no Concourse form; a placeholder task keeps its place)
 [lost] pipeline/ci/trigger/0 trigger.filter.branches (the push trigger has no branch filter, and a git resource follows one branch; the resource follows the default branch of the repository)
+[lost] pipeline/ci/trigger/1 trigger.tag (a job cannot trigger on a push and on a tag: the tag resource has no version on a branch push, so the job would never start; the job runs on push only)
 [emulated] pipeline/ci ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
 [emulated] pipeline/ci/job/build job.runner: worker tags of the task (the tasks carry the worker tags ubuntu-latest; a build waits until a worker has them)
 [emulated] pipeline/ci/job/build/step/build-step-2 step.action: image selection; placeholder task (later tasks without an image run in this image; the action is applied without a task; a task that runs true keeps its place)
-[emulated] pipeline/ci/trigger/1 trigger.tag: git resource with source.tag_filter (a tag trigger that also has a branch filter is lost, because one git resource cannot hold both sets)
