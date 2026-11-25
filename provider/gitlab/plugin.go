@@ -38,11 +38,7 @@ func (e *emitter) pluginWord(sp string, v ir.Value) (word, why string) {
 		e.secretSetup(sp, caps.StepEnv, v.Secret)
 		return `"$` + v.Secret + `"`, ""
 	case ir.ValueExpr:
-		w, ok := shellWord(v.Expr)
-		if !ok {
-			return "", "an expression has no GitLab variable"
-		}
-		return w, ""
+		return e.exprWord(sp, v.Expr)
 	}
 	parts, err := expr.ParseScriptTemplate(v.Lit)
 	if err != nil {
@@ -52,9 +48,9 @@ func (e *emitter) pluginWord(sp string, v ir.Value) (word, why string) {
 	for _, p := range parts {
 		text := p.Text
 		if p.Expr != nil {
-			w, ok := shellWord(p.Expr)
-			if !ok {
-				return "", "an expression has no GitLab variable"
+			w, why := e.exprWord(sp, p.Expr)
+			if why != "" {
+				return "", why
 			}
 			sb.WriteString(w)
 			continue
@@ -68,6 +64,18 @@ func (e *emitter) pluginWord(sp string, v ir.Value) (word, why string) {
 		return "''", ""
 	}
 	return sb.String(), ""
+}
+
+// exprWord spells an expression operand as a shell word and reports a secret it names as an external variable.
+func (e *emitter) exprWord(sp string, x expr.Expr) (string, string) {
+	w, ok := shellWord(x)
+	if !ok {
+		return "", "an expression has no GitLab variable"
+	}
+	if r, isRef := x.(expr.Ref); isRef && len(r.Path) == 2 && r.Path[0] == expr.PrefixSecrets {
+		e.secretSetup(sp, caps.StepEnv, r.Path[1])
+	}
+	return w, ""
 }
 
 // pluginScript writes the subshell that sets the settings and runs the entrypoint; why says what has no spelling.

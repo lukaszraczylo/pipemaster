@@ -1070,13 +1070,6 @@
      "detail": "Argo schedules pods; a runner label has no form"
     },
     {
-     "path": "pipeline/drone/job/baseimage/step/Build Docker baseimage",
-     "feature": "step.action",
-     "level": "external",
-     "strategy": "plugin image with PLUGIN_ variables",
-     "detail": "the settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a list of scalars is comma-joined, any other list or map is JSON; the image entrypoint runs and the container has no command; the plugin starts a Docker daemon, so it sets securityContext.privileged: true and the cluster policy must admit privileged pods"
-    },
-    {
      "path": "pipeline/drone/job/API",
      "feature": "ext.passthrough",
      "level": "emulated",
@@ -1194,6 +1187,13 @@
      "level": "emulated",
      "strategy": "step id renamed",
      "detail": "step id Build Docker baseimage is not a DNS-1123 label; written as build-docker-baseimage"
+    },
+    {
+     "path": "pipeline/drone/job/baseimage/step/Build Docker baseimage",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "plugin image with PLUGIN_ variables",
+     "detail": "the settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a list of scalars is comma-joined, any other list or map is JSON; the image entrypoint runs and the container has no command; the plugin starts a Docker daemon, so it sets securityContext.privileged: true and the cluster policy must admit privileged pods"
     },
     {
      "path": "pipeline/drone/job/baseimage/step/Docker tag",

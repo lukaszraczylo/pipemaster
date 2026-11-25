@@ -30,10 +30,13 @@ func TestClusterPrivilegedPlugin(t *testing.T) {
 			}
 			found := false
 			for _, e := range rep.Entries {
-				found = found || e.Level == caps.External && strings.Contains(e.Detail, "admit privileged pods")
+				if e.Level == caps.External {
+					t.Errorf("the file carries the setting, so the entry is not external: %+v", e)
+				}
+				found = found || e.Level == caps.Emulated && strings.Contains(e.Detail, "admit privileged pods")
 			}
 			if !found {
-				t.Errorf("no external entry about the cluster policy: %+v", rep.Entries)
+				t.Errorf("no emulated entry with the cluster policy caveat: %+v", rep.Entries)
 			}
 			files, _, err = prov(t, to).Emit(oneJob(pluginStep("plugins/slack", map[string]ir.Value{"channel": lit("c")})))
 			if err != nil {

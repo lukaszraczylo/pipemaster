@@ -33,44 +33,70 @@ func gitlabPluginScript(t *testing.T, st *ir.Step) (string, *report.Report) {
 	return "", rep
 }
 
-// A literal setting must reach the plugin byte for byte: nothing in it runs or expands in the job shell.
-func TestGitLabPluginSettingsAreData(t *testing.T) {
-	hostile := map[string]string{
-		"single quote":       `it's`,
-		"double quote":       `say "hi"`,
-		"dollar name":        `$HOME and ${HOME}`,
-		"command":            `$(touch PWNED)`,
-		"backtick":           "`touch PWNED`",
-		"backslash":          `a\b\n\$`,
-		"double dollar":      `$$ $? $1`,
-		"quote then command": `'; touch PWNED; echo '`,
-		"empty":              ``,
-		"spaces":             `  lead and trail  `,
-		"glob":               `*`,
-		"semicolon":          `a; b && c | d`,
+// runPluginSetting emits a slack plugin step with one literal setting, runs the script under sh with the
+// entrypoint replaced by a probe, and returns the value the plugin sees. It fails when a side-effect file exists.
+func runPluginSetting(t *testing.T, value string) string {
+	t.Helper()
+	script, _ := gitlabPluginScript(t, pluginStep("plugins/slack", map[string]ir.Value{"text": lit(value)}))
+	if script == "" {
+		t.Fatal("no script with the settings")
 	}
-	for name, value := range hostile {
+	if !strings.Contains(script, "'/bin/drone-slack'") {
+		t.Fatalf("the entrypoint is missing:\n%s", script)
+	}
+	dir := t.TempDir()
+	out := filepath.Join(dir, "got")
+	probe := strings.Replace(script, "'/bin/drone-slack'", `printf '%s' "$PLUGIN_TEXT" > `+out, 1)
+	_, stderr, code := runScriptIn(t, dir, probe)
+	if code != 0 {
+		t.Fatalf("exit %d, stderr %q\n%s", code, stderr, probe)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "PWNED")); err == nil {
+		t.Fatalf("a setting ran as a command\n%s", script)
+	}
+	got, err := os.ReadFile(out) // #nosec G304 -- path in the test temp dir
+	if err != nil {
+		t.Fatalf("%v\n%s", err, script)
+	}
+	return string(got)
+}
+
+// A literal setting must reach the plugin byte for byte: nothing in it runs or expands in the job shell.
+// "in" is the setting text, "want" what the plugin sees; a ${{ 'x' }} literal expression yields x.
+func TestGitLabPluginSettingsAreData(t *testing.T) {
+	tests := map[string]struct{ in, want string }{
+		"single quote":       {`it's`, `it's`},
+		"double quote":       {`say "hi"`, `say "hi"`},
+		"dollar name":        {`$HOME and ${HOME}`, `$HOME and ${HOME}`},
+		"command":            {`$(touch PWNED)`, `$(touch PWNED)`},
+		"backtick":           {"`touch PWNED`", "`touch PWNED`"},
+		"backslash":          {`a\b\n\$`, `a\b\n\$`},
+		"trailing backslash": {`a\`, `a\`},
+		"double backslash":   {`a\\`, `a\\`},
+		"double dollar":      {`$$ $? $1`, `$$ $? $1`},
+		"trailing dollar":    {`cost$`, `cost$`},
+		"quote then command": {`'; touch PWNED; echo '`, `'; touch PWNED; echo '`},
+		"newline":            {"line1\nline2\n  indented\n", "line1\nline2\n  indented\n"},
+		"newline command":    {"a\n$(touch PWNED)\nb", "a\n$(touch PWNED)\nb"},
+		"unicode":            {"日本語 \U0001F600 é", "日本語 \U0001F600 é"},
+		"empty":              {``, ``},
+		"spaces":             {`  lead and trail  `, `  lead and trail  `},
+		"glob":               {`*`, `*`},
+		"semicolon":          {`a; b && c | d`, `a; b && c | d`},
+		"expr command":       {`${{ '$(touch PWNED)' }}`, `$(touch PWNED)`},
+		"expr embedded":      {`x ${{ 'a$(touch PWNED)' }} y'z`, `x a$(touch PWNED) y'z`},
+		"expr home":          {`${{ 'a $HOME' }}`, `a $HOME`},
+		"expr braces":        {`${{ '${HOME}' }}`, `${HOME}`},
+		"expr backtick":      {"${{ '`touch PWNED`' }}", "`touch PWNED`"},
+		"expr double quote":  {`${{ 'say "hi" \' }}`, `say "hi" \`},
+		"expr backslash":     {`${{ 'a\b$' }}`, `a\b$`},
+		"expr unicode":       {`${{ 'é日' }}`, `é日`},
+		"expr then command":  {`${{ 'a' }}$(touch PWNED)`, `a$(touch PWNED)`},
+	}
+	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			script, _ := gitlabPluginScript(t, pluginStep("plugins/slack", map[string]ir.Value{"text": lit(value)}))
-			if script == "" {
-				t.Fatal("no script with the settings")
-			}
-			if !strings.Contains(script, "'/bin/drone-slack'") {
-				t.Fatalf("the entrypoint is missing:\n%s", script)
-			}
-			dir := t.TempDir()
-			out := filepath.Join(dir, "got")
-			probe := strings.Replace(script, "'/bin/drone-slack'", `printf '%s' "$PLUGIN_TEXT" > `+out, 1)
-			_, stderr, code := runScriptIn(t, dir, probe)
-			if code != 0 {
-				t.Fatalf("exit %d, stderr %q\n%s", code, stderr, probe)
-			}
-			got, err := os.ReadFile(out) // #nosec G304 -- path in the test temp dir
-			if err != nil || string(got) != value {
-				t.Fatalf("PLUGIN_TEXT = %q (%v), want %q\n%s", got, err, value, script)
-			}
-			if _, err := os.Stat(filepath.Join(dir, "PWNED")); err == nil {
-				t.Fatalf("a setting ran as a command\n%s", script)
+			if got := runPluginSetting(t, tt.in); got != tt.want {
+				t.Fatalf("PLUGIN_TEXT = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -163,5 +189,21 @@ func TestGitLabPrivilegedPluginIsExternal(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("no external entry names privileged = true: %+v", rep.Entries)
+	}
+}
+
+// A secret that a setting reaches through a template keeps its external entry.
+func TestGitLabPluginTemplateSecretVerdict(t *testing.T) {
+	with := map[string]ir.Value{"password": lit("p=${{ secrets.docker_pw }}")}
+	script, rep := gitlabPluginScript(t, pluginStep("plugins/slack", with))
+	if !strings.Contains(script, `"$docker_pw"`) {
+		t.Fatalf("the secret is not a variable reference:\n%s", script)
+	}
+	found := false
+	for _, e := range rep.Entries {
+		found = found || e.Level == caps.External && strings.Contains(e.Detail+e.Strategy, "docker_pw")
+	}
+	if !found {
+		t.Errorf("no external entry names docker_pw: %+v", rep.Entries)
 	}
 }

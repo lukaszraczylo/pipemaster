@@ -382,7 +382,7 @@
 50-woodpecker-rust-confirm-email woodpecker->gitea native=   4 emulated=   3 external=   0 lost=   2
 50-woodpecker-rust-confirm-email woodpecker->gitlab native=   4 emulated=   2 external=   1 lost=   2
 50-woodpecker-rust-confirm-email woodpecker->tekton native=   6 emulated=   1 external=   1 lost=   1
-51-drone-parsr drone->argo native=  30 emulated=  24 external=   1 lost=  10
+51-drone-parsr drone->argo native=  30 emulated=  25 external=   0 lost=  10
 51-drone-parsr drone->concourse native=  30 emulated=  23 external=   0 lost=  14
 51-drone-parsr drone->forgejo native=  27 emulated=  24 external=   0 lost=   6
 51-drone-parsr drone->gha native=  27 emulated=  23 external=   0 lost=   6
@@ -460,7 +460,7 @@
 61-drone-pinmonl drone->gha native=   9 emulated=   7 external=   0 lost=   5
 61-drone-pinmonl drone->gitea native=   9 emulated=   7 external=   0 lost=   5
 61-drone-pinmonl drone->gitlab native=   6 emulated=   4 external=   1 lost=   8
-61-drone-pinmonl drone->tekton native=  10 emulated=   6 external=   1 lost=   2
+61-drone-pinmonl drone->tekton native=  10 emulated=   7 external=   0 lost=   2
 61-drone-pinmonl drone->woodpecker native=  13 emulated=   1 external=   0 lost=   4
 62-drone-elasticsearch-test-data drone->argo native=   4 emulated=   6 external=   0 lost=   6
 62-drone-elasticsearch-test-data drone->concourse native=   6 emulated=   4 external=   0 lost=   8

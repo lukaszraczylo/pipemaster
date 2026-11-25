@@ -60,11 +60,7 @@ func (sx *stepCtx) pluginContainer(st *ir.Step, name string, last bool) *contain
 		priv = "; the plugin starts a Docker daemon, so it sets securityContext.privileged: true and the cluster policy must admit privileged pods"
 	}
 	sx.act.Hold = nodeCanon(c.m.N)
-	level := e.emulate
-	if priv != "" {
-		level = e.external
-	}
-	level(path, caps.StepAction, pluginStrategy, "the settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a list of scalars is comma-joined, any other list or map is JSON; the image entrypoint runs and the container has no command"+priv)
+	e.emulate(path, caps.StepAction, pluginStrategy, "the settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a list of scalars is comma-joined, any other list or map is JSON; the image entrypoint runs and the container has no command"+priv)
 	return c
 }
 

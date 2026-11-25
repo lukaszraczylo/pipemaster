@@ -57,10 +57,6 @@ func (tc *taskCtx) pluginStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 		priv = "; the plugin starts a Docker daemon, so it sets securityContext.privileged: true and the cluster policy must admit privileged pods"
 	}
 	tc.stepTail(m, st, cond)
-	level := tc.e.emulate
-	if priv != "" {
-		level = tc.e.external
-	}
-	level(sp, caps.StepAction, pluginStrategy, "the settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a list of scalars is comma-joined, any other list or map is JSON; the image entrypoint runs and the step has no script"+priv)
+	tc.e.emulate(sp, caps.StepAction, pluginStrategy, "the settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a list of scalars is comma-joined, any other list or map is JSON; the image entrypoint runs and the step has no script"+priv)
 	return m, true, tc.markAction(b, sp, st, "", m)
 }
