@@ -28,7 +28,6 @@ func TestJudge(t *testing.T) {
 		rep    *report.Report
 		name   string
 		log    string
-		run    string
 		status string
 	}{
 		{name: "same", src: tr(0, "a"), tgt: tr(0, "a"), status: StatusPass},
@@ -51,10 +50,8 @@ func TestJudge(t *testing.T) {
 			rep: rep(entry(caps.Lost, caps.JobRunner, "pipeline/ci/job/build")), status: StatusFail},
 		{name: "external runner label explains nothing", src: tr(0, "a", "b"), tgt: tr(1, "a"),
 			rep: rep(entry(caps.External, caps.JobRunner, "pipeline/ci/job/b")), status: StatusFail},
-		{name: "external trigger explains nothing for another event", src: tr(0, "a", "b"), tgt: tr(0, "a"),
+		{name: "external trigger explains nothing", src: tr(0, "a", "b"), tgt: tr(0, "a"),
 			rep: rep(entry(caps.External, caps.TriggerPullRequest, "pipeline/ci/trigger/0")), status: StatusFail},
-		{name: "external trigger explains the event it starts", src: tr(0, "a", "b"), tgt: tr(0, "a"), run: kindPush,
-			rep: rep(entry(caps.External, caps.TriggerPush, "pipeline/ci/trigger/0")), status: StatusExplained},
 		{name: "passthrough explains nothing", src: tr(0, "a", "b"), tgt: tr(0, "a"),
 			rep: rep(entry(caps.Lost, caps.ExtPassthrough, "pipeline/ci/job/x/step/y")), status: StatusFail},
 		{name: "emulated shell explains a stopped step", src: tr(0, "bash.ok:c"), tgt: tr(127),
@@ -77,8 +74,6 @@ func TestJudge(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			c.tgt.Log = c.log
-			fx := fx
-			fx.Run = c.run
 			got, detail, rules := Judge(fx, c.src, c.tgt, c.rep)
 			if got != c.status {
 				t.Fatalf("status %s, want %s (%s | %s)", got, c.status, detail, rules)

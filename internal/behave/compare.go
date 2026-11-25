@@ -225,11 +225,8 @@ func explainFact(fx Fixture, rep *report.Report, tgtLog string, f Fact, explaine
 		if conditionFeatures[e.Feature] && e.Level == caps.Lost && disablesWork(e.Detail) {
 			ef, why = []string{kindMissing}, "a lost condition that the emitter fails safe removes the work it guards"
 		}
-		if kind, isTrigger := triggerRun[e.Feature]; isTrigger && e.Level == caps.External {
-			ef, why = nil, "the harness starts the run itself, so a trigger that the operator sets up changes no other run"
-			if kind == fx.Run {
-				ef, why = []string{kindMissing, kindExtra}, "the trigger of this event is set up outside the file"
-			}
+		if _, isTrigger := triggerRun[e.Feature]; isTrigger && e.Level == caps.External {
+			ef, why = nil, "the harness starts the run itself, so a trigger that the operator sets up changes no run"
 		}
 		loud := printsLoud(tgtLog, e)
 		if loud {

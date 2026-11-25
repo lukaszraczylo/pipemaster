@@ -276,7 +276,6 @@ func (r *Runner) compareOne(ctx context.Context, fx Fixture, tgt, evName string,
 	if capsOf(tgt).noSHA || capsOf(fx.Source).noSHA {
 		srcCmp, tgtCmp = withoutPrefix(src, markerSHA), withoutPrefix(tr, markerSHA)
 	}
-	fx.Run = events[evName].Kind
 	res.Status, res.Detail, res.Explained = Judge(fx, srcCmp, tgtCmp, conv.Report)
 	if res.Status != StatusPass {
 		if len(tr.Markers) == 0 {

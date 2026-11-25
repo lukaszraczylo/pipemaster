@@ -21,7 +21,6 @@ type Fixture struct {
 	Name      string              `json:"-"`
 	Source    string              `json:"-"`
 	Dir       string              `json:"-"`
-	Run       string              `json:"-"`
 	Features  []string            `json:"features"`
 	Events    []string            `json:"events"`
 	Owners    map[string][]string `json:"owners"`
