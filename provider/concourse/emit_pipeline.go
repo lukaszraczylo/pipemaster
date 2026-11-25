@@ -30,6 +30,8 @@ type pipeEmitter struct {
 	sources  []*source
 	sinks    []*ir.Job
 	tagSplit bool
+	// twinPass is true while the tag twins are written.
+	twinPass bool
 	serial   bool
 }
 

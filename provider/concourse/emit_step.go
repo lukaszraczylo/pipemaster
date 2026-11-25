@@ -228,6 +228,20 @@ func (jx *jobEmitter) guarded(sc *scope, path, name string, st *ir.Step, body []
 			cond = nil
 		}
 	}
+	if cond != nil && jx.pe.tagSplit {
+		// A job of a split source runs on one event only, so a condition on the event is decided here.
+		ev := "push"
+		if jx.pe.twinPass {
+			ev = "tag"
+		}
+		switch decideRun(cond, ev, ev == "tag") {
+		case runNever:
+			e.markArg(caps.StepIf, jx.sm(name), disabledArg{If: expr.String(cond), Script: strings.Join(body, "\n")})
+			return append([]string{disabledScript}, body...), true
+		case runAlways:
+			cond = nil
+		}
+	}
 	if jx.guard != nil && cond != nil {
 		cond = expr.Binary{Op: expr.OpAnd, L: jx.guard, R: cond}
 	} else if jx.guard != nil {
@@ -634,4 +648,67 @@ func (jx *jobEmitter) workerTags() []string {
 		}
 	}
 	return out
+}
+
+type runVerdict int
+
+const (
+	runUnknown runVerdict = iota
+	runNever
+	runAlways
+)
+
+// decideRun says whether a condition holds on every run or on none of the runs of one event, where the tag name is
+// set on a tag run only. A condition that reads anything else stays unknown.
+func decideRun(c expr.Expr, event string, tagSet bool) runVerdict {
+	switch v := c.(type) {
+	case expr.Ref:
+		if len(v.Path) == 1 && v.Path[0] == expr.CtxTag {
+			return verdictOf(tagSet)
+		}
+	case expr.Unary:
+		if v.Op == expr.OpNot {
+			switch decideRun(v.X, event, tagSet) {
+			case runNever:
+				return runAlways
+			case runAlways:
+				return runNever
+			}
+			return runUnknown
+		}
+	case expr.Binary:
+		if v.Op == expr.OpAnd || v.Op == expr.OpOr {
+			l, r := decideRun(v.L, event, tagSet), decideRun(v.R, event, tagSet)
+			if v.Op == expr.OpAnd {
+				switch {
+				case l == runNever || r == runNever:
+					return runNever
+				case l == runAlways && r == runAlways:
+					return runAlways
+				}
+			} else {
+				switch {
+				case l == runAlways || r == runAlways:
+					return runAlways
+				case l == runNever && r == runNever:
+					return runNever
+				}
+			}
+			return runUnknown
+		}
+	}
+	switch {
+	case len(expr.EventsPossible(c, []string{event})) == 0:
+		return runNever
+	case len(expr.EventsPossible(expr.Unary{Op: expr.OpNot, X: c}, []string{event})) == 0:
+		return runAlways
+	}
+	return runUnknown
+}
+
+func verdictOf(b bool) runVerdict {
+	if b {
+		return runAlways
+	}
+	return runNever
 }

@@ -863,3 +863,19 @@ func TestTagOnlySourceHasNoTwin(t *testing.T) {
 		t.Errorf("a tag-only source has a twin:\n%s", files[".concourse/ci.yml"])
 	}
 }
+
+// A job of a split source runs on one event, so a step that needs a tag runs in the twin and never in the push job.
+func TestTagOnlyStepRunsOnlyInTheTwin(t *testing.T) {
+	p := project(scriptJob("publish", "make publish"))
+	p.Pipelines[0].Jobs[0].Steps[0].If = expr.Ref{Path: []string{expr.CtxTag}}
+	p.Pipelines[0].Triggers = []ir.Trigger{pushOn("main"), {Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{"v*"}}}}
+	files, _ := emit(t, p)
+	doc := pipelineDoc(t, files)
+	script := func(job string) string { return fmt.Sprint(jobDoc(t, doc, job)["plan"]) }
+	if !strings.Contains(script("publish"), "exit 0") {
+		t.Errorf("the push job runs the tag step: %s", script("publish"))
+	}
+	if strings.Contains(script("publish-tag"), "exit 0") || !strings.Contains(script("publish-tag"), "make publish") {
+		t.Errorf("the twin does not run the tag step: %s", script("publish-tag"))
+	}
+}

@@ -124,13 +124,13 @@ func (pe *pipeEmitter) tagTwins(all, tags []*source) []*yaml.Node {
 	for _, j := range pe.pl.Jobs {
 		twin[j.ID] = unique(taken, pe.jobName[j.ID]+tagTwinSuffix)
 	}
-	pe.jobName, pe.sources, pe.primary = twin, tags, firstGit(tags)
+	pe.jobName, pe.sources, pe.primary, pe.twinPass = twin, tags, firstGit(tags), true
 	var out []*yaml.Node
 	for _, j := range pe.pl.Jobs {
 		out = append(out, pe.job(j))
 	}
 	pe.doc.Head = pe.doc.Head[:pushDoc]
-	pe.jobName, pe.sources, pe.primary = pushNames, all, pushPrimary
+	pe.jobName, pe.sources, pe.primary, pe.twinPass = pushNames, all, pushPrimary, false
 	for _, j := range pe.pl.Jobs {
 		e.markArg(caps.TriggerTag, pe.mpath+"/job/"+twin[j.ID], tagTwinArg{Of: pushNames[j.ID]})
 	}
@@ -289,6 +289,21 @@ func (jx *jobEmitter) condition() {
 		jx.manual, jx.condHeld = true, true
 		e.lose(jx.path, caps.JobIf, changesDetail)
 		return
+	}
+	if jx.pe.tagSplit {
+		// The job of a split source runs on one event, so a condition on the event or the tag is decided here.
+		ev := "push"
+		if jx.pe.twinPass {
+			ev = "tag"
+		}
+		switch decideRun(j.If, ev, ev == "tag") {
+		case runAlways:
+			return
+		case runNever:
+			jx.manual, jx.condHeld = true, true
+			e.emulate(jx.path, caps.JobIf, "no triggering get", "the condition is false on every "+ev+" run, so this job has no triggering get; the other job of the pair runs the source condition")
+			return
+		}
 	}
 	refs, ok := guardRefs(j.If)
 	if !ok || !guardable(j.If) {
