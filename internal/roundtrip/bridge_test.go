@@ -27,7 +27,7 @@ semgrep-sast:
     - if: '$CI_COMMIT_BRANCH == "main"'
 `
 
-var bridgeTargets = []string{provider.GHA, "woodpecker", "drone", "tekton", "argo"}
+var bridgeTargets = []string{provider.GHA, "woodpecker", "drone", "tekton", "argo", "concourse"}
 
 // A job with no steps because its work lives in another pipeline or an include must fail loudly, never run true.
 func TestBridgeJobFailsLoudly(t *testing.T) {

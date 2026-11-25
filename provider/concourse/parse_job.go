@@ -101,6 +101,7 @@ func (b *pipeBuilder) job(m *omap) *builtJob {
 	for _, s := range steps {
 		j.Steps = append(j.Steps, jb.step(s)...)
 	}
+	jb.bridgeMarker()
 	jb.ifMarker()
 	if len(jb.caches) > 0 {
 		j.Cache = []ir.Cache{{Paths: jb.caches}}

@@ -94,3 +94,38 @@ func (c *chain) pluginTask(st *ir.Step, path string) []*yaml.Node {
 	e.emulate(path, caps.StepAction, pluginStrategy, caveat)
 	return []*yaml.Node{m.N}
 }
+
+// bridgeArg is the marker argument of the failing task that stands for a job with no steps.
+type bridgeArg struct {
+	Task string `json:"task"`
+}
+
+const bridgeTaskName = "bridge"
+
+// bridgeTask writes the failing task of a job whose work lives in another pipeline or in an include, so the job
+// does not pass with only a get. It returns nil for a job that holds no such work.
+func (jx *jobEmitter) bridgeTask() []*yaml.Node {
+	e := jx.pe.e
+	if len(jx.j.Steps) > 0 {
+		return nil
+	}
+	reason, ok := emitkit.BridgeWork(jx.j)
+	if !ok {
+		return nil
+	}
+	name := unique(jx.taken, bridgeTaskName)
+	cfg := newMap()
+	cfg.SetStr("platform", defaultPlatform)
+	cfg.Set("image_resource", imageNode(defaultImage, "", defaultTag))
+	run := newMap()
+	run.SetStr("path", shellCommand)
+	run.Set("args", strSeq([]string{defaultFlags, emitkit.FailLoud(caps.StepScript, jx.path, reason)}))
+	cfg.Set("run", run.N)
+	m := newMap()
+	m.SetStr("task", name)
+	m.Set("config", cfg.N)
+	e.lose(jx.path+"/step/script", caps.StepScript, reason+"; a task that prints the loss and exits 1 keeps the job honest")
+	e.emulate(jx.path, caps.StepScript, "failing task", reason+"; a task that prints the loss and exits 1 stands in")
+	e.markArg(caps.StepScript, jx.mpath, bridgeArg{Task: name})
+	return []*yaml.Node{m.N}
+}

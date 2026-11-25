@@ -808,3 +808,18 @@ func (b *pipeBuilder) mergeTagTwins(pl *ir.Pipeline, built []*builtJob) []*built
 	})
 	return slices.DeleteFunc(slices.Clone(built), func(bj *builtJob) bool { return twins[bj] })
 }
+
+// bridgeMarker drops the failing task that pipemaster wrote for a job with no steps, when the task is still there.
+func (jb *jobBuilder) bridgeMarker() {
+	var a bridgeArg
+	if !jb.b.arg(jb.path, caps.StepScript, &a) {
+		return
+	}
+	steps := jb.job.Steps
+	last := len(steps) - 1
+	if last < 0 || steps[last].ID != a.Task || !emitkit.IsFailLoud(steps[last].Script) {
+		jb.b.ignored(jb.path, caps.StepScript, "the failing task of the job was edited after pipemaster wrote it")
+		return
+	}
+	jb.job.Steps = steps[:last]
+}

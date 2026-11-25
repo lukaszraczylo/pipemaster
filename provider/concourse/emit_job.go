@@ -388,6 +388,7 @@ func (jx *jobEmitter) plan() []*yaml.Node {
 	jx.setupMatrix()
 	ch := &chain{jx: jx}
 	body := ch.steps(main)
+	body = append(body, jx.bridgeTask()...)
 	for _, st := range hooks {
 		jx.hookStep(st)
 	}
