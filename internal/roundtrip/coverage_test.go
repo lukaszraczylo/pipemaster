@@ -32,6 +32,8 @@ var noSourceForm = map[string]string{
 	provider.Concourse + "/" + string(caps.PipelineEnv):             "a Concourse pipeline has no env, so no Concourse source yields a pipeline env",
 	provider.Concourse + "/" + string(caps.PipelineFinally):         "the parser reads a job hook as a step with a status condition, so no Concourse source yields a finally job",
 	provider.Concourse + "/" + string(caps.TriggerManual):           "a job with no triggering get is a manual job, and the parser sets no manual pipeline trigger",
+	provider.Tekton + "/" + string(caps.JobRunner):                  "Tekton has no runner label, so no Tekton source yields a runner",
+	provider.Argo + "/" + string(caps.JobRunner):                    "the parser keeps a node selector in Ext and sets no runner label",
 	provider.Tekton + "/" + string(caps.StepAction):                 "a Tekton StepAction ref has no IR action form, so no Tekton source yields an IR action",
 	provider.Tekton + "/" + string(caps.TriggerManual):              "a person starts a Tekton Pipeline with tkn, so no Tekton file holds a manual trigger",
 	provider.Woodpecker + "/" + string(caps.JobTimeout):             "Woodpecker limits the whole pipeline with a repo setting, which no workflow file holds",

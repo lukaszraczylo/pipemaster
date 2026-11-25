@@ -309,6 +309,11 @@ func (e *emitter) platform(m *ymap, c *docCtx, ext map[string]any) error {
 	emitkit.ReportHosted(e.origin, r.Labels, "platform",
 		func(st, d string) { e.external(c.jp, caps.JobRunner, st, d) },
 		func(d string) { e.lose(c.jp, caps.JobRunner, d) })
+	for _, l := range emitkit.Unplaced(e.origin, r.Labels) {
+		if l != label {
+			e.lose(c.jp, caps.JobRunner, "the runner label "+l+" has no Drone form; only the os/arch platform does")
+		}
+	}
 	n := newYMap()
 	if label != "" {
 		parts := strings.Split(label, "/")

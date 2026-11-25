@@ -1,11 +1,11 @@
 Loss report: gitea -> woodpecker
 [lost] pipeline/.shared display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
 [lost] pipeline/.shared/job/run job.if (no trigger of the pipeline has a Woodpecker event; the workflow never runs)
-[lost] pipeline/.shared/job/run job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
 [lost] pipeline/.shared/trigger/0 ext.passthrough (Ext of provider gha (event) is not written to the Woodpecker file; it is kept in round-trip metadata)
 [lost] pipeline/.shared/trigger/0 trigger.api (Woodpecker starts API pipelines as manual events)
 [lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
-[lost] pipeline/ci/job/build job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
+[external] pipeline/.shared/job/run job.runner: no backend label (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
+[external] pipeline/ci/job/build job.runner: no backend label (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [emulated] pipeline/.shared/job/run job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/.shared/job/run/step/run-step-1 step.shell: bash-if-present wrapper command (the source runs the step under bash when the image has it; Woodpecker runs commands through /bin/sh -e of the image, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh)
 [emulated] pipeline/ci project.multi_pipeline: each job of each pipeline is a workflow named <pipeline>-<job> (each workflow carries its pipeline's trigger condition)

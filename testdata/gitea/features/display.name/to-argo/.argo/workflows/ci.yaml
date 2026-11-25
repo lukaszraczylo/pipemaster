@@ -2,6 +2,7 @@
 # pipemaster:arg {"name":"Compile"}
 # pipemaster:emulated display.name pipeline/ci/job/build
 # pipemaster:arg {"name":"Build the binary"}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0

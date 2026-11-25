@@ -1,6 +1,6 @@
 Loss report: forgejo -> drone
 [lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
-[lost] pipeline/ci/job/build job.runner (only the platform has a Drone form; other runner labels are lost)
+[external] pipeline/ci/job/build job.runner: no platform (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [external] pipeline/ci/job/build/step/build-step-1 script.interpolation: secret for variable (variable REGION is bound to the secret REGION; Drone has no variables, so create the secret REGION with the value of the variable)
 [emulated] pipeline/ci pipeline.env: copied into the environment of every pipeline document (a step variable of the same name wins)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

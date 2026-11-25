@@ -1,0 +1,14 @@
+kind: pipeline
+type: docker
+name: ci
+platform:
+  os: linux
+  arch: arm64
+trigger:
+  event:
+    - push
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

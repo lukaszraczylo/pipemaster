@@ -1,7 +1,7 @@
 Loss report: gha -> drone
 [lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
 [lost] pipeline/ci expr.opaque (no Drone spelling for expression gha.github.run_number)
-[lost] pipeline/ci/job/build job.runner (only the platform has a Drone form; other runner labels are lost)
+[external] pipeline/ci/job/build job.runner: no platform (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [emulated] pipeline/ci pipeline.env: copied into the environment of every pipeline document (a step variable of the same name wins)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/ci/job/build job.env: environment of every step (a document environment holds strings only, so a secret variable is set on each step)

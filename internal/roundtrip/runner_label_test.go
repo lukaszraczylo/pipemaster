@@ -38,18 +38,28 @@ func convertText(t *testing.T, from, to, name, content string) (string, string) 
 }
 
 func TestHostedRunnerLabelNamesNoTagOrLabelOnOtherEngines(t *testing.T) {
-	keys := map[string]string{"gitlab": "tags:", "concourse": "tags:", "woodpecker": "labels:", "tekton": "nodeSelector", "argo": "nodeSelector"}
+	keys := map[string]string{"gitlab": "tags:", "concourse": "tags:", "woodpecker": "labels:", "tekton": "nodeSelector", "argo": "nodeSelector", "drone": "node:"}
+	verdicts := map[string][2]string{
+		"ubuntu-latest": {"[external]", "GitHub-hosted image tools are not present"},
+		"ubuntu-22.04":  {"[external]", "GitHub-hosted image tools are not present"},
+		"macos-14":      {"[lost]", "macOS machine image"},
+		"windows-2022":  {"[lost]", "Windows machine image"},
+	}
 	for to, key := range keys {
-		for _, label := range []string{"ubuntu-latest", "ubuntu-22.04", "macos-14", "windows-2022"} {
+		for label, want := range verdicts {
 			t.Run(to+"/"+label, func(t *testing.T) {
 				out, msg := convertText(t, "gha", to, ".github/workflows/ci.yml", strings.Replace(hostedWorkflow, "%s", label, 1))
-				for _, bad := range []string{key} {
-					if strings.Contains(out, bad) {
-						t.Fatalf("output has %q:\n%s", bad, out)
+				if strings.Contains(out, key) {
+					t.Fatalf("output has %q:\n%s", key, out)
+				}
+				var line string
+				for _, l := range strings.Split(msg, "\n") {
+					if strings.Contains(l, "job.runner") && strings.HasPrefix(l, want[0]) && strings.Contains(l, label) {
+						line = l
 					}
 				}
-				if !strings.Contains(msg, "job.runner") {
-					t.Fatalf("report names no job.runner verdict:\n%s", msg)
+				if line == "" || !strings.Contains(line, want[1]) {
+					t.Fatalf("report has no %s job.runner line naming %q and %q:\n%s", want[0], label, want[1], msg)
 				}
 			})
 		}

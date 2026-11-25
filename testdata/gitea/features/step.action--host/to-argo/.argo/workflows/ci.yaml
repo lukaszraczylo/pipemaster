@@ -11,6 +11,7 @@
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'builtin:'\n    repo: checkout\nid: build-step-4\nkind: action\n","hold":"{\"args\":[\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-4: Argo does not run the action /checkout' \\u003e\\u00262; exit 1\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-4\",\"workingDir\":\"/workspace\"}","seq":3}
 # pipemaster:emulated step.script pipeline/ci/job/build
 # pipemaster:arg {}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1

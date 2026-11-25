@@ -53,7 +53,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.ProjectMultiPipeline:   {Level: caps.Emulated, Strategy: "one WorkflowTemplate per IR pipeline", Caveat: "each pipeline gets its own trigger"},
 		caps.TriggerManual:          {Level: caps.External, Strategy: "argo submit --from workflowtemplate/<name>", Caveat: "a person starts the run; the report names the command. The EventBus, the EventSource Service and Ingress, the artifact repository ConfigMap, the RBAC under .argo/rbac/, the ci-secrets Secret and the ci-vars ConfigMap values are external as well"},
 		caps.TriggerFilterPaths:     {Level: caps.Lost, Caveat: "a Sensor data filter cannot test the changed files of a push"},
-		caps.JobRunner:              {Level: caps.Lost, Caveat: "Argo schedules pods; only a platform label can carry a node selector"},
+		caps.JobRunner:              {Level: caps.External, Strategy: "workers the operator provides", Caveat: "Argo schedules pods; only a platform label can carry a node selector"},
 		caps.JobEnvironment:         {Level: caps.Lost, Caveat: "Argo has no environment name or URL"},
 		caps.PipelinePermissions:    {Level: caps.Lost, Caveat: "permissions come from the ServiceAccount of the Workflow"},
 		caps.StepTimeout:            {Level: caps.Lost, Caveat: "containerSet has no timeout per container; the template timeout covers the whole job"},

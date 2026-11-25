@@ -1,6 +1,6 @@
 Loss report: forgejo -> drone
 [lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
-[lost] pipeline/ci/job/build job.runner (only the platform has a Drone form; other runner labels are lost)
+[lost] pipeline/ci/job/build job.runner (the runner label docker has no Drone form; only the os/arch platform does)
 [lost] pipeline/ci/job/build/step/build-step-1 script.interpolation (no Drone spelling for expression ref_name; the line is replaced by a line that prints the loss and exits 1)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.if: case-sensitive comparison (Drone compares case-sensitively; GHA ignores case)

@@ -563,12 +563,6 @@
    "report": [
     {
      "path": "pipeline/drone/job/API",
-     "feature": "job.runner",
-     "level": "lost",
-     "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
-    },
-    {
-     "path": "pipeline/drone/job/API",
      "feature": "script.interpolation",
      "level": "lost",
      "strategy": "kept as written",
@@ -601,12 +595,6 @@
      "detail": "Ext of provider drone (settings) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/drone/job/Sonarqube",
-     "feature": "job.runner",
-     "level": "lost",
-     "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
-    },
-    {
      "path": "pipeline/drone/job/Sonarqube/step/Code analysis",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -618,12 +606,6 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "Ext of provider drone (detach) is not written to the Woodpecker file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/drone/job/UI",
-     "feature": "job.runner",
-     "level": "lost",
-     "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
     },
     {
      "path": "pipeline/drone/job/UI/step/Build UI Docker image",
@@ -639,9 +621,31 @@
      "detail": "Ext of provider drone (settings) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
+     "path": "pipeline/drone/job/API",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "workers the operator provides",
+     "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
+    },
+    {
+     "path": "pipeline/drone/job/Sonarqube",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "workers the operator provides",
+     "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
+    },
+    {
+     "path": "pipeline/drone/job/UI",
+     "feature": "job.runner",
+     "level": "external",
+     "strategy": "workers the operator provides",
+     "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
+    },
+    {
      "path": "pipeline/drone/job/baseimage",
      "feature": "job.runner",
-     "level": "lost",
+     "level": "external",
+     "strategy": "workers the operator provides",
      "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
     },
     {

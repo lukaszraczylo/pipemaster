@@ -30,7 +30,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.PipelinePermissions:    {Level: caps.Lost, Caveat: "token scopes are server and repo settings"},
 		caps.PipelineFinally:        {Level: caps.Emulated, Strategy: "a document that depends on every other document and runs on trigger status success and failure", Caveat: "the server skips a stage whose status filter does not match the build result"},
 		caps.JobNeedsArtifacts:      {Level: caps.Lost, Caveat: "documents share no workspace"},
-		caps.JobRunner:              {Level: caps.Lost, Caveat: "only the platform has a Drone form; other runner labels are lost"},
+		caps.JobRunner:              {Level: caps.External, Strategy: "workers the operator provides", Caveat: "only the platform has a Drone form; other runner labels are lost"},
 		caps.JobMatrix:              {Level: caps.Emulated, Strategy: "one pipeline document per cell", Caveat: "fail-fast and max-parallel are lost; a failed sibling stops the others without order"},
 		caps.JobTimeout:             {Level: caps.External, Strategy: "repo setting timeout", Caveat: "the setting has no per-pipeline or per-step form"},
 		caps.JobRetry:               {Level: caps.Lost, Caveat: "Drone has no retry key; only clone.retries exists"},

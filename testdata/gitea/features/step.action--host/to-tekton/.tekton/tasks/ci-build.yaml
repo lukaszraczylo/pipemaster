@@ -15,6 +15,7 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-4
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'builtin:'\n    repo: checkout\nid: build-step-4\nkind: action\n","wrote":"{\"image\":\"alpine:3.22\",\"name\":\"build-step-4\",\"script\":\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-4: no Tekton mapping for action /checkout' \\u003e\\u00262; exit 1\"}","at":3,"seq":3}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:

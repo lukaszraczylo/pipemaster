@@ -1,9 +1,9 @@
 Loss report: gha -> drone
 [lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
 [lost] pipeline/ci/job/build job.if (the triggers of the pipeline have no single Drone condition; the document never runs)
-[lost] pipeline/ci/job/build job.runner (only the platform has a Drone form; other runner labels are lost)
 [lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider gha (types, workflows) is not written to the Drone file; it is kept in round-trip metadata)
 [lost] pipeline/ci/trigger/0 trigger.filter.branches (the document is disabled, so the trigger is not written)
 [lost] pipeline/ci/trigger/0 trigger.pipeline_done (Drone has no pipeline-completion trigger)
+[external] pipeline/ci/job/build job.runner: no platform (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.shell: bash-if-present wrapper command (the source runs the step under bash when the image has it; Drone pipes commands to /bin/sh, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh)

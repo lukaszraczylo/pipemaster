@@ -1,0 +1,24 @@
+# pipemaster:emulated trigger.push pipeline/woodpecker/trigger/0
+# pipemaster:emulated pipeline.concurrency pipeline/woodpecker
+# pipemaster:emulated job.if pipeline/woodpecker/job/ci
+# pipemaster:arg {"from":"woodpecker","guard":true}
+# pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/build
+# pipemaster:arg {"kind":"script","image":{"Ref":"golang:1.25","Entrypoint":null},"script":["go build ./..."]}
+on:
+  push:
+    branches:
+      - '**'
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  ci:
+    if: '!github.event.deleted'
+    runs-on: linux/arm64
+    steps:
+      # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/build
+      - id: build
+        uses: docker://golang:1.25
+        with:
+          entrypoint: /bin/sh
+          args: -ec 'go build ./...'

@@ -3,6 +3,7 @@
 # pipemaster:lost script pipeline/ci/job/build/step/build-step-1: echo {{ opaque(gha): env[github.job] }}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"step":"id: build-step-1\nkind: script\nscript:\n    - 'echo $\u007b{ opaque(gha): env[github.job] }}'\n","hold":"{\"args\":[\"if command -v bash \\u003e/dev/null 2\\u003e\\u00261; then exec bash -e -c \\\"$1\\\"; fi; exec sh -e -c \\\"$1\\\"\",\"pipemaster\",\"printf '%s\\\\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Argo spelling for expression opaque(gha): env[github.job]; the line is replaced by a line that prints the loss and exits 1' \\u003e\\u00262; exit 1\"],\"command\":[\"sh\",\"-c\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-1\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0

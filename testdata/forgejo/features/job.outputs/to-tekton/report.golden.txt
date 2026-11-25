@@ -1,7 +1,7 @@
 Loss report: forgejo -> tekton
-[lost] pipeline/ci/job/use job.runner (Tekton schedules pods, not runner labels)
 [lost] pipeline/ci/job/version job.outputs (no Tekton spelling for expression steps.tag.outputs.value)
-[lost] pipeline/ci/job/version job.runner (Tekton schedules pods, not runner labels)
+[external] pipeline/ci/job/use job.runner: no node selector (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
+[external] pipeline/ci/job/version job.runner: no node selector (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [external] pipeline/ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [external] pipeline/ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [emulated] pipeline/ci/job/use/step/use-step-1 step.image: default image (the step names no image and Tekton requires one; alpine:3.22 runs it)

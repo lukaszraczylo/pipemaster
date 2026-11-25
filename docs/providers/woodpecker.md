@@ -44,7 +44,7 @@ The following table comes from `pipemaster caps --to woodpecker --format md`.
 | job.needs.artifacts | lost | (workflows do not share a workspace) |
 | job.outputs | lost | (Woodpecker steps cannot pass values to other workflows) |
 | job.retry | lost | (Woodpecker has no retry key; restarts are manual) |
-| job.runner | lost | (only a platform label has a Woodpecker form (labels.platform); other labels are lost) |
+| job.runner | external | workers the operator provides (only a platform label has a Woodpecker form (labels.platform); other labels are lost) |
 | job.services | native |  |
 | job.timeout | external | repo setting Timeout (Woodpecker limits the whole pipeline, not a workflow) |
 | pipeline.concurrency | native | workflow concurrency limit 1 with group (cancel-in-progress has no Woodpecker form) |

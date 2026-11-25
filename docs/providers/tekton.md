@@ -44,7 +44,7 @@ The following table comes from `pipemaster caps --to tekton --format md`.
 | job.needs.artifacts | emulated | workspace on a PVC from volumeClaimTemplate (tasks on different nodes need ReadWriteMany or the affinity assistant) |
 | job.outputs | native | Task results |
 | job.retry | native |  |
-| job.runner | lost | (Tekton schedules pods, not runner labels) |
+| job.runner | external | workers the operator provides (Tekton schedules pods, not runner labels) |
 | job.services | emulated | Task sidecars (the service is at localhost, not at its name) |
 | job.timeout | native |  |
 | pipeline.concurrency | lost | (Tekton has no concurrency group or cancel-in-progress) |

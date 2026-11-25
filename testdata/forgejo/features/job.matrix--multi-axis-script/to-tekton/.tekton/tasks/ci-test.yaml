@@ -2,6 +2,7 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"axes":[{"Name":"os","Values":["linux","mac"]},{"Name":"go","Values":["1.24","1.25"]}],"exclude":[[{"Key":"go","Value":"1.24"},{"Key":"os","Value":"mac"}]]}
+# pipemaster:emulated job.runner pipeline/ci/job/test
 # pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-1
 apiVersion: tekton.dev/v1
 kind: Task

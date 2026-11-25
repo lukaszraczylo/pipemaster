@@ -1,6 +1,6 @@
 Loss report: gha -> tekton
-[lost] pipeline/ci/job/check job.runner (Tekton schedules pods, not runner labels)
 [lost] pipeline/ci/job/check/step/check-step-2 script.interpolation (no Tekton spelling for expression steps.meta.outputs.version; the line is replaced by a line that prints the loss and exits 1)
+[external] pipeline/ci/job/check job.runner: no node selector (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [external] pipeline/ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [external] pipeline/ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [emulated] pipeline/ci/job/check step.workdir: shared working directory (the steps run in /workspace, the volume that Tekton mounts in every step; the source runs its steps in one shared directory)

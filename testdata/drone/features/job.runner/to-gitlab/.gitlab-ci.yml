@@ -1,0 +1,13 @@
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+# pipemaster:emulated step.image pipeline/drone/job/ci
+# pipemaster:arg {"job":"ci","parts":["ci"],"own":["build"]}
+ci:
+  image: golang:1.25
+  tags:
+    - linux/arm64
+  needs: []
+  script:
+    # pipemaster:step build
+    - go build ./...

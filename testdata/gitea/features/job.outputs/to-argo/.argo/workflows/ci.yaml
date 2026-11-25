@@ -3,7 +3,9 @@
 # pipemaster:arg {"step":"id: tag\nkind: script\nscript:\n    - echo \"value=v1\" \u003e\u003e \"$GITHUB_OUTPUT\"\n","hold":"{\"args\":[\"if command -v bash \\u003e/dev/null 2\\u003e\\u00261; then exec bash -e -c \\\"$1\\\"; fi; exec sh -e -c \\\"$1\\\"\",\"pipemaster\",\"echo \\\"value=v1\\\" \\u003e\\u003e \\\"$GITHUB_OUTPUT\\\"\"],\"command\":[\"sh\",\"-c\"],\"image\":\"alpine:3.22\",\"name\":\"main\",\"workingDir\":\"/workspace\"}"}
 # pipemaster:emulated job.outputs pipeline/ci/job/version
 # pipemaster:arg {"values":{"tag":"$\u007b{ steps.tag.outputs.value }}"}}
+# pipemaster:emulated job.runner pipeline/ci/job/use
 # pipemaster:emulated step.shell pipeline/ci/job/use/step/use-step-1
+# pipemaster:emulated job.runner pipeline/ci/job/version
 # pipemaster:emulated step.shell pipeline/ci/job/version/step/tag
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0

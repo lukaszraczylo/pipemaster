@@ -1,6 +1,6 @@
 Loss report: forgejo -> argo
-[lost] pipeline/ci/job/check job.runner (Argo schedules pods; only a platform label can carry a node selector)
 [lost] pipeline/ci/job/check/step/check-step-2 script.interpolation (no Argo spelling for expression steps.meta.outputs.version; the line is replaced by a line that prints the loss and exits 1)
+[external] pipeline/ci/job/check job.runner: no node selector (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [external] pipeline/ci/trigger/1 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/ci/job/check/step/check-step-2 step.if: guard in the script that reads context values from env (containerSet has no when, so every step condition runs as a shell guard that reads context values from env; a condition with no guard form disables the script and the container still starts; a containerSet starts every container at once and each waits for its dependencies, and a container that exits non-zero stops its dependents)

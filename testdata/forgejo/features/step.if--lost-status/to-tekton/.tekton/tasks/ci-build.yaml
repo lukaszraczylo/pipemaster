@@ -8,6 +8,7 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated step.workdir pipeline/ci/job/build
 # pipemaster:arg {"dir":"/workspace"}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-2
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-4

@@ -189,10 +189,10 @@ func (e *emitter) jobFeatures(tc *jobCtx) {
 		e.lose(path, caps.JobRetry, "retry conditions "+strings.Join(j.Retry.On, ", ")+" have no form; Argo retries on failure and error")
 	}
 	r := j.Runner
-	rest := emitkit.ReportHosted(e.origin, r.Labels, "node selector",
+	emitkit.ReportHosted(e.origin, r.Labels, "node selector",
 		func(st, d string) { e.external(path, caps.JobRunner, st, d) },
 		func(d string) { e.lose(path, caps.JobRunner, d) })
-	if len(rest) > 0 || r.Platform != "" || len(r.Selector) > 0 {
+	if len(emitkit.Unplaced(e.origin, r.Labels)) > 0 || r.Platform != "" || len(r.Selector) > 0 {
 		e.lose(path, caps.JobRunner, "Argo schedules pods; a runner label has no form")
 	}
 }

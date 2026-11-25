@@ -1,6 +1,6 @@
 Loss report: forgejo -> tekton
 [lost] pipeline/ci expr.opaque (no Tekton spelling for expression gha.github.run_number)
-[lost] pipeline/ci/job/build job.runner (Tekton schedules pods, not runner labels)
+[external] pipeline/ci/job/build job.runner: no node selector (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [external] pipeline/ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [external] pipeline/ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [emulated] pipeline/ci pipeline.env: stepTemplate env (the pipeline env is copied into the stepTemplate of every Task)

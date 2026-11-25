@@ -47,7 +47,7 @@ The following table comes from `pipemaster caps --to argo --format md`.
 | job.needs.artifacts | native | DAG task arguments artifacts from the needed task (the artifact repository ConfigMap is external; artifacts load only into a container named main) |
 | job.outputs | native | template outputs parameters read from files under /workspace/.pipemaster/outputs (outputs load only from the container named main; a value is written by a last script line of that container, and a parameter name that is not a valid name is lost) |
 | job.retry | native | template retryStrategy |
-| job.runner | lost | (Argo schedules pods; only a platform label can carry a node selector) |
+| job.runner | external | workers the operator provides (Argo schedules pods; only a platform label can carry a node selector) |
 | job.services | emulated | template sidecars (the service is at localhost, not at its name) |
 | job.timeout | native | template timeout (the timeout counts Pending time too) |
 | pipeline.concurrency | emulated | synchronization mutex (cancel-in-progress is lost; a second run waits for the mutex) |

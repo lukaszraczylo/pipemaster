@@ -1,0 +1,9 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: woodpecker
+spec:
+  tasks:
+    - name: ci
+      taskRef:
+        name: woodpecker-ci

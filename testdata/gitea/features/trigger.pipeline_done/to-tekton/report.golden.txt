@@ -1,7 +1,7 @@
 Loss report: gitea -> tekton
-[lost] pipeline/ci/job/build job.runner (Tekton schedules pods, not runner labels)
 [lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider gha (types, workflows) is not written to the Tekton file; it is kept in round-trip metadata)
 [lost] pipeline/ci/trigger/0 trigger.pipeline_done (Tekton has no pipeline-completion trigger)
+[external] pipeline/ci/job/build job.runner: no node selector (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.image: default image (the step names no image and Tekton requires one; alpine:3.22 runs it)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.shell: bash-if-present preamble in the script (the source runs the step under bash when the image has it; the script starts with a line that re-runs it under bash -e when the image has bash, else it runs under sh -e, so bash-only syntax fails under sh)
 [emulated] pipeline/ci/trigger/0 trigger.filter.branches: CEL interceptor filter on the ref (the EventListener serves GitHub webhooks only)

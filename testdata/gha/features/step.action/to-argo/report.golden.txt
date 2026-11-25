@@ -1,8 +1,8 @@
 Loss report: gha -> argo
-[lost] pipeline/ci/job/build job.runner (Argo schedules pods; only a platform label can carry a node selector)
 [lost] pipeline/ci/job/build/step/build-step-1 step.action (the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; the input token of the action has no Argo form)
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (the action docker://alpine:3.20 has no Argo form; the step is dropped)
 [lost] pipeline/ci/job/build/step/local step.action (the action ./.github/actions/setup has no Argo form; the step is dropped)
+[external] pipeline/ci/job/build job.runner: no node selector (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [external] pipeline/ci/trigger/1 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/ci/job/build step.script: no-op container (the job runs no script, so a container named main carries its inputs and outputs)

@@ -2,6 +2,7 @@
 # pipemaster:arg {"vars":{"REGION":"vars.REGION"}}
 # pipemaster:emulated pipeline.env pipeline/ci
 # pipemaster:arg {"vars":"- name: API_TOKEN\n  value:\n    secret: API_TOKEN\n","names":["API_TOKEN"]}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated config.name pipeline/ci/ref/secrets.API_TOKEN
 # pipemaster:emulated config.name pipeline/ci/ref/secrets.DEPLOY_KEY

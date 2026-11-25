@@ -4,6 +4,7 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated step.workdir pipeline/ci/job/check
 # pipemaster:arg {"dir":"/workspace"}
+# pipemaster:emulated job.runner pipeline/ci/job/check
 # pipemaster:emulated step.shell pipeline/ci/job/check/step/check-step-2
 # pipemaster:emulated step.shell pipeline/ci/job/check/step/meta
 apiVersion: tekton.dev/v1

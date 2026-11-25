@@ -1,5 +1,6 @@
 # pipemaster:emulated pipeline.inputs pipeline/ci
 # pipemaster:arg {"types":{"dry-run":"boolean","environment":"choice"},"required":["environment"]}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.manual pipeline/ci/trigger/0
 apiVersion: argoproj.io/v1alpha1

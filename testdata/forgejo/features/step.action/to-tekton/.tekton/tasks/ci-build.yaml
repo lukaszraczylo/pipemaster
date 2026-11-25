@@ -8,6 +8,7 @@
 # pipemaster:lost step pipeline/ci/job/build/step/local uses ./.github/actions/setup
 # pipemaster:emulated step.action pipeline/ci/job/build/step/local
 # pipemaster:arg {"step":"action:\n    kind: local\n    path: ./.github/actions/setup\nid: local\nkind: action\n","wrote":"{\"image\":\"golang:1.24\",\"name\":\"local\",\"script\":\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/local: no Tekton mapping for action ./.github/actions/setup' \\u003e\\u00262; exit 1\"}","at":2,"seq":3}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:

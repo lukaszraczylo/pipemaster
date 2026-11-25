@@ -10,6 +10,7 @@
 # pipemaster:arg {"step":"action:\n    kind: local\n    path: ./.github/actions/setup\nid: local\nkind: action\n","hold":"{\"args\":[\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/local: Argo does not run the action ./.github/actions/setup' \\u003e\\u00262; exit 1\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"golang:1.24\",\"name\":\"local\",\"workingDir\":\"/workspace\"}","seq":3}
 # pipemaster:emulated step.script pipeline/ci/job/build
 # pipemaster:arg {}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated config.name pipeline/ci/ref/secrets.PAT
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0

@@ -1,5 +1,6 @@
 # pipemaster:emulated step.image pipeline/deploy/job/deploy/step/deploy-step-1
 # pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated job.runner pipeline/deploy/job/deploy
 # pipemaster:emulated step.shell pipeline/deploy/job/deploy/step/deploy-step-1
 apiVersion: tekton.dev/v1
 kind: Task

@@ -1,6 +1,8 @@
 # pipemaster:emulated step.image pipeline/ci/job/build
 # pipemaster:arg {"steps":{"build-step-1":"ref: alpine:3.20\nentrypoint:\n    - \"\"\n"},"wrote":{"build-step-1":"alpine:3.20"}}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated job.runner pipeline/ci/job/deploy
 # pipemaster:emulated step.shell pipeline/ci/job/deploy/step/deploy-step-1
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0

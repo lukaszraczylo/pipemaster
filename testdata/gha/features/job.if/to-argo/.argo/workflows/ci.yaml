@@ -1,3 +1,4 @@
+# pipemaster:emulated job.runner pipeline/ci/job/deploy
 # pipemaster:emulated step.shell pipeline/ci/job/deploy/step/deploy-step-1
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0

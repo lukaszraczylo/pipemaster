@@ -297,7 +297,7 @@ func TestRunnerPlatformAndNode(t *testing.T) {
 	if pf["os"] != "linux" || pf["arch"] != "arm64" || d["node"].(map[string]any)["disk"] != "ssd" {
 		t.Fatalf("platform %v node %v", pf, d["node"])
 	}
-	wantLevel(t, rep, caps.JobRunner, "job/build", caps.Lost)
+	wantLevel(t, rep, caps.JobRunner, "job/build", caps.External)
 }
 
 func TestEmitServices(t *testing.T) {

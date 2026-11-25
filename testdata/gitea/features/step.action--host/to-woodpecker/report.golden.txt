@@ -1,6 +1,6 @@
 Loss report: gitea -> woodpecker
-[lost] pipeline/ci/job/build job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
 [lost] pipeline/ci/job/build/step/build-step-2 step.action (no Woodpecker mapping for action org/tool@v2)
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (no Woodpecker mapping for action org/local-action@main)
 [lost] pipeline/ci/job/build/step/build-step-4 step.action (no Woodpecker mapping for action /checkout)
+[external] pipeline/ci/job/build job.runner: no backend label (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

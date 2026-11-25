@@ -1,5 +1,6 @@
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"axes":[{"Name":"go","Values":["1.21","1.22"]}],"include":[[{"Key":"experimental","Value":"true"},{"Key":"go","Value":"1.22"}]]}
+# pipemaster:emulated job.runner pipeline/ci/job/test
 # pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-1
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0

@@ -1,5 +1,6 @@
 # pipemaster:emulated pipeline.concurrency pipeline/ci
 # pipemaster:arg {"cancel":true}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0

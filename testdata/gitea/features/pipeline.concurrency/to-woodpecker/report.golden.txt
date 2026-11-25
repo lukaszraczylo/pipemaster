@@ -1,6 +1,6 @@
 Loss report: gitea -> woodpecker
 [lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
 [lost] pipeline/ci pipeline.concurrency (cancel-in-progress has no Woodpecker form; a limit queues runs)
-[lost] pipeline/ci/job/build job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
+[external] pipeline/ci/job/build job.runner: no backend label (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.shell: bash-if-present wrapper command (the source runs the step under bash when the image has it; Woodpecker runs commands through /bin/sh -e of the image, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh)

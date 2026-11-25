@@ -254,6 +254,11 @@ func (e *emitter) labels(m *wmap, c *wfCtx, ext map[string]any) error {
 	emitkit.ReportHosted(e.origin, r.Labels, "backend label",
 		func(st, d string) { e.external(c.jp, caps.JobRunner, st, d) },
 		func(d string) { e.lose(c.jp, caps.JobRunner, d) })
+	for _, l := range emitkit.Unplaced(e.origin, r.Labels) {
+		if l != platform {
+			e.lose(c.jp, caps.JobRunner, "the runner label "+l+" has no Woodpecker form; only labels.platform does")
+		}
+	}
 	n := newMap()
 	if platform != "" {
 		v, err := e.text(nil, c.jp, caps.JobRunner, valueText, platform)

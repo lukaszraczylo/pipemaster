@@ -3,6 +3,7 @@
 # pipemaster:arg {"step":"id: build-step-1\nkind: script\nscript:\n    - echo \"sha $\u007b{ sha }} on $\u007b{ ref_name }}\"\n    - echo \"$\u007b{ gha.github.workspace }}\"\n","hold":"{\"args\":[\"if command -v bash \\u003e/dev/null 2\\u003e\\u00261; then exec bash -e -c \\\"$1\\\"; fi; exec sh -e -c \\\"$1\\\"\",\"pipemaster\",\"echo \\\"sha ${PM_CTX_SHA} on ${PM_CTX_REF_NAME}\\\"\\nprintf '%s\\\\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Argo spelling for expression gha.github.workspace; the line is replaced by a line that prints the loss and exits 1' \\u003e\\u00262; exit 1\"],\"command\":[\"sh\",\"-c\"],\"env\":[{\"name\":\"PM_CTX_SHA\",\"value\":\"{{workflow.parameters.ctx-sha}}\"},{\"name\":\"PM_CTX_REF_NAME\",\"value\":\"{{workflow.parameters.ctx-ref-name}}\"}],\"image\":\"alpine:3.22\",\"name\":\"build-step-1\",\"workingDir\":\"/workspace\"}"}
 # pipemaster:emulated script.interpolation pipeline/ci/job/build
 # pipemaster:arg {"vars":{"PM_CTX_REF_NAME":"ref_name","PM_CTX_SHA":"sha"}}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0

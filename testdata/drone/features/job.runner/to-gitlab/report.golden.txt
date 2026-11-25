@@ -1,0 +1,3 @@
+Loss report: drone -> gitlab
+[external] pipeline/drone/job/ci job.runner: job tags (the job carries the tags linux/arm64; register a runner with these tags, or the job stays pending)
+[emulated] pipeline/drone/job/ci/step/build step.image: the shared image of the steps is the job image (every script step of the job runs in this image)

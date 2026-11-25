@@ -71,8 +71,8 @@
     "note": "template retryStrategy"
    },
    "job.runner": {
-    "level": "lost",
-    "note": "(Argo schedules pods; only a platform label can carry a node selector)"
+    "level": "external",
+    "note": "workers the operator provides (Argo schedules pods; only a platform label can carry a node selector)"
    },
    "job.services": {
     "level": "emulated",
@@ -451,8 +451,8 @@
     "note": "(Drone has no retry key; only clone.retries exists)"
    },
    "job.runner": {
-    "level": "lost",
-    "note": "(only the platform has a Drone form; other runner labels are lost)"
+    "level": "external",
+    "note": "workers the operator provides (only the platform has a Drone form; other runner labels are lost)"
    },
    "job.services": {
     "level": "native"
@@ -1273,8 +1273,8 @@
     "level": "native"
    },
    "job.runner": {
-    "level": "lost",
-    "note": "(Tekton schedules pods, not runner labels)"
+    "level": "external",
+    "note": "workers the operator provides (Tekton schedules pods, not runner labels)"
    },
    "job.services": {
     "level": "emulated",
@@ -1454,8 +1454,8 @@
     "note": "(Woodpecker has no retry key; restarts are manual)"
    },
    "job.runner": {
-    "level": "lost",
-    "note": "(only a platform label has a Woodpecker form (labels.platform); other labels are lost)"
+    "level": "external",
+    "note": "workers the operator provides (only a platform label has a Woodpecker form (labels.platform); other labels are lost)"
    },
    "job.services": {
     "level": "native"

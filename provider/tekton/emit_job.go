@@ -54,11 +54,15 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 	tc := e.newTaskCtx(pp, jp)
 	tc.doc = &outDoc{}
 	e.owners[jp.path] = tc.doc
-	rest := emitkit.ReportHosted(e.origin, j.Runner.Labels, "node selector",
+	emitkit.ReportHosted(e.origin, j.Runner.Labels, "node selector",
 		func(st, d string) { e.external(jp.path, caps.JobRunner, st, d) },
 		func(d string) { e.lose(jp.path, caps.JobRunner, d) })
-	if len(rest) > 0 {
+	rest := emitkit.Unplaced(e.origin, j.Runner.Labels)
+	switch {
+	case len(rest) > 0:
 		e.lose(jp.path, caps.JobRunner, "Tekton schedules pods; the runner label "+strings.Join(rest, ", ")+" has no form")
+	case j.Runner.Platform != "" || len(j.Runner.Selector) > 0:
+		e.lose(jp.path, caps.JobRunner, "Tekton schedules pods; the runner platform and selector have no form")
 	}
 	jc, viaChanges := tc.changesCond(jp.path, j.If)
 	if !viaChanges {

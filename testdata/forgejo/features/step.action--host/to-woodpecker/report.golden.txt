@@ -1,5 +1,5 @@
 Loss report: forgejo -> woodpecker
-[lost] pipeline/ci/job/build job.runner (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
+[lost] pipeline/ci/job/build job.runner (the runner label docker has no Woodpecker form; only labels.platform does)
 [lost] pipeline/ci/job/build/step/build-step-2 step.action: image selection (missing input go-version)
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (no Woodpecker mapping for action org/tool/sub@v2)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

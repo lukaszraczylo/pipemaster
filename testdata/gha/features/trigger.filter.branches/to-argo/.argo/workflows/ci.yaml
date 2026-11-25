@@ -1,3 +1,4 @@
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.pull_request pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/1

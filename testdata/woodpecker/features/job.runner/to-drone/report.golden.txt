@@ -1,0 +1,2 @@
+Loss report: woodpecker -> drone
+[external] pipeline/woodpecker/job/ci job.runner: workers the operator provides (only the platform has a Drone form; other runner labels are lost)

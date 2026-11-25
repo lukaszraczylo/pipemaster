@@ -1,0 +1,9 @@
+when:
+  - event: push
+labels:
+  platform: linux/arm64
+steps:
+  - name: build
+    image: golang:1.25
+    commands:
+      - go build ./...

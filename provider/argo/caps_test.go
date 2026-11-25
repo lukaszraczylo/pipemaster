@@ -24,9 +24,9 @@ func TestCapsLedger(t *testing.T) {
 			caps.JobEnv, caps.PipelineEnv, caps.PipelineConcurrency, caps.StepIf, caps.StepContinueOnError,
 			caps.StepAction, caps.StepShell, caps.ConfigName, caps.ProjectMultiPipeline,
 		},
-		caps.External: {caps.TriggerManual},
+		caps.External: {caps.TriggerManual, caps.JobRunner},
 		caps.Lost: {
-			caps.TriggerFilterPaths, caps.JobRunner, caps.JobEnvironment, caps.PipelinePermissions,
+			caps.TriggerFilterPaths, caps.JobEnvironment, caps.PipelinePermissions,
 			caps.StepTimeout, caps.TriggerPipelineDone, caps.TriggerResource,
 		},
 	}

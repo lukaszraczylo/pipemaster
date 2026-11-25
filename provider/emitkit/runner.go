@@ -68,6 +68,18 @@ func WorkerTags(origin string, labels []string) []string {
 	return out
 }
 
+// Unplaced returns the labels that no hosted report covers: a label with a template expression, and a label that
+// is not hosted. A dialect with no form for them must report each as lost.
+func Unplaced(origin string, labels []string) []string {
+	var out []string
+	for _, l := range labels {
+		if strings.Contains(l, exprOpen) || HostedHere(origin, l) == NotHosted {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
 // ReportHosted reports the hosted labels of a GHA project to a dialect that has no form for them. A hosted
 // Linux label runs on any Linux worker, but the worker must supply the tools (external). A macOS or Windows
 // label names a platform no worker stands for (lost). noun names what the dialect would have written, such as
