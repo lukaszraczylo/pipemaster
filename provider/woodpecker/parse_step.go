@@ -162,6 +162,17 @@ func (w *wf) step(m *omap, id string, idx int, derived bool, mapKey string) (*ir
 			k.keep("failure", v, caps.StepContinueOnError, "failure: "+t+" has no IR form; kept in Ext", r.line("failure"))
 		}
 	}
+	if v, ok := r.take(keyDependsOn); ok {
+		dep, err := readStepDeps(v, r.line(keyDependsOn))
+		if err != nil {
+			return nil, fmt.Errorf("step %s: %w", id, err)
+		}
+		if w.deps == nil {
+			w.deps = map[string]stepDep{}
+		}
+		w.deps[id] = dep
+		k.vals[ExtDependsOn] = plain(v)
+	}
 	if v, ok := r.take(whenKey); ok {
 		spec, err := parseWhen(v, r.line(whenKey))
 		if err != nil {

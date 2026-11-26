@@ -128,9 +128,6 @@ func (k *sink) keepRest(r *reader, feats map[string]caps.Feature) {
 			f = ff
 		}
 		detail := "key " + key + " has no IR field; kept in Ext"
-		if key == "depends_on" {
-			detail += "; step order follows the file and the step DAG is not applied"
-		}
 		k.keep(key, r.m.vals[key], f, detail, r.line(key))
 	}
 }

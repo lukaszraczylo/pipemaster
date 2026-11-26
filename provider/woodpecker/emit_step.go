@@ -2,6 +2,7 @@ package woodpecker
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -62,7 +63,7 @@ func (e *emitter) steps(c *wfCtx) (*yaml.Node, error) {
 		}
 	}
 	c.mapForm = mapForm
-	for i, st := range c.j.Steps {
+	for i, st := range sourceOrder(c.j.Steps) {
 		if st == nil {
 			continue
 		}
@@ -216,6 +217,10 @@ func (e *emitter) finishStep(c *wfCtx, sp string, st *ir.Step, idx int, body *wm
 	d := stepDone{node: m.n, key: key, src: st.ID, anon: anon}
 	if c.mapForm && key != st.ID {
 		d.read = key
+	}
+	if dep, ok := ext[ExtDependsOn]; ok {
+		ext = maps.Clone(ext)
+		ext[keyDependsOn] = dep
 	}
 	return d, m.addExtra(ext, skip)
 }
