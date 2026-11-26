@@ -1,0 +1,20 @@
+stages: [prepare, verify]
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline"
+
+seed:
+  stage: prepare
+  script:
+    - echo "seeding $TARGET"
+
+check-api:
+  stage: verify
+  script:
+    - echo "checking api on $TARGET"
+
+check-ui:
+  stage: verify
+  script:
+    - echo "checking ui on $TARGET"

@@ -1,0 +1,26 @@
+name: deploy
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      dry-run:
+        type: boolean
+        default: true
+    secrets:
+      token:
+        required: true
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "planning for ${{ inputs.environment }}"
+  apply:
+    needs: [plan]
+    if: ${{ !inputs.dry-run }}
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_TOKEN: ${{ secrets.token }}
+    steps:
+      - run: deploy --env "${{ inputs.environment }}"

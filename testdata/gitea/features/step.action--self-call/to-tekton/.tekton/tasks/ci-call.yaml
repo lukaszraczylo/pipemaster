@@ -1,7 +1,7 @@
 # pipemaster:emulated step.image pipeline/ci/job/call/step/call-step-1
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated step.action pipeline/ci/job/call/step/call-step-1
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'self:'\n    owner: org\n    repo: shared\n    path: .gitea/workflows/build.yml\n    ref: main\nid: call-step-1\nkind: pipeline_call\n","wrote":"{\"image\":\"alpine:3.22\",\"name\":\"call-step-1\",\"script\":\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/call/step/call-step-1: the step has no action reference and no Tekton ref' \\u003e\\u00262; exit 1\"}","at":0}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'self:'\n    owner: org\n    repo: shared\n    path: .gitea/workflows/build.yml\n    ref: main\nid: call-step-1\nkind: pipeline_call\n","wrote":"{\"image\":\"alpine:3.22\",\"name\":\"call-step-1\",\"script\":\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/call/step/call-step-1: the step calls the reusable workflow org/shared/.gitea/workflows/build.yml@main; the file is remote or not in the input, and Tekton has no call of another pipeline, so the work of that work' \\u003e\\u00262; exit 1\"}","at":0}
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -10,4 +10,4 @@ spec:
   steps:
     - name: call-step-1
       image: alpine:3.22
-      script: 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/call/step/call-step-1: the step has no action reference and no Tekton ref'' >&2; exit 1'
+      script: 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/call/step/call-step-1: the step calls the reusable workflow org/shared/.gitea/workflows/build.yml@main; the file is remote or not in the input, and Tekton has no call of another pipeline, so the work of that work'' >&2; exit 1'

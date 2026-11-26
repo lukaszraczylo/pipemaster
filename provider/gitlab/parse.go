@@ -43,17 +43,30 @@ var (
 )
 
 // Parse reads .gitlab-ci.yml and every local include into one pipeline with ID gitlab-ci.
-func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
-	proj, rep, err := adapter{}.parseSource(fsys)
-	vars.Strip(proj)
-	return proj, rep, err
+func (a adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
+	return a.parseRoot(fsys, rootFile, []string{rootFile})
 }
 
-func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
+// parseRoot parses a root file under any name. chain holds the files of the pipelines being read, outermost
+// first, so a child that includes an ancestor is not read again.
+func (a adapter) parseRoot(fsys fs.FS, root string, chain []string) (*ir.Project, *report.Report, error) {
+	proj, rep, err := a.parseSource(fsys, root)
+	if err != nil {
+		return proj, rep, err
+	}
+	vars.Strip(proj)
+	if err := a.attachChildren(fsys, proj, rep, chain); err != nil {
+		return nil, nil, err
+	}
+	ir.Normalize(proj)
+	return proj, rep, ir.Validate(proj)
+}
+
+func (adapter) parseSource(fsys fs.FS, rootName string) (*ir.Project, *report.Report, error) {
 	rep := &report.Report{Source: dialect}
 	s := newState(rep)
 	ld := newLoader(fsys, s)
-	root, err := ld.load(rootFile, nil, nil)
+	root, err := ld.load(rootName, nil, nil)
 	if err != nil {
 		return nil, nil, err
 	}

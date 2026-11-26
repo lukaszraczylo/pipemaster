@@ -2,18 +2,22 @@ package roundtrip
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"testing/fstest"
 
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/meta"
 	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 // NewMeta records what emitting proj through target loses: Ext blobs, renamed IDs, display names, action
 // steps and the fields rep marks lost or external.
 func NewMeta(sourceID string, proj *ir.Project, target provider.Provider, rep *report.Report) *meta.Meta {
+	proj, inlined := inline.Flatten(proj, target.ID())
 	ids := IDsFor(target, proj)
 	lost, skipped := meta.CollectLost(proj, append(sourceEntries(rep, ids), retainedEntries(rep, ids)...))
 	noteUnrecorded(rep, ids, skipped)
@@ -25,8 +29,16 @@ func NewMeta(sourceID string, proj *ir.Project, target provider.Provider, rep *r
 		Dialect:  proj.Origin.Dialect,
 		Ext:      meta.Collect(proj),
 		Residual: meta.CollectResidual(proj),
+		Calls:    nilIfEmpty(inlined.Calls),
 		Version:  meta.Version,
 	}
+}
+
+func nilIfEmpty(c map[string]meta.Call) map[string]meta.Call {
+	if len(c) == 0 {
+		return nil
+	}
+	return c
 }
 
 // Restore undoes the renames in m, then re-attaches its Ext, names and lost fields. It returns the stored
@@ -49,9 +61,55 @@ func restore(proj *ir.Project, m *meta.Meta, keepEdits bool) (orphans, kept []st
 		proj.Origin.Provider, proj.Origin.Dialect = m.Source, m.Dialect
 	}
 	if keepEdits {
-		return meta.ReattachKeepingEdits(proj, m)
+		orphans, kept = meta.ReattachKeepingEdits(proj, m)
+		// The edited jobs win, so the inlined jobs stay as they are instead of collapsing into the stored call.
+		kept = append(kept, slices.Sorted(maps.Keys(m.Calls))...)
+		return orphans, kept
 	}
-	return meta.Reattach(proj, m), nil
+	orphans = meta.Reattach(proj, m)
+	return append(orphans, restoreCalls(proj, m.Calls)...), nil
+}
+
+// restoreCalls replaces the jobs that an inline wrote with the stored call job and its child pipeline, and puts
+// back the needs of the jobs that the inline rewired. It returns the call paths it could not restore.
+func restoreCalls(proj *ir.Project, calls map[string]meta.Call) (orphans []string) {
+	for _, path := range slices.Sorted(maps.Keys(calls)) {
+		c := calls[path]
+		pid, _, ok := strings.Cut(strings.TrimPrefix(path, "pipeline/"), "/job/")
+		var pl *ir.Pipeline
+		if ok && proj != nil {
+			for _, p := range proj.Pipelines {
+				if p != nil && p.ID == pid {
+					pl = p
+				}
+			}
+		}
+		if pl == nil || c.Job == nil || !hasAll(pl, c.Inlined) {
+			orphans = append(orphans, path)
+			continue
+		}
+		drop := func(j *ir.Job) bool { return j == nil || j.ID == c.Job.ID || slices.Contains(c.Inlined, j.ID) }
+		pl.Jobs = slices.DeleteFunc(pl.Jobs, drop)
+		pl.Finally = slices.DeleteFunc(pl.Finally, drop)
+		call := ir.Clone(&ir.Project{Pipelines: []*ir.Pipeline{{Jobs: []*ir.Job{c.Job}}}}).Pipelines[0].Jobs[0]
+		pl.Jobs = append(pl.Jobs, call)
+		for _, j := range append(slices.Clone(pl.Jobs), pl.Finally...) {
+			if was, ok := c.Needs[j.ID]; ok {
+				j.Needs = slices.Clone(was)
+			}
+		}
+	}
+	return orphans
+}
+
+func hasAll(pl *ir.Pipeline, ids []string) bool {
+	have := map[string]bool{}
+	for _, j := range append(slices.Clone(pl.Jobs), pl.Finally...) {
+		if j != nil {
+			have[j.ID] = true
+		}
+	}
+	return !slices.ContainsFunc(ids, func(id string) bool { return !have[id] })
 }
 
 // sourceEntries rewrites report paths under a renamed job to the source job ID.

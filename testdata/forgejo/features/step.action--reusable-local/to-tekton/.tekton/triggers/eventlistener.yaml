@@ -1,0 +1,35 @@
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+# pipemaster:arg {"kind":"push","name":"ci-push-0","branches":{"Include":["main"],"Exclude":null},"tags":{"Include":null,"Exclude":null},"paths":{"Include":null,"Exclude":null}}
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: pipemaster
+spec:
+  serviceAccountName: pipemaster-triggers
+  triggers:
+    - name: ci-push-0
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: eventTypes
+              value:
+                - push
+            - name: secretRef
+              value:
+                secretName: pipemaster-github-webhook
+                secretKey: token
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: body.ref.startsWith('refs/heads/') && (body.ref.replace('refs/heads/','',1).matches(r'^main$'))
+            - name: overlays
+              value:
+                - key: ctx_ref_name
+                  expression: body.ref.replace('refs/heads/','',1)
+      bindings:
+        - ref: ci-github
+      template:
+        ref: ci-run

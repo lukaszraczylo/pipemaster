@@ -1,0 +1,2 @@
+Loss report: gha -> gitea
+[emulated] pipeline/ci/job/release step.action: inline child jobs (the child pipeline .github/workflows/deploy.yml runs inline as jobs release-apply, release-plan; a return to GitHub Actions restores the call and the child file only with the round-trip metadata)

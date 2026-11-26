@@ -148,7 +148,11 @@ func (tc *taskCtx) actionStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 	if st.Action == nil || st.Kind == ir.StepPipelineCall || tc.e.own && extOf(st.Ext)["ref"] != nil {
 		m := tc.extAction(st, sp, name)
 		if m == nil {
-			return tc.failedAction(b, st, sp, name, "the step has no action reference and no Tekton ref")
+			why := "the step has no action reference and no Tekton ref"
+			if r := emitkit.CallReason(st, "Tekton"); r != "" {
+				why = r
+			}
+			return tc.failedAction(b, st, sp, name, why)
 		}
 		return m, nil
 	}

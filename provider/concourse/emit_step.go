@@ -59,7 +59,11 @@ func (c *chain) step(st *ir.Step) []*yaml.Node {
 		}
 		return c.action(st, path, at)
 	case ir.StepPipelineCall:
-		e.lose(path, caps.StepAction, "a call of another pipeline has no Concourse form; a placeholder task keeps its place")
+		why := "a call of another pipeline has no Concourse form; a placeholder task keeps its place"
+		if r := emitkit.CallReason(st, "Concourse"); r != "" {
+			why = r + "; a placeholder task keeps its place"
+		}
+		e.lose(path, caps.StepAction, why)
 		return c.placeholder(st, path, actionArg{}, true)
 	case ir.StepScript, "":
 		if n := c.taskFile(st, path); n != nil {

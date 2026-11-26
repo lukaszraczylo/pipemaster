@@ -1,0 +1,80 @@
+# pipemaster:emulated job.container pipeline/ci/job/build
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+  branch:
+    - main
+steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make build'
+---
+# pipemaster:emulated job.container pipeline/ci/job/notify
+kind: pipeline
+type: docker
+name: notify
+trigger:
+  event:
+    - push
+  branch:
+    - main
+depends_on:
+  - release-apply
+steps:
+  - name: notify-step-1
+    image: ubuntu:latest
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo released'
+---
+# pipemaster:emulated job.if pipeline/ci/job/release-apply
+# pipemaster:arg {"if":"ref_name == 'main'","back":"(event == 'push') \u0026\u0026 (ref_type == 'branch') \u0026\u0026 (branch == 'main') \u0026\u0026 ((ref == 'refs/heads/main') || (tag == 'main'))","triggers":"- kind: push\n  branches:\n    include:\n        - main\n"}
+# pipemaster:emulated job.env pipeline/ci/job/release-apply
+# pipemaster:arg "- name: DEPLOY_TOKEN\n  value:\n    secret: DEPLOY_TOKEN\n"
+# pipemaster:emulated job.container pipeline/ci/job/release-apply
+kind: pipeline
+type: docker
+name: release-apply
+trigger:
+  event:
+    - push
+  branch:
+    - main
+  ref:
+    - refs/heads/main
+    - refs/tags/main
+depends_on:
+  - release-plan
+steps:
+  - name: release-apply-step-1
+    image: ubuntu:latest
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'deploy --env "staging"'
+    environment:
+      DEPLOY_TOKEN:
+        from_secret: DEPLOY_TOKEN
+---
+# pipemaster:emulated job.if pipeline/ci/job/release-plan
+# pipemaster:arg {"if":"ref_name == 'main'","back":"(event == 'push') \u0026\u0026 (ref_type == 'branch') \u0026\u0026 (branch == 'main') \u0026\u0026 ((ref == 'refs/heads/main') || (tag == 'main'))","triggers":"- kind: push\n  branches:\n    include:\n        - main\n"}
+# pipemaster:emulated job.container pipeline/ci/job/release-plan
+kind: pipeline
+type: docker
+name: release-plan
+trigger:
+  event:
+    - push
+  branch:
+    - main
+  ref:
+    - refs/heads/main
+    - refs/tags/main
+depends_on:
+  - build
+steps:
+  - name: release-plan-step-1
+    image: ubuntu:latest
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo "planning for staging"'

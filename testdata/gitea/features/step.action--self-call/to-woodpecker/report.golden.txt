@@ -1,5 +1,5 @@
 Loss report: gitea -> woodpecker
-[lost] pipeline/ci/job/call/step/call-step-1 step.action (step kind pipeline_call has no Woodpecker form)
+[lost] pipeline/ci/job/call/step/call-step-1 step.action (the step calls the reusable workflow org/shared/.gitea/workflows/build.yml@main; the file is remote or not in the input, and Woodpecker has no call of another pipeline, so the work of that workflow is missing)
 [external] pipeline/ci/job/plain job.runner: no backend label (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [emulated] pipeline/ci/job/call job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/ci/job/plain job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

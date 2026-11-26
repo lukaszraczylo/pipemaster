@@ -1,0 +1,49 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  params:
+    - name: ctx-branch
+      default: ""
+  tasks:
+    - name: compile
+      taskRef:
+        name: gitlab-ci-compile
+    - name: ship
+      taskRef:
+        name: gitlab-ci-ship
+      runAfter:
+        - compile
+        - integration-check-api
+        - integration-check-ui
+    - name: integration-check-api
+      taskRef:
+        name: gitlab-ci-integration-check-api
+      runAfter:
+        - integration-seed
+      when:
+        - input: $(params.ctx-branch)
+          operator: in
+          values:
+            - main
+    - name: integration-check-ui
+      taskRef:
+        name: gitlab-ci-integration-check-ui
+      runAfter:
+        - integration-seed
+      when:
+        - input: $(params.ctx-branch)
+          operator: in
+          values:
+            - main
+    - name: integration-seed
+      taskRef:
+        name: gitlab-ci-integration-seed
+      runAfter:
+        - compile
+      when:
+        - input: $(params.ctx-branch)
+          operator: in
+          values:
+            - main

@@ -1,5 +1,5 @@
 Loss report: gitea -> concourse
-[lost] pipeline/ci/job/call/step/call-step-1 step.action (a call of another pipeline has no Concourse form; a placeholder task keeps its place; Concourse does not run the action; a task that prints the loss and exits 1 keeps its place)
+[lost] pipeline/ci/job/call/step/call-step-1 step.action (the step calls the reusable workflow org/shared/.gitea/workflows/build.yml@main; the file is remote or not in the input, and Concourse has no call of another pipeline, so the work of that workflow is missing; a placeholder task keeps its place; Concourse does not run the action; a task that prints the loss and exits 1 keeps its place)
 [lost] pipeline/ci/trigger/0 trigger.filter.branches (the push trigger has no branch filter, and a git resource follows one branch; the resource follows the default branch of the repository)
 [external] pipeline/ci/job/plain job.runner: no worker tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [emulated] pipeline/ci ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)

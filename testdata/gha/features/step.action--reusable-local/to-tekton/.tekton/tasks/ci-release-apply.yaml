@@ -1,0 +1,24 @@
+# pipemaster:emulated step.image pipeline/ci/job/release-apply/step/release-apply-step-1
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated job.runner pipeline/ci/job/release-apply
+# pipemaster:emulated step.shell pipeline/ci/job/release-apply/step/release-apply-step-1
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ci-release-apply
+spec:
+  stepTemplate:
+    env:
+      - name: DEPLOY_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: ci-secrets
+            key: DEPLOY_TOKEN
+  steps:
+    - name: release-apply-step-1
+      image: alpine:3.22
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        deploy --env "staging"

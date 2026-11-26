@@ -1,0 +1,39 @@
+# pipemaster:emulated config.name pipeline/ci/ref/secrets.DEPLOY_TOKEN
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  displayName: ci
+  params:
+    - name: ctx-ref-name
+      default: ""
+  tasks:
+    - name: build
+      taskRef:
+        name: ci-build
+    - name: notify
+      taskRef:
+        name: ci-notify
+      runAfter:
+        - release-apply
+    - name: release-apply
+      taskRef:
+        name: ci-release-apply
+      runAfter:
+        - release-plan
+      when:
+        - input: $(params.ctx-ref-name)
+          operator: in
+          values:
+            - main
+    - name: release-plan
+      taskRef:
+        name: ci-release-plan
+      runAfter:
+        - build
+      when:
+        - input: $(params.ctx-ref-name)
+          operator: in
+          values:
+            - main

@@ -30,6 +30,9 @@ var (
 func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	proj, rep, err := a.parseSource(fsys)
 	vars.Strip(proj)
+	if err == nil {
+		attachCalls(proj, rep, a.d.ID)
+	}
 	return proj, rep, err
 }
 

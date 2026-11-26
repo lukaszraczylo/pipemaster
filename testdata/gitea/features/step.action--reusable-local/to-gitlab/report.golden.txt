@@ -1,0 +1,7 @@
+Loss report: gitea -> gitlab
+[external] pipeline/ci/job/build job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
+[external] pipeline/ci/job/notify job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
+[external] pipeline/ci/job/release-apply job.env: create DEPLOY_TOKEN as a masked CI/CD variable in the project settings, protected too for protected branches (a GitLab file cannot mark a secret as one; it writes DEPLOY_TOKEN as plain variable references and the operator sets the values there)
+[external] pipeline/ci/job/release-apply job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
+[external] pipeline/ci/job/release-plan job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
+[emulated] pipeline/ci/job/release step.action: inline child jobs (the child pipeline .gitea/workflows/deploy.yml runs inline as jobs release-apply, release-plan; a return to GitHub Actions restores the call and the child file only with the round-trip metadata)

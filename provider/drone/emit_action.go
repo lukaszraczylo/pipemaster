@@ -168,6 +168,9 @@ func (e *emitter) failingStep(c *docCtx, sp string, st *ir.Step, f caps.Feature,
 func (e *emitter) mapAction(c *docCtx, sp string, st *ir.Step) (image, lost string, err error) {
 	if st.Action == nil || st.Kind == ir.StepPipelineCall {
 		why := "step kind " + string(st.Kind) + " has no Drone form"
+		if r := emitkit.CallReason(st, "Drone"); r != "" {
+			why = r
+		}
 		e.dropAction(sp, st, why)
 		return "", why, nil
 	}

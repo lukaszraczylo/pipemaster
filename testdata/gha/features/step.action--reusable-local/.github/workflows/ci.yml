@@ -1,0 +1,23 @@
+name: ci
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: make build
+  release:
+    needs: [build]
+    if: github.ref_name == 'main'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: staging
+      dry-run: false
+    secrets:
+      token: ${{ secrets.DEPLOY_TOKEN }}
+  notify:
+    needs: [release]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo released

@@ -1,0 +1,156 @@
+# pipemaster:emulated job.env pipeline/gitlab-ci/job/integration-check-api
+# pipemaster:arg {"vars":"- name: TARGET\n  value:\n    lit: staging\n","names":["TARGET"]}
+# pipemaster:emulated job.env pipeline/gitlab-ci/job/integration-check-ui
+# pipemaster:arg {"vars":"- name: TARGET\n  value:\n    lit: staging\n","names":["TARGET"]}
+# pipemaster:emulated job.env pipeline/gitlab-ci/job/integration-seed
+# pipemaster:arg {"vars":"- name: TARGET\n  value:\n    lit: staging\n","names":["TARGET"]}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/integration-check-api/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/integration-check-ui/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/integration-seed/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/ship/step/script
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: gitlab-ci
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-branch
+        value: ""
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: compile
+            template: compile
+          - name: ship
+            template: ship
+            dependencies:
+              - compile
+              - integration-check-api
+              - integration-check-ui
+          - name: integration-check-api
+            template: integration-check-api
+            dependencies:
+              - integration-seed
+            when: '{{= workflow.parameters[''ctx-branch''] == ''main'' }}'
+          - name: integration-check-ui
+            template: integration-check-ui
+            dependencies:
+              - integration-seed
+            when: '{{= workflow.parameters[''ctx-branch''] == ''main'' }}'
+          - name: integration-seed
+            template: integration-seed
+            dependencies:
+              - compile
+            when: '{{= workflow.parameters[''ctx-branch''] == ''main'' }}'
+    - name: compile
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -c
+            args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make build
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: ship
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -c
+            args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make ship
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: integration-check-api
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -c
+            args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo "checking api on $TARGET"
+            workingDir: /workspace
+            env:
+              - name: TARGET
+                value: staging
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: integration-check-ui
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -c
+            args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo "checking ui on $TARGET"
+            workingDir: /workspace
+            env:
+              - name: TARGET
+                value: staging
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: integration-seed
+      containerSet:
+        containers:
+          - name: script
+            image: alpine:3.22
+            command:
+              - sh
+              - -c
+            args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo "seeding $TARGET"
+            workingDir: /workspace
+            env:
+              - name: TARGET
+                value: staging
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

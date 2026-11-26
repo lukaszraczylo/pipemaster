@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - pipeline.yaml
+  - rbac/triggers.yaml
+  - tasks/ci-build.yaml
+  - tasks/ci-notify.yaml
+  - tasks/ci-release-apply.yaml
+  - tasks/ci-release-plan.yaml
+  - triggers/eventlistener.yaml
+  - triggers/triggerbinding.yaml
+  - triggers/triggertemplate.yaml

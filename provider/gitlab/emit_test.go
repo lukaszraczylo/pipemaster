@@ -136,13 +136,10 @@ func TestEmitValidatesSchema(t *testing.T) {
 		for _, name := range dirNames(t, dir) {
 			t.Run(filepath.Base(filepath.Dir(dir))+"/"+name, func(t *testing.T) {
 				files, _ := emitFiles(t, load(name))
-				if len(files) == 0 {
-					t.Fatal("no files emitted")
+				if _, ok := files[rootFile]; !ok {
+					t.Fatalf("no %s emitted", rootFile)
 				}
 				for fname, data := range files {
-					if fname != rootFile {
-						t.Fatalf("unexpected path %s", fname)
-					}
 					if err := validate.File("gitlab", fname, data); err != nil {
 						t.Fatalf("%v\n%s", err, data)
 					}

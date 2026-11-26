@@ -13,6 +13,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/report"
 	"github.com/lukaszraczylo/pipemaster/vars"
 )
@@ -29,7 +30,11 @@ const (
 // Emit writes one workflow file per pipeline at <Dirs[0]>/<pipeline id>.yml. Every feature use goes
 // through the ledger; Finish fails the call when one was never accounted for.
 func (a *adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
-	p, idRenames := withValidJobIDs(p)
+	return inline.Emit(p, a.d.ID, a.emitFlat)
+}
+
+func (a *adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	p, idRenames := withValidJobIDs(withNativeChildren(p, a.d.ID))
 	p, vres := vars.Prepare(p, a.d.ID)
 	p = bindRefEnv(p, a.d.ID)
 	p, noForm, injected := provider.WithDefaultTriggers(p, a.d.ID)

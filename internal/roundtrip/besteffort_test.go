@@ -16,6 +16,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
@@ -159,6 +160,22 @@ func isDisabledCall(e report.Entry, d irDiff) bool {
 	return d.Field == "If" && e.Feature == caps.StepAction && strings.HasPrefix(e.IRPath, d.Path+"/step/")
 }
 
+// inlineCovers is true when the inline entry of a call explains the difference. The entry is emulated, because the
+// child work runs in the target, and it says that a return without metadata keeps the jobs inline. It covers the
+// call job, the jobs that took its place, and the needs of the jobs of the same pipeline that it rewired.
+func inlineCovers(e report.Entry, d irDiff) bool {
+	if e.Strategy != inline.EntryStrategy || e.Level != caps.Emulated || pipelineRE.FindString(e.IRPath) != pipelineRE.FindString(d.Path) {
+		return false
+	}
+	switch d.Field {
+	case "Needs":
+		return true
+	case "<node>":
+		return d.Path == e.IRPath || strings.HasPrefix(d.Path, e.IRPath+"/") || strings.HasPrefix(d.Path, e.IRPath+"-")
+	}
+	return false
+}
+
 // covered reports whether a lost or external entry at the node, or below it, names a feature that
 // accounts for the differing field.
 func covered(d irDiff, reps ...*report.Report) bool {
@@ -171,6 +188,9 @@ func covered(d irDiff, reps ...*report.Report) bool {
 				return true
 			}
 			if e.Level >= caps.External && isDisabledCall(e, d) {
+				return true
+			}
+			if inlineCovers(e, d) {
 				return true
 			}
 		}

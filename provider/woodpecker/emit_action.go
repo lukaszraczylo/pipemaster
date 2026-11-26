@@ -62,6 +62,9 @@ func (e *emitter) failingStep(c *wfCtx, sp string, st *ir.Step, idx int, f caps.
 func (e *emitter) mapAction(c *wfCtx, sp string, st *ir.Step) (image, lost string, err error) {
 	if st.Action == nil || st.Kind == ir.StepPipelineCall {
 		why := "step kind " + string(st.Kind) + " has no Woodpecker form"
+		if r := emitkit.CallReason(st, "Woodpecker"); r != "" {
+			why = r
+		}
 		e.dropAction(sp, st, why)
 		return "", why, nil
 	}

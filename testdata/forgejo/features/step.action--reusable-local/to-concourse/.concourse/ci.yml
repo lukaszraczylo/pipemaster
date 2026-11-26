@@ -1,0 +1,163 @@
+# pipemaster:emulated display.name pipeline/ci
+# pipemaster:arg {"name":"ci","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
+# pipemaster:arg {"digest":"794aecb466dac38b192d7a1f1b61499ca1aab6788c5abd8931a5c89bbf20d71a","carry":"id: build-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
+# pipemaster:arg {"digest":"4a35c356eda050e73bbb1f369d8fa260c70c27cd555e96e9e8af168d193780d8","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/notify/step/notify-step-1/carry
+# pipemaster:arg {"digest":"3e353cf387c4bd832708119eb0bbaa9e41cfa2842cc925b73976c6fb32069931","carry":"id: notify-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/notify/carry
+# pipemaster:arg {"digest":"7a58e39ec1b6121d145cacf3298ad98e8a8b7aa664d228559135d1224a73c8ff","carry":"id: notify\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: release-apply\n"}
+# pipemaster:emulated job.if pipeline/ci/job/release-apply
+# pipemaster:arg {"if":"ref_name == 'main'","guard":"branch == 'main'","folded":true}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/release-apply/step/release-apply-step-1/carry
+# pipemaster:arg {"digest":"41d5f3c988ec236196d4ffae9c1115b6c900165769c53505340ebf96ba781883","carry":"id: release-apply-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/release-apply/carry
+# pipemaster:arg {"digest":"d85516651f573c5fc0ce84e3f55199cb45a77e53a106a65200270866c0f84dcb","carry":"if: ref_name == 'main'\nid: release-apply\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: release-plan\nenv:\n    - name: DEPLOY_TOKEN\n      value:\n        secret: DEPLOY_TOKEN\n"}
+# pipemaster:emulated job.if pipeline/ci/job/release-plan
+# pipemaster:arg {"if":"ref_name == 'main'","guard":"branch == 'main'","folded":true}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/release-plan/step/release-plan-step-1/carry
+# pipemaster:arg {"digest":"bf02c38123fe723b0163f9b837493af7786379ebe926f8cef46f5ac79fdd8cf8","carry":"id: release-plan-step-1\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/job/release-plan/carry
+# pipemaster:arg {"digest":"1cefa5fc0bc8df8115f06d8e7fc663f34e1a77de16a016d67787aa91b247a821","carry":"if: ref_name == 'main'\nid: release-plan\nrunner:\n    labels:\n        - ubuntu-latest\nneeds:\n    - job: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci/carry
+# pipemaster:arg {"digest":"f782d46b47b6e8484b86c57f7808fb3425b911f1f053c80f9b6130f06cf97acc","carry":"id: ci\nname: ci\ntriggers:\n    - kind: push\n      branches:\n        include:\n            - main\n"}
+# pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated job.runner pipeline/ci/job/build
+# pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated job.runner pipeline/ci/job/notify
+# pipemaster:emulated step.image pipeline/ci/job/notify/step/notify-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/notify/step/notify-step-1
+# pipemaster:emulated job.env pipeline/ci/job/release-apply
+# pipemaster:emulated job.runner pipeline/ci/job/release-apply
+# pipemaster:emulated step.image pipeline/ci/job/release-apply/step/release-apply-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/release-apply/step/release-apply-step-1
+# pipemaster:emulated job.runner pipeline/ci/job/release-plan
+# pipemaster:emulated step.image pipeline/ci/job/release-plan/step/release-plan-step-1
+# pipemaster:emulated step.shell pipeline/ci/job/release-plan/step/release-plan-step-1
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+      branch: main
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make build
+            dir: workspace
+  - name: notify
+    plan:
+      - get: source
+        passed:
+          - release-apply
+        trigger: true
+      - task: notify-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo released
+            dir: workspace
+  - name: release-apply
+    plan:
+      - get: source
+        passed:
+          - release-plan
+        trigger: true
+      - task: release-apply-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          params:
+            DEPLOY_TOKEN: ((DEPLOY_TOKEN))
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - |-
+                PM_CTX_BRANCH="$(cat ../workspace/.git/branch)"; export PM_CTX_BRANCH # pipemaster:ctx
+                if ! [ "$PM_CTX_BRANCH" = 'main' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard
+                deploy --env "staging"
+            dir: workspace
+  - name: release-plan
+    plan:
+      - get: source
+        passed:
+          - build
+        trigger: true
+      - task: release-plan-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - |-
+                PM_CTX_BRANCH="$(cat ../workspace/.git/branch)"; export PM_CTX_BRANCH # pipemaster:ctx
+                if ! [ "$PM_CTX_BRANCH" = 'main' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard
+                echo "planning for staging"
+            dir: workspace

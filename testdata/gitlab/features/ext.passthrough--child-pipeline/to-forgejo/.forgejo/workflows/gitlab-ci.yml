@@ -1,0 +1,93 @@
+# pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/compile
+# pipemaster:arg {"guard":true}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/compile
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/ship
+# pipemaster:arg {"guard":true}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/ship
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/ship/step/script
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/ship
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/integration-check-api
+# pipemaster:arg {"src":"branch == 'main'","guard":true}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/integration-check-api
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/integration-check-api/step/script
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/integration-check-api
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/integration-check-ui
+# pipemaster:arg {"src":"branch == 'main'","guard":true}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/integration-check-ui
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/integration-check-ui/step/script
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/integration-check-ui
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/integration-seed
+# pipemaster:arg {"src":"branch == 'main'","guard":true}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/integration-seed
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/integration-seed/step/script
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/integration-seed
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  push:
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  compile:
+    if: '!github.event.deleted'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: make build
+        shell: bash
+  ship:
+    needs:
+      - compile
+      - integration-check-api
+      - integration-check-ui
+    if: '!github.event.deleted'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: make ship
+        shell: bash
+  integration-check-api:
+    needs:
+      - integration-seed
+    if: github.ref_type == 'branch' && github.ref_name == 'main' && !github.event.deleted
+    runs-on: ubuntu-latest
+    env:
+      TARGET: staging
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: echo "checking api on $TARGET"
+        shell: bash
+  integration-check-ui:
+    needs:
+      - integration-seed
+    if: github.ref_type == 'branch' && github.ref_name == 'main' && !github.event.deleted
+    runs-on: ubuntu-latest
+    env:
+      TARGET: staging
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: echo "checking ui on $TARGET"
+        shell: bash
+  integration-seed:
+    needs:
+      - compile
+    if: github.ref_type == 'branch' && github.ref_name == 'main' && !github.event.deleted
+    runs-on: ubuntu-latest
+    env:
+      TARGET: staging
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: script
+        run: echo "seeding $TARGET"
+        shell: bash

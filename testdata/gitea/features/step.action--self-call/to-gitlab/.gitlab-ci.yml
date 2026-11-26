@@ -7,7 +7,7 @@ call:
   script:
     # pipemaster:step call-step-1
     # pipemaster:lost step call-step-1 kind pipeline_call
-    - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/call/step/call-step-1: the step kind has no GitLab form'' >&2; exit 1'
+    - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/call/step/call-step-1: the step calls the reusable workflow org/shared/.gitea/workflows/build.yml@main; the file is remote or not in the input, and GitLab has no call of another pipeline, so the work of that work'' >&2; exit 1'
 plain:
   needs: []
   script:

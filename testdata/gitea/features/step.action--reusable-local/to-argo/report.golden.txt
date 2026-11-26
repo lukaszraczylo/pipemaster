@@ -1,0 +1,14 @@
+Loss report: gitea -> argo
+[external] pipeline/ci/job/build job.runner: no node selector (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
+[external] pipeline/ci/job/notify job.runner: no node selector (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
+[external] pipeline/ci/job/release-apply job.runner: no node selector (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
+[external] pipeline/ci/job/release-plan job.runner: no node selector (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
+[external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[emulated] pipeline/ci/job/build/step/build-step-1 step.shell: container command sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)
+[emulated] pipeline/ci/job/notify/step/notify-step-1 step.shell: container command sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)
+[emulated] pipeline/ci/job/release step.action: inline child jobs (the child pipeline .gitea/workflows/deploy.yml runs inline as jobs release-apply, release-plan; a return to GitHub Actions restores the call and the child file only with the round-trip metadata)
+[emulated] pipeline/ci/job/release-apply job.env: copied into the env of every container of the set (a step variable of the same name wins)
+[emulated] pipeline/ci/job/release-apply/step/release-apply-step-1 step.shell: container command sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)
+[emulated] pipeline/ci/job/release-plan/step/release-plan-step-1 step.shell: container command sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)
+[emulated] pipeline/ci/ref/secrets.DEPLOY_TOKEN config.name: secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars (the Secret values and ConfigMap values are not written)
+[emulated] pipeline/ci/trigger/0 trigger.filter.branches

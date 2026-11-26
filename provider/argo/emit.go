@@ -11,6 +11,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/dnsid"
 	"github.com/lukaszraczylo/pipemaster/report"
 	"github.com/lukaszraczylo/pipemaster/vars"
@@ -39,6 +40,10 @@ var fit = dnsid.Fit
 // Emit writes the project as Argo files under .argo/. Every feature use goes through the ledger; Finish fails
 // the call when one was never accounted for.
 func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	return inline.Emit(p, a.ID(), a.emitFlat)
+}
+
+func (a adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, error) {
 	p, vres := vars.Prepare(p, dialect)
 	origin := ""
 	if p != nil {

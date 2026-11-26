@@ -11,6 +11,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/report"
 	"github.com/lukaszraczylo/pipemaster/vars"
 )
@@ -27,6 +28,20 @@ const (
 // fails the call when one was never accounted for. Local include files are not re-emitted: Parse
 // merged them into the jobs, so the emitted file stands alone.
 func (adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	return inline.Emit(p, dialect, adapter{}.emitFlat)
+}
+
+func (a adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	p, notes := singleIncludes(p)
+	files, rep, err := a.emitMain(p)
+	if err != nil {
+		return files, rep, err
+	}
+	rep.Entries = append(rep.Entries, notes...)
+	return files, rep, a.emitChildren(p, files, rep)
+}
+
+func (adapter) emitMain(p *ir.Project) (map[string][]byte, *report.Report, error) {
 	p, vres := vars.Prepare(p, dialect)
 	p, noForm, injected := provider.WithDefaultTriggers(p, dialect)
 	origin := ""

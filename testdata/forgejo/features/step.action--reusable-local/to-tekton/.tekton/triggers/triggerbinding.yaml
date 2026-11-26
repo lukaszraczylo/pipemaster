@@ -1,0 +1,9 @@
+# pipemaster:generated
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: ci-github
+spec:
+  params:
+    - name: ctx-ref-name
+      value: $(extensions.ctx_ref_name)
