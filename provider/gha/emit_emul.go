@@ -17,9 +17,16 @@ import (
 const (
 	cachePolicyPull = "pull"
 	cachePolicyPush = "push"
-	monthDays       = 30
-	weekDays        = 7
-	hoursPerDay     = 24
+	// gitlabDefaultCacheKey is the key GitLab gives a cache with no key; every such job shares it
+	// (https://docs.gitlab.com/ci/yaml/#cachekey).
+	gitlabDefaultCacheKey = "default"
+	cacheScopeCaveat      = "GitHub restores only caches of the current branch, the base branch of a pull request and the default branch, while a GitLab key with no branch part is shared across branches"
+	cacheRunSep           = "-run-"
+	cacheRunID            = "${{ github.run_id }}"
+	hashFilesCall         = "hashfiles("
+	monthDays             = 30
+	weekDays              = 7
+	hoursPerDay           = 24
 )
 
 var expireRE = regexp.MustCompile(`^(\d+)\s*(hours?|days?|weeks?|months?)$`)
@@ -57,7 +64,7 @@ func (e *emitter) templateNode(path, s string) (*yaml.Node, error) {
 	return str(t), err
 }
 
-// preSteps are the steps that run before the job's own: the checkout, artifact downloads, then the cache restore.
+// preSteps are the steps that run before the job's own: the checkout, artifact downloads, then the cache restore; a push-only cache has no restore.
 func (e *emitter) preSteps(c jobCtx, jp string, j *ir.Job) ([]*yaml.Node, error) {
 	var out []*yaml.Node
 	if n, err := e.checkoutStep(c, jp, j); err != nil {
@@ -95,13 +102,26 @@ func (e *emitter) preSteps(c jobCtx, jp string, j *ir.Job) ([]*yaml.Node, error)
 		}
 	}
 	for _, ch := range j.Cache {
-		n, err := e.cacheStep(jp, j, ch)
+		if ch.Policy == cachePolicyPush {
+			continue
+		}
+		n, err := e.cacheStep(jp, ch)
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, n)
 	}
 	return out, nil
+}
+
+// cacheRollDetail names the effect of a rewritten key. GitHub scoping:
+// https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching
+func cacheRollDetail(shared bool) string {
+	d := "the key is <key>-run-<run_id> and the restore prefix is <key>-run-: each run saves a new cache and restores the newest by prefix, because actions/cache never overwrites a key; " + cacheScopeCaveat
+	if shared {
+		d = "the source has no key, so GitLab shares one cache named default across jobs; " + d
+	}
+	return d
 }
 
 func withOf(kv ...any) *yaml.Node {
@@ -112,7 +132,7 @@ func withOf(kv ...any) *yaml.Node {
 	return m.n
 }
 
-func (e *emitter) cacheStep(jp string, j *ir.Job, ch ir.Cache) (*yaml.Node, error) {
+func (e *emitter) cacheStep(jp string, ch ir.Cache) (*yaml.Node, error) {
 	sub := ""
 	switch ch.Policy {
 	case cachePolicyPull:
@@ -129,11 +149,14 @@ func (e *emitter) cacheStep(jp string, j *ir.Job, ch ir.Cache) (*yaml.Node, erro
 	}
 	key := ch.Key
 	if key == "" {
-		key = j.ID + "-cache"
+		key = gitlabDefaultCacheKey
 	}
-	kn, err := e.templateNode(jp, key)
+	kn, restore, changed, err := e.cacheKeys(jp, key, ch.FallbackKeys)
 	if err != nil {
 		return nil, err
+	}
+	if changed {
+		e.emulate(jp, caps.JobCache, "actions/cache step with a rolling key", cacheRollDetail(ch.Key == ""))
 	}
 	m := newMap()
 	uses, err := e.synthUses(jp, "cache", ref)
@@ -141,8 +164,54 @@ func (e *emitter) cacheStep(jp string, j *ir.Job, ch ir.Cache) (*yaml.Node, erro
 		return nil, err
 	}
 	m.set("uses", str(uses))
-	m.set("with", withOf("path", pathNode(ch.Paths), "key", kn))
+	with := newMap()
+	with.set("path", pathNode(ch.Paths))
+	with.set("key", kn)
+	if len(restore) > 0 && sub != "save" {
+		with.set("restore-keys", block(restore))
+	}
+	m.set("with", with.n)
 	return marked(m, emitkit.Marker(caps.JobCache, jp)), nil
+}
+
+// cacheKeys writes the key and the restore-keys. actions/cache never overwrites an existing key, but GitLab uploads
+// the cache again after every run, so a key with no content hash becomes the rolling pair <key>-run-<run_id> and
+// <key>-run-: each run saves a new entry and the next run restores the newest. The "-run-" part keeps the prefix of
+// "main" from matching the keys of "main-hotfix". A hashFiles key already names its content. The bool is true
+// when a key was rewritten.
+func (e *emitter) cacheKeys(jp, key string, fallback []string) (*yaml.Node, []string, bool, error) {
+	changed := false
+	rolled := func(k string) (string, string, error) {
+		t, err := e.template(jp, k)
+		if err != nil {
+			return "", "", err
+		}
+		if hashesContent(k) {
+			return t, t, nil
+		}
+		changed = true
+		return t + cacheRunSep + cacheRunID, t + cacheRunSep, nil
+	}
+	k, restore, err := rolled(key)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	var restoreKeys []string
+	if !hashesContent(key) {
+		restoreKeys = append(restoreKeys, restore)
+	}
+	for _, fb := range fallback {
+		_, r, err := rolled(fb)
+		if err != nil {
+			return nil, nil, false, err
+		}
+		restoreKeys = append(restoreKeys, r)
+	}
+	return str(k), restoreKeys, changed, nil
+}
+
+func hashesContent(key string) bool {
+	return strings.Contains(strings.ToLower(key), hashFilesCall)
 }
 
 func artifactName(j *ir.Job, i int, a ir.Artifact) string {
@@ -169,9 +238,19 @@ func (e *emitter) producerArtifacts(pl *ir.Pipeline, id string) []string {
 	return nil
 }
 
-// postSteps are the upload steps that close the job.
+// postSteps are the cache saves of a push policy and the uploads that close the job.
 func (e *emitter) postSteps(jp string, j *ir.Job) ([]*yaml.Node, error) {
 	var out []*yaml.Node
+	for _, ch := range j.Cache {
+		if ch.Policy != cachePolicyPush {
+			continue
+		}
+		n, err := e.cacheStep(jp, ch)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
 	for i, a := range j.Artifacts {
 		ref, err := reverseAction("upload", "")
 		if err != nil {

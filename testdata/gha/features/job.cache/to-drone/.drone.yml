@@ -1,6 +1,6 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/build
 # pipemaster:emulated job.cache pipeline/gitlab-ci/job/build
-# pipemaster:arg [{"Key":"$$\u007b{ hashFiles('go.sum') }}","Policy":"pull-push","Paths":[".cache/go-build"]}]
+# pipemaster:arg [{"Key":"$$\u007b{ hashFiles('go.sum') }}","Policy":"pull-push","Paths":[".cache/go-build"],"FallbackKeys":null}]
 kind: pipeline
 type: docker
 name: build

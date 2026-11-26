@@ -1,5 +1,5 @@
 # pipemaster:emulated job.cache pipeline/woodpecker/job/ci
-# pipemaster:arg {"workspace":"pipemaster-workspace","cache":[{"Key":"go-mod","Policy":"pull-push","Paths":["~/go/pkg/mod"]}]}
+# pipemaster:arg {"workspace":"pipemaster-workspace","cache":[{"Key":"go-mod","Policy":"pull-push","Paths":["~/go/pkg/mod"],"FallbackKeys":null}]}
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:

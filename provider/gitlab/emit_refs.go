@@ -91,6 +91,9 @@ func refSites(pl *ir.Pipeline) []refSite {
 			cp := jp + "/cache/" + strconv.Itoa(i)
 			key(cp+"/key", &j.Cache[i].Key)
 			strs(cp+"/paths", j.Cache[i].Paths)
+			for k := range j.Cache[i].FallbackKeys {
+				key(cp+"/fallback/"+strconv.Itoa(k), &j.Cache[i].FallbackKeys[k])
+			}
 		}
 		for i := range j.Artifacts {
 			ap := jp + "/artifact/" + strconv.Itoa(i)

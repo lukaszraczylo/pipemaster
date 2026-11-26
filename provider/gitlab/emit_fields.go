@@ -311,6 +311,17 @@ func (e *emitter) cacheNodes(path string, p *jobPrep, extra any) (*yaml.Node, er
 		if c.Policy != "" {
 			m.set("policy", str(c.Policy))
 		}
+		if len(c.FallbackKeys) > 0 {
+			fks := make([]string, len(c.FallbackKeys))
+			for k, fk := range c.FallbackKeys {
+				t, err := e.field(path, caps.JobCache, fk)
+				if err != nil {
+					return nil, err
+				}
+				fks[k] = t
+			}
+			m.set("fallback_keys", strSeq(fks))
+		}
 		if err := m.addExtra(rest, nil); err != nil {
 			return nil, err
 		}

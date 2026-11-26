@@ -31,7 +31,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.JobEnvironment:         {Level: caps.Lost, Caveat: "Woodpecker has no environment name or URL in the workflow"},
 		caps.JobEnvironmentApproval: {Level: caps.External, Strategy: "repo setting Require approval for"},
 		caps.JobManual:              {Level: caps.Emulated, Strategy: "when event manual; a person starts the workflow from the UI or API", Caveat: "the workflow no longer runs on its normal events"},
-		caps.JobCache:               {Level: caps.Emulated, Strategy: "shared workspace of the steps in one workflow", Caveat: "nothing persists between runs"},
+		caps.JobCache:               {Level: caps.Emulated, Strategy: "shared workspace of the steps in one workflow", Caveat: "nothing persists between runs; for persistence add a cache plugin step (for example woodpecker-plugin-cache) with an S3-compatible bucket or a host volume, set up by the operator"},
 		caps.JobArtifacts:           {Level: caps.Emulated, Strategy: "shared workspace of the steps in one workflow", Caveat: "other workflows cannot read the files"},
 		caps.JobOutputs:             {Level: caps.Lost, Caveat: "Woodpecker steps cannot pass values to other workflows"},
 		caps.StepAction:             {Level: caps.Native, Strategy: "per actions.Lookup verdict; a plugin step is native", Caveat: "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"},

@@ -1,5 +1,5 @@
 # pipemaster:emulated job.cache pipeline/ci/job/build
-# pipemaster:arg {"workspace":"pipemaster-workspace","cache":[{"Key":"","Policy":"","Paths":[".cache/go","vendor"]}]}
+# pipemaster:arg {"workspace":"pipemaster-workspace","cache":[{"Key":"","Policy":"","Paths":[".cache/go","vendor"],"FallbackKeys":null}]}
 # pipemaster:emulated step.workdir pipeline/ci/job/build
 # pipemaster:arg {"dir":"/workspace"}
 apiVersion: tekton.dev/v1

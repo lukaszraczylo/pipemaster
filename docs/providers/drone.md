@@ -29,7 +29,7 @@ The following table comes from `pipemaster caps --to drone --format md`.
 | ext.passthrough | native |  |
 | job.allow_failure | emulated | failure ignore on every step (later steps still run after a failed step) |
 | job.artifacts | emulated | shared workspace of the steps in one document (other documents cannot read the files) |
-| job.cache | emulated | shared workspace of the steps in one document (nothing persists between runs) |
+| job.cache | emulated | shared workspace of the steps in one document (nothing persists between runs; for persistence add a cache plugin step (for example drone-cache) with an S3-compatible bucket or a host volume, set up by the operator) |
 | job.container | native |  |
 | job.env | native | pipeline environment |
 | job.environment | lost | (Drone has no environment name or URL in the pipeline file) |

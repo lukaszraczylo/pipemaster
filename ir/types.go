@@ -231,9 +231,10 @@ type Environment struct {
 
 // Cache is a restorable path set.
 type Cache struct {
-	Key    string   `yaml:"key,omitempty"`
-	Policy string   `yaml:"policy,omitempty"`
-	Paths  []string `yaml:"paths,omitempty"`
+	Key          string   `yaml:"key,omitempty"`
+	Policy       string   `yaml:"policy,omitempty"`
+	Paths        []string `yaml:"paths,omitempty"`
+	FallbackKeys []string `yaml:"fallback_keys,omitempty"`
 }
 
 // Artifact is a file set a job produces.

@@ -337,9 +337,11 @@ func (jx *jobEmitter) cachePaths() {
 				jx.caches = append(jx.caches, clean)
 			}
 		}
-		if c.Key != "" || c.Policy != "" {
-			e.emulate(jx.path, caps.JobCache, "task caches", "a task cache has no key or policy; the cache is kept per job and task")
+		detail := "a task cache is kept per worker, job and task step, so a new worker starts cold; it has no key or policy"
+		if len(c.FallbackKeys) > 0 {
+			detail += ", and the fallback keys are not used"
 		}
+		e.emulate(jx.path, caps.JobCache, "task caches", detail)
 	}
 }
 

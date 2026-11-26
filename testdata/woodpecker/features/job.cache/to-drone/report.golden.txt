@@ -1,2 +1,2 @@
 Loss report: woodpecker -> drone
-[emulated] pipeline/woodpecker/job/ci job.cache: shared workspace of the steps in one document (nothing persists between runs)
+[emulated] pipeline/woodpecker/job/ci job.cache: shared workspace of the steps in one document (nothing persists between runs; for persistence add a cache plugin step (for example drone-cache) with an S3-compatible bucket or a host volume, set up by the operator)

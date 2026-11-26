@@ -607,6 +607,11 @@ func (pr *preparer) jobFields(orig, cp *ir.Job) []string {
 			var m []string
 			cp.Cache[i].Key, m = pr.field(cp.Cache[i].Key, path, caps.JobCache)
 			msgs = append(msgs, m...)
+			cp.Cache[i].FallbackKeys = slices.Clone(cp.Cache[i].FallbackKeys)
+			for k := range cp.Cache[i].FallbackKeys {
+				cp.Cache[i].FallbackKeys[k], m = pr.field(cp.Cache[i].FallbackKeys[k], path, caps.JobCache)
+				msgs = append(msgs, m...)
+			}
 		}
 	}
 	if len(cp.Artifacts) > 0 {

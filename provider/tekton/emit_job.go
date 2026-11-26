@@ -263,7 +263,7 @@ func (tc *taskCtx) workspaceSteps(b *stepBook, clone int) error {
 		tc.e.mark(f.f, tc.jp.path)
 	}
 	if len(j.Cache) > 0 {
-		tc.e.emulate(tc.jp.path, caps.JobCache, "shared workspace", "the workspace is mounted at "+workspaceMount+"; cache paths are not copied in or out and nothing persists between runs")
+		tc.e.emulate(tc.jp.path, caps.JobCache, "shared workspace", "the workspace is mounted at "+workspaceMount+"; cache paths are not copied in or out and nothing persists between runs; to persist, the operator binds a PVC (or an object store step) that outlives the PipelineRun")
 	}
 	return nil
 }

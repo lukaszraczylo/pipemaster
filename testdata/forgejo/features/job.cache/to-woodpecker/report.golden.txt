@@ -1,4 +1,4 @@
 Loss report: forgejo -> woodpecker
-[emulated] pipeline/gitlab-ci/job/build job.cache: shared workspace of the steps in one workflow (nothing persists between runs)
+[emulated] pipeline/gitlab-ci/job/build job.cache: shared workspace of the steps in one workflow (nothing persists between runs; for persistence add a cache plugin step (for example woodpecker-plugin-cache) with an S3-compatible bucket or a host volume, set up by the operator)
 [emulated] pipeline/gitlab-ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/gitlab-ci/job/build/step/script step.shell: bash-if-present wrapper command (the source runs the step under bash when the image has it; Woodpecker runs commands through /bin/sh -e of the image, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh)
