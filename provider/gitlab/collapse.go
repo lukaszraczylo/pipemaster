@@ -215,7 +215,8 @@ func unsub(st *ir.Step, lines []string, workdir, env bool) ([]string, bool) {
 	if env {
 		n := 0
 		for n < len(inner) {
-			m := exportRE.FindStringSubmatch(inner[n])
+			line, used := exportLine(inner[n:])
+			m := exportRE.FindStringSubmatch(line)
 			if m == nil {
 				break
 			}
@@ -224,7 +225,7 @@ func unsub(st *ir.Step, lines []string, workdir, env bool) ([]string, bool) {
 				return nil, false
 			}
 			st.Env = append(st.Env, ir.Var{Name: m[1], Value: v})
-			n++
+			n += used
 		}
 		if n == 0 {
 			return nil, false
@@ -232,6 +233,34 @@ func unsub(st *ir.Step, lines []string, workdir, env bool) ([]string, bool) {
 		inner = inner[n:]
 	}
 	return inner, len(inner) > 0
+}
+
+// exportLine joins the lines of one export whose double-quoted value holds newlines, and says how many it used.
+func exportLine(lines []string) (string, int) {
+	if !strings.HasPrefix(lines[0], "export ") {
+		return lines[0], 1
+	}
+	open := false
+	for used := 1; used <= len(lines); used++ {
+		open = quoteOpen(lines[used-1], open)
+		if !open {
+			return strings.Join(lines[:used], "\n"), used
+		}
+	}
+	return lines[0], 1
+}
+
+// quoteOpen reports whether a double quote is still open after line, given the state before it.
+func quoteOpen(line string, open bool) bool {
+	for i := 0; i < len(line); i++ {
+		switch line[i] {
+		case '\\':
+			i++
+		case '"':
+			open = !open
+		}
+	}
+	return open
 }
 
 // envValue reads an exported value back as the IR holds a variable: text, a secret reference, or an

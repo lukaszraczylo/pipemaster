@@ -16,7 +16,8 @@ import (
 // changesStepName names the generated step that computes the path predicates of the job condition.
 const changesStepName = "pipemaster-changes"
 
-const changesScriptPath = "/tmp/pipemaster-changes.sh"
+// changesScriptPath lies in the build workspace: a fixed path under /tmp is shared by concurrent builds on an exec or ssh runner.
+const changesScriptPath = dexpr.ChangesDir + "/changes.sh"
 
 // changesPrelude maps the Drone build to the values the shared script reads. A tag, a schedule and every other
 // event count every path as changed; a pull request compares with the fetched target branch.
