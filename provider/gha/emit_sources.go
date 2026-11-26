@@ -5,6 +5,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
+	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 )
@@ -58,9 +59,15 @@ func withGitLabSources(p *ir.Project, target string) (*ir.Project, map[string]so
 				continue
 			case admit == provider.AdmitMaybe && residual != nil && !slices.Contains(apiSources, ev.Name):
 				// With the default triggers the parser has ANDed the workflow condition into every job already.
-				if !provider.DefaultPushTag(pl) {
-					gates = append(gates, sourceGate{source: ev.Name, cond: residual})
+				if provider.DefaultPushTag(pl) {
+					break
 				}
+				g := sourceGate{source: ev.Name, cond: residual}
+				if !gateTranslates(g) {
+					lost[pl.ID] = append(lost[pl.ID], ev)
+					continue
+				}
+				gates = append(gates, g)
 			case admit == provider.AdmitMaybe:
 				lost[pl.ID] = append(lost[pl.ID], ev)
 				continue
@@ -112,6 +119,27 @@ type sourceGate struct {
 	source string
 }
 
+// expr is true for a run of another source, and for a run of the source when the rule condition holds.
+func (g sourceGate) expr() expr.Expr {
+	isSource := expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{expr.CtxEvent}}, R: expr.Lit{Kind: expr.LitStr, Str: g.source}}
+	return expr.Binary{Op: expr.OpOr, L: expr.Unary{Op: expr.OpNot, X: isSource}, R: g.cond}
+}
+
+// gateTranslates is true when the gate reads in GHA. A rule that tests the truthiness of a variable has no GHA form, and
+// a gate that cannot be written would disable every job, so the source stays lost.
+func gateTranslates(g sourceGate) bool {
+	from := expr.SourceFor(provider.GitLab, exprgha.Lang)
+	if from == nil {
+		return true
+	}
+	x := g.expr()
+	if _, ok := expr.TranslateFacts(x, *from, exprgha.Lang, expr.Facts{}); ok {
+		return true
+	}
+	_, _, ok := expr.TranslateApprox(x, *from, exprgha.Lang)
+	return ok
+}
+
 // gateJobs ANDs into the condition of every job, for each gate, that a run of the source passes the workflow rules:
 // the run is of another source, or the rule condition holds. cp holds the jobs afterwards; the result maps each changed
 // job ID to what it was.
@@ -121,8 +149,7 @@ func gateJobs(cp *ir.Pipeline, gates []sourceGate) map[string]condBack {
 	}
 	var gate expr.Expr
 	for _, g := range gates {
-		isSource := expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{expr.CtxEvent}}, R: expr.Lit{Kind: expr.LitStr, Str: g.source}}
-		one := expr.Binary{Op: expr.OpOr, L: expr.Unary{Op: expr.OpNot, X: isSource}, R: g.cond}
+		one := g.expr()
 		if gate == nil {
 			gate = one
 			continue

@@ -78,6 +78,7 @@ func TestGitLabWorkflowRulesDecideSourceEvents(t *testing.T) {
 		{"admits web by a source rule before a ref rule", "workflow:\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == \"web\"'\n    - if: '$CI_COMMIT_BRANCH == \"main\"'\n", true, false},
 		{"excludes web", "workflow:\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == \"web\"'\n      when: never\n    - when: always\n", false, false},
 		{"admits only the push source", "workflow:\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == \"push\"'\n", false, false},
+		{"admits web under a truthiness test that GHA cannot state", "workflow:\n  rules:\n    - if: '$CI_MERGE_REQUEST_IID'\n    - if: '$CI_COMMIT_BRANCH == \"main\"'\n", false, true},
 		{"admits web on a branch only", "workflow:\n  rules:\n    - if: '$CI_COMMIT_BRANCH == \"main\"'\n", true, false},
 	}
 	for _, c := range cases {
