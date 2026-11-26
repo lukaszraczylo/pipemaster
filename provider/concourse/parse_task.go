@@ -159,7 +159,8 @@ func (jb *jobBuilder) fileTask(st *ir.Step, k *sink, m *omap, file, written stri
 				jb.fileShell(ts, scratch)
 				ts.Script = jb.fileScript(ts, m, file, cfg, scratch, line)
 				st.Kind, st.Script, st.Shell, st.WorkDir, st.Image = ir.StepScript, ts.Script, ts.Shell, ts.WorkDir, ts.Image
-				jb.fileNotes(file, scratch, scratchRep, m, line)
+				jb.fileNotes(file, scratch, scratchRep, m, line, !isPowershell(ts.Shell))
+				jb.b.read[rel] = true
 				return params, true
 			}
 			why = "the task file has no script that the IR can hold"
@@ -365,7 +366,7 @@ func (jb *jobBuilder) fileLayout(ts *ir.Step, m *omap, file string, cfg *omap, s
 
 // fileNotes reports what a task file holds that the IR step does not: the keys with no IR field, run keys such as
 // user with their values, and the notes of the config reader.
-func (jb *jobBuilder) fileNotes(file string, scratch *sink, rep *report.Report, m *omap, line int) {
+func (jb *jobBuilder) fileNotes(file string, scratch *sink, rep *report.Report, m *omap, line int, layout bool) {
 	add := func(f caps.Feature, detail string) {
 		jb.k.Rep.Add(report.Entry{
 			IRPath: scratch.Path, Feature: f, Level: caps.Lost, Strategy: "kept in the task file",
@@ -373,7 +374,20 @@ func (jb *jobBuilder) fileNotes(file string, scratch *sink, rep *report.Report, 
 		})
 	}
 	if rest, ok := scratch.Out[ExtConfig].(map[string]any); ok && len(rest) > 0 {
-		add(caps.ExtPassthrough, fmt.Sprintf("task file %s: keys %s have no IR field; they stay in the task file", file, strings.Join(sortedKeys(rest), ", ")))
+		var keys []string
+		for _, key := range sortedKeys(rest) {
+			switch {
+			case (key == "inputs" || key == "outputs") && layout:
+				// fileLayout lays the directories out and reports what it made or could not make.
+			case key == "platform":
+				jb.platformNote("task file "+file, rest[key], scratch, line)
+			default:
+				keys = append(keys, key)
+			}
+		}
+		if len(keys) > 0 {
+			add(caps.ExtPassthrough, fmt.Sprintf("task file %s: keys %s have no IR field; they stay in the task file and no target runs them", file, strings.Join(keys, ", ")))
+		}
 	}
 	if run, ok := scratch.Out[ExtRun].(map[string]any); ok && len(run) > 0 {
 		var kv []string
@@ -717,4 +731,25 @@ func acrossBody(step *omap, mx *ir.Matrix) ([]any, bool) {
 		return nil, false
 	}
 	return []any{rest}, true
+}
+
+// platformNote reports the platform of a task file. A linux task runs on the runner of every target; any other
+// platform needs a runner of that kind, which the operator provides.
+func (jb *jobBuilder) platformNote(what string, v any, scratch *sink, line int) {
+	p, isText := v.(string)
+	if !isText {
+		p, _ = text(v)
+	}
+	if p == "linux" {
+		jb.k.Rep.Retained = append(jb.k.Rep.Retained, report.Entry{
+			IRPath: scratch.Path, Feature: caps.ExtPassthrough, Level: caps.Lost, Strategy: strategyExt,
+			Detail: what + ": platform linux runs on the runner of every target; the key stays in round-trip metadata", SourceLoc: jb.k.Loc(line),
+		})
+		return
+	}
+	jb.k.Rep.Add(report.Entry{
+		IRPath: scratch.Path, Feature: caps.JobRunner, Level: caps.External, Strategy: "runner of the platform",
+		Detail:    fmt.Sprintf("%s: platform %s needs a runner of that platform on the target; register one with a matching label and set it as the job runner", what, p),
+		SourceLoc: jb.k.Loc(line),
+	})
 }

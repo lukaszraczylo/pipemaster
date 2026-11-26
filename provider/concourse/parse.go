@@ -4,12 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"path"
 	"sort"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 	"github.com/lukaszraczylo/pipemaster/report"
 	"github.com/lukaszraczylo/pipemaster/vars"
@@ -61,6 +63,7 @@ func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		return nil, rep, fmt.Errorf("concourse: no pipeline with a jobs list found under %s/", dirName)
 	}
 	var pls []*ir.Pipeline
+	read := map[string]bool{}
 	byID := map[string]string{}
 	for _, src := range pipes {
 		id := strings.TrimSuffix(path.Base(src.name), path.Ext(src.name))
@@ -77,8 +80,9 @@ func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 			return nil, nil, fmt.Errorf("%s: %w", src.name, err)
 		}
 		pls = append(pls, pl)
+		maps.Copy(read, pb.read)
 	}
-	keepOtherFiles(rep, pls[0], others, otherNames)
+	keepOtherFiles(rep, pls[0], others, otherNames, read)
 	proj := &ir.Project{Origin: ir.Origin{Provider: dialect, Dialect: dialect, Files: files}, Pipelines: pls}
 	if err := ir.Validate(proj); err != nil {
 		return nil, nil, err
@@ -127,18 +131,27 @@ func isPipeline(top *omap) bool {
 }
 
 // keepOtherFiles keeps the files that are no pipeline (task files, vars files) in the Ext of the first pipeline.
-func keepOtherFiles(rep *report.Report, pl *ir.Pipeline, others map[string]any, names []string) {
+func keepOtherFiles(rep *report.Report, pl *ir.Pipeline, others map[string]any, names []string, read map[string]bool) {
 	if len(others) == 0 {
 		return
 	}
 	sort.Strings(names)
+	allRead := true
 	for _, n := range names {
+		if read[n] {
+			continue
+		}
+		allRead = false
 		rep.Add(report.Entry{
 			IRPath: "pipeline/" + pl.ID, Feature: caps.ExtPassthrough, Level: caps.Lost, Strategy: strategyExt,
 			Detail: n + " has no jobs list, so it is no pipeline; the file is kept in Ext", SourceLoc: n,
 		})
 	}
-	extMap(pl)[ExtFiles] = others
+	ext := extMap(pl)
+	ext[ExtFiles] = others
+	if allRead {
+		carry(ext, ExtFiles)
+	}
 }
 
 const strategyExt = "kept in Ext[" + dialect + "]"
@@ -162,20 +175,26 @@ type pipeBuilder struct {
 	plainVars map[string]bool
 	// defaulted holds the names of the params that were read as secrets with no marker or vars entry to say otherwise.
 	defaulted map[string]bool
-	rep       *report.Report
-	fsys      fs.FS
-	res       map[string]*resource
-	types     map[string]bool
-	used      map[string]bool
-	jobSet    map[string]bool
-	file      string
-	id        string
-	resOrder  []*resource
-	jobNames  []string
+	// read holds the task files that a step read, by path.
+	read map[string]bool
+	// getsKept holds the jobs whose source gets have a key that the target checkout ignores.
+	getsKept map[*ir.Job]bool
+	rep      *report.Report
+	fsys     fs.FS
+	res      map[string]*resource
+	types    map[string]bool
+	used     map[string]bool
+	jobSet   map[string]bool
+	file     string
+	id       string
+	resOrder []*resource
+	jobNames []string
+	// resLost is true when a resource has a key that no target runs.
+	resLost bool
 }
 
 func newPipelineBuilder(rep *report.Report, file, id string) *pipeBuilder {
-	return &pipeBuilder{rep: rep, file: file, id: id, res: map[string]*resource{}, types: map[string]bool{}, used: map[string]bool{}, jobSet: map[string]bool{}, present: map[string]bool{}, plainVars: map[string]bool{}, defaulted: map[string]bool{}}
+	return &pipeBuilder{rep: rep, file: file, id: id, res: map[string]*resource{}, types: map[string]bool{}, used: map[string]bool{}, jobSet: map[string]bool{}, present: map[string]bool{}, plainVars: map[string]bool{}, defaulted: map[string]bool{}, getsKept: map[*ir.Job]bool{}, read: map[string]bool{}}
 }
 
 func (b *pipeBuilder) path() string { return "pipeline/" + b.id }
@@ -230,6 +249,7 @@ func (b *pipeBuilder) build(top *omap) (*ir.Pipeline, error) {
 	b.finallyHooks(pl, built)
 	b.orphanNames()
 	b.secretNote()
+	b.markCarried(pl)
 	b.keepResources(k)
 	for _, key := range knownTop {
 		if v, ok := r.Take(key); ok {
@@ -294,4 +314,21 @@ func (b *pipeBuilder) secretNote() {
 	b.note(caps.ConfigName, caps.Emulated, b.path(), "every ((name)) is a secret",
 		"Concourse resolves every ((name)) from the credential manager, so the params "+strings.Join(names, ", ")+
 			" are treated as secrets, plain vars included; recreate a plain value as a plain variable in the target if it is no secret", 0)
+}
+
+// markCarried lists the job Ext keys whose behaviour the IR or the report already holds, so a target that cannot
+// write the Ext does not report them a second time.
+func (b *pipeBuilder) markCarried(pl *ir.Pipeline) {
+	for _, j := range pl.Jobs {
+		m, _ := j.Ext[dialect].(map[string]any)
+		var carried []any
+		for _, key := range []string{ExtGets, ExtGetsParallel, ExtTriggers, ExtTriggerIf, "public"} {
+			if _, has := m[key]; has && (key != ExtGets || !b.getsKept[j]) {
+				carried = append(carried, key)
+			}
+		}
+		if len(carried) > 0 {
+			m[emitkit.CarriedKey] = carried
+		}
+	}
 }

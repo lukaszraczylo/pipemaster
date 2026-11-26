@@ -38,6 +38,11 @@ const (
 	ExtCron = "cron"
 	// ExtUnreadable is the Ext key of an api trigger that says why the source trigger could not be read.
 	ExtUnreadable = "unreadable"
+	// ExtLoadScript is the script that stands for a load_var step; the step stays verbatim while the script is unchanged.
+	ExtLoadScript = "load_script"
+	// ExtLoadRefs holds the script lines that read load_var values into the params of a task; the emitter drops
+	// them and writes the params back.
+	ExtLoadRefs = "load_refs"
 	// ExtStep and ExtKind keep a step the IR cannot model: the verbatim step and its kind key.
 	ExtStep = "step"
 	ExtKind = "kind"

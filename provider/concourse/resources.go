@@ -10,6 +10,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -89,18 +90,31 @@ func (b *pipeBuilder) keepResources(k *sink) {
 		}
 		var kept []string
 		for _, key := range r.m.Order {
-			if key != "name" && key != "type" {
+			switch key {
+			case "name", "type":
+			case "check_every":
+				b.note(caps.ExtPassthrough, caps.External, k.Path, strategyExt,
+					fmt.Sprintf("resource %s: check_every %s is the poll interval of Concourse. The target starts jobs from its own events, so no interval exists; set up a webhook for the repository on the target", r.name, r.plainText("check_every")), r.line)
+			case "source":
+				if !b.carriedSource(r) {
+					kept = append(kept, key)
+				}
+			default:
 				kept = append(kept, key)
 			}
 		}
-		detail := fmt.Sprintf("resource %s (type %s): keys %s have no IR field; the definition is kept in Ext", r.name, r.typ, strings.Join(kept, ", "))
 		if len(kept) == 0 {
-			detail = fmt.Sprintf("resource %s (type %s) has no IR field; the definition is kept in Ext", r.name, r.typ)
+			continue
 		}
+		b.resLost = true
+		detail := fmt.Sprintf("resource %s (type %s): keys %s have no IR field; the target does not run the resource and ignores them; the definition is kept in Ext", r.name, r.typ, strings.Join(kept, ", "))
 		if !b.used[r.name] {
 			detail += "; the resource is unused: no job gets or puts it"
 		}
 		b.note(caps.ExtPassthrough, caps.Lost, k.Path, strategyExt, detail, r.line)
+	}
+	if !b.resLost {
+		k.Out[emitkit.CarriedKey] = []any{ExtResources}
 	}
 	k.Out[ExtResources] = list
 }
@@ -343,7 +357,7 @@ func resourceExt(names ...string) ir.Ext {
 	for i, n := range names {
 		refs[i] = n
 	}
-	return ir.Ext{dialect: map[string]any{ExtResourcesRef: refs}}
+	return ir.Ext{dialect: map[string]any{ExtResourcesRef: refs, emitkit.CarriedKey: []any{ExtResourcesRef}}}
 }
 
 // failSafe is the api trigger for a resource trigger that the parser cannot read exactly: it never fires.
@@ -681,4 +695,33 @@ func (b *pipeBuilder) concurrency(pl *ir.Pipeline, jobs []*builtJob) {
 		b.note(caps.PipelineConcurrency, caps.Lost, b.path(), strategyExt,
 			"serial and serial_groups name several groups, which one pipeline concurrency group cannot hold; the keys stay in the job Ext", 0)
 	}
+}
+
+// carriedKeys are the source keys that the IR holds, by resource type: the checkout and trigger of a git resource and
+// the image of a registry-image resource.
+var carriedKeys = map[string][]string{
+	typeGit:          {"uri", "branch", "paths", "ignore_paths", "tag_filter"},
+	"registry-image": {"repository", "tag", "digest"},
+	typeTime:         {"interval", "start", "stop", "days"},
+}
+
+// carriedSource is true when the resource is used and every key of its source is one that the targets run.
+func (b *pipeBuilder) carriedSource(r *resource) bool {
+	keys, ok := carriedKeys[r.typ]
+	src := r.source()
+	if !ok || src == nil || !b.builtin(r, r.typ) || !b.used[r.name] {
+		return false
+	}
+	for _, key := range src.Order {
+		if !slices.Contains(keys, key) {
+			return false
+		}
+	}
+	return true
+}
+
+// plainText is the text of a key of the resource, or a note that it is a var.
+func (r *resource) plainText(key string) string {
+	t, _ := text(r.m.Vals[key])
+	return t
 }

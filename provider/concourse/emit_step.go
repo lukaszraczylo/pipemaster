@@ -19,6 +19,7 @@ import (
 var stepSkip = map[string]bool{
 	"file": true, ExtConfig: true, ExtParams: true, ExtShellFlags: true, ExtBashDefault: true, ExtCommand: true, ExtArgs: true, ExtScriptLine: true,
 	ExtEntrypoint: true, ExtImageResource: true, ExtRun: true, ExtKind: true, ExtStep: true, ExtTaskDigest: true, ExtFileParams: true,
+	ExtLoadScript: true, ExtLoadRefs: true, emitkit.CarriedKey: true,
 }
 
 // posixShells are the shells that run a script with -ec.
@@ -66,6 +67,9 @@ func (c *chain) step(st *ir.Step) []*yaml.Node {
 		e.lose(path, caps.StepAction, why)
 		return c.placeholder(st, path, actionArg{}, true)
 	case ir.StepScript, "":
+		if n := c.loadVar(st, path); n != nil {
+			return []*yaml.Node{n}
+		}
 		if n := c.taskFile(st, path); n != nil {
 			return []*yaml.Node{n}
 		}
@@ -139,7 +143,7 @@ func (c *chain) script(st *ir.Step, path string) *yaml.Node {
 	sc.envParams(path, st.Env)
 	sc.envParams(path, jx.j.Env)
 	sc.envParams(path, jx.pe.pl.Env)
-	body := sc.scriptLines(path, st.Script)
+	body := sc.scriptLines(path, dropLoadRefs(st.Script, ext))
 	script, disabled := jx.guarded(sc, path, name, st, body)
 	if len(script) == 0 {
 		script = []string{placeholderCmd}

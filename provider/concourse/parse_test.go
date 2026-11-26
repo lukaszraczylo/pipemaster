@@ -340,7 +340,7 @@ func TestInlineTaskMapping(t *testing.T) {
 	if cfg, _ := e["config"].(map[string]any); cfg["platform"] != "linux" || cfg["inputs"] == nil {
 		t.Errorf("residual config = %v", e["config"])
 	}
-	for _, want := range []string{"LOCAL", "platform"} {
+	for _, want := range []string{"LOCAL", "task config keys inputs"} {
 		if !hasEntry(rep, want) {
 			t.Errorf("no entry mentions %q", want)
 		}
