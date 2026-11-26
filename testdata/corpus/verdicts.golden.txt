@@ -161,9 +161,9 @@
 21-gitlab-gitlab-shell gitlab->argo native=  75 emulated=  82 external=   6 lost=  67
 21-gitlab-gitlab-shell gitlab->concourse native=  75 emulated=  73 external=  22 lost=  59
 21-gitlab-gitlab-shell gitlab->drone native=  91 emulated=  66 external=   0 lost=  54
-21-gitlab-gitlab-shell gitlab->forgejo native= 120 emulated=  64 external=  22 lost=  46
-21-gitlab-gitlab-shell gitlab->gha native= 120 emulated=  63 external=  22 lost=  46
-21-gitlab-gitlab-shell gitlab->gitea native= 119 emulated=  63 external=  22 lost=  46
+21-gitlab-gitlab-shell gitlab->forgejo native= 120 emulated=  75 external=  21 lost=  29
+21-gitlab-gitlab-shell gitlab->gha native= 120 emulated=  74 external=  21 lost=  29
+21-gitlab-gitlab-shell gitlab->gitea native= 119 emulated=  74 external=  21 lost=  29
 21-gitlab-gitlab-shell gitlab->tekton native=  90 emulated=  70 external=   3 lost=  68
 21-gitlab-gitlab-shell gitlab->woodpecker native=  89 emulated=  71 external=   0 lost=  51
 22-gitlab-gitlab-vscode-extension gitlab->argo native= 111 emulated=  61 external=   6 lost=  87
