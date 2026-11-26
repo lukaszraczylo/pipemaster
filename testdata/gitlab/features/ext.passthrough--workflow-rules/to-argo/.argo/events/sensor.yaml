@@ -69,7 +69,7 @@ spec:
             - dest: spec.arguments.parameters.2.value
               src:
                 dependencyName: gitlab-ci-tag
-                value: tag
+                value: push
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1

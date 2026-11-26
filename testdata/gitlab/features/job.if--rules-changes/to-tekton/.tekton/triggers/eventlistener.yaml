@@ -58,7 +58,7 @@ spec:
                 - key: ctx_branch
                   expression: ''''''
                 - key: ctx_event
-                  expression: '''tag'''
+                  expression: '''push'''
       bindings:
         - ref: gitlab-ci-github
       template:
