@@ -16,7 +16,6 @@ import (
 const (
 	reqArtifacts    = "artifacts"
 	reqAllowFailure = "allow_failure"
-	reqManual       = "manual"
 )
 
 // engineCap states what one engine cannot do on this setup, each with the evidence for the claim.
@@ -33,7 +32,7 @@ func capsOf(provider string) engineCap {
 	case provDrone:
 		return engineCap{noSHA: true}
 	case provArgo:
-		return engineCap{unsupported: map[string]string{reqArtifacts: argoArtifactsWhy, reqManual: argoManualWhy}}
+		return engineCap{unsupported: map[string]string{reqArtifacts: argoArtifactsWhy}}
 	case provConcourse:
 		return engineCap{events: []string{EvPushMain, EvPushBranch, EvTag}, eventWhy: concoursePRWhy}
 	}
@@ -141,8 +140,3 @@ var glChildWhy = map[string]string{
 
 // glChildDepthWhy cites the nesting limit: "a maximum depth of two levels of child pipelines".
 const glChildDepthWhy = "the child pipelines nest deeper than GitLab allows (https://docs.gitlab.com/ci/pipelines/downstream_pipelines/, nested child pipelines)"
-
-// argoManualWhy cites the Argo suspend rule: the converted file holds a manual job at a suspend task, and the harness
-// never resumes it, so the workflow stays suspended on purpose.
-const argoManualWhy = "Argo holds a manual job at a suspend task: \"Once suspended, a Workflow will not schedule any new steps until it is resumed.\" " +
-	"The harness never resumes it, so the run does not finish by design (https://argo-workflows.readthedocs.io/en/latest/walk-through/suspending/)"

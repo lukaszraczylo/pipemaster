@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/lukaszraczylo/pipemaster/internal/behave/argostate"
 )
 
 const defaultSARole = `apiVersion: rbac.authorization.k8s.io/v1
@@ -290,7 +292,7 @@ func (a *argoEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	}
 	tr := &Trace{}
 	for _, n := range names {
-		exit, err := a.kube.waitStatus(ctx, ns, n, "{.status.phase}", map[string]int{"Succeeded": 0, "Failed": 1, "Error": 1})
+		exit, err := a.settle(ctx, ns, n)
 		if err != nil {
 			return nil, err
 		}
@@ -301,6 +303,54 @@ func (a *argoEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	tr.Log, tr.Markers = collect(ctx, a.kube, ns, "workflows.argoproj.io/workflow")
 	tr.Duration = time.Since(start)
 	return tr, nil
+}
+
+const (
+	argoIdlePolls = 3
+	argoPoll      = 2 * time.Second
+	argoStop      = `{"spec":{"shutdown":"Stop"}}`
+)
+
+// settle waits for the Workflow to end. A manual job is a suspend task that the harness never resumes: when the
+// Workflow holds a suspend node, nothing else runs, and that holds for several polls, the harness stops the
+// Workflow, as a manual job that no operator starts. The markers that ran stay, and the stop is not a failure.
+func (a *argoEngine) settle(ctx context.Context, ns, name string) (int, error) {
+	deadline := time.Now().Add(timeoutK8s)
+	idle, stopped := 0, false
+	for time.Now().Before(deadline) {
+		out, code, err := a.kube.env.Kubectl(ctx, kubeShort, "", "-n", ns, "get", name, "-o", "json")
+		if err == nil && code == 0 {
+			st, err := argostate.Parse(out)
+			if err != nil {
+				return -1, err
+			}
+			switch {
+			case st.Done():
+				if (st.Phase == "Succeeded") || (stopped && !st.Failed) {
+					return 0, nil
+				}
+				return 1, nil
+			case st.Idle() && !stopped:
+				if idle++; idle >= argoIdlePolls {
+					if out, code, err := a.kube.env.Kubectl(ctx, kubeShort, "", "-n", ns, "patch", name, "--type", "merge", "-p", argoStop); err != nil || code != 0 {
+						return -1, fmt.Errorf("stop %s: %v %s", name, err, tail(out, 400))
+					}
+					stopped = true
+				}
+			default:
+				idle = 0
+			}
+		}
+		if err := a.kube.checkDiskPressure(ctx); err != nil {
+			return -1, err
+		}
+		select {
+		case <-ctx.Done():
+			return -1, ctx.Err()
+		case <-time.After(argoPoll):
+		}
+	}
+	return -1, fmt.Errorf("%s in %s did not finish within %s", name, ns, timeoutK8s)
 }
 
 func (a *argoEngine) workflows(docs []map[string]any, w *Workspace, evType string, body map[string]any) ([]string, error) {
