@@ -13,7 +13,7 @@ build:
     # pipemaster:step build-step-2
     # pipemaster:step build-step-3
     # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
-    # pipemaster:arg {"cache":{"Key":"go-mod","Policy":"","Paths":["~/go/pkg/mod"]},"step":{"action":{"Kind":"repo","Host":"https://github.com","Owner":"actions","Repo":"cache","Path":"","Ref":"v4","Image":""},"with":{"key":{"l":"go-mod"},"path":{"l":"~/go/pkg/mod"}},"id":"build-step-2"},"kind":"cache","pos":1}
+    # pipemaster:arg {"cache":{"Key":"go-mod","Policy":"","Paths":["~/go/pkg/mod"],"FallbackKeys":null},"step":{"action":{"Kind":"repo","Host":"https://github.com","Owner":"actions","Repo":"cache","Path":"","Ref":"v4","Image":""},"with":{"key":{"l":"go-mod"},"path":{"l":"~/go/pkg/mod"}},"id":"build-step-2"},"kind":"cache","pos":1}
     - make build
     # pipemaster:step build-step-4
     # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-4

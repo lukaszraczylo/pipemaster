@@ -1,5 +1,5 @@
 # pipemaster:emulated job.cache pipeline/ci/job/build
-# pipemaster:arg [{"Key":"","Policy":"","Paths":[".cache/go","vendor"]}]
+# pipemaster:arg [{"Key":"","Policy":"","Paths":[".cache/go","vendor"],"FallbackKeys":null}]
 when:
   - event: push
     branch: main

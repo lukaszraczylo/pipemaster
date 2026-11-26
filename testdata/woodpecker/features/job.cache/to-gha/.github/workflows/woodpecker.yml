@@ -5,7 +5,7 @@
 # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/build
 # pipemaster:arg {"kind":"script","image":{"Ref":"golang:1.25","Entrypoint":null},"script":["go build ./..."]}
 # pipemaster:emulated job.cache pipeline/woodpecker/job/ci
-# pipemaster:arg {"cache":[{"Key":"go-mod","Policy":"pull-push","Paths":["~/go/pkg/mod"]}],"pre":1,"post":0}
+# pipemaster:arg {"cache":[{"Key":"go-mod","Policy":"pull-push","Paths":["~/go/pkg/mod"],"FallbackKeys":null}],"pre":1,"post":0}
 on:
   push:
     branches:
@@ -19,7 +19,8 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: ~/go/pkg/mod
-          key: go-mod
+          key: go-mod-${{ github.run_id }}
+          restore-keys: go-mod-
       # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/build
       - id: build
         uses: docker://golang:1.25
