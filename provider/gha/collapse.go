@@ -84,7 +84,7 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			pl.Triggers = slices.DeleteFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerManual })
 		case caps.TriggerSchedule:
 			for i := range pl.Triggers {
-				if pl.Triggers[i].Kind == ir.TriggerSchedule && pl.Triggers[i].Cron == neverCron {
+				if pl.Triggers[i].Kind == ir.TriggerSchedule && pl.Triggers[i].Cron == placeholderCron {
 					pl.Triggers[i].Cron = ""
 				}
 			}

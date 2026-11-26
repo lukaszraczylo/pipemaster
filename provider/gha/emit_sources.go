@@ -8,9 +8,9 @@ import (
 	"github.com/lukaszraczylo/pipemaster/provider"
 )
 
-// neverCron is a cron expression that names a day no month has, so a schedule written with it never starts a run.
-// GitLab keeps the cron outside the CI file and GHA needs one.
-const neverCron = "0 0 31 2 *"
+// placeholderCron fires on 29 February only. GitLab keeps the cron outside the CI file and GHA needs one, and actionlint
+// rejects a cron that names no day, so the owner must set the real one.
+const placeholderCron = "0 0 29 2 *"
 
 // Pipeline sources that start a run through an API call. GHA has the one event repository_dispatch, and the
 // event_type of the call tells the two apart.
@@ -77,10 +77,10 @@ func dropSourceEvents(pl *ir.Pipeline, arg sourceEventsArg) {
 }
 
 // externalCron writes the schedule of a GitLab source that names no cron: the schedule lives in the project settings,
-// and the workflow keeps a cron that never fires until the owner sets the real one.
+// and the workflow keeps a cron that fires on 29 February only until the owner sets the real one.
 func (e *emitter) externalCron(path string) string {
-	e.external(path, caps.TriggerSchedule, "set the cron expression in on.schedule: GitLab keeps the schedule in the project settings, so the workflow holds "+neverCron+" (never fires)",
+	e.external(path, caps.TriggerSchedule, "set the cron expression in on.schedule: GitLab keeps the schedule in the project settings, so the workflow holds "+placeholderCron+" (fires on 29 February only)",
 		"the schedule names no cron expression")
 	e.mark(caps.TriggerSchedule, path)
-	return neverCron
+	return placeholderCron
 }

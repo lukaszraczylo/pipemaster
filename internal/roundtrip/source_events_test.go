@@ -36,7 +36,7 @@ func lostJobIf(rep *report.Report) bool {
 func TestGitLabSourcesStartGHAJobs(t *testing.T) {
 	out, rep := convert(t, "gitlab", "gha", ".gitlab-ci.yml", sourcesGitLab)
 	for _, want := range []string{
-		"workflow_dispatch:", "repository_dispatch:", "- api", "- trigger", "schedule:", "- cron: 0 0 31 2 *",
+		"workflow_dispatch:", "repository_dispatch:", "- api", "- trigger", "schedule:", "- cron: 0 0 29 2 *",
 		"github.event_name == 'workflow_dispatch'", "github.event_name == 'schedule'",
 		"github.event_name == 'repository_dispatch' && github.event.action == 'api'",
 		"github.event_name == 'repository_dispatch' && github.event.action == 'trigger'",
