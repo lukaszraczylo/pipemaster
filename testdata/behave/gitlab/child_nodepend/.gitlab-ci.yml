@@ -1,0 +1,11 @@
+default:
+  image: alpine:3.20
+stages: [one, two]
+setup:
+  stage: one
+  script:
+    - echo "MARK child_nodepend.setup" | tee -a trace.log
+run_child:
+  stage: two
+  trigger:
+    include: ci/child.yml

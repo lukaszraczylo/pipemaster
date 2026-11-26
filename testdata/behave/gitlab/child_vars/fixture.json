@@ -1,0 +1,17 @@
+{
+  "features": [
+    "ext.passthrough"
+  ],
+  "events": [
+    "push-main",
+    "push-branch"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": [
+    "child_vars.target:staging",
+    "child_vars.own:kept"
+  ],
+  "owners": {},
+  "requires": []
+}

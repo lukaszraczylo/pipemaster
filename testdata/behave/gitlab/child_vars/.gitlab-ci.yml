@@ -1,0 +1,8 @@
+default:
+  image: alpine:3.20
+run_child:
+  variables:
+    TARGET: staging
+  trigger:
+    include: ci/child.yml
+    strategy: depend

@@ -1,0 +1,17 @@
+name: deploy
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "MARK reusable_local.plan:${{ inputs.environment }}" | tee -a trace.log
+  apply:
+    needs: plan
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "MARK reusable_local.apply" | tee -a trace.log

@@ -1,0 +1,8 @@
+default:
+  image: alpine:3.20
+show:
+  variables:
+    OWN: kept
+  script:
+    - echo "MARK child_vars.target:$TARGET" | tee -a trace.log
+    - echo "MARK child_vars.own:$OWN" | tee -a trace.log
