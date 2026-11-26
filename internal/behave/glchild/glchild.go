@@ -16,9 +16,11 @@
 package glchild
 
 import (
+	"encoding/json"
 	"fmt"
 	"maps"
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -325,4 +327,27 @@ func varMap(n *yaml.Node) map[string]string {
 		}
 	}
 	return out
+}
+
+var listStart = regexp.MustCompile(`(?m)^\[$`)
+
+// Running reads the output of `gitlab-ci-local --list-json` and returns the jobs that start by themselves for the
+// run: the ones that the rules did not drop (when: never) and that need no operator (when: manual).
+func Running(out string) (map[string]bool, error) {
+	at := listStart.FindStringIndex(out)
+	if at == nil {
+		return nil, fmt.Errorf("no job list in the output of gitlab-ci-local")
+	}
+	var jobs []struct {
+		Name string `json:"name"`
+		When string `json:"when"`
+	}
+	if err := json.NewDecoder(strings.NewReader(out[at[0]:])).Decode(&jobs); err != nil {
+		return nil, fmt.Errorf("read the job list: %w", err)
+	}
+	run := map[string]bool{}
+	for _, j := range jobs {
+		run[j.Name] = j.When != "never" && j.When != "manual"
+	}
+	return run, nil
 }

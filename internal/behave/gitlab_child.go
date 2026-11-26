@@ -27,12 +27,23 @@ func (e *gitlabEngine) withChildren(ctx context.Context, w *Workspace, doc []byt
 	}
 	outcomes := map[string]glchild.Outcome{}
 	var log strings.Builder
+	var running map[string]bool
 	for i, t := range triggers {
 		if t.Reason != "" {
 			return nil, "", blocked("%s", glChildWhy[t.Reason])
 		}
 		if depth >= glchild.MaxDepth {
 			return nil, "", blocked("%s", glChildDepthWhy)
+		}
+		if running == nil {
+			if running, err = e.startingJobs(ctx, w, doc, vars, fmt.Sprintf("%d", depth)); err != nil {
+				return nil, "", err
+			}
+		}
+		if !running[t.Job] {
+			// GitLab never starts the child of a trigger job that does not run, so the child has no side effect.
+			outcomes[t.Job] = glchild.Outcome{Created: true}
+			continue
 		}
 		var files [][]byte
 		for _, f := range t.Files {
@@ -59,6 +70,30 @@ func (e *gitlabEngine) withChildren(ctx context.Context, w *Workspace, doc []byt
 	}
 	spliced, err := glchild.Rewrite(doc, outcomes)
 	return spliced, log.String(), err
+}
+
+// startingJobs asks gitlab-ci-local which jobs of the file start by themselves for the run, with the same rules
+// that decide whether the trigger job prints the markers of its child.
+func (e *gitlabEngine) startingJobs(ctx context.Context, w *Workspace, doc []byte, vars map[string]string, id string) (map[string]bool, error) {
+	name := ".pm-list-" + id + ".yml"
+	path := filepath.Join(w.Dir, name)
+	if err := os.WriteFile(path, doc, 0o600); err != nil { // #nosec G703 -- a file of the harness workspace
+		return nil, err
+	}
+	defer os.Remove(path) // #nosec G104 -- a scratch file of the harness workspace
+	args := []string{"--file", name, "--state-dir", ".gitlab-ci-local-pm-list", "--list-json"}
+	out, code, err := e.env.run(ctx, runOpts{Dir: w.Dir, Timeout: timeoutLocal}, e.env.GitlabCILocal(), append(args, varArgs(vars)...)...)
+	if err != nil {
+		return nil, err
+	}
+	if code != 0 {
+		return nil, blocked("gitlab-ci-local cannot list the jobs of a file with trigger jobs (exit %d): %s", code, diagnose(out))
+	}
+	jobs, err := glchild.Running(out)
+	if err != nil {
+		return nil, blocked("%v", err)
+	}
+	return jobs, nil
 }
 
 // runChild runs one child pipeline. GitLab creates no child when its workflow:rules match nothing, and the

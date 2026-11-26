@@ -1,6 +1,7 @@
 package glchild_test
 
 import (
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -231,5 +232,21 @@ func TestRewriteKeepsWhatDecidesWhenTheChildStarts(t *testing.T) {
 	}
 	if !strings.Contains(string(out), "ci/a.yml") {
 		t.Errorf("a trigger job without an outcome stays as it is:\n%s", out)
+	}
+}
+
+func TestRunning(t *testing.T) {
+	out := "WARN Avoid overriding [CI_PIPELINE_SOURCE]\nparsing finished\n[\n" +
+		`{"name":"a","stage":"one","when":"on_success"},{"name":"b","when":"manual"},{"name":"c","when":"never"},{"name":"d","when":"always"}` + "\n]\n"
+	got, err := glchild.Running(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{"a": true, "b": false, "c": false, "d": true}
+	if !maps.Equal(got, want) {
+		t.Errorf("Running = %v, want %v", got, want)
+	}
+	if _, err := glchild.Running("no list here"); err == nil {
+		t.Error("output without a job list must fail loudly")
 	}
 }
