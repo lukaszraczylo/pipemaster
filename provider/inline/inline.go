@@ -4,6 +4,7 @@ package inline
 
 import (
 	"fmt"
+	"path"
 	"slices"
 	"sort"
 	"strings"
@@ -225,7 +226,9 @@ func (f *flattener) inline(j *ir.Job, owner map[string]string, root string, top 
 			nj.Matrix = &m
 		}
 		nj.Env = mergeEnv(mergeEnv(child.Env, nj.Env), callEnv(j, fwd))
-		nj.Env = append(nj.Env, hiddenEnv(hide, pl.Env, nj.Env)...)
+		hiddenVars := hiddenEnv(hide, pl.Env, nj.Env)
+		nj.Env = append(nj.Env, hiddenVars...)
+		f.unsetInScripts(nj, hiddenVars)
 		args.apply(nj)
 		return nj
 	}
@@ -480,7 +483,7 @@ func (f *flattener) report(j *ir.Job, path, kind string, child *ir.Pipeline, add
 		}
 	}
 	if kind == kindGitLab && !forwardsPipelineVars(j) {
-		caveats = append(caveats, "a variable that a run sets by hand reads as unset in the child conditions, as GitLab does not forward it without forward:pipeline_variables, but its value can reach the scripts of the child jobs")
+		caveats = append(caveats, "a variable that a run sets by hand reads as unset in the child conditions, as GitLab does not forward it without forward:pipeline_variables, but its value reaches the scripts of the child jobs, because they run in the same pipeline")
 	}
 	if j.Matrix != nil {
 		caveats = append(caveats, "the matrix of the call applies to every child job, so a job that needs a matrix job waits for all its instances")
@@ -634,6 +637,80 @@ func hiddenEnv(h *hiding, parent, own []ir.Var) []ir.Var {
 		}
 	}
 	return out
+}
+
+var posixShells = []string{"sh", "bash", "dash", "ash", "zsh", "ksh"}
+
+// shellBase names the interpreter of a shell setting or of a shebang line, or "" for a template that holds {0}.
+func shellBase(words string) string {
+	f := strings.Fields(words)
+	if len(f) > 0 && path.Base(f[0]) == "env" {
+		f = slices.DeleteFunc(f[1:], func(w string) bool { return strings.HasPrefix(w, "-") })
+	}
+	if len(f) == 0 || strings.Contains(words, "{0}") {
+		return ""
+	}
+	return path.Base(f[0])
+}
+
+// unsetLine writes the command that unsets names in the shell of a step, with ok false when the shell has no such form.
+func unsetLine(shell string, names []string) (line string, posix, ok bool) {
+	if shell == "" {
+		return "unset -v " + strings.Join(names, " "), true, true
+	}
+	var cmds []string
+	switch base := shellBase(shell); {
+	case slices.Contains(posixShells, base):
+		return "unset -v " + strings.Join(names, " "), true, true
+	case base == "pwsh" || base == "powershell":
+		for _, n := range names {
+			cmds = append(cmds, "Remove-Item Env:"+n+" -ErrorAction Ignore")
+		}
+	case base == "cmd":
+		for _, n := range names {
+			cmds = append(cmds, "set "+n+"=")
+		}
+	default:
+		return "", false, false
+	}
+	return strings.Join(cmds, "\n"), false, true
+}
+
+// unsetInScripts makes the script steps of j read each hidden variable as unset, not as empty: the empty value
+// differs from unset for ${NAME-x}, ${NAME+x} and test -v, and a value that a run sets by hand must not reach the script.
+// A step whose shell has no unset form keeps its script and gets a report entry.
+func (f *flattener) unsetInScripts(j *ir.Job, hidden []ir.Var) {
+	if len(hidden) == 0 {
+		return
+	}
+	names := make([]string, len(hidden))
+	for i, v := range hidden {
+		names[i] = v.Name
+	}
+	for _, st := range j.Steps {
+		if st == nil || st.Action != nil || len(st.Script) == 0 || emitkit.IsFailLoud(st.Script) {
+			continue
+		}
+		first, rest, multi := strings.Cut(st.Script[0], "\n")
+		shebang := strings.HasPrefix(first, "#!")
+		line, posix, ok := unsetLine(st.Shell, names)
+		if ok && shebang && (!posix || !slices.Contains(posixShells, shellBase(first[2:]))) {
+			ok = false
+		}
+		if !ok {
+			f.res.Entries = append(f.res.Entries, report.Entry{
+				IRPath: jobPath(f.pl.ID, j.ID) + "/step/" + st.ID, Feature: caps.StepShell, Level: caps.Emulated, Strategy: EntryStrategy,
+				Detail: "the shell of the step has no unset form, so " + strings.Join(names, ", ") + " stay set to the empty value in the script, not unset",
+			})
+			continue
+		}
+		switch {
+		case !shebang:
+			st.Script[0] = line + "\n" + st.Script[0]
+		case multi:
+			st.Script[0] = first + "\n" + line + "\n" + rest
+		}
+	}
 }
 
 // hideVars reads each variable that the child cannot see as unset in a condition.

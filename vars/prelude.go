@@ -179,7 +179,7 @@ func (pr *preparer) step(st *ir.Step, outer []ir.Var, fieldLost []string) *ir.St
 		}
 	}
 	for _, name := range reexport {
-		defs = append(defs, fmt.Sprintf("export %s=\"%s\"", name, quoteValue(env[name].Lit)))
+		defs = append(defs, fmt.Sprintf("export %s=\"%s\"", name, quoteValue(env[name].Lit, pr.origin)))
 	}
 	for _, l := range fieldLost {
 		if arm, isArm := strings.CutPrefix(l, armMark); isArm {
@@ -329,9 +329,13 @@ func appendNew(l []string, s string) []string {
 }
 
 // quoteValue writes a variable value as the inside of a double-quoted shell string that still expands $NAME.
-func quoteValue(v string) string {
-	v = strings.NewReplacer(`\`, `\\`, `"`, `\"`, "`", "\\`", "$(", `\$(`, "$$", `\$`).Replace(v)
-	return v
+// Only a GitLab value keeps "$$" as an escape for one "$"; elsewhere "$$" is two literal dollars.
+func quoteValue(v, origin string) string {
+	pair := `\$\$`
+	if provider.Family(origin) == provider.GitLab {
+		pair = `\$`
+	}
+	return strings.NewReplacer(`\`, `\\`, `"`, `\"`, "`", "\\`", "$(", `\$(`, "$$", pair).Replace(v)
 }
 
 // Strip removes the prelude that Prepare wrote from the scripts of p.
