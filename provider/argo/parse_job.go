@@ -32,12 +32,12 @@ type jobBuilder struct {
 	gitArts       map[*ir.Step]string
 	holds         map[string]string
 	outArts       map[string]string
+	vols          map[string]volume
+	mapped        map[mount]bool
 	path          string
 	fileOutputs   []string
 	finally       bool
 	cacheMounts   bool
-	vols          map[string]volume
-	mapped        map[mount]bool
 }
 
 func (c *plCtx) newJob(cl *call, ids map[string]string, finally bool) *jobBuilder {
