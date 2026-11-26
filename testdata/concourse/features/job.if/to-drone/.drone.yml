@@ -1,5 +1,5 @@
 # pipemaster:emulated job.if pipeline/ci/job/build
-# pipemaster:arg {"if":"branch == 'main'","back":"(event == 'push') \u0026\u0026 (ref_type == 'branch') \u0026\u0026 (branch == 'main')","triggers":"- ext:\n    concourse:\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n"}
+# pipemaster:arg {"if":"branch == 'main'","back":"(event == 'push') \u0026\u0026 (ref_type == 'branch') \u0026\u0026 (branch == 'main')","triggers":"- ext:\n    concourse:\n        _carried:\n            - resources\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n"}
 kind: pipeline
 type: docker
 name: build

@@ -6,6 +6,8 @@ origin:
 pipelines:
     - ext:
         concourse:
+            _carried:
+                - resources
             resources:
                 - name: source-main
                   source:
@@ -22,6 +24,8 @@ pipelines:
       triggers:
         - ext:
             concourse:
+                _carried:
+                    - resources
                 resources:
                     - source-release-old
           kind: push
@@ -30,6 +34,8 @@ pipelines:
                 - '!release/old'
         - ext:
             concourse:
+                _carried:
+                    - resources
                 resources:
                     - source-main
           kind: push
@@ -39,6 +45,8 @@ pipelines:
       jobs:
         - ext:
             concourse:
+                _carried:
+                    - gets
                 gets:
                     - get: source-main
                       trigger: true

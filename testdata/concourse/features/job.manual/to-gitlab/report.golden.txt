@@ -1,5 +1,4 @@
 Loss report: concourse -> gitlab
 [lost] pipeline/gitlab-ci ext.passthrough (the pipeline has no trigger GitLab can express; workflow:rules never starts it)
-[lost] pipeline/gitlab-ci/job/deploy ext.passthrough (Ext of provider concourse (gets) is not written to the GitLab file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci/job/deploy/step/script ext.passthrough (Ext of provider concourse (config, input_mapping) is not written to the GitLab file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci/job/deploy/step/script step.image (GitLab sets the image per job, not per step; the job is not split because the job is manual and allowed to fail)

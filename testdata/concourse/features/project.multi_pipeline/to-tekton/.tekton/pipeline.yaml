@@ -1,3 +1,4 @@
+# pipemaster:emulated ext.passthrough pipeline/.shared
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:

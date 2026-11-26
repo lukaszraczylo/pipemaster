@@ -1,9 +1,5 @@
 Loss report: concourse -> argo
-[lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the Argo file; it is kept in round-trip metadata)
-[lost] pipeline/ci/job/test ext.passthrough (Ext of provider concourse (gets) is not written to the Argo file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/test/step/test-step-1 ext.passthrough (Ext of provider concourse (config, input_mapping, tags) is not written to the Argo file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the Argo file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider concourse (resources) is not written to the Argo file; it is kept in round-trip metadata)
 [external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [external] pipeline/ci/trigger/1 trigger.tag: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/ci/job/test job.matrix: withItems over the expanded cells (the cells run as withItems of one task; fail-fast and max-parallel have no form on one task, so every cell runs and a failing cell fails the task)

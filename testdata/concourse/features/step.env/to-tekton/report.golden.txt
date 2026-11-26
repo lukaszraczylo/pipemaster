@@ -1,8 +1,4 @@
 Loss report: concourse -> tekton
-[lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the Tekton file; it is kept in round-trip metadata)
-[lost] pipeline/ci/job/build ext.passthrough (Ext of provider concourse (gets) is not written to the Tekton file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the Tekton file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider concourse (resources) is not written to the Tekton file; it is kept in round-trip metadata)
 [external] pipeline/ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [external] pipeline/ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [emulated] pipeline/ci/ref/secrets.KEY config.name: secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars (the Secret values and ConfigMap values are not written)

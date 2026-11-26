@@ -1,9 +1,5 @@
 Loss report: concourse -> woodpecker
 [lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
-[lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the Woodpecker file; it is kept in round-trip metadata)
-[lost] pipeline/ci/job/build ext.passthrough (Ext of provider concourse (gets) is not written to the Woodpecker file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-step-1 ext.passthrough (Ext of provider concourse (config, input_mapping, tags) is not written to the Woodpecker file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the Woodpecker file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider concourse (resources) is not written to the Woodpecker file; it is kept in round-trip metadata)
 [external] pipeline/ci/trigger/0 trigger.schedule: when event cron (Woodpecker keeps the schedule in the repo settings: add a cron job with the schedule "0 0 * * 0" under Settings > Cron)
 [external] pipeline/ci/trigger/1 trigger.schedule: when event cron (Woodpecker keeps the schedule in the repo settings: add a cron job with the schedule "30 5 * * 1-5" under Settings > Cron)

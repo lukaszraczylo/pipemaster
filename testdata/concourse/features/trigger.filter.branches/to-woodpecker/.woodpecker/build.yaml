@@ -1,5 +1,5 @@
 # pipemaster:emulated trigger.filter.branches pipeline/ci
-# pipemaster:arg "- ext:\n    concourse:\n        resources:\n            - source-release-old\n  kind: push\n  branches:\n    include:\n        - '!release/old'\n- ext:\n    concourse:\n        resources:\n            - source-main\n  kind: push\n  branches:\n    include:\n        - main\n"
+# pipemaster:arg "- ext:\n    concourse:\n        _carried:\n            - resources\n        resources:\n            - source-release-old\n  kind: push\n  branches:\n    include:\n        - '!release/old'\n- ext:\n    concourse:\n        _carried:\n            - resources\n        resources:\n            - source-main\n  kind: push\n  branches:\n    include:\n        - main\n"
 when:
   - event: push
     branch:

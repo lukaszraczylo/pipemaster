@@ -1,10 +1,6 @@
 Loss report: concourse -> argo
-[lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the Argo file; it is kept in round-trip metadata)
-[lost] pipeline/ci/job/build ext.passthrough (Ext of provider concourse (gets) is not written to the Argo file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-step-1 ext.passthrough (Ext of provider concourse (config, input_mapping, tags) is not written to the Argo file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the Argo file; it is kept in round-trip metadata)
 [lost] pipeline/ci/trigger/0 trigger.filter.tags (the trigger is not written: a glob has no exact regex)
-[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider concourse (resources) is not written to the Argo file; it is kept in round-trip metadata)
 [lost] pipeline/ci/trigger/1 trigger.filter.tags (the trigger is not written: a glob has no exact regex)
 [emulated] pipeline/ci/trigger/0 trigger.tag: EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only)
 [emulated] pipeline/ci/trigger/1 trigger.tag: EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only)

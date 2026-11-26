@@ -1,9 +1,5 @@
 Loss report: concourse -> gitea
-[lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata)
-[lost] pipeline/ci/job/build ext.passthrough (Ext of provider concourse (gets) is not written to the GHA file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-step-1 ext.passthrough (Ext of provider concourse (config, input_mapping, tags) is not written to the GHA file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata)
 [lost] pipeline/ci/trigger/1 trigger.push (event push already has a trigger; GHA allows one filter set per event)
 [emulated] pipeline/ci job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/ci/job/build job.runner: default runner label ubuntu-latest (the IR holds no runner label)

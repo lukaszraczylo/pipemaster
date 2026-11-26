@@ -1,5 +1,6 @@
 # pipemaster:emulated step.image pipeline/.shared/job/run
 # pipemaster:arg {"steps":{"run-step-1":"ref: ubuntu:latest\n"},"wrote":{"run-step-1":"ubuntu:latest"}}
+# pipemaster:emulated ext.passthrough pipeline/.shared
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
