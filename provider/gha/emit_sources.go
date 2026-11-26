@@ -8,10 +8,6 @@ import (
 	"github.com/lukaszraczylo/pipemaster/provider"
 )
 
-// placeholderCron fires on 29 February only. GitLab keeps the cron outside the CI file and GHA needs one, and actionlint
-// rejects a cron that names no day, so the owner must set the real one.
-const placeholderCron = "0 0 29 2 *"
-
 // Pipeline sources that start a run through an API call. GHA has the one event repository_dispatch, and the
 // event_type of the call tells the two apart.
 var apiSources = []string{"api", "trigger"}
@@ -35,12 +31,17 @@ func withGitLabSources(p *ir.Project, target string) (*ir.Project, map[string]so
 		fired := provider.GitLabNamedSources(pl)
 		var added []ir.Trigger
 		var types []any
+		manual := slices.ContainsFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerManual })
 		for _, ev := range fired {
 			switch {
-			case ev.Name == "web":
-				added = append(added, ir.Trigger{Kind: ir.TriggerManual})
-			case ev.Name == "schedule":
-				added = append(added, ir.Trigger{Kind: ir.TriggerSchedule})
+			case ev.Name == "web" || ev.Name == "schedule" && !slices.ContainsFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerSchedule }):
+				if !manual {
+					manual = true
+					added = append(added, ir.Trigger{Kind: ir.TriggerManual})
+				}
+				if ev.Name == "schedule" {
+					added = append(added, ir.Trigger{Kind: ir.TriggerSchedule})
+				}
 			case slices.Contains(apiSources, ev.Name):
 				types = append(types, ev.Name)
 			}
@@ -76,11 +77,10 @@ func dropSourceEvents(pl *ir.Pipeline, arg sourceEventsArg) {
 	pl.Triggers = slices.DeleteFunc(pl.Triggers, func(t ir.Trigger) bool { return slices.Contains(arg.Kinds, t.Kind) })
 }
 
-// externalCron writes the schedule of a GitLab source that names no cron: the schedule lives in the project settings,
-// and the workflow keeps a cron that fires on 29 February only until the owner sets the real one.
-func (e *emitter) externalCron(path string) string {
-	e.external(path, caps.TriggerSchedule, "set the cron expression in on.schedule: GitLab keeps the schedule in the project settings, so the workflow holds "+placeholderCron+" (fires on 29 February only)",
+// externalSchedule reports a GitLab schedule that names no cron: GitLab keeps the cron in the project settings, and an
+// invented time would run the workflow when no schedule asked for it. The workflow has no schedule event, and
+// workflow_dispatch keeps the job reachable.
+func (e *emitter) externalSchedule(path string) {
+	e.external(path, caps.TriggerSchedule, "add on: schedule: - cron: <the cron of your GitLab pipeline schedule> to the workflow: GitLab keeps the schedule in the project settings, so the workflow has no schedule event and the job starts by workflow_dispatch",
 		"the schedule names no cron expression")
-	e.mark(caps.TriggerSchedule, path)
-	return placeholderCron
 }

@@ -36,7 +36,7 @@ func lostJobIf(rep *report.Report) bool {
 func TestGitLabSourcesStartGHAJobs(t *testing.T) {
 	out, rep := convert(t, "gitlab", "gha", ".gitlab-ci.yml", sourcesGitLab)
 	for _, want := range []string{
-		"workflow_dispatch:", "repository_dispatch:", "- api", "- trigger", "schedule:", "- cron: 0 0 29 2 *",
+		"workflow_dispatch:", "repository_dispatch:", "- api", "- trigger",
 		"github.event_name == 'workflow_dispatch'", "github.event_name == 'schedule'",
 		"github.event_name == 'repository_dispatch' && github.event.action == 'api'",
 		"github.event_name == 'repository_dispatch' && github.event.action == 'trigger'",
@@ -47,6 +47,9 @@ func TestGitLabSourcesStartGHAJobs(t *testing.T) {
 	}
 	if strings.Contains(out, "if: false") || lostJobIf(rep) {
 		t.Errorf("a job was disabled:\n%s\n%+v", out, rep.Entries)
+	}
+	if strings.Contains(out, "cron:") || strings.Contains(out, "\n  schedule:") {
+		t.Errorf("the workflow holds a schedule that no GitLab schedule named:\n%s", out)
 	}
 	var external bool
 	for _, e := range rep.Entries {
@@ -105,5 +108,59 @@ func TestEventlessSourceGetsADroneEventList(t *testing.T) {
 		if strings.Contains(out, "- "+no) {
 			t.Errorf("event %s is admitted:\n%s", no, out)
 		}
+	}
+}
+
+const branchTagGitLab = `branch_only:
+  script: [echo branch]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+tag_only:
+  script: [echo tag]
+  rules:
+    - if: '$CI_COMMIT_TAG == "v1"'
+`
+
+// A tag push gives a branch test no branch: Tekton and Argo tell refs/tags/ from refs/heads/ in the webhook ref, so a
+// branch-only job never starts on a tag push, and a tag name never reads as a branch name.
+func TestTektonAndArgoTagPushHasNoBranch(t *testing.T) {
+	t.Run("tekton", func(t *testing.T) {
+		out, _ := convertText(t, "gitlab", "tekton", ".gitlab-ci.yml", branchTagGitLab)
+		for _, want := range []string{
+			"body.ref.startsWith('refs/heads/')", "body.ref.startsWith('refs/tags/')",
+			"key: ctx_branch\n                  expression: ''''''",
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("missing %q:\n%s", want, out)
+			}
+		}
+		if strings.Contains(out, "ctx_branch\n                  expression: body.ref.replace('refs/tags/'") {
+			t.Errorf("a tag push sets the branch:\n%s", out)
+		}
+	})
+	t.Run("argo", func(t *testing.T) {
+		out, _ := convertText(t, "gitlab", "argo", ".gitlab-ci.yml", branchTagGitLab)
+		const tagName = `trimPrefix "refs/tags/" .Input.body.ref`
+		if got := strings.Count(out, tagName); got != 1 {
+			t.Errorf("the tag trigger reads the tag name %d times, want 1 (the tag param only):\n%s", got, out)
+		}
+		if !strings.Contains(out, "spec.arguments.parameters.1.value\n              src:\n                dataTemplate: '{{ "+tagName) {
+			t.Errorf("the tag name does not go to the tag param alone:\n%s", out)
+		}
+	})
+}
+
+// A GitLab schedule keeps its cron in the project settings, so no target file holds a time that no schedule named.
+func TestGitLabScheduleInventsNoCron(t *testing.T) {
+	cronKeys := []string{"cron:", "schedule:", "CronWorkflow", "CronJob"}
+	for _, to := range []string{"gha", "gitea", "forgejo", "woodpecker", "drone", "tekton", "argo", "concourse"} {
+		t.Run(to, func(t *testing.T) {
+			out, _ := convertText(t, "gitlab", to, ".gitlab-ci.yml", sourcesGitLab)
+			for _, k := range cronKeys {
+				if strings.Contains(out, k) {
+					t.Errorf("%s holds %q for a schedule that names no cron:\n%s", to, k, out)
+				}
+			}
+		})
 	}
 }

@@ -309,11 +309,12 @@ func (e *emitter) prEvent(b *onBuilder, path string, t *ir.Trigger) error {
 
 func (e *emitter) scheduleEntry(seq *yaml.Node, path string, t *ir.Trigger) (*yaml.Node, error) {
 	cron := t.Cron
-	switch {
-	case cron == "" && e.origin == provider.GitLab:
-		cron = e.externalCron(path)
-	case cron == "":
-		e.lose(path, caps.TriggerSchedule, "the schedule names no cron expression; GHA needs one")
+	if cron == "" {
+		if e.origin == provider.GitLab {
+			e.externalSchedule(path)
+		} else {
+			e.lose(path, caps.TriggerSchedule, "the schedule names no cron expression; GHA needs one")
+		}
 		return seq, nil
 	}
 	if seq == nil {
