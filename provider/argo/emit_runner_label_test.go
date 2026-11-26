@@ -55,3 +55,18 @@ func TestRunnerSelectorBecomesNodeSelectorEntry(t *testing.T) {
 		}
 	}
 }
+
+func TestMixedRunnerJobNamesLostKeyAndSetup(t *testing.T) {
+	j := scriptJob("build", "make")
+	j.Runner = ir.Runner{Labels: []string{"gpu", "has space"}}
+	_, rep := emit(t, project(j))
+	for _, e := range rep.Entries {
+		if e.Feature == caps.JobRunner {
+			if e.Level != caps.Lost || !strings.Contains(e.Detail, "has space") || !strings.Contains(e.Detail, "runner.pipemaster.io/gpu=true") {
+				t.Errorf("the entry must name the lost label and the node setup: %+v", e)
+			}
+			return
+		}
+	}
+	t.Error("no job.runner entry")
+}

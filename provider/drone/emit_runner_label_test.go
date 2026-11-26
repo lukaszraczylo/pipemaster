@@ -81,3 +81,18 @@ func TestMixedNodeMapSplitsTagsAndSelector(t *testing.T) {
 		t.Errorf("the mixed map must come back with both kinds:\n%s", text)
 	}
 }
+
+func TestMixedRunnerJobNamesLostKeyAndSetup(t *testing.T) {
+	j := gjob("ci", gstep("s", "x"))
+	j.Runner = ir.Runner{Labels: []string{"gpu", "has space"}}
+	_, rep := emitText(t, gproject("woodpecker", j))
+	for _, e := range rep.Entries {
+		if e.Feature == caps.JobRunner {
+			if e.Level != caps.Lost || !strings.Contains(e.Detail, "has space") || !strings.Contains(e.Detail, "DRONE_RUNNER_LABELS=gpu:true") {
+				t.Errorf("the entry must name the lost label and the runner setup: %+v", e)
+			}
+			return
+		}
+	}
+	t.Error("no job.runner entry")
+}

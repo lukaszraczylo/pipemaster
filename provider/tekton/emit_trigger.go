@@ -438,17 +438,20 @@ func taskRunSpecs(pp *plan) *yaml.Node {
 // carries them; otherwise no PipelineRun of the output can hold them.
 func (e *emitter) reportNodeSelectors(pp *plan, templated bool) {
 	for _, jp := range pp.jobs {
-		if len(jp.nodeSel) == 0 {
-			continue
+		if len(jp.nodeSel) > 0 {
+			var keys []string
+			for _, k := range slices.Sorted(maps.Keys(jp.nodeSel)) {
+				keys = append(keys, k+"="+jp.nodeSel[k])
+			}
+			if templated {
+				e.external(jp.path, caps.JobRunner, "workers the operator provides", "label the nodes "+strings.Join(keys, ", ")+" for the runner labels and selector (taskRunSpecs podTemplate nodeSelector of the TriggerTemplate; a run started with tkn pipeline start skips it)")
+			} else {
+				e.lose(jp.path, caps.JobRunner, "the runner labels need a taskRunSpecs podTemplate nodeSelector ("+strings.Join(keys, ", ")+") on the PipelineRun, and this output has no generated TriggerTemplate to hold it")
+			}
 		}
-		var keys []string
-		for _, k := range slices.Sorted(maps.Keys(jp.nodeSel)) {
-			keys = append(keys, k+"="+jp.nodeSel[k])
-		}
-		if templated {
-			e.external(jp.path, caps.JobRunner, "workers the operator provides", "label the nodes "+strings.Join(keys, ", ")+" for the runner labels and selector (taskRunSpecs podTemplate nodeSelector of the TriggerTemplate; a run started with tkn pipeline start skips it)")
-		} else {
-			e.lose(jp.path, caps.JobRunner, "the runner labels need a taskRunSpecs podTemplate nodeSelector ("+strings.Join(keys, ", ")+") on the PipelineRun, and this output has no generated TriggerTemplate to hold it")
+		// The external entry goes first so the lost entry that follows holds both texts.
+		for _, m := range jp.runnerLost {
+			e.lose(jp.path, caps.JobRunner, m)
 		}
 	}
 }

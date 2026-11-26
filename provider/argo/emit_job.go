@@ -193,7 +193,7 @@ func (e *emitter) jobFeatures(tc *jobCtx) {
 	emitkit.ReportHosted(e.origin, r.Labels, "node selector",
 		func(st, d string) { e.external(path, caps.JobRunner, st, d) },
 		func(d string) { e.lose(path, caps.JobRunner, d) })
-	var keys []string
+	var keys, lostMsgs []string
 	for _, l := range emitkit.Unplaced(e.origin, r.Labels) {
 		if k, ok := emitkit.NodeKey(l); ok {
 			if tc.nodeSel == nil {
@@ -203,12 +203,12 @@ func (e *emitter) jobFeatures(tc *jobCtx) {
 			keys = append(keys, k+"="+emitkit.TagValue)
 			continue
 		}
-		e.lose(path, caps.JobRunner, "the runner label "+l+" has no node selector key: "+emitkit.TagHint)
+		lostMsgs = append(lostMsgs, "the runner label "+l+" has no node selector key: "+emitkit.TagHint)
 	}
 	for _, k := range slices.Sorted(maps.Keys(r.Selector)) {
 		v := r.Selector[k]
 		if !emitkit.ValidNodeLabel(k, v) {
-			e.lose(path, caps.JobRunner, "the runner selector "+k+"="+v+" is not a Kubernetes label, so a nodeSelector cannot hold it")
+			lostMsgs = append(lostMsgs, "the runner selector "+k+"="+v+" is not a Kubernetes label, so a nodeSelector cannot hold it")
 			continue
 		}
 		if tc.nodeSel == nil {
@@ -221,7 +221,11 @@ func (e *emitter) jobFeatures(tc *jobCtx) {
 		e.external(path, caps.JobRunner, "workers the operator provides", "label the nodes "+strings.Join(keys, ", ")+" for the runner labels and selector (template nodeSelector)")
 	}
 	if r.Platform != "" {
-		e.lose(path, caps.JobRunner, "Argo schedules pods; a runner platform has no form")
+		lostMsgs = append(lostMsgs, "Argo schedules pods; a runner platform has no form")
+	}
+	// The external entry goes first so the lost entry that follows holds both texts.
+	for _, m := range lostMsgs {
+		e.lose(path, caps.JobRunner, m)
 	}
 }
 

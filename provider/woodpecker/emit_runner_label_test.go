@@ -54,3 +54,12 @@ func TestRunnerSelectorThatIsNoLabelIsLost(t *testing.T) {
 		}
 	}
 }
+
+func TestMixedRunnerJobNamesLostKeyAndSetup(t *testing.T) {
+	j := wpJob("ci", wpStep("s", "x"))
+	j.Runner = ir.Runner{Labels: []string{"gpu", "has space"}}
+	_, rep := one(t, wpProject("drone", j))
+	if !reportHas(rep, caps.JobRunner, caps.Lost) || !reportDetail(rep, caps.JobRunner, "has space") || !reportDetail(rep, caps.JobRunner, "WOODPECKER_AGENT_LABELS=gpu=true") {
+		t.Errorf("the entry must name the lost label and the agent setup: %+v", rep.Entries)
+	}
+}

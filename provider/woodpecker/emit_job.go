@@ -264,7 +264,7 @@ func (e *emitter) labels(m *wmap, c *wfCtx, ext map[string]any) error {
 		}
 		n.set("platform", str(v))
 	}
-	var tags []string
+	var tags, lostMsgs []string
 	for _, l := range emitkit.Unplaced(e.origin, r.Labels) {
 		if l == platform {
 			continue
@@ -274,12 +274,12 @@ func (e *emitter) labels(m *wmap, c *wfCtx, ext map[string]any) error {
 			tags = append(tags, k+"="+emitkit.TagValue)
 			continue
 		}
-		e.lose(c.jp, caps.JobRunner, "the runner label "+l+" has no Woodpecker label key: "+emitkit.TagHint)
+		lostMsgs = append(lostMsgs, "the runner label "+l+" has no Woodpecker label key: "+emitkit.TagHint)
 	}
 	for _, k := range slices.Sorted(maps.Keys(r.Selector)) {
 		v := r.Selector[k]
 		if _, ok := emitkit.TagKey(k); !ok || k == "platform" || v == "" || n.has(k) {
-			e.lose(c.jp, caps.JobRunner, "the runner selector "+k+"="+v+" has no Woodpecker label: the key must be a label key other than platform, and the value must not be empty")
+			lostMsgs = append(lostMsgs, "the runner selector "+k+"="+v+" has no Woodpecker label: the key must be a label key other than platform, and the value must not be empty")
 			continue
 		}
 		t, err := e.text(nil, c.jp, caps.JobRunner, valueText, v)
@@ -289,8 +289,19 @@ func (e *emitter) labels(m *wmap, c *wfCtx, ext map[string]any) error {
 		n.set(k, str(t))
 		tags = append(tags, k+"="+t)
 	}
+	setup := ""
 	if len(tags) > 0 {
-		e.external(c.jp, caps.JobRunner, "workers the operator provides", "register a Woodpecker agent with WOODPECKER_AGENT_LABELS="+strings.Join(tags, ",")+" for the runner labels")
+		setup = "register a Woodpecker agent with WOODPECKER_AGENT_LABELS=" + strings.Join(tags, ",") + " for the runner labels"
+	}
+	switch {
+	case len(lostMsgs) > 0:
+		// One lost entry holds the lost keys and the setup, because the ledger keeps one entry per job.
+		if setup != "" {
+			lostMsgs = append(lostMsgs, setup)
+		}
+		e.lose(c.jp, caps.JobRunner, strings.Join(lostMsgs, "; "))
+	case setup != "":
+		e.external(c.jp, caps.JobRunner, "workers the operator provides", setup)
 	}
 	if err := n.mergeMap(ext[keyLabels]); err != nil {
 		return err

@@ -46,7 +46,9 @@ type jobPlan struct {
 	tname   string
 	kname   string
 	path    string
-	finally bool
+	// runnerLost holds the runner losses; reportNodeSelectors writes them after the external entry.
+	runnerLost []string
+	finally    bool
 }
 
 // ctxParams lists every reserved param name.

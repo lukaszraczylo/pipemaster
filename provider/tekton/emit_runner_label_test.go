@@ -48,3 +48,13 @@ func TestRunnerSelectorThatIsNoLabelIsLost(t *testing.T) {
 	_, rep := emit(t, project(j))
 	wantEntry(t, rep, caps.JobRunner, caps.Lost, "bad key=x")
 }
+
+func TestMixedRunnerJobNamesLostKeyAndSetup(t *testing.T) {
+	j := scriptJob("build", "make")
+	j.Runner = ir.Runner{Labels: []string{"gpu", "has space"}}
+	p := project(j)
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush}}
+	_, rep := emit(t, p)
+	wantEntry(t, rep, caps.JobRunner, caps.Lost, "has space")
+	wantEntry(t, rep, caps.JobRunner, caps.Lost, "runner.pipemaster.io/gpu=true")
+}
