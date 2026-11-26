@@ -227,7 +227,9 @@ func (e *emitter) condition(path string, f caps.Feature, x expr.Expr, what strin
 		return nil, nil, false
 	}
 	if e.from != nil {
-		if t, ok = expr.TranslateFacts(rest, *e.from, wpexpr.Lang, e.facts); !ok {
+		facts := e.facts
+		facts.Exact = hasStatusCall(x) // a condition with a status call carries no source marker
+		if t, ok = expr.TranslateFacts(rest, *e.from, wpexpr.Lang, facts); !ok {
 			e.disable(path, f, x, what)
 			return nil, nil, false
 		}

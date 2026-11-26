@@ -23,6 +23,7 @@ const (
 type emitter struct {
 	// injected names the pipelines whose triggers come from the default events of their source.
 	injected       map[string]bool
+	srcEvents      map[string]sourceEventsArg
 	origin         string
 	jobGuards      map[string]bool
 	from           *expr.Dialect

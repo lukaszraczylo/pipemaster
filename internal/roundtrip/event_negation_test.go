@@ -51,6 +51,7 @@ func TestDroneEventFiltersRunOnWoodpeckerNeverWhereDroneSkips(t *testing.T) {
 		{"exclude pull request", nil, []string{"pull_request"}},
 		{"exclude cron", nil, []string{"cron"}},
 		{"exclude two", nil, []string{"pull_request", "cron"}},
+		{"exclude push and tag", nil, []string{"push", "tag"}},
 		{"include pull request", []string{"pull_request"}, nil},
 		{"include and exclude", []string{"pull_request", "cron"}, []string{"cron"}},
 	}

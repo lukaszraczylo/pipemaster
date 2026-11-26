@@ -82,6 +82,12 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			}
 		case caps.TriggerManual:
 			pl.Triggers = slices.DeleteFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerManual })
+		case caps.TriggerSchedule:
+			for i := range pl.Triggers {
+				if pl.Triggers[i].Kind == ir.TriggerSchedule && pl.Triggers[i].Cron == neverCron {
+					pl.Triggers[i].Cron = ""
+				}
+			}
 		case caps.JobIf:
 			if j := markedJob(pl, u.IRPath); j != nil {
 				j.If = sourceCond(rep, u, args[u], j.If, &condsFrom)
@@ -101,6 +107,10 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 		case caps.TriggerAPI:
 			dropSynthEvent(pl, u.IRPath, provider.Family(e.d.ID))
 		case caps.TriggerPush:
+			var src sourceEventsArg
+			if len(args[u]) == 1 && u.IRPath == "pipeline/"+pl.ID && json.Unmarshal([]byte(args[u][0]), &src) == nil && len(src.Kinds) > 0 {
+				dropSourceEvents(pl, src)
+			}
 			var d provider.DefaultTriggersArg
 			if len(args[u]) == 1 && json.Unmarshal([]byte(args[u][0]), &d) == nil && d.Default {
 				if u.IRPath == "pipeline/"+pl.ID {

@@ -38,9 +38,11 @@ func (a *adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, er
 	p, vres := vars.Prepare(p, a.d.ID)
 	p = bindRefEnv(p, a.d.ID)
 	p, noForm, injected := provider.WithDefaultTriggers(p, a.d.ID)
+	p, srcEvents := withGitLabSources(p, a.d.ID)
 	e := &emitter{origin: originProvider(p), d: a.d, from: sourceDialect(originProvider(p)), led: emitkit.NewLedger("ir", a.d.ID, a.Caps()),
 		jobGuards: p.Origin.Guarded}
 	e.injected = injected
+	e.srcEvents = srcEvents
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)
@@ -112,6 +114,11 @@ func (e *emitter) pipelineFile(pl *ir.Pipeline) (string, []byte, error) {
 	}
 	if e.injected[pl.ID] {
 		if err := e.markArg(caps.TriggerPush, "pipeline/"+pl.ID, provider.DefaultTriggersArg{Default: true}); err != nil {
+			return "", nil, err
+		}
+	}
+	if arg, ok := e.srcEvents[pl.ID]; ok {
+		if err := e.markArg(caps.TriggerPush, "pipeline/"+pl.ID, arg); err != nil {
 			return "", nil, err
 		}
 	}

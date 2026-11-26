@@ -37,11 +37,13 @@ var Lang = expr.Dialect{
 	Class:      expr.ClassGitLab,
 	BranchOnPR: true,
 	TagEvent:   true,
-	Vocab:      langVocab(),
-	Sem:        Semantics,
-	Events:     langEvents(),
-	Reads:      inSubset,
-	Supports:   func(e expr.Expr) bool { _, ok := FromExpr(e, Semantics); return ok },
+	// DeployEvents are the Drone events with no canonical name that a deployment of another dialect covers.
+	DeployEvents: []string{"promote", "rollback"},
+	Vocab:        langVocab(),
+	Sem:          Semantics,
+	Events:       langEvents(),
+	Reads:        inSubset,
+	Supports:     func(e expr.Expr) bool { _, ok := FromExpr(e, Semantics); return ok },
 }
 
 func init() { expr.RegisterLang(&Lang) }

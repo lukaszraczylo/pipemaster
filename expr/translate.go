@@ -22,10 +22,15 @@ type Dialect struct {
 	Vocab  Vocab
 	Sem    Semantics
 	ID     string
+	// DeployEvent is the event of the dialect for a promotion or rollback (Woodpecker: deployment).
+	DeployEvent string
 	// PushEvents are the events that stand for canonical push when Events has no entry for it (Woodpecker: push and
 	// tag, as GHA and GitLab call a tag push a push).
 	PushEvents []string
-	Class      Class
+	// DeployEvents are the events of the dialect that no canonical name stands for and that a DeployEvent covers
+	// (Drone: promote, rollback).
+	DeployEvents []string
+	Class        Class
 	// BranchOnPR is true when the branch ref holds the target branch in a pull request run (Woodpecker, Drone).
 	// GitLab leaves it unset in a merge request pipeline.
 	BranchOnPR bool
@@ -728,7 +733,7 @@ func userRef(r Ref) bool {
 // by the Lean theorems: only Translate and Translatable are proved, and tests check this function in Go
 // alone. An exact translation returns no caveats.
 func TranslateApprox(e Expr, from, to Dialect) (Expr, []string, bool) {
-	for _, v := range variants(e, from, to) {
+	for _, v := range eventVariants(e, from, to) {
 		if t, cav, ok := translateApprox(v.e, v.from, to); ok {
 			return v.finish(t), cav, true
 		}
