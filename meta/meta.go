@@ -48,7 +48,11 @@ type Meta struct {
 	// SourceInvalid holds the schema findings of the files the first conversion read, so a full return that
 	// restores them can tell a finding the user already had from a new one.
 	SourceInvalid []string `yaml:"source_invalid,omitempty"`
-	Version       int      `yaml:"version,omitempty"`
+	// Guarded holds the source IR paths of the jobs whose deletion guard the GHA parser stripped. GuardScoped
+	// tells an empty list from a source that kept no such record, where every job from another provider is guarded.
+	Guarded     []string `yaml:"guarded,omitempty"`
+	Version     int      `yaml:"version,omitempty"`
+	GuardScoped bool     `yaml:"guard_scoped,omitempty"`
 }
 
 // Call records one child call that an emit inlined: the call job as the source holds it, with its child pipeline,

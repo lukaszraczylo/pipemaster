@@ -21,7 +21,7 @@ func NewMeta(sourceID string, proj *ir.Project, target provider.Provider, rep *r
 	ids := IDsFor(target, proj)
 	lost, skipped := meta.CollectLost(proj, append(sourceEntries(rep, ids), retainedEntries(rep, ids)...))
 	noteUnrecorded(rep, ids, skipped)
-	return &meta.Meta{
+	m := &meta.Meta{
 		IDs:      ids,
 		Lost:     lost,
 		Source:   sourceID,
@@ -32,6 +32,11 @@ func NewMeta(sourceID string, proj *ir.Project, target provider.Provider, rep *r
 		Calls:    nilIfEmpty(inlined.Calls),
 		Version:  meta.Version,
 	}
+	if g := proj.Origin.Guarded; g != nil {
+		m.GuardScoped = true
+		m.Guarded = slices.Sorted(maps.Keys(g))
+	}
+	return m
 }
 
 func nilIfEmpty(c map[string]meta.Call) map[string]meta.Call {
@@ -59,6 +64,12 @@ func restore(proj *ir.Project, m *meta.Meta, keepEdits bool) (orphans, kept []st
 	RestoreIDs(proj, m.IDs)
 	if m.Source != "" {
 		proj.Origin.Provider, proj.Origin.Dialect = m.Source, m.Dialect
+	}
+	if m.GuardScoped {
+		proj.Origin.Guarded = map[string]bool{}
+		for _, p := range m.Guarded {
+			proj.Origin.Guarded[p] = true
+		}
 	}
 	if keepEdits {
 		orphans, kept = meta.ReattachKeepingEdits(proj, m)

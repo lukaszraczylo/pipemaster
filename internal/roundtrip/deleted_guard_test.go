@@ -10,6 +10,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
+	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
@@ -297,6 +298,46 @@ func TestMixedDirectoryThroughGitLabAndBack(t *testing.T) {
 			if strings.Count(string(f.Data), "!github.event.deleted") > 1 {
 				t.Errorf("%s: guard doubled in %s:\n%s", c.name, n, f.Data)
 			}
+		}
+	}
+}
+
+// TestMixedDirectoryKeepsGuardThroughGitLabWithMetadata: the metadata carries which jobs held a stripped guard, so
+// the trip back guards the converted job and leaves the hand-written one alone.
+func TestMixedDirectoryKeepsGuardThroughGitLabWithMetadata(t *testing.T) {
+	gha, gl := prov(t, "gha"), prov(t, "gitlab")
+	for _, c := range mixedNatives {
+		src, _, err := gha.Parse(mixedDir(t, c.native))
+		if err != nil {
+			t.Fatal(err)
+		}
+		files, rep, err := gl.Emit(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fsys := toFS(attachOne(files, roundtrip.NewMeta("gha", src, gl, rep)))
+		mid, _, err := gl.Parse(fsys)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m, err := loadTop(fsys, mid.Origin.Files)
+		if err != nil || m == nil {
+			t.Fatalf("load meta: %v %v", m, err)
+		}
+		roundtrip.Restore(mid, m)
+		out, _, err := gha.Emit(mid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		conv, nat := string(out[".github/workflows/gitlab-ci.yml"]), string(out[".github/workflows/native.yml"])
+		if !strings.Contains(conv, "!github.event.deleted") {
+			t.Errorf("%s: converted job lost its deletion guard:\n%s", c.name, conv)
+		}
+		if strings.Contains(nat, "deleted") || strings.Contains(nat, "checkout") {
+			t.Errorf("%s: hand-written job gained a guard or checkout:\n%s", c.name, nat)
+		}
+		if want := alone(t, c.native); nat != want {
+			t.Errorf("%s: native workflow changed:\n--- want\n%s\n--- got\n%s", c.name, want, nat)
 		}
 	}
 }
