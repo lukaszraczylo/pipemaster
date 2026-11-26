@@ -354,7 +354,7 @@ func TestPullRequestFilterRejectsForks(t *testing.T) {
 }
 
 func TestTagTriggerSetsTheEventOfTheSourceDialect(t *testing.T) {
-	for origin, want := range map[string]string{"gha": "'push'", "woodpecker": "'tag'", "drone": "'tag'", "gitlab": "'tag'"} {
+	for origin, want := range map[string]string{"gha": "'push'", "woodpecker": "'tag'", "drone": "'tag'", "concourse": "'tag'", "gitlab": "'push'", "gitea": "'push'"} {
 		t.Run(origin, func(t *testing.T) {
 			p := withTriggers(ir.Trigger{Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{"v*"}}})
 			p.Origin = ir.Origin{Provider: origin, Dialect: origin}

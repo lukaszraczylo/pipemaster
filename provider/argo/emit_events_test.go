@@ -142,7 +142,7 @@ func TestCronParseBack(t *testing.T) {
 }
 
 func TestTagTriggerSetsTheEventOfTheSourceDialect(t *testing.T) {
-	for origin, want := range map[string]string{"gha": "value: push", "woodpecker": "value: tag", "gitlab": "value: tag"} {
+	for origin, want := range map[string]string{"gha": "value: push", "woodpecker": "value: tag", "drone": "value: tag", "concourse": "value: tag", "gitlab": "value: push", "gitea": "value: push"} {
 		t.Run(origin, func(t *testing.T) {
 			p := project(scriptJob("build", "echo ${{ event }}"))
 			p.Origin = ir.Origin{Provider: origin, Dialect: origin}

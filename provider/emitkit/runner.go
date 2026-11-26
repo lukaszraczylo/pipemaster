@@ -68,12 +68,12 @@ func WorkerTags(origin string, labels []string) []string {
 	return out
 }
 
-// TagIsEvent is true when a pipeline from origin tests a tag run as the event tag. Drone, GitLab, Woodpecker
-// and Concourse name a tag event. A GHA-family, Tekton or Argo push event also covers a tag push, so those
-// projects test it as push.
+// TagIsEvent is true when a pipeline from origin tests a tag run as the event tag. Drone, Woodpecker and Concourse
+// name a tag event. A GHA-family, GitLab, Tekton or Argo push event also covers a tag push (GitLab: pipeline source
+// push includes branches and tags, https://docs.gitlab.com/ci/jobs/job_rules/), so those projects test it as push.
 func TagIsEvent(origin string) bool {
 	switch origin {
-	case provider.Drone, provider.GitLab, provider.Woodpecker, provider.Concourse:
+	case provider.Drone, provider.Woodpecker, provider.Concourse:
 		return true
 	}
 	return false
