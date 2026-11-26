@@ -1,5 +1,6 @@
 Loss report: gitlab -> gha
 [lost] pipeline/gitlab-ci/job/build ext.passthrough (Ext of provider gitlab (cache) is not written to the GHA file; it is kept in round-trip metadata)
 [emulated] pipeline/gitlab-ci job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
+[emulated] pipeline/gitlab-ci/job/build job.cache: actions/cache step; policy pull is actions/cache/restore, policy push is actions/cache/save at job end (a key with no hashFiles call becomes a rolling key (<key>-run-<run_id>, restored by prefix) so each run saves a cache as GitLab does; GitHub restores only caches of the current branch, the base branch of a pull request and the default branch, while a GitLab key with no branch part is shared across branches)
 [emulated] pipeline/gitlab-ci/job/build job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/gitlab-ci/job/build step.action: actions/checkout step (GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs)

@@ -1,5 +1,6 @@
 Loss report: drone -> gitea
 [emulated] pipeline/drone job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
+[emulated] pipeline/drone/job/ci job.cache: actions/cache step with a rolling key (the key is <key>-run-<run_id> and the restore prefix is <key>-run-: each run saves a new cache and restores the newest by prefix, because actions/cache never overwrites a key; GitHub restores only caches of the current branch, the base branch of a pull request and the default branch, while a GitLab key with no branch part is shared across branches)
 [emulated] pipeline/drone/job/ci job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/drone/job/ci/step/build step.image: uses: docker://<image> with entrypoint and args
 [emulated] pipeline/drone/trigger/0 trigger.push: branches: '**' (GHA fires a push without filters for branches and tags; branches are named explicitly to leave tags out or beside a tag filter)

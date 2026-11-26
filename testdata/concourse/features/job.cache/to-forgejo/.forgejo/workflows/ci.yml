@@ -26,8 +26,8 @@ jobs:
           path: |
             .cache/go
             vendor
-          key: default-${{ github.run_id }}
-          restore-keys: default-
+          key: default-run-${{ github.run_id }}
+          restore-keys: default-run-
       # pipemaster:emulated step.image pipeline/ci/job/build/step/compile
       - id: compile
         uses: docker://golang:latest

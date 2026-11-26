@@ -19,8 +19,8 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: ~/go/pkg/mod
-          key: go-mod-${{ github.run_id }}
-          restore-keys: go-mod-
+          key: go-mod-run-${{ github.run_id }}
+          restore-keys: go-mod-run-
       # pipemaster:emulated step.image pipeline/drone/job/ci/step/build
       - id: build
         uses: docker://golang:1.25
