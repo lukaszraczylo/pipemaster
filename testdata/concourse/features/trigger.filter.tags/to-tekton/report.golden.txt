@@ -3,3 +3,4 @@ Loss report: concourse -> tekton
 [lost] pipeline/ci/trigger/1 trigger.filter.tags (a glob has no exact CEL regex, so the filter is false and the trigger never fires; the globs stay in the marker)
 [external] pipeline/ci/trigger/0 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [external] pipeline/ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[emulated] pipeline/ci/job/build/step/source-checkout step.action: StepAction ref to the tektoncd-catalog git-clone through the git resolver (the ctx-repo and ctx-sha params carry the repository and the commit)

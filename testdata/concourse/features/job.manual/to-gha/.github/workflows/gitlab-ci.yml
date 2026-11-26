@@ -2,6 +2,8 @@
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/deploy
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/deploy/step/script
 # pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["make deploy"]}
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/deploy
+# pipemaster:arg {"pre":1,"post":0}
 on:
   # pipemaster:emulated job.manual pipeline/gitlab-ci/job/deploy
   workflow_dispatch:
@@ -12,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated step.image pipeline/gitlab-ci/job/deploy/step/script
       - id: script
         uses: docker://ubuntu:latest

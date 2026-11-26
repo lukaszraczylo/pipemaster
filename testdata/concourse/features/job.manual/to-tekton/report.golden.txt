@@ -1,2 +1,3 @@
 Loss report: concourse -> tekton
 [lost] pipeline/gitlab-ci/job/deploy job.manual (Tekton has no manual job gate)
+[emulated] pipeline/gitlab-ci/job/deploy/step/source-checkout step.action: StepAction ref to the tektoncd-catalog git-clone through the git resolver (the ctx-repo and ctx-sha params carry the repository and the commit)

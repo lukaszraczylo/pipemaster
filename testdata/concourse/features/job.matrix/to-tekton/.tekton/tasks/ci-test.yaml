@@ -1,3 +1,5 @@
+# pipemaster:emulated step.action pipeline/ci/job/test/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"{\"name\":\"source-checkout\",\"params\":[{\"name\":\"url\",\"value\":\"https://github.com/$(params.ctx-repo).git\"},{\"name\":\"revision\",\"value\":\"$(params.ctx-sha)\"},{\"name\":\"output-path\",\"value\":\"/workspace\"}],\"ref\":{\"params\":[{\"name\":\"url\",\"value\":\"https://github.com/tektoncd-catalog/git-clone.git\"},{\"name\":\"revision\",\"value\":\"v1.7.1\"},{\"name\":\"pathInRepo\",\"value\":\"stepaction/git-clone/git-clone.yaml\"}],\"resolver\":\"git\"}}","at":0}
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"axes":[{"Name":"os","Values":["ubuntu-latest","macos-latest"]},{"Name":"go","Values":["1.24","1.25"]}],"exclude":[[{"Key":"go","Value":"1.24"},{"Key":"os","Value":"macos-latest"}]],"include":[[{"Key":"experimental","Value":"true"},{"Key":"go","Value":"1.25"},{"Key":"os","Value":"ubuntu-latest"}]]}
 apiVersion: tekton.dev/v1
@@ -9,7 +11,28 @@ spec:
     - name: os
     - name: go
     - name: experimental
+    - name: ctx-repo
+    - name: ctx-sha
+  stepTemplate:
+    workingDir: /workspace
   steps:
+    - name: source-checkout
+      ref:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/tektoncd-catalog/git-clone.git
+          - name: revision
+            value: v1.7.1
+          - name: pathInRepo
+            value: stepaction/git-clone/git-clone.yaml
+      params:
+        - name: url
+          value: https://github.com/$(params.ctx-repo).git
+        - name: revision
+          value: $(params.ctx-sha)
+        - name: output-path
+          value: /workspace
     - name: test-step-1
       image: ubuntu:latest
       script: echo $(params.go)

@@ -1,3 +1,5 @@
+# pipemaster:emulated step.action pipeline/ci/job/build/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated job.cache pipeline/ci/job/build
 # pipemaster:arg {"caches":"- paths:\n    - .cache/go\n    - vendor\n"}
 # pipemaster:emulated step.image pipeline/ci/job/build
@@ -10,6 +12,12 @@ metadata:
   name: ci
 spec:
   entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-sha
+        value: ""
+      - name: ctx-repo
+        value: ""
   volumeClaimTemplates:
     - metadata:
         name: cache-build-1
@@ -36,7 +44,8 @@ spec:
             args:
               - go build ./...
             workingDir: /workspace
-          - name: test
+          - # pipemaster:id test
+            name: main
             image: golang:latest
             command:
               - sh
@@ -55,6 +64,13 @@ spec:
           - name: cache-build-1
             mountPath: /workspace/vendor
             subPath: p2
+      inputs:
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       volumes:
         - emptyDir: {}
           name: workspace

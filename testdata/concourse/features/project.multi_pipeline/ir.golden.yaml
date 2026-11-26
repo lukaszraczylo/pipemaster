@@ -21,6 +21,7 @@ pipelines:
             concourse:
                 _carried:
                     - gets
+                _checkout: {}
                 gets:
                     - get: source
           id: run
@@ -86,6 +87,7 @@ pipelines:
             concourse:
                 _carried:
                     - gets
+                _checkout: {}
                 gets:
                     - get: source
                       trigger: true

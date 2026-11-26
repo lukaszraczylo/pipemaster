@@ -29,6 +29,12 @@ spec:
           params:
             - name: filter
               value: "false"
+            - name: overlays
+              value:
+                - key: ctx_sha
+                  expression: body.after
+                - key: ctx_repo
+                  expression: body.repository.full_name
       bindings:
         - ref: ci-github
       template:
@@ -53,6 +59,12 @@ spec:
           params:
             - name: filter
               value: "false"
+            - name: overlays
+              value:
+                - key: ctx_sha
+                  expression: body.after
+                - key: ctx_repo
+                  expression: body.repository.full_name
       bindings:
         - ref: ci-github
       template:

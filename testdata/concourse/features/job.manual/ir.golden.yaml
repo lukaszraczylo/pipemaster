@@ -24,6 +24,7 @@ pipelines:
             concourse:
                 _carried:
                     - gets
+                _checkout: {}
                 gets:
                     - get: source
                     - get: source-tags

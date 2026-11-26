@@ -34,6 +34,14 @@ spec:
               src:
                 dependencyName: ci-push
                 value: push
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dataKey: body.after
+                dependencyName: ci-push
+            - dest: spec.arguments.parameters.2.value
+              src:
+                dataKey: body.repository.full_name
+                dependencyName: ci-push
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -44,6 +52,10 @@ spec:
                 arguments:
                   parameters:
                     - name: ctx-event
+                      value: ""
+                    - name: ctx-sha
+                      value: ""
+                    - name: ctx-repo
                       value: ""
                 serviceAccountName: pipemaster-workflow
                 workflowTemplateRef:
@@ -58,6 +70,14 @@ spec:
               src:
                 dependencyName: ci-tag
                 value: tag
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dataKey: body.after
+                dependencyName: ci-tag
+            - dest: spec.arguments.parameters.2.value
+              src:
+                dataKey: body.repository.full_name
+                dependencyName: ci-tag
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -68,6 +88,10 @@ spec:
                 arguments:
                   parameters:
                     - name: ctx-event
+                      value: ""
+                    - name: ctx-sha
+                      value: ""
+                    - name: ctx-repo
                       value: ""
                 serviceAccountName: pipemaster-workflow
                 workflowTemplateRef:

@@ -49,6 +49,7 @@ pipelines:
             concourse:
                 _carried:
                     - gets
+                _checkout: {}
                 gets:
                     - get: source
                       trigger: true

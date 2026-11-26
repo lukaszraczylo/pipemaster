@@ -25,6 +25,14 @@ spec:
               src:
                 dataTemplate: '{{ trimPrefix "refs/heads/" .Input.body.ref }}'
                 dependencyName: ci-push
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dataKey: body.after
+                dependencyName: ci-push
+            - dest: spec.arguments.parameters.2.value
+              src:
+                dataKey: body.repository.full_name
+                dependencyName: ci-push
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -35,6 +43,10 @@ spec:
                 arguments:
                   parameters:
                     - name: ctx-branch
+                      value: ""
+                    - name: ctx-sha
+                      value: ""
+                    - name: ctx-repo
                       value: ""
                 serviceAccountName: pipemaster-workflow
                 workflowTemplateRef:

@@ -1,3 +1,4 @@
 Loss report: concourse -> tekton
 [lost] pipeline/drone/job/deploy job.environment (Tekton has no environment name or URL)
 [lost] pipeline/drone/job/deploy job.environment.approval (Tekton has no approval gate)
+[emulated] pipeline/drone/job/deploy/step/source-checkout step.action: StepAction ref to the tektoncd-catalog git-clone through the git resolver (the ctx-repo and ctx-sha params carry the repository and the commit)

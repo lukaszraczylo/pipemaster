@@ -1,6 +1,7 @@
 Loss report: concourse -> argo
 [lost] pipeline/ci/job/build/step/compile ext.passthrough (Ext of provider concourse (config) is not written to the Argo file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/test ext.passthrough (Ext of provider concourse (config) is not written to the Argo file; it is kept in round-trip metadata)
+[external] pipeline/ci/job/build/step/source-checkout step.action: input git artifact at /workspace (the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; a private repository needs usernameSecret and passwordSecret, or sshPrivateKeySecret, on the git artifact; the file names none)
 [external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/ci/job/build job.cache: PVC from volumeClaimTemplates (the cache  is a claim per job and holds the paths; it lives for one Workflow unless the claim is shared)
 [emulated] pipeline/ci/trigger/0 trigger.filter.branches

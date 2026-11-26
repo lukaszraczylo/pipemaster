@@ -1,5 +1,9 @@
+# pipemaster:emulated step.action pipeline/ci/job/build/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated step.image pipeline/ci/job/build
 # pipemaster:arg {"steps":{"build-step-1":"ref: alpine:3.20\n"},"wrote":{"build-step-1":"alpine:3.20"}}
+# pipemaster:emulated step.action pipeline/ci/job/deploy/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated step.image pipeline/ci/job/deploy
 # pipemaster:arg {"steps":{"deploy-step-1":"ref: ubuntu:latest\n"},"wrote":{"deploy-step-1":"ubuntu:latest"}}
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
@@ -15,6 +19,12 @@ metadata:
     workflows.argoproj.io/title: base
 spec:
   entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-sha
+        value: ""
+      - name: ctx-repo
+        value: ""
   templates:
     - name: main
       dag:
@@ -28,7 +38,8 @@ spec:
     - name: build
       containerSet:
         containers:
-          - name: build-step-1
+          - # pipemaster:id build-step-1
+            name: main
             image: alpine:3.20
             command:
               - sh
@@ -39,13 +50,21 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+      inputs:
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       volumes:
         - emptyDir: {}
           name: workspace
     - name: deploy
       containerSet:
         containers:
-          - name: deploy-step-1
+          - # pipemaster:id deploy-step-1
+            name: main
             image: ubuntu:latest
             command:
               - sh
@@ -56,6 +75,13 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+      inputs:
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       volumes:
         - emptyDir: {}
           name: workspace

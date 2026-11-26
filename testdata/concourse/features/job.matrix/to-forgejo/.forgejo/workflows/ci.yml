@@ -4,6 +4,8 @@
 # pipemaster:emulated job.runner pipeline/ci/job/test
 # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
 # pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo $\u007b{ matrix.go }}"]}
+# pipemaster:emulated job.artifacts pipeline/ci/job/test
+# pipemaster:arg {"pre":1,"post":0}
 name: matrix
 on:
   push:
@@ -36,6 +38,7 @@ jobs:
       fail-fast: false
       max-parallel: 2
     steps:
+      - uses: https://github.com/actions/checkout@v7
       # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
       - id: test-step-1
         uses: docker://ubuntu:latest

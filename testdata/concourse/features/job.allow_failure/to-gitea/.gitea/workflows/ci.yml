@@ -3,6 +3,8 @@
 # pipemaster:emulated job.runner pipeline/ci/job/flaky
 # pipemaster:emulated step.image pipeline/ci/job/flaky/step/flaky-step-1
 # pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo ok"]}
+# pipemaster:emulated job.artifacts pipeline/ci/job/flaky
+# pipemaster:arg {"pre":1,"post":0}
 name: allow
 on:
   push:
@@ -16,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated step.image pipeline/ci/job/flaky/step/flaky-step-1
       - id: flaky-step-1
         uses: docker://ubuntu:latest
