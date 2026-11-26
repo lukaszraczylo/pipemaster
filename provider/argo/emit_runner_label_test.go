@@ -33,3 +33,25 @@ func TestRunnerTagBecomesNodeSelector(t *testing.T) {
 		t.Errorf("want external for the valid tag and lost for the invalid one: %+v", rep.Entries)
 	}
 }
+
+func TestRunnerSelectorBecomesNodeSelectorEntry(t *testing.T) {
+	j := scriptJob("build", "make")
+	j.Runner = ir.Runner{Selector: map[string]string{"region": "eu"}}
+	bad := scriptJob("bad", "make")
+	bad.Runner = ir.Runner{Selector: map[string]string{"bad key": "x"}}
+	files, rep := emit(t, project(j, bad))
+	all := joinFiles(files)
+	if !strings.Contains(all, "region: eu") || strings.Contains(all, "bad key") {
+		t.Errorf("a valid selector entry is a nodeSelector entry and an invalid one is not written:\n%s", all)
+	}
+	wantLevels := map[caps.Level]string{caps.External: "region=eu", caps.Lost: "bad key=x"}
+	for lv, sub := range wantLevels {
+		found := false
+		for _, e := range rep.Entries {
+			found = found || (e.Feature == caps.JobRunner && e.Level == lv && strings.Contains(e.Detail, sub))
+		}
+		if !found {
+			t.Errorf("no %v job.runner entry naming %q: %+v", lv, sub, rep.Entries)
+		}
+	}
+}

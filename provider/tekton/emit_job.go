@@ -1,6 +1,8 @@
 package tekton
 
 import (
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -65,10 +67,21 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 			jp.nodeSel[k] = emitkit.TagValue
 			continue
 		}
-		e.lose(jp.path, caps.JobRunner, "the runner label "+l+" has no node selector key: a key needs letters, digits, dot, underscore or dash")
+		e.lose(jp.path, caps.JobRunner, "the runner label "+l+" has no node selector key: "+emitkit.TagHint)
 	}
-	if j.Runner.Platform != "" || len(j.Runner.Selector) > 0 {
-		e.lose(jp.path, caps.JobRunner, "Tekton schedules pods; the runner platform and selector have no form")
+	for _, k := range slices.Sorted(maps.Keys(j.Runner.Selector)) {
+		v := j.Runner.Selector[k]
+		if !emitkit.ValidNodeLabel(k, v) {
+			e.lose(jp.path, caps.JobRunner, "the runner selector "+k+"="+v+" is not a Kubernetes label, so a nodeSelector cannot hold it")
+			continue
+		}
+		if jp.nodeSel == nil {
+			jp.nodeSel = map[string]string{}
+		}
+		jp.nodeSel[k] = v
+	}
+	if j.Runner.Platform != "" {
+		e.lose(jp.path, caps.JobRunner, "Tekton schedules pods; the runner platform has no form")
 	}
 	jc, viaChanges := tc.changesCond(jp.path, j.If)
 	if !viaChanges {

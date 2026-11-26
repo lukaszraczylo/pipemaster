@@ -203,13 +203,25 @@ func (e *emitter) jobFeatures(tc *jobCtx) {
 			keys = append(keys, k+"="+emitkit.TagValue)
 			continue
 		}
-		e.lose(path, caps.JobRunner, "the runner label "+l+" has no node selector key: a key needs letters, digits, dot, underscore or dash")
+		e.lose(path, caps.JobRunner, "the runner label "+l+" has no node selector key: "+emitkit.TagHint)
+	}
+	for _, k := range slices.Sorted(maps.Keys(r.Selector)) {
+		v := r.Selector[k]
+		if !emitkit.ValidNodeLabel(k, v) {
+			e.lose(path, caps.JobRunner, "the runner selector "+k+"="+v+" is not a Kubernetes label, so a nodeSelector cannot hold it")
+			continue
+		}
+		if tc.nodeSel == nil {
+			tc.nodeSel = map[string]any{}
+		}
+		tc.nodeSel[k] = v
+		keys = append(keys, k+"="+v)
 	}
 	if len(keys) > 0 {
-		e.external(path, caps.JobRunner, "workers the operator provides", "label the nodes "+strings.Join(keys, ", ")+" for the runner labels (template nodeSelector)")
+		e.external(path, caps.JobRunner, "workers the operator provides", "label the nodes "+strings.Join(keys, ", ")+" for the runner labels and selector (template nodeSelector)")
 	}
-	if r.Platform != "" || len(r.Selector) > 0 {
-		e.lose(path, caps.JobRunner, "Argo schedules pods; a runner platform or selector has no form")
+	if r.Platform != "" {
+		e.lose(path, caps.JobRunner, "Argo schedules pods; a runner platform has no form")
 	}
 }
 

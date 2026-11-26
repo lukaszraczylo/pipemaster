@@ -137,6 +137,32 @@ func TagKey(tag string) (string, bool) {
 	return tag, len(tag) <= maxTagLen && tagRE.MatchString(tag)
 }
 
+// TagHint says what a valid tag looks like, for the lost entry of a tag that TagKey refuses.
+const TagHint = "a label key has 1 to 63 letters, digits, dots, underscores or dashes and starts and ends with a letter or digit"
+
+var (
+	nodeKeyNameRE = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$`)
+	nodePrefixRE  = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$`)
+)
+
+const maxNodePrefixLen = 253
+
+// ValidNodeLabel is true when k and v form a Kubernetes label: an optional DNS prefix and a name for the key, and a
+// value of at most 63 name characters (it can be empty).
+func ValidNodeLabel(k, v string) bool {
+	name := k
+	if prefix, rest, ok := strings.Cut(k, "/"); ok {
+		if len(prefix) > maxNodePrefixLen || !nodePrefixRE.MatchString(prefix) {
+			return false
+		}
+		name = rest
+	}
+	if len(name) > maxTagLen || !nodeKeyNameRE.MatchString(name) {
+		return false
+	}
+	return v == "" || (len(v) <= maxTagLen && nodeKeyNameRE.MatchString(v))
+}
+
 // NodeKey returns the Kubernetes node selector key of a runner tag, or false when the tag has no valid key.
 func NodeKey(tag string) (string, bool) {
 	if _, ok := TagKey(tag); !ok {

@@ -31,3 +31,26 @@ func TestRunnerTagWithNoValidKeyIsLost(t *testing.T) {
 		t.Errorf("a tag with no valid key is lost, never written:\n%s", body)
 	}
 }
+
+func TestRunnerSelectorBecomesAgentLabel(t *testing.T) {
+	j := wpJob("ci", wpStep("s", "x"))
+	j.Runner = ir.Runner{Labels: []string{"gpu"}, Selector: map[string]string{"region": "eu"}}
+	body, rep := one(t, wpProject("drone", j))
+	if !strings.Contains(body, "region: eu") || !strings.Contains(body, "gpu: \"true\"") {
+		t.Errorf("a selector entry must become a labels key beside the tag:\n%s", body)
+	}
+	if !reportHas(rep, caps.JobRunner, caps.External) || !reportDetail(rep, caps.JobRunner, "region=eu") {
+		t.Errorf("want an external entry that names the selector entry: %+v", rep.Entries)
+	}
+}
+
+func TestRunnerSelectorThatIsNoLabelIsLost(t *testing.T) {
+	for _, sel := range []map[string]string{{"bad key": "x"}, {"empty": ""}, {"platform": "x"}} {
+		j := wpJob("ci", wpStep("s", "x"))
+		j.Runner = ir.Runner{Selector: sel}
+		body, rep := one(t, wpProject("drone", j))
+		if !reportHas(rep, caps.JobRunner, caps.Lost) || strings.Contains(body, "bad key") {
+			t.Errorf("%v: want a lost entry and no written key:\n%s\n%+v", sel, body, rep.Entries)
+		}
+	}
+}

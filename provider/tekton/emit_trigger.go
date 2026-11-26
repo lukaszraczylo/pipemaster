@@ -446,7 +446,7 @@ func (e *emitter) reportNodeSelectors(pp *plan, templated bool) {
 			keys = append(keys, k+"="+jp.nodeSel[k])
 		}
 		if templated {
-			e.external(jp.path, caps.JobRunner, "workers the operator provides", "label the nodes "+strings.Join(keys, ", ")+" for the runner labels (taskRunSpecs podTemplate nodeSelector of the TriggerTemplate)")
+			e.external(jp.path, caps.JobRunner, "workers the operator provides", "label the nodes "+strings.Join(keys, ", ")+" for the runner labels and selector (taskRunSpecs podTemplate nodeSelector of the TriggerTemplate; a run started with tkn pipeline start skips it)")
 		} else {
 			e.lose(jp.path, caps.JobRunner, "the runner labels need a taskRunSpecs podTemplate nodeSelector ("+strings.Join(keys, ", ")+") on the PipelineRun, and this output has no generated TriggerTemplate to hold it")
 		}

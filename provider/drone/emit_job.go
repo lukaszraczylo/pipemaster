@@ -316,11 +316,15 @@ func (e *emitter) platform(m *ymap, c *docCtx, ext map[string]any) error {
 			continue
 		}
 		if k, ok := emitkit.TagKey(l); ok {
+			if _, dup := r.Selector[k]; dup {
+				e.lose(c.jp, caps.JobRunner, "the runner label "+l+" has the key of a runner selector entry; the selector value is kept")
+				continue
+			}
 			tagged[k] = emitkit.TagValue
 			tags = append(tags, k+":"+emitkit.TagValue)
 			continue
 		}
-		e.lose(c.jp, caps.JobRunner, "the runner label "+l+" has no Drone node key: a key needs letters, digits, dot, underscore or dash")
+		e.lose(c.jp, caps.JobRunner, "the runner label "+l+" has no Drone node key: "+emitkit.TagHint)
 	}
 	if len(tags) > 0 {
 		e.external(c.jp, caps.JobRunner, "workers the operator provides", "register a Drone runner with DRONE_RUNNER_LABELS="+strings.Join(tags, ",")+" for the runner labels")
@@ -343,9 +347,7 @@ func (e *emitter) platform(m *ymap, c *docCtx, ext map[string]any) error {
 	m.set(keyPlatform, nonEmpty(n))
 	sel := newYMap()
 	for _, k := range sortedKeys(tagged) {
-		if _, dup := r.Selector[k]; !dup {
-			sel.set(k, ystr(tagged[k]))
-		}
+		sel.set(k, ystr(tagged[k]))
 	}
 	for _, k := range sortedKeys(r.Selector) {
 		sel.set(k, ystr(esc(r.Selector[k])))

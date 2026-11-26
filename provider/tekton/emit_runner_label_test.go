@@ -29,3 +29,22 @@ func TestRunnerTagWithoutTriggerTemplateIsLost(t *testing.T) {
 	_, rep := emit(t, project(j))
 	wantEntry(t, rep, caps.JobRunner, caps.Lost, "no generated TriggerTemplate")
 }
+
+func TestRunnerSelectorBecomesTaskRunSpecEntry(t *testing.T) {
+	j := scriptJob("build", "make")
+	j.Runner = ir.Runner{Selector: map[string]string{"region": "eu"}}
+	p := project(j)
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush}}
+	files, rep := emit(t, p)
+	if all := joinFiles(files); !strings.Contains(all, "region: eu") {
+		t.Errorf("a selector entry must reach the taskRunSpecs nodeSelector:\n%s", all)
+	}
+	wantEntry(t, rep, caps.JobRunner, caps.External, "region=eu")
+}
+
+func TestRunnerSelectorThatIsNoLabelIsLost(t *testing.T) {
+	j := scriptJob("build", "make")
+	j.Runner = ir.Runner{Selector: map[string]string{"bad key": "x"}}
+	_, rep := emit(t, project(j))
+	wantEntry(t, rep, caps.JobRunner, caps.Lost, "bad key=x")
+}
