@@ -225,7 +225,9 @@ func (f *flattener) inline(j *ir.Job, owner map[string]string, root string, top 
 			nj.Matrix = &m
 		}
 		nj.Env = mergeEnv(mergeEnv(child.Env, nj.Env), callEnv(j, fwd))
-		nj.Env = append(nj.Env, hiddenEnv(hide, pl.Env, nj.Env)...)
+		hiddenVars := hiddenEnv(hide, pl.Env, nj.Env)
+		nj.Env = append(nj.Env, hiddenVars...)
+		unsetInScripts(nj, hiddenVars)
 		args.apply(nj)
 		return nj
 	}
@@ -634,6 +636,30 @@ func hiddenEnv(h *hiding, parent, own []ir.Var) []ir.Var {
 		}
 	}
 	return out
+}
+
+// unsetInScripts makes the script steps of j read each hidden variable as unset, not as empty: the empty value
+// differs from unset for ${NAME-x}, ${NAME+x} and test -v, and a value that a run sets by hand must not reach the script.
+func unsetInScripts(j *ir.Job, hidden []ir.Var) {
+	if len(hidden) == 0 {
+		return
+	}
+	names := make([]string, len(hidden))
+	for i, v := range hidden {
+		names[i] = v.Name
+	}
+	line := "unset -v " + strings.Join(names, " ")
+	for _, st := range j.Steps {
+		if st == nil || st.Action != nil || len(st.Script) == 0 || emitkit.IsFailLoud(st.Script) {
+			continue
+		}
+		first, rest, multi := strings.Cut(st.Script[0], "\n")
+		if strings.HasPrefix(first, "#!") && multi {
+			st.Script[0] = first + "\n" + line + "\n" + rest
+		} else if !strings.HasPrefix(first, "#!") {
+			st.Script[0] = line + "\n" + st.Script[0]
+		}
+	}
 }
 
 // hideVars reads each variable that the child cannot see as unset in a condition.
