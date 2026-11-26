@@ -375,3 +375,63 @@ func TestRemapPaths(t *testing.T) {
 		}
 	}
 }
+
+func TestFlattenHidesParentVariablesFromTheChild(t *testing.T) {
+	for _, tc := range []struct {
+		trigger  map[string]any
+		name     string
+		wantRuns bool
+		wantEnv  bool
+	}{
+		{name: "forwarded by default", trigger: map[string]any{"include": "ci/child.yml"}, wantRuns: true},
+		{name: "yaml variables off", trigger: map[string]any{"include": "ci/child.yml", "forward": map[string]any{"yaml_variables": false}}, wantEnv: true},
+		{name: "pipeline variables on", trigger: map[string]any{"include": "ci/child.yml", "forward": map[string]any{"yaml_variables": false, "pipeline_variables": true}}, wantRuns: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			src := gitlabProject(tc.trigger)
+			src.Pipelines[0].Env = []ir.Var{{Name: "PARENT", Value: ir.Value{Lit: "x"}}}
+			src.Pipelines[0].Jobs[1].Env = nil
+			s2 := find(t, src, "call").Child.Pipeline.Jobs[1]
+			s2.If = eq(ref("env", "PARENT"), str("x"))
+			flat, _ := inline.Flatten(src, "drone")
+			j := find(t, flat, "call-s2")
+			folded := expr.FoldConst(j.If)
+			runs := folded == nil || expr.String(folded) != "false"
+			if runs != tc.wantRuns {
+				t.Errorf("condition on a parent variable = %v, want runs=%v", expr.String(j.If), tc.wantRuns)
+			}
+			empty := slices.ContainsFunc(j.Env, func(v ir.Var) bool { return v.Name == "PARENT" && v.Value == (ir.Value{}) })
+			if empty != tc.wantEnv {
+				t.Errorf("PARENT set empty in the job = %v, want %v", empty, tc.wantEnv)
+			}
+		})
+	}
+}
+
+func TestFlattenGatesChildJobsWithTheChildGate(t *testing.T) {
+	for _, tc := range []struct {
+		gate  expr.Expr
+		check func(t *testing.T, cond string)
+		name  string
+	}{
+		{name: "tag gate", gate: eq(ref("tag"), str("v1")), check: func(t *testing.T, cond string) {
+			if !strings.Contains(cond, "tag") {
+				t.Errorf("condition %q must hold the gate", cond)
+			}
+		}},
+		{name: "push source gate never starts from a parent", gate: eq(ref("event"), str("push")), check: func(t *testing.T, cond string) {
+			if cond != "false" {
+				t.Errorf("condition %q, want false", cond)
+			}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			src := gitlabProject(map[string]any{"include": "ci/child.yml"})
+			find(t, src, "call").Child.Gate = tc.gate
+			flat, _ := inline.Flatten(src, "drone")
+			for _, id := range []string{"call-s1", "call-s2", "call-s3"} {
+				tc.check(t, expr.String(expr.FoldConst(expr.Binary{Op: expr.OpAnd, L: expr.Lit{Kind: expr.LitBool, Bool: true}, R: find(t, flat, id).If})))
+			}
+		})
+	}
+}

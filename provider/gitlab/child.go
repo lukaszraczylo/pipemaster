@@ -12,6 +12,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -52,7 +53,7 @@ func (a adapter) attachChildren(fsys fs.FS, proj *ir.Project, rep *report.Report
 				})
 				continue
 			}
-			child, crep, cfiles, err := a.parseChild(fsys, files, chain)
+			child, crep, gate, cfiles, err := a.parseChild(fsys, files, chain)
 			if err != nil {
 				rep.Add(report.Entry{
 					IRPath: "pipeline/" + pl.ID + "/job/" + j.ID, Feature: caps.ExtPassthrough, Level: caps.Lost,
@@ -70,7 +71,7 @@ func (a adapter) attachChildren(fsys fs.FS, proj *ir.Project, rep *report.Report
 			})
 			crep.Entries = slices.DeleteFunc(crep.Entries, isChildWorkflowNote)
 			rep.Entries = append(rep.Entries, inline.RemapPaths(crep.Entries, pipelineID, pl.ID, j.ID)...)
-			j.Child = &ir.Child{Pipeline: child, Native: []string{dialect}, Files: files}
+			j.Child = &ir.Child{Gate: gate, Pipeline: child, Native: []string{dialect}, Files: files}
 			for _, f := range cfiles {
 				if !slices.Contains(proj.Origin.Files, f) {
 					proj.Origin.Files = append(proj.Origin.Files, f)
@@ -143,24 +144,24 @@ func localPath(fsys fs.FS, p string) (string, bool) {
 
 // parseChild reads files as one child pipeline: GitLab merges the files of one include list, so they become the
 // includes of a synthetic root file. It returns the files the child read.
-func (a adapter) parseChild(fsys fs.FS, files []string, chain []string) (*ir.Pipeline, *report.Report, []string, error) {
+func (a adapter) parseChild(fsys fs.FS, files []string, chain []string) (*ir.Pipeline, *report.Report, expr.Expr, []string, error) {
 	var inc []map[string]string
 	for _, f := range files {
 		inc = append(inc, map[string]string{includeLocalKey: "/" + f})
 	}
 	root, err := yaml.Marshal(map[string]any{triggerInclude: inc})
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	proj, rep, err := a.parseRoot(overlayFS{FS: fsys, name: childRoot, data: root}, childRoot, append(slices.Clone(chain), files...))
+	proj, rep, gate, err := a.parseRoot(overlayFS{FS: fsys, name: childRoot, data: root}, childRoot, append(slices.Clone(chain), files...))
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	if len(proj.Pipelines) != 1 {
-		return nil, nil, nil, nil
+		return nil, nil, nil, nil, nil
 	}
 	read := slices.DeleteFunc(slices.Clone(proj.Origin.Files), func(f string) bool { return f == childRoot })
-	return proj.Pipelines[0], rep, read, nil
+	return proj.Pipelines[0], rep, gate, read, nil
 }
 
 // overlayFS serves one synthetic file over a real tree, so the include loader reads the child as a root file.

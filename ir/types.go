@@ -67,6 +67,8 @@ type Job struct {
 // Child is the same-repository pipeline that a call job starts: a GitLab child pipeline or a local GHA reusable
 // workflow. The pipeline never stands alone in Project.Pipelines, so no emitter writes it as an independent one.
 type Child struct {
+	// Gate is the condition under which the child pipeline starts at all, such as its workflow:rules. Nil admits every start.
+	Gate     expr.Expr `yaml:"-"`
 	Pipeline *Pipeline `yaml:"pipeline"`
 	// Native lists the providers that write the child as the construct it came from; every other target gets the
 	// child's jobs inlined into the calling pipeline.

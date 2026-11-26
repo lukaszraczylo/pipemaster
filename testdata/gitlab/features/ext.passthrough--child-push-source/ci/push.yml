@@ -1,0 +1,6 @@
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+x:
+  script:
+    - make only

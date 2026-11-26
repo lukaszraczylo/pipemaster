@@ -1,0 +1,29 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make build'
+---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/ping-go
+kind: pipeline
+type: docker
+name: ping-go
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - build
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make notify'

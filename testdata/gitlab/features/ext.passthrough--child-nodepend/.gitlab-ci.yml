@@ -1,0 +1,9 @@
+stages: [build, deploy]
+build:
+  stage: build
+  script:
+    - make build
+ping:
+  stage: deploy
+  trigger:
+    include: ci/ping.yml

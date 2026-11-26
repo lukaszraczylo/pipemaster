@@ -10,6 +10,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/report"
 	"github.com/lukaszraczylo/pipemaster/vars"
@@ -44,40 +45,43 @@ var (
 
 // Parse reads .gitlab-ci.yml and every local include into one pipeline with ID gitlab-ci.
 func (a adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
-	return a.parseRoot(fsys, rootFile, []string{rootFile})
+	proj, rep, _, err := a.parseRoot(fsys, rootFile, []string{rootFile})
+	return proj, rep, err
 }
 
 // parseRoot parses a root file under any name. chain holds the files of the pipelines being read, outermost
 // first, so a child that includes an ancestor is not read again.
-func (a adapter) parseRoot(fsys fs.FS, root string, chain []string) (*ir.Project, *report.Report, error) {
-	proj, rep, err := a.parseSource(fsys, root)
+// It also returns the gate of a child root file: its workflow:rules, when they map to triggers.
+func (a adapter) parseRoot(fsys fs.FS, root string, chain []string) (*ir.Project, *report.Report, expr.Expr, error) {
+	proj, rep, gate, err := a.parseSource(fsys, root)
 	if err != nil {
-		return proj, rep, err
+		return proj, rep, nil, err
 	}
 	vars.Strip(proj)
 	if err := a.attachChildren(fsys, proj, rep, chain); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	ir.Normalize(proj)
-	return proj, rep, ir.Validate(proj)
+	return proj, rep, gate, ir.Validate(proj)
 }
 
-func (adapter) parseSource(fsys fs.FS, rootName string) (*ir.Project, *report.Report, error) {
+func (adapter) parseSource(fsys fs.FS, rootName string) (*ir.Project, *report.Report, expr.Expr, error) {
 	rep := &report.Report{Source: dialect}
 	s := newState(rep)
+	s.child = rootName == childRoot
 	ld := newLoader(fsys, s)
 	root, err := ld.load(rootName, nil, nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	s.remote = remoteNames(ld.remote)
 	s.spec = ld.spec
 	if root, err = s.resolveRefs(root); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	pl, infos, err := s.parsePipeline(root, ld.remote)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	restoreJobIDs(pl, ld.ids)
 	pls := splitPipelines(pl, ld.markers, ld.args)
@@ -96,10 +100,10 @@ func (adapter) parseSource(fsys fs.FS, rootName string) (*ir.Project, *report.Re
 		s.guardJobs(pls[0])
 	}
 	if err := ir.Validate(proj); err != nil {
-		return nil, nil, s.locate(err, infos)
+		return nil, nil, nil, s.locate(err, infos)
 	}
 	ir.Normalize(proj)
-	return proj, rep, nil
+	return proj, rep, s.gate, nil
 }
 
 func (s *state) parsePipeline(root *yaml.Node, remote []any) (*ir.Pipeline, []*jobInfo, error) {

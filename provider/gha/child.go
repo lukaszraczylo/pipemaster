@@ -88,7 +88,7 @@ func (r *callResolver) resolve(pl *ir.Pipeline, stack []*ir.Pipeline) {
 		}
 		r.resolve(target, stack)
 		cp := ir.Clone(&ir.Project{Pipelines: []*ir.Pipeline{target}}).Pipelines[0]
-		j.Child = &ir.Child{Pipeline: cp, Native: []string{r.dialect}, Files: []string{r.file[target]}}
+		j.Child = &ir.Child{Pipeline: cp, Native: nativeCalls(r.dialect), Files: []string{r.file[target]}}
 		r.used[target] = true
 		var own []report.Entry
 		for _, e := range r.rep.Entries {
@@ -100,6 +100,16 @@ func (r *callResolver) resolve(pl *ir.Pipeline, stack []*ir.Pipeline) {
 	}
 	r.done[pl] = true
 }
+
+// nativeCalls lists the targets that write the child as the job-level uses: it came from: the source dialect alone,
+// so a file returns as the user wrote it. No other target takes the call natively, Gitea and Forgejo included, because the
+// converter claims no support it cannot cite. GitHub documents local calls
+// (https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations: reusable workflows
+// "in the same repository as the calling repository can be referenced with just the path and filename"), and so does
+// Forgejo (https://forgejo.org/docs/latest/user/actions/reference/, jobs.<job_id>.uses: "./.forgejo/workflows/reusable.yml
+// - refers to a workflow file within the same repository as the current workflow is defined"). The Gitea docs
+// (https://docs.gitea.com/usage/actions/comparison) do not mention them, so a Gitea file only keeps its own call on a return to Gitea.
+func nativeCalls(dialect string) []string { return []string{dialect} }
 
 // localCall is the call step of a job whose uses: names a local file.
 func localCall(j *ir.Job) *ir.Step {

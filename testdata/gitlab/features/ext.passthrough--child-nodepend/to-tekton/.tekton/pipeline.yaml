@@ -1,0 +1,14 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  tasks:
+    - name: build
+      taskRef:
+        name: gitlab-ci-build
+    - name: ping-go
+      taskRef:
+        name: gitlab-ci-ping-go
+      runAfter:
+        - build

@@ -21,19 +21,23 @@ const (
 
 // state is shared by one Parse call; org records the file each resolved node came from so errors name it.
 type state struct {
-	org   map[*yaml.Node]string
-	rep   *report.Report
-	lines map[string]position
-	spec  *yaml.Node
 	guard expr.Expr
+	// gate is the condition of a child pipeline whose workflow:rules have a trigger form.
+	gate expr.Expr
 	// wfCond is workflow:rules as one condition; nil when they do not compile.
 	wfCond   expr.Expr
 	queue    map[*ir.Job][]lineRewrite
+	spec     *yaml.Node
+	lines    map[string]position
+	org      map[*yaml.Node]string
 	splitImg map[*ir.Job]map[string]ir.Image
+	rep      *report.Report
 	remote   []string
 	nodes    int
 	includes int
 	restored bool
+	// child is true for the root file of a child pipeline.
+	child bool
 }
 
 type position struct {

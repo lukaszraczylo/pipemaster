@@ -18,17 +18,18 @@ import (
 
 // Source dialect keys and GitLab trigger keys that the rewrite reads.
 const (
-	extGitLab    = "gitlab"
-	extTrigger   = "trigger"
-	extStrategy  = "strategy"
-	extForward   = "forward"
-	extYAMLVars  = "yaml_variables"
-	strategyWait = "depend"
-	parentSource = "parent_pipeline"
-	idJoin       = "-"
-	derivedStep  = "-step-"
-	kindGitLab   = "gitlab"
-	kindReusable = "reusable workflow"
+	extGitLab       = "gitlab"
+	extTrigger      = "trigger"
+	extStrategy     = "strategy"
+	extForward      = "forward"
+	extYAMLVars     = "yaml_variables"
+	extPipelineVars = "pipeline_variables"
+	strategyWait    = "depend"
+	parentSource    = "parent_pipeline"
+	idJoin          = "-"
+	derivedStep     = "-step-"
+	kindGitLab      = "gitlab"
+	kindReusable    = "reusable workflow"
 )
 
 // EntryStrategy is the strategy of every report entry that an inline writes.
@@ -210,7 +211,8 @@ func (f *flattener) inline(j *ir.Job, owner map[string]string, root string, top 
 		if !inside && !finally {
 			nj.Needs = append(nj.Needs, slices.Clone(j.Needs)...)
 		}
-		nj.If = andExpr(j.If, childCond(cj.If, kind))
+		hide := f.hidden(j, child, nj, fwd)
+		nj.If = andExpr(j.If, childCond(andExpr(j.Child.Gate, cj.If), kind, hide))
 		nj.Manual = nj.Manual || j.Manual
 		nj.AllowFailure = nj.AllowFailure || j.AllowFailure
 		if nj.Matrix == nil && j.Matrix != nil {
@@ -218,6 +220,7 @@ func (f *flattener) inline(j *ir.Job, owner map[string]string, root string, top 
 			nj.Matrix = &m
 		}
 		nj.Env = mergeEnv(mergeEnv(child.Env, nj.Env), callEnv(j, fwd))
+		nj.Env = append(nj.Env, hiddenEnv(hide, pl.Env, nj.Env)...)
 		args.apply(nj)
 		return nj
 	}
@@ -333,11 +336,11 @@ func andExpr(a, b expr.Expr) expr.Expr {
 }
 
 // childCond folds the conditions of a GitLab child job for a run that the parent starts.
-func childCond(e expr.Expr, kind string) expr.Expr {
+func childCond(e expr.Expr, kind string, hide *hiding) expr.Expr {
 	if e == nil || kind != kindGitLab {
 		return e
 	}
-	e = expr.FoldEvent(e, parentSource)
+	e = expr.FoldEvent(hideVars(e, hide), parentSource)
 	if l, ok := e.(expr.Lit); ok && expr.LitTruthy(l) {
 		return nil
 	}
@@ -421,7 +424,14 @@ func (f *flattener) report(j *ir.Job, path, kind string, child *ir.Pipeline, add
 		caveats = append(caveats, "the trigger variables are variables of each child job")
 	}
 	if len(f.pl.Env) > 0 {
-		caveats = append(caveats, "the variables of the calling pipeline also reach the child jobs")
+		if kind == kindGitLab && fwd {
+			caveats = append(caveats, "the variables of the calling pipeline reach the child jobs, as the trigger forwards them")
+		} else {
+			caveats = append(caveats, "the variables of the calling pipeline are set empty in the child jobs, as the child does not receive them")
+		}
+	}
+	if kind == kindGitLab && !forwardsPipelineVars(j) {
+		caveats = append(caveats, "a variable that a run sets by hand reads as unset in the child conditions, as GitLab does not forward it without forward:pipeline_variables, but its value can reach the scripts of the child jobs")
 	}
 	if j.Matrix != nil {
 		caveats = append(caveats, "the matrix of the call applies to every child job, so a job that needs a matrix job waits for all its instances")
@@ -529,4 +539,63 @@ func callSource(kind string) string {
 		return "GitLab"
 	}
 	return "GitHub Actions"
+}
+
+// hiding is what a GitLab child must not see of its parent: a variable that is not in seen reads as unset.
+type hiding struct{ seen map[string]bool }
+
+// hidden says what the child jobs of a GitLab trigger see. GitLab forwards the variables of the trigger job and
+// the pipeline file only with forward:yaml_variables, and a variable that a run sets by hand only with
+// forward:pipeline_variables. The result is nil when nothing is hidden.
+func (f *flattener) hidden(j *ir.Job, child *ir.Pipeline, cj *ir.Job, fwd bool) *hiding {
+	if callKind(j) == kindGitLab && forwardsPipelineVars(j) {
+		return nil
+	}
+	h := &hiding{seen: map[string]bool{}}
+	for _, vars := range [][]ir.Var{child.Env, cj.Env} {
+		for _, v := range vars {
+			h.seen[v.Name] = true
+		}
+	}
+	if fwd && callKind(j) == kindGitLab {
+		for _, vars := range [][]ir.Var{j.Env, f.pl.Env} {
+			for _, v := range vars {
+				h.seen[v.Name] = true
+			}
+		}
+	}
+	return h
+}
+
+func forwardsPipelineVars(j *ir.Job) bool {
+	f, _ := trigger(j)[extForward].(map[string]any)
+	v, _ := f[extPipelineVars].(bool)
+	return v
+}
+
+// hiddenEnv sets each parent variable that the child must not see to the empty value, so the child reads it as unset.
+func hiddenEnv(h *hiding, parent, own []ir.Var) []ir.Var {
+	if h == nil {
+		return nil
+	}
+	var out []ir.Var
+	for _, v := range parent {
+		if !h.seen[v.Name] && !slices.ContainsFunc(own, func(o ir.Var) bool { return o.Name == v.Name }) {
+			out = append(out, ir.Var{Name: v.Name})
+		}
+	}
+	return out
+}
+
+// hideVars reads each variable that the child cannot see as unset in a condition.
+func hideVars(e expr.Expr, h *hiding) expr.Expr {
+	if h == nil {
+		return e
+	}
+	return expr.FoldConst(expr.MapRefs(e, func(r expr.Ref) expr.Expr {
+		if len(r.Path) == 2 && r.Path[0] == expr.PrefixEnv && !h.seen[r.Path[1]] {
+			return expr.Lit{Kind: expr.LitNull}
+		}
+		return r
+	}))
 }

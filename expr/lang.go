@@ -87,6 +87,25 @@ func walkRefs(e Expr, fn func(Ref) bool) bool {
 	return true
 }
 
+// MapRefs returns e with each Ref replaced by fn of it.
+func MapRefs(e Expr, fn func(Ref) Expr) Expr {
+	switch v := e.(type) {
+	case Ref:
+		return fn(v)
+	case Unary:
+		return Unary{Op: v.Op, X: MapRefs(v.X, fn)}
+	case Binary:
+		return Binary{Op: v.Op, L: MapRefs(v.L, fn), R: MapRefs(v.R, fn)}
+	case Call:
+		args := make([]Expr, len(v.Args))
+		for i, a := range v.Args {
+			args[i] = MapRefs(a, fn)
+		}
+		return Call{Name: v.Name, Args: args}
+	}
+	return e
+}
+
 // names reports whether d's vocabulary names every ref of e.
 func (d Dialect) names(e Expr) bool {
 	return walkRefs(e, func(r Ref) bool { _, ok := d.Vocab.Dialect(r.Path); return ok })

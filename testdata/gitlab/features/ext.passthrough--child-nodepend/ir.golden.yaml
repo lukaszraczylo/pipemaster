@@ -1,0 +1,59 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+        - ci/ping.yml
+pipelines:
+    - ext:
+        gitlab:
+            stages:
+                - build
+                - deploy
+      id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - ext:
+            gitlab:
+                stage: build
+          id: build
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make build
+        - child:
+            pipeline:
+                id: gitlab-ci-ping
+                triggers:
+                    - kind: push
+                    - kind: tag
+                jobs:
+                    - id: go
+                      steps:
+                        - ext:
+                            gitlab:
+                                section: script
+                          id: script
+                          kind: script
+                          script:
+                            - make notify
+            native:
+                - gitlab
+            files:
+                - ci/ping.yml
+          ext:
+            gitlab:
+                _derived_needs: true
+                _no_script: true
+                stage: deploy
+                trigger:
+                    include: ci/ping.yml
+          id: ping
+          needs:
+            - job: build

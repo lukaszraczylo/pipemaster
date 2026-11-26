@@ -58,6 +58,12 @@ func (s *state) workflow(pl *ir.Pipeline, r *reader) (guard expr.Expr, err error
 	if !ok {
 		trigs = []ir.Trigger{{Kind: ir.TriggerPush}, {Kind: ir.TriggerTag}}
 	}
+	if ok && s.child && w != nil {
+		// A child pipeline has no triggers of its own, so the rules travel as the gate of the child.
+		if s.gate, err = s.workflowGuard(w); err != nil {
+			return nil, err
+		}
+	}
 	for _, t := range trigs {
 		if t.Kind == ir.TriggerSchedule {
 			s.rep.Add(report.Entry{
