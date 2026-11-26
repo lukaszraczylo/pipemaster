@@ -5,13 +5,15 @@ package behave
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
+
+	"github.com/lukaszraczylo/pipemaster/internal/behave/nsguard"
 )
 
 const (
@@ -25,24 +27,37 @@ const (
 	kubeShort      = time.Minute
 	kubeLong       = 5 * time.Minute
 	clusterStart   = 5 * time.Minute
-	deleteTries    = 3
 )
 
 // Kube manages the Kiri Kubernetes cluster for the Tekton and Argo engines. It only ever talks to the kiri context.
 type Kube struct {
-	env      *Env
-	open     map[string]struct{}
-	counter  atomic.Int64
-	runStamp int64
-	mu       sync.Mutex
-	nsMu     sync.Mutex
-	started  bool
-	ready    bool
+	env     *Env
+	spaces  *nsguard.Guard
+	mu      sync.Mutex
+	started bool
+	ready   bool
 }
 
 // NewKube returns a manager; Start brings the cluster up.
 func NewKube(env *Env) *Kube {
-	return &Kube{env: env, runStamp: time.Now().Unix(), open: map[string]struct{}{}}
+	k := &Kube{env: env}
+	k.spaces = nsguard.New(nsPrefix, k.createNS, k.deleteNS)
+	return k
+}
+
+func (k *Kube) createNS(ctx context.Context, ns string) error {
+	if out, code, err := k.env.Kubectl(ctx, kubeShort, "", "create", "namespace", ns); err != nil || code != 0 {
+		return fmt.Errorf("%v %s", err, out)
+	}
+	return nil
+}
+
+func (k *Kube) deleteNS(ctx context.Context, ns string) error {
+	out, code, err := k.env.Kubectl(ctx, kubeShort, "", "delete", "namespace", ns, "--ignore-not-found", "--wait=false")
+	if err != nil || code != 0 {
+		return fmt.Errorf("%v %s", err, out)
+	}
+	return nil
 }
 
 // Start checks the context, starts the cluster when it is down and installs the pinned Tekton and Argo releases.
@@ -102,7 +117,9 @@ func (k *Kube) install(ctx context.Context, crd, manifest, createNS, waitNS stri
 
 // Stop stops the cluster when this run started it. It never deletes the cluster.
 func (k *Kube) Stop(ctx context.Context) {
-	k.sweep()
+	if err := k.spaces.Sweep(); err != nil {
+		slog.Error("namespaces left on the cluster", "error", err)
+	}
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	if !k.started {
@@ -115,48 +132,8 @@ func (k *Kube) Stop(ctx context.Context) {
 	k.started = false
 }
 
-// Namespace creates a fresh namespace for one run and returns it with its cleanup. The namespace is tracked before
-// the create call, so a create that times out after the server accepted it is still deleted by the cleanup or by sweep.
-func (k *Kube) Namespace(ctx context.Context) (string, func(), error) {
-	ns := fmt.Sprintf("%s-%d-%d", nsPrefix, k.runStamp, k.counter.Add(1))
-	k.nsMu.Lock()
-	k.open[ns] = struct{}{}
-	k.nsMu.Unlock()
-	if out, code, err := k.env.Kubectl(ctx, kubeShort, "", "create", "namespace", ns); err != nil || code != 0 {
-		k.release(ns)
-		return "", nil, fmt.Errorf("create namespace %s: %v %s", ns, err, out)
-	}
-	return ns, func() { k.release(ns) }, nil
-}
-
-// release deletes one tracked namespace on a context that no cancel or timeout of the run can stop. It retries,
-// because a namespace that stays behind is the failure this exists to prevent.
-func (k *Kube) release(ns string) {
-	for range deleteTries {
-		c, cancel := context.WithTimeout(context.Background(), kubeShort)
-		_, code, err := k.env.Kubectl(c, kubeShort, "", "delete", "namespace", ns, "--ignore-not-found", "--wait=false")
-		cancel()
-		if err == nil && code == 0 {
-			k.nsMu.Lock()
-			delete(k.open, ns)
-			k.nsMu.Unlock()
-			return
-		}
-	}
-}
-
-// sweep deletes every namespace of this run that a cleanup did not remove.
-func (k *Kube) sweep() {
-	k.nsMu.Lock()
-	left := make([]string, 0, len(k.open))
-	for ns := range k.open {
-		left = append(left, ns)
-	}
-	k.nsMu.Unlock()
-	for _, ns := range left {
-		k.release(ns)
-	}
-}
+// Namespace creates a fresh namespace for one run and returns it with its cleanup.
+func (k *Kube) Namespace(ctx context.Context) (string, func(), error) { return k.spaces.Namespace(ctx) }
 
 // logLine is one timestamped container log line.
 type logLine struct {
