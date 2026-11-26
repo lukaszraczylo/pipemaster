@@ -1,0 +1,16 @@
+default:
+  image: alpine:3.20
+stages: [one, two, three]
+setup:
+  stage: one
+  script:
+    - echo "MARK child_filtered.setup" | tee -a trace.log
+run_child:
+  stage: two
+  trigger:
+    include: ci/child.yml
+    strategy: depend
+after:
+  stage: three
+  script:
+    - echo "MARK child_filtered.after" | tee -a trace.log

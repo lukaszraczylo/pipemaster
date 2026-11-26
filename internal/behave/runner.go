@@ -205,7 +205,7 @@ func (r *Runner) runSources(ctx context.Context, fixtures []Fixture) map[string]
 				dst := filepath.Join(r.env.Work, "ws", fx.Source, fx.Name, "source-"+evName)
 				tr, err := r.exec(ctx, fx.Source, fx.Dir, dst, events[evName])
 				switch {
-				case err == nil && tr.Exit != 0:
+				case err == nil && tr.Exit != 0 && !fx.Failure:
 					err = blocked("the source failed on its own engine (exit %d): %s", tr.Exit, diagnose(tr.Log))
 				case err == nil && missingMarker(fx.Expect, tr.Markers) != "":
 					err = blocked("the source engine did not reproduce marker %q: an engine limitation, not a converter result", missingMarker(fx.Expect, tr.Markers))
