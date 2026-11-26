@@ -92,6 +92,10 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 		if st == nil {
 			continue
 		}
+		if tc.e.own && extOf(st.Ext)[ExtWorkspaceDirs] == true {
+			tc.e.skipped[jp.path+"/step/"+st.ID] = true
+			continue
+		}
 		if tc.e.own && extOf(st.Ext)[ExtSourceCheckout] == true {
 			tc.e.skipped[jp.path+"/step/"+st.ID] = true
 			tc.e.withdrawCheckout(jp.path)

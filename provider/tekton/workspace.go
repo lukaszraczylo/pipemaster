@@ -150,6 +150,16 @@ func (c *plCtx) taskWorkspaces(pt *omap) (dirs map[string]string, pipeline map[s
 	return dirs, pipeline
 }
 
+// addWorkspaceDirs gives a job that mounts workspaces a first step that creates their directories. Tekton
+// mounts the volume of a workspace, so the Tekton emitter skips the step.
+func (b *jobBuilder) addWorkspaceDirs() {
+	if len(b.tx.dataWS) == 0 || b.k.Out[ExtCatalogRef] != nil || len(b.job.Steps) == 0 {
+		return
+	}
+	dirs := slices.Collect(maps.Values(b.tx.dataWS))
+	b.job.Steps = append([]*ir.Step{emitkit.DirsStep(b.job.ID, dirs, dialect, ExtWorkspaceDirs)}, b.job.Steps...)
+}
+
 // reportWorkspaces gives each mapped workspace of a job its verdict.
 func (b *jobBuilder) reportWorkspaces() {
 	declared := b.mounts

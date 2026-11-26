@@ -164,7 +164,7 @@ func (tc *taskCtx) stepExt(m *wmap, st *ir.Step) error {
 	if len(x) == 0 || !tc.e.own {
 		return nil
 	}
-	skip := map[string]bool{ExtWorkspaceDir: true, ExtWorkspaceDirIR: true, ExtScriptSource: true, ExtScriptIR: true, ExtSourceCheckout: true, ExtCommand: true, ExtArgs: true, ExtScriptLine: true, ExtBashDefault: true, "ref": true, "params": true, "taskRef": true, "timeout": true, "onError": true}
+	skip := map[string]bool{ExtWorkspaceDir: true, ExtWorkspaceDirIR: true, ExtScriptSource: true, ExtScriptIR: true, ExtSourceCheckout: true, ExtWorkspaceDirs: true, ExtCommand: true, ExtArgs: true, ExtScriptLine: true, ExtBashDefault: true, "ref": true, "params": true, "taskRef": true, "timeout": true, "onError": true}
 	for _, k := range sortedKeys(x) {
 		if skip[k] || m.Has(k) {
 			continue

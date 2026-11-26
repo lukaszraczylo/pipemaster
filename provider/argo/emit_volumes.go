@@ -11,16 +11,18 @@ import (
 )
 
 // withoutSharedVolumes returns the job without the artifacts and artifact needs that the parser made for the
-// volumes of an Argo file. The volume carries those files, so Argo needs no artifact for them.
+// volumes of an Argo file, and without the step that creates their directories. The volume carries those files.
 func (e *emitter) withoutSharedVolumes(j *ir.Job) *ir.Job {
 	if !e.own || j == nil {
 		return j
 	}
 	rec := emitkit.SharedRecord(j, dialect, ExtWorkspaceArtifacts)
-	if len(rec) == 0 {
+	synthetic := func(st *ir.Step) bool { return st != nil && extOf(st.Ext)[ExtWorkspaceDirs] == true }
+	if len(rec) == 0 && !slices.ContainsFunc(j.Steps, synthetic) {
 		return j
 	}
 	out := *j
+	out.Steps = slices.DeleteFunc(slices.Clone(j.Steps), synthetic)
 	out.Artifacts = slices.DeleteFunc(slices.Clone(j.Artifacts), func(a ir.Artifact) bool { return slices.Contains(rec["artifacts"], a.Name) })
 	if len(out.Artifacts) == 0 {
 		out.Artifacts = nil

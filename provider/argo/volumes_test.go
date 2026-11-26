@@ -59,10 +59,13 @@ func TestClaimBetweenTemplatesBecomesAnArtifact(t *testing.T) {
 	if len(cons.Needs) != 1 || !cons.Needs[0].Artifacts {
 		t.Fatalf("consumer needs = %+v", cons.Needs)
 	}
-	if got := strings.Join(prod.Steps[0].Script, "\n"); got != "sh -c '"+"echo data > pm-workspaces/work/shared.txt"+"'" {
+	if got := strings.Join(prod.Steps[0].Script, "\n"); got != "mkdir -p pm-workspaces/work" {
+		t.Errorf("the directory step = %q", got)
+	}
+	if got := strings.Join(prod.Steps[1].Script, "\n"); got != "sh -c '"+"echo data > pm-workspaces/work/shared.txt"+"'" {
 		t.Errorf("producer script = %q", got)
 	}
-	if got := strings.Join(cons.Steps[0].Script, "\n"); got != "sh -c '"+"cat pm-workspaces/work/shared.txt"+"'" {
+	if got := strings.Join(cons.Steps[1].Script, "\n"); got != "sh -c '"+"cat pm-workspaces/work/shared.txt"+"'" {
 		t.Errorf("consumer script = %q", got)
 	}
 	if volEntry(rep, "pipeline/ci/job/produce", caps.JobArtifacts, caps.Emulated) == nil || volEntry(rep, "pipeline/ci/job/consume", caps.JobNeedsArtifacts, caps.Emulated) == nil {
@@ -114,7 +117,7 @@ func TestEmptyDirInOneTemplateIsADirectory(t *testing.T) {
 `)
 	pl, rep := parseYAML(t, src)
 	j := pl.Jobs[0]
-	if got := strings.Join(j.Steps[0].Script, "\n"); got != "sh -c '"+"echo x > pm-workspaces/scratch/a && cat pm-workspaces/scratch/a"+"'" {
+	if got := strings.Join(j.Steps[1].Script, "\n"); got != "sh -c '"+"echo x > pm-workspaces/scratch/a && cat pm-workspaces/scratch/a"+"'" {
 		t.Errorf("script = %q", got)
 	}
 	if len(j.Artifacts) != 0 {
@@ -142,7 +145,7 @@ func TestSecretVolumeIsExternal(t *testing.T) {
 	if e == nil || !strings.Contains(e.Detail, "Secret registry-auth") {
 		t.Fatalf("no external verdict that names the Secret: %+v", rep.Entries)
 	}
-	if got := strings.Join(pl.Jobs[0].Steps[0].Script, "\n"); got != "sh -c '"+"cat pm-workspaces/creds/config.json"+"'" {
+	if got := strings.Join(pl.Jobs[0].Steps[1].Script, "\n"); got != "sh -c '"+"cat pm-workspaces/creds/config.json"+"'" {
 		t.Errorf("script = %q", got)
 	}
 }
@@ -171,7 +174,7 @@ func TestMountPathWithinAWordIsNotRewritten(t *testing.T) {
       - {name: scratch, mountPath: /scratch}
 `)
 	pl, _ := parseYAML(t, src)
-	if got := strings.Join(pl.Jobs[0].Steps[0].Script, "\n"); got != "sh -c '"+"ls /scratchy pm-workspaces/scratch pm-workspaces/scratch/x"+"'" {
+	if got := strings.Join(pl.Jobs[0].Steps[1].Script, "\n"); got != "sh -c '"+"ls /scratchy pm-workspaces/scratch pm-workspaces/scratch/x"+"'" {
 		t.Errorf("script = %q", got)
 	}
 }

@@ -69,6 +69,7 @@ func (b *jobBuilder) body(t *omap) error {
 	b.k.KeepRest(r)
 	b.reportVolumes()
 	b.keepMountPaths()
+	b.addVolumeDirs()
 	b.uniqueStepIDs()
 	b.collapseSteps()
 	b.collapseActions()

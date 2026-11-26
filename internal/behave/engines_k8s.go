@@ -223,7 +223,8 @@ func (t *tektonEngine) pipelineRuns(docs []map[string]any, w *Workspace, evType 
 	return out, nil
 }
 
-// directPipelineRun starts the Pipeline without a trigger: ctx-* parameters take the canonical event values.
+// directPipelineRun starts the Pipeline without a trigger: ctx-* parameters take the canonical event values. A
+// workspace is a claim, because an emptyDir is private to one task pod and tasks then share no files.
 func directPipelineRun(pipeline map[string]any, w *Workspace) string {
 	ctxVals := canonicalCtx(w)
 	var params []any
@@ -234,7 +235,9 @@ func directPipelineRun(pipeline map[string]any, w *Workspace) string {
 	}
 	var wss []any
 	for _, ws := range list(dig(pipeline, "spec", "workspaces")) {
-		wss = append(wss, map[string]any{"name": str(ws, "name"), "emptyDir": map[string]any{}})
+		wss = append(wss, map[string]any{"name": str(ws, "name"), "volumeClaimTemplate": map[string]any{"spec": map[string]any{
+			"accessModes": []any{"ReadWriteOnce"}, "resources": map[string]any{"requests": map[string]any{"storage": "1Gi"}},
+		}}})
 	}
 	run := map[string]any{
 		"apiVersion": "tekton.dev/v1",

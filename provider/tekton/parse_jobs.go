@@ -127,6 +127,7 @@ func (c *plCtx) job(m *omap, finally bool) (*ir.Job, error) {
 		return nil, fmt.Errorf("task %s: %w", name, err)
 	}
 	b.addSourceCheckout()
+	b.addWorkspaceDirs()
 	b.reportWorkspaces()
 	b.k.KeepRest(r)
 	b.finish()

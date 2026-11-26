@@ -29,6 +29,8 @@ const (
 	// ExtWorkspaceArtifacts is the job Ext key that names the artifacts and needs that the parser made for the
 	// volumes of the file, which Argo shares through the volume itself.
 	ExtWorkspaceArtifacts = "workspace_artifacts"
+	// ExtWorkspaceDirs marks the step that the parser added to create the directories of the volumes of a template.
+	ExtWorkspaceDirs = "workspace_dirs"
 	// ExtArguments is the job Ext key that holds the task arguments that no template text reads.
 	ExtArguments = "arguments"
 )

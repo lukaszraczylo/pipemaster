@@ -161,6 +161,19 @@ func (b *jobBuilder) planVolumes(t *omap) {
 	b.tx.paths = pairs
 }
 
+// addVolumeDirs gives a job that mounts volumes a first step that creates their directories. Argo mounts the
+// volume, so the Argo emitter skips the step.
+func (b *jobBuilder) addVolumeDirs() {
+	if len(b.tx.paths) == 0 || len(b.job.Steps) == 0 {
+		return
+	}
+	var dirs []string
+	for _, p := range b.tx.paths {
+		dirs = append(dirs, p.dir)
+	}
+	b.job.Steps = append([]*ir.Step{emitkit.DirsStep(b.job.ID, dirs, dialect, ExtWorkspaceDirs)}, b.job.Steps...)
+}
+
 // keepVolumes keeps the template volumes in Ext. A volume that no mount maps has no directory and is lost.
 func (b *jobBuilder) keepVolumes(v any, line int) {
 	b.k.Out["volumes"] = plain(v)

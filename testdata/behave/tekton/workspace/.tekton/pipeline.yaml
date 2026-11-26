@@ -1,0 +1,35 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  workspaces:
+    - name: shared
+  tasks:
+    - name: produce
+      workspaces:
+        - name: out
+          workspace: shared
+      taskSpec:
+        workspaces:
+          - name: out
+        steps:
+          - name: write
+            image: alpine
+            script: |
+              echo data > $(workspaces.out.path)/shared.txt
+              echo "MARK workspace.produce"
+    - name: consume
+      runAfter:
+        - produce
+      workspaces:
+        - name: in
+          workspace: shared
+      taskSpec:
+        workspaces:
+          - name: in
+        steps:
+          - name: read
+            image: alpine
+            script: |
+              echo "MARK workspace.consume:$(cat $(workspaces.in.path)/shared.txt)"

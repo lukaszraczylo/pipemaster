@@ -61,6 +61,9 @@ func TestWorkspaceBetweenTasksBecomesAnArtifact(t *testing.T) {
 	if len(cons.Needs) != 1 || !cons.Needs[0].Artifacts {
 		t.Fatalf("consumer needs = %+v", cons.Needs)
 	}
+	if got := step(t, prod, "produce-workspace-dirs").Script[0]; got != "mkdir -p pm-workspaces/shared" {
+		t.Errorf("the directory step = %q", got)
+	}
 	if got := step(t, prod, "write").Script[0]; got != "echo data > pm-workspaces/shared/shared.txt" {
 		t.Errorf("producer script = %q", got)
 	}

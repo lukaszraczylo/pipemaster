@@ -33,6 +33,8 @@ const (
 	// ExtWorkspaceArtifacts is the job Ext key that names the artifacts and the needs that the parser made for the
 	// workspaces of the file, which the Tekton file shares through its own volume and so needs no copy steps.
 	ExtWorkspaceArtifacts = "workspace_artifacts"
+	// ExtWorkspaceDirs marks the step that the parser added to create the directories of the workspaces of a Task.
+	ExtWorkspaceDirs = "workspace_dirs"
 	// ExtCommand is the step Ext key that keeps the command list of a step that the IR holds as one script line.
 	ExtCommand = "command"
 	// ExtArgs is the step Ext key that keeps the args list beside ExtCommand.
