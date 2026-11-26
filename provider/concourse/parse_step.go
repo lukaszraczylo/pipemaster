@@ -473,7 +473,7 @@ func (jb *jobBuilder) env(st *ir.Step, k *sink, cfgParams *omap, r *reader) {
 			v, ok := jb.paramValue(m.Vals[name])
 			if !ok {
 				if lv, isRef := jb.loadVarParam(st, k, name, m.Vals[name]); isRef {
-					refs = append(refs, loadRef(name, lv))
+					refs = append(refs, loadRef(name, lv)...)
 					read[name] = plain(m.Vals[name])
 					delete(unread, name)
 					continue

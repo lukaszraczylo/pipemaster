@@ -57,7 +57,7 @@ func (adapter) emitMain(p *ir.Project) (map[string][]byte, *report.Report, error
 	}
 	for id, events := range noForm {
 		for _, g := range provider.GroupByFeature(events) {
-			e.lose("pipeline/"+id, g.Feature, "the source runs on the events "+strings.Join(g.Names, ", ")+" when its file names no trigger; GitLab has no pipeline source for them")
+			e.lose("pipeline/"+id, g.Feature, "the source runs on the events "+strings.Join(g.Names, ", ")+" and its file has no trigger form for them; GitLab has no pipeline source for them")
 		}
 	}
 	files := map[string][]byte{}

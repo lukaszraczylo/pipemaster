@@ -94,7 +94,7 @@ func (r *Runner) addTime(provider string, d time.Duration) {
 }
 
 // exec runs one workspace on the engine of provider, under the engine's slot cap.
-func (r *Runner) exec(ctx context.Context, provider string, src, dst string, ev Event) (*Trace, error) {
+func (r *Runner) exec(ctx context.Context, provider string, src, dst string, ev Event, converted bool) (*Trace, error) {
 	r.cap <- struct{}{}
 	defer func() { <-r.cap }()
 	r.sem[provider] <- struct{}{}
@@ -112,6 +112,7 @@ func (r *Runner) exec(ctx context.Context, provider string, src, dst string, ev 
 		if w, err = r.env.NewWorkspace(ctx, src, dst, ev); err != nil {
 			return nil, err
 		}
+		w.Converted = converted
 		tr, err = eng.Run(ctx, w)
 		if tr != nil {
 			r.addTime(provider, tr.Duration)
@@ -203,7 +204,7 @@ func (r *Runner) runSources(ctx context.Context, fixtures []Fixture) map[string]
 			go func(fx Fixture, evName string) {
 				defer wg.Done()
 				dst := filepath.Join(r.env.Work, "ws", fx.Source, fx.Name, "source-"+evName)
-				tr, err := r.exec(ctx, fx.Source, fx.Dir, dst, events[evName])
+				tr, err := r.exec(ctx, fx.Source, fx.Dir, dst, events[evName], false)
 				switch {
 				case err == nil && tr.Exit != 0 && !fx.Failure:
 					err = blocked("the source failed on its own engine (exit %d): %s", tr.Exit, diagnose(tr.Log))
@@ -262,7 +263,7 @@ func (r *Runner) compareOne(ctx context.Context, fx Fixture, tgt, evName string,
 		return
 	}
 	dst := filepath.Join(r.env.Work, "ws", fx.Source, fx.Name, tgt+"-"+evName)
-	tr, err := r.exec(ctx, tgt, conv.Dir, dst, events[evName])
+	tr, err := r.exec(ctx, tgt, conv.Dir, dst, events[evName], true)
 	if err != nil {
 		if b, ok := asBlocked(err); ok {
 			res.Status, res.Detail = StatusBlocked, b.Reason

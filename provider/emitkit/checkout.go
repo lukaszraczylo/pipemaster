@@ -2,6 +2,8 @@ package emitkit
 
 import (
 	"fmt"
+	"io/fs"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -207,16 +209,39 @@ func RetainSourceCheckout(l *Ledger, jobPaths []string) {
 	}
 }
 
-// DropSourceCheckout removes the first step of each job when WithSourceCheckout added it. It runs when a target file is
-// parsed, so the step does not come back as a step of the source.
-func DropSourceCheckout(p *ir.Project) {
+// GeneratedCheckouts counts the checkout steps that an emitter marked in the YAML files of fsys. A step with the
+// same name but no marker is native to the file, so a parser passes this count to DropSourceCheckout.
+func GeneratedCheckouts(fsys fs.FS) int {
+	n := 0
+	_ = fs.WalkDir(fsys, ".", func(name string, d fs.DirEntry, err error) error { // #nosec G104 -- an unreadable file has no marker, so it counts zero
+		if err != nil || d.IsDir() || (path.Ext(name) != ".yaml" && path.Ext(name) != ".yml") {
+			return nil
+		}
+		src, rerr := fs.ReadFile(fsys, name)
+		if rerr != nil {
+			return nil
+		}
+		for _, m := range ParseMarkers(src) {
+			if m.Feature == caps.StepAction && strings.HasSuffix(m.IRPath, "/step/"+checkoutStepID) {
+				n++
+			}
+		}
+		return nil
+	})
+	return n
+}
+
+// DropSourceCheckout removes the first step of each job when WithSourceCheckout added it, at most generated times.
+// It runs when a target file is parsed, so the step does not come back as a step of the source.
+func DropSourceCheckout(p *ir.Project, generated int) {
 	if p == nil {
 		return
 	}
 	for _, pl := range p.Pipelines {
 		for _, j := range pl.Jobs {
-			if len(j.Steps) > 0 && j.Steps[0] != nil && j.Steps[0].ID == checkoutStepID && j.Steps[0].Kind == ir.StepAction {
+			if generated > 0 && len(j.Steps) > 0 && j.Steps[0] != nil && j.Steps[0].ID == checkoutStepID && j.Steps[0].Kind == ir.StepAction {
 				j.Steps = j.Steps[1:]
+				generated--
 			}
 		}
 	}

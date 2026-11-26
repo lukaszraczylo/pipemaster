@@ -436,7 +436,7 @@ func (e *emitter) workflowRun(b *onBuilder, path string, t *ir.Trigger) error {
 func (e *emitter) noteDefaultEvents(noForm map[string][]provider.SourceEvent) {
 	for id, events := range noForm {
 		for _, g := range provider.GroupByFeature(events) {
-			e.lose("pipeline/"+id, g.Feature, "the source runs on the events "+strings.Join(g.Names, ", ")+" when its file names no trigger; "+e.d.title()+" has no event for them")
+			e.lose("pipeline/"+id, g.Feature, "the source runs on the events "+strings.Join(g.Names, ", ")+" and its file has no trigger form for them; "+e.d.title()+" has no event for them")
 		}
 	}
 }

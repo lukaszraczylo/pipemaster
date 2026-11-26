@@ -44,7 +44,8 @@ func repoHoldsFiles(dir string) bool {
 }
 
 // jobsWithoutCheckout lists the jobs of a workflow that run steps and have no checkout step. A job that calls a
-// reusable workflow has no steps of its own, so it is not listed.
+// reusable workflow has no steps of its own, so it is not listed. A checkout step counts at any position and under any
+// if: guard, so the check cannot fail a job that has such a step.
 func jobsWithoutCheckout(raw []byte) ([]string, error) {
 	var doc struct {
 		Jobs map[string]struct {

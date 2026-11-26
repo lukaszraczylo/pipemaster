@@ -1,6 +1,7 @@
 package concourse_test
 
 import (
+	"os/exec"
 	"slices"
 	"strings"
 	"testing"
@@ -81,9 +82,9 @@ func TestLoadVarReferenceRewrite(t *testing.T) {
 	if len(use.Env) != 0 {
 		t.Errorf("VERSION must not stay an env entry: %+v", use.Env)
 	}
-	want := `export VERSION="$(cat '.pipemaster/vars/ver')"`
-	if len(use.Script) == 0 || use.Script[0] != want {
-		t.Errorf("script %q, want first line %q", use.Script, want)
+	want := []string{`VERSION="$(cat '.pipemaster/vars/ver')" || exit 1`, "export VERSION"}
+	if len(use.Script) < 2 || use.Script[0] != want[0] || use.Script[1] != want[1] {
+		t.Errorf("script %q, want first lines %q", use.Script, want)
 	}
 	if got := entriesAt(rep, caps.Lost, "VERSION"); len(got) != 0 {
 		t.Errorf("a rewritten reference is no loss: %+v", got)
@@ -122,5 +123,19 @@ func TestLoadVarRoundTripAndEdit(t *testing.T) {
 	edited := files[".concourse/ci.yml"]
 	if strings.Contains(edited, "load_var:") || !strings.Contains(edited, "echo changed") {
 		t.Errorf("an edited load_var script must become a task:\n%s", edited)
+	}
+}
+
+func TestLoadRefFailsWhenTheFileIsMissing(t *testing.T) {
+	pl, _ := parseYAML(t, oneJob("  - {load_var: ver, file: repo/VERSION}\n"+loadVarTask))
+	script := strings.Join(pl.Jobs[0].Steps[1].Script, "\n")
+	cmd := exec.Command("sh", "-c", script) // #nosec G204 -- script comes from the parser under test
+	cmd.Dir = t.TempDir()
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("a missing load_var file must fail the step, output %q", out)
+	}
+	if strings.Contains(string(out), "\n\n") || string(out) == "\n" {
+		t.Errorf("the task body printed an empty value: %q", out)
 	}
 }

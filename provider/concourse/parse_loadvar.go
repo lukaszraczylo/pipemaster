@@ -80,7 +80,7 @@ func (jb *jobBuilder) loadVarStep(m *omap) *ir.Step {
 		emitkit.CarriedKey: []any{ExtKind, ExtStep, ExtLoadScript},
 	}}
 	jb.k.Rep.Add(jb.entry(caps.StepScript, caps.Emulated, "script step that writes "+loadVarFile(name),
-		fmt.Sprintf("load_var %s has no variable form on the targets; a step copies %s (format %s) to %s and later steps read that file. A value read as json or yaml, and a field reference such as ((.:%s.key)), have no script form", name, src, format, loadVarFile(name), name), line))
+		fmt.Sprintf("load_var %s has no variable form on the targets; a step copies %s (format %s) to %s and later steps read that file. A value read as json or yaml, and a field reference such as ((.:%s.key)), have no script form. Concourse hides the value in build logs and a target does not", name, src, format, loadVarFile(name), name), line))
 	return st
 }
 
@@ -107,7 +107,8 @@ func stringsAny(l []string) []any {
 	return out
 }
 
-// loadRef is the script line that makes a load_var value the env var of a task.
-func loadRef(env, name string) string {
-	return "export " + env + `="$(cat ` + shellQuote(loadVarFile(name)) + `)"`
+// loadRef is the script lines that make a load_var value the env var of a task. The assignment is separate from
+// export, because export hides the exit status of cat and a missing file must fail the step.
+func loadRef(env, name string) []string {
+	return []string{env + `="$(cat ` + shellQuote(loadVarFile(name)) + `)" || exit 1`, "export " + env}
 }

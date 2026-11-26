@@ -117,6 +117,7 @@ func (k *Kube) serveRepo(ctx context.Context, ns string, w *Workspace) error {
 		"apiVersion": "v1", "kind": "Pod",
 		"metadata": map[string]any{"name": gitSrvName, "labels": map[string]any{"app": gitSrvName}},
 		"spec": map[string]any{
+			"automountServiceAccountToken": false,
 			"containers": []any{map[string]any{
 				"name": "git", "image": mirrorRef(gitSrvImage), "command": []any{"sh", "-c", script},
 				"ports":          []any{map[string]any{"containerPort": gitSrvPort}},
