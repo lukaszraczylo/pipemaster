@@ -36,13 +36,6 @@
      "path": "pipeline/build-and-deploy",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "pipeline workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "Ext of provider tekton (workspaces) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
@@ -50,21 +43,7 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
      "detail": "Task param manifest_dir: key description has no IR form; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "Task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests",
@@ -95,21 +74,7 @@
      "path": "pipeline/build-and-deploy/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/build-image",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the GHA file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/fetch-repository",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -168,21 +133,7 @@
      "path": "pipeline/pipeline-tutorial-check-pr",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "pipeline workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "Ext of provider tekton (pipelineRun, workspaces) is not written to the GHA file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
@@ -196,13 +147,6 @@
      "level": "lost",
      "strategy": "dropped",
      "detail": "param url of the catalog task git-clone has no checkout input and is not applied"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
@@ -364,13 +308,6 @@
      "path": "pipeline/build-and-deploy",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "pipeline workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "the pipeline has no trigger GitLab can express; workflow:rules never starts it"
     },
     {
@@ -378,21 +315,7 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
      "detail": "Task param manifest_dir: key description has no IR form; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "Task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests",
@@ -435,13 +358,6 @@
      "path": "pipeline/build-and-deploy/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/build-image",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
@@ -449,13 +365,6 @@
      "feature": "job.if",
      "level": "lost",
      "detail": "pipeline build-and-deploy has no trigger GitLab can express; job disabled"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/fetch-repository",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -538,21 +447,7 @@
      "path": "pipeline/pipeline-tutorial-check-pr",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "pipeline workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "the pipeline has no trigger GitLab can express; workflow:rules never starts it"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
@@ -578,13 +473,6 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "detail": "the action reference actions/checkout@v7 is not in the GitLab file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
@@ -745,13 +633,6 @@
      "path": "pipeline/build-and-deploy",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "pipeline workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "Ext of provider tekton (workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
@@ -765,21 +646,7 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
      "detail": "Task param manifest_dir: key description has no IR form; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "Task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests",
@@ -810,13 +677,6 @@
      "path": "pipeline/build-and-deploy/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/build-image",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
@@ -824,13 +684,6 @@
      "feature": "expr.opaque",
      "level": "lost",
      "detail": "no Woodpecker spelling for expression inputs.IMAGE"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/fetch-repository",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -913,13 +766,6 @@
      "path": "pipeline/pipeline-tutorial-check-pr",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "pipeline workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "Ext of provider tekton (pipelineRun, workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
@@ -927,13 +773,6 @@
      "feature": "pipeline.inputs",
      "level": "lost",
      "detail": "Woodpecker has no typed pipeline inputs"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
@@ -965,13 +804,6 @@
      "feature": "step.action",
      "level": "lost",
      "detail": "input ref has no value on this target: its value inputs.revision is a pipeline parameter or an expression with no Woodpecker spelling, so the step stops before it runs git"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
@@ -1072,13 +904,6 @@
      "path": "pipeline/build-and-deploy",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "pipeline workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "Ext of provider tekton (workspaces) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
@@ -1092,21 +917,7 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
      "detail": "Task param manifest_dir: key description has no IR form; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "Task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests",
@@ -1137,13 +948,6 @@
      "path": "pipeline/build-and-deploy/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/build-image",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
@@ -1151,13 +955,6 @@
      "feature": "expr.opaque",
      "level": "lost",
      "detail": "no Drone spelling for expression inputs.IMAGE"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/fetch-repository",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -1240,13 +1037,6 @@
      "path": "pipeline/pipeline-tutorial-check-pr",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "pipeline workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "Ext of provider tekton (pipelineRun, workspaces) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
@@ -1254,13 +1044,6 @@
      "feature": "pipeline.inputs",
      "level": "lost",
      "detail": "Drone has no typed pipeline inputs"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
@@ -1292,13 +1075,6 @@
      "feature": "step.action",
      "level": "lost",
      "detail": "input submodules has no Drone equivalent; input ref has no value on this target: its value inputs.revision is a pipeline parameter or an expression with no Drone spelling, so the step stops before it runs git"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
@@ -1424,13 +1200,6 @@
      "path": "pipeline/build-and-deploy",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "pipeline workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "Ext of provider tekton (workspaces) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
@@ -1438,21 +1207,7 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
      "detail": "Task param manifest_dir: key description has no IR form; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "Task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests",
@@ -1483,21 +1238,7 @@
      "path": "pipeline/build-and-deploy/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/build-image",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the Argo file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/fetch-repository",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -1562,21 +1303,7 @@
      "path": "pipeline/pipeline-tutorial-check-pr",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "pipeline workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "Ext of provider tekton (pipelineRun, workspaces) is not written to the Argo file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
@@ -1596,13 +1323,6 @@
      "feature": "step.action",
      "level": "lost",
      "detail": "the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; the input submodules of the action has no Argo form"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
@@ -1742,13 +1462,6 @@
      "path": "pipeline/build-and-deploy",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "pipeline workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "Ext of provider tekton (workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
     },
     {
@@ -1761,21 +1474,7 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
      "detail": "Task param manifest_dir: key description has no IR form; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "Task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests",
@@ -1806,13 +1505,6 @@
      "path": "pipeline/build-and-deploy/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/build-image",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
     },
     {
@@ -1820,13 +1512,6 @@
      "feature": "expr.opaque",
      "level": "lost",
      "detail": "no Concourse spelling for inputs.IMAGE in the value of PARAM_IMAGE; the variable is not written"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/fetch-repository",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -1903,26 +1588,12 @@
      "path": "pipeline/pipeline-tutorial-check-pr",
      "feature": "ext.passthrough",
      "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "pipeline workspaces have no IR field; kept in Ext"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr",
-     "feature": "ext.passthrough",
-     "level": "lost",
      "detail": "Ext of provider tekton (pipelineRun, workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr",
      "feature": "pipeline.inputs",
      "level": "lost"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
@@ -1948,13 +1619,6 @@
      "feature": "step.action",
      "level": "lost",
      "detail": "the step needs git in its image; a repository other than the source needs a token or secret that the operator creates, and the host is github.com unless the action names another; the input submodules of the action has no Concourse form"
-    },
-    {
-     "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "strategy": "kept in Ext[tekton]",
-     "detail": "task workspaces have no IR field; kept in Ext"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",

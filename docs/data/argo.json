@@ -12,7 +12,7 @@
    "files": [
     {
      "path": ".github/workflows/buildkit.yml",
-     "text": "# pipemaster:emulated job.runner pipeline/buildkit/job/build-image\n# pipemaster:emulated job.runner pipeline/buildkit/job/git-clone\non:\n  # pipemaster:emulated pipeline.inputs pipeline/buildkit\n  workflow_dispatch:\n    inputs:\n      repo:\n        default: https://gitee.com/dev-ops/go-gin-rest-api.git\n      branch:\n        default: main\n      path:\n        default: go-gin-rest-api\n      image:\n        default: registry.cn-shenzhen.aliyuncs.com/dev-ops/go-gin-rest-api\n      version:\n        default: 1.0.1\njobs:\n  build-image:\n    needs:\n      - git-clone\n    if: false\n    runs-on: ubuntu-latest\n    container: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n    steps:\n      # pipemaster:lost job.if pipeline/buildkit/job/build-image: (needs.git-clone.result == 'success') || (needs.git-clone.result == 'skipped')\n      - id: main\n        run: buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name=${{ inputs.image }}:${{ inputs.version }},push=true\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \"type=registry,mode=max,ref=${{ inputs.image }}:buildkit-cache\" --import-cache \"type=registry,ref=${{ inputs.image }}:buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n        working-directory: /workspace/${{ inputs.path }}\n        env:\n          BUILDKITD_FLAGS: --oci-worker-no-process-sandbox\n  git-clone:\n    runs-on: ubuntu-latest\n    container: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n    steps:\n      - id: main\n        run: git-clone-pull.sh \"${{ inputs.repo }}\" \"${{ inputs.branch }}\" \"${{ inputs.path }}\"\n"
+     "text": "# pipemaster:emulated job.runner pipeline/buildkit/job/build-image\n# pipemaster:emulated job.runner pipeline/buildkit/job/git-clone\non:\n  # pipemaster:emulated pipeline.inputs pipeline/buildkit\n  workflow_dispatch:\n    inputs:\n      repo:\n        default: https://gitee.com/dev-ops/go-gin-rest-api.git\n      branch:\n        default: main\n      path:\n        default: go-gin-rest-api\n      image:\n        default: registry.cn-shenzhen.aliyuncs.com/dev-ops/go-gin-rest-api\n      version:\n        default: 1.0.1\njobs:\n  build-image:\n    needs:\n      - git-clone\n    if: false\n    runs-on: ubuntu-latest\n    container: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n    steps:\n      # pipemaster:lost job.if pipeline/buildkit/job/build-image: (needs.git-clone.result == 'success') || (needs.git-clone.result == 'skipped')\n      - id: build-image-workspace-dirs\n        run: mkdir -p pm-workspaces/cache pm-workspaces/docker-secret\n      - id: main\n        run: buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name=${{ inputs.image }}:${{ inputs.version }},push=true\" --export-cache type=local,mode=max,dest=pm-workspaces/cache --import-cache type=local,src=pm-workspaces/cache --export-cache \"type=registry,mode=max,ref=${{ inputs.image }}:buildkit-cache\" --import-cache \"type=registry,ref=${{ inputs.image }}:buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n        working-directory: /workspace/${{ inputs.path }}\n        env:\n          BUILDKITD_FLAGS: --oci-worker-no-process-sandbox\n  git-clone:\n    runs-on: ubuntu-latest\n    container: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n    steps:\n      - id: git-clone-workspace-dirs\n        run: mkdir -p pm-workspaces/rsa-secret\n      - id: main\n        run: git-clone-pull.sh \"${{ inputs.repo }}\" \"${{ inputs.branch }}\" \"${{ inputs.path }}\"\n"
     }
    ],
    "report": [
@@ -21,7 +21,7 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumes has no IR field; kept in Ext"
+     "detail": "key volumes workspace has no IR field and no template mounts it to a directory; kept in Ext"
     },
     {
      "path": "pipeline/buildkit",
@@ -33,7 +33,7 @@
      "path": "pipeline/buildkit/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider argo (depends) is not written to the GHA file; it is kept in round-trip metadata"
+     "detail": "Ext of provider argo (depends, mount_paths) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image",
@@ -49,11 +49,17 @@
      "detail": "condition not expressible in GitHub Actions; job disabled"
     },
     {
+     "path": "pipeline/buildkit/job/build-image/step/build-image-workspace-dirs",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (workspace_dirs) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
      "path": "pipeline/buildkit/job/build-image/step/main",
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumeMounts has no IR field; kept in Ext"
+     "detail": "key volumeMounts has no IR field for a volume that no directory stands for; kept in Ext"
     },
     {
      "path": "pipeline/buildkit/job/build-image/step/main",
@@ -76,11 +82,17 @@
      "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
     },
     {
+     "path": "pipeline/buildkit/job/git-clone/step/git-clone-workspace-dirs",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (workspace_dirs) is not written to the GHA file; it is kept in round-trip metadata"
+    },
+    {
      "path": "pipeline/buildkit/job/git-clone/step/main",
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumeMounts has no IR field; kept in Ext"
+     "detail": "key volumeMounts has no IR field for a volume that no directory stands for; kept in Ext"
     },
     {
      "path": "pipeline/buildkit/job/git-clone/step/main",
@@ -96,11 +108,32 @@
      "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
     },
     {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "external",
+     "strategy": "volume bound to a Secret acr-regcred",
+     "detail": "volume docker-secret is a Secret acr-regcred; the operator must provide Secret acr-regcred and put its files in pm-workspaces/docker-secret before the step runs: a GitHub Actions secret written to the files, a GitLab file CI/CD variable, or a Drone or Woodpecker secret written to the files"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone",
+     "feature": "ext.passthrough",
+     "level": "external",
+     "strategy": "volume bound to a Secret rsa-secret",
+     "detail": "volume rsa-secret is a Secret rsa-secret; the operator must provide Secret rsa-secret and put its files in pm-workspaces/rsa-secret before the step runs: a GitHub Actions secret written to the files, a GitLab file CI/CD variable, or a Drone or Woodpecker secret written to the files"
+    },
+    {
      "path": "pipeline/buildkit",
      "feature": "pipeline.inputs",
      "level": "emulated",
      "strategy": "workflow_dispatch trigger",
      "detail": "inputs need a workflow_dispatch trigger; the pipeline had none"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "emulated",
+     "strategy": "workspace directory",
+     "detail": "volume cache is the directory pm-workspaces/cache of the job checkout; its mount paths in scripts, commands and working directories read that directory"
     },
     {
      "path": "pipeline/buildkit/job/build-image",
@@ -124,7 +157,7 @@
    "files": [
     {
      "path": ".gitlab-ci.yml",
-     "text": "# pipemaster:emulated pipeline.inputs pipeline/buildkit\n# pipemaster:arg [{\"Name\":\"repo\",\"Type\":\"\",\"Default\":\"https://gitee.com/dev-ops/go-gin-rest-api.git\",\"Description\":\"\",\"Required\":false},{\"Name\":\"branch\",\"Type\":\"\",\"Default\":\"main\",\"Description\":\"\",\"Required\":false},{\"Name\":\"path\",\"Type\":\"\",\"Default\":\"go-gin-rest-api\",\"Description\":\"\",\"Required\":false},{\"Name\":\"image\",\"Type\":\"\",\"Default\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/go-gin-rest-api\",\"Description\":\"\",\"Required\":false},{\"Name\":\"version\",\"Type\":\"\",\"Default\":\"1.0.1\",\"Description\":\"\",\"Required\":false}]\n# pipemaster:emulated script.interpolation pipeline/buildkit\n# pipemaster:arg [{\"k\":\"t\",\"p\":\"job/build-image/step/main/script/0\",\"g\":\"buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \\\"type=image,name=$image:$version,push=true\\\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \\\"type=registry,mode=max,ref=$image:buildkit-cache\\\" --import-cache \\\"type=registry,ref=$image:buildkit-cache\\\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\",\"s\":\"buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \\\"type=image,name=$\\u007b{ inputs.image }}:$\\u007b{ inputs.version }},push=true\\\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \\\"type=registry,mode=max,ref=$\\u007b{ inputs.image }}:buildkit-cache\\\" --import-cache \\\"type=registry,ref=$\\u007b{ inputs.image }}:buildkit-cache\\\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\"},{\"k\":\"t\",\"p\":\"job/build-image/step/main/workdir\",\"g\":\"/workspace/$path\",\"s\":\"/workspace/$\\u007b{ inputs.path }}\"},{\"k\":\"t\",\"p\":\"job/git-clone/step/main/script/0\",\"g\":\"git-clone-pull.sh \\\"$repo\\\" \\\"$branch\\\" \\\"$path\\\"\",\"s\":\"git-clone-pull.sh \\\"$\\u007b{ inputs.repo }}\\\" \\\"$\\u007b{ inputs.branch }}\\\" \\\"$\\u007b{ inputs.path }}\\\"\"}]\nstages:\n  - stage-0\n  - stage-1\nvariables:\n  repo: https://gitee.com/dev-ops/go-gin-rest-api.git\n  branch: main\n  path: go-gin-rest-api\n  image: registry.cn-shenzhen.aliyuncs.com/dev-ops/go-gin-rest-api\n  version: 1.0.1\nworkflow:\n  rules:\n    - when: never\n# pipemaster:lost job.if pipeline/buildkit/job/build-image: (needs.git-clone.result == 'success') || (needs.git-clone.result == 'skipped')\nbuild-image:\n  stage: stage-1\n  image: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n  needs:\n    - git-clone\n  rules:\n    - when: never\n  script:\n    # pipemaster:step main\n    # pipemaster:emulated step.workdir pipeline/buildkit/job/build-image/step/main\n    # pipemaster:emulated step.env pipeline/buildkit/job/build-image/step/main\n    - |\n      (\n      cd \"/workspace/$path\" || exit 1\n      export BUILDKITD_FLAGS=\"--oci-worker-no-process-sandbox\"\n      buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name=$image:$version,push=true\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \"type=registry,mode=max,ref=$image:buildkit-cache\" --import-cache \"type=registry,ref=$image:buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n      )\ngit-clone:\n  stage: stage-0\n  image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n  needs: []\n  script:\n    # pipemaster:step main\n    - git-clone-pull.sh \"$repo\" \"$branch\" \"$path\"\n"
+     "text": "# pipemaster:emulated pipeline.inputs pipeline/buildkit\n# pipemaster:arg [{\"Name\":\"repo\",\"Type\":\"\",\"Default\":\"https://gitee.com/dev-ops/go-gin-rest-api.git\",\"Description\":\"\",\"Required\":false},{\"Name\":\"branch\",\"Type\":\"\",\"Default\":\"main\",\"Description\":\"\",\"Required\":false},{\"Name\":\"path\",\"Type\":\"\",\"Default\":\"go-gin-rest-api\",\"Description\":\"\",\"Required\":false},{\"Name\":\"image\",\"Type\":\"\",\"Default\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/go-gin-rest-api\",\"Description\":\"\",\"Required\":false},{\"Name\":\"version\",\"Type\":\"\",\"Default\":\"1.0.1\",\"Description\":\"\",\"Required\":false}]\n# pipemaster:emulated script.interpolation pipeline/buildkit\n# pipemaster:arg [{\"k\":\"t\",\"p\":\"job/build-image/step/main/script/0\",\"g\":\"buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \\\"type=image,name=$image:$version,push=true\\\" --export-cache type=local,mode=max,dest=pm-workspaces/cache --import-cache type=local,src=pm-workspaces/cache --export-cache \\\"type=registry,mode=max,ref=$image:buildkit-cache\\\" --import-cache \\\"type=registry,ref=$image:buildkit-cache\\\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\",\"s\":\"buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \\\"type=image,name=$\\u007b{ inputs.image }}:$\\u007b{ inputs.version }},push=true\\\" --export-cache type=local,mode=max,dest=pm-workspaces/cache --import-cache type=local,src=pm-workspaces/cache --export-cache \\\"type=registry,mode=max,ref=$\\u007b{ inputs.image }}:buildkit-cache\\\" --import-cache \\\"type=registry,ref=$\\u007b{ inputs.image }}:buildkit-cache\\\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\"},{\"k\":\"t\",\"p\":\"job/build-image/step/main/workdir\",\"g\":\"/workspace/$path\",\"s\":\"/workspace/$\\u007b{ inputs.path }}\"},{\"k\":\"t\",\"p\":\"job/git-clone/step/main/script/0\",\"g\":\"git-clone-pull.sh \\\"$repo\\\" \\\"$branch\\\" \\\"$path\\\"\",\"s\":\"git-clone-pull.sh \\\"$\\u007b{ inputs.repo }}\\\" \\\"$\\u007b{ inputs.branch }}\\\" \\\"$\\u007b{ inputs.path }}\\\"\"}]\nstages:\n  - stage-0\n  - stage-1\nvariables:\n  repo: https://gitee.com/dev-ops/go-gin-rest-api.git\n  branch: main\n  path: go-gin-rest-api\n  image: registry.cn-shenzhen.aliyuncs.com/dev-ops/go-gin-rest-api\n  version: 1.0.1\nworkflow:\n  rules:\n    - when: never\n# pipemaster:lost job.if pipeline/buildkit/job/build-image: (needs.git-clone.result == 'success') || (needs.git-clone.result == 'skipped')\nbuild-image:\n  stage: stage-1\n  image: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n  needs:\n    - git-clone\n  rules:\n    - when: never\n  script:\n    # pipemaster:step build-image-workspace-dirs\n    - mkdir -p pm-workspaces/cache pm-workspaces/docker-secret\n    # pipemaster:step main\n    # pipemaster:emulated step.workdir pipeline/buildkit/job/build-image/step/main\n    # pipemaster:emulated step.env pipeline/buildkit/job/build-image/step/main\n    - |\n      (\n      cd \"/workspace/$path\" || exit 1\n      export BUILDKITD_FLAGS=\"--oci-worker-no-process-sandbox\"\n      buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name=$image:$version,push=true\" --export-cache type=local,mode=max,dest=pm-workspaces/cache --import-cache type=local,src=pm-workspaces/cache --export-cache \"type=registry,mode=max,ref=$image:buildkit-cache\" --import-cache \"type=registry,ref=$image:buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n      )\ngit-clone:\n  stage: stage-0\n  image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n  needs: []\n  script:\n    # pipemaster:step git-clone-workspace-dirs\n    - mkdir -p pm-workspaces/rsa-secret\n    # pipemaster:step main\n    - git-clone-pull.sh \"$repo\" \"$branch\" \"$path\"\n"
     }
    ],
    "report": [
@@ -133,7 +166,7 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumes has no IR field; kept in Ext"
+     "detail": "key volumes workspace has no IR field and no template mounts it to a directory; kept in Ext"
     },
     {
      "path": "pipeline/buildkit",
@@ -145,7 +178,7 @@
      "path": "pipeline/buildkit/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider argo (depends) is not written to the GitLab file; it is kept in round-trip metadata"
+     "detail": "Ext of provider argo (depends, mount_paths) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image",
@@ -161,11 +194,17 @@
      "detail": "condition not expressible in GitLab CI; job disabled"
     },
     {
+     "path": "pipeline/buildkit/job/build-image/step/build-image-workspace-dirs",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (workspace_dirs) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
      "path": "pipeline/buildkit/job/build-image/step/main",
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumeMounts has no IR field; kept in Ext"
+     "detail": "key volumeMounts has no IR field for a volume that no directory stands for; kept in Ext"
     },
     {
      "path": "pipeline/buildkit/job/build-image/step/main",
@@ -188,11 +227,17 @@
      "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
     },
     {
+     "path": "pipeline/buildkit/job/git-clone/step/git-clone-workspace-dirs",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (workspace_dirs) is not written to the GitLab file; it is kept in round-trip metadata"
+    },
+    {
      "path": "pipeline/buildkit/job/git-clone/step/main",
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumeMounts has no IR field; kept in Ext"
+     "detail": "key volumeMounts has no IR field for a volume that no directory stands for; kept in Ext"
     },
     {
      "path": "pipeline/buildkit/job/git-clone/step/main",
@@ -208,11 +253,32 @@
      "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
     },
     {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "external",
+     "strategy": "volume bound to a Secret acr-regcred",
+     "detail": "volume docker-secret is a Secret acr-regcred; the operator must provide Secret acr-regcred and put its files in pm-workspaces/docker-secret before the step runs: a GitHub Actions secret written to the files, a GitLab file CI/CD variable, or a Drone or Woodpecker secret written to the files"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone",
+     "feature": "ext.passthrough",
+     "level": "external",
+     "strategy": "volume bound to a Secret rsa-secret",
+     "detail": "volume rsa-secret is a Secret rsa-secret; the operator must provide Secret rsa-secret and put its files in pm-workspaces/rsa-secret before the step runs: a GitHub Actions secret written to the files, a GitLab file CI/CD variable, or a Drone or Woodpecker secret written to the files"
+    },
+    {
      "path": "pipeline/buildkit",
      "feature": "pipeline.inputs",
      "level": "emulated",
      "strategy": "variables with description",
      "detail": "input types and required flags are not enforced"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "emulated",
+     "strategy": "workspace directory",
+     "detail": "volume cache is the directory pm-workspaces/cache of the job checkout; its mount paths in scripts, commands and working directories read that directory"
     },
     {
      "path": "pipeline/buildkit/job/build-image/step/main",
@@ -234,11 +300,11 @@
    "files": [
     {
      "path": ".woodpecker/build-image.yaml",
-     "text": "# pipemaster:emulated job.container pipeline/buildkit/job/build-image\n# pipemaster:arg {\"Ref\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\",\"Entrypoint\":null}\n# pipemaster:emulated script.interpolation pipeline/buildkit/job/build-image/step/main\n# pipemaster:arg {\"refs\":[\"inputs.image\",\"inputs.version\"],\"pos\":0}\n# pipemaster:lost step.workdir pipeline/buildkit/job/build-image/step/main: {{ inputs.path }}\n# pipemaster:lost step pipeline/buildkit/job/build-image/step/main: an image or workdir lost an expression, so the step is disabled\n# pipemaster:lost job.if pipeline/buildkit/job/build-image: (needs.git-clone.result == 'success') || (needs.git-clone.result == 'skipped')\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\n    evaluate: \"false\"\ndepends_on:\n  - git-clone\nsteps:\n  - name: main\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n    commands:\n      - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name=$${image}:$${version},push=true\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \"type=registry,mode=max,ref=$${image}:buildkit-cache\" --import-cache \"type=registry,ref=$${image}:buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n    environment:\n      BUILDKITD_FLAGS: --oci-worker-no-process-sandbox\n    directory: /workspace/\n    when:\n      - evaluate: \"false\"\n"
+     "text": "# pipemaster:emulated job.container pipeline/buildkit/job/build-image\n# pipemaster:arg {\"Ref\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\",\"Entrypoint\":null}\n# pipemaster:emulated script.interpolation pipeline/buildkit/job/build-image/step/main\n# pipemaster:arg {\"refs\":[\"inputs.image\",\"inputs.version\"],\"pos\":1}\n# pipemaster:lost step.workdir pipeline/buildkit/job/build-image/step/main: {{ inputs.path }}\n# pipemaster:lost step pipeline/buildkit/job/build-image/step/main: an image or workdir lost an expression, so the step is disabled\n# pipemaster:lost job.if pipeline/buildkit/job/build-image: (needs.git-clone.result == 'success') || (needs.git-clone.result == 'skipped')\nwhen:\n  - event:\n      - push\n      - pull_request\n      - pull_request_closed\n      - pull_request_metadata\n      - tag\n      - release\n      - deployment\n      - cron\n      - manual\n    evaluate: \"false\"\ndepends_on:\n  - git-clone\nsteps:\n  - name: build-image-workspace-dirs\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n    commands:\n      - mkdir -p pm-workspaces/cache pm-workspaces/docker-secret\n  - name: main\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n    commands:\n      - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name=$${image}:$${version},push=true\" --export-cache type=local,mode=max,dest=pm-workspaces/cache --import-cache type=local,src=pm-workspaces/cache --export-cache \"type=registry,mode=max,ref=$${image}:buildkit-cache\" --import-cache \"type=registry,ref=$${image}:buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n    environment:\n      BUILDKITD_FLAGS: --oci-worker-no-process-sandbox\n    directory: /workspace/\n    when:\n      - evaluate: \"false\"\n"
     },
     {
      "path": ".woodpecker/git-clone.yaml",
-     "text": "# pipemaster:emulated job.container pipeline/buildkit/job/git-clone\n# pipemaster:arg {\"Ref\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\",\"Entrypoint\":null}\n# pipemaster:emulated script.interpolation pipeline/buildkit/job/git-clone/step/main\n# pipemaster:arg {\"refs\":[\"inputs.repo\",\"inputs.branch\",\"inputs.path\"],\"pos\":0}\n# pipemaster:emulated trigger.push pipeline/buildkit/job/git-clone\n# pipemaster:arg {\"default_events\":[\"push\",\"pull_request\",\"tag\"]}\nwhen:\n  - event:\n      - push\n      - pull_request\n      - tag\nsteps:\n  - name: main\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n    commands:\n      - git-clone-pull.sh \"$${repo}\" \"$${branch}\" \"$${path}\"\n"
+     "text": "# pipemaster:emulated job.container pipeline/buildkit/job/git-clone\n# pipemaster:arg {\"Ref\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\",\"Entrypoint\":null}\n# pipemaster:emulated script.interpolation pipeline/buildkit/job/git-clone/step/main\n# pipemaster:arg {\"refs\":[\"inputs.repo\",\"inputs.branch\",\"inputs.path\"],\"pos\":1}\n# pipemaster:emulated trigger.push pipeline/buildkit/job/git-clone\n# pipemaster:arg {\"default_events\":[\"push\",\"pull_request\",\"tag\"]}\nwhen:\n  - event:\n      - push\n      - pull_request\n      - tag\nsteps:\n  - name: git-clone-workspace-dirs\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n    commands:\n      - mkdir -p pm-workspaces/rsa-secret\n  - name: main\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n    commands:\n      - git-clone-pull.sh \"$${repo}\" \"$${branch}\" \"$${path}\"\n"
     }
    ],
    "report": [
@@ -247,7 +313,7 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumes has no IR field; kept in Ext"
+     "detail": "key volumes workspace has no IR field and no template mounts it to a directory; kept in Ext"
     },
     {
      "path": "pipeline/buildkit",
@@ -265,7 +331,7 @@
      "path": "pipeline/buildkit/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider argo (depends) is not written to the Woodpecker file; it is kept in round-trip metadata"
+     "detail": "Ext of provider argo (depends, mount_paths) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image",
@@ -281,11 +347,17 @@
      "detail": "condition not expressible in Woodpecker CI; the workflow disabled"
     },
     {
+     "path": "pipeline/buildkit/job/build-image/step/build-image-workspace-dirs",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (workspace_dirs) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
      "path": "pipeline/buildkit/job/build-image/step/main",
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumeMounts has no IR field; kept in Ext"
+     "detail": "key volumeMounts has no IR field for a volume that no directory stands for; kept in Ext"
     },
     {
      "path": "pipeline/buildkit/job/build-image/step/main",
@@ -320,11 +392,17 @@
      "detail": "no Woodpecker spelling for expression inputs.path"
     },
     {
+     "path": "pipeline/buildkit/job/git-clone/step/git-clone-workspace-dirs",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (workspace_dirs) is not written to the Woodpecker file; it is kept in round-trip metadata"
+    },
+    {
      "path": "pipeline/buildkit/job/git-clone/step/main",
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumeMounts has no IR field; kept in Ext"
+     "detail": "key volumeMounts has no IR field for a volume that no directory stands for; kept in Ext"
     },
     {
      "path": "pipeline/buildkit/job/git-clone/step/main",
@@ -340,6 +418,13 @@
      "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
     },
     {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "external",
+     "strategy": "volume bound to a Secret acr-regcred",
+     "detail": "volume docker-secret is a Secret acr-regcred; the operator must provide Secret acr-regcred and put its files in pm-workspaces/docker-secret before the step runs: a GitHub Actions secret written to the files, a GitLab file CI/CD variable, or a Drone or Woodpecker secret written to the files"
+    },
+    {
      "path": "pipeline/buildkit/job/build-image/step/main",
      "feature": "script.interpolation",
      "level": "external",
@@ -347,11 +432,25 @@
      "detail": "input image is read as the variable image, which nothing sets; define it in the Woodpecker environment; input version is read as the variable version, which nothing sets; define it in the Woodpecker environment"
     },
     {
+     "path": "pipeline/buildkit/job/git-clone",
+     "feature": "ext.passthrough",
+     "level": "external",
+     "strategy": "volume bound to a Secret rsa-secret",
+     "detail": "volume rsa-secret is a Secret rsa-secret; the operator must provide Secret rsa-secret and put its files in pm-workspaces/rsa-secret before the step runs: a GitHub Actions secret written to the files, a GitLab file CI/CD variable, or a Drone or Woodpecker secret written to the files"
+    },
+    {
      "path": "pipeline/buildkit/job/git-clone/step/main",
      "feature": "script.interpolation",
      "level": "external",
      "strategy": "environment variable for input",
      "detail": "input repo is read as the variable repo, which nothing sets; define it in the Woodpecker environment; input branch is read as the variable branch, which nothing sets; define it in the Woodpecker environment; input path is read as the variable path, which nothing sets; define it in the Woodpecker environment"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "emulated",
+     "strategy": "workspace directory",
+     "detail": "volume cache is the directory pm-workspaces/cache of the job checkout; its mount paths in scripts, commands and working directories read that directory"
     }
    ]
   },
@@ -361,7 +460,7 @@
    "files": [
     {
      "path": ".drone.yml",
-     "text": "# pipemaster:lost job.if pipeline/buildkit/job/build-image: (needs.git-clone.result == 'success') || (needs.git-clone.result == 'skipped')\n# pipemaster:emulated script.interpolation pipeline/buildkit/job/build-image/step/main\n# pipemaster:arg {\"at\":{\"inputs.image\":{\"at\":[0,1,2],\"of\":3},\"inputs.version\":{\"at\":[0],\"of\":1}},\"refs\":[\"inputs.image\",\"inputs.version\"],\"pos\":0}\n# pipemaster:lost step.workdir pipeline/buildkit/job/build-image/step/main: {{ inputs.path }}\n# pipemaster:lost step pipeline/buildkit/job/build-image/step/main: an image or workdir lost an expression, so the step is disabled\n# pipemaster:emulated job.container pipeline/buildkit/job/build-image\n# pipemaster:arg {\"Ref\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\",\"Entrypoint\":null,\"taken\":1}\nkind: pipeline\ntype: docker\nname: build-image\ntrigger:\n  event:\n    exclude:\n      - '**'\ndepends_on:\n  - git-clone\nsteps:\n  - name: main\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n    commands:\n      - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name=$${image}:$${version},push=true\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \"type=registry,mode=max,ref=$${image}:buildkit-cache\" --import-cache \"type=registry,ref=$${image}:buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n    environment:\n      BUILDKITD_FLAGS: --oci-worker-no-process-sandbox\n    working_dir: /workspace/\n    when:\n      event:\n        exclude:\n          - '**'\n---\n# pipemaster:emulated script.interpolation pipeline/buildkit/job/git-clone/step/main\n# pipemaster:arg {\"at\":{\"inputs.branch\":{\"at\":[0],\"of\":1},\"inputs.path\":{\"at\":[0],\"of\":1},\"inputs.repo\":{\"at\":[0],\"of\":1}},\"refs\":[\"inputs.repo\",\"inputs.branch\",\"inputs.path\"],\"pos\":0}\n# pipemaster:emulated job.container pipeline/buildkit/job/git-clone\n# pipemaster:arg {\"Ref\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\",\"Entrypoint\":null,\"taken\":1}\nkind: pipeline\ntype: docker\nname: git-clone\nsteps:\n  - name: main\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n    commands:\n      - git-clone-pull.sh \"$${repo}\" \"$${branch}\" \"$${path}\"\n"
+     "text": "# pipemaster:lost job.if pipeline/buildkit/job/build-image: (needs.git-clone.result == 'success') || (needs.git-clone.result == 'skipped')\n# pipemaster:emulated script.interpolation pipeline/buildkit/job/build-image/step/main\n# pipemaster:arg {\"at\":{\"inputs.image\":{\"at\":[0,1,2],\"of\":3},\"inputs.version\":{\"at\":[0],\"of\":1}},\"refs\":[\"inputs.image\",\"inputs.version\"],\"pos\":1}\n# pipemaster:lost step.workdir pipeline/buildkit/job/build-image/step/main: {{ inputs.path }}\n# pipemaster:lost step pipeline/buildkit/job/build-image/step/main: an image or workdir lost an expression, so the step is disabled\n# pipemaster:emulated job.container pipeline/buildkit/job/build-image\n# pipemaster:arg {\"Ref\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\",\"Entrypoint\":null,\"taken\":2}\nkind: pipeline\ntype: docker\nname: build-image\ntrigger:\n  event:\n    exclude:\n      - '**'\ndepends_on:\n  - git-clone\nsteps:\n  - name: build-image-workspace-dirs\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n    commands:\n      - mkdir -p pm-workspaces/cache pm-workspaces/docker-secret\n  - name: main\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n    commands:\n      - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name=$${image}:$${version},push=true\" --export-cache type=local,mode=max,dest=pm-workspaces/cache --import-cache type=local,src=pm-workspaces/cache --export-cache \"type=registry,mode=max,ref=$${image}:buildkit-cache\" --import-cache \"type=registry,ref=$${image}:buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n    environment:\n      BUILDKITD_FLAGS: --oci-worker-no-process-sandbox\n    working_dir: /workspace/\n    when:\n      event:\n        exclude:\n          - '**'\n---\n# pipemaster:emulated script.interpolation pipeline/buildkit/job/git-clone/step/main\n# pipemaster:arg {\"at\":{\"inputs.branch\":{\"at\":[0],\"of\":1},\"inputs.path\":{\"at\":[0],\"of\":1},\"inputs.repo\":{\"at\":[0],\"of\":1}},\"refs\":[\"inputs.repo\",\"inputs.branch\",\"inputs.path\"],\"pos\":1}\n# pipemaster:emulated job.container pipeline/buildkit/job/git-clone\n# pipemaster:arg {\"Ref\":\"registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\",\"Entrypoint\":null,\"taken\":2}\nkind: pipeline\ntype: docker\nname: git-clone\nsteps:\n  - name: git-clone-workspace-dirs\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n    commands:\n      - mkdir -p pm-workspaces/rsa-secret\n  - name: main\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n    commands:\n      - git-clone-pull.sh \"$${repo}\" \"$${branch}\" \"$${path}\"\n"
     }
    ],
    "report": [
@@ -370,7 +469,7 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumes has no IR field; kept in Ext"
+     "detail": "key volumes workspace has no IR field and no template mounts it to a directory; kept in Ext"
     },
     {
      "path": "pipeline/buildkit",
@@ -388,7 +487,7 @@
      "path": "pipeline/buildkit/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider argo (depends) is not written to the Drone file; it is kept in round-trip metadata"
+     "detail": "Ext of provider argo (depends, mount_paths) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image",
@@ -404,11 +503,17 @@
      "detail": "condition not expressible in Drone CI; the document disabled"
     },
     {
+     "path": "pipeline/buildkit/job/build-image/step/build-image-workspace-dirs",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (workspace_dirs) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
      "path": "pipeline/buildkit/job/build-image/step/main",
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumeMounts has no IR field; kept in Ext"
+     "detail": "key volumeMounts has no IR field for a volume that no directory stands for; kept in Ext"
     },
     {
      "path": "pipeline/buildkit/job/build-image/step/main",
@@ -443,11 +548,17 @@
      "detail": "no Drone spelling for expression inputs.path"
     },
     {
+     "path": "pipeline/buildkit/job/git-clone/step/git-clone-workspace-dirs",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (workspace_dirs) is not written to the Drone file; it is kept in round-trip metadata"
+    },
+    {
      "path": "pipeline/buildkit/job/git-clone/step/main",
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumeMounts has no IR field; kept in Ext"
+     "detail": "key volumeMounts has no IR field for a volume that no directory stands for; kept in Ext"
     },
     {
      "path": "pipeline/buildkit/job/git-clone/step/main",
@@ -463,6 +574,13 @@
      "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
     },
     {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "external",
+     "strategy": "volume bound to a Secret acr-regcred",
+     "detail": "volume docker-secret is a Secret acr-regcred; the operator must provide Secret acr-regcred and put its files in pm-workspaces/docker-secret before the step runs: a GitHub Actions secret written to the files, a GitLab file CI/CD variable, or a Drone or Woodpecker secret written to the files"
+    },
+    {
      "path": "pipeline/buildkit/job/build-image/step/main",
      "feature": "script.interpolation",
      "level": "external",
@@ -470,11 +588,25 @@
      "detail": "input image is read as the variable image, which nothing sets; define it in the Drone environment; input version is read as the variable version, which nothing sets; define it in the Drone environment"
     },
     {
+     "path": "pipeline/buildkit/job/git-clone",
+     "feature": "ext.passthrough",
+     "level": "external",
+     "strategy": "volume bound to a Secret rsa-secret",
+     "detail": "volume rsa-secret is a Secret rsa-secret; the operator must provide Secret rsa-secret and put its files in pm-workspaces/rsa-secret before the step runs: a GitHub Actions secret written to the files, a GitLab file CI/CD variable, or a Drone or Woodpecker secret written to the files"
+    },
+    {
      "path": "pipeline/buildkit/job/git-clone/step/main",
      "feature": "script.interpolation",
      "level": "external",
      "strategy": "environment variable for input",
      "detail": "input repo is read as the variable repo, which nothing sets; define it in the Drone environment; input branch is read as the variable branch, which nothing sets; define it in the Drone environment; input path is read as the variable path, which nothing sets; define it in the Drone environment"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "emulated",
+     "strategy": "workspace directory",
+     "detail": "volume cache is the directory pm-workspaces/cache of the job checkout; its mount paths in scripts, commands and working directories read that directory"
     }
    ]
   },
@@ -492,11 +624,11 @@
     },
     {
      "path": ".tekton/tasks/buildkit-build-image.yaml",
-     "text": "apiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: buildkit-build-image\nspec:\n  params:\n    - name: image\n    - name: version\n    - name: path\n  stepTemplate:\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n  steps:\n    - name: main\n      script: buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name=$(params.image):$(params.version),push=true\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \"type=registry,mode=max,ref=$(params.image):buildkit-cache\" --import-cache \"type=registry,ref=$(params.image):buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n      env:\n        - name: BUILDKITD_FLAGS\n          value: --oci-worker-no-process-sandbox\n      workingDir: /workspace/$(params.path)\n"
+     "text": "# pipemaster:emulated step.workdir pipeline/buildkit/job/build-image\n# pipemaster:arg {\"dir\":\"/workspace\"}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: buildkit-build-image\nspec:\n  params:\n    - name: image\n    - name: version\n    - name: path\n  stepTemplate:\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\n    workingDir: /workspace\n  steps:\n    - name: build-image-workspace-dirs\n      script: mkdir -p pm-workspaces/cache pm-workspaces/docker-secret\n    - name: main\n      script: buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name=$(params.image):$(params.version),push=true\" --export-cache type=local,mode=max,dest=pm-workspaces/cache --import-cache type=local,src=pm-workspaces/cache --export-cache \"type=registry,mode=max,ref=$(params.image):buildkit-cache\" --import-cache \"type=registry,ref=$(params.image):buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n      env:\n        - name: BUILDKITD_FLAGS\n          value: --oci-worker-no-process-sandbox\n      workingDir: /workspace/$(params.path)\n"
     },
     {
      "path": ".tekton/tasks/buildkit-git-clone.yaml",
-     "text": "apiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: buildkit-git-clone\nspec:\n  params:\n    - name: repo\n    - name: branch\n    - name: path\n  stepTemplate:\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n  steps:\n    - name: main\n      script: git-clone-pull.sh \"$(params.repo)\" \"$(params.branch)\" \"$(params.path)\"\n"
+     "text": "# pipemaster:emulated step.workdir pipeline/buildkit/job/git-clone\n# pipemaster:arg {\"dir\":\"/workspace\"}\napiVersion: tekton.dev/v1\nkind: Task\nmetadata:\n  name: buildkit-git-clone\nspec:\n  params:\n    - name: repo\n    - name: branch\n    - name: path\n  stepTemplate:\n    image: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\n    workingDir: /workspace\n  steps:\n    - name: git-clone-workspace-dirs\n      script: mkdir -p pm-workspaces/rsa-secret\n    - name: main\n      script: git-clone-pull.sh \"$(params.repo)\" \"$(params.branch)\" \"$(params.path)\"\n"
     }
    ],
    "report": [
@@ -505,7 +637,7 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumes has no IR field; kept in Ext"
+     "detail": "key volumes workspace has no IR field and no template mounts it to a directory; kept in Ext"
     },
     {
      "path": "pipeline/buildkit",
@@ -517,7 +649,7 @@
      "path": "pipeline/buildkit/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider argo (depends) is not written to the Tekton file; it is kept in round-trip metadata"
+     "detail": "Ext of provider argo (depends, mount_paths) is not written to the Tekton file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image",
@@ -537,7 +669,7 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumeMounts has no IR field; kept in Ext"
+     "detail": "key volumeMounts has no IR field for a volume that no directory stands for; kept in Ext"
     },
     {
      "path": "pipeline/buildkit/job/build-image/step/main",
@@ -558,7 +690,7 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumeMounts has no IR field; kept in Ext"
+     "detail": "key volumeMounts has no IR field for a volume that no directory stands for; kept in Ext"
     },
     {
      "path": "pipeline/buildkit/job/git-clone/step/main",
@@ -566,6 +698,41 @@
      "level": "lost",
      "strategy": "kept in Ext[argo]",
      "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "external",
+     "strategy": "volume bound to a Secret acr-regcred",
+     "detail": "volume docker-secret is a Secret acr-regcred; the operator must provide Secret acr-regcred and put its files in pm-workspaces/docker-secret before the step runs: a GitHub Actions secret written to the files, a GitLab file CI/CD variable, or a Drone or Woodpecker secret written to the files"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone",
+     "feature": "ext.passthrough",
+     "level": "external",
+     "strategy": "volume bound to a Secret rsa-secret",
+     "detail": "volume rsa-secret is a Secret rsa-secret; the operator must provide Secret rsa-secret and put its files in pm-workspaces/rsa-secret before the step runs: a GitHub Actions secret written to the files, a GitLab file CI/CD variable, or a Drone or Woodpecker secret written to the files"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "emulated",
+     "strategy": "workspace directory",
+     "detail": "volume cache is the directory pm-workspaces/cache of the job checkout; its mount paths in scripts, commands and working directories read that directory"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "step.workdir",
+     "level": "emulated",
+     "strategy": "shared working directory",
+     "detail": "the steps run in /workspace, the volume that Tekton mounts in every step; the source runs its steps in one shared directory"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone",
+     "feature": "step.workdir",
+     "level": "emulated",
+     "strategy": "shared working directory",
+     "detail": "the steps run in /workspace, the volume that Tekton mounts in every step; the source runs its steps in one shared directory"
     }
    ]
   },
@@ -575,7 +742,7 @@
    "files": [
     {
      "path": ".concourse/buildkit.yml",
-     "text": "# pipemaster:emulated ext.passthrough pipeline/buildkit/job/build-image/step/main/carry\n# pipemaster:arg {\"digest\":\"1efd0d4b2e88cc11140f880ab0bd65622a21f50a15641d2c24c88f01ccd483db\",\"carry\":\"id: main\\nkind: script\\nworkdir: /workspace/$\\u007b{ inputs.path }}\\nscript:\\n    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \\\"type=image,name=$\\u007b{ inputs.image }}:$\\u007b{ inputs.version }},push=true\\\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \\\"type=registry,mode=max,ref=$\\u007b{ inputs.image }}:buildkit-cache\\\" --import-cache \\\"type=registry,ref=$\\u007b{ inputs.image }}:buildkit-cache\\\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\\nenv:\\n    - name: BUILDKITD_FLAGS\\n      value:\\n        lit: --oci-worker-no-process-sandbox\\n\"}\n# pipemaster:emulated job.manual pipeline/buildkit/job/build-image\n# pipemaster:arg {\"manual\":false,\"held\":true,\"cond\":true}\n# pipemaster:emulated ext.passthrough pipeline/buildkit/job/build-image/carry\n# pipemaster:arg {\"digest\":\"1dd35114e02a358faa901ddbcef4b22d26cacedbb6d4f5dda2530544461c8542\",\"carry\":\"if: (needs.git-clone.result == 'success') || (needs.git-clone.result == 'skipped')\\ncontainer:\\n    ref: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\\nid: build-image\\nneeds:\\n    - job: git-clone\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/buildkit/job/git-clone/step/main/carry\n# pipemaster:arg {\"digest\":\"57fb8c4aae9e9d07e5fa256a09b59b97e0c25f09e37ffa52b20c906863ec27ca\",\"carry\":\"id: main\\nkind: script\\nscript:\\n    - git-clone-pull.sh \\\"$\\u007b{ inputs.repo }}\\\" \\\"$\\u007b{ inputs.branch }}\\\" \\\"$\\u007b{ inputs.path }}\\\"\\n\"}\n# pipemaster:emulated job.manual pipeline/buildkit/job/git-clone\n# pipemaster:arg {\"manual\":false,\"held\":true}\n# pipemaster:emulated ext.passthrough pipeline/buildkit/job/git-clone/carry\n# pipemaster:arg {\"digest\":\"483a31cbe6410051dd2abe5ede6c779e6cd86247464d112d878483daa50d8ef8\",\"carry\":\"container:\\n    ref: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\\nid: git-clone\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/buildkit/carry\n# pipemaster:arg {\"digest\":\"a9dcabdf146e13f0b705d5e79537530b2e20a76f3afe2b7c43e4cd921b73fc50\",\"carry\":\"id: buildkit\\ninputs:\\n    - name: repo\\n      default: https://gitee.com/dev-ops/go-gin-rest-api.git\\n    - name: branch\\n      default: main\\n    - name: path\\n      default: go-gin-rest-api\\n    - name: image\\n      default: registry.cn-shenzhen.aliyuncs.com/dev-ops/go-gin-rest-api\\n    - name: version\\n      default: 1.0.1\\n\"}\n# pipemaster:emulated trigger.manual pipeline/buildkit/job/git-clone\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\njobs:\n  - name: build-image\n    plan:\n      - get: source\n        passed:\n          - git-clone\n      - task: main\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit\n              tag: v0.12.1-rootless\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          params:\n            BUILDKITD_FLAGS: --oci-worker-no-process-sandbox\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                # pipemaster:lost buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name={{ inputs.image }}:{{ inputs.version }},push=true\" --export-cache type=local,mode=max,dest=/cache --import-cache type=local,src=/cache --export-cache \"type=registry,mode=max,ref={{ inputs.image }}:buildkit-cache\" --import-cache \"type=registry,ref={{ inputs.image }}:buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n                printf '%s\\n' 'pipemaster: lost: script.interpolation pipeline/buildkit/job/build-image/step/main: no Concourse spelling for expression inputs.image, inputs.version, inputs.image, inputs.image; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1\n            dir: workspace\n  - name: git-clone\n    plan:\n      - get: source\n      - task: main\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: registry.cn-shenzhen.aliyuncs.com/dev-ops/git\n              tag: v2.30.2\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                # pipemaster:lost git-clone-pull.sh \"{{ inputs.repo }}\" \"{{ inputs.branch }}\" \"{{ inputs.path }}\"\n                printf '%s\\n' 'pipemaster: lost: script.interpolation pipeline/buildkit/job/git-clone/step/main: no Concourse spelling for expression inputs.repo, inputs.branch, inputs.path; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1\n            dir: workspace\n"
+     "text": "# pipemaster:emulated ext.passthrough pipeline/buildkit/job/build-image/step/build-image-workspace-dirs/carry\n# pipemaster:arg {\"digest\":\"503c6a2e03682838289280d116d082388d99ba7ce93ebd5616f2803365680da3\",\"carry\":\"id: build-image-workspace-dirs\\nkind: script\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/buildkit/job/build-image/step/main/carry\n# pipemaster:arg {\"digest\":\"b3e85e95da626ec08b149e61481c220407bd56ceccf7c8b230b0e86486c72b88\",\"carry\":\"id: main\\nkind: script\\nworkdir: /workspace/$\\u007b{ inputs.path }}\\nscript:\\n    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \\\"type=image,name=$\\u007b{ inputs.image }}:$\\u007b{ inputs.version }},push=true\\\" --export-cache type=local,mode=max,dest=pm-workspaces/cache --import-cache type=local,src=pm-workspaces/cache --export-cache \\\"type=registry,mode=max,ref=$\\u007b{ inputs.image }}:buildkit-cache\\\" --import-cache \\\"type=registry,ref=$\\u007b{ inputs.image }}:buildkit-cache\\\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\\nenv:\\n    - name: BUILDKITD_FLAGS\\n      value:\\n        lit: --oci-worker-no-process-sandbox\\n\"}\n# pipemaster:emulated job.manual pipeline/buildkit/job/build-image\n# pipemaster:arg {\"manual\":false,\"held\":true,\"cond\":true}\n# pipemaster:emulated ext.passthrough pipeline/buildkit/job/build-image/carry\n# pipemaster:arg {\"digest\":\"c8820f5c3150cbb6e9132ac81abb3fe635f7ca34d8d47781fa546034e6c6f942\",\"carry\":\"if: (needs.git-clone.result == 'success') || (needs.git-clone.result == 'skipped')\\ncontainer:\\n    ref: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit:v0.12.1-rootless\\nid: build-image\\nneeds:\\n    - job: git-clone\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/buildkit/job/git-clone/step/git-clone-workspace-dirs/carry\n# pipemaster:arg {\"digest\":\"f2991272743672d9bb0285a66b1a103482f691c3c883ba584cd54f1ee0283013\",\"carry\":\"id: git-clone-workspace-dirs\\nkind: script\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/buildkit/job/git-clone/step/main/carry\n# pipemaster:arg {\"digest\":\"b628326f2e9c42458904da0362d4529a62b15c89b5bf02133be2dd1b409c854c\",\"carry\":\"id: main\\nkind: script\\nscript:\\n    - git-clone-pull.sh \\\"$\\u007b{ inputs.repo }}\\\" \\\"$\\u007b{ inputs.branch }}\\\" \\\"$\\u007b{ inputs.path }}\\\"\\n\"}\n# pipemaster:emulated job.manual pipeline/buildkit/job/git-clone\n# pipemaster:arg {\"manual\":false,\"held\":true}\n# pipemaster:emulated ext.passthrough pipeline/buildkit/job/git-clone/carry\n# pipemaster:arg {\"digest\":\"ae70b0b08f0e52c98624187e9146408899d548896e5576dfba182fff4c1f19d1\",\"carry\":\"container:\\n    ref: registry.cn-shenzhen.aliyuncs.com/dev-ops/git:v2.30.2\\nid: git-clone\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/buildkit/carry\n# pipemaster:arg {\"digest\":\"a9dcabdf146e13f0b705d5e79537530b2e20a76f3afe2b7c43e4cd921b73fc50\",\"carry\":\"id: buildkit\\ninputs:\\n    - name: repo\\n      default: https://gitee.com/dev-ops/go-gin-rest-api.git\\n    - name: branch\\n      default: main\\n    - name: path\\n      default: go-gin-rest-api\\n    - name: image\\n      default: registry.cn-shenzhen.aliyuncs.com/dev-ops/go-gin-rest-api\\n    - name: version\\n      default: 1.0.1\\n\"}\n# pipemaster:emulated trigger.manual pipeline/buildkit/job/git-clone\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\njobs:\n  - name: build-image\n    plan:\n      - get: source\n        passed:\n          - git-clone\n      - task: build-image-workspace-dirs\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit\n              tag: v0.12.1-rootless\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          run:\n            path: sh\n            args:\n              - -ec\n              - mkdir -p pm-workspaces/cache pm-workspaces/docker-secret\n            dir: workspace\n      - task: main\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: registry.cn-shenzhen.aliyuncs.com/dev-ops/buildkit\n              tag: v0.12.1-rootless\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          params:\n            BUILDKITD_FLAGS: --oci-worker-no-process-sandbox\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                # pipemaster:lost buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output \"type=image,name={{ inputs.image }}:{{ inputs.version }},push=true\" --export-cache type=local,mode=max,dest=pm-workspaces/cache --import-cache type=local,src=pm-workspaces/cache --export-cache \"type=registry,mode=max,ref={{ inputs.image }}:buildkit-cache\" --import-cache \"type=registry,ref={{ inputs.image }}:buildkit-cache\" --opt build-arg:GOPROXY=http://goproxy.goproxy.svc:8081,direct\n                printf '%s\\n' 'pipemaster: lost: script.interpolation pipeline/buildkit/job/build-image/step/main: no Concourse spelling for expression inputs.image, inputs.version, inputs.image, inputs.image; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1\n            dir: workspace\n  - name: git-clone\n    plan:\n      - get: source\n      - task: git-clone-workspace-dirs\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: registry.cn-shenzhen.aliyuncs.com/dev-ops/git\n              tag: v2.30.2\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          run:\n            path: sh\n            args:\n              - -ec\n              - mkdir -p pm-workspaces/rsa-secret\n            dir: workspace\n      - task: main\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: registry.cn-shenzhen.aliyuncs.com/dev-ops/git\n              tag: v2.30.2\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                # pipemaster:lost git-clone-pull.sh \"{{ inputs.repo }}\" \"{{ inputs.branch }}\" \"{{ inputs.path }}\"\n                printf '%s\\n' 'pipemaster: lost: script.interpolation pipeline/buildkit/job/git-clone/step/main: no Concourse spelling for expression inputs.repo, inputs.branch, inputs.path; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1\n            dir: workspace\n"
     }
    ],
    "report": [
@@ -584,7 +751,7 @@
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumes has no IR field; kept in Ext"
+     "detail": "key volumes workspace has no IR field and no template mounts it to a directory; kept in Ext"
     },
     {
      "path": "pipeline/buildkit",
@@ -601,7 +768,7 @@
      "path": "pipeline/buildkit/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider argo (depends) is not written to the Concourse file; it is kept in round-trip metadata"
+     "detail": "Ext of provider argo (depends, mount_paths) is not written to the Concourse file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image",
@@ -617,11 +784,17 @@
      "detail": "the condition has no shell test form; the job has no triggering get, so a person starts it"
     },
     {
+     "path": "pipeline/buildkit/job/build-image/step/build-image-workspace-dirs",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (workspace_dirs) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
      "path": "pipeline/buildkit/job/build-image/step/main",
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumeMounts has no IR field; kept in Ext"
+     "detail": "key volumeMounts has no IR field for a volume that no directory stands for; kept in Ext"
     },
     {
      "path": "pipeline/buildkit/job/build-image/step/main",
@@ -656,11 +829,17 @@
      "detail": "the working directory holds an expression, which a task dir cannot hold; the step runs in the checkout"
     },
     {
+     "path": "pipeline/buildkit/job/git-clone/step/git-clone-workspace-dirs",
+     "feature": "ext.passthrough",
+     "level": "lost",
+     "detail": "Ext of provider argo (workspace_dirs) is not written to the Concourse file; it is kept in round-trip metadata"
+    },
+    {
      "path": "pipeline/buildkit/job/git-clone/step/main",
      "feature": "ext.passthrough",
      "level": "lost",
      "strategy": "kept in Ext[argo]",
-     "detail": "key volumeMounts has no IR field; kept in Ext"
+     "detail": "key volumeMounts has no IR field for a volume that no directory stands for; kept in Ext"
     },
     {
      "path": "pipeline/buildkit/job/git-clone/step/main",
@@ -680,6 +859,27 @@
      "level": "lost",
      "strategy": "kept in Ext[argo]",
      "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "external",
+     "strategy": "volume bound to a Secret acr-regcred",
+     "detail": "volume docker-secret is a Secret acr-regcred; the operator must provide Secret acr-regcred and put its files in pm-workspaces/docker-secret before the step runs: a GitHub Actions secret written to the files, a GitLab file CI/CD variable, or a Drone or Woodpecker secret written to the files"
+    },
+    {
+     "path": "pipeline/buildkit/job/git-clone",
+     "feature": "ext.passthrough",
+     "level": "external",
+     "strategy": "volume bound to a Secret rsa-secret",
+     "detail": "volume rsa-secret is a Secret rsa-secret; the operator must provide Secret rsa-secret and put its files in pm-workspaces/rsa-secret before the step runs: a GitHub Actions secret written to the files, a GitLab file CI/CD variable, or a Drone or Woodpecker secret written to the files"
+    },
+    {
+     "path": "pipeline/buildkit/job/build-image",
+     "feature": "ext.passthrough",
+     "level": "emulated",
+     "strategy": "workspace directory",
+     "detail": "volume cache is the directory pm-workspaces/cache of the job checkout; its mount paths in scripts, commands and working directories read that directory"
     },
     {
      "path": "pipeline/buildkit/job/git-clone",
