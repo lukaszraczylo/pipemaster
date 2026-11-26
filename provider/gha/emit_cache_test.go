@@ -1,6 +1,7 @@
 package gha_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -62,5 +63,76 @@ func TestCachePolicyRoundTrip(t *testing.T) {
 				t.Errorf("cache not restored: steps=%d cache=%+v\n%s", len(bj.Steps), bj.Cache, text)
 			}
 		})
+	}
+}
+
+func TestCacheKeysRollAndRestore(t *testing.T) {
+	cases := map[string]struct {
+		cache   ir.Cache
+		want    []string
+		notWant []string
+	}{
+		"static key rolls": {
+			ir.Cache{Key: "deps", Paths: []string{"vendor"}},
+			[]string{"key: deps-${{ github.run_id }}", "restore-keys: deps-"}, nil,
+		},
+		"no key shares the GitLab default": {
+			ir.Cache{Paths: []string{"vendor"}},
+			[]string{"key: default-${{ github.run_id }}", "restore-keys: default-"}, []string{"build-cache"},
+		},
+		"content hash key stays": {
+			ir.Cache{Key: "go-${{ hashFiles('go.sum') }}", Paths: []string{"vendor"}},
+			[]string{"key: go-${{ hashFiles('go.sum') }}"}, []string{"run_id", "restore-keys"},
+		},
+		"fallback keys": {
+			ir.Cache{Key: "deps-main", FallbackKeys: []string{"deps-default", "x-${{ hashFiles('a') }}"}, Paths: []string{"vendor"}},
+			[]string{"key: deps-main-${{ github.run_id }}", "deps-main-", "deps-default-", "x-${{ hashFiles('a') }}"}, nil,
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			p := baseProject(t)
+			job(p, "build").Cache = []ir.Cache{c.cache}
+			files, _, err := gha.New(gha.GHA).Emit(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			data := string(files[".github/workflows/ci.yml"])
+			for _, w := range c.want {
+				if !strings.Contains(data, w) {
+					t.Errorf("want %q in\n%s", w, data)
+				}
+			}
+			for _, w := range c.notWant {
+				if strings.Contains(data, w) {
+					t.Errorf("did not want %q in\n%s", w, data)
+				}
+			}
+			lintFileIgnoring(t, "ci.yml", files[".github/workflows/ci.yml"], constantIf)
+		})
+	}
+}
+
+func TestSaveStepHasNoRestoreKeys(t *testing.T) {
+	p := baseProject(t)
+	job(p, "build").Cache = []ir.Cache{{Key: "deps", Policy: "push", FallbackKeys: []string{"old"}, Paths: []string{"vendor"}}}
+	files, _, err := gha.New(gha.GHA).Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := string(files[".github/workflows/ci.yml"])
+	if strings.Contains(data, "restore-keys") || !strings.Contains(data, "key: deps-${{ github.run_id }}") {
+		t.Errorf("save step is wrong:\n%s", data)
+	}
+	lintFileIgnoring(t, "ci.yml", files[".github/workflows/ci.yml"], constantIf)
+}
+
+func TestCacheFallbackKeysRoundTrip(t *testing.T) {
+	p := baseProject(t)
+	job(p, "build").Cache = []ir.Cache{{Key: "deps", FallbackKeys: []string{"a", "b"}, Paths: []string{"vendor"}}}
+	back, text := viaGHA(t, p)
+	c := back.Pipelines[0].Jobs[0].Cache
+	if len(c) != 1 || c[0].Key != "deps" || !slices.Equal(c[0].FallbackKeys, []string{"a", "b"}) || !slices.Equal(c[0].Paths, []string{"vendor"}) {
+		t.Errorf("cache = %+v\n%s", c, text)
 	}
 }

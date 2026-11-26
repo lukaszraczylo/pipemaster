@@ -1,6 +1,7 @@
 package gitlab_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -33,5 +34,25 @@ func TestJobCacheIsNativeWithPolicy(t *testing.T) {
 				t.Errorf("%v\n%s", err, doc)
 			}
 		})
+	}
+}
+
+func TestCacheFallbackKeysAreCarried(t *testing.T) {
+	pl, _ := pipeline(t, "j:\n  script: [x]\n  cache:\n    key: deps-main\n    fallback_keys: [deps-default, deps-old]\n    paths: [vendor]\n")
+	j := job(t, pl, "j")
+	if len(j.Cache) != 1 || !slices.Equal(j.Cache[0].FallbackKeys, []string{"deps-default", "deps-old"}) {
+		t.Fatalf("cache = %+v", j.Cache)
+	}
+	if x, ok := ext(j.Ext)["cache"]; ok {
+		t.Errorf("fallback_keys still in Ext: %v", x)
+	}
+	p := glProject("gha", glJob("build", glStep("make")))
+	p.Pipelines[0].Jobs[0].Cache = j.Cache
+	doc := emitDoc(t, p)
+	if !strings.Contains(doc, "fallback_keys:") || !strings.Contains(doc, "- deps-default") || !strings.Contains(doc, "- deps-old") {
+		t.Errorf("fallback_keys not emitted:\n%s", doc)
+	}
+	if err := validate.File("gitlab", rootFile, []byte(doc)); err != nil {
+		t.Errorf("%v\n%s", err, doc)
 	}
 }

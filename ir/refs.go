@@ -144,6 +144,7 @@ func (r *refScan) job(j *Job) {
 	}
 	for _, c := range j.Cache {
 		r.text(c.Key)
+		r.text(c.FallbackKeys...)
 	}
 	for _, a := range j.Artifacts {
 		r.text(a.Name)

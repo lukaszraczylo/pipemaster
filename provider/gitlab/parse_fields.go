@@ -285,6 +285,19 @@ func (s *state) cacheEntry(n *yaml.Node) (c ir.Cache, rest map[string]any, err e
 			return c, nil, err
 		}
 	}
+	if f := r.take("fallback_keys"); f != nil {
+		if f.Kind != yaml.SequenceNode {
+			r.release("fallback_keys")
+		} else {
+			for _, it := range f.Content {
+				fk, err := s.text(it, "cache fallback key")
+				if err != nil {
+					return c, nil, err
+				}
+				c.FallbackKeys = append(c.FallbackKeys, fk)
+			}
+		}
+	}
 	x, err := r.ext()
 	if x != nil {
 		rest = x[dialect].(map[string]any)

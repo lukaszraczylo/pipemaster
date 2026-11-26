@@ -17,9 +17,14 @@ import (
 const (
 	cachePolicyPull = "pull"
 	cachePolicyPush = "push"
-	monthDays       = 30
-	weekDays        = 7
-	hoursPerDay     = 24
+	// gitlabDefaultCacheKey is the key GitLab gives a cache with no key; every such job shares it
+	// (https://docs.gitlab.com/ci/yaml/#cachekey).
+	gitlabDefaultCacheKey = "default"
+	cacheRunSuffix        = "-${{ github.run_id }}"
+	hashFilesCall         = "hashFiles("
+	monthDays             = 30
+	weekDays              = 7
+	hoursPerDay           = 24
 )
 
 var expireRE = regexp.MustCompile(`^(\d+)\s*(hours?|days?|weeks?|months?)$`)
@@ -98,7 +103,7 @@ func (e *emitter) preSteps(c jobCtx, jp string, j *ir.Job) ([]*yaml.Node, error)
 		if ch.Policy == cachePolicyPush {
 			continue
 		}
-		n, err := e.cacheStep(jp, j, ch)
+		n, err := e.cacheStep(jp, ch)
 		if err != nil {
 			return nil, err
 		}
@@ -115,7 +120,7 @@ func withOf(kv ...any) *yaml.Node {
 	return m.n
 }
 
-func (e *emitter) cacheStep(jp string, j *ir.Job, ch ir.Cache) (*yaml.Node, error) {
+func (e *emitter) cacheStep(jp string, ch ir.Cache) (*yaml.Node, error) {
 	sub := ""
 	switch ch.Policy {
 	case cachePolicyPull:
@@ -132,9 +137,9 @@ func (e *emitter) cacheStep(jp string, j *ir.Job, ch ir.Cache) (*yaml.Node, erro
 	}
 	key := ch.Key
 	if key == "" {
-		key = j.ID + "-cache"
+		key = gitlabDefaultCacheKey
 	}
-	kn, err := e.templateNode(jp, key)
+	kn, restore, err := e.cacheKeys(jp, key, ch.FallbackKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -144,8 +149,46 @@ func (e *emitter) cacheStep(jp string, j *ir.Job, ch ir.Cache) (*yaml.Node, erro
 		return nil, err
 	}
 	m.set("uses", str(uses))
-	m.set("with", withOf("path", pathNode(ch.Paths), "key", kn))
+	with := newMap()
+	with.set("path", pathNode(ch.Paths))
+	with.set("key", kn)
+	if len(restore) > 0 && sub != "save" {
+		with.set("restore-keys", block(restore))
+	}
+	m.set("with", with.n)
 	return marked(m, emitkit.Marker(caps.JobCache, jp)), nil
+}
+
+// cacheKeys writes the key and the restore-keys. actions/cache never overwrites an existing key, but GitLab uploads
+// the cache again after every run, so a key with no content hash becomes the rolling pair <key>-<run_id> and <key>-:
+// each run saves a new entry and the next run restores the newest. A hashFiles key already names its content.
+func (e *emitter) cacheKeys(jp, key string, fallback []string) (*yaml.Node, []string, error) {
+	rolled := func(k string) (string, string, error) {
+		t, err := e.template(jp, k)
+		if err != nil {
+			return "", "", err
+		}
+		if strings.Contains(k, hashFilesCall) {
+			return t, t, nil
+		}
+		return t + cacheRunSuffix, t + "-", nil
+	}
+	k, restore, err := rolled(key)
+	if err != nil {
+		return nil, nil, err
+	}
+	var restoreKeys []string
+	if !strings.Contains(key, hashFilesCall) {
+		restoreKeys = append(restoreKeys, restore)
+	}
+	for _, fb := range fallback {
+		_, r, err := rolled(fb)
+		if err != nil {
+			return nil, nil, err
+		}
+		restoreKeys = append(restoreKeys, r)
+	}
+	return str(k), restoreKeys, nil
 }
 
 func artifactName(j *ir.Job, i int, a ir.Artifact) string {
@@ -179,7 +222,7 @@ func (e *emitter) postSteps(jp string, j *ir.Job) ([]*yaml.Node, error) {
 		if ch.Policy != cachePolicyPush {
 			continue
 		}
-		n, err := e.cacheStep(jp, j, ch)
+		n, err := e.cacheStep(jp, ch)
 		if err != nil {
 			return nil, err
 		}
