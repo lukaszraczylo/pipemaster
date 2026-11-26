@@ -472,7 +472,7 @@
 62-drone-elasticsearch-test-data drone->woodpecker native=  11 emulated=   1 external=   0 lost=   5
 63-tekton-pipeline tekton->argo native= 100 emulated=   6 external=   0 lost=  49
 63-tekton-pipeline tekton->concourse native=  77 emulated=  21 external=   0 lost=  75
-63-tekton-pipeline tekton->drone native=  76 emulated=   8 external=   2 lost=  71
+63-tekton-pipeline tekton->drone native=  76 emulated=  13 external=   2 lost=  71
 63-tekton-pipeline tekton->forgejo native=  64 emulated=  76 external=   0 lost=  46
 63-tekton-pipeline tekton->gha native=  64 emulated=  76 external=   0 lost=  46
 63-tekton-pipeline tekton->gitea native=  64 emulated=  76 external=   0 lost=  46
@@ -480,7 +480,7 @@
 63-tekton-pipeline tekton->woodpecker native=  75 emulated=   8 external=   2 lost=  72
 64-tekton-triggers tekton->argo native=   2 emulated=   1 external=   0 lost=   2
 64-tekton-triggers tekton->concourse native=   2 emulated=   2 external=   0 lost=   3
-64-tekton-triggers tekton->drone native=   2 emulated=   1 external=   0 lost=   2
+64-tekton-triggers tekton->drone native=   2 emulated=   2 external=   0 lost=   2
 64-tekton-triggers tekton->forgejo native=   2 emulated=   2 external=   0 lost=   2
 64-tekton-triggers tekton->gha native=   2 emulated=   2 external=   0 lost=   2
 64-tekton-triggers tekton->gitea native=   2 emulated=   2 external=   0 lost=   2
@@ -488,7 +488,7 @@
 64-tekton-triggers tekton->woodpecker native=   2 emulated=   1 external=   0 lost=   2
 65-tekton-plumbing tekton->argo native=  18 emulated=   1 external=   2 lost=  19
 65-tekton-plumbing tekton->concourse native=  14 emulated=   7 external=   0 lost=  24
-65-tekton-plumbing tekton->drone native=  14 emulated=   5 external=   0 lost=  28
+65-tekton-plumbing tekton->drone native=  14 emulated=   6 external=   0 lost=  28
 65-tekton-plumbing tekton->forgejo native=  15 emulated=  10 external=   0 lost=  18
 65-tekton-plumbing tekton->gha native=  18 emulated=  10 external=   0 lost=  18
 65-tekton-plumbing tekton->gitea native=  15 emulated=  10 external=   0 lost=  18
@@ -496,7 +496,7 @@
 65-tekton-plumbing tekton->woodpecker native=  16 emulated=   3 external=   0 lost=  28
 66-tekton-results tekton->argo native=  46 emulated=   3 external=   8 lost=  34
 66-tekton-results tekton->concourse native=  40 emulated=  19 external=   0 lost=  45
-66-tekton-results tekton->drone native=  40 emulated=  14 external=   1 lost=  52
+66-tekton-results tekton->drone native=  40 emulated=  16 external=   1 lost=  52
 66-tekton-results tekton->forgejo native=  43 emulated=  20 external=   0 lost=  32
 66-tekton-results tekton->gha native=  53 emulated=  20 external=   0 lost=  32
 66-tekton-results tekton->gitea native=  43 emulated=  20 external=   0 lost=  32
@@ -504,7 +504,7 @@
 66-tekton-results tekton->woodpecker native=  48 emulated=   6 external=   1 lost=  52
 67-tekton-chains tekton->argo native=  29 emulated=   1 external=   3 lost=  38
 67-tekton-chains tekton->concourse native=  20 emulated=  14 external=   0 lost=  44
-67-tekton-chains tekton->drone native=  20 emulated=   8 external=   3 lost=  50
+67-tekton-chains tekton->drone native=  20 emulated=   9 external=   3 lost=  50
 67-tekton-chains tekton->forgejo native=  24 emulated=  16 external=   0 lost=  37
 67-tekton-chains tekton->gha native=  28 emulated=  16 external=   0 lost=  37
 67-tekton-chains tekton->gitea native=  24 emulated=  16 external=   0 lost=  37
@@ -512,7 +512,7 @@
 67-tekton-chains tekton->woodpecker native=  23 emulated=   5 external=   3 lost=  50
 68-tekton-build-definitions tekton->argo native=   3 emulated=   0 external=   0 lost=   6
 68-tekton-build-definitions tekton->concourse native=   1 emulated=   4 external=   0 lost=   5
-68-tekton-build-definitions tekton->drone native=   1 emulated=   2 external=   1 lost=   7
+68-tekton-build-definitions tekton->drone native=   1 emulated=   3 external=   1 lost=   7
 68-tekton-build-definitions tekton->forgejo native=   2 emulated=   3 external=   0 lost=   6
 68-tekton-build-definitions tekton->gha native=   2 emulated=   3 external=   0 lost=   6
 68-tekton-build-definitions tekton->gitea native=   2 emulated=   3 external=   0 lost=   6
@@ -520,7 +520,7 @@
 68-tekton-build-definitions tekton->woodpecker native=   1 emulated=   2 external=   1 lost=   7
 69-tekton-pipelines-tutorial tekton->argo native=  15 emulated=   3 external=   3 lost=  13
 69-tekton-pipelines-tutorial tekton->concourse native=  11 emulated=  10 external=   0 lost=  19
-69-tekton-pipelines-tutorial tekton->drone native=  13 emulated=   4 external=   0 lost=  21
+69-tekton-pipelines-tutorial tekton->drone native=  13 emulated=   6 external=   0 lost=  21
 69-tekton-pipelines-tutorial tekton->forgejo native=  12 emulated=  10 external=   0 lost=  11
 69-tekton-pipelines-tutorial tekton->gha native=  17 emulated=  10 external=   0 lost=  11
 69-tekton-pipelines-tutorial tekton->gitea native=  12 emulated=  10 external=   0 lost=  11
@@ -528,7 +528,7 @@
 69-tekton-pipelines-tutorial tekton->woodpecker native=  16 emulated=   1 external=   0 lost=  21
 70-tekton-git-clone tekton->argo native=   2 emulated=   1 external=   0 lost=   2
 70-tekton-git-clone tekton->concourse native=   2 emulated=   2 external=   0 lost=   3
-70-tekton-git-clone tekton->drone native=   2 emulated=   1 external=   0 lost=   2
+70-tekton-git-clone tekton->drone native=   2 emulated=   2 external=   0 lost=   2
 70-tekton-git-clone tekton->forgejo native=   2 emulated=   2 external=   0 lost=   2
 70-tekton-git-clone tekton->gha native=   2 emulated=   2 external=   0 lost=   2
 70-tekton-git-clone tekton->gitea native=   2 emulated=   2 external=   0 lost=   2
@@ -536,14 +536,14 @@
 70-tekton-git-clone tekton->woodpecker native=   2 emulated=   1 external=   0 lost=   2
 71-tekton-catalog tekton->argo native=   2 emulated=   1 external=   0 lost=   2
 71-tekton-catalog tekton->concourse native=   2 emulated=   2 external=   0 lost=   3
-71-tekton-catalog tekton->drone native=   2 emulated=   1 external=   0 lost=   2
+71-tekton-catalog tekton->drone native=   2 emulated=   2 external=   0 lost=   2
 71-tekton-catalog tekton->forgejo native=   2 emulated=   2 external=   0 lost=   2
 71-tekton-catalog tekton->gha native=   2 emulated=   2 external=   0 lost=   2
 71-tekton-catalog tekton->gitea native=   2 emulated=   2 external=   0 lost=   2
 71-tekton-catalog tekton->gitlab native=   1 emulated=   1 external=   0 lost=   3
 71-tekton-catalog tekton->woodpecker native=   2 emulated=   1 external=   0 lost=   2
 72-argo-ci-example argo->concourse native=   4 emulated=   6 external=   0 lost=  15
-72-argo-ci-example argo->drone native=   4 emulated=   5 external=   0 lost=  16
+72-argo-ci-example argo->drone native=   4 emulated=   6 external=   0 lost=  16
 72-argo-ci-example argo->forgejo native=   4 emulated=   6 external=   0 lost=  15
 72-argo-ci-example argo->gha native=   4 emulated=   6 external=   0 lost=  15
 72-argo-ci-example argo->gitea native=   4 emulated=   6 external=   0 lost=  15
@@ -551,7 +551,7 @@
 72-argo-ci-example argo->tekton native=   6 emulated=   5 external=   0 lost=  14
 72-argo-ci-example argo->woodpecker native=   4 emulated=   5 external=   0 lost=  16
 73-argo-go-gin-rest-api argo->concourse native=   6 emulated=   1 external=   0 lost=   9
-73-argo-go-gin-rest-api argo->drone native=   6 emulated=   0 external=   2 lost=   8
+73-argo-go-gin-rest-api argo->drone native=   6 emulated=   1 external=   2 lost=   8
 73-argo-go-gin-rest-api argo->forgejo native=   7 emulated=   3 external=   0 lost=   5
 73-argo-go-gin-rest-api argo->gha native=   7 emulated=   3 external=   0 lost=   5
 73-argo-go-gin-rest-api argo->gitea native=   7 emulated=   3 external=   0 lost=   5
@@ -559,7 +559,7 @@
 73-argo-go-gin-rest-api argo->tekton native=  10 emulated=   0 external=   0 lost=   3
 73-argo-go-gin-rest-api argo->woodpecker native=   6 emulated=   0 external=   2 lost=   8
 74-argo-workflows-examples argo->concourse native=  53 emulated=  11 external=   1 lost=  53
-74-argo-workflows-examples argo->drone native=  53 emulated=   4 external=   1 lost=  53
+74-argo-workflows-examples argo->drone native=  53 emulated=   9 external=   1 lost=  53
 74-argo-workflows-examples argo->forgejo native=  60 emulated=  22 external=   0 lost=  48
 74-argo-workflows-examples argo->gha native=  61 emulated=  22 external=   0 lost=  48
 74-argo-workflows-examples argo->gitea native=  60 emulated=  22 external=   0 lost=  48
@@ -567,7 +567,7 @@
 74-argo-workflows-examples argo->tekton native=  68 emulated=   7 external=   0 lost=  38
 74-argo-workflows-examples argo->woodpecker native=  53 emulated=   4 external=   1 lost=  53
 75-argo-events-examples argo->concourse native=  11 emulated=   2 external=   0 lost=   7
-75-argo-events-examples argo->drone native=  11 emulated=   0 external=   0 lost=   7
+75-argo-events-examples argo->drone native=  11 emulated=   1 external=   0 lost=   7
 75-argo-events-examples argo->forgejo native=  11 emulated=   4 external=   0 lost=   7
 75-argo-events-examples argo->gha native=  11 emulated=   4 external=   0 lost=   7
 75-argo-events-examples argo->gitea native=  11 emulated=   4 external=   0 lost=   7
@@ -575,7 +575,7 @@
 75-argo-events-examples argo->tekton native=  11 emulated=   1 external=   0 lost=   7
 75-argo-events-examples argo->woodpecker native=  11 emulated=   0 external=   0 lost=   7
 76-argo-gitops-template argo->concourse native=   0 emulated=   2 external=   0 lost=   1
-76-argo-gitops-template argo->drone native=   0 emulated=   2 external=   0 lost=   2
+76-argo-gitops-template argo->drone native=   0 emulated=   3 external=   0 lost=   2
 76-argo-gitops-template argo->forgejo native=   0 emulated=   1 external=   0 lost=   1
 76-argo-gitops-template argo->gha native=   0 emulated=   1 external=   0 lost=   1
 76-argo-gitops-template argo->gitea native=   0 emulated=   1 external=   0 lost=   1
@@ -583,7 +583,7 @@
 76-argo-gitops-template argo->tekton native=   0 emulated=   0 external=   0 lost=   1
 76-argo-gitops-template argo->woodpecker native=   0 emulated=   2 external=   0 lost=   2
 77-argo-handson argo->concourse native=   0 emulated=   2 external=   0 lost=   1
-77-argo-handson argo->drone native=   0 emulated=   2 external=   0 lost=   2
+77-argo-handson argo->drone native=   0 emulated=   3 external=   0 lost=   2
 77-argo-handson argo->forgejo native=   0 emulated=   1 external=   0 lost=   1
 77-argo-handson argo->gha native=   0 emulated=   1 external=   0 lost=   1
 77-argo-handson argo->gitea native=   0 emulated=   1 external=   0 lost=   1
@@ -591,7 +591,7 @@
 77-argo-handson argo->tekton native=   0 emulated=   0 external=   0 lost=   1
 77-argo-handson argo->woodpecker native=   0 emulated=   2 external=   0 lost=   2
 78-argo-kind-argo-lab argo->concourse native=   2 emulated=   1 external=   0 lost=   5
-78-argo-kind-argo-lab argo->drone native=   2 emulated=   0 external=   0 lost=   5
+78-argo-kind-argo-lab argo->drone native=   2 emulated=   1 external=   0 lost=   5
 78-argo-kind-argo-lab argo->forgejo native=   2 emulated=   2 external=   0 lost=   4
 78-argo-kind-argo-lab argo->gha native=   2 emulated=   2 external=   0 lost=   4
 78-argo-kind-argo-lab argo->gitea native=   2 emulated=   2 external=   0 lost=   4
@@ -645,9 +645,9 @@
 84-concourse-setup-runtime-resource concourse->gitea native=  18 emulated=  15 external=   0 lost=  48
 84-concourse-setup-runtime-resource concourse->gitlab native=  17 emulated=   2 external=   0 lost=  56
 84-concourse-setup-runtime-resource concourse->tekton native=  34 emulated=  30 external=   1 lost=  32
-84-concourse-setup-runtime-resource concourse->woodpecker native=  15 emulated=  10 external=   0 lost=  55
+84-concourse-setup-runtime-resource concourse->woodpecker native=  15 emulated=  10 external=   1 lost=  54
 85-concourse-cli-ci concourse->argo native=  61 emulated=  16 external=   0 lost= 191
-85-concourse-cli-ci concourse->drone native=  55 emulated=  45 external=   0 lost= 208
+85-concourse-cli-ci concourse->drone native=  55 emulated=  46 external=   0 lost= 208
 85-concourse-cli-ci concourse->forgejo native=  65 emulated=  41 external=   0 lost= 188
 85-concourse-cli-ci concourse->gha native=  65 emulated=  42 external=   0 lost= 187
 85-concourse-cli-ci concourse->gitea native=  65 emulated=  41 external=   0 lost= 188

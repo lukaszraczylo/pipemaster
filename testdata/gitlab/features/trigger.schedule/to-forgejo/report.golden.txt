@@ -1,5 +1,5 @@
 Loss report: gitlab -> forgejo
-[lost] pipeline/gitlab-ci/trigger/0 trigger.schedule (the schedule names no cron expression; GHA needs one)
+[external] pipeline/gitlab-ci/trigger/0 trigger.schedule: set the cron expression in on.schedule: GitLab keeps the schedule in the project settings, so the workflow holds 0 0 29 2 * (fires on 29 February only) (the schedule names no cron expression)
 [emulated] pipeline/gitlab-ci/job/nightly job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/gitlab-ci/job/nightly step.action: actions/checkout step (GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs)
 [native] pipeline/gitlab-ci/job/nightly/synth/checkout step.action (printed as an absolute URL; an instance that cannot reach https://github.com needs the URL edited)

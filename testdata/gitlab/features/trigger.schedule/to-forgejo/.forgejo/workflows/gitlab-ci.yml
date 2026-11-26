@@ -1,10 +1,11 @@
+# pipemaster:emulated trigger.schedule pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/nightly
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/nightly/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/nightly
 # pipemaster:arg {"pre":1,"post":0}
 on:
-  # pipemaster:emulated trigger.manual pipeline/gitlab-ci
-  workflow_dispatch:
+  schedule:
+    - cron: 0 0 29 2 *
 jobs:
   nightly:
     runs-on: ubuntu-latest

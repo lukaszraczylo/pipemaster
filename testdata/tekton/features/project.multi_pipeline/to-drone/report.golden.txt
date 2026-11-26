@@ -2,6 +2,7 @@ Loss report: tekton -> drone
 [lost] pipeline/.shared display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
 [lost] pipeline/.shared/job/run ext.passthrough (Ext of provider tekton (task_name) is not written to the Drone file; it is kept in round-trip metadata)
 [lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
+[emulated] pipeline/.shared trigger.push: trigger event push, pull_request, tag (the source names no event; a Drone document with no trigger runs on every event, so the list holds the events of a push, a pull request and a tag only)
 [emulated] pipeline/.shared/job/run job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/ci project.multi_pipeline: each pipeline is a document named <pipeline>-<job> (each document carries its pipeline's trigger condition)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

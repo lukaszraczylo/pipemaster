@@ -1,8 +1,15 @@
 # pipemaster:emulated project.multi_pipeline pipeline/.shared
 # pipemaster:arg {"pipeline":".shared","job":"run","p":0,"j":0}
+# pipemaster:emulated trigger.push pipeline/.shared
+# pipemaster:arg {"default_events":["push","pull_request","tag"]}
 kind: pipeline
 type: docker
 name: .shared-run
+trigger:
+  event:
+    - push
+    - pull_request
+    - tag
 steps:
   - name: run-step-1
     image: ubuntu:latest

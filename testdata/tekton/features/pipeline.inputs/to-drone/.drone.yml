@@ -1,7 +1,14 @@
+# pipemaster:emulated trigger.push pipeline/ci
+# pipemaster:arg {"default_events":["push","pull_request","tag"]}
 # pipemaster:emulated job.container pipeline/ci/job/build
 kind: pipeline
 type: docker
 name: build
+trigger:
+  event:
+    - push
+    - pull_request
+    - tag
 steps:
   - name: build-step-1
     image: ubuntu:latest
