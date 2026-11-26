@@ -76,6 +76,9 @@ func (e *emitter) pipelineDoc(pp *plan) error {
 		}
 		tmpls = append(tmpls, out.tmpls...)
 	}
+	if err := e.markRefTypes(pp); err != nil {
+		return err
+	}
 	if len(pp.changes) > 0 {
 		task, tmpl := e.changesTemplate(pp)
 		tasks, tmpls = append([]*yaml.Node{task}, tasks...), append([]*yaml.Node{tmpl}, tmpls...)

@@ -38,6 +38,8 @@ type plan struct {
 	renamed map[string]string
 	// ctx names the reserved ctx-* params that something reads.
 	ctx map[string]bool
+	// refTypes holds the job conditions written as a test of the ref type.
+	refTypes map[string]refTypeJob
 	// tmpls holds the template names in use.
 	tmpls map[string]bool
 	// claims are the volumeClaimTemplates that caches need, by claim name.
