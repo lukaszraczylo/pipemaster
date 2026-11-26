@@ -1,5 +1,6 @@
 # pipemaster:emulated job.container pipeline/ci/job/build
-# pipemaster:lost step.if pipeline/ci/job/build/step/build-step-2: event == 'push'
+# pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
+# pipemaster:arg {"src":"event == 'push'","from":"forgejo"}
 when:
   - event: push
   - event: tag
@@ -15,4 +16,6 @@ steps:
     commands:
       - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo push'
     when:
-      - evaluate: "false"
+      - event:
+          - push
+          - tag

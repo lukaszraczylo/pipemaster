@@ -2,5 +2,6 @@ Loss report: concourse -> drone
 [lost] pipeline/gitlab-ci ext.passthrough (Ext of provider concourse (resources) is not written to the Drone file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci/job/deploy ext.passthrough (Ext of provider concourse (gets) is not written to the Drone file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci/job/deploy/step/script ext.passthrough (Ext of provider concourse (config, input_mapping) is not written to the Drone file; it is kept in round-trip metadata)
+[emulated] pipeline/gitlab-ci trigger.push: trigger event push, pull_request, tag (the source names no event; a Drone document with no trigger runs on every event, so the list holds the events of a push, a pull request and a tag only)
 [emulated] pipeline/gitlab-ci/job/deploy job.allow_failure: failure ignore on every step (later steps still run after a failed step)
 [emulated] pipeline/gitlab-ci/job/deploy job.manual: trigger event custom (a person starts the build through the API or drone build create; the document no longer runs on its normal events)

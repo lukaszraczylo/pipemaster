@@ -305,7 +305,7 @@ func TestTranslateApprox(t *testing.T) {
 		`$CI_COMMIT_SHA == $CI_COMMIT_REF_NAME`:             "",
 		`$CI_COMMIT_SHA == null`:                            "",
 		`$CI_JOB_NAME == "x"`:                               "",
-		`$CI_PIPELINE_SOURCE == "api"`:                      "",
+		`$CI_PIPELINE_SOURCE == "api"`:                      `github.event_name == 'repository_dispatch' && github.event.action == 'api'`,
 		`$CI_COMMIT_SHA && $CI_COMMIT_SHA == "a"`:           "",
 	} {
 		out, caveats, ok := expr.TranslateApprox(glParse(t, src), gitlab.Lang, gha.Lang)

@@ -308,15 +308,20 @@ func (e *emitter) prEvent(b *onBuilder, path string, t *ir.Trigger) error {
 }
 
 func (e *emitter) scheduleEntry(seq *yaml.Node, path string, t *ir.Trigger) (*yaml.Node, error) {
-	if t.Cron == "" {
-		e.lose(path, caps.TriggerSchedule, "the schedule names no cron expression; GHA needs one")
+	cron := t.Cron
+	if cron == "" {
+		if e.origin == provider.GitLab {
+			e.externalSchedule(path)
+		} else {
+			e.lose(path, caps.TriggerSchedule, "the schedule names no cron expression; GHA needs one")
+		}
 		return seq, nil
 	}
 	if seq == nil {
 		seq = seqOf()
 	}
 	m := newMap()
-	m.set("cron", str(t.Cron))
+	m.set("cron", str(cron))
 	if err := m.addExtra(e.ext(t.Ext), nil); err != nil {
 		return nil, err
 	}

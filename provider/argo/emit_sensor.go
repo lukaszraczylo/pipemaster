@@ -33,6 +33,9 @@ func ctxSource(name, event string, tag, tagEvent, prTarget bool) (eventSrc, bool
 		return eventSrc{key: "body.pull_request.head.ref"}, true
 	case "ctx-branch", "ctx-ref-name":
 		switch {
+		case push && tag && name == "ctx-branch":
+			// A tag run has no branch: a branch test must not read the tag name.
+			return eventSrc{}, false
 		case push && tag:
 			return eventSrc{tmpl: trimTags}, true
 		case push:

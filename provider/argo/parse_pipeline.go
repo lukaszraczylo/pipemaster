@@ -60,6 +60,7 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 	if pl.Jobs, err = c.orchestrate(entry, false, "entrypoint_"); err != nil {
 		return nil, fmt.Errorf("%s: %w", src.doc.Loc(0), err)
 	}
+	c.refTypeMarker(pl)
 	if exit != "" {
 		if pl.Finally, err = c.orchestrate(exit, true, "exit_"); err != nil {
 			return nil, fmt.Errorf("%s: %w", src.doc.Loc(0), err)

@@ -92,6 +92,9 @@ func (e *emitter) pipeline(pp *plan) error {
 			tasks = append(tasks, pt.N)
 		}
 	}
+	if err := e.markRefTypes(pp); err != nil {
+		return err
+	}
 	if len(pp.changes) > 0 {
 		tasks = append([]*yaml.Node{e.changesPipelineTask(pp)}, tasks...)
 	}

@@ -1,4 +1,5 @@
-# pipemaster:lost step.if pipeline/ci/job/build/step/build-step-2: event == 'push'
+# pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
+# pipemaster:arg {"src":"event == 'push'","from":"concourse"}
 # pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/1
 when:
   - event: push
@@ -15,4 +16,6 @@ steps:
     commands:
       - echo push
     when:
-      - evaluate: "false"
+      - event:
+          - push
+          - tag

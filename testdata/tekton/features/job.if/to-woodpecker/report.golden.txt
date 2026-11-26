@@ -1,4 +1,4 @@
 Loss report: tekton -> woodpecker
 [lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
-[lost] pipeline/ci/job/deploy job.if (condition not expressible in Woodpecker CI; the workflow disabled)
+[external] pipeline/ci/job/deploy job.if: pull request test (Woodpecker holds the target branch in CI_COMMIT_BRANCH on a pull request, so the condition gains a pull request test; the source condition is kept in a marker)
 [emulated] pipeline/ci/job/deploy job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

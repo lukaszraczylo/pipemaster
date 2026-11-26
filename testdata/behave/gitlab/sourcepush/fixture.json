@@ -1,0 +1,26 @@
+{
+  "features": [
+    "job.if",
+    "trigger.tag",
+    "trigger.pull_request",
+    "trigger.push"
+  ],
+  "events": [
+    "push-main",
+    "push-branch",
+    "tag",
+    "pr"
+  ],
+  "expect_failure": false,
+  "unordered": true,
+  "expect": [],
+  "owners": {
+    "sourcepush.push": [
+      "push-only"
+    ],
+    "sourcepush.always": [
+      "always"
+    ]
+  },
+  "requires": []
+}

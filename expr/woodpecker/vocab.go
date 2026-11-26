@@ -93,10 +93,12 @@ var Lang = expr.Dialect{
 	PRFamily:   true,
 	EventRx:    true,
 	PushEvents: []string{"push", "tag"},
-	Vocab:      Vocab,
-	Sem:        Semantics,
-	Events:     Events,
-	Reads:      reads,
-	Supports:   supports,
-	Native:     native,
+	// DeployEvent is the one event that a Drone promotion and rollback map to.
+	DeployEvent: "deployment",
+	Vocab:       Vocab,
+	Sem:         Semantics,
+	Events:      Events,
+	Reads:       reads,
+	Supports:    supports,
+	Native:      native,
 }

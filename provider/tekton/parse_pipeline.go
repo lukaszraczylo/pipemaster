@@ -80,6 +80,7 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 		return nil, fmt.Errorf("%s: %w", src.doc.File, err)
 	}
 	emitkit.RewriteInputRefs(pl, renames)
+	restoreRefTypes(pl, src.doc.Head)
 	if envVars != nil && !c.envBad {
 		pl.Env = envVars
 	}

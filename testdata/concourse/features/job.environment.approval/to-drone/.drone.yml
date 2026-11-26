@@ -1,3 +1,5 @@
+# pipemaster:emulated trigger.push pipeline/drone
+# pipemaster:arg {"default_events":["push","pull_request","tag"]}
 # pipemaster:emulated job.environment.approval pipeline/drone/job/deploy
 # pipemaster:arg "[]\n"
 kind: pipeline

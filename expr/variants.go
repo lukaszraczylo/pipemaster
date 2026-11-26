@@ -49,6 +49,26 @@ func variants(e Expr, from, to Dialect) []variant {
 	return append(out, bases...)
 }
 
+// eventVariants adds the variants of the event test to variants. The Lean model of Translate does not state them, so
+// only TranslateFacts and TranslateApprox try them.
+func variantsFor(e Expr, from, to Dialect, f Facts) []variant {
+	if f.Exact {
+		return variants(e, from, to)
+	}
+	return eventVariants(e, from, to)
+}
+
+func eventVariants(e Expr, from, to Dialect) []variant {
+	out := variants(e, from, to)
+	if v, ok := dispatchSourceVariant(e, from, to); ok {
+		out = append(out, v)
+	}
+	if v, ok := pushEventsVariant(e, from, to); ok {
+		out = append(out, v)
+	}
+	return out
+}
+
 func strLit(s string) Lit { return Lit{Kind: LitStr, Str: s} }
 
 func rebuild(e Expr, leaf func(Expr) (Expr, bool)) (Expr, bool) {

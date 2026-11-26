@@ -1,0 +1,10 @@
+default:
+  image: alpine:3.20
+always:
+  script:
+    - echo "MARK sourcepush.always" | tee -a trace.log
+push-only:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+  script:
+    - echo "MARK sourcepush.push" | tee -a trace.log

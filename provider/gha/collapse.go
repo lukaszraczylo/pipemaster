@@ -22,6 +22,7 @@ import (
 func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string, rep *report.Report, restoreConds bool) (condsFrom string, guarded []string) {
 	carriedDone := map[string]bool{}
 	finallyPaths := map[string]bool{}
+	var sources []sourceEventsArg
 	for _, u := range uses {
 		if u.Feature == caps.PipelineFinally {
 			finallyPaths[u.IRPath] = true
@@ -101,6 +102,11 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 		case caps.TriggerAPI:
 			dropSynthEvent(pl, u.IRPath, provider.Family(e.d.ID))
 		case caps.TriggerPush:
+			var src sourceEventsArg
+			if len(args[u]) == 1 && u.IRPath == "pipeline/"+pl.ID && json.Unmarshal([]byte(args[u][0]), &src) == nil && len(src.Kinds) > 0 {
+				dropSourceEvents(pl, src)
+				sources = append(sources, src)
+			}
 			var d provider.DefaultTriggersArg
 			if len(args[u]) == 1 && json.Unmarshal([]byte(args[u][0]), &d) == nil && d.Default {
 				if u.IRPath == "pipeline/"+pl.ID {
@@ -112,6 +118,9 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 		case caps.TriggerTag:
 			dropMatchAll(pl, ir.TriggerTag, func(t *ir.Trigger) *ir.Filter { return &t.Tags })
 		}
+	}
+	for _, src := range sources {
+		restoreGatedConds(pl, src)
 	}
 	return condsFrom, guarded
 }

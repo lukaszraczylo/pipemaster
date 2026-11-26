@@ -30,6 +30,8 @@ type plan struct {
 	renamed map[string]string
 	// ctx names the reserved ctx-* params that some task reads.
 	ctx map[string]bool
+	// refTypes holds the job conditions written as a test of the ref type.
+	refTypes map[string]refTypeJob
 	// changes holds the path plans that the generated task pipemaster-changes computes.
 	changes []emitkit.ChangesPlan
 	name    string

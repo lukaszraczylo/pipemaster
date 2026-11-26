@@ -761,6 +761,13 @@ func (e *emitter) jobSet(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (j
 		}
 		out.set, out.has = cs, true
 	}
+	cs, def, err := e.defaultEvents(pl)
+	if err != nil {
+		return jobCond{}, err
+	}
+	if def {
+		out.set, out.has = cs, true
+	}
 	switch {
 	case j.Environment != nil && j.Environment.Approval:
 		cs := condSet{c: dexpr.Conditions{Event: dexpr.Filter{Include: []string{eventPromote}}}}

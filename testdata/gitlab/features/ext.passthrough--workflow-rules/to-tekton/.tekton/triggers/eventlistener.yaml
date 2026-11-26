@@ -62,7 +62,7 @@ spec:
                 - key: ctx_tag
                   expression: body.ref.replace('refs/tags/','',1)
                 - key: ctx_event
-                  expression: '''tag'''
+                  expression: '''push'''
       bindings:
         - ref: gitlab-ci-github
       template:

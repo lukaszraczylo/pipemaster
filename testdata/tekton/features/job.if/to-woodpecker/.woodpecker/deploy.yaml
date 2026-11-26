@@ -1,10 +1,11 @@
 # pipemaster:emulated job.container pipeline/ci/job/deploy
-# pipemaster:lost job.if pipeline/ci/job/deploy: (ref == 'refs/heads/main') && (event == 'push')
+# pipemaster:emulated job.if pipeline/ci/job/deploy
+# pipemaster:arg {"src":"(ref == 'refs/heads/main') \u0026\u0026 (event == 'push')","from":"tekton","gate":false}
 when:
   - event: push
-    evaluate: "false"
+    evaluate: (CI_PIPELINE_EVENT == "push" || CI_PIPELINE_EVENT == "tag") && CI_COMMIT_REF == "refs/heads/main"
   - event: tag
-    evaluate: "false"
+    evaluate: (CI_PIPELINE_EVENT == "push" || CI_PIPELINE_EVENT == "tag") && CI_COMMIT_REF == "refs/heads/main"
 steps:
   - name: deploy-step-1
     image: ubuntu:latest

@@ -189,6 +189,10 @@ func (tc *taskCtx) cond(path string, f caps.Feature, e expr.Expr, sc scope) cond
 	if e == nil {
 		return condition{}
 	}
+	orig := e
+	if f == caps.JobIf {
+		e = expr.RefTypeForm(e)
+	}
 	switch {
 	case f == caps.JobIf && !tc.jp.finally && len(tc.jp.j.Needs) > 0 && callsAlways(e):
 		tc.e.lose(path, f, "always() has no Tekton form outside finally; Tekton skips the task when a dependency fails")
@@ -196,6 +200,9 @@ func (tc *taskCtx) cond(path string, f caps.Feature, e expr.Expr, sc scope) cond
 		tc.e.lose(path, f, "always() has no Tekton form for a step; Tekton does not run a step after a step fails")
 	}
 	if en, ok := tc.whenEntries(e, sc); ok {
+		if f == caps.JobIf {
+			tc.noteRefType(orig, e)
+		}
 		return condition{when: en}
 	}
 	if !expr.HasOpaque(e) {
