@@ -97,6 +97,17 @@ func TestGitLabWorkflowRulesDecideSourceEvents(t *testing.T) {
 	}
 }
 
+// The push source has its own trigger, so a workflow that limits it to a branch loses nothing for it.
+func TestGitLabWorkflowOnABranchLosesNoPushSource(t *testing.T) {
+	src := "workflow:\n  rules:\n    - if: '$CI_COMMIT_BRANCH == \"main\"'\njob_push:\n  script: [echo push]\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == \"push\"'\n"
+	_, rep := convert(t, "gitlab", "gha", ".gitlab-ci.yml", src)
+	for _, e := range rep.Entries {
+		if e.Level == caps.Lost && strings.Contains(e.Detail, "workflow rules admit") {
+			t.Errorf("a source with a trigger of its own is reported lost: %+v", e)
+		}
+	}
+}
+
 // A job whose condition names no API source adds no event the source never named.
 func TestGitLabDefaultSourcesAddOnlyNamedEvents(t *testing.T) {
 	out, _ := convert(t, "gitlab", "gha", ".gitlab-ci.yml", "build:\n  script: [make]\n  rules:\n    - if: '$CI_COMMIT_BRANCH == \"main\"'\n")

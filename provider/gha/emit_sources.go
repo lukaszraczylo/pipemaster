@@ -37,6 +37,9 @@ func withGitLabSources(p *ir.Project, target string) (*ir.Project, map[string]so
 				slices.ContainsFunc(added, func(t ir.Trigger) bool { return t.Kind == k })
 		}
 		for _, ev := range provider.GitLabNamedSources(pl) {
+			if ev.Name != "web" && ev.Name != "schedule" && !slices.Contains(apiSources, ev.Name) {
+				continue
+			}
 			switch provider.WorkflowAdmits(pl, ev.Name) {
 			case provider.AdmitNo:
 				continue
