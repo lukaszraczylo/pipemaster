@@ -2,6 +2,8 @@
 when:
   - event: push
   - event: tag
+labels:
+  linux: "true"
 steps:
   - image: ubuntu:latest
     commands:

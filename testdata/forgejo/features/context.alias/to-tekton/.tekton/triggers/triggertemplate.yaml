@@ -22,3 +22,8 @@ spec:
             value: $(tt.params.ctx-sha)
           - name: ctx-ref-name
             value: $(tt.params.ctx-ref-name)
+        taskRunSpecs:
+          - pipelineTaskName: build
+            podTemplate:
+              nodeSelector:
+                runner.pipemaster.io/docker: "true"

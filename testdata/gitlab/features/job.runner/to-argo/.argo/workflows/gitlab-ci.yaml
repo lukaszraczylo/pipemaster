@@ -1,3 +1,4 @@
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
@@ -34,3 +35,6 @@ spec:
       volumes:
         - emptyDir: {}
           name: workspace
+      nodeSelector:
+        runner.pipemaster.io/docker: "true"
+        runner.pipemaster.io/linux: "true"

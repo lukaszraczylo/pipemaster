@@ -4,8 +4,10 @@
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: upload-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\n    path:\n        lit: dist/\nid: build-step-3\nkind: action\n","kind":"artifact_upload","hold":"{\"args\":[\"true\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-3\",\"workingDir\":\"/workspace\"}","arts":["dist"],"outs":["{\"name\":\"dist\",\"path\":\"/workspace/dist/\"}"],"seq":1}
 # pipemaster:emulated step.action pipeline/gitlab-ci/job/test/step/test-step-1
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\nid: test-step-1\nkind: action\n","kind":"artifact_download","hold":"{\"args\":[\"true\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"test-step-1\",\"workingDir\":\"/workspace\"}","needs":["build"]}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/build-step-2
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build/step/build-step-3
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/test
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/test/step/test-step-2
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
@@ -73,6 +75,8 @@ spec:
       volumes:
         - emptyDir: {}
           name: workspace
+      nodeSelector:
+        runner.pipemaster.io/ubuntu-latest: "true"
     - name: test
       containerSet:
         containers:
@@ -107,3 +111,5 @@ spec:
       volumes:
         - emptyDir: {}
           name: workspace
+      nodeSelector:
+        runner.pipemaster.io/ubuntu-latest: "true"

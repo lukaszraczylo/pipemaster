@@ -6,6 +6,8 @@
 kind: pipeline
 type: docker
 name: build
+node:
+  ubuntu-latest: "true"
 trigger:
   event:
     - push
@@ -22,6 +24,8 @@ steps:
 kind: pipeline
 type: docker
 name: test
+node:
+  ubuntu-latest: "true"
 trigger:
   event:
     - push

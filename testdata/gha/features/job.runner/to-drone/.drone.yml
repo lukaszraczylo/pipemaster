@@ -2,6 +2,10 @@
 kind: pipeline
 type: docker
 name: build
+node:
+  linux: "true"
+  self-hosted: "true"
+  x64: "true"
 trigger:
   event:
     - push
@@ -17,6 +21,7 @@ kind: pipeline
 type: docker
 name: grouped
 node:
+  linux: "true"
   group: big-runners
 trigger:
   event:

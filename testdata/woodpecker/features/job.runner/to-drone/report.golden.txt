@@ -1,2 +1,2 @@
 Loss report: woodpecker -> drone
-[external] pipeline/woodpecker/job/ci job.runner: workers the operator provides (only the platform has a Drone form; other runner labels are lost)
+[external] pipeline/woodpecker/job/ci job.runner: workers the operator provides (the os/arch platform becomes platform and every other runner label becomes a node key with the value true; register a runner with DRONE_RUNNER_LABELS to match)

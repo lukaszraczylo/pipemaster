@@ -2,6 +2,8 @@
 when:
   - event: push
   - event: tag
+labels:
+  docker: "true"
 steps:
   - image: ubuntu:latest
     commands:

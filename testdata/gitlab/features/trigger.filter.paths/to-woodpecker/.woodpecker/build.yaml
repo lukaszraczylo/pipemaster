@@ -12,6 +12,8 @@ when:
         - src/**
       exclude:
         - src/docs/**
+labels:
+  ubuntu-latest: "true"
 steps:
   - name: build-step-1
     image: ubuntu:latest

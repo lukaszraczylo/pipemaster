@@ -14,3 +14,8 @@ spec:
         pipelineRef:
           name: ci
         params: []
+        taskRunSpecs:
+          - pipelineTaskName: deploy
+            podTemplate:
+              nodeSelector:
+                runner.pipemaster.io/docker: "true"

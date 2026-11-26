@@ -1,4 +1,4 @@
 Loss report: woodpecker -> argo
-[lost] pipeline/woodpecker/job/ci job.runner (Argo schedules pods; a runner label has no form)
+[lost] pipeline/woodpecker/job/ci job.runner (the runner label linux/arm64 has no node selector key: a key needs letters, digits, dot, underscore or dash)
 [external] pipeline/woodpecker/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/woodpecker/trigger/0 trigger.filter.branches

@@ -5,6 +5,8 @@
 kind: pipeline
 type: docker
 name: .shared-run
+node:
+  ubuntu-latest: "true"
 trigger:
   event:
     exclude:
@@ -21,6 +23,8 @@ steps:
 kind: pipeline
 type: docker
 name: ci-build
+node:
+  ubuntu-latest: "true"
 trigger:
   event:
     - push

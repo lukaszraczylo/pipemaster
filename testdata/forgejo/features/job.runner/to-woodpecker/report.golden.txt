@@ -1,7 +1,7 @@
 Loss report: forgejo -> woodpecker
 [lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
-[lost] pipeline/ci/job/build job.runner (the runner label x64 has no Woodpecker form; only labels.platform does)
-[lost] pipeline/ci/job/grouped job.runner (the runner label linux has no Woodpecker form; only labels.platform does)
+[external] pipeline/ci/job/build job.runner: workers the operator provides (register a Woodpecker agent with WOODPECKER_AGENT_LABELS=linux=true,self-hosted=true,x64=true for the runner labels)
+[external] pipeline/ci/job/grouped job.runner: workers the operator provides (register a Woodpecker agent with WOODPECKER_AGENT_LABELS=linux=true for the runner labels)
 [emulated] pipeline/ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.shell: bash-if-present wrapper command (the source runs the step under bash when the image has it; Woodpecker runs commands through /bin/sh -e of the image, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh)
 [emulated] pipeline/ci/job/grouped job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)

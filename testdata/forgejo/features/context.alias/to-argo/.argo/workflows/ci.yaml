@@ -1,5 +1,6 @@
 # pipemaster:emulated script.interpolation pipeline/ci/job/build
 # pipemaster:arg {"vars":{"PM_CTX_REF_NAME":"ref_name","PM_CTX_SHA":"sha"}}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
@@ -69,3 +70,5 @@ spec:
       volumes:
         - emptyDir: {}
           name: workspace
+      nodeSelector:
+        runner.pipemaster.io/docker: "true"

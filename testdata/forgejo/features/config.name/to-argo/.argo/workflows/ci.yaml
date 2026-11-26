@@ -1,5 +1,6 @@
 # pipemaster:emulated script.interpolation pipeline/ci/job/build
 # pipemaster:arg {"vars":{"CI":"vars.CI","FORGEJO_REGION":"vars.FORGEJO_REGION"}}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated config.name pipeline/ci/ref/secrets.DEPLOY_KEY
 # pipemaster:emulated config.name pipeline/ci/ref/vars.CI
@@ -57,3 +58,5 @@ spec:
       volumes:
         - emptyDir: {}
           name: workspace
+      nodeSelector:
+        runner.pipemaster.io/docker: "true"

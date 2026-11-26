@@ -1,5 +1,5 @@
 Loss report: gitlab -> tekton
-[lost] pipeline/gitlab-ci/job/version job.runner (Tekton schedules pods; the runner label ubuntu-latest has no form)
+[external] pipeline/gitlab-ci/job/version job.runner: workers the operator provides (label the nodes runner.pipemaster.io/ubuntu-latest=true for the runner labels (taskRunSpecs podTemplate nodeSelector of the TriggerTemplate))
 [external] pipeline/gitlab-ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [emulated] pipeline/gitlab-ci/job/version job.outputs: result step (an output with a value is written to its result file by the step pipemaster-outputs)
 [emulated] pipeline/gitlab-ci/job/version step.workdir: shared working directory (the steps run in /workspace, the volume that Tekton mounts in every step; the source runs its steps in one shared directory)

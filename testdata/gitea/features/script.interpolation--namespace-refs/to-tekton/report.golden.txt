@@ -1,5 +1,5 @@
 Loss report: gitea -> tekton
-[lost] pipeline/ci/job/test job.runner (Tekton schedules pods; the runner label ${{ matrix.os }} has no form)
+[lost] pipeline/ci/job/test job.runner (the runner label ${{ matrix.os }} has no node selector key: a key needs letters, digits, dot, underscore or dash)
 [external] pipeline/ci/trigger/0 trigger.manual: tkn pipeline start ci (a person starts the run with `tkn pipeline start ci`)
 [emulated] pipeline/ci pipeline.env: stepTemplate env (the pipeline env is copied into the stepTemplate of every Task)
 [emulated] pipeline/ci/job/test/step/test-step-1 script.interpolation: shell variable (a secret or variable in the script is read as a shell variable from the step env)

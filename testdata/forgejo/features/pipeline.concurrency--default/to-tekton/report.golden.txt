@@ -1,5 +1,5 @@
 Loss report: forgejo -> tekton
-[lost] pipeline/ci/job/build job.runner (Tekton schedules pods; the runner label docker has no form)
+[external] pipeline/ci/job/build job.runner: workers the operator provides (label the nodes runner.pipemaster.io/docker=true for the runner labels (taskRunSpecs podTemplate nodeSelector of the TriggerTemplate))
 [external] pipeline/ci/trigger/0 trigger.pull_request: same-repository pull requests only; Secret pipemaster-github-webhook (the filter admits only pull requests from this repository, because the code of a fork would run with every secret of the Task; GitHub Actions withholds secrets from fork runs. Remove the head.repo term of the filter to accept forks; create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [external] pipeline/ci/trigger/1 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [external] pipeline/ci/trigger/2 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)

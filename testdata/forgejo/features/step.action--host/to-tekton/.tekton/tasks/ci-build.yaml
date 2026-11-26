@@ -10,6 +10,7 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-3
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://codeberg.org\n    owner: org\n    repo: tool\n    path: sub\n    ref: v2\nid: build-step-3\nkind: action\n","wrote":"{\"image\":\"alpine:3.22\",\"name\":\"build-step-3\",\"script\":\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: no Tekton mapping for action org/tool/sub@v2' \\u003e\\u00262; exit 1\"}","at":2,"seq":2}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:

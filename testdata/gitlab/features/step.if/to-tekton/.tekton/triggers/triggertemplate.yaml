@@ -18,3 +18,8 @@ spec:
         params:
           - name: ctx-event
             value: $(tt.params.ctx-event)
+        taskRunSpecs:
+          - pipelineTaskName: build
+            podTemplate:
+              nodeSelector:
+                runner.pipemaster.io/ubuntu-latest: "true"

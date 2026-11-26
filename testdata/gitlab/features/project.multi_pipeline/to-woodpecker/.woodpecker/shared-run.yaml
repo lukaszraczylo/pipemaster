@@ -14,6 +14,8 @@ when:
       - cron
       - manual
     evaluate: "false"
+labels:
+  ubuntu-latest: "true"
 steps:
   - name: run-step-1
     image: ubuntu:latest

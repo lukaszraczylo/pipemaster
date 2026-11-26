@@ -1,6 +1,8 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/build
 when:
   - event: push
+labels:
+  ubuntu-latest: "true"
 concurrency:
   limit: 1
   group: ci-

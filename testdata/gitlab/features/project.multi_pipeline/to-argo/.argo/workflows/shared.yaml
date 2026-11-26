@@ -1,4 +1,5 @@
 # pipemaster:emulated ext.passthrough pipeline/.shared
+# pipemaster:emulated job.runner pipeline/.shared/job/run
 # pipemaster:emulated step.shell pipeline/.shared/job/run/step/run-step-1
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
@@ -34,3 +35,5 @@ spec:
       volumes:
         - emptyDir: {}
           name: workspace
+      nodeSelector:
+        runner.pipemaster.io/ubuntu-latest: "true"
