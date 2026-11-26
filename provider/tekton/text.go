@@ -1,6 +1,7 @@
 package tekton
 
 import (
+	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -56,6 +57,7 @@ type texts struct {
 	modern   map[string]bool
 	srcWS    map[string]bool
 	dataWS   map[string]string
+	up       string
 	kept     []string
 	wsHits   int
 	markWS   bool
@@ -104,10 +106,13 @@ func (x *texts) ref(word string) (expr.Ref, bool) {
 // dirOf is the IR directory of a Task workspace: the checkout for a source workspace, the workspace directory
 // for a data workspace.
 func (x *texts) dirOf(name string) (string, bool) {
-	if x.srcWS[name] {
-		return checkoutDir, true
-	}
 	dir, ok := x.dataWS[name]
+	if x.srcWS[name] {
+		dir, ok = checkoutDir, true
+	}
+	if ok && x.up != "" {
+		dir = path.Clean(x.up + dir)
+	}
 	return dir, ok
 }
 

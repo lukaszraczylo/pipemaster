@@ -489,7 +489,7 @@ func (tc *taskCtx) stepTemplate(x map[string]any) (*yaml.Node, error) {
 		m.SetStr("image", tc.containerRef)
 	}
 	sc := newScope()
-	jobEnv, err := tc.envList(sc, tc.jp.path, j.Env)
+	jobEnv, err := tc.envList(sc, tc.jp.path, j.Env, extOf(j.Ext)[ExtEnvWorkspace])
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +498,7 @@ func (tc *taskCtx) stepTemplate(x map[string]any) (*yaml.Node, error) {
 	for _, n := range jobEnv {
 		taken[envName(n)] = true
 	}
-	pipeEnv, err := tc.envList(sc, tc.pp.path, tc.pp.pl.Env)
+	pipeEnv, err := tc.envList(sc, tc.pp.path, tc.pp.pl.Env, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -567,7 +567,7 @@ func (tc *taskCtx) sidecars() (*yaml.Node, error) {
 		} else if len(sv.Image.Entrypoint) > 0 {
 			tc.e.lose(sp, caps.JobServices, "the service entrypoint has no Tekton sidecar command form")
 		}
-		env, err := tc.envList(sc, sp, sv.Env)
+		env, err := tc.envList(sc, sp, sv.Env, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -626,7 +626,7 @@ func (tc *taskCtx) ports(sp string, ps []string) *yaml.Node {
 
 // jobHandled lists the job Ext keys that the emitter writes in a place of its own.
 var jobHandled = map[string]bool{
-	ExtImplicitNeeds: true, ExtWorkspaceArtifacts: true, ExtCatalogRef: true, ExtLegacyParams: true, ExtBoundParams: true, "task_name": true, "matrix_include_names": true, "array_params": true, "unused_params": true,
+	ExtImplicitNeeds: true, ExtWorkspaceArtifacts: true, ExtEnvWorkspace: true, ExtCatalogRef: true, ExtLegacyParams: true, ExtBoundParams: true, "task_name": true, "matrix_include_names": true, "array_params": true, "unused_params": true,
 	"params": true, "stepTemplate": true, "results": true, "task_metadata": true, "task_params": true, "task_workspaces": true,
 	"task_description": true, "workspaces": true, "description": true,
 }

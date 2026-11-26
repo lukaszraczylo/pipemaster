@@ -64,23 +64,13 @@ func (b *jobBuilder) step(m *omap, n int) (*ir.Step, error) {
 			st.Image = &ir.Image{Ref: img}
 		}
 	}
+	if err := b.workingDir(st, k, r, id); err != nil {
+		return nil, err
+	}
+	b.tx.up = emitkit.UpFrom(st.WorkDir)
+	defer func() { b.tx.up = "" }()
 	if err := b.command(st, k, r); err != nil {
 		return nil, fmt.Errorf("step %s: %w", id, err)
-	}
-	if v, ok := r.Take("workingDir"); ok {
-		t, isText := text(v)
-		if !isText {
-			return nil, fmt.Errorf("step %s: workingDir must be a string", id)
-		}
-		if rel, ok := b.sourceDir(t); ok {
-			st.WorkDir = rel
-			k.Out[ExtWorkspaceDir], k.Out[ExtWorkspaceDirIR] = t, rel
-		} else {
-			var err error
-			if st.WorkDir, err = b.tx.template(t); err != nil {
-				return nil, err
-			}
-		}
 	}
 	if v, ok := r.Take("timeout"); ok {
 		if d, ok := parseDuration(v); ok {
@@ -109,6 +99,26 @@ func (b *jobBuilder) step(m *omap, n int) (*ir.Step, error) {
 	k.KeepRest(r)
 	st.Ext = k.Ext()
 	return st, nil
+}
+
+// workingDir reads the working directory of a step.
+func (b *jobBuilder) workingDir(st *ir.Step, k *sink, r *reader, id string) error {
+	v, ok := r.Take("workingDir")
+	if !ok {
+		return nil
+	}
+	t, isText := text(v)
+	if !isText {
+		return fmt.Errorf("step %s: workingDir must be a string", id)
+	}
+	if rel, ok := b.sourceDir(t); ok {
+		st.WorkDir = rel
+		k.Out[ExtWorkspaceDir], k.Out[ExtWorkspaceDirIR] = t, rel
+		return nil
+	}
+	var err error
+	st.WorkDir, err = b.tx.template(t)
+	return err
 }
 
 func firstOf(ss ...string) string {
@@ -254,23 +264,29 @@ func (b *jobBuilder) envWithout(st *ir.Step, k *sink, r *reader, skip []exprtekt
 	if !ok {
 		return nil
 	}
-	vars, from, err := b.envList(v, skip)
+	ws := map[string]any{}
+	vars, from, err := b.envList(v, skip, ws)
 	if err != nil {
 		return err
 	}
 	st.Env = vars
+	if len(ws) > 0 {
+		k.Out[ExtEnvWorkspace] = ws
+	}
 	if len(from) > 0 {
 		k.Keep("valueFrom", from, caps.StepEnv, "env entries with valueFrom have no Value form; kept in Ext", r.Line("env"))
 	}
 	return nil
 }
 
-// envList reads a Kubernetes env list.
-func (b *jobBuilder) envList(v any, skip []exprtekton.EnvVar) ([]ir.Var, map[string]any, error) {
-	// A workspace path in an env value stays as written: the value has no spelling to restore it from.
-	saved, savedData := b.tx.srcWS, b.tx.dataWS
-	b.tx.srcWS, b.tx.dataWS = nil, nil
-	defer func() { b.tx.srcWS, b.tx.dataWS = saved, savedData }()
+// envList reads a Kubernetes env list. With a non-nil ws, a literal value that holds a workspace path gets the
+// directory, and ws keeps the IR text and the source text under the variable name. Without ws, the path stays as written.
+func (b *jobBuilder) envList(v any, skip []exprtekton.EnvVar, ws map[string]any) ([]ir.Var, map[string]any, error) {
+	if ws == nil {
+		saved, savedData := b.tx.srcWS, b.tx.dataWS
+		b.tx.srcWS, b.tx.dataWS = nil, nil
+		defer func() { b.tx.srcWS, b.tx.dataWS = saved, savedData }()
+	}
 	list, ok := v.([]any)
 	if !ok {
 		return nil, nil, fmt.Errorf("env must be a list")
@@ -298,9 +314,35 @@ func (b *jobBuilder) envList(v any, skip []exprtekton.EnvVar) ([]ir.Var, map[str
 		if slices.ContainsFunc(skip, func(g exprtekton.EnvVar) bool { return g.Name == name && g.Value == raw }) {
 			continue
 		}
-		vars = append(vars, ir.Var{Name: name, Value: b.tx.value(raw)})
+		vars = append(vars, ir.Var{Name: name, Value: b.envValue(name, raw, ws)})
 	}
 	return vars, from, nil
+}
+
+// envValue reads an env value. A literal that holds a workspace path is recorded in ws; an expression keeps the
+// path as written, because the value then has no single spelling to restore.
+func (b *jobBuilder) envValue(name, raw string, ws map[string]any) ir.Value {
+	if ws == nil {
+		return b.tx.value(raw)
+	}
+	hits := b.tx.wsHits
+	marked, n := b.markWorkspaceLiterals(raw)
+	b.tx.wsHits += n
+	b.tx.markWS = true
+	v := b.tx.value(marked)
+	b.tx.markWS = false
+	if b.tx.wsHits == hits {
+		return v
+	}
+	if v.Kind != ir.ValueLit {
+		saved, savedData := b.tx.srcWS, b.tx.dataWS
+		b.tx.srcWS, b.tx.dataWS = nil, nil
+		defer func() { b.tx.srcWS, b.tx.dataWS = saved, savedData }()
+		return b.tx.value(raw)
+	}
+	irText, _ := splitWorkspaceMarks(v.Lit, b.tx.dirOf)
+	ws[name] = []any{irText, raw}
+	return ir.Value{Lit: irText}
 }
 
 // storeValue reads the Secret or ConfigMap key that the emitter writes for a secret or a variable.
@@ -345,11 +387,15 @@ func (b *jobBuilder) stepTemplate(v any, line int) error {
 		b.containerRef = ref
 	}
 	if ev, ok := r.Take("env"); ok {
-		vars, from, err := b.envList(ev, nil)
+		ws := map[string]any{}
+		vars, from, err := b.envList(ev, nil, ws)
 		if err != nil {
 			return err
 		}
 		b.job.Env = vars
+		if len(ws) > 0 {
+			b.k.Out[ExtEnvWorkspace] = ws
+		}
 		if len(from) > 0 {
 			b.k.Keep("valueFrom", from, caps.JobEnv, "stepTemplate env entries with valueFrom have no Value form; kept in Ext", r.Line("env"))
 		}
@@ -402,7 +448,7 @@ func (b *jobBuilder) sidecars(v any) error {
 			}
 		}
 		if ev, ok := r.Take("env"); ok {
-			vars, from, err := b.envList(ev, nil)
+			vars, from, err := b.envList(ev, nil, nil)
 			if err != nil {
 				return err
 			}

@@ -315,7 +315,7 @@ func TestSourceWorkspaceMapsToTheCheckoutAndReturnsExactly(t *testing.T) {
 		t.Fatalf("steps = %+v", j.Steps)
 	}
 	a, b := step(t, j, "a"), step(t, j, "b")
-	if a.WorkDir != "sub" || b.WorkDir != "" || strings.Join(a.Script, "\n") != "ls ./x\ncp ./conf /workspace/src2/conf" {
+	if a.WorkDir != "sub" || b.WorkDir != "" || strings.Join(a.Script, "\n") != "ls ../x\ncp ../conf /workspace/src2/conf" {
 		t.Fatalf("a = %+v, b = %+v", a, b)
 	}
 	files, _, err := tekton.New().Emit(p)

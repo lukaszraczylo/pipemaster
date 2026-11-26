@@ -369,8 +369,9 @@ func (tc *taskCtx) valueNode(sc *stepScope, path, name string, v ir.Value) (*yam
 	return nameValue(name, out), nil
 }
 
-// envList renders variables as a Kubernetes env list in order; a name already in sc is skipped.
-func (tc *taskCtx) envList(sc *stepScope, path string, vs []ir.Var) ([]*yaml.Node, error) {
+// envList renders variables as a Kubernetes env list in order; a name already in sc is skipped. A value that
+// still equals the IR text recorded in ws returns to its source text.
+func (tc *taskCtx) envList(sc *stepScope, path string, vs []ir.Var, ws any) ([]*yaml.Node, error) {
 	var out []*yaml.Node
 	seen := map[string]bool{}
 	for _, v := range vs {
@@ -378,6 +379,10 @@ func (tc *taskCtx) envList(sc *stepScope, path string, vs []ir.Var) ([]*yaml.Nod
 			continue
 		}
 		seen[v.Name] = true
+		if src, ok := tc.envSource(ws, v); ok {
+			out = append(out, nameValue(v.Name, src))
+			continue
+		}
 		n, err := tc.valueNode(sc, path, v.Name, v.Value)
 		if err != nil {
 			return nil, err
@@ -387,6 +392,18 @@ func (tc *taskCtx) envList(sc *stepScope, path string, vs []ir.Var) ([]*yaml.Nod
 		}
 	}
 	return out, nil
+}
+
+// envSource returns the source text of a value that the parser rewrote for a workspace path.
+func (tc *taskCtx) envSource(ws any, v ir.Var) (string, bool) {
+	m, _ := ws.(map[string]any)
+	pair, _ := m[v.Name].([]any)
+	if !tc.e.own || len(pair) != 2 || v.Value.Kind != ir.ValueLit {
+		return "", false
+	}
+	irText, _ := pair[0].(string)
+	src, _ := pair[1].(string)
+	return src, v.Value.Lit == irText
 }
 
 // legacySpelling writes $(inputs.params.x) back for the params that the parsed Task spelled that way.

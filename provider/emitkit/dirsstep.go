@@ -1,6 +1,7 @@
 package emitkit
 
 import (
+	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -32,4 +33,17 @@ func quotePath(p string) string {
 		return p
 	}
 	return "'" + strings.ReplaceAll(p, "'", `'\''`) + "'"
+}
+
+// UpFrom is the prefix that leads from the working directory of a step back to the checkout root, so a path
+// that the IR keeps relative to the root also resolves in the step. A root, absolute or escaping directory gets none.
+func UpFrom(workDir string) string {
+	if workDir == "" || path.IsAbs(workDir) {
+		return ""
+	}
+	dir := path.Clean(workDir)
+	if dir == "." || dir == ".." || strings.HasPrefix(dir, "../") {
+		return ""
+	}
+	return strings.Repeat("../", strings.Count(dir, "/")+1)
 }
