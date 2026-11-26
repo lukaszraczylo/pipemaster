@@ -1,0 +1,16 @@
+{
+  "features": [
+    "step.script"
+  ],
+  "events": [
+    "push-main",
+    "push-branch"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": [
+    "stepdeps.last:first-mid"
+  ],
+  "owners": {},
+  "requires": []
+}

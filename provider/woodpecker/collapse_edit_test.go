@@ -323,13 +323,6 @@ func TestLiteralTemplateOpenerDoesNotFailTheGitLabConversion(t *testing.T) {
 	}
 }
 
-func TestStepDependsOnReportSaysTheDAGIsNotApplied(t *testing.T) {
-	_, rep := parseWoodpecker(t, "steps:\n  - name: b\n    image: alpine\n    depends_on: [a]\n    commands: [echo b]\n  - name: a\n    image: alpine\n    commands: [echo a]\n")
-	if !reportDetailHas(rep, "the step DAG is not applied") {
-		t.Errorf("entries: %+v", rep.Entries)
-	}
-}
-
 func TestKeptSubstitutionReportNamesTheWholeForm(t *testing.T) {
 	_, rep := parseWoodpecker(t, "steps:\n  - name: s\n    image: alpine\n    commands:\n      - echo ${{ x }}\n")
 	if !reportDetailHas(rep, "${{ x }} is a Woodpecker substitution") {
