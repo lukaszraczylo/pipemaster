@@ -1,3 +1,9 @@
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/common/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/prod/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:arg {"vars":"- name: SHARED\n  value:\n    lit: \"1\"\n","names":["SHARED"]}
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
@@ -13,6 +19,12 @@ metadata:
   name: gitlab-ci
 spec:
   entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-sha
+        value: ""
+      - name: ctx-repo
+        value: ""
   templates:
     - name: main
       dag:
@@ -29,7 +41,8 @@ spec:
     - name: build
       containerSet:
         containers:
-          - name: script
+          - # pipemaster:id script
+            name: main
             image: alpine:3
             command:
               - sh
@@ -45,6 +58,13 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+      inputs:
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       retryStrategy:
         limit: "1"
       volumes:
@@ -53,7 +73,8 @@ spec:
     - name: common
       containerSet:
         containers:
-          - name: script
+          - # pipemaster:id script
+            name: main
             image: alpine:3
             command:
               - sh
@@ -69,6 +90,13 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+      inputs:
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       retryStrategy:
         limit: "1"
       volumes:
@@ -77,7 +105,8 @@ spec:
     - name: prod
       containerSet:
         containers:
-          - name: script
+          - # pipemaster:id script
+            name: main
             image: alpine:3
             command:
               - sh
@@ -93,6 +122,13 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+      inputs:
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       retryStrategy:
         limit: "1"
       volumes:

@@ -6,12 +6,21 @@ spec:
   params:
     - name: ctx-event
       default: ""
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
     - name: ctx-actor
       default: ""
   tasks:
     - name: ci
       taskRef:
         name: drone-ci
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       when:
         - input: $(params.ctx-event)
           operator: in

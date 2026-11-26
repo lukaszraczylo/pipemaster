@@ -1,3 +1,5 @@
 Loss report: drone -> forgejo
 [emulated] pipeline/drone/job/ci job.runner: default runner label ubuntu-latest (the IR holds no runner label)
+[emulated] pipeline/drone/job/ci step.action: actions/checkout step (Drone clones the repository before the steps (https://docs.drone.io/pipeline/docker/syntax/cloning/); clone.depth maps to the step input, and GHA does not clone)
 [emulated] pipeline/drone/job/ci/step/build step.image: uses: docker://<image> with entrypoint and args
+[native] pipeline/drone/job/ci/synth/checkout step.action (printed as an absolute URL; an instance that cannot reach https://github.com needs the URL edited)

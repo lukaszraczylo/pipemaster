@@ -7,6 +7,10 @@ spec:
   params:
     - name: ctx-event
       default: ""
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   resourcetemplates:
     - apiVersion: tekton.dev/v1
       kind: PipelineRun
@@ -18,3 +22,7 @@ spec:
         params:
           - name: ctx-event
             value: $(tt.params.ctx-event)
+          - name: ctx-sha
+            value: $(tt.params.ctx-sha)
+          - name: ctx-repo
+            value: $(tt.params.ctx-repo)

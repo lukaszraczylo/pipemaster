@@ -1,5 +1,7 @@
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/build-step-1
-# pipemaster:arg {"step":"if: always()\nid: build-step-1\nkind: script\nscript:\n    - echo cleanup\n","hold":"{\"args\":[\"if command -v bash \\u003e/dev/null 2\\u003e\\u00261; then exec bash -e -c \\\"$1\\\"; fi; exec sh -e -c \\\"$1\\\"\",\"pipemaster\",\"exit 0 # pipemaster:lost the step condition has no shell form\"],\"command\":[\"sh\",\"-c\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-1\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:arg {"step":"if: always()\nid: build-step-1\nkind: script\nscript:\n    - echo cleanup\n","hold":"{\"args\":[\"if command -v bash \\u003e/dev/null 2\\u003e\\u00261; then exec bash -e -c \\\"$1\\\"; fi; exec sh -e -c \\\"$1\\\"\",\"pipemaster\",\"exit 0 # pipemaster:lost the step condition has no shell form\"],\"command\":[\"sh\",\"-c\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-1\",\"workingDir\":\"/workspace\"}","seq":1}
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/build-step-1
 # pipemaster:emulated step.if pipeline/gitlab-ci/job/build/step/build-step-2
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/build-step-2
@@ -14,6 +16,10 @@ spec:
   arguments:
     parameters:
       - name: ctx-event
+        value: ""
+      - name: ctx-sha
+        value: ""
+      - name: ctx-repo
         value: ""
   templates:
     - name: main
@@ -34,7 +40,8 @@ spec:
               - pipemaster
               - 'exit 0 # pipemaster:lost the step condition has no shell form'
             workingDir: /workspace
-          - name: build-step-2
+          - # pipemaster:id build-step-2
+            name: main
             image: alpine:3.22
             command:
               - sh
@@ -54,6 +61,13 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+      inputs:
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       volumes:
         - emptyDir: {}
           name: workspace

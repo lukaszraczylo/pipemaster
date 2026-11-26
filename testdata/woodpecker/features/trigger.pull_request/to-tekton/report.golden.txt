@@ -1,2 +1,3 @@
 Loss report: woodpecker -> tekton
 [external] pipeline/woodpecker/trigger/0 trigger.pull_request: same-repository pull requests only; Secret pipemaster-github-webhook (the filter admits only pull requests from this repository, because the code of a fork would run with every secret of the Task; GitHub Actions withholds secrets from fork runs. Remove the head.repo term of the filter to accept forks; create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[emulated] pipeline/woodpecker/job/ci/step/source-checkout step.action: StepAction ref to the tektoncd-catalog git-clone through the git resolver (the ctx-repo and ctx-sha params carry the repository and the commit)

@@ -1,3 +1,5 @@
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/deploy/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/deploy/step/script
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
@@ -13,6 +15,10 @@ spec:
     parameters:
       - name: ctx-branch
         value: ""
+      - name: ctx-sha
+        value: ""
+      - name: ctx-repo
+        value: ""
   templates:
     - name: main
       dag:
@@ -23,7 +29,8 @@ spec:
     - name: deploy
       containerSet:
         containers:
-          - name: script
+          - # pipemaster:id script
+            name: main
             image: alpine:3.22
             command:
               - sh
@@ -36,6 +43,13 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+      inputs:
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       volumes:
         - emptyDir: {}
           name: workspace

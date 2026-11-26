@@ -4,7 +4,11 @@ kind: TriggerTemplate
 metadata:
   name: woodpecker-run
 spec:
-  params: []
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   resourcetemplates:
     - apiVersion: tekton.dev/v1
       kind: PipelineRun
@@ -13,7 +17,11 @@ spec:
       spec:
         pipelineRef:
           name: woodpecker
-        params: []
+        params:
+          - name: ctx-sha
+            value: $(tt.params.ctx-sha)
+          - name: ctx-repo
+            value: $(tt.params.ctx-repo)
         workspaces:
           - name: pipemaster-workspace
             volumeClaimTemplate:

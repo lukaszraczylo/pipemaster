@@ -1,5 +1,6 @@
 Loss report: gitlab -> argo
 [lost] pipeline/gitlab-ci/job/build ext.passthrough (Ext of provider gitlab (cache) is not written to the Argo file; it is kept in round-trip metadata)
+[external] pipeline/gitlab-ci/job/build/step/source-checkout step.action: input git artifact at /workspace (the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; a private repository needs usernameSecret and passwordSecret, or sshPrivateKeySecret, on the git artifact; the file names none)
 [external] pipeline/gitlab-ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [external] pipeline/gitlab-ci/trigger/1 trigger.tag: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/gitlab-ci/job/build job.cache: PVC from volumeClaimTemplates (the cache ${{ hashFiles('go.sum') }} is a claim per job and holds the paths; it lives for one Workflow unless the claim is shared)

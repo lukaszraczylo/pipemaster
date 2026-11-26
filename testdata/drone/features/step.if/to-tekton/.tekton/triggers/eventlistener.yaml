@@ -30,6 +30,10 @@ spec:
                   expression: body.ref.replace('refs/heads/','',1)
                 - key: ctx_event
                   expression: '''push'''
+                - key: ctx_sha
+                  expression: body.after
+                - key: ctx_repo
+                  expression: body.repository.full_name
                 - key: ctx_actor
                   expression: body.sender.login
       bindings:

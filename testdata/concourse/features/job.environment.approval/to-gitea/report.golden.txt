@@ -3,6 +3,6 @@ Loss report: concourse -> gitea
 [lost] pipeline/drone/job/deploy/step/deploy ext.passthrough (Ext of provider concourse (config, input_mapping) is not written to the GHA file; it is kept in round-trip metadata)
 [external] pipeline/drone/job/deploy job.environment.approval: configure required reviewers on the environment in repository settings
 [emulated] pipeline/drone/job/deploy job.runner: default runner label ubuntu-latest (the IR holds no runner label)
-[emulated] pipeline/drone/job/deploy step.action: actions/checkout step (Concourse fetches the repository with the get of the job and GHA does not; the depth param of the get maps to fetch-depth)
+[emulated] pipeline/drone/job/deploy step.action: actions/checkout step (Concourse fetches the repository with the get of the job; the depth param of the get maps to the step input, and GHA does not clone)
 [emulated] pipeline/drone/job/deploy/step/deploy step.image: uses: docker://<image> with entrypoint and args
 [native] pipeline/drone/job/deploy/synth/checkout step.action (resolves against DEFAULT_ACTIONS_URL; default github)

@@ -1,5 +1,6 @@
 Loss report: gitlab -> argo
 [lost] pipeline/gitlab-ci/job/build job.runner (Argo schedules pods; a runner label has no form)
+[external] pipeline/gitlab-ci/job/build/step/source-checkout step.action: input git artifact at /workspace (the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; a private repository needs usernameSecret and passwordSecret, or sshPrivateKeySecret, on the git artifact; the file names none)
 [external] pipeline/gitlab-ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/gitlab-ci/job/build/step/build-step-1 step.shell: container command sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)
 [emulated] pipeline/gitlab-ci/trigger/0 trigger.filter.branches

@@ -6,14 +6,27 @@ spec:
   params:
     - name: ctx-branch
       default: ""
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: build
       taskRef:
         name: gitlab-ci-build
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
     - name: release-created
       taskRef:
         name: gitlab-ci-release-created
       params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
         - name: ctx-branch
           value: $(params.ctx-branch)
       runAfter:
@@ -21,6 +34,11 @@ spec:
     - name: release-publish
       taskRef:
         name: gitlab-ci-release-publish
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       runAfter:
         - build
         - release-created

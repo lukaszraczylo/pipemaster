@@ -38,6 +38,14 @@ spec:
               src:
                 dependencyName: gitlab-ci-push
                 value: push
+            - dest: spec.arguments.parameters.3.value
+              src:
+                dataKey: body.after
+                dependencyName: gitlab-ci-push
+            - dest: spec.arguments.parameters.4.value
+              src:
+                dataKey: body.repository.full_name
+                dependencyName: gitlab-ci-push
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -52,6 +60,10 @@ spec:
                     - name: ctx-tag
                       value: ""
                     - name: ctx-event
+                      value: ""
+                    - name: ctx-sha
+                      value: ""
+                    - name: ctx-repo
                       value: ""
                 serviceAccountName: pipemaster-workflow
                 workflowTemplateRef:
@@ -74,6 +86,14 @@ spec:
               src:
                 dependencyName: gitlab-ci-tag
                 value: tag
+            - dest: spec.arguments.parameters.3.value
+              src:
+                dataKey: body.after
+                dependencyName: gitlab-ci-tag
+            - dest: spec.arguments.parameters.4.value
+              src:
+                dataKey: body.repository.full_name
+                dependencyName: gitlab-ci-tag
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -88,6 +108,10 @@ spec:
                     - name: ctx-tag
                       value: ""
                     - name: ctx-event
+                      value: ""
+                    - name: ctx-sha
+                      value: ""
+                    - name: ctx-repo
                       value: ""
                 serviceAccountName: pipemaster-workflow
                 workflowTemplateRef:

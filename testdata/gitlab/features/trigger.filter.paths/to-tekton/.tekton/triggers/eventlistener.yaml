@@ -30,6 +30,12 @@ spec:
           params:
             - name: filter
               value: body.action in ['opened','synchronize','reopened'] && body.pull_request.head.repo.full_name == body.repository.full_name && (extensions.changed_files.added + extensions.changed_files.modified + extensions.changed_files.removed).exists(f, !(f.matches(r'^.*\.md$')))
+            - name: overlays
+              value:
+                - key: ctx_sha
+                  expression: body.pull_request.head.sha
+                - key: ctx_repo
+                  expression: body.repository.full_name
       bindings:
         - ref: gitlab-ci-github
       template:
@@ -54,6 +60,12 @@ spec:
           params:
             - name: filter
               value: "false"
+            - name: overlays
+              value:
+                - key: ctx_sha
+                  expression: body.after
+                - key: ctx_repo
+                  expression: body.repository.full_name
       bindings:
         - ref: gitlab-ci-github
       template:

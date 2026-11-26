@@ -5,7 +5,7 @@
 # pipemaster:emulated step.image pipeline/drone/job/ci/step/build
 # pipemaster:arg {"kind":"script","image":{"Ref":"golang:1.25","Entrypoint":null},"script":["go build ./..."]}
 # pipemaster:emulated job.cache pipeline/drone/job/ci
-# pipemaster:arg {"cache":[{"Key":"go-mod","Policy":"pull-push","Paths":["~/go/pkg/mod"]}],"pre":1,"post":0}
+# pipemaster:arg {"cache":[{"Key":"go-mod","Policy":"pull-push","Paths":["~/go/pkg/mod"]}],"pre":2,"post":0}
 on:
   push:
     branches:
@@ -15,6 +15,7 @@ jobs:
     if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated job.cache pipeline/drone/job/ci
       - uses: actions/cache@v6
         with:

@@ -3,23 +3,43 @@ kind: Pipeline
 metadata:
   name: gitlab-ci
 spec:
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   workspaces:
     - name: pipemaster-workspace
   tasks:
     - name: compile
       taskRef:
         name: gitlab-ci-compile
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       workspaces:
         - name: pipemaster-workspace
           workspace: pipemaster-workspace
     - name: docs
       taskRef:
         name: gitlab-ci-docs
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       runAfter:
         - compile
     - name: unit
       taskRef:
         name: gitlab-ci-unit
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       runAfter:
         - compile
       workspaces:

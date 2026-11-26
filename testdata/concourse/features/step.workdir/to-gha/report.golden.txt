@@ -2,6 +2,6 @@ Loss report: concourse -> gha
 [lost] pipeline/ci/job/build/step/build-step-1 ext.passthrough (Ext of provider concourse (input_mapping, tags) is not written to the GHA file; it is kept in round-trip metadata)
 [emulated] pipeline/ci job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/ci/job/build job.runner: default runner label ubuntu-latest (the IR holds no runner label)
-[emulated] pipeline/ci/job/build step.action: actions/checkout step (Concourse fetches the repository with the get of the job and GHA does not; the depth param of the get maps to fetch-depth)
+[emulated] pipeline/ci/job/build step.action: actions/checkout step (Concourse fetches the repository with the get of the job; the depth param of the get maps to the step input, and GHA does not clone)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.image: uses: docker://<image> with entrypoint and args
 [emulated] pipeline/ci/job/build/step/build-step-1 step.workdir: kept in the image step marker (a docker step has no working-directory)

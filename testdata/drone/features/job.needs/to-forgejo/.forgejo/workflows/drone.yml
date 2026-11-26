@@ -5,11 +5,15 @@
 # pipemaster:emulated job.runner pipeline/drone/job/lint
 # pipemaster:emulated step.image pipeline/drone/job/lint/step/lint
 # pipemaster:arg {"kind":"script","image":{"Ref":"golangci/golangci-lint:v2","Entrypoint":null},"script":["golangci-lint run"]}
+# pipemaster:emulated job.artifacts pipeline/drone/job/lint
+# pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.if pipeline/drone/job/ship
 # pipemaster:arg {"from":"drone","guard":true}
 # pipemaster:emulated job.runner pipeline/drone/job/ship
 # pipemaster:emulated step.image pipeline/drone/job/ship/step/ship
 # pipemaster:arg {"kind":"script","image":{"Ref":"alpine:3.20","Entrypoint":null},"script":["./ship.sh"]}
+# pipemaster:emulated job.artifacts pipeline/drone/job/ship
+# pipemaster:arg {"pre":1,"post":0}
 on:
   push:
     branches:
@@ -22,6 +26,7 @@ jobs:
     if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
+      - uses: https://github.com/actions/checkout@v7
       # pipemaster:emulated step.image pipeline/drone/job/lint/step/lint
       - id: lint
         uses: docker://golangci/golangci-lint:v2
@@ -34,6 +39,7 @@ jobs:
     if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
+      - uses: https://github.com/actions/checkout@v7
       # pipemaster:emulated step.image pipeline/drone/job/ship/step/ship
       - id: ship
         uses: docker://alpine:3.20

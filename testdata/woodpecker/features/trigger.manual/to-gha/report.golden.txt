@@ -1,3 +1,4 @@
 Loss report: woodpecker -> gha
 [emulated] pipeline/woodpecker/job/ci job.runner: default runner label ubuntu-latest (the IR holds no runner label)
+[emulated] pipeline/woodpecker/job/ci step.action: actions/checkout step (Woodpecker clones the repository before the steps (https://woodpecker-ci.org/docs/usage/workflow-syntax); the depth and recursive settings of the clone map to the step inputs, and GHA does not clone)
 [emulated] pipeline/woodpecker/job/ci/step/build step.image: uses: docker://<image> with entrypoint and args

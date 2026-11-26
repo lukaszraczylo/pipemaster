@@ -28,6 +28,12 @@ spec:
           params:
             - name: filter
               value: body.ref.startsWith('refs/heads/') && (extensions.changed_files.added + extensions.changed_files.modified + extensions.changed_files.removed).exists(f, (f.matches(r'^src/main\.go$') || f.matches(r'^go\.mod$')))
+            - name: overlays
+              value:
+                - key: ctx_sha
+                  expression: body.after
+                - key: ctx_repo
+                  expression: body.repository.full_name
       bindings:
         - ref: woodpecker-github
       template:

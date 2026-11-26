@@ -4,6 +4,8 @@
 # pipemaster:emulated job.runner pipeline/drone/job/ci
 # pipemaster:emulated step.image pipeline/drone/job/ci/step/flaky
 # pipemaster:arg {"kind":"script","image":{"Ref":"alpine:3.20","Entrypoint":null},"script":["./flaky.sh"]}
+# pipemaster:emulated job.artifacts pipeline/drone/job/ci
+# pipemaster:arg {"pre":1,"post":0}
 on:
   push:
     branches:
@@ -14,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated step.image pipeline/drone/job/ci/step/flaky
       - id: flaky
         uses: docker://alpine:3.20

@@ -25,6 +25,10 @@ spec:
               src:
                 dataKey: body.after
                 dependencyName: woodpecker-push
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dataKey: body.repository.full_name
+                dependencyName: woodpecker-push
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -35,6 +39,8 @@ spec:
                 arguments:
                   parameters:
                     - name: ctx-sha
+                      value: ""
+                    - name: ctx-repo
                       value: ""
                 serviceAccountName: pipemaster-workflow
                 workflowTemplateRef:
