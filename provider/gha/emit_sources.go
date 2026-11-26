@@ -18,31 +18,43 @@ type sourceEventsArg struct {
 	Kinds []ir.TriggerKind `json:"source_events"`
 }
 
-// withGitLabSources gives a GitLab pipeline with the default triggers the triggers of the other sources that its job
-// conditions admit: web, schedule, api and trigger. The default of GitLab runs a job on each of them, and a workflow
-// that names push only never starts the jobs that test for one.
-func withGitLabSources(p *ir.Project, target string) (*ir.Project, map[string]sourceEventsArg) {
+// withGitLabSources gives a GitLab pipeline the triggers of the other sources that its job conditions name: web, schedule,
+// api and trigger. The default of GitLab runs a job on each of them, and a workflow that names push only never starts
+// the jobs that test for one. The workflow rules decide: a source they exclude gets no trigger, and a source they admit
+// only on some branch or tag cannot get one, because GHA has no ref filter on these events, so it comes back as lost.
+func withGitLabSources(p *ir.Project, target string) (*ir.Project, map[string]sourceEventsArg, map[string][]provider.SourceEvent) {
 	if p == nil || p.Origin.Provider != provider.GitLab || provider.SameFamily(p.Origin.Provider, target) {
-		return p, nil
+		return p, nil, nil
 	}
 	var out *ir.Project
 	args := map[string]sourceEventsArg{}
+	lost := map[string][]provider.SourceEvent{}
 	for i, pl := range p.Pipelines {
-		fired := provider.GitLabNamedSources(pl)
 		var added []ir.Trigger
 		var types []any
-		manual := slices.ContainsFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerManual })
-		for _, ev := range fired {
+		has := func(k ir.TriggerKind) bool {
+			return slices.ContainsFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == k }) ||
+				slices.ContainsFunc(added, func(t ir.Trigger) bool { return t.Kind == k })
+		}
+		for _, ev := range provider.GitLabNamedSources(pl) {
+			switch provider.WorkflowAdmits(pl, ev.Name) {
+			case provider.AdmitNo:
+				continue
+			case provider.AdmitMaybe:
+				lost[pl.ID] = append(lost[pl.ID], ev)
+				continue
+			}
 			switch {
-			case ev.Name == "web" || ev.Name == "schedule" && !slices.ContainsFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerSchedule }):
-				if !manual {
-					manual = true
+			case ev.Name == "web" && !has(ir.TriggerManual):
+				added = append(added, ir.Trigger{Kind: ir.TriggerManual})
+			case ev.Name == "schedule":
+				if !has(ir.TriggerManual) {
 					added = append(added, ir.Trigger{Kind: ir.TriggerManual})
 				}
-				if ev.Name == "schedule" {
+				if !has(ir.TriggerSchedule) {
 					added = append(added, ir.Trigger{Kind: ir.TriggerSchedule})
 				}
-			case slices.Contains(apiSources, ev.Name):
+			case slices.Contains(apiSources, ev.Name) && !has(ir.TriggerAPI):
 				types = append(types, ev.Name)
 			}
 		}
@@ -67,9 +79,9 @@ func withGitLabSources(p *ir.Project, target string) (*ir.Project, map[string]so
 		args[pl.ID] = arg
 	}
 	if out == nil {
-		return p, nil
+		return p, args, lost
 	}
-	return out, args
+	return out, args, lost
 }
 
 // dropSourceEvents removes the triggers that withGitLabSources added.
@@ -83,4 +95,13 @@ func dropSourceEvents(pl *ir.Pipeline, arg sourceEventsArg) {
 func (e *emitter) externalSchedule(path string) {
 	e.external(path, caps.TriggerSchedule, "add on: schedule: - cron: <the cron of your GitLab pipeline schedule> to the workflow: GitLab keeps the schedule in the project settings, so the workflow has no schedule event and the job starts by workflow_dispatch",
 		"the schedule names no cron expression")
+}
+
+// loseSources reports the sources that the workflow rules admit on some branch or tag only. The job condition names the
+// source and the workflow has no event for it, so the job does not start.
+func (e *emitter) loseSources(pl *ir.Pipeline) {
+	for _, ev := range e.srcLost[pl.ID] {
+		e.lose("pipeline/"+pl.ID, ev.Feature, "the workflow rules admit the "+ev.Name+" source only on some branches, tags or variables, and "+
+			e.d.title()+" has no ref filter for it; the jobs for that source do not start")
+	}
 }

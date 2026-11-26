@@ -8,16 +8,12 @@ import (
 )
 
 // GitLabNamedSources lists the pipeline sources that a job or step condition of a GitLab pipeline names, when the
-// pipeline has the default push and tag triggers and no workflow block. A condition that tests no source names none, so
-// a job with no source test adds no event; a test such as `source != push` names every other source.
+// pipeline has the default push and tag triggers or a workflow block, which WorkflowAdmits reads. A condition that
+// tests no source names none, so a job with no source test adds no event; a test such as `source != push` names every
+// other source.
 func GitLabNamedSources(pl *ir.Pipeline) []SourceEvent {
-	if pl == nil || !defaultPushTag(pl.Triggers) {
+	if pl == nil || !hasWorkflow(pl) && !defaultPushTag(pl.Triggers) {
 		return nil
-	}
-	if m, _ := pl.Ext[GitLab].(map[string]any); m != nil {
-		if _, has := m["workflow"]; has {
-			return nil
-		}
 	}
 	names := make([]string, len(gitlabEvents))
 	for i, ev := range gitlabEvents {
@@ -54,4 +50,10 @@ func defaultPushTag(ts []ir.Trigger) bool {
 		!slices.ContainsFunc(ts, func(t ir.Trigger) bool {
 			return len(t.Branches.Include)+len(t.Branches.Exclude)+len(t.Tags.Include)+len(t.Tags.Exclude)+len(t.Paths.Include)+len(t.Paths.Exclude) > 0
 		})
+}
+
+func hasWorkflow(pl *ir.Pipeline) bool {
+	m, _ := pl.Ext[GitLab].(map[string]any)
+	_, has := m["workflow"]
+	return has
 }

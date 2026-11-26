@@ -60,6 +60,43 @@ func TestGitLabSourcesStartGHAJobs(t *testing.T) {
 	}
 }
 
+const webJob = `job_web:
+  script: [echo web]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+`
+
+// The workflow rules decide which source gets an event: an admitted source gets one, an excluded source gets none, and a
+// source that the rules admit only on some ref is reported lost, so no job is disabled without a verdict.
+func TestGitLabWorkflowRulesDecideSourceEvents(t *testing.T) {
+	cases := []struct {
+		name, workflow string
+		dispatch, lost bool
+	}{
+		{"admits web by source", "workflow:\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == \"web\" || $CI_PIPELINE_SOURCE == \"push\"'\n", true, false},
+		{"admits every source", "workflow:\n  rules:\n    - when: always\n", true, false},
+		{"admits web by a source rule before a ref rule", "workflow:\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == \"web\"'\n    - if: '$CI_COMMIT_BRANCH == \"main\"'\n", true, false},
+		{"excludes web", "workflow:\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == \"web\"'\n      when: never\n    - when: always\n", false, false},
+		{"admits only the push source", "workflow:\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == \"push\"'\n", false, false},
+		{"admits web on a branch only", "workflow:\n  rules:\n    - if: '$CI_COMMIT_BRANCH == \"main\"'\n", false, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out, rep := convert(t, "gitlab", "gha", ".gitlab-ci.yml", c.workflow+webJob)
+			if got := strings.Contains(out, "\n  workflow_dispatch:"); got != c.dispatch {
+				t.Errorf("workflow_dispatch present = %v, want %v:\n%s", got, c.dispatch, out)
+			}
+			var lost bool
+			for _, e := range rep.Entries {
+				lost = lost || e.Level == caps.Lost && e.Feature == caps.TriggerManual && strings.Contains(e.Detail, "workflow rules")
+			}
+			if lost != c.lost {
+				t.Errorf("source loss reported = %v, want %v:\n%+v", lost, c.lost, rep.Entries)
+			}
+		})
+	}
+}
+
 // A job whose condition names no API source adds no event the source never named.
 func TestGitLabDefaultSourcesAddOnlyNamedEvents(t *testing.T) {
 	out, _ := convert(t, "gitlab", "gha", ".gitlab-ci.yml", "build:\n  script: [make]\n  rules:\n    - if: '$CI_COMMIT_BRANCH == \"main\"'\n")
@@ -148,6 +185,57 @@ func TestTektonAndArgoTagPushHasNoBranch(t *testing.T) {
 			t.Errorf("the tag name does not go to the tag param alone:\n%s", out)
 		}
 	})
+}
+
+// A GitLab job for the push source also runs on a tag push, because GitLab gives a tag pipeline the source push
+// (https://docs.gitlab.com/ci/jobs/job_rules/). The tag trigger of Tekton and Argo therefore reports the event push,
+// and a job that tests the branch still gets no branch on the tag trigger.
+func TestGitLabPushJobRunsOnTagPushOnTektonAndArgo(t *testing.T) {
+	src := "push_job:\n  script: [echo push]\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == \"push\"'\n" + branchTagGitLab
+	for _, to := range []string{"tekton", "argo"} {
+		t.Run(to, func(t *testing.T) {
+			out, _ := convertText(t, "gitlab", to, ".gitlab-ci.yml", src)
+			for _, bad := range []string{"'''tag'''", "value: tag"} {
+				if strings.Contains(out, bad) {
+					t.Errorf("the tag trigger reports the event tag, and the push-only job does not start on it (%q):\n%s", bad, out)
+				}
+			}
+			if !strings.Contains(out, "ctx-event") || !strings.Contains(out, "push") {
+				t.Errorf("the push-only job has no event test:\n%s", out)
+			}
+		})
+	}
+}
+
+// No target disables or loses the push-only job: each one has an event or a condition that holds on a branch push and on
+// a tag push.
+func TestGitLabPushJobIsKeptOnEveryTarget(t *testing.T) {
+	src := "push_job:\n  script: [echo push]\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == \"push\"'\n"
+	for _, to := range []string{"gha", "gitea", "forgejo", "drone", "woodpecker", "tekton", "argo", "concourse"} {
+		t.Run(to, func(t *testing.T) {
+			out, rep := convert(t, "gitlab", to, ".gitlab-ci.yml", src)
+			if lostJobIf(rep) || strings.Contains(out, "if: false") || strings.Contains(out, "{{= false }}") || strings.Contains(out, "pipemaster-disabled") {
+				t.Errorf("the push-only job is disabled:\n%s\n%+v", out, rep.Entries)
+			}
+		})
+	}
+}
+
+// A tag-only job of a GHA source starts on a tag push on Tekton and Argo, which read the ref type: the prefix test of
+// the ref and the test of the ref type hold on the same runs.
+func TestGHATagOnlyJobHasATestOfTheRefTypeOnTektonAndArgo(t *testing.T) {
+	src := "on: [push, pull_request]\njobs:\n  a:\n    runs-on: ubuntu-latest\n    if: startsWith(github.ref, 'refs/tags/')\n    steps:\n      - run: echo a\n  b:\n    runs-on: ubuntu-latest\n    if: github.ref_type == 'tag'\n    steps:\n      - run: echo b\n"
+	for to, want := range map[string]string{"tekton": "$(params.ctx-ref-type)", "argo": "workflow.parameters[''ctx-ref-type''] == ''tag''"} {
+		t.Run(to, func(t *testing.T) {
+			out, rep := convert(t, "gha", to, ".github/workflows/ci.yml", src)
+			if lostJobIf(rep) {
+				t.Errorf("a tag-only job is lost:\n%+v", rep.Entries)
+			}
+			if got := strings.Count(out, want); got < 2 {
+				t.Errorf("%q occurs %d times, want a test for each of the two jobs:\n%s", want, got, out)
+			}
+		})
+	}
 }
 
 // A GitLab schedule keeps its cron in the project settings, so no target file holds a time that no schedule named.
