@@ -131,7 +131,7 @@ var handoffFeatures = map[caps.Feature]bool{caps.JobNeeds: true, caps.JobNeedsAr
 // failureFeatures change how a failure counts.
 var failureFeatures = map[caps.Feature]bool{caps.JobAllowFailure: true, caps.StepContinueOnError: true}
 
-// disableWords mark a loss detail of an emitter that turns a condition it cannot state into work that never runs.
+// disableWords mark (the wording is the emitters; no typed flag in report.Entry marks the case) a loss detail of an emitter that turns a condition it cannot state into work that never runs.
 var disableWords = []string{"never runs", "disabled"}
 
 func disablesWork(detail string) bool {
@@ -145,6 +145,8 @@ func effects(level caps.Level, f caps.Feature) ([]string, string) {
 		return nil, "does not change a run"
 	case f == caps.StepShell && level == caps.Emulated:
 		return []string{kindMissing, kindValue, kindExit}, "an image without the shell stops the step, and the work after it is missing"
+	case f == caps.StepImage && level == caps.Emulated:
+		return []string{kindValue}, "a default image changes the tools of the step, not whether it exits"
 	case f == caps.StepAction && level == caps.External:
 		return []string{kindMissing, kindValue, kindExit}, "an action that the operator wires outside the file leaves its output out"
 	case conditionFeatures[f] && level == caps.Lost:

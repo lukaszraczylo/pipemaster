@@ -54,6 +54,8 @@ func TestJudge(t *testing.T) {
 			rep: rep(entry(caps.External, caps.TriggerPullRequest, "pipeline/ci/trigger/0")), status: StatusFail},
 		{name: "passthrough explains nothing", src: tr(0, "a", "b"), tgt: tr(0, "a"),
 			rep: rep(entry(caps.Lost, caps.ExtPassthrough, "pipeline/ci/job/x/step/y")), status: StatusFail},
+		{name: "emulated image does not explain an exit", src: tr(0, "bash.ok:c"), tgt: tr(127),
+			rep: rep(entry(caps.Emulated, caps.StepImage, "pipeline/ci/job/build/step/s")), status: StatusFail},
 		{name: "emulated shell explains a stopped step", src: tr(0, "bash.ok:c"), tgt: tr(127),
 			rep: rep(entry(caps.Emulated, caps.StepShell, "pipeline/ci/job/build/step/s")), status: StatusExplained},
 		{name: "external action explains a value", src: tr(0, "a.consume:payload"), tgt: tr(0, "a.consume:"),

@@ -470,6 +470,17 @@ func (e *gitlabEngine) defaultImageNode(ctx context.Context, root *yaml.Node) er
 }
 
 func (e *gitlabEngine) variables(w *Workspace) []string {
+	v := glRunVars(w)
+	var out, ignore []string
+	for k, val := range v {
+		out = append(out, "--variable", k+"="+val)
+		ignore = append(ignore, k)
+	}
+	return append(out, "--ignore-predefined-vars", strings.Join(ignore, ","))
+}
+
+// glRunVars holds the predefined variables that the harness sets for one run.
+func glRunVars(w *Workspace) map[string]string {
 	v := map[string]string{
 		"CI_PIPELINE_SOURCE": "push",
 		"CI_COMMIT_BRANCH":   w.Ev.Branch,
@@ -487,12 +498,7 @@ func (e *gitlabEngine) variables(w *Workspace) []string {
 		v["CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"] = w.Ev.Branch
 		v["CI_MERGE_REQUEST_TARGET_BRANCH_NAME"] = w.Ev.Target
 	}
-	var out, ignore []string
-	for k, val := range v {
-		out = append(out, "--variable", k+"="+val)
-		ignore = append(ignore, k)
-	}
-	return append(out, "--ignore-predefined-vars", strings.Join(ignore, ","))
+	return v
 }
 
 func (e *gitlabEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
@@ -508,6 +514,13 @@ func (e *gitlabEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	rewritten, err := e.rewriteImages(ctx, raw)
 	if err != nil {
 		return nil, fmt.Errorf("prepare images: %w", err)
+	}
+	admitted, err := workflowAdmits(rewritten, glRunVars(w))
+	if err != nil {
+		return nil, blocked("workflow:rules of the converted output cannot be evaluated: %v", err)
+	}
+	if !admitted {
+		return &Trace{Log: "GitLab creates no pipeline: workflow:rules admit no run of this event", NoPipeline: true}, nil
 	}
 	if w.Ev.Kind == kindPR {
 		var active bool
