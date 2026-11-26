@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -481,11 +482,13 @@ func (e *gitlabEngine) defaultImageNode(ctx context.Context, root *yaml.Node) er
 	return nil
 }
 
-func (e *gitlabEngine) variables(w *Workspace) []string {
-	v := glRunVars(w)
+func (e *gitlabEngine) variables(w *Workspace) []string { return varArgs(glRunVars(w)) }
+
+// varArgs turns variables into the options of gitlab-ci-local, in a stable order.
+func varArgs(v map[string]string) []string {
 	var out, ignore []string
-	for k, val := range v {
-		out = append(out, "--variable", k+"="+val)
+	for _, k := range slices.Sorted(maps.Keys(v)) {
+		out = append(out, "--variable", k+"="+v[k])
 		ignore = append(ignore, k)
 	}
 	return append(out, "--ignore-predefined-vars", strings.Join(ignore, ","))
@@ -514,20 +517,24 @@ func glRunVars(w *Workspace) map[string]string {
 }
 
 func (e *gitlabEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
-	bin := e.env.GitlabCILocal()
-	if err := e.env.Require(bin); err != nil {
+	if err := e.env.Require(e.env.GitlabCILocal()); err != nil {
 		return nil, err
 	}
-	file := filepath.Join(w.Dir, ".gitlab-ci.yml")
+	file := filepath.Join(w.Dir, rootFile)
 	raw, err := os.ReadFile(file) // #nosec G304 -- the workspace file of the harness
 	if err != nil {
 		return nil, blocked("no .gitlab-ci.yml in the converted output")
 	}
-	rewritten, err := e.rewriteImages(ctx, raw)
+	vars := glRunVars(w)
+	spliced, childLog, err := e.withChildren(ctx, w, raw, vars, 0)
+	if err != nil {
+		return nil, err
+	}
+	rewritten, err := e.rewriteImages(ctx, spliced)
 	if err != nil {
 		return nil, fmt.Errorf("prepare images: %w", err)
 	}
-	admitted, err := workflowAdmits(rewritten, glRunVars(w))
+	admitted, err := workflowAdmits(rewritten, vars)
 	if err != nil {
 		return nil, blocked("workflow:rules of the converted output cannot be evaluated: %v", err)
 	}
@@ -546,6 +553,21 @@ func (e *gitlabEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	if err := os.WriteFile(file, rewritten, 0o600); err != nil { // #nosec G703 -- a file of the harness workspace
 		return nil, err
 	}
+	tr, err := e.exec(ctx, w, rootFile, vars)
+	if err != nil {
+		return nil, err
+	}
+	tr.Log = childLog + tr.Log
+	// The rules of every job are false in a merge request pipeline, so GitLab creates none.
+	tr.NoPipeline = w.Ev.Kind == kindPR && tr.Exit == 0 && len(tr.Markers) == 0
+	return tr, nil
+}
+
+const rootFile = ".gitlab-ci.yml"
+
+// exec runs one prepared pipeline file of the workspace with gitlab-ci-local.
+func (e *gitlabEngine) exec(ctx context.Context, w *Workspace, name string, vars map[string]string) (*Trace, error) {
+	bin := e.env.GitlabCILocal()
 	shim := filepath.Join(e.env.Work, "docker-kiri-shim")
 	if err := os.WriteFile(shim, []byte(kiriShim), 0o700); err != nil { // #nosec G306 -- an executable helper script
 		return nil, err
@@ -559,14 +581,14 @@ func (e *gitlabEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 		return nil, fmt.Errorf("prepare shim image: %w", err)
 	}
 	args := []string{"--helper-image", helper, "--container-executable", shim, "--pull-policy", "if-not-present", "--artifacts-to-source=false"}
-	args = append(args, e.variables(w)...)
+	if name != rootFile {
+		args = append(args, "--file", name, "--state-dir", ".gitlab-ci-local-"+strings.TrimSuffix(filepath.Base(name), ".yml"))
+	}
+	args = append(args, varArgs(vars)...)
 	start := time.Now()
 	out, code, err := e.env.run(ctx, runOpts{Dir: w.Dir, Timeout: timeoutLocal, Env: []string{"PM_SHIM_LOG=" + w.Dir + ".shim.log", "PM_HELPER_IMG=" + base}}, bin, args...)
 	if err != nil {
 		return nil, err
 	}
-	tr := newTrace(out, code, payloadLines(out, glLine), time.Since(start))
-	// The rules of every job are false in a merge request pipeline, so GitLab creates none.
-	tr.NoPipeline = w.Ev.Kind == kindPR && code == 0 && len(tr.Markers) == 0
-	return tr, nil
+	return newTrace(out, code, payloadLines(out, glLine), time.Since(start)), nil
 }

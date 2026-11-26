@@ -1,0 +1,5 @@
+default:
+  image: alpine:3.20
+never:
+  script:
+    - echo "MARK child_manual.child" | tee -a trace.log
