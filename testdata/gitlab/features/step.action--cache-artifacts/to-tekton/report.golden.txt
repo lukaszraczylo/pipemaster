@@ -1,6 +1,6 @@
 Loss report: gitlab -> tekton
-[external] pipeline/gitlab-ci/job/build job.runner: workers the operator provides (label the nodes runner.pipemaster.io/ubuntu-latest=true for the runner labels (taskRunSpecs podTemplate nodeSelector of the TriggerTemplate))
-[external] pipeline/gitlab-ci/job/test job.runner: workers the operator provides (label the nodes runner.pipemaster.io/ubuntu-latest=true for the runner labels (taskRunSpecs podTemplate nodeSelector of the TriggerTemplate))
+[external] pipeline/gitlab-ci/job/build job.runner: workers the operator provides (label the nodes runner.pipemaster.io/ubuntu-latest=true for the runner labels and selector (taskRunSpecs podTemplate nodeSelector of the TriggerTemplate; a run started with tkn pipeline start skips it))
+[external] pipeline/gitlab-ci/job/test job.runner: workers the operator provides (label the nodes runner.pipemaster.io/ubuntu-latest=true for the runner labels and selector (taskRunSpecs podTemplate nodeSelector of the TriggerTemplate; a run started with tkn pipeline start skips it))
 [external] pipeline/gitlab-ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [emulated] pipeline/gitlab-ci/job/build step.workdir: shared working directory (the steps run in /workspace, the volume that Tekton mounts in every step; the source runs its steps in one shared directory)
 [emulated] pipeline/gitlab-ci/job/build/step/build-step-1 step.action: shared workspace on a PVC (nothing persists between runs and the paths are not copied)

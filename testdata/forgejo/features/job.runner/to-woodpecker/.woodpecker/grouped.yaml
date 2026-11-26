@@ -4,6 +4,7 @@ when:
   - event: tag
 labels:
   linux: "true"
+  group: big-runners
 steps:
   - image: ubuntu:latest
     commands:

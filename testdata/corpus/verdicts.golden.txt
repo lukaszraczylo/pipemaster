@@ -390,7 +390,7 @@
 51-drone-parsr drone->gitlab native=  19 emulated=  16 external=   7 lost=  15
 51-drone-parsr drone->tekton native=  24 emulated=  30 external=   0 lost=  15
 51-drone-parsr drone->woodpecker native=  45 emulated=   1 external=   4 lost=   4
-52-drone-distribution drone->argo native= 205 emulated=  70 external=   0 lost= 165
+52-drone-distribution drone->argo native= 205 emulated=  70 external=   4 lost= 161
 52-drone-distribution drone->concourse native= 198 emulated=  86 external=   4 lost= 155
 52-drone-distribution drone->forgejo native= 264 emulated= 125 external=   0 lost= 103
 52-drone-distribution drone->gha native= 264 emulated= 124 external=   0 lost= 103

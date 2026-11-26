@@ -24,4 +24,5 @@ spec:
           - pipelineTaskName: grouped
             podTemplate:
               nodeSelector:
+                group: big-runners
                 runner.pipemaster.io/linux: "true"

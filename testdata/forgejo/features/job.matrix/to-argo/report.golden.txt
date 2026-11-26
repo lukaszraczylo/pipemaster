@@ -1,5 +1,5 @@
 Loss report: forgejo -> argo
-[lost] pipeline/ci/job/test job.runner (the runner label ${{ matrix.os }} has no node selector key: a key needs letters, digits, dot, underscore or dash)
+[lost] pipeline/ci/job/test job.runner (the runner label ${{ matrix.os }} has no node selector key: a label key has 1 to 63 letters, digits, dots, underscores or dashes and starts and ends with a letter or digit)
 [external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [external] pipeline/ci/trigger/1 trigger.tag: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/ci/job/test job.matrix: withItems over the expanded cells (the cells run as withItems of one task; fail-fast and max-parallel have no form on one task, so every cell runs and a failing cell fails the task)
