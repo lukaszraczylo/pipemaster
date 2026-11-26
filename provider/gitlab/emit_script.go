@@ -391,7 +391,7 @@ func (e *emitter) stepLines(sp string, st *ir.Step) ([]string, error) {
 	return out, nil
 }
 
-// exports renders step env as export lines; a value GitLab cannot carry on one line is lost.
+// exports renders step env as export lines; a value with a newline stays inside its double quotes across lines.
 func (e *emitter) exports(sp string, st *ir.Step) ([]string, error) {
 	var out []string
 	for _, v := range st.Env {
@@ -404,10 +404,6 @@ func (e *emitter) exports(sp string, st *ir.Step) ([]string, error) {
 			return nil, err
 		}
 		if !ok {
-			continue
-		}
-		if strings.Contains(t, "\n") {
-			e.lose(sp, caps.StepEnv, "variable "+v.Name+" holds a newline")
 			continue
 		}
 		out = append(out, "export "+v.Name+"="+dq(t))
