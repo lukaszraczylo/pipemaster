@@ -17,10 +17,10 @@ func TestCachePolicyMapping(t *testing.T) {
 		atEnd    bool
 		level    caps.Level
 	}{
-		"default":   {"", "actions/cache@", false, caps.Native},
-		"pull-push": {"pull-push", "actions/cache@", false, caps.Native},
-		"pull":      {"pull", "actions/cache/restore@", false, caps.Native},
-		"push":      {"push", "actions/cache/save@", true, caps.Native},
+		"default":   {"", "actions/cache@", false, caps.Emulated},
+		"pull-push": {"pull-push", "actions/cache@", false, caps.Emulated},
+		"pull":      {"pull", "actions/cache/restore@", false, caps.Emulated},
+		"push":      {"push", "actions/cache/save@", true, caps.Emulated},
 		"unknown":   {"bogus", "actions/cache@", false, caps.Emulated},
 	}
 	for name, c := range cases {
@@ -74,11 +74,11 @@ func TestCacheKeysRollAndRestore(t *testing.T) {
 	}{
 		"static key rolls": {
 			ir.Cache{Key: "deps", Paths: []string{"vendor"}},
-			[]string{"key: deps-${{ github.run_id }}", "restore-keys: deps-"}, nil,
+			[]string{"key: deps-run-${{ github.run_id }}", "restore-keys: deps-run-"}, nil,
 		},
 		"no key shares the GitLab default": {
 			ir.Cache{Paths: []string{"vendor"}},
-			[]string{"key: default-${{ github.run_id }}", "restore-keys: default-"}, []string{"build-cache"},
+			[]string{"key: default-run-${{ github.run_id }}", "restore-keys: default-run-"}, []string{"build-cache"},
 		},
 		"content hash key stays": {
 			ir.Cache{Key: "go-${{ hashFiles('go.sum') }}", Paths: []string{"vendor"}},
@@ -86,7 +86,7 @@ func TestCacheKeysRollAndRestore(t *testing.T) {
 		},
 		"fallback keys": {
 			ir.Cache{Key: "deps-main", FallbackKeys: []string{"deps-default", "x-${{ hashFiles('a') }}"}, Paths: []string{"vendor"}},
-			[]string{"key: deps-main-${{ github.run_id }}", "deps-main-", "deps-default-", "x-${{ hashFiles('a') }}"}, nil,
+			[]string{"key: deps-main-run-${{ github.run_id }}", "deps-main-run-", "deps-default-run-", "x-${{ hashFiles('a') }}"}, nil,
 		},
 	}
 	for name, c := range cases {
@@ -121,7 +121,7 @@ func TestSaveStepHasNoRestoreKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 	data := string(files[".github/workflows/ci.yml"])
-	if strings.Contains(data, "restore-keys") || !strings.Contains(data, "key: deps-${{ github.run_id }}") {
+	if strings.Contains(data, "restore-keys") || !strings.Contains(data, "key: deps-run-${{ github.run_id }}") {
 		t.Errorf("save step is wrong:\n%s", data)
 	}
 	lintFileIgnoring(t, "ci.yml", files[".github/workflows/ci.yml"], constantIf)
@@ -134,5 +134,34 @@ func TestCacheFallbackKeysRoundTrip(t *testing.T) {
 	c := back.Pipelines[0].Jobs[0].Cache
 	if len(c) != 1 || c[0].Key != "deps" || !slices.Equal(c[0].FallbackKeys, []string{"a", "b"}) || !slices.Equal(c[0].Paths, []string{"vendor"}) {
 		t.Errorf("cache = %+v\n%s", c, text)
+	}
+}
+
+func TestCachePrefixDoesNotMatchALongerKey(t *testing.T) {
+	for _, key := range []string{"main", "main-hotfix"} {
+		p := baseProject(t)
+		job(p, "build").Cache = []ir.Cache{{Key: key, Paths: []string{"vendor"}}}
+		files, rep, err := gha.New(gha.GHA).Emit(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data := string(files[".github/workflows/ci.yml"])
+		prefix := "restore-keys: " + key + "-run-\n"
+		if !strings.Contains(data, prefix) || !strings.Contains(data, "key: "+key+"-run-${{ github.run_id }}") {
+			t.Errorf("key %s: rolling pair missing:\n%s", key, data)
+		}
+		// "main-run-" is no prefix of "main-hotfix-run-<id>", and the reverse needs the same "-run-" tail.
+		if strings.HasPrefix("main-hotfix-run-1", "main-run-") {
+			t.Fatal("the separator does not keep the keys apart")
+		}
+		found := false
+		for _, e := range rep.Entries {
+			if e.Feature == caps.JobCache && e.Level == caps.Emulated && strings.Contains(e.Detail, "newest by prefix") && strings.Contains(e.Detail, "default branch") {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("key %s: no emulated entry naming the rolling key and the branch scope: %+v", key, rep.Entries)
+		}
 	}
 }

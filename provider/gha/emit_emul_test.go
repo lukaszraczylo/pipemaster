@@ -75,6 +75,13 @@ func emulCases() map[string]emulCase {
 			mutate: func(p *ir.Project) { job(p, "deploy").Manual = true },
 			want:   []string{"# pipemaster:emulated job.manual " + jobDeploy, "workflow_dispatch", "github.event_name == 'workflow_dispatch'"},
 		},
+		"cache": {
+			feature: caps.JobCache, path: jobBuild, level: caps.Emulated,
+			mutate: func(p *ir.Project) {
+				job(p, "build").Cache = []ir.Cache{{Key: "deps-${{ sha }}", Paths: []string{"~/.cache", "vendor"}}}
+			},
+			want: []string{"uses: actions/cache@v6", "key: deps-${{ github.sha }}-run-${{ github.run_id }}", "~/.cache"},
+		},
 		"artifacts": {
 			feature: caps.JobArtifacts, path: jobBuild, level: caps.Emulated,
 			mutate: func(p *ir.Project) {
@@ -186,7 +193,7 @@ func TestEveryNonNativeCapIsEmulatedOrLost(t *testing.T) {
 
 func TestCapsLedger(t *testing.T) {
 	want := map[caps.Feature]caps.Level{
-		caps.JobRetry: caps.Emulated, caps.JobManual: caps.Emulated, caps.JobCache: caps.Native,
+		caps.JobRetry: caps.Emulated, caps.JobManual: caps.Emulated, caps.JobCache: caps.Emulated,
 		caps.JobArtifacts: caps.Emulated, caps.JobNeedsArtifacts: caps.Emulated, caps.PipelineFinally: caps.Emulated,
 		caps.JobEnvironmentApproval: caps.External, caps.StepImage: caps.Emulated, caps.TriggerResource: caps.Lost,
 	}

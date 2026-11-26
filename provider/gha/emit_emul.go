@@ -20,8 +20,10 @@ const (
 	// gitlabDefaultCacheKey is the key GitLab gives a cache with no key; every such job shares it
 	// (https://docs.gitlab.com/ci/yaml/#cachekey).
 	gitlabDefaultCacheKey = "default"
-	cacheRunSuffix        = "-${{ github.run_id }}"
-	hashFilesCall         = "hashFiles("
+	cacheScopeCaveat      = "GitHub restores only caches of the current branch, the base branch of a pull request and the default branch, while a GitLab key with no branch part is shared across branches"
+	cacheRunSep           = "-run-"
+	cacheRunID            = "${{ github.run_id }}"
+	hashFilesCall         = "hashfiles("
 	monthDays             = 30
 	weekDays              = 7
 	hoursPerDay           = 24
@@ -112,6 +114,16 @@ func (e *emitter) preSteps(c jobCtx, jp string, j *ir.Job) ([]*yaml.Node, error)
 	return out, nil
 }
 
+// cacheRollDetail names the effect of a rewritten key. GitHub scoping:
+// https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching
+func cacheRollDetail(shared bool) string {
+	d := "the key is <key>-run-<run_id> and the restore prefix is <key>-run-: each run saves a new cache and restores the newest by prefix, because actions/cache never overwrites a key; " + cacheScopeCaveat
+	if shared {
+		d = "the source has no key, so GitLab shares one cache named default across jobs; " + d
+	}
+	return d
+}
+
 func withOf(kv ...any) *yaml.Node {
 	m := newMap()
 	for i := 0; i+1 < len(kv); i += 2 {
@@ -139,9 +151,12 @@ func (e *emitter) cacheStep(jp string, ch ir.Cache) (*yaml.Node, error) {
 	if key == "" {
 		key = gitlabDefaultCacheKey
 	}
-	kn, restore, err := e.cacheKeys(jp, key, ch.FallbackKeys)
+	kn, restore, changed, err := e.cacheKeys(jp, key, ch.FallbackKeys)
 	if err != nil {
 		return nil, err
+	}
+	if changed {
+		e.emulate(jp, caps.JobCache, "actions/cache step with a rolling key", cacheRollDetail(ch.Key == ""))
 	}
 	m := newMap()
 	uses, err := e.synthUses(jp, "cache", ref)
@@ -160,35 +175,43 @@ func (e *emitter) cacheStep(jp string, ch ir.Cache) (*yaml.Node, error) {
 }
 
 // cacheKeys writes the key and the restore-keys. actions/cache never overwrites an existing key, but GitLab uploads
-// the cache again after every run, so a key with no content hash becomes the rolling pair <key>-<run_id> and <key>-:
-// each run saves a new entry and the next run restores the newest. A hashFiles key already names its content.
-func (e *emitter) cacheKeys(jp, key string, fallback []string) (*yaml.Node, []string, error) {
+// the cache again after every run, so a key with no content hash becomes the rolling pair <key>-run-<run_id> and
+// <key>-run-: each run saves a new entry and the next run restores the newest. The "-run-" part keeps the prefix of
+// "main" from matching the keys of "main-hotfix". A hashFiles key already names its content. The bool is true
+// when a key was rewritten.
+func (e *emitter) cacheKeys(jp, key string, fallback []string) (*yaml.Node, []string, bool, error) {
+	changed := false
 	rolled := func(k string) (string, string, error) {
 		t, err := e.template(jp, k)
 		if err != nil {
 			return "", "", err
 		}
-		if strings.Contains(k, hashFilesCall) {
+		if hashesContent(k) {
 			return t, t, nil
 		}
-		return t + cacheRunSuffix, t + "-", nil
+		changed = true
+		return t + cacheRunSep + cacheRunID, t + cacheRunSep, nil
 	}
 	k, restore, err := rolled(key)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	var restoreKeys []string
-	if !strings.Contains(key, hashFilesCall) {
+	if !hashesContent(key) {
 		restoreKeys = append(restoreKeys, restore)
 	}
 	for _, fb := range fallback {
 		_, r, err := rolled(fb)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, false, err
 		}
 		restoreKeys = append(restoreKeys, r)
 	}
-	return str(k), restoreKeys, nil
+	return str(k), restoreKeys, changed, nil
+}
+
+func hashesContent(key string) bool {
+	return strings.Contains(strings.ToLower(key), hashFilesCall)
 }
 
 func artifactName(j *ir.Job, i int, a ir.Artifact) string {
