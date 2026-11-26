@@ -24,6 +24,9 @@ type plCtx struct {
 	inNames map[string]string
 	// restored holds the steps that a marker put back whole; they carry no copied env.
 	restored map[*ir.Step]bool
+	vols     map[string]volume
+	binds    map[string][]string
+	mounted  map[string][]string
 	file     string
 	plID     string
 }
@@ -38,7 +41,7 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 	}
 	pl := &ir.Pipeline{ID: id}
 	k := newSink(p.rep, src.doc.File, "pipeline/"+id)
-	c := &plCtx{p: p, src: src, k: k, file: src.doc.File, plID: id, restored: map[*ir.Step]bool{}}
+	c := &plCtx{p: p, src: src, k: k, file: src.doc.File, plID: id, restored: map[*ir.Step]bool{}, binds: map[string][]string{}, mounted: map[string][]string{}}
 	r := newReader(src.spec)
 	if err := p.params(pl, k, r); err != nil {
 		return nil, fmt.Errorf("%s: %w", src.doc.Loc(0), err)
@@ -65,6 +68,8 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 			k.Keep("exitHook", hook, caps.PipelineFinally, "the exit hook keys beside template have no IR field; kept in Ext", 0)
 		}
 	}
+	c.keepWorkflowVolumes(r)
+	c.linkVolumes(pl.Jobs)
 	k.KeepRest(r)
 	c.metadata(pl)
 	c.unreached()

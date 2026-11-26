@@ -103,7 +103,7 @@ func (e *emitter) planNames(pls []*ir.Pipeline) {
 				if j == nil {
 					continue
 				}
-				jp := &jobPlan{j: j, finally: i == 1, path: pp.path + "/job/" + j.ID}
+				jp := &jobPlan{j: e.withoutSharedVolumes(j), finally: i == 1, path: pp.path + "/job/" + j.ID}
 				jp.task = e.dnsName(tnames, jp.path, "job id", j.ID, maxName, true)
 				jp.tmpl = unique(pp.tmpls, jp.task, maxName)
 				pp.jobs = append(pp.jobs, jp)

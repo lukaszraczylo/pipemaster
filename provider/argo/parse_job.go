@@ -36,6 +36,8 @@ type jobBuilder struct {
 	fileOutputs   []string
 	finally       bool
 	cacheMounts   bool
+	vols          map[string]volume
+	mapped        map[mount]bool
 }
 
 func (c *plCtx) newJob(cl *call, ids map[string]string, finally bool) *jobBuilder {

@@ -33,7 +33,7 @@ var jobSkip = map[string]bool{
 	ExtImplicitNeeds: true, ExtDepends: true, ExtGates: true, ExtArguments: true, keyInputs: true, keyOutputs: true,
 	"sidecars": true, "continueOn": true, "templateRef": true, "withItems": true, "withParam": true, "withSequence": true,
 	"retryStrategy": true, "timeout": true, "activeDeadlineSeconds": true, "containerSet": true, "hooks": true, "onExit": true,
-	"argument_artifacts": true, "volumes": true, "nodeSelector": true,
+	"argument_artifacts": true, "volumes": true, "nodeSelector": true, ExtMountPaths: true, ExtWorkspaceArtifacts: true,
 }
 
 // taskKeys are the job Ext keys that belong to the DAG task, not the template.
@@ -144,6 +144,7 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (jobOut, error) {
 		e.containerTemplate(tc, tm, conts, jx)
 	}
 	e.templateKeys(tc, tm, sx, jx, taskStep != nil)
+	restoreMountPaths(tm.N, jx[ExtMountPaths])
 	d := e.finalDeps(tc, cond, jx)
 	d.depends = e.keptDepends(tc, jx, d.depends)
 	var gate string
