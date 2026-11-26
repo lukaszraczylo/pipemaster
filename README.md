@@ -92,7 +92,7 @@ Secret names map between providers. Secret values, runner registration, webhooks
 | Target | What it runs |
 | --- | --- |
 | `make check` | `go test -short ./...` (a deterministic sample of the chain matrix), `golangci-lint` and the Lean checks. It needs the pinned linters, so run `make linters` first. |
-| `make chains` | The full chain matrix. It took about 285 seconds and 1.4 GB of memory at nine providers. |
+| `make matrix` | The full chain matrix with a 40 minute timeout. It took about 608 seconds at nine providers, which is over the 10 minute default of `go test`. |
 | `make linters` | Builds or downloads the pinned linters into `.tools/bin`: actionlint, woodpecker-cli, drone, kubeconform, argo and fly. |
 | `make lint-real` | Every test except the chain matrix, without `-short`, with every pinned linter required, then `golangci-lint`. |
 | `make release-check` | `goreleaser check`, then a snapshot build of every target into `dist/` without publishing. |

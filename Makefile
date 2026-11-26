@@ -1,18 +1,18 @@
-.PHONY: test chains lint lint-real lean vectors check linters release-check behave behave-tools
+.PHONY: test matrix lint lint-real lean vectors check linters release-check behave behave-tools
 
 test:
 	go test ./...
 
 # The full chain matrix; `make check` runs a deterministic sample of it.
-chains: export PIPEMASTER_REQUIRE_LINTERS = 1
-chains: export PATH := $(CURDIR)/.tools/bin:$(PATH)
-chains:
-	go test ./internal/roundtrip -run TestChainMatrix -count=1
+matrix: export PIPEMASTER_REQUIRE_LINTERS = 1
+matrix: export PATH := $(CURDIR)/.tools/bin:$(PATH)
+matrix:
+	go test ./internal/roundtrip -run TestChainMatrix -count=1 -timeout 40m
 
 lint:
 	golangci-lint run
 
-# Every test that runs a real linter, with every pinned linter required. The chain matrix runs under `make chains`.
+# Every test that runs a real linter, with every pinned linter required. The chain matrix runs under `make matrix`.
 lint-real: export PIPEMASTER_REQUIRE_LINTERS = 1
 lint-real: export PATH := $(CURDIR)/.tools/bin:$(PATH)
 lint-real: linters
