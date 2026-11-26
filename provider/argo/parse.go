@@ -2,6 +2,7 @@ package argo
 
 import (
 	"fmt"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"io/fs"
 	"sort"
 	"strconv"
@@ -46,6 +47,7 @@ type project struct {
 func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	proj, rep, err := adapter{}.parseSource(fsys)
 	vars.Strip(proj)
+	emitkit.DropSourceCheckout(proj)
 	return proj, rep, err
 }
 

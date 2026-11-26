@@ -139,6 +139,9 @@ func (t *tektonEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	if err != nil {
 		return nil, err
 	}
+	if clonesGitHub(docs) {
+		return nil, blocked("the converted output clones the repository from %s and the harness has no git host", cloneHostURL)
+	}
 	evType, body := githubPayload(w)
 	runs, err := t.pipelineRuns(docs, w, evType, body)
 	if err != nil {
@@ -264,6 +267,9 @@ func (a *argoEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	docs, err := readDir(dir)
 	if err != nil {
 		return nil, err
+	}
+	if clonesGitHub(docs) {
+		return nil, blocked("the converted output clones the repository from %s and the harness has no git host", cloneHostURL)
 	}
 	evType, body := githubPayload(w)
 	flows, err := a.workflows(docs, w, evType, body)

@@ -65,6 +65,11 @@ func (a *actEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	if total > 0 && len(workflows) == 0 {
 		return &Trace{Log: "GitHub starts no workflow: no on: filter admits the event " + w.Ev.Name, NoPipeline: true}, nil
 	}
+	if why, err := missingCheckout(w.Dir, workflows); err != nil {
+		return nil, blocked("the converted workflow cannot be read: %v", err)
+	} else if why != "" {
+		return &Trace{Log: why, Exit: 1}, nil
+	}
 	evFile := filepath.Join(filepath.Dir(w.Dir), filepath.Base(w.Dir)+"-event.json")
 	if err := os.WriteFile(evFile, raw, 0o600); err != nil {
 		return nil, err

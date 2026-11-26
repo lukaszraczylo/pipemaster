@@ -93,6 +93,11 @@ func carriedKeys(raw any) []string {
 // stay for the round trip and ForeignExt retains them without a report entry.
 const CarriedKey = "_carried"
 
+// CheckoutKey is the job Ext key of a source whose job reads the repository of the pipeline but has no checkout step,
+// because its provider fetches the repository before the job. A provider that fetches nothing by itself, such as
+// GitHub Actions, writes the checkout. The value holds the fetch depth under "depth", when the source set one.
+const CheckoutKey = "_checkout"
+
 // meaningfulKeys lists the sorted Ext keys of one provider that carry behaviour.
 func meaningfulKeys(raw any) []string {
 	m, _ := raw.(map[string]any)

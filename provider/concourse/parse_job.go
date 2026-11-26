@@ -117,6 +117,7 @@ func (b *pipeBuilder) job(m *omap) *builtJob {
 	jb.needs(bj, plan)
 	needCarry := jb.gateMarker(bj)
 	jb.k.Out[ExtGets] = gets
+	jb.sourceCheckout(gets, len(steps) > 0)
 	if len(gets) == 0 {
 		jb.k.Out[ExtGets] = []any{}
 	}
