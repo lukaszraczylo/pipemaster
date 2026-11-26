@@ -27,7 +27,7 @@ func TestWithSourceCheckout(t *testing.T) {
 		{name: "adds checkout", p: sourceProject("concourse", map[string]any{}, script), wantSteps: 2, added: true},
 		{name: "carries depth", p: sourceProject("concourse", map[string]any{"depth": 1}, script), wantSteps: 2, wantDepth: "1", added: true},
 		{name: "no marker", p: sourceProject("concourse", nil, script), wantSteps: 1},
-		{name: "other origin", p: sourceProject("drone", map[string]any{}, script), wantSteps: 1},
+		{name: "other origin", p: sourceProject("argo", map[string]any{}, script), wantSteps: 1},
 		{name: "no steps", p: sourceProject("concourse", map[string]any{})},
 	}
 	for _, tc := range tests {

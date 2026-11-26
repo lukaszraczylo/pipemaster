@@ -1,7 +1,6 @@
 package gha
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -10,9 +9,6 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/actions"
 	"github.com/lukaszraczylo/pipemaster/caps"
-	"github.com/lukaszraczylo/pipemaster/expr"
-	exprconcourse "github.com/lukaszraczylo/pipemaster/expr/concourse"
-	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
@@ -257,34 +253,11 @@ func (e *emitter) markCarried(jp string, j *ir.Job, pre, post int) error {
 	return e.markArg(f, jp, c)
 }
 
-const (
-	gitStrategyVar   = "GIT_STRATEGY"
-	gitStrategyNone  = "none"
-	gitDepthVar      = "GIT_DEPTH"
-	gitSubmodulesVar = "GIT_SUBMODULE_STRATEGY"
-	submodulesNormal = "normal"
-	submodulesDeep   = "recursive"
-)
-
-// envLit is the literal value of a variable the job or its pipeline sets; the job wins.
-func envLit(c jobCtx, j *ir.Job, name string) string {
-	for _, vars := range [][]ir.Var{j.Env, c.pl.Env} {
-		for _, v := range vars {
-			if v.Name == name && v.Value.Kind == ir.ValueLit {
-				return v.Value.Lit
-			}
-		}
-	}
-	return ""
-}
-
-// checkoutStep is the clone GitLab runs before every job, which a GHA job must ask for. It is nil for any other
-// origin, for a job with no steps and for GIT_STRATEGY none. The step is counted as a pre step, so Parse removes it again.
+// checkoutStep is the clone that the CI system of the source runs before the steps, which a GHA job must ask for.
+// It is nil when the origin does not clone for the job. The step is counted as a pre step, so Parse removes it again.
 func (e *emitter) checkoutStep(c jobCtx, jp string, j *ir.Job) (*yaml.Node, error) {
-	if depth, ok := sourceCheckout(e.from, j); ok {
-		return e.sourceCheckoutNode(jp, depth)
-	}
-	if e.from == nil || e.from.ID != exprgitlab.Dialect || len(j.Steps) == 0 || envLit(c, j, gitStrategyVar) == gitStrategyNone {
+	co, ok := emitkit.SourceCheckout(e.origin, c.pl, j)
+	if !ok {
 		return nil, nil
 	}
 	ref, err := reverseAction("checkout", "")
@@ -298,57 +271,18 @@ func (e *emitter) checkoutStep(c jobCtx, jp string, j *ir.Job) (*yaml.Node, erro
 	}
 	m.set("uses", str(uses))
 	with := newMap()
-	if d, err := strconv.Atoi(envLit(c, j, gitDepthVar)); err == nil {
-		with.set("fetch-depth", intNode(d))
+	if co.Depth > 0 {
+		with.set("fetch-depth", intNode(co.Depth))
 	}
-	switch envLit(c, j, gitSubmodulesVar) {
-	case submodulesNormal:
+	switch co.Submodules {
+	case emitkit.SubmodulesOn:
 		with.set("submodules", boolNodeOf(true))
-	case submodulesDeep:
-		with.set("submodules", str(submodulesDeep))
+	case emitkit.SubmodulesDeep:
+		with.set("submodules", str(emitkit.SubmodulesDeep))
 	}
 	if len(with.n.Content) > 0 {
 		m.set("with", with.n)
 	}
-	e.emulate(jp, caps.StepAction, "actions/checkout step", "GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs")
-	return m.n, nil
-}
-
-// sourceCheckout reports whether a job of a Concourse source reads the repository that holds the pipeline, and the
-// fetch depth that its get set (0 for the full history). The job has no checkout step because Concourse fetches
-// the repository with the get.
-func sourceCheckout(from *expr.Dialect, j *ir.Job) (int, bool) {
-	if from == nil || from.ID != exprconcourse.Dialect || len(j.Steps) == 0 {
-		return 0, false
-	}
-	if first := j.Steps[0]; first != nil && first.Kind == ir.StepAction && first.Action != nil && first.Action.Repo == "checkout" {
-		return 0, false
-	}
-	ext, _ := j.Ext[exprconcourse.Dialect].(map[string]any)
-	v, ok := ext[emitkit.CheckoutKey]
-	if !ok {
-		return 0, false
-	}
-	m, _ := v.(map[string]any)
-	depth, _ := strconv.Atoi(fmt.Sprint(m["depth"]))
-	return max(depth, 0), true
-}
-
-// sourceCheckoutNode is the checkout step for a job of a Concourse source.
-func (e *emitter) sourceCheckoutNode(jp string, depth int) (*yaml.Node, error) {
-	ref, err := reverseAction("checkout", "")
-	if err != nil {
-		return nil, err
-	}
-	m := newMap()
-	uses, err := e.synthUses(jp, "checkout", ref)
-	if err != nil {
-		return nil, err
-	}
-	m.set("uses", str(uses))
-	if depth > 0 {
-		m.set("with", withOf("fetch-depth", intNode(depth)))
-	}
-	e.emulate(jp, caps.StepAction, "actions/checkout step", "Concourse fetches the repository with the get of the job and GHA does not; the depth param of the get maps to fetch-depth")
+	e.emulate(jp, caps.StepAction, "actions/checkout step", emitkit.SourceCheckoutDetail(e.origin))
 	return m.n, nil
 }

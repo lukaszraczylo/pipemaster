@@ -3,7 +3,6 @@
 package behave
 
 import (
-	"encoding/json"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -50,10 +49,3 @@ func copyRepoFiles(src, dst string) error {
 }
 
 const cloneHostURL = "https://github.com/"
-
-// clonesGitHub is true when a converted Tekton or Argo document clones a repository from GitHub. The Kiri cluster
-// has no git host for the fixture repository, so such a run cannot start.
-func clonesGitHub(docs []map[string]any) bool {
-	raw, err := json.Marshal(docs)
-	return err == nil && strings.Contains(string(raw), cloneHostURL)
-}

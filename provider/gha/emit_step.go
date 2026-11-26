@@ -459,7 +459,7 @@ func (e *emitter) jobSteps(c jobCtx, j *ir.Job) (*yaml.Node, error) {
 		if st == nil {
 			continue
 		}
-		n, w, err := e.stepNode(jp, e.reidentify(j, st, len(seq.Content)+1), attempts)
+		n, w, err := e.stepNode(jp, e.reidentify(j, st, len(seq.Content)-len(pre)+1), attempts)
 		if err != nil {
 			return nil, err
 		}

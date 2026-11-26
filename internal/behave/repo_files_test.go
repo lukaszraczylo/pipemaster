@@ -46,22 +46,3 @@ func TestCopyRepoFiles(t *testing.T) {
 		}
 	}
 }
-
-func TestClonesGitHub(t *testing.T) {
-	tests := []struct {
-		name string
-		docs []map[string]any
-		want bool
-	}{
-		{"clone param", []map[string]any{{"params": []any{map[string]any{"name": "url", "value": "https://github.com/pipemaster/behave.git"}}}}, true},
-		{"script only", []map[string]any{{"script": "echo hi"}}, false},
-		{"none", nil, false},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := clonesGitHub(tc.docs); got != tc.want {
-				t.Errorf("got %v, want %v", got, tc.want)
-			}
-		})
-	}
-}

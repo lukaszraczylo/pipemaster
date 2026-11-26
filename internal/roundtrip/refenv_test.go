@@ -293,7 +293,7 @@ func TestArgoSensorFillsTheBranchParamsPerEvent(t *testing.T) {
 	files, _ := emitFiles(t, "drone", provider.Argo, map[string]string{".drone.yml": droneBranchImage})
 	sensor := string(files[".argo/events/sensor.yaml"])
 	for _, w := range []string{
-		"dest: spec.arguments.parameters.1.value\n              src:\n                dataKey: body.pull_request.base.ref\n                dependencyName: drone-pr",
+		"dest: spec.arguments.parameters.3.value\n              src:\n                dataKey: body.pull_request.base.ref\n                dependencyName: drone-pr",
 		`dest: spec.arguments.parameters.0.value
               src:
                 dataTemplate: '{{ trimPrefix "refs/heads/" .Input.body.ref }}'
