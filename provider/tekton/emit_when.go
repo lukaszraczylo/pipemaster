@@ -189,6 +189,7 @@ func (tc *taskCtx) cond(path string, f caps.Feature, e expr.Expr, sc scope) cond
 	if e == nil {
 		return condition{}
 	}
+	e = expr.RefTypeForm(e)
 	switch {
 	case f == caps.JobIf && !tc.jp.finally && len(tc.jp.j.Needs) > 0 && callsAlways(e):
 		tc.e.lose(path, f, "always() has no Tekton form outside finally; Tekton skips the task when a dependency fails")

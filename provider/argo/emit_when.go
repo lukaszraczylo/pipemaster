@@ -202,7 +202,7 @@ func (tc *jobCtx) condition() taskCond {
 	var whens, depends []string
 	mentioned := map[string]bool{}
 	opaqueWhen := ""
-	for _, cj := range conjuncts(j.If) {
+	for _, cj := range conjuncts(expr.RefTypeForm(j.If)) {
 		if o, isOpaque := cj.(expr.Opaque); isOpaque {
 			text, ok := exprargo.OpaqueWhen(o)
 			if !ok {
