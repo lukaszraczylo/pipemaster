@@ -156,13 +156,14 @@ func TestTagTriggerSetsTheEventOfTheSourceDialect(t *testing.T) {
 	}
 }
 
-func TestPushBesideATagTriggerAdmitsBranchRefsOnly(t *testing.T) {
+func TestPushTriggerAdmitsBranchRefsOnly(t *testing.T) {
 	for name, tc := range map[string]struct {
 		triggers []ir.Trigger
 		want     bool
 	}{
 		"push and tag": {[]ir.Trigger{{Kind: ir.TriggerPush}, {Kind: ir.TriggerTag}}, true},
-		"push alone":   {[]ir.Trigger{{Kind: ir.TriggerPush}}, false},
+		"push alone":   {[]ir.Trigger{{Kind: ir.TriggerPush}}, true},
+		"tag alone":    {[]ir.Trigger{{Kind: ir.TriggerTag}}, false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			p := project(scriptJob("build", "x"))

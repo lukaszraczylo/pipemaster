@@ -24,6 +24,12 @@ spec:
       name: gitlab-ci-pr
     - eventName: push
       eventSourceName: pipemaster-github
+      filters:
+        data:
+          - path: body.ref
+            type: string
+            value:
+              - ^refs/heads/.*$
       name: gitlab-ci-push
   template:
     serviceAccountName: pipemaster-sensor

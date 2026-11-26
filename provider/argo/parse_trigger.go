@@ -411,12 +411,9 @@ func (p *project) sensorTrigger(t sensorTrigger, byName map[string]*ir.Pipeline)
 	return true
 }
 
-// branchesOnly reads the branch ref filter that the emitter adds to a push trigger beside a tag trigger as no
-// filter: a push with no branch filter is a push of a branch.
+// branchesOnly reads the branch ref filter that the emitter adds to a push trigger as no filter: a push with no
+// branch filter is a push of a branch.
 func branchesOnly(pl *ir.Pipeline) {
-	if !slices.ContainsFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerTag }) {
-		return
-	}
 	for i := range pl.Triggers {
 		if t := &pl.Triggers[i]; t.Kind == ir.TriggerPush && slices.Equal(t.Branches.Include, []string{globDeep}) {
 			t.Branches.Include = nil

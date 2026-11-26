@@ -6,6 +6,12 @@ spec:
   dependencies:
     - eventName: push
       eventSourceName: pipemaster-github
+      filters:
+        data:
+          - path: body.ref
+            type: string
+            value:
+              - ^refs/heads/.*$
       name: ci-push
   template:
     serviceAccountName: pipemaster-sensor

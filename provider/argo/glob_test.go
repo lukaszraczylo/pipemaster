@@ -117,10 +117,20 @@ func TestBranchGlobRoundTripsOverASmallAlphabet(t *testing.T) {
 	}
 	gen("", 4)
 	for _, g := range globs {
+		if g == "**" {
+			continue // admits every branch, the wire form of a push with no branch filter
+		}
 		files, _ := emit(t, triggerProject(ir.Trigger{Kind: ir.TriggerPush, Branches: ir.Filter{Include: []string{g}}}))
 		back := roundTrip(t, files)
 		if got := back.Pipelines[0].Triggers[0].Branches.Include; len(got) != 1 || got[0] != g {
 			t.Fatalf("glob %q read back as %v\n%s", g, got, files[".argo/events/sensor.yaml"])
 		}
+	}
+}
+
+func TestDeepBranchGlobReadsBackAsNoFilter(t *testing.T) {
+	files, _ := emit(t, triggerProject(ir.Trigger{Kind: ir.TriggerPush, Branches: ir.Filter{Include: []string{"**"}}}))
+	if got := roundTrip(t, files).Pipelines[0].Triggers[0].Branches.Include; len(got) != 0 {
+		t.Fatalf("glob ** read back as %v", got)
 	}
 }
