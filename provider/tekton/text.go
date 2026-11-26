@@ -38,6 +38,7 @@ var (
 	// tektonVar is the first segment of every variable that Tekton substitutes; `$(date)` and the like are shell.
 	tektonVar = regexp.MustCompile(`^(inputs\.params|params|tasks|results|workspaces|context|steps|credentials|artifacts)\.`)
 	// workspacePath reads $(workspaces.name.path).
+	workspaceVar  = regexp.MustCompile(`\$\(workspaces\.([A-Za-z0-9_.-]+)\.path\)`)
 	workspacePath = regexp.MustCompile(`^workspaces\.([A-Za-z0-9_.-]+)\.path$`)
 	// paramVar reads the three spellings of a param variable.
 	paramVar = regexp.MustCompile(`^params(?:\.([A-Za-z_][A-Za-z0-9_-]*)|\['([^']+)'\]|\["([^"]+)"\])$`)

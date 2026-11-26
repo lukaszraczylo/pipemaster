@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
@@ -95,4 +96,26 @@ func TestMountPathInAWorkingDirectoryStepResolvesFromTheCheckoutRoot(t *testing.
 	if !strings.Contains(all, "cat /data/f") || !strings.Contains(all, "workingDir: /data/app") {
 		t.Errorf("the mount path must return:\n%s", all)
 	}
+}
+
+func TestConflictingMountHasAVerdictThatNamesTheEffect(t *testing.T) {
+	src := wt(`  - name: main
+    volumes:
+    - {name: data, emptyDir: {}}
+    container:
+      image: alpine
+      command: [sh, -c]
+      args: ["cp /a/x /b/y"]
+      volumeMounts:
+      - {name: data, mountPath: /a}
+      - {name: data, mountPath: /b}
+`)
+	_, rep := parseYAML(t, src)
+	for _, e := range rep.Entries {
+		if e.Level == caps.Lost && strings.Contains(e.Detail, "mount of the volume data at /b") &&
+			strings.Contains(e.Detail, "also mounted at /a") && strings.Contains(e.Detail, "no artifact carries") {
+			return
+		}
+	}
+	t.Errorf("no entry names the mount, the volume and the effect: %+v", rep.Entries)
 }

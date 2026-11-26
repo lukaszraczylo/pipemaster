@@ -87,7 +87,13 @@ func (s SharedDirs) Link(jobs []*ir.Job, rep *report.Report) {
 			}
 			detail := "the " + s.Noun + " reads " + name + " that " + strings.Join(latest, ", ") + " wrote, so it downloads the artifact of " + dir + "; the target copies the files, the source mounts one volume"
 			if len(latest) > 1 {
-				detail += "; " + strings.Join(latest, " and ") + " run in parallel and write the same directory, so the file of the artifact that downloads last wins on a path that both write"
+				var order []string
+				for _, n := range j.Needs {
+					if slices.Contains(latest, n.JobID) {
+						order = append(order, n.JobID)
+					}
+				}
+				detail += "; " + strings.Join(order, " and ") + " run in parallel and write the same directory. The target downloads the artifacts in the order of the needs of this " + s.Noun + ", so the files of " + order[len(order)-1] + ", the last of them, win on a path that both write"
 			}
 			rep.Add(s.entry(j.ID, caps.JobNeedsArtifacts, caps.Emulated, detail))
 		}

@@ -100,6 +100,7 @@ type jobBuilder struct {
 	marks        *marks
 	containerRef string
 	path         string
+	tplEnv       []string
 	finally      bool
 	inTask       bool
 }

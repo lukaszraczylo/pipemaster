@@ -150,7 +150,8 @@ func (b *jobBuilder) planVolumes(t *omap) {
 			}
 			dir = path.Join(dir, clean)
 		}
-		if slices.ContainsFunc(pairs, func(p pathPair) bool { return p.path != m.path && p.dir == dir || p.path == m.path && p.dir != dir }) {
+		if i := slices.IndexFunc(pairs, func(p pathPair) bool { return p.path != m.path && p.dir == dir || p.path == m.path && p.dir != dir }); i >= 0 {
+			b.keepMountPath(m, dir, pairs[i])
 			continue
 		}
 		b.vols[v.name], b.mapped[m] = v, true
@@ -164,6 +165,18 @@ func (b *jobBuilder) planVolumes(t *omap) {
 	}
 	slices.SortStableFunc(pairs, func(a, b pathPair) int { return len(b.path) - len(a.path) })
 	b.tx.paths = pairs
+}
+
+// keepMountPath reports a mount that stays unmapped because it conflicts with a mapped one.
+func (b *jobBuilder) keepMountPath(m mount, dir string, with pathPair) {
+	why := "the volume " + m.name + " is also mounted at " + with.path + ", which already stands for " + dir
+	if m.path == with.path {
+		why = "another volume is mounted at " + m.path + " and already stands for " + with.dir
+	}
+	b.c.p.rep.Add(report.Entry{
+		IRPath: b.k.Path, Feature: caps.ExtPassthrough, Level: caps.Lost, Strategy: "mount path stays as written", SourceLoc: b.c.file,
+		Detail: "the mount of the volume " + m.name + " at " + m.path + " has no directory of its own: " + why + ", so a script that reads " + m.path + " keeps that path, which no artifact carries to a later job on the target",
+	})
 }
 
 // addVolumeDirs gives a job that mounts volumes a first step that creates their directories. Argo mounts the

@@ -14,6 +14,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 const (
@@ -69,6 +70,12 @@ func (b *jobBuilder) step(m *omap, n int) (*ir.Step, error) {
 	}
 	b.tx.up = emitkit.UpFrom(st.WorkDir)
 	defer func() { b.tx.up = "" }()
+	if b.tx.up != "" && len(b.tplEnv) > 0 {
+		k.Rep.Add(report.Entry{
+			IRPath: k.Path, Feature: caps.StepEnv, Level: caps.Lost, Strategy: "path stays relative to the checkout root", SourceLoc: k.File,
+			Detail: "the job env " + strings.Join(b.tplEnv, ", ") + " holds a workspace path relative to the checkout root, and the step working directory " + st.WorkDir + " resolves it under that directory on the target",
+		})
+	}
 	if err := b.command(st, k, r); err != nil {
 		return nil, fmt.Errorf("step %s: %w", id, err)
 	}
@@ -265,7 +272,7 @@ func (b *jobBuilder) envWithout(st *ir.Step, k *sink, r *reader, skip []exprtekt
 		return nil
 	}
 	ws := map[string]any{}
-	vars, from, err := b.envList(v, skip, ws)
+	vars, from, err := b.envList(v, skip, envScope{ws: ws, k: k, f: caps.StepEnv})
 	if err != nil {
 		return err
 	}
@@ -279,14 +286,17 @@ func (b *jobBuilder) envWithout(st *ir.Step, k *sink, r *reader, skip []exprtekt
 	return nil
 }
 
+// envScope says where an env list sits: the sink of its IR path, the feature of its verdict, and the map that
+// keeps the source text of a value that holds a workspace path. A nil ws keeps every value as written.
+type envScope struct {
+	ws map[string]any
+	k  *sink
+	f  caps.Feature
+}
+
 // envList reads a Kubernetes env list. With a non-nil ws, a literal value that holds a workspace path gets the
-// directory, and ws keeps the IR text and the source text under the variable name. Without ws, the path stays as written.
-func (b *jobBuilder) envList(v any, skip []exprtekton.EnvVar, ws map[string]any) ([]ir.Var, map[string]any, error) {
-	if ws == nil {
-		saved, savedData := b.tx.srcWS, b.tx.dataWS
-		b.tx.srcWS, b.tx.dataWS = nil, nil
-		defer func() { b.tx.srcWS, b.tx.dataWS = saved, savedData }()
-	}
+// directory, and ws keeps the IR text and the source text under the variable name.
+func (b *jobBuilder) envList(v any, skip []exprtekton.EnvVar, sc envScope) ([]ir.Var, map[string]any, error) {
 	list, ok := v.([]any)
 	if !ok {
 		return nil, nil, fmt.Errorf("env must be a list")
@@ -314,35 +324,69 @@ func (b *jobBuilder) envList(v any, skip []exprtekton.EnvVar, ws map[string]any)
 		if slices.ContainsFunc(skip, func(g exprtekton.EnvVar) bool { return g.Name == name && g.Value == raw }) {
 			continue
 		}
-		vars = append(vars, ir.Var{Name: name, Value: b.envValue(name, raw, ws)})
+		vars = append(vars, ir.Var{Name: name, Value: b.envValue(name, raw, sc)})
 	}
 	return vars, from, nil
 }
 
-// envValue reads an env value. A literal that holds a workspace path is recorded in ws; an expression keeps the
-// path as written, because the value then has no single spelling to restore.
-func (b *jobBuilder) envValue(name, raw string, ws map[string]any) ir.Value {
-	if ws == nil {
+// envValue reads an env value. A literal that holds a workspace path is recorded in sc.ws. A value that the
+// parser cannot rewrite keeps the path as written, and the report names the effect.
+func (b *jobBuilder) envValue(name, raw string, sc envScope) ir.Value {
+	refs := b.workspaceRefs(raw)
+	if len(refs) == 0 {
 		return b.tx.value(raw)
 	}
-	hits := b.tx.wsHits
-	marked, n := b.markWorkspaceLiterals(raw)
-	b.tx.wsHits += n
-	b.tx.markWS = true
-	v := b.tx.value(marked)
-	b.tx.markWS = false
-	if b.tx.wsHits == hits {
-		return v
+	if sc.ws != nil {
+		hits := b.tx.wsHits
+		marked, n := b.markWorkspaceLiterals(raw)
+		b.tx.wsHits += n
+		b.tx.markWS = true
+		v := b.tx.value(marked)
+		b.tx.markWS = false
+		if b.tx.wsHits != hits && v.Kind == ir.ValueLit {
+			irText, _ := splitWorkspaceMarks(v.Lit, b.tx.dirOf)
+			sc.ws[name] = []any{irText, raw}
+			return ir.Value{Lit: irText}
+		}
 	}
-	if v.Kind != ir.ValueLit {
-		saved, savedData := b.tx.srcWS, b.tx.dataWS
-		b.tx.srcWS, b.tx.dataWS = nil, nil
-		defer func() { b.tx.srcWS, b.tx.dataWS = saved, savedData }()
-		return b.tx.value(raw)
+	why := "a sidecar or an expression holds it"
+	if sc.ws != nil {
+		why = "the value is an expression"
 	}
-	irText, _ := splitWorkspaceMarks(v.Lit, b.tx.dirOf)
-	ws[name] = []any{irText, raw}
-	return ir.Value{Lit: irText}
+	b.keepWorkspacePath(sc, name, refs, why)
+	saved, savedData := b.tx.srcWS, b.tx.dataWS
+	b.tx.srcWS, b.tx.dataWS = nil, nil
+	defer func() { b.tx.srcWS, b.tx.dataWS = saved, savedData }()
+	return b.tx.value(raw)
+}
+
+// keepWorkspacePath reports an env value whose workspace path stays as written.
+func (b *jobBuilder) keepWorkspacePath(sc envScope, name string, refs []string, why string) {
+	dirs := make([]string, len(refs))
+	for i, r := range refs {
+		dirs[i], _ = b.tx.dirOf(r)
+	}
+	sc.k.Rep.Add(report.Entry{
+		IRPath: sc.k.Path, Feature: sc.f, Level: caps.Lost, Strategy: "path stays as written", SourceLoc: sc.k.File,
+		Detail: "env " + name + " holds the path of workspace " + strings.Join(refs, ", ") + " (" + why + "); the path stays as written and does not point at the directory " + strings.Join(dirs, ", ") + " that the workspace becomes on the target",
+	})
+}
+
+// workspaceRefs lists the mapped workspaces that a value names, as $(workspaces.x.path) or /workspace/x.
+func (b *jobBuilder) workspaceRefs(raw string) []string {
+	var out []string
+	add := func(name string) {
+		if _, ok := b.tx.dirOf(name); ok && !slices.Contains(out, name) {
+			out = append(out, name)
+		}
+	}
+	for _, m := range workspaceVar.FindAllStringSubmatch(raw, -1) {
+		add(m[1])
+	}
+	for _, m := range workspaceLiteral.FindAllString(raw, -1) {
+		add(m[strings.Index(m, workspaceDir+"/")+len(workspaceDir)+1:])
+	}
+	return out
 }
 
 // storeValue reads the Secret or ConfigMap key that the emitter writes for a secret or a variable.
@@ -388,13 +432,14 @@ func (b *jobBuilder) stepTemplate(v any, line int) error {
 	}
 	if ev, ok := r.Take("env"); ok {
 		ws := map[string]any{}
-		vars, from, err := b.envList(ev, nil, ws)
+		vars, from, err := b.envList(ev, nil, envScope{ws: ws, k: b.k, f: caps.JobEnv})
 		if err != nil {
 			return err
 		}
 		b.job.Env = vars
 		if len(ws) > 0 {
 			b.k.Out[ExtEnvWorkspace] = ws
+			b.tplEnv = slices.Sorted(maps.Keys(ws))
 		}
 		if len(from) > 0 {
 			b.k.Keep("valueFrom", from, caps.JobEnv, "stepTemplate env entries with valueFrom have no Value form; kept in Ext", r.Line("env"))
@@ -448,7 +493,7 @@ func (b *jobBuilder) sidecars(v any) error {
 			}
 		}
 		if ev, ok := r.Take("env"); ok {
-			vars, from, err := b.envList(ev, nil, nil)
+			vars, from, err := b.envList(ev, nil, envScope{k: b.k, f: caps.JobServices})
 			if err != nil {
 				return err
 			}
