@@ -174,6 +174,10 @@ func (f *flattener) inline(j *ir.Job, owner map[string]string, root string, top 
 	args := callArgs(j, child)
 	depend := kind != kindGitLab || triggerStrategy(j) == strategyWait
 	fwd := forwardsVars(j)
+	gate := f.gateJob(j, child, unique(taken, j.ID+gateSuffix), kind, fwd)
+	if gate == nil {
+		delete(taken, j.ID+gateSuffix)
+	}
 	var added, sinks []*ir.Job
 	needed := map[string]bool{}
 	for _, cj := range child.Jobs {
@@ -210,6 +214,7 @@ func (f *flattener) inline(j *ir.Job, owner map[string]string, root string, top 
 		}
 		if !inside && !finally {
 			nj.Needs = append(nj.Needs, slices.Clone(j.Needs)...)
+			nj.Needs = addNeed(nj.Needs, gate)
 		}
 		hide := f.hidden(j, child, nj, fwd)
 		nj.If = andExpr(j.If, childCond(andExpr(j.Child.Gate, cj.If), kind, hide))
@@ -249,9 +254,16 @@ func (f *flattener) inline(j *ir.Job, owner map[string]string, root string, top 
 		if o == nil || o == j {
 			continue
 		}
+		before := o.Needs
 		o.Needs = rewire(o.Needs, j.ID, depend, sinkNeeds, callNeeds)
+		if len(before) != len(o.Needs) || !slices.Equal(before, o.Needs) {
+			o.Needs = addNeed(o.Needs, gate)
+		}
 	}
 	pl.Jobs = slices.DeleteFunc(pl.Jobs, func(o *ir.Job) bool { return o == j })
+	if gate != nil {
+		added = append([]*ir.Job{gate}, added...)
+	}
 	pl.Jobs = append(pl.Jobs, added...)
 	pl.Finally = append(pl.Finally, finally...)
 	rec := top[root]
@@ -262,8 +274,42 @@ func (f *flattener) inline(j *ir.Job, owner map[string]string, root string, top 
 		owner[a.ID] = root
 		rec.Inlined = append(rec.Inlined, a.ID)
 	}
-	f.report(j, path, kind, child, added, finally, depend, fwd, args)
+	f.report(j, path, kind, child, added, finally, depend, fwd, args, gate)
 	return added
+}
+
+// gateSuffix names the job that stands for the trigger job when the child pipeline is not created.
+const gateSuffix = "-created"
+
+// gateJob returns the job that fails when the child workflow rules do not create the child pipeline, as GitLab
+// fails the trigger job then. It returns nil when the child pipeline always starts.
+func (f *flattener) gateJob(j *ir.Job, child *ir.Pipeline, id, kind string, fwd bool) *ir.Job {
+	if j.Child.Gate == nil {
+		return nil
+	}
+	g := childCond(j.Child.Gate, kind, f.hidden(j, child, &ir.Job{}, fwd))
+	if g == nil {
+		return nil
+	}
+	fail := &ir.Step{ID: "fail", Kind: ir.StepScript, Script: []string{"exit 1"}, If: expr.Unary{Op: expr.OpNot, X: g}}
+	if l, ok := g.(expr.Lit); ok {
+		fail.If = nil
+		if expr.LitTruthy(l) {
+			return nil
+		}
+	}
+	return &ir.Job{
+		ID: id, If: j.If, Manual: j.Manual, AllowFailure: j.AllowFailure, Needs: slices.Clone(j.Needs),
+		Steps: []*ir.Step{fail, {ID: "pass", Kind: ir.StepScript, Script: []string{"true"}}},
+	}
+}
+
+// addNeed adds a need on the gate job. A nil gate changes nothing.
+func addNeed(needs []ir.Need, gate *ir.Job) []ir.Need {
+	if gate == nil || slices.ContainsFunc(needs, func(n ir.Need) bool { return n.JobID == gate.ID }) {
+		return needs
+	}
+	return append(needs, ir.Need{JobID: gate.ID})
 }
 
 // dropCall removes a call whose child the rewrite cannot carry. The call job stays without its child, so the
@@ -402,7 +448,7 @@ func callEnv(j *ir.Job, forward bool) []ir.Var {
 	return j.Env
 }
 
-func (f *flattener) report(j *ir.Job, path, kind string, child *ir.Pipeline, added, finally []*ir.Job, depend, fwd bool, args *callInputs) {
+func (f *flattener) report(j *ir.Job, path, kind string, child *ir.Pipeline, added, finally []*ir.Job, depend, fwd bool, args *callInputs, gate *ir.Job) {
 	ids := make([]string, 0, len(added)+len(finally))
 	for _, a := range append(slices.Clone(added), finally...) {
 		ids = append(ids, a.ID)
@@ -417,6 +463,9 @@ func (f *flattener) report(j *ir.Job, path, kind string, child *ir.Pipeline, add
 		detail = fmt.Sprintf("the child pipeline %s has no jobs", files)
 	}
 	var caveats []string
+	if gate != nil {
+		caveats = append(caveats, "the job "+gate.ID+" fails when the workflow rules of the child pipeline do not create it, as GitLab fails the trigger job, and every job that needs the call waits for it")
+	}
 	if !depend {
 		caveats = append(caveats, "without strategy: depend the trigger job passes when the child pipeline starts, so jobs that need it wait for its own needs only; a failed child job now fails the pipeline")
 	}

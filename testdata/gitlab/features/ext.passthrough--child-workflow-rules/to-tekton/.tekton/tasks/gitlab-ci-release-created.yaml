@@ -1,0 +1,37 @@
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/release-created/step/fail
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/release-created/step/pass
+# pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated step.workdir pipeline/gitlab-ci/job/release-created
+# pipemaster:arg {"dir":"/workspace"}
+# pipemaster:emulated step.if pipeline/gitlab-ci/job/release-created/step/fail
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/release-created/step/fail
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/release-created/step/pass
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-release-created
+spec:
+  params:
+    - name: ctx-branch
+  stepTemplate:
+    workingDir: /workspace
+  steps:
+    - name: fail
+      image: alpine:3.22
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        if ! ( ! [ "$PM_CTX_BRANCH" = 'main' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard
+        exit 1
+      env:
+        - name: PM_CTX_BRANCH
+          value: $(params.ctx-branch)
+    - name: pass
+      image: alpine:3.22
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        true

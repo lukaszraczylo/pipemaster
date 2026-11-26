@@ -1,4 +1,6 @@
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/po-created/step/fail
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/po-created/step/pass
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/po-x/step/script
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
@@ -16,10 +18,15 @@ spec:
         tasks:
           - name: build
             template: build
+          - name: po-created
+            template: po-created
+            dependencies:
+              - build
           - name: po-x
             template: po-x
             dependencies:
               - build
+              - po-created
             when: '{{= false }}'
     - name: build
       containerSet:
@@ -34,6 +41,37 @@ spec:
               - pipemaster
               - make build
             workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: po-created
+      containerSet:
+        containers:
+          - name: fail
+            image: alpine:3.22
+            command:
+              - sh
+              - -c
+            args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - exit 1
+            workingDir: /workspace
+          - name: pass
+            image: alpine:3.22
+            command:
+              - sh
+              - -c
+            args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - "true"
+            workingDir: /workspace
+            dependencies:
+              - fail
         volumeMounts:
           - name: workspace
             mountPath: /workspace

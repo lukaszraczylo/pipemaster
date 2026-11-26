@@ -10,11 +10,20 @@ spec:
     - name: build
       taskRef:
         name: gitlab-ci-build
+    - name: release-created
+      taskRef:
+        name: gitlab-ci-release-created
+      params:
+        - name: ctx-branch
+          value: $(params.ctx-branch)
+      runAfter:
+        - build
     - name: release-publish
       taskRef:
         name: gitlab-ci-release-publish
       runAfter:
         - build
+        - release-created
       when:
         - input: $(params.ctx-branch)
           operator: in

@@ -435,3 +435,51 @@ func TestFlattenGatesChildJobsWithTheChildGate(t *testing.T) {
 		})
 	}
 }
+
+func TestFlattenGateJobFailsWhenTheChildIsNotCreated(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		trigger map[string]any
+		zNeeds  []string
+	}{
+		{"depend", map[string]any{"include": "ci/child.yml", "strategy": "depend"}, []string{"call-created", "call-s2", "call-s3"}},
+		{"no depend", map[string]any{"include": "ci/child.yml"}, []string{"a", "call-created"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			src := gitlabProject(tc.trigger)
+			call := find(t, src, "call")
+			call.Manual = true
+			call.Child.Gate = eq(ref("tag"), str("v1"))
+			flat, res := inline.Flatten(src, "drone")
+			gate := find(t, flat, "call-created")
+			if !gate.Manual || gate.If == nil || expr.String(gate.If) != expr.String(call.If) {
+				t.Errorf("gate job manual=%v if=%v, want the manual flag and the condition of the call", gate.Manual, gate.If)
+			}
+			if got := needs(gate); !slices.Equal(got, []string{"a"}) {
+				t.Errorf("gate job needs %v, want what the call needs", got)
+			}
+			if len(gate.Steps) == 0 || gate.Steps[0].If == nil || !strings.Contains(strings.Join(gate.Steps[0].Script, ""), "exit 1") {
+				t.Fatalf("gate steps = %+v, want a guarded exit 1", gate.Steps)
+			}
+			if got := expr.String(gate.Steps[0].If); !strings.Contains(got, "tag") || !strings.Contains(got, "!") {
+				t.Errorf("exit guard = %q, want the negated child gate", got)
+			}
+			if got := needs(find(t, flat, "call-s1")); !slices.Equal(got, []string{"a", "call-created"}) {
+				t.Errorf("child root needs %v, want a and call-created", got)
+			}
+			if got := needs(find(t, flat, "z")); !slices.Equal(got, tc.zNeeds) {
+				t.Errorf("z needs %v, want %v", got, tc.zNeeds)
+			}
+			if !strings.Contains(res.Entries[0].Detail, "call-created fails when the workflow rules") || res.Entries[0].Level != caps.Emulated {
+				t.Errorf("entry = %+v, want an emulated verdict with the gate caveat", res.Entries[0])
+			}
+		})
+	}
+}
+
+func TestFlattenWithoutGateAddsNoGateJob(t *testing.T) {
+	flat, _ := inline.Flatten(gitlabProject(map[string]any{"include": "ci/child.yml"}), "drone")
+	if slices.Contains(ids(flat), "call-created") {
+		t.Errorf("job ids = %v, want no gate job", ids(flat))
+	}
+}

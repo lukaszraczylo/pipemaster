@@ -1,0 +1,24 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/release-created
+# pipemaster:emulated step.if pipeline/gitlab-ci/job/release-created/step/fail
+# pipemaster:arg {"src":"!(branch == 'main')","from":"gitlab"}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
+when:
+  - event: push
+  - event: tag
+  - event:
+      - manual
+      - cron
+depends_on:
+  - build
+steps:
+  - name: fail
+    image: ubuntu:latest
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'exit 1'
+    when:
+      - evaluate: '!(!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "main")'
+  - name: pass
+    image: ubuntu:latest
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'true'

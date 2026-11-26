@@ -12,6 +12,26 @@ steps:
     commands:
       - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make build'
 ---
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/po-created
+kind: pipeline
+type: docker
+name: po-created
+trigger:
+  event:
+    - push
+    - tag
+depends_on:
+  - build
+steps:
+  - name: fail
+    image: ubuntu:latest
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'exit 1'
+  - name: pass
+    image: ubuntu:latest
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'true'
+---
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/po-x
 # pipemaster:arg {"if":"false","back":"!@opaque('drone', 'when.event glob \"**\"')","triggers":"- kind: push\n- kind: tag\n"}
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/po-x
@@ -24,6 +44,7 @@ trigger:
       - '**'
 depends_on:
   - build
+  - po-created
 steps:
   - name: script
     image: ubuntu:latest

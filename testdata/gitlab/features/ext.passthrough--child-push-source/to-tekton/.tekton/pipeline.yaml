@@ -7,11 +7,17 @@ spec:
     - name: build
       taskRef:
         name: gitlab-ci-build
+    - name: po-created
+      taskRef:
+        name: gitlab-ci-po-created
+      runAfter:
+        - build
     - name: po-x
       taskRef:
         name: gitlab-ci-po-x
       runAfter:
         - build
+        - po-created
       when:
         - input: pipemaster-disabled
           operator: in

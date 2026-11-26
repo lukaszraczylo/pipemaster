@@ -5,6 +5,13 @@
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/po-created
+# pipemaster:arg {"guard":true}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/po-created
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/po-created/step/fail
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/po-created/step/pass
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/po-created
+# pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/po-x
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/po-x/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/po-x
@@ -23,9 +30,23 @@ jobs:
       - id: script
         run: make build
         shell: bash
+  po-created:
+    needs:
+      - build
+    if: '!github.event.deleted'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://github.com/actions/checkout@v7
+      - id: fail
+        run: exit 1
+        shell: bash
+      - id: pass
+        run: "true"
+        shell: bash
   po-x:
     needs:
       - build
+      - po-created
     if: false
     runs-on: ubuntu-latest
     steps:

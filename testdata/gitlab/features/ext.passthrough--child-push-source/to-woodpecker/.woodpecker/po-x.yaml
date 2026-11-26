@@ -13,6 +13,7 @@ when:
     evaluate: "false"
 depends_on:
   - build
+  - po-created
 steps:
   - name: script
     image: ubuntu:latest

@@ -263,3 +263,30 @@ func TestEveryProviderRunsTheChildWork(t *testing.T) {
 		}
 	}
 }
+
+const filteredRoot = "stages: [one, two]\ncall:\n  stage: one\n  trigger:\n    include: ci/child.yml\n%safter:\n  stage: two\n  script: [echo after]\n"
+
+const filteredChild = "workflow:\n  rules:\n    - if: '$CI_COMMIT_BRANCH == \"main\"'\n" + childSrcChild
+
+// TestFilteredCallRoundTripsExactly checks that the gate job of a filtered child leaves no trace after a return.
+func TestFilteredCallRoundTripsExactly(t *testing.T) {
+	for name, strategy := range map[string]string{"depend": "    strategy: depend\n", "no depend": ""} {
+		fsys := fstest.MapFS{
+			".gitlab-ci.yml": {Data: []byte(strings.Replace(filteredRoot, "%s", strategy, 1))},
+			"ci/child.yml":   {Data: []byte(filteredChild)},
+		}
+		for _, to := range targets(provider.GitLab) {
+			for _, embed := range []bool{false, true} {
+				t.Run(name+"/"+to+"/"+map[bool]string{false: "sidecar", true: "embed"}[embed], func(t *testing.T) {
+					r := hops(t, fsys, prov(t, provider.GitLab), prov(t, to), embed, true)
+					if same, diff := ir.Equal(r.src, r.back); !same {
+						t.Errorf("A->B->A differs:\n%s", diff)
+					}
+					if childJobsOf(r.src) == 0 {
+						t.Fatal("the source has no child: the test checks nothing")
+					}
+				})
+			}
+		}
+	}
+}

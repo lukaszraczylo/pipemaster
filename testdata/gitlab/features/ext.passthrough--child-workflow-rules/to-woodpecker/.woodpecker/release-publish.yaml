@@ -14,6 +14,7 @@ when:
     evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "main"'
 depends_on:
   - build
+  - release-created
 steps:
   - name: script
     image: ubuntu:latest

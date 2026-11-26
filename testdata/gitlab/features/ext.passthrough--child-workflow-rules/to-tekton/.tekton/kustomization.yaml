@@ -4,6 +4,7 @@ resources:
   - pipeline.yaml
   - rbac/triggers.yaml
   - tasks/gitlab-ci-build.yaml
+  - tasks/gitlab-ci-release-created.yaml
   - tasks/gitlab-ci-release-publish.yaml
   - triggers/eventlistener.yaml
   - triggers/triggerbinding.yaml
