@@ -1,9 +1,9 @@
 Loss report: gitlab -> woodpecker
 [lost] pipeline/gitlab-ci ext.passthrough (Ext of provider gitlab (spec) is not written to the Woodpecker file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci pipeline.inputs (Woodpecker has no typed pipeline inputs)
-[lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline when its file names no trigger; Woodpecker has no event for them)
-[lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat when its file names no trigger; Woodpecker has no event for them)
+[lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline and its file has no trigger form for them; Woodpecker has no event for them)
+[lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat and its file has no trigger form for them; Woodpecker has no event for them)
 [emulated] pipeline/gitlab-ci pipeline.env: copied into the environment of every step (a step variable of the same name wins)
-[emulated] pipeline/gitlab-ci trigger.manual: manual or deployment event (the source runs on these events when its file names no trigger; Woodpecker starts each as its nearest event: api as manual, trigger as manual)
+[emulated] pipeline/gitlab-ci trigger.manual: manual or deployment event (the source runs on these events and its file has no trigger form for them; Woodpecker starts each as its nearest event: api as manual, trigger as manual)
 [emulated] pipeline/gitlab-ci/job/deploy job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/gitlab-ci/job/deploy/step/script step.shell: bash-if-present wrapper command (the source runs the step under bash when the image has it; Woodpecker runs commands through /bin/sh -e of the image, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh)

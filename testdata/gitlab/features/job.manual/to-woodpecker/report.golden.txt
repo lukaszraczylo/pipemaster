@@ -1,7 +1,7 @@
 Loss report: gitlab -> woodpecker
-[lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline when its file names no trigger; Woodpecker has no event for them)
-[lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat when its file names no trigger; Woodpecker has no event for them)
-[emulated] pipeline/gitlab-ci trigger.manual: manual or deployment event (the source runs on these events when its file names no trigger; Woodpecker starts each as its nearest event: api as manual, trigger as manual)
+[lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline and its file has no trigger form for them; Woodpecker has no event for them)
+[lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat and its file has no trigger form for them; Woodpecker has no event for them)
+[emulated] pipeline/gitlab-ci trigger.manual: manual or deployment event (the source runs on these events and its file has no trigger form for them; Woodpecker starts each as its nearest event: api as manual, trigger as manual)
 [emulated] pipeline/gitlab-ci/job/deploy job.allow_failure: failure ignore on every step (later steps still run after a failed step)
 [emulated] pipeline/gitlab-ci/job/deploy job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/gitlab-ci/job/deploy job.manual: when event manual (the workflow runs only when a person starts it from the UI or API)
