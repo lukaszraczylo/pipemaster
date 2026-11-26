@@ -54,6 +54,9 @@ func normalizeJob(j *Job) {
 	}
 	sort.SliceStable(j.Needs, func(a, b int) bool { return j.Needs[a].JobID < j.Needs[b].JobID })
 	sort.Strings(j.Runner.Labels)
+	if j.Child != nil && j.Child.Pipeline != nil {
+		Normalize(&Project{Pipelines: []*Pipeline{j.Child.Pipeline}})
+	}
 	if j.Matrix != nil {
 		for _, set := range [][]Combo{j.Matrix.Include, j.Matrix.Exclude} {
 			for _, c := range set {

@@ -48,6 +48,7 @@ type Job struct {
 	Matrix       *Matrix      `yaml:"matrix,omitempty"`
 	Retry        *Retry       `yaml:"retry,omitempty"`
 	Environment  *Environment `yaml:"environment,omitempty"`
+	Child        *Child       `yaml:"child,omitempty"`
 	Ext          Ext          `yaml:"ext,omitempty"`
 	ID           string       `yaml:"id"`
 	Name         string       `yaml:"name,omitempty"`
@@ -61,6 +62,17 @@ type Job struct {
 	Outputs      []Output     `yaml:"outputs,omitempty"`
 	AllowFailure bool         `yaml:"allow_failure,omitempty"`
 	Manual       bool         `yaml:"manual,omitempty"`
+}
+
+// Child is the same-repository pipeline that a call job starts: a GitLab child pipeline or a local GHA reusable
+// workflow. The pipeline never stands alone in Project.Pipelines, so no emitter writes it as an independent one.
+type Child struct {
+	Pipeline *Pipeline `yaml:"pipeline"`
+	// Native lists the providers that write the child as the construct it came from; every other target gets the
+	// child's jobs inlined into the calling pipeline.
+	Native []string `yaml:"native,omitempty"`
+	// Files lists the input files that hold the child, in the order the source reads them.
+	Files []string `yaml:"files,omitempty"`
 }
 
 // StepKind says what a step runs.

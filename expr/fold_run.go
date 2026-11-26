@@ -130,6 +130,9 @@ func refPrefix(c Call, tag bool) (Expr, bool) {
 	return Lit{Kind: LitBool, Bool: strings.HasPrefix(prefix, lit)}, true
 }
 
+// FoldConst folds the literal parts of e: a test of two literals, and an && or || with a literal side.
+func FoldConst(e Expr) Expr { return foldConst(e) }
+
 func foldConst(e Expr) Expr {
 	switch v := e.(type) {
 	case Unary:
