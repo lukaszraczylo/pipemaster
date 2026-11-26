@@ -747,6 +747,9 @@ func (g *group) placeTriggers(rep *report.Report) []ir.Trigger {
 	for _, d := range g.docs {
 		d.placeCondition(list, restored)
 	}
+	if isDefaultEvents(sel, list) {
+		return nil
+	}
 	return list
 }
 
