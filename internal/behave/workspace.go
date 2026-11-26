@@ -18,15 +18,17 @@ const fixtureFile = "fixture.json"
 
 // Fixture is one synthetic pipeline of one source provider.
 type Fixture struct {
-	Name      string              `json:"-"`
-	Source    string              `json:"-"`
-	Dir       string              `json:"-"`
-	Features  []string            `json:"features"`
-	Events    []string            `json:"events"`
-	Owners    map[string][]string `json:"owners"`
+	Name     string              `json:"-"`
+	Source   string              `json:"-"`
+	Dir      string              `json:"-"`
+	Features []string            `json:"features"`
+	Events   []string            `json:"events"`
+	Owners   map[string][]string `json:"owners"`
+	// Manual lists, per marker, the events on which the owner job is manual in the source. The source engine never runs a manual job.
+	Manual    map[string][]string `json:"manual"`
 	Expect    []string            `json:"expect"`
 	Requires  []string            `json:"requires"`
-	Failure   bool                `json:"expect_failure"`
+	Failure   bool                `json:"expect_failure"` // a non-zero exit of the source is the behaviour under test
 	Unordered bool                `json:"unordered"`
 }
 

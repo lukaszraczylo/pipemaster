@@ -175,6 +175,13 @@ func effects(level caps.Level, f caps.Feature) ([]string, string) {
 
 func (f Fact) kindIn(kinds []string) bool { return slices.Contains(kinds, f.Kind) }
 
+// manualOn reports whether the fixture declares a job owner for the marker that is manual on the event. A lost
+// manual gate explains the extra work of that job only, because the source engine never ran the job.
+func manualOn(fx Fixture, event, marker string) bool {
+	tokens, owned := fx.Owners[marker]
+	return owned && !slices.Contains(tokens, anyOwner) && slices.Contains(fx.Manual[marker], event)
+}
+
 // owns reports whether the IR path covers the marker. A marker without a declared owner belongs to every path.
 func owns(irPath string, owners map[string][]string, marker string) bool {
 	tokens, ok := owners[marker]
@@ -212,7 +219,7 @@ func cmpBool(a, b bool) int {
 }
 
 // explainFact returns the rule that explains the fact, or an empty string.
-func explainFact(fx Fixture, rep *report.Report, tgtLog string, f Fact, explainedOwners []string) string {
+func explainFact(fx Fixture, event string, rep *report.Report, tgtLog string, f Fact, explainedOwners []string) string {
 	if rep == nil {
 		return ""
 	}
@@ -237,6 +244,9 @@ func explainFact(fx Fixture, rep *report.Report, tgtLog string, f Fact, explaine
 		if !f.kindIn(ef) {
 			continue
 		}
+		if e.Feature == caps.JobManual && e.Level == caps.Lost && !loud && !manualOn(fx, event, f.Marker) {
+			continue
+		}
 		if f.Kind == kindExit {
 			if !loud && !slices.ContainsFunc(explainedOwners, func(m string) bool { return owns(e.IRPath, fx.Owners, m) }) {
 				continue
@@ -250,13 +260,13 @@ func explainFact(fx Fixture, rep *report.Report, tgtLog string, f Fact, explaine
 }
 
 // Explain binds each fact to a verdict of the loss report. It returns the rules used and the facts left unexplained.
-func Explain(fx Fixture, rep *report.Report, tgtLog string, facts []Fact) (rules []string, left []Fact) {
+func Explain(fx Fixture, event string, rep *report.Report, tgtLog string, facts []Fact) (rules []string, left []Fact) {
 	var owners []string
 	for _, f := range facts {
 		if f.Kind == kindExit {
 			continue
 		}
-		if r := explainFact(fx, rep, tgtLog, f, nil); r != "" {
+		if r := explainFact(fx, event, rep, tgtLog, f, nil); r != "" {
 			if !slices.Contains(rules, r) {
 				rules = append(rules, r)
 			}
@@ -269,7 +279,7 @@ func Explain(fx Fixture, rep *report.Report, tgtLog string, facts []Fact) (rules
 		if f.Kind != kindExit {
 			continue
 		}
-		if r := explainFact(fx, rep, tgtLog, f, owners); r != "" {
+		if r := explainFact(fx, event, rep, tgtLog, f, owners); r != "" {
 			rules = append(rules, r)
 		} else {
 			left = append(left, f)
@@ -279,12 +289,12 @@ func Explain(fx Fixture, rep *report.Report, tgtLog string, facts []Fact) (rules
 }
 
 // Judge turns two traces and the loss report into one matrix cell.
-func Judge(fx Fixture, src, tgt *Trace, rep *report.Report) (status, detail, explained string) {
+func Judge(fx Fixture, event string, src, tgt *Trace, rep *report.Report) (status, detail, explained string) {
 	d := Diff(src, tgt, fx.Unordered)
 	if d == "" {
 		return StatusPass, "", ""
 	}
-	rules, left := Explain(fx, rep, tgt.Log, Facts(src, tgt, fx.Unordered))
+	rules, left := Explain(fx, event, rep, tgt.Log, Facts(src, tgt, fx.Unordered))
 	if len(left) == 0 && len(rules) > 0 {
 		return StatusExplained, d, strings.Join(rules, "; ")
 	}

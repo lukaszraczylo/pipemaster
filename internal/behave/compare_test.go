@@ -20,7 +20,7 @@ func entry(l caps.Level, f caps.Feature, path string) report.Entry {
 func TestJudge(t *testing.T) {
 	fx := Fixture{Owners: map[string][]string{
 		"branch.main": {"main-only"}, "branch.tag": {"tag-only"}, "branch.always": {"always"},
-	}}
+	}, Manual: map[string][]string{"branch.tag": {"push-main"}}}
 	tr := func(exit int, m ...string) *Trace { return &Trace{Markers: m, Exit: exit} }
 	cases := []struct {
 		src    *Trace
@@ -28,7 +28,9 @@ func TestJudge(t *testing.T) {
 		rep    *report.Report
 		name   string
 		log    string
+		event  string
 		status string
+		fx     *Fixture
 	}{
 		{name: "same", src: tr(0, "a"), tgt: tr(0, "a"), status: StatusPass},
 		{name: "lost condition cannot explain extra work", src: tr(0, "branch.always"), tgt: tr(0, "branch.always", "branch.tag"),
@@ -56,11 +58,20 @@ func TestJudge(t *testing.T) {
 			rep: rep(entry(caps.External, caps.JobRunner, "pipeline/ci/job/b")), status: StatusFail},
 		{name: "external trigger explains nothing", src: tr(0, "a", "b"), tgt: tr(0, "a"),
 			rep: rep(entry(caps.External, caps.TriggerPullRequest, "pipeline/ci/trigger/0")), status: StatusFail},
-		{name: "lost manual gate explains work that runs by itself", src: tr(0, "branch.always"), tgt: tr(0, "branch.always", "branch.tag"),
+		{name: "lost manual gate explains work that runs by itself", event: "push-main", src: tr(0, "branch.always"), tgt: tr(0, "branch.always", "branch.tag"),
 			rep: rep(entry(caps.Lost, caps.JobManual, "pipeline/ci/job/tag-only")), status: StatusExplained},
-		{name: "lost manual gate of another job explains nothing", src: tr(0, "branch.always"), tgt: tr(0, "branch.always", "branch.tag"),
+		{name: "lost manual gate of another job explains nothing", event: "push-main", src: tr(0, "branch.always"), tgt: tr(0, "branch.always", "branch.tag"),
 			rep: rep(entry(caps.Lost, caps.JobManual, "pipeline/ci/job/main-only")), status: StatusFail},
-		{name: "lost manual gate cannot remove work", src: tr(0, "branch.always", "branch.tag"), tgt: tr(0, "branch.always"),
+		{name: "lost manual gate without a declared owner explains nothing", event: "push-main", fx: &Fixture{Manual: map[string][]string{"branch.tag": {"push-main"}}},
+			src: tr(0, "branch.always"), tgt: tr(0, "branch.always", "branch.tag"),
+			rep: rep(entry(caps.Lost, caps.JobManual, "pipeline/ci/job/tag-only")), status: StatusFail},
+		{name: "lost manual gate of a job that is not manual explains nothing", event: "push-main",
+			src: tr(0, "branch.always"), tgt: tr(0, "branch.always", "branch.main"),
+			rep: rep(entry(caps.Lost, caps.JobManual, "pipeline/ci/job/main-only")), status: StatusFail},
+		{name: "lost manual gate on another event explains nothing", event: "push-branch",
+			src: tr(0, "branch.always"), tgt: tr(0, "branch.always", "branch.tag"),
+			rep: rep(entry(caps.Lost, caps.JobManual, "pipeline/ci/job/tag-only")), status: StatusFail},
+		{name: "lost manual gate cannot remove work", event: "push-main", src: tr(0, "branch.always", "branch.tag"), tgt: tr(0, "branch.always"),
 			rep: rep(entry(caps.Lost, caps.JobManual, "pipeline/ci/job/tag-only")), status: StatusFail},
 		{name: "passthrough explains nothing", src: tr(0, "a", "b"), tgt: tr(0, "a"),
 			rep: rep(entry(caps.Lost, caps.ExtPassthrough, "pipeline/ci/job/x/step/y")), status: StatusFail},
@@ -86,7 +97,11 @@ func TestJudge(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			c.tgt.Log = c.log
-			got, detail, rules := Judge(fx, c.src, c.tgt, c.rep)
+			f := fx
+			if c.fx != nil {
+				f = *c.fx
+			}
+			got, detail, rules := Judge(f, c.event, c.src, c.tgt, c.rep)
 			if got != c.status {
 				t.Fatalf("status %s, want %s (%s | %s)", got, c.status, detail, rules)
 			}

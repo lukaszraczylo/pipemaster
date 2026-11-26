@@ -276,7 +276,7 @@ func (r *Runner) compareOne(ctx context.Context, fx Fixture, tgt, evName string,
 	if capsOf(tgt).noSHA || capsOf(fx.Source).noSHA {
 		srcCmp, tgtCmp = withoutPrefix(src, markerSHA), withoutPrefix(tr, markerSHA)
 	}
-	res.Status, res.Detail, res.Explained = Judge(fx, srcCmp, tgtCmp, conv.Report)
+	res.Status, res.Detail, res.Explained = Judge(fx, evName, srcCmp, tgtCmp, conv.Report)
 	if res.Status != StatusPass {
 		if len(tr.Markers) == 0 {
 			res.Detail += " | target log: " + diagnose(tr.Log)
@@ -343,7 +343,7 @@ func (r *Runner) limited(fx Fixture, tgt, evName, why string, conv *Converted, s
 	case len(src.Markers) == 0:
 		none := &Trace{Log: "the target engine has no event for this run", NoPipeline: true}
 		res.SourceTime = src.Duration
-		res.Status, res.Detail, res.Explained = Judge(fx, src, none, conv.Report)
+		res.Status, res.Detail, res.Explained = Judge(fx, evName, src, none, conv.Report)
 	default:
 		res.Status, res.Detail = StatusFail, why+"; the source ran on the event but the converted file carries no verdict for "+string(caps.TriggerPullRequest)
 	}

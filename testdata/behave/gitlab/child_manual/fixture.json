@@ -9,8 +9,22 @@
   "expect_failure": false,
   "unordered": false,
   "expect": [],
-  "owners": {},
-  "requires": [
-    "manual"
-  ]
+  "owners": {
+    "child_manual.setup": [
+      "setup"
+    ],
+    "child_manual.after": [
+      "after"
+    ],
+    "child_manual.child": [
+      "run_child-never"
+    ]
+  },
+  "requires": [],
+  "manual": {
+    "child_manual.child": [
+      "push-main",
+      "push-branch"
+    ]
+  }
 }
