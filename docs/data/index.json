@@ -72,7 +72,7 @@
    },
    "job.runner": {
     "level": "external",
-    "note": "workers the operator provides (Argo schedules pods; only a platform label can carry a node selector)"
+    "note": "workers the operator provides (each runner label becomes a template nodeSelector key runner.pipemaster.io/<label>=true; label the nodes to match)"
    },
    "job.services": {
     "level": "emulated",
@@ -452,7 +452,7 @@
    },
    "job.runner": {
     "level": "external",
-    "note": "workers the operator provides (only the platform has a Drone form; other runner labels are lost)"
+    "note": "workers the operator provides (the os/arch platform becomes platform and every other runner label becomes a node key with the value true; register a runner with DRONE_RUNNER_LABELS to match)"
    },
    "job.services": {
     "level": "native"
@@ -1274,7 +1274,7 @@
    },
    "job.runner": {
     "level": "external",
-    "note": "workers the operator provides (Tekton schedules pods, not runner labels)"
+    "note": "workers the operator provides (each runner label becomes a taskRunSpecs podTemplate nodeSelector key runner.pipemaster.io/<label>=true in the generated TriggerTemplate; label the nodes to match)"
    },
    "job.services": {
     "level": "emulated",
@@ -1455,7 +1455,7 @@
    },
    "job.runner": {
     "level": "external",
-    "note": "workers the operator provides (only a platform label has a Woodpecker form (labels.platform); other labels are lost)"
+    "note": "workers the operator provides (a platform label becomes labels.platform and every other label becomes a labels key with the value true; register an agent with WOODPECKER_AGENT_LABELS to match)"
    },
    "job.services": {
     "level": "native"

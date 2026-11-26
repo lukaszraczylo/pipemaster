@@ -625,28 +625,28 @@
      "feature": "job.runner",
      "level": "external",
      "strategy": "workers the operator provides",
-     "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
+     "detail": "a platform label becomes labels.platform and every other label becomes a labels key with the value true; register an agent with WOODPECKER_AGENT_LABELS to match"
     },
     {
      "path": "pipeline/drone/job/Sonarqube",
      "feature": "job.runner",
      "level": "external",
      "strategy": "workers the operator provides",
-     "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
+     "detail": "a platform label becomes labels.platform and every other label becomes a labels key with the value true; register an agent with WOODPECKER_AGENT_LABELS to match"
     },
     {
      "path": "pipeline/drone/job/UI",
      "feature": "job.runner",
      "level": "external",
      "strategy": "workers the operator provides",
-     "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
+     "detail": "a platform label becomes labels.platform and every other label becomes a labels key with the value true; register an agent with WOODPECKER_AGENT_LABELS to match"
     },
     {
      "path": "pipeline/drone/job/baseimage",
      "feature": "job.runner",
      "level": "external",
      "strategy": "workers the operator provides",
-     "detail": "only a platform label has a Woodpecker form (labels.platform); other labels are lost"
+     "detail": "a platform label becomes labels.platform and every other label becomes a labels key with the value true; register an agent with WOODPECKER_AGENT_LABELS to match"
     },
     {
      "path": "pipeline/drone",
@@ -691,7 +691,7 @@
      "path": "pipeline/drone/job/API",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods; the runner label linux/amd64 has no form"
+     "detail": "the runner label linux/amd64 has no node selector key: a label key has 1 to 63 letters, digits, dots, underscores or dashes and starts and ends with a letter or digit"
     },
     {
      "path": "pipeline/drone/job/API",
@@ -736,7 +736,7 @@
      "path": "pipeline/drone/job/Sonarqube",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods; the runner label linux/amd64 has no form"
+     "detail": "the runner label linux/amd64 has no node selector key: a label key has 1 to 63 letters, digits, dots, underscores or dashes and starts and ends with a letter or digit"
     },
     {
      "path": "pipeline/drone/job/Sonarqube/step/Code analysis",
@@ -767,7 +767,7 @@
      "path": "pipeline/drone/job/UI",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods; the runner label linux/amd64 has no form"
+     "detail": "the runner label linux/amd64 has no node selector key: a label key has 1 to 63 letters, digits, dots, underscores or dashes and starts and ends with a letter or digit"
     },
     {
      "path": "pipeline/drone/job/UI/step/Build UI Docker image",
@@ -798,7 +798,7 @@
      "path": "pipeline/drone/job/baseimage",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Tekton schedules pods; the runner label linux/amd64 has no form"
+     "detail": "the runner label linux/amd64 has no node selector key: a label key has 1 to 63 letters, digits, dots, underscores or dashes and starts and ends with a letter or digit"
     },
     {
      "path": "pipeline/drone/job/baseimage/step/Build Docker baseimage",
@@ -1038,7 +1038,7 @@
      "path": "pipeline/drone/job/API",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Argo schedules pods; a runner label has no form"
+     "detail": "the runner label linux/amd64 has no node selector key: a label key has 1 to 63 letters, digits, dots, underscores or dashes and starts and ends with a letter or digit"
     },
     {
      "path": "pipeline/drone/job/API",
@@ -1083,7 +1083,7 @@
      "path": "pipeline/drone/job/Sonarqube",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Argo schedules pods; a runner label has no form"
+     "detail": "the runner label linux/amd64 has no node selector key: a label key has 1 to 63 letters, digits, dots, underscores or dashes and starts and ends with a letter or digit"
     },
     {
      "path": "pipeline/drone/job/Sonarqube/step/Code analysis",
@@ -1102,7 +1102,7 @@
      "path": "pipeline/drone/job/UI",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Argo schedules pods; a runner label has no form"
+     "detail": "the runner label linux/amd64 has no node selector key: a label key has 1 to 63 letters, digits, dots, underscores or dashes and starts and ends with a letter or digit"
     },
     {
      "path": "pipeline/drone/job/UI/step/Build UI Docker image",
@@ -1127,7 +1127,7 @@
      "path": "pipeline/drone/job/baseimage",
      "feature": "job.runner",
      "level": "lost",
-     "detail": "Argo schedules pods; a runner label has no form"
+     "detail": "the runner label linux/amd64 has no node selector key: a label key has 1 to 63 letters, digits, dots, underscores or dashes and starts and ends with a letter or digit"
     },
     {
      "path": "pipeline/drone/job/API",
