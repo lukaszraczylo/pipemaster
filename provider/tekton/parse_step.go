@@ -206,7 +206,7 @@ func (b *jobBuilder) script(st *ir.Step, k *sink, t string) ([]exprtekton.EnvVar
 		if err != nil {
 			return nil, err
 		}
-		ir, file := splitWorkspaceMarks(tl)
+		ir, file := splitWorkspaceMarks(tl, b.tx.dirOf)
 		st.Script = append(st.Script, ir)
 		undone = append(undone, file)
 	}
@@ -268,9 +268,9 @@ func (b *jobBuilder) envWithout(st *ir.Step, k *sink, r *reader, skip []exprtekt
 // envList reads a Kubernetes env list.
 func (b *jobBuilder) envList(v any, skip []exprtekton.EnvVar) ([]ir.Var, map[string]any, error) {
 	// A workspace path in an env value stays as written: the value has no spelling to restore it from.
-	saved := b.tx.srcWS
-	b.tx.srcWS = nil
-	defer func() { b.tx.srcWS = saved }()
+	saved, savedData := b.tx.srcWS, b.tx.dataWS
+	b.tx.srcWS, b.tx.dataWS = nil, nil
+	defer func() { b.tx.srcWS, b.tx.dataWS = saved, savedData }()
 	list, ok := v.([]any)
 	if !ok {
 		return nil, nil, fmt.Errorf("env must be a list")
@@ -513,12 +513,19 @@ func (c ctxEnvs) restore(script string) string {
 	return c.repl.Replace(script)
 }
 
-// sourceDir reads a working directory under a source workspace as a directory relative to the checkout.
+// sourceDir reads a working directory under a mapped workspace as a directory relative to the checkout.
 func (b *jobBuilder) sourceDir(t string) (string, bool) {
-	for _, ws := range slices.Sorted(maps.Keys(b.tx.srcWS)) {
+	names := slices.Sorted(maps.Keys(b.tx.srcWS))
+	names = append(names, slices.Sorted(maps.Keys(b.tx.dataWS))...)
+	for _, ws := range names {
+		dir, _ := b.tx.dirOf(ws)
 		for _, root := range []string{workspaceDir + "/" + ws, varOpen + "workspaces." + ws + ".path" + varClose} {
 			if rest, ok := strings.CutPrefix(t, root); ok && (rest == "" || strings.HasPrefix(rest, "/")) {
-				return strings.TrimPrefix(path.Clean("/"+rest), "/"), true
+				rel := strings.TrimPrefix(path.Clean("/"+rest), "/")
+				if dir == checkoutDir {
+					return rel, true
+				}
+				return path.Join(dir, rel), true
 			}
 		}
 	}
@@ -540,7 +547,7 @@ func (b *jobBuilder) markWorkspaceLiterals(l string) (string, int) {
 	out := workspaceLiteral.ReplaceAllStringFunc(l, func(m string) string {
 		at := strings.Index(m, workspaceDir+"/")
 		lead, ws := m[:at], m[at+len(workspaceDir)+1:]
-		if !b.tx.srcWS[ws] {
+		if _, ok := b.tx.dirOf(ws); !ok {
 			return m
 		}
 		n++
@@ -551,7 +558,7 @@ func (b *jobBuilder) markWorkspaceLiterals(l string) (string, int) {
 
 // splitWorkspaceMarks resolves the marks of a template into the IR text, where a workspace path is the checkout
 // directory, and the text that keeps the workspace path as the file wrote it.
-func splitWorkspaceMarks(t string) (ir, file string) {
+func splitWorkspaceMarks(t string, dirOf func(string) (string, bool)) (ir, file string) {
 	var a, f strings.Builder
 	for len(t) > 0 {
 		i := strings.IndexAny(t, wsMark+litMark)
@@ -569,7 +576,8 @@ func splitWorkspaceMarks(t string) (ir, file string) {
 			f.WriteString(t[i:])
 			break
 		}
-		a.WriteString(checkoutDir)
+		dir, _ := dirOf(name)
+		a.WriteString(dir)
 		if mark == wsMark {
 			f.WriteString(varOpen + "workspaces." + name + ".path" + varClose)
 		} else {

@@ -27,6 +27,7 @@ func (c *plCtx) jobs(pl *ir.Pipeline, tasks, finally any) error {
 	}
 	regular = withoutChangesTask(regular)
 	c.srcWS = c.sourceWorkspaces(append(append([]*omap{}, regular...), fin...))
+	c.declaredWorkspaces(c.pipeWS)
 	for _, m := range append(append([]*omap{}, regular...), fin...) {
 		name, ok := text(m.Vals["name"])
 		if !ok || name == "" {
@@ -57,6 +58,7 @@ func (c *plCtx) jobs(pl *ir.Pipeline, tasks, finally any) error {
 			*grp.dst = append(*grp.dst, j)
 		}
 	}
+	c.linkWorkspaces(pl.Jobs)
 	return nil
 }
 
@@ -93,6 +95,8 @@ type jobBuilder struct {
 	opaque       map[string]bool
 	prints       map[string]string
 	ws           *workspaceArg
+	wsPipe       map[string]string
+	mounts       map[string]string
 	marks        *marks
 	containerRef string
 	path         string
@@ -111,6 +115,8 @@ func (c *plCtx) job(m *omap, finally bool) (*ir.Job, error) {
 	b.k = newSink(c.p.rep, c.file, b.path)
 	b.ws = c.p.workspaceOf(m, b.path)
 	b.tx.srcWS = c.taskSourceWorkspaces(m)
+	b.tx.dataWS, b.wsPipe = c.taskWorkspaces(m)
+	c.binds[id] = slices.Sorted(maps.Values(b.wsPipe))
 	c.ws = c.ws || b.ws != nil
 	r := newReader(m)
 	r.Take("name")
@@ -121,6 +127,7 @@ func (c *plCtx) job(m *omap, finally bool) (*ir.Job, error) {
 		return nil, fmt.Errorf("task %s: %w", name, err)
 	}
 	b.addSourceCheckout()
+	b.reportWorkspaces()
 	b.k.KeepRest(r)
 	b.finish()
 	return b.job, nil
@@ -165,7 +172,7 @@ func (b *jobBuilder) header(r *reader) error {
 		}
 	}
 	if v, ok := r.Take("workspaces"); ok && b.ws == nil {
-		b.k.Keep("workspaces", v, caps.ExtPassthrough, "task workspaces have no IR field; kept in Ext", r.Line("workspaces"))
+		b.keepWorkspaces("workspaces", v, workspaceNames(v, "name"), r.Line("workspaces"))
 	}
 	if v, ok := r.Take("matrix"); ok {
 		if err := b.matrix(v, r.Line("matrix")); err != nil {

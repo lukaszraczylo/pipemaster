@@ -30,6 +30,9 @@ const (
 	ExtScriptIR = "script_ir"
 	// ExtSourceCheckout marks the checkout step that the parser added for a Task that reads the source workspace.
 	ExtSourceCheckout = "source_checkout"
+	// ExtWorkspaceArtifacts is the job Ext key that names the artifacts and the needs that the parser made for the
+	// workspaces of the file, which the Tekton file shares through its own volume and so needs no copy steps.
+	ExtWorkspaceArtifacts = "workspace_artifacts"
 	// ExtCommand is the step Ext key that keeps the command list of a step that the IR holds as one script line.
 	ExtCommand = "command"
 	// ExtArgs is the step Ext key that keeps the args list beside ExtCommand.

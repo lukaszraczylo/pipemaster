@@ -1,6 +1,7 @@
 package tekton
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -215,30 +216,40 @@ func (e *emitter) remoteTask(pp *plan, jp *jobPlan) (*wmap, bool) {
 // the job settings the workspace stands in for.
 func (tc *taskCtx) workspaceSteps(b *stepBook, clone int) error {
 	j := tc.jp.j
+	shared := tc.sharedWorkspaces(j)
 	var needs []string
 	var restore []string
 	for _, n := range j.Needs {
-		if !n.Artifacts {
+		if !n.Artifacts || (tc.e.own && slices.Contains(emitkit.SharedRecord(j, dialect, ExtWorkspaceArtifacts)["needs"], n.JobID)) {
 			continue
 		}
 		needs = append(needs, n.JobID)
 		if nj, ok := tc.pp.byID[n.JobID]; ok {
+			skip := tc.sharedWorkspaces(nj.j)
 			for _, a := range nj.j.Artifacts {
-				restore = append(restore, downloadScript(artifactName(artifactKey(nj.j, a)), "")...)
+				if !skip[a.Name] {
+					restore = append(restore, downloadScript(artifactName(artifactKey(nj.j, a)), "")...)
+				}
 			}
 		}
 	}
-	if len(j.Cache)+len(j.Artifacts)+len(needs) == 0 {
+	var arts []ir.Artifact
+	for _, a := range j.Artifacts {
+		if !shared[a.Name] {
+			arts = append(arts, a)
+		}
+	}
+	if len(j.Cache)+len(arts)+len(needs) == 0 {
 		return nil
 	}
 	tc.useWorkspace()
-	arg := workspaceArg{Workspace: workspaceName, Cache: j.Cache, Artifacts: j.Artifacts, Needs: needs}
+	arg := workspaceArg{Workspace: workspaceName, Cache: j.Cache, Artifacts: arts, Needs: needs}
 	if len(restore) > 0 {
 		step, script := tc.workspaceStep(restoreStep, restore)
 		b.nodes, arg.Restore = insertAt(b.nodes, clone, step), script
 	}
 	var save []string
-	for _, a := range j.Artifacts {
+	for _, a := range arts {
 		save = append(save, uploadScript(artifactName(artifactKey(j, a)), a.Paths)...)
 	}
 	if len(save) > 0 {
@@ -249,7 +260,7 @@ func (tc *taskCtx) workspaceSteps(b *stepBook, clone int) error {
 	for _, f := range []struct {
 		f  caps.Feature
 		ok bool
-	}{{caps.JobCache, len(j.Cache) > 0}, {caps.JobArtifacts, len(j.Artifacts) > 0}, {caps.JobNeedsArtifacts, len(needs) > 0}} {
+	}{{caps.JobCache, len(j.Cache) > 0}, {caps.JobArtifacts, len(arts) > 0}, {caps.JobNeedsArtifacts, len(needs) > 0}} {
 		if !f.ok {
 			continue
 		}
@@ -266,6 +277,19 @@ func (tc *taskCtx) workspaceSteps(b *stepBook, clone int) error {
 		tc.e.emulate(tc.jp.path, caps.JobCache, "shared workspace", "the workspace is mounted at "+workspaceMount+"; cache paths are not copied in or out and nothing persists between runs")
 	}
 	return nil
+}
+
+// sharedWorkspaces names the artifacts of a job that stand for a workspace of the Tekton file. The file shares
+// those files through its own volume, so the emitter writes no copy step for them.
+func (tc *taskCtx) sharedWorkspaces(j *ir.Job) map[string]bool {
+	out := map[string]bool{}
+	if !tc.e.own {
+		return out
+	}
+	for _, n := range emitkit.SharedRecord(j, dialect, ExtWorkspaceArtifacts)["artifacts"] {
+		out[n] = true
+	}
+	return out
 }
 
 // artifactKey is the directory name of a job artifact: its name, or the job ID.
@@ -598,7 +622,7 @@ func (tc *taskCtx) ports(sp string, ps []string) *yaml.Node {
 
 // jobHandled lists the job Ext keys that the emitter writes in a place of its own.
 var jobHandled = map[string]bool{
-	ExtImplicitNeeds: true, ExtCatalogRef: true, ExtLegacyParams: true, ExtBoundParams: true, "task_name": true, "matrix_include_names": true, "array_params": true, "unused_params": true,
+	ExtImplicitNeeds: true, ExtWorkspaceArtifacts: true, ExtCatalogRef: true, ExtLegacyParams: true, ExtBoundParams: true, "task_name": true, "matrix_include_names": true, "array_params": true, "unused_params": true,
 	"params": true, "stepTemplate": true, "results": true, "task_metadata": true, "task_params": true, "task_workspaces": true,
 	"task_description": true, "workspaces": true, "description": true,
 }

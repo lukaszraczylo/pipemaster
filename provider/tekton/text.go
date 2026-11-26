@@ -55,6 +55,7 @@ type texts struct {
 	bind     map[string][]expr.Part
 	modern   map[string]bool
 	srcWS    map[string]bool
+	dataWS   map[string]string
 	kept     []string
 	wsHits   int
 	markWS   bool
@@ -100,14 +101,26 @@ func (x *texts) ref(word string) (expr.Ref, bool) {
 	return r, true
 }
 
+// dirOf is the IR directory of a Task workspace: the checkout for a source workspace, the workspace directory
+// for a data workspace.
+func (x *texts) dirOf(name string) (string, bool) {
+	if x.srcWS[name] {
+		return checkoutDir, true
+	}
+	dir, ok := x.dataWS[name]
+	return dir, ok
+}
+
 // variable reads the inside of one $(...) as parts; ok is false when the form stays text.
 func (x *texts) variable(inner string) ([]expr.Part, bool) {
-	if m := workspacePath.FindStringSubmatch(inner); m != nil && x.task && x.srcWS[m[1]] {
-		x.wsHits++
-		if x.markWS {
-			return []expr.Part{{Text: wsMark + m[1] + wsMark}}, true
+	if m := workspacePath.FindStringSubmatch(inner); m != nil && x.task {
+		if dir, ok := x.dirOf(m[1]); ok {
+			x.wsHits++
+			if x.markWS {
+				return []expr.Part{{Text: wsMark + m[1] + wsMark}}, true
+			}
+			return []expr.Part{{Text: dir}}, true
 		}
-		return []expr.Part{{Text: checkoutDir}}, true
 	}
 	if rest, ok := strings.CutPrefix(inner, legacyParamPrefix); ok {
 		if !x.task {
