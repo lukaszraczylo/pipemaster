@@ -178,3 +178,35 @@ func TestMountPathWithinAWordIsNotRewritten(t *testing.T) {
 		t.Errorf("script = %q", got)
 	}
 }
+
+func TestClaimReadAcrossAnUnrelatedTemplateGetsTheFilesAndReturnsExactly(t *testing.T) {
+	src := strings.Replace(sharedClaimWorkflow, "      - {name: consume, template: consume, depends: produce}\n",
+		"      - {name: middle, template: middle, depends: produce}\n      - {name: consume, template: consume, depends: middle}\n", 1)
+	src += "  - name: middle\n    container: {image: alpine, command: [sh, -c], args: [\"true\"]}\n"
+	p, _ := parseFiles(t, map[string]string{"app.yaml": src})
+	cons := job(t, p.Pipelines[0], "consume")
+	got := map[string]bool{}
+	for _, n := range cons.Needs {
+		got[n.JobID] = n.Artifacts
+	}
+	if len(got) != 2 || got["middle"] || !got["produce"] {
+		t.Fatalf("consumer needs = %+v", cons.Needs)
+	}
+	files, _ := emit(t, p)
+	all := ""
+	in := map[string]string{}
+	for n, b := range files {
+		all += b
+		in[n] = b
+	}
+	if strings.Contains(all, "depends: middle && produce") || strings.Contains(all, "produce && middle") {
+		t.Errorf("the Argo file holds the added edge:\n%s", all)
+	}
+	back, _, err := parseRepo(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if same, diff := ir.Equal(p, back); !same {
+		t.Errorf("A->A differs:\n%s", diff)
+	}
+}

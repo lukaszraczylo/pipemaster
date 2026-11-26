@@ -71,6 +71,9 @@ func (e *emitter) planNames(pls []*ir.Pipeline) {
 				if j == nil {
 					continue
 				}
+				if e.own && j != nil {
+					j = emitkit.WithoutAddedNeeds(j, dialect, ExtWorkspaceArtifacts)
+				}
 				jp := &jobPlan{j: j, finally: i == 1, path: pp.path + "/job/" + j.ID}
 				jp.tname = e.dnsName(tnames, jp.path, "job id", j.ID, maxName, true)
 				base := pl.ID + "-" + j.ID

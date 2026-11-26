@@ -27,7 +27,7 @@ func (e *emitter) withoutSharedVolumes(j *ir.Job) *ir.Job {
 	if len(out.Artifacts) == 0 {
 		out.Artifacts = nil
 	}
-	out.Needs = slices.Clone(j.Needs)
+	out.Needs = slices.DeleteFunc(slices.Clone(j.Needs), func(n ir.Need) bool { return slices.Contains(rec["added"], n.JobID) })
 	for i := range out.Needs {
 		if slices.Contains(rec["needs"], out.Needs[i].JobID) {
 			out.Needs[i].Artifacts = false

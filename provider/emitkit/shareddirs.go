@@ -31,14 +31,27 @@ type SharedDirs struct {
 }
 
 // Link adds the artifacts and the artifact needs for the shared directories, reports each, and records them in
-// the Ext of the jobs. A job that binds a volume uploads its directory when a later job that binds it runs
-// directly after it, and that later job downloads the directory.
+// the Ext of the jobs. A job that binds a volume downloads the directory from each latest writer that it runs
+// after, directly or not. A writer that runs after another writer has restored the files of that writer and
+// uploads them again, so it carries the state of both.
+//
+// A need on a job that the reader already runs after through other jobs adds no order. The DAG order and the
+// events stay as they were. The added needs are recorded under "added", and the emitter of the source drops them.
 func (s SharedDirs) Link(jobs []*ir.Job, rep *report.Report) {
 	byID := map[string]*ir.Job{}
+	direct := map[string][]string{}
 	for _, j := range jobs {
 		byID[j.ID] = j
+		for _, n := range j.Needs {
+			direct[j.ID] = append(direct[j.ID], n.JobID)
+		}
+	}
+	before := map[string]map[string]bool{}
+	for _, j := range jobs {
+		before[j.ID] = reach(j.ID, direct)
 	}
 	shared := map[string][]string{}
+	added := map[string][]string{}
 	for _, name := range slices.Sorted(maps.Keys(s.Dir)) {
 		if s.Skip != nil && s.Skip(name) {
 			continue
@@ -50,26 +63,34 @@ func (s SharedDirs) Link(jobs []*ir.Job, rep *report.Report) {
 				binders[j.ID] = true
 			}
 		}
-		linked := map[string][]string{}
 		for _, j := range jobs {
 			if !binders[j.ID] {
 				continue
 			}
-			for i := range j.Needs {
-				n := &j.Needs[i]
-				if !binders[n.JobID] {
-					continue
-				}
-				n.Artifacts = true
-				linked[j.ID] = append(linked[j.ID], n.JobID)
-				if s.addArtifact(byID[n.JobID], name, dir, rep) {
-					shared[n.JobID] = append(shared[n.JobID], SharedArtifactPrefix+name)
+			var cand []string
+			for _, o := range jobs {
+				if binders[o.ID] && before[j.ID][o.ID] {
+					cand = append(cand, o.ID)
 				}
 			}
-		}
-		s.reportUnlinked(jobs, binders, linked, name, rep)
-		for _, id := range slices.Sorted(maps.Keys(linked)) {
-			rep.Add(s.entry(id, caps.JobNeedsArtifacts, caps.Emulated, "the "+s.Noun+" reads "+name+" that "+strings.Join(linked[id], ", ")+" wrote, so it downloads the artifact of "+dir+"; the target copies the files, the source mounts one volume"))
+			latest := slices.DeleteFunc(slices.Clone(cand), func(x string) bool {
+				return slices.ContainsFunc(cand, func(y string) bool { return y != x && before[y][x] })
+			})
+			for _, w := range latest {
+				if s.addNeed(j, w) {
+					added[j.ID] = append(added[j.ID], w)
+				}
+				s.addArtifact(byID[w], name, dir, rep)
+				shared[w] = append(shared[w], SharedArtifactPrefix+name)
+			}
+			if len(latest) == 0 {
+				continue
+			}
+			detail := "the " + s.Noun + " reads " + name + " that " + strings.Join(latest, ", ") + " wrote, so it downloads the artifact of " + dir + "; the target copies the files, the source mounts one volume"
+			if len(latest) > 1 {
+				detail += "; " + strings.Join(latest, " and ") + " run in parallel and write the same directory, so the file of the artifact that downloads last wins on a path that both write"
+			}
+			rep.Add(s.entry(j.ID, caps.JobNeedsArtifacts, caps.Emulated, detail))
 		}
 	}
 	needs := map[string][]string{}
@@ -82,45 +103,35 @@ func (s SharedDirs) Link(jobs []*ir.Job, rep *report.Report) {
 	}
 	for _, j := range jobs {
 		if len(shared[j.ID]) > 0 || len(needs[j.ID]) > 0 {
-			s.record(j, shared[j.ID], needs[j.ID])
+			s.record(j, shared[j.ID], needs[j.ID], added[j.ID])
 		}
 	}
+}
+
+// addNeed makes the need of j on w carry artifacts. It reports whether it added the need, which j did not hold.
+func (s SharedDirs) addNeed(j *ir.Job, w string) bool {
+	for i := range j.Needs {
+		if j.Needs[i].JobID == w {
+			j.Needs[i].Artifacts = true
+			return false
+		}
+	}
+	j.Needs = append(j.Needs, ir.Need{JobID: w, Artifacts: true})
+	return true
 }
 
 func (s SharedDirs) entry(job string, f caps.Feature, level caps.Level, detail string) report.Entry {
 	return report.Entry{IRPath: "pipeline/" + s.Pipeline + "/job/" + job, Feature: f, Level: level, Strategy: "workspace directory as artifact", Detail: detail, SourceLoc: s.File}
 }
 
-// addArtifact adds the directory to the artifacts of the job that writes it. It reports whether it added one.
-func (s SharedDirs) addArtifact(j *ir.Job, name, dir string, rep *report.Report) bool {
+// addArtifact adds the directory to the artifacts of the job that writes it.
+func (s SharedDirs) addArtifact(j *ir.Job, name, dir string, rep *report.Report) {
 	art := SharedArtifactPrefix + name
 	if slices.ContainsFunc(j.Artifacts, func(a ir.Artifact) bool { return a.Name == art }) {
-		return false
+		return
 	}
 	j.Artifacts = append(j.Artifacts, ir.Artifact{Name: art, Paths: []string{dir}})
 	rep.Add(s.entry(j.ID, caps.JobArtifacts, caps.Emulated, "a later "+s.Noun+" reads "+name+" after this "+s.Noun+", so the directory "+dir+" is an artifact; the source shares the files through "+s.Medium+", the target through an artifact upload"))
-	return true
-}
-
-// reportUnlinked names a job that reads a volume after another job with no chain of jobs that mount it between them.
-func (s SharedDirs) reportUnlinked(jobs []*ir.Job, binders map[string]bool, linked map[string][]string, name string, rep *report.Report) {
-	needs := map[string][]string{}
-	for _, j := range jobs {
-		for _, n := range j.Needs {
-			needs[j.ID] = append(needs[j.ID], n.JobID)
-		}
-	}
-	for _, j := range jobs {
-		if !binders[j.ID] {
-			continue
-		}
-		all, chain := reach(j.ID, needs), reach(j.ID, linked)
-		for _, prev := range slices.Sorted(maps.Keys(all)) {
-			if binders[prev] && !chain[prev] {
-				rep.Add(s.entry(j.ID, caps.JobNeedsArtifacts, caps.Lost, "the "+s.Noun+" reads "+name+" that "+s.Noun+" "+prev+" wrote, but a "+s.Noun+" that does not mount it runs between them; the files do not reach this "+s.Noun+" on a target with one runner per job"))
-			}
-		}
-	}
 }
 
 // reach lists the jobs that a job reaches along the edges.
@@ -140,7 +151,7 @@ func reach(from string, edges map[string][]string) map[string]bool {
 }
 
 // record keeps the artifacts and needs that Link made in the Ext of the job.
-func (s SharedDirs) record(j *ir.Job, arts, needs []string) {
+func (s SharedDirs) record(j *ir.Job, arts, needs, implicit []string) {
 	if j.Ext == nil {
 		j.Ext = ir.Ext{}
 	}
@@ -149,7 +160,7 @@ func (s SharedDirs) record(j *ir.Job, arts, needs []string) {
 		d = map[string]any{}
 	}
 	rec := map[string]any{}
-	for k, v := range map[string][]string{"artifacts": arts, "needs": needs} {
+	for k, v := range map[string][]string{"artifacts": arts, "needs": needs, "added": implicit} {
 		if len(v) == 0 {
 			continue
 		}
@@ -178,4 +189,15 @@ func SharedRecord(j *ir.Job, dialect, key string) map[string][]string {
 		}
 	}
 	return out
+}
+
+// WithoutAddedNeeds returns the job without the needs that Link added, so the file of the source gets no new edge.
+func WithoutAddedNeeds(j *ir.Job, dialect, key string) *ir.Job {
+	added := SharedRecord(j, dialect, key)["added"]
+	if len(added) == 0 {
+		return j
+	}
+	out := *j
+	out.Needs = slices.DeleteFunc(slices.Clone(j.Needs), func(n ir.Need) bool { return slices.Contains(added, n.JobID) })
+	return &out
 }

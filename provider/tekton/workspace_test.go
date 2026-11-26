@@ -1,6 +1,7 @@
 package tekton_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -111,12 +112,115 @@ func TestWorkspaceBetweenTasksReturnsExactly(t *testing.T) {
 	}
 }
 
-func TestWorkspaceReadAcrossAnUnrelatedTaskIsLost(t *testing.T) {
-	src := strings.Replace(twoTaskWorkspace, "  - name: consume\n    runAfter: [produce]\n", "  - name: middle\n    runAfter: [produce]\n    taskSpec:\n      steps:\n      - {name: m, image: alpine, script: 'true'}\n  - name: consume\n    runAfter: [middle]\n", 1)
-	_, rep := parseYAML(t, src)
-	e := entryAt(rep, "pipeline/ci/job/consume", caps.JobNeedsArtifacts, caps.Lost)
-	if e == nil || !strings.Contains(e.Detail, "do not reach this task") {
-		t.Fatalf("no lost verdict for the unlinked read: %+v", rep.Entries)
+const middleTask = "  - name: middle\n    runAfter: [produce]\n    taskSpec:\n      steps:\n      - {name: m, image: alpine, script: 'true'}\n  - name: consume\n    runAfter: [middle]\n"
+
+func needSet(j *ir.Job) map[string]bool {
+	out := map[string]bool{}
+	for _, n := range j.Needs {
+		out[n.JobID+"/"+fmtAny(n.Artifacts)] = true
+	}
+	return out
+}
+
+func TestWorkspaceReadAcrossAnUnrelatedTaskGetsTheFiles(t *testing.T) {
+	src := strings.Replace(twoTaskWorkspace, "  - name: consume\n    runAfter: [produce]\n", middleTask, 1)
+	pl, _ := parseYAML(t, src)
+	cons := job(t, pl, "consume")
+	if got := needSet(cons); !got["middle/false"] || !got["produce/true"] || len(got) != 2 {
+		t.Fatalf("consumer needs = %+v", cons.Needs)
+	}
+	if len(job(t, pl, "produce").Artifacts) != 1 {
+		t.Errorf("the writer has no artifact: %+v", job(t, pl, "produce").Artifacts)
+	}
+	if len(job(t, pl, "middle").Needs) != 1 || job(t, pl, "middle").Needs[0].Artifacts {
+		t.Errorf("the task that does not bind the workspace changed: %+v", job(t, pl, "middle").Needs)
+	}
+}
+
+func TestWorkspaceNeedAddsNoOrderAndReturnsExactly(t *testing.T) {
+	src := strings.Replace(twoTaskWorkspace, "  - name: consume\n    runAfter: [produce]\n", middleTask, 1)
+	p, _ := parseFiles(t, map[string]string{"p.yaml": src})
+	pl := p.Pipelines[0]
+	before := map[string]string{}
+	for _, j := range pl.Jobs {
+		before[j.ID] = ancestors(pl, j.ID)
+	}
+	if before["consume"] != "middle,produce" {
+		t.Fatalf("ancestors of consume = %q", before["consume"])
+	}
+	files, _, err := tekton.New().Emit(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := map[string]string{}
+	var all strings.Builder
+	for n, b := range files {
+		in[n] = string(b)
+		all.Write(b)
+	}
+	if strings.Contains(all.String(), "- middle\n                - produce") {
+		t.Errorf("the Tekton file holds the added edge:\n%s", all.String())
+	}
+	file := back0(t, in).Pipelines[0]
+	for _, j := range file.Jobs {
+		if ancestors(file, j.ID) != before[j.ID] {
+			t.Errorf("order of %s changed", j.ID)
+		}
+	}
+	back, _, err := tekton.New().Parse(repo(in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if same, diff := ir.Equal(p, back); !same {
+		t.Errorf("A->A differs:\n%s", diff)
+	}
+}
+
+// ancestors lists the jobs that a job runs after, directly or not.
+func ancestors(pl *ir.Pipeline, id string) string {
+	needs := map[string][]string{}
+	for _, j := range pl.Jobs {
+		for _, n := range j.Needs {
+			needs[j.ID] = append(needs[j.ID], n.JobID)
+		}
+	}
+	seen := map[string]bool{}
+	var walk func(string)
+	walk = func(x string) {
+		for _, n := range needs[x] {
+			if !seen[n] {
+				seen[n] = true
+				walk(n)
+			}
+		}
+	}
+	walk(id)
+	var out []string
+	for k := range seen {
+		out = append(out, k)
+	}
+	slices.Sort(out)
+	return strings.Join(out, ",")
+}
+
+func TestWorkspaceChainDownloadsFromTheLatestWriterOnly(t *testing.T) {
+	src := strings.Replace(twoTaskWorkspace, "  - name: consume\n    runAfter: [produce]\n", "  - name: second\n    runAfter: [produce]\n    workspaces:\n    - {name: out, workspace: shared}\n    taskSpec:\n      workspaces:\n      - name: out\n      steps:\n      - {name: w, image: alpine, script: 'echo more >> $(workspaces.out.path)/shared.txt'}\n  - name: consume\n    runAfter: [second]\n", 1)
+	pl, _ := parseYAML(t, src)
+	if got := needSet(job(t, pl, "consume")); len(got) != 1 || !got["second/true"] {
+		t.Errorf("consumer needs = %+v", job(t, pl, "consume").Needs)
+	}
+}
+
+func TestTwoParallelWritersBothFeedTheReader(t *testing.T) {
+	src := strings.Replace(twoTaskWorkspace, "  - name: consume\n    runAfter: [produce]\n", "  - name: produce2\n    workspaces:\n    - {name: out, workspace: shared}\n    taskSpec:\n      workspaces:\n      - name: out\n      steps:\n      - {name: w, image: alpine, script: 'echo two > $(workspaces.out.path)/two.txt'}\n  - name: consume\n    runAfter: [produce, produce2]\n", 1)
+	pl, rep := parseYAML(t, src)
+	cons := job(t, pl, "consume")
+	if got := needSet(cons); len(got) != 2 || !got["produce/true"] || !got["produce2/true"] {
+		t.Fatalf("consumer needs = %+v", cons.Needs)
+	}
+	e := entryAt(rep, "pipeline/ci/job/consume", caps.JobNeedsArtifacts, caps.Emulated)
+	if e == nil || !strings.Contains(e.Detail, "run in parallel") {
+		t.Errorf("the parallel writers have no caveat: %+v", rep.Entries)
 	}
 }
 
@@ -169,4 +273,13 @@ func TestWorkspaceSubPathThatEscapesIsNotMapped(t *testing.T) {
 	if entryAt(rep, "pipeline/ci/job/produce", caps.ExtPassthrough, caps.Lost) == nil {
 		t.Errorf("the unmapped workspace has no verdict: %+v", rep.Entries)
 	}
+}
+
+func back0(t *testing.T, in map[string]string) *ir.Project {
+	t.Helper()
+	p, _, err := tekton.New().Parse(repo(in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
 }
