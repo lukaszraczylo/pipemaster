@@ -63,3 +63,16 @@ func TestMixedRunnerJobNamesLostKeyAndSetup(t *testing.T) {
 		t.Errorf("the entry must name the lost label and the agent setup: %+v", rep.Entries)
 	}
 }
+
+func TestHostedLabelAndBadTagKeepBothTexts(t *testing.T) {
+	for _, hosted := range []string{"macos-latest", "ubuntu-latest"} {
+		j := wpJob("ci", wpStep("s", "x"))
+		j.Runner = ir.Runner{Labels: []string{hosted, "gpu", "has space"}}
+		_, rep := one(t, wpProject(ghaOrigin, j))
+		for _, want := range []string{hosted, "has space", "WOODPECKER_AGENT_LABELS=gpu=true"} {
+			if !reportDetail(rep, caps.JobRunner, want) {
+				t.Errorf("%s: the job.runner entry must name %q: %+v", hosted, want, rep.Entries)
+			}
+		}
+	}
+}

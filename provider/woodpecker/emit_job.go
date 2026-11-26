@@ -253,9 +253,11 @@ func (e *emitter) labels(m *wmap, c *wfCtx, ext map[string]any) error {
 			platform = l
 		}
 	}
+	var hostedStrategy string
+	var hostedExt, lostMsgs []string
 	emitkit.ReportHosted(e.origin, r.Labels, "backend label",
-		func(st, d string) { e.external(c.jp, caps.JobRunner, st, d) },
-		func(d string) { e.lose(c.jp, caps.JobRunner, d) })
+		func(st, d string) { hostedStrategy = st; hostedExt = append(hostedExt, d) },
+		func(d string) { lostMsgs = append(lostMsgs, d) })
 	n := newMap()
 	if platform != "" {
 		v, err := e.text(nil, c.jp, caps.JobRunner, valueText, platform)
@@ -264,7 +266,7 @@ func (e *emitter) labels(m *wmap, c *wfCtx, ext map[string]any) error {
 		}
 		n.set("platform", str(v))
 	}
-	var tags, lostMsgs []string
+	var tags []string
 	for _, l := range emitkit.Unplaced(e.origin, r.Labels) {
 		if l == platform {
 			continue
@@ -289,19 +291,18 @@ func (e *emitter) labels(m *wmap, c *wfCtx, ext map[string]any) error {
 		n.set(k, str(t))
 		tags = append(tags, k+"="+t)
 	}
-	setup := ""
+	setup := hostedExt
+	strategy := hostedStrategy
 	if len(tags) > 0 {
-		setup = "register a Woodpecker agent with WOODPECKER_AGENT_LABELS=" + strings.Join(tags, ",") + " for the runner labels"
+		setup = append(setup, "register a Woodpecker agent with WOODPECKER_AGENT_LABELS="+strings.Join(tags, ",")+" for the runner labels")
+		strategy = joinNew(strategy, "workers the operator provides")
 	}
 	switch {
 	case len(lostMsgs) > 0:
-		// One lost entry holds the lost keys and the setup, because the ledger keeps one entry per job.
-		if setup != "" {
-			lostMsgs = append(lostMsgs, setup)
-		}
-		e.lose(c.jp, caps.JobRunner, strings.Join(lostMsgs, "; "))
-	case setup != "":
-		e.external(c.jp, caps.JobRunner, "workers the operator provides", setup)
+		// One lost entry holds every text, because the ledger keeps one entry per job and a lost entry replaces an earlier one.
+		e.lose(c.jp, caps.JobRunner, strings.Join(append(lostMsgs, setup...), "; "))
+	case len(setup) > 0:
+		e.external(c.jp, caps.JobRunner, strategy, strings.Join(setup, "; "))
 	}
 	if err := n.mergeMap(ext[keyLabels]); err != nil {
 		return err
