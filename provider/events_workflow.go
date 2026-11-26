@@ -26,43 +26,54 @@ const (
 
 // WorkflowAdmits reads the workflow:rules block that the GitLab parser keeps in Ext, in list order: the first rule
 // that matches decides, and a pipeline that matches no rule does not start. A pipeline with no block admits every source.
-func WorkflowAdmits(pl *ir.Pipeline, source string) Admission {
+// For AdmitMaybe the second result is the condition on the branch, the tag and the variables under which the rules start
+// a pipeline from the source, and nil when a rule does not compile.
+func WorkflowAdmits(pl *ir.Pipeline, source string) (Admission, expr.Expr) {
 	m, _ := pl.Ext[GitLab].(map[string]any)
 	wf, has := m["workflow"]
 	if !has {
-		return AdmitYes
+		return AdmitYes, nil
 	}
 	block, _ := wf.(map[string]any)
 	rules, ok := block["rules"].([]any)
 	if !ok {
-		return AdmitMaybe
+		return AdmitMaybe, nil
 	}
-	src := []string{source}
+	var admitted expr.Expr = expr.Lit{Kind: expr.LitBool}
+	var earlier []expr.Expr
 	for _, r := range rules {
 		rule, ok := r.(map[string]any)
 		if !ok {
-			return AdmitMaybe
+			return AdmitMaybe, nil
 		}
 		cond, ok := ruleCond(rule)
 		if !ok {
-			return AdmitMaybe
+			return AdmitMaybe, nil
 		}
-		certain := true
+		var c expr.Expr = expr.Lit{Kind: expr.LitBool, Bool: true}
 		if cond != nil {
-			if len(expr.EventsPossible(cond, src)) == 0 {
-				continue
+			c = expr.FoldEvent(cond, source)
+		}
+		if rule[ruleWhen] != whenNever {
+			term := c
+			for _, prev := range earlier {
+				term = expr.Binary{Op: expr.OpAnd, L: term, R: expr.Unary{Op: expr.OpNot, X: prev}}
 			}
-			certain = len(expr.EventsPossible(expr.Unary{Op: expr.OpNot, X: cond}, src)) == 0
+			admitted = expr.Binary{Op: expr.OpOr, L: admitted, R: term}
 		}
-		switch {
-		case !certain:
-			return AdmitMaybe
-		case rule[ruleWhen] == whenNever:
-			return AdmitNo
+		earlier = append(earlier, c)
+		if cond == nil {
+			break
 		}
-		return AdmitYes
 	}
-	return AdmitNo
+	admitted = expr.FoldConst(admitted)
+	if lit, isLit := admitted.(expr.Lit); isLit && lit.Kind == expr.LitBool {
+		if lit.Bool {
+			return AdmitYes, nil
+		}
+		return AdmitNo, nil
+	}
+	return AdmitMaybe, admitted
 }
 
 // ruleCond compiles the if key of a workflow rule. A rule with no if key matches every pipeline and gives a nil condition.

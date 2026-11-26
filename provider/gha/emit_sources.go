@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 )
@@ -15,13 +16,23 @@ var apiSources = []string{"api", "trigger"}
 // sourceEventsArg marks the triggers the emitter added for the pipeline sources that the jobs of a GitLab pipeline
 // name, so reading the file back drops them.
 type sourceEventsArg struct {
-	Kinds []ir.TriggerKind `json:"source_events"`
+	// Conds holds, by job ID, the condition that withGitLabSources gated with the workflow rules and what it became.
+	Conds map[string]condBack `json:"source_conds,omitempty"`
+	Kinds []ir.TriggerKind    `json:"source_events"`
+}
+
+// condBack is the job condition of the source (If, empty for none) and the gated condition that replaced it (Back).
+type condBack struct {
+	If   string `json:"if"`
+	Back string `json:"back"`
 }
 
 // withGitLabSources gives a GitLab pipeline the triggers of the other sources that its job conditions name: web, schedule,
 // api and trigger. The default of GitLab runs a job on each of them, and a workflow that names push only never starts
-// the jobs that test for one. The workflow rules decide: a source they exclude gets no trigger, and a source they admit
-// only on some branch or tag cannot get one, because GHA has no ref filter on these events, so it comes back as lost.
+// the jobs that test for one. The workflow rules decide: a source they exclude gets no trigger. A web or schedule source
+// that they admit on some branch or tag gets its trigger, and every job gets the rule condition for a run of that source,
+// so no job runs where GitLab starts none. An api or trigger source under such a condition comes back as lost, because a
+// repository_dispatch run has no ref of its own to test.
 func withGitLabSources(p *ir.Project, target string) (*ir.Project, map[string]sourceEventsArg, map[string][]provider.SourceEvent) {
 	if p == nil || p.Origin.Provider != provider.GitLab || provider.SameFamily(p.Origin.Provider, target) {
 		return p, nil, nil
@@ -32,6 +43,7 @@ func withGitLabSources(p *ir.Project, target string) (*ir.Project, map[string]so
 	for i, pl := range p.Pipelines {
 		var added []ir.Trigger
 		var types []any
+		var gates []sourceGate
 		has := func(k ir.TriggerKind) bool {
 			return slices.ContainsFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == k }) ||
 				slices.ContainsFunc(added, func(t ir.Trigger) bool { return t.Kind == k })
@@ -40,10 +52,16 @@ func withGitLabSources(p *ir.Project, target string) (*ir.Project, map[string]so
 			if ev.Name != "web" && ev.Name != "schedule" && !slices.Contains(apiSources, ev.Name) {
 				continue
 			}
-			switch provider.WorkflowAdmits(pl, ev.Name) {
-			case provider.AdmitNo:
+			admit, residual := provider.WorkflowAdmits(pl, ev.Name)
+			switch {
+			case admit == provider.AdmitNo:
 				continue
-			case provider.AdmitMaybe:
+			case admit == provider.AdmitMaybe && residual != nil && !slices.Contains(apiSources, ev.Name):
+				// With the default triggers the parser has ANDed the workflow condition into every job already.
+				if !provider.DefaultPushTag(pl) {
+					gates = append(gates, sourceGate{source: ev.Name, cond: residual})
+				}
+			case admit == provider.AdmitMaybe:
 				lost[pl.ID] = append(lost[pl.ID], ev)
 				continue
 			}
@@ -74,8 +92,9 @@ func withGitLabSources(p *ir.Project, target string) (*ir.Project, map[string]so
 		}
 		cp := *pl
 		cp.Triggers = append(slices.Clone(pl.Triggers), added...)
-		out.Pipelines[i] = &cp
 		arg := sourceEventsArg{}
+		arg.Conds = gateJobs(&cp, gates)
+		out.Pipelines[i] = &cp
 		for _, t := range added {
 			arg.Kinds = append(arg.Kinds, t.Kind)
 		}
@@ -85,6 +104,64 @@ func withGitLabSources(p *ir.Project, target string) (*ir.Project, map[string]so
 		return p, args, lost
 	}
 	return out, args, lost
+}
+
+// sourceGate is the condition under which the workflow rules start a pipeline from a source.
+type sourceGate struct {
+	cond   expr.Expr
+	source string
+}
+
+// gateJobs ANDs into the condition of every job, for each gate, that a run of the source passes the workflow rules:
+// the run is of another source, or the rule condition holds. cp holds the jobs afterwards; the result maps each changed
+// job ID to what it was.
+func gateJobs(cp *ir.Pipeline, gates []sourceGate) map[string]condBack {
+	if len(gates) == 0 {
+		return nil
+	}
+	var gate expr.Expr
+	for _, g := range gates {
+		isSource := expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{expr.CtxEvent}}, R: expr.Lit{Kind: expr.LitStr, Str: g.source}}
+		one := expr.Binary{Op: expr.OpOr, L: expr.Unary{Op: expr.OpNot, X: isSource}, R: g.cond}
+		if gate == nil {
+			gate = one
+			continue
+		}
+		gate = expr.Binary{Op: expr.OpAnd, L: gate, R: one}
+	}
+	conds := map[string]condBack{}
+	jobs := make([]*ir.Job, len(cp.Jobs))
+	for i, j := range cp.Jobs {
+		c := *j
+		was := ""
+		if j.If == nil {
+			c.If = gate
+		} else {
+			was = expr.String(j.If)
+			c.If = expr.Binary{Op: expr.OpAnd, L: j.If, R: gate}
+		}
+		conds[j.ID] = condBack{If: was, Back: expr.String(c.If)}
+		jobs[i] = &c
+	}
+	cp.Jobs = jobs
+	return conds
+}
+
+// restoreGatedConds gives back the job conditions that gateJobs changed, for each job whose condition is still as written.
+func restoreGatedConds(pl *ir.Pipeline, arg sourceEventsArg) {
+	for _, j := range pl.Jobs {
+		w, ok := arg.Conds[j.ID]
+		if !ok || j.If == nil || expr.String(j.If) != w.Back {
+			continue
+		}
+		j.If = nil
+		if w.If == "" {
+			continue
+		}
+		if orig, err := expr.ParseCanonical(w.If); err == nil {
+			j.If = orig
+		}
+	}
 }
 
 // dropSourceEvents removes the triggers that withGitLabSources added.

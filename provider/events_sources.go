@@ -44,6 +44,10 @@ func GitLabNamedSources(pl *ir.Pipeline) []SourceEvent {
 	return slices.DeleteFunc(slices.Clone(gitlabEvents), func(ev SourceEvent) bool { return !slices.Contains(named, ev.Name) })
 }
 
+// DefaultPushTag is true for the two bare triggers that the GitLab parser gives a pipeline with no workflow rules, or
+// with rules that have no trigger form. The parser then ANDs the workflow condition into every job.
+func DefaultPushTag(pl *ir.Pipeline) bool { return defaultPushTag(pl.Triggers) }
+
 // defaultPushTag is true for the two bare triggers that the GitLab parser gives a pipeline with no workflow rules.
 func defaultPushTag(ts []ir.Trigger) bool {
 	return len(ts) == 2 && ts[0].Kind == ir.TriggerPush && ts[1].Kind == ir.TriggerTag &&

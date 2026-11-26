@@ -78,7 +78,7 @@ func TestGitLabWorkflowRulesDecideSourceEvents(t *testing.T) {
 		{"admits web by a source rule before a ref rule", "workflow:\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == \"web\"'\n    - if: '$CI_COMMIT_BRANCH == \"main\"'\n", true, false},
 		{"excludes web", "workflow:\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == \"web\"'\n      when: never\n    - when: always\n", false, false},
 		{"admits only the push source", "workflow:\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == \"push\"'\n", false, false},
-		{"admits web on a branch only", "workflow:\n  rules:\n    - if: '$CI_COMMIT_BRANCH == \"main\"'\n", false, true},
+		{"admits web on a branch only", "workflow:\n  rules:\n    - if: '$CI_COMMIT_BRANCH == \"main\"'\n", true, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -105,6 +105,40 @@ func TestGitLabWorkflowOnABranchLosesNoPushSource(t *testing.T) {
 		if e.Level == caps.Lost && strings.Contains(e.Detail, "workflow rules admit") {
 			t.Errorf("a source with a trigger of its own is reported lost: %+v", e)
 		}
+	}
+}
+
+// A workflow rule that admits the web source on one branch starts a manual run on that branch only. Rules with no trigger
+// form reach the jobs as a guard already; rules that read as a push filter get the gate from the emitter, and the
+// pipeline reads back as the GitLab file it came from.
+func TestGitLabWorkflowBranchRuleGatesTheManualRun(t *testing.T) {
+	cases := []struct {
+		name, workflow string
+		wantGate       bool
+	}{
+		{"rule with no trigger form", "workflow:\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == \"web\" && $CI_COMMIT_BRANCH == \"main\"'\n", false},
+		{"rule that reads as a push filter", "workflow:\n  rules:\n    - if: '$CI_COMMIT_BRANCH == \"main\"'\n", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out, rep := convert(t, "gitlab", "gha", ".gitlab-ci.yml", c.workflow+webJob+"job_any:\n  script: [echo any]\n")
+			if !strings.Contains(out, "\n  workflow_dispatch:") {
+				t.Errorf("no manual run:\n%s", out)
+			}
+			if got := strings.Count(out, "github.ref_name == 'main'"); got < 2 {
+				t.Errorf("a job runs on a manual run of another branch (%d ref tests):\n%s", got, out)
+			}
+			if got := strings.Contains(out, "!(github.event_name == 'workflow_dispatch')"); got != c.wantGate {
+				t.Errorf("emitter gate present = %v, want %v:\n%s", got, c.wantGate, out)
+			}
+			if lostJobIf(rep) {
+				t.Errorf("a job condition is lost:\n%+v", rep.Entries)
+			}
+			code, got, msg := runOut("roundtrip", writeGitlab(t, c.workflow+webJob+"job_any:\n  script: [echo any]\n"), "--via", "gha")
+			if code != 0 || got != "no differences\n" {
+				t.Errorf("round trip: code=%d out=%q\n%s", code, got, msg)
+			}
+		})
 	}
 }
 
@@ -213,6 +247,32 @@ func TestGitLabPushJobRunsOnTagPushOnTektonAndArgo(t *testing.T) {
 			}
 			if !strings.Contains(out, "ctx-event") || !strings.Contains(out, "push") {
 				t.Errorf("the push-only job has no event test:\n%s", out)
+			}
+		})
+	}
+}
+
+// A GitLab job that excludes tags does not start on a tag push on Tekton or Argo. The tag trigger gives the tag param the
+// tag name, so a test of an empty tag keeps the job away, and a condition with no form (a null test, a bare branch)
+// disables the job and says so.
+func TestGitLabTagExcludingJobsSkipTagPushOnTektonAndArgo(t *testing.T) {
+	src := "notag_eq:\n  script: [echo a]\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == \"push\" && $CI_COMMIT_TAG == \"\"'\n" +
+		"notag_null:\n  script: [echo b]\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == \"push\" && $CI_COMMIT_TAG == null'\n" +
+		"branch_bare:\n  script: [echo c]\n  rules:\n    - if: '$CI_COMMIT_BRANCH'\n"
+	cases := map[string]struct {
+		tagTest, disabled string
+	}{
+		"tekton": {"- input: $(params.ctx-tag)", "pipemaster-disabled"},
+		"argo":   {"workflow.parameters[''ctx-tag'']", "{{= false }}"},
+	}
+	for to, c := range cases {
+		t.Run(to, func(t *testing.T) {
+			out, _ := convertText(t, "gitlab", to, ".gitlab-ci.yml", src)
+			if !strings.Contains(out, c.tagTest) {
+				t.Errorf("the tag-excluding job has no test of the tag param (%q):\n%s", c.tagTest, out)
+			}
+			if got := strings.Count(out, c.disabled); got != 2 {
+				t.Errorf("the jobs with no form are disabled %d times, want 2 (%q):\n%s", got, c.disabled, out)
 			}
 		})
 	}

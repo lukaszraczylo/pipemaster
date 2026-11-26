@@ -18,10 +18,12 @@ func TestTagPrefixConditionIsWrittenAsRefTypeAndComesBack(t *testing.T) {
 		cond    expr.Expr
 		name    string
 		refType bool
+		guard   bool
 	}{
-		{tagPrefix("refs/tags/"), "tag prefix", true},
-		{expr.Unary{Op: expr.OpNot, X: tagPrefix("refs/tags/")}, "negated tag prefix", true},
-		{tagPrefix("refs/tags/v"), "a longer tag prefix has no ref type form", false},
+		{tagPrefix("refs/tags/"), "tag prefix", true, false},
+		{expr.Unary{Op: expr.OpNot, X: tagPrefix("refs/tags/")}, "negated tag prefix", true, true},
+		{expr.Binary{Op: expr.OpOr, L: tagPrefix("refs/tags/"), R: expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{expr.CtxBranch}}, R: expr.Lit{Kind: expr.LitStr, Str: "main"}}}, "or with a branch test is a shell guard", true, true},
+		{tagPrefix("refs/tags/v"), "a longer tag prefix has no ref type form", false, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -37,6 +39,15 @@ func TestTagPrefixConditionIsWrittenAsRefTypeAndComesBack(t *testing.T) {
 			for _, e := range rep.Entries {
 				if e.Feature == caps.JobIf && e.Level == caps.Lost {
 					t.Fatalf("the condition is lost: %+v", e)
+				}
+			}
+			if c.guard {
+				var guarded bool
+				for _, e := range rep.Entries {
+					guarded = guarded || e.Feature == caps.JobIf && e.Strategy == "shell guard"
+				}
+				if !guarded {
+					t.Fatalf("the condition is not a shell guard:\n%s", joinFiles(files))
 				}
 			}
 			back, _ := reparse(t, files)
