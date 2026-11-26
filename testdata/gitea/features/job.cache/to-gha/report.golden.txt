@@ -1,3 +1,2 @@
 Loss report: gitea -> gha
-[emulated] pipeline/gitlab-ci/job/build job.cache: actions/cache step
 [emulated] pipeline/gitlab-ci/job/build job.runner: default runner label ubuntu-latest (the IR holds no runner label)

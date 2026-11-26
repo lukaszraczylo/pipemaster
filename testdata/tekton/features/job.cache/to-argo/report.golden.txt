@@ -1,6 +1,6 @@
 Loss report: tekton -> argo
 [external] pipeline/gitlab-ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [external] pipeline/gitlab-ci/trigger/1 trigger.tag: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
-[emulated] pipeline/gitlab-ci/job/build job.cache: PVC from volumeClaimTemplates (the cache ${{ hashFiles('go.sum') }} is a claim per job and holds the paths; it lives for one Workflow unless the claim is shared)
+[emulated] pipeline/gitlab-ci/job/build job.cache: PVC from volumeClaimTemplates (the cache ${{ hashFiles('go.sum') }} is a claim per job and holds the paths; it lives for one Workflow; to persist, the operator provides a shared PVC or an artifact repository (S3) for the key)
 [emulated] pipeline/gitlab-ci/trigger/0 trigger.filter.branches
 [emulated] pipeline/gitlab-ci/trigger/1 trigger.filter.branches
