@@ -136,6 +136,8 @@ var glChildWhy = map[string]string{
 	glchild.ReasonFiles: "the child include lists no file or more than three, and GitLab allows up to three files " +
 		"(https://docs.gitlab.com/ci/pipelines/downstream_pipelines/, combine multiple child pipeline configuration files)",
 	glchild.ReasonForm: "the trigger include has a form that the harness does not read",
+	glchild.ReasonInherit: "the trigger key of the job comes from extends or a YAML merge key, and the harness reads the trigger key of a job only " +
+		"(https://docs.gitlab.com/ci/yaml/#extends)",
 }
 
 // glChildDepthWhy cites the nesting limit: "a maximum depth of two levels of child pipelines".

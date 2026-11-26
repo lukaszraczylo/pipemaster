@@ -45,6 +45,7 @@ const (
 	ReasonGlob     = "glob"
 	ReasonFiles    = "files"
 	ReasonForm     = "form"
+	ReasonInherit  = "inherit"
 )
 
 const (
@@ -55,6 +56,9 @@ const (
 	keyInherit   = "inherit"
 	keyForward   = "forward"
 	keyStrategy  = "strategy"
+	keyExtends   = "extends"
+	mergeKey     = "<<"
+	maxInherit   = 8
 	keyLocal     = "local"
 	strategyDep  = "depend"
 	strategyMirr = "mirror"
@@ -92,11 +96,49 @@ func Triggers(doc []byte, pipelineVars map[string]string) ([]Trigger, error) {
 		}
 		trig := get(job, keyTrigger)
 		if trig == nil {
+			if inheritsTrigger(top, job, 0) {
+				out = append(out, Trigger{Job: name, Reason: ReasonInherit})
+			}
 			continue
 		}
 		out = append(out, plan(name, job, trig, global, pipelineVars))
 	}
 	return out, nil
+}
+
+// inheritsTrigger reports whether a job gets its trigger key from a job it extends or from a YAML merge key.
+func inheritsTrigger(top, job *yaml.Node, depth int) bool {
+	if depth > maxInherit {
+		return false
+	}
+	var from []*yaml.Node
+	if ext := get(job, keyExtends); ext != nil {
+		names := []*yaml.Node{ext}
+		if ext.Kind == yaml.SequenceNode {
+			names = ext.Content
+		}
+		for _, n := range names {
+			from = append(from, get(top, n.Value))
+		}
+	}
+	for i := 0; i+1 < len(job.Content); i += 2 {
+		if job.Content[i].Value != mergeKey {
+			continue
+		}
+		srcs := []*yaml.Node{job.Content[i+1]}
+		if srcs[0].Kind == yaml.SequenceNode {
+			srcs = srcs[0].Content
+		}
+		for _, s := range srcs {
+			if s.Kind == yaml.AliasNode {
+				s = s.Alias
+			}
+			from = append(from, s)
+		}
+	}
+	return slices.ContainsFunc(from, func(n *yaml.Node) bool {
+		return n != nil && n.Kind == yaml.MappingNode && (get(n, keyTrigger) != nil || inheritsTrigger(top, n, depth+1))
+	})
 }
 
 func plan(name string, job, trig *yaml.Node, global, pipelineVars map[string]string) Trigger {
@@ -201,30 +243,58 @@ func localFiles(inc *yaml.Node) ([]string, string) {
 }
 
 // Merge joins the files of one child pipeline the way GitLab merges included files: maps merge by key, and any
-// other value of a later file replaces the earlier one.
+// other value of a later file replaces the earlier one. A single file passes through unchanged, and the merge keeps
+// the order of the keys, the anchors and the tags of the files.
 func Merge(files [][]byte) ([]byte, error) {
-	merged := map[string]any{}
+	if len(files) == 1 {
+		return files[0], nil
+	}
+	var merged *yaml.Node
 	for i, f := range files {
-		var m map[string]any
-		if err := yaml.Unmarshal(f, &m); err != nil {
+		top, err := topMap(f)
+		if err != nil {
 			return nil, fmt.Errorf("child file %d: %w", i+1, err)
 		}
-		merged = deepMerge(merged, m)
+		switch {
+		case top == nil:
+		case merged == nil:
+			merged = top
+		default:
+			mergeMaps(merged, top)
+		}
+	}
+	if merged == nil {
+		return nil, nil
 	}
 	return yaml.Marshal(merged)
 }
 
-func deepMerge(a, b map[string]any) map[string]any {
-	for k, v := range b {
-		if bm, ok := v.(map[string]any); ok {
-			if am, ok := a[k].(map[string]any); ok {
-				a[k] = deepMerge(am, bm)
-				continue
-			}
+// mergeMaps adds the keys of b to a in order. A key that both hold with a map value merges; any other value of b
+// replaces the value of a in place.
+func mergeMaps(a, b *yaml.Node) {
+	for i := 0; i+1 < len(b.Content); i += 2 {
+		k, v := b.Content[i], b.Content[i+1]
+		at := slices.IndexFunc(pairs(a), func(p int) bool { return a.Content[p].Value == k.Value })
+		if at < 0 {
+			a.Content = append(a.Content, k, v)
+			continue
 		}
-		a[k] = v
+		p := pairs(a)[at]
+		if a.Content[p+1].Kind == yaml.MappingNode && v.Kind == yaml.MappingNode {
+			mergeMaps(a.Content[p+1], v)
+			continue
+		}
+		a.Content[p+1] = v
 	}
-	return a
+}
+
+// pairs returns the index of each key of a mapping node.
+func pairs(m *yaml.Node) []int {
+	var out []int
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		out = append(out, i)
+	}
+	return out
 }
 
 // Outcome is what a child pipeline did.

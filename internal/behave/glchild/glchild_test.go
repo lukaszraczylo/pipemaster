@@ -119,7 +119,7 @@ func TestMergeJoinsFilesByKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"job1:", "job2:", "X: 1", `"Y": 2`, "script:", "stage: a"} {
+	for _, want := range []string{"job1:", "job2:", "X: 1", "Y: 2", "script:", "stage: a"} {
 		if !strings.Contains(string(out), want) {
 			t.Errorf("merged file lacks %q:\n%s", want, out)
 		}
@@ -248,5 +248,56 @@ func TestRunning(t *testing.T) {
 	}
 	if _, err := glchild.Running("no list here"); err == nil {
 		t.Error("output without a job list must fail loudly")
+	}
+}
+
+func TestMergeKeepsJobOrderAndTags(t *testing.T) {
+	out, err := glchild.Merge([][]byte{
+		[]byte("z_job:\n  script: [z]\na_job:\n  script: [a]\n"),
+		[]byte("m_job:\n  script:\n    - !reference [.tpl, script]\na_job:\n  stage: s\n"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(out)
+	if strings.Index(s, "z_job:") >= strings.Index(s, "a_job:") || strings.Index(s, "a_job:") >= strings.Index(s, "m_job:") {
+		t.Errorf("job order changed:\n%s", s)
+	}
+	if !strings.Contains(s, "!reference") || !strings.Contains(s, "stage: s") {
+		t.Errorf("tag or merged key lost:\n%s", s)
+	}
+}
+
+func TestMergeKeepsASingleFileUnchanged(t *testing.T) {
+	in := "# comment\nb:\n  script: [x]\na: &anc\n  script: [y]\nc:\n  <<: *anc\n"
+	out, err := glchild.Merge([][]byte{[]byte(in)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != in {
+		t.Errorf("a single file changed:\n%s", out)
+	}
+}
+
+func TestInheritedTriggerIsFlagged(t *testing.T) {
+	for name, doc := range map[string]string{
+		"extends":      ".tpl:\n  trigger:\n    include: ci/c.yml\ncall:\n  extends: .tpl\n",
+		"extends list": ".tpl:\n  trigger:\n    include: ci/c.yml\ncall:\n  extends: [.other, .tpl]\n.other:\n  script: [x]\n",
+		"chain":        ".base:\n  trigger:\n    include: ci/c.yml\n.mid:\n  extends: .base\ncall:\n  extends: .mid\n",
+		"merge key":    ".tpl: &tpl\n  trigger:\n    include: ci/c.yml\ncall:\n  <<: *tpl\n  stage: x\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := glchild.Triggers([]byte(doc), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != 1 || got[0].Job != "call" || got[0].Reason != glchild.ReasonInherit {
+				t.Errorf("triggers = %+v, want one blocked inherited trigger for call", got)
+			}
+		})
+	}
+	got, _ := glchild.Triggers([]byte("a:\n  extends: .t\n.t:\n  script: [x]\n"), nil)
+	if len(got) != 0 {
+		t.Errorf("a job that inherits no trigger is flagged: %+v", got)
 	}
 }
