@@ -24,7 +24,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.PipelineFinally:        {Level: caps.Emulated, Strategy: "a workflow that depends on every other workflow and runs on status success or failure", Caveat: "a skipped dependency is optional, so the workflow still runs"},
 		caps.JobNeedsArtifacts:      {Level: caps.Lost, Caveat: "workflows do not share a workspace"},
 		caps.JobIf:                  {Level: caps.Native, Strategy: "workflow when", Caveat: "only the translatable expression subset; any other condition disables the workflow"},
-		caps.JobRunner:              {Level: caps.External, Strategy: "workers the operator provides", Caveat: "only a platform label has a Woodpecker form (labels.platform); other labels are lost"},
+		caps.JobRunner:              {Level: caps.External, Strategy: "workers the operator provides", Caveat: "a platform label becomes labels.platform and every other label becomes a labels key with the value true; register an agent with WOODPECKER_AGENT_LABELS to match"},
 		caps.JobTimeout:             {Level: caps.External, Strategy: "repo setting Timeout", Caveat: "Woodpecker limits the whole pipeline, not a workflow"},
 		caps.JobRetry:               {Level: caps.Lost, Caveat: "Woodpecker has no retry key; restarts are manual"},
 		caps.JobAllowFailure:        {Level: caps.Emulated, Strategy: "failure ignore on every step", Caveat: "later steps still run after a failed step"},

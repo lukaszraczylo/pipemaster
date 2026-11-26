@@ -63,6 +63,7 @@ func (e *emitter) triggers() error {
 		if t != nil {
 			templates = append(templates, t)
 		}
+		e.reportNodeSelectors(pp, t != nil)
 	}
 	for _, l := range e.listeners {
 		if err := e.listenerDoc(l); err != nil {

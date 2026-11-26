@@ -1,6 +1,7 @@
 package tekton
 
 import (
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -408,6 +409,50 @@ func (e *emitter) bindingDoc(name string, ctxs []string) *outDoc {
 	return &outDoc{Root: root.N, Head: []string{generatedMarker}}
 }
 
+// taskRunSpecs writes one taskRunSpecs entry per task with runner tags: a podTemplate nodeSelector with one label
+// per tag. It returns nil when no task has a tag.
+func taskRunSpecs(pp *plan) *yaml.Node {
+	var specs []*yaml.Node
+	for _, jp := range pp.jobs {
+		if len(jp.nodeSel) == 0 {
+			continue
+		}
+		sel := newMap()
+		for _, k := range slices.Sorted(maps.Keys(jp.nodeSel)) {
+			sel.SetStr(k, jp.nodeSel[k])
+		}
+		pt := newMap()
+		pt.Set("nodeSelector", sel.N)
+		m := newMap()
+		m.SetStr("pipelineTaskName", jp.tname)
+		m.Set("podTemplate", pt.N)
+		specs = append(specs, m.N)
+	}
+	if len(specs) == 0 {
+		return nil
+	}
+	return seqOf(specs...)
+}
+
+// reportNodeSelectors reports the runner tags of the tasks of a plan. A TriggerTemplate that this emitter wrote
+// carries them; otherwise no PipelineRun of the output can hold them.
+func (e *emitter) reportNodeSelectors(pp *plan, templated bool) {
+	for _, jp := range pp.jobs {
+		if len(jp.nodeSel) == 0 {
+			continue
+		}
+		var keys []string
+		for _, k := range slices.Sorted(maps.Keys(jp.nodeSel)) {
+			keys = append(keys, k+"="+jp.nodeSel[k])
+		}
+		if templated {
+			e.external(jp.path, caps.JobRunner, "workers the operator provides", "label the nodes "+strings.Join(keys, ", ")+" for the runner labels (taskRunSpecs podTemplate nodeSelector of the TriggerTemplate)")
+		} else {
+			e.lose(jp.path, caps.JobRunner, "the runner labels need a taskRunSpecs podTemplate nodeSelector ("+strings.Join(keys, ", ")+") on the PipelineRun, and this output has no generated TriggerTemplate to hold it")
+		}
+	}
+}
+
 func (e *emitter) templateDoc(pp *plan, name string, ctxs []string) *outDoc {
 	root := newMap()
 	root.SetStr("apiVersion", apiTriggersV1)
@@ -448,6 +493,9 @@ func (e *emitter) templateDoc(pp *plan, name string, ctxs []string) *outDoc {
 		w.SetStr("name", workspaceName)
 		w.Set("volumeClaimTemplate", vc.N)
 		rs.Set("workspaces", seqOf(w.N))
+	}
+	if trs := taskRunSpecs(pp); trs != nil {
+		rs.Set("taskRunSpecs", trs)
 	}
 	run.Set("spec", rs.N)
 	spec := newMap()

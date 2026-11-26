@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -254,11 +255,6 @@ func (e *emitter) labels(m *wmap, c *wfCtx, ext map[string]any) error {
 	emitkit.ReportHosted(e.origin, r.Labels, "backend label",
 		func(st, d string) { e.external(c.jp, caps.JobRunner, st, d) },
 		func(d string) { e.lose(c.jp, caps.JobRunner, d) })
-	for _, l := range emitkit.Unplaced(e.origin, r.Labels) {
-		if l != platform {
-			e.lose(c.jp, caps.JobRunner, "the runner label "+l+" has no Woodpecker form; only labels.platform does")
-		}
-	}
 	n := newMap()
 	if platform != "" {
 		v, err := e.text(nil, c.jp, caps.JobRunner, valueText, platform)
@@ -266,6 +262,21 @@ func (e *emitter) labels(m *wmap, c *wfCtx, ext map[string]any) error {
 			return err
 		}
 		n.set("platform", str(v))
+	}
+	var tags []string
+	for _, l := range emitkit.Unplaced(e.origin, r.Labels) {
+		if l == platform {
+			continue
+		}
+		if k, ok := emitkit.TagKey(l); ok && k != "platform" {
+			n.set(k, str(emitkit.TagValue))
+			tags = append(tags, k+"="+emitkit.TagValue)
+			continue
+		}
+		e.lose(c.jp, caps.JobRunner, "the runner label "+l+" has no Woodpecker label key: a key needs letters, digits, dot, underscore or dash")
+	}
+	if len(tags) > 0 {
+		e.external(c.jp, caps.JobRunner, "workers the operator provides", "register a Woodpecker agent with WOODPECKER_AGENT_LABELS="+strings.Join(tags, ",")+" for the runner labels")
 	}
 	if err := n.mergeMap(ext[keyLabels]); err != nil {
 		return err

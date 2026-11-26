@@ -309,10 +309,21 @@ func (e *emitter) platform(m *ymap, c *docCtx, ext map[string]any) error {
 	emitkit.ReportHosted(e.origin, r.Labels, "platform",
 		func(st, d string) { e.external(c.jp, caps.JobRunner, st, d) },
 		func(d string) { e.lose(c.jp, caps.JobRunner, d) })
+	tagged := map[string]string{}
+	var tags []string
 	for _, l := range emitkit.Unplaced(e.origin, r.Labels) {
-		if l != label {
-			e.lose(c.jp, caps.JobRunner, "the runner label "+l+" has no Drone form; only the os/arch platform does")
+		if l == label {
+			continue
 		}
+		if k, ok := emitkit.TagKey(l); ok {
+			tagged[k] = emitkit.TagValue
+			tags = append(tags, k+":"+emitkit.TagValue)
+			continue
+		}
+		e.lose(c.jp, caps.JobRunner, "the runner label "+l+" has no Drone node key: a key needs letters, digits, dot, underscore or dash")
+	}
+	if len(tags) > 0 {
+		e.external(c.jp, caps.JobRunner, "workers the operator provides", "register a Drone runner with DRONE_RUNNER_LABELS="+strings.Join(tags, ",")+" for the runner labels")
 	}
 	n := newYMap()
 	if label != "" {
@@ -331,6 +342,11 @@ func (e *emitter) platform(m *ymap, c *docCtx, ext map[string]any) error {
 	}
 	m.set(keyPlatform, nonEmpty(n))
 	sel := newYMap()
+	for _, k := range sortedKeys(tagged) {
+		if _, dup := r.Selector[k]; !dup {
+			sel.set(k, ystr(tagged[k]))
+		}
+	}
 	for _, k := range sortedKeys(r.Selector) {
 		sel.set(k, ystr(esc(r.Selector[k])))
 	}

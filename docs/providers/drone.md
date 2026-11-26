@@ -41,7 +41,7 @@ The following table comes from `pipemaster caps --to drone --format md`.
 | job.needs.artifacts | lost | (documents share no workspace) |
 | job.outputs | lost | (Drone steps cannot pass values to other pipelines) |
 | job.retry | lost | (Drone has no retry key; only clone.retries exists) |
-| job.runner | external | workers the operator provides (only the platform has a Drone form; other runner labels are lost) |
+| job.runner | external | workers the operator provides (the os/arch platform becomes platform and every other runner label becomes a node key with the value true; register a runner with DRONE_RUNNER_LABELS to match) |
 | job.services | native |  |
 | job.timeout | external | repo setting timeout (the setting has no per-pipeline or per-step form) |
 | pipeline.concurrency | lost | (Drone concurrency.limit is a count and the IR models a group and cancel-in-progress, not a limit) |

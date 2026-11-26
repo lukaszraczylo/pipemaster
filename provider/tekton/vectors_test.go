@@ -79,6 +79,7 @@ const (
 	featImage       = "step.image"
 	featNoop        = "step.script"
 	featShell       = "step.shell"
+	featRunner      = "job.runner"
 	featWorkdir     = "step.workdir"
 	sharedWorkDir   = "/workspace"
 	featNeeds       = "job.needs"
@@ -271,6 +272,8 @@ func applyTaskMarks(t *vTask, src []byte) error {
 			if a.Dir != sharedWorkDir {
 				return fmt.Errorf("shared directory marker %q, want %q", a.Dir, sharedWorkDir)
 			}
+		case featRunner:
+			// The note says the runner labels are node selectors of the TriggerTemplate, which the model leaves out.
 		case featShell:
 			// The note says a step from a bash-default source starts with the bash-if-present preamble, which the decoder strips.
 		case featNeeds:

@@ -369,7 +369,8 @@ structure Trig where
 
 /-- A workflow file; `name` is the file stem. `jobEnv` is the `job.env` marker (empty when absent), `noop` the
 `step.script` marker of the job, `manual` the `job.manual` marker with its triggers, `fin` the `pipeline.finally`
-marker (needs and `noIf`), `tagIdx` the `trigger.filter.tags` marker, `platform` the `labels.platform` key. -/
+marker (needs and `noIf`), `tagIdx` the `trigger.filter.tags` marker, `platform` the `labels.platform` key, `tags`
+the other `labels` keys, each with the value `true`. -/
 structure WFile where
   name : String
   whens : List Entry
@@ -382,6 +383,7 @@ structure WFile where
   fin : Option (List Core.Need × Bool)
   tagIdx : Option Nat
   platform : Option String
+  tags : List String
   deriving DecidableEq, Repr
 
 /-! ### Constants of the emitter and parser -/
@@ -430,8 +432,22 @@ def platformLabel (l : String) : Bool :=
   | _ => false
 
 /-- Mirrors woodpecker.emitter.labels (provider/woodpecker/emit_job.go): the first runner label of the
-`os/arch` form becomes `labels.platform`; every other label is lost. -/
+`os/arch` form becomes `labels.platform`; every other label is a tag (see `tagsOf`). -/
 def platformOf (r : List String) : Option String := r.find? platformLabel
+
+/-- A character of the label-name class `[A-Za-z0-9._-]` (emitkit.tagRE, provider/emitkit/runner.go). -/
+def tagChar (c : Char) : Bool := c.isAlphanum || c == '.' || c == '_' || c == '-'
+
+/-- Mirrors emitkit.TagKey (provider/emitkit/runner.go): at most 63 characters, name characters only, and an
+alphanumeric first and last character. -/
+def tagKeyOk (l : String) : Bool :=
+  l.length ≤ 63 && l.toList.all tagChar && (l.toList.head?.map Char.isAlphanum).getD false &&
+    (l.toList.getLast?.map Char.isAlphanum).getD false
+
+/-- The runner labels that become `labels` keys beside the platform: a valid label name that is not the platform
+label and not the key `platform`. Any other label is lost. -/
+def tagsOf (r : List String) : List String :=
+  r.filter fun l => some l != platformOf r && tagKeyOk l && l != "platform"
 
 /-- The pipeline triggers in IR order (`ir.CorePipeline.Project`): pr, push, tag. -/
 def trigsOf (p : Pipe) : List Trig :=
@@ -488,6 +504,7 @@ def mainFile (p : Pipe) (j : Core.Job) : WFile where
   fin := none
   tagIdx := tagIdxOf p
   platform := platformOf j.runner
+  tags := tagsOf j.runner
 
 /-- Mirrors woodpecker.emitter.dependsOn (provider/woodpecker/emit_job.go): a finally workflow waits for every
 main workflow as optional. Its needs are on main jobs, so they add nothing, and it keeps them in the marker. -/
@@ -503,6 +520,7 @@ def finFile (p : Pipe) (j : Core.Job) : WFile where
   fin := some (j.needs, !j.onFailure)
   tagIdx := tagIdxOf p
   platform := platformOf j.runner
+  tags := tagsOf j.runner
 
 /-- Mirrors woodpecker.Emit (provider/woodpecker/emit.go) on the core subset: one file per job, main jobs first. -/
 def toWp (p : Pipe) : List WFile := p.jobs.map (mainFile p) ++ p.fin.map (finFile p)

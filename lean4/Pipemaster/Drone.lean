@@ -48,7 +48,8 @@ structure DStep where
 /-- One pipeline document; `name` is the job id. `env` is the document `environment`, `noop` the `step.script`
 marker, `allowFailure` the `job.allow_failure` marker, `manual` the `job.manual` marker with the pipeline triggers,
 `fin` the `pipeline.finally` marker (needs and `noIf`), `ifTrigs` the triggers of the `job.if` marker, and
-`platform` the label that `platform` holds (`os/arch` or `os/arch/variant`). -/
+`platform` the label that `platform` holds (`os/arch` or `os/arch/variant`), and `tags` the other `node` keys, each
+with the value `true`. -/
 structure DDoc where
   name : String
   trigger : Option DTrig
@@ -56,6 +57,7 @@ structure DDoc where
   steps : List DStep
   env : List Var
   platform : Option String
+  tags : List String
   noop : Bool
   allowFailure : Bool
   manual : Option (List Woodpecker.Trig)
@@ -154,6 +156,11 @@ theorem map_comp_unescVar_escVar (l : List Var) : l.map (unescVar ∘ escVar) = 
 /-- Mirrors drone.platformRE (provider/drone/emit_job.go): the label `os/arch` or `os/arch/variant`. -/
 def platformOf (r : List String) : Option String := Woodpecker.platformOf r
 
+/-- The runner labels that become `node` keys: a valid label name (`Woodpecker.tagKeyOk`) that is not the platform
+label. Any other label is lost. -/
+def tagsOf (r : List String) : List String :=
+  r.filter fun l => some l != platformOf r && Woodpecker.tagKeyOk l
+
 /-- The label that the parser reads back: `os` and `arch` only; the variant stays in Ext (parse_doc.go platform). -/
 def platDrop (l : String) : String := "/".intercalate ((l.splitOn "/").take 2)
 
@@ -200,6 +207,7 @@ def mainDoc (p : Pipe) (j : Core.Job) : DDoc where
   steps := stepsOf j
   env := j.env.map escVar
   platform := platformOf j.runner
+  tags := tagsOf j.runner
   noop := j.steps.isEmpty
   allowFailure := j.allowFailure
   manual := if j.manual then some (trigsOf p) else none
@@ -216,6 +224,7 @@ def finDoc (p : Pipe) (j : Core.Job) : DDoc where
   steps := stepsOf j
   env := j.env.map escVar
   platform := platformOf j.runner
+  tags := tagsOf j.runner
   noop := j.steps.isEmpty
   allowFailure := j.allowFailure
   manual := none
@@ -291,7 +300,7 @@ def parseDoc (d : DDoc) : Core.Job where
     | some (ns, _) => ns
     | none => d.deps.map fun n => ⟨n, false⟩
   env := d.env.map unescVar
-  runner := (d.platform.map platDrop).toList
+  runner := (d.platform.map platDrop).toList ++ d.tags
   steps := parseSteps d
   retry := 0
   timeout := 0
@@ -594,15 +603,15 @@ theorem readTriggers_toDrone (p : Pipe) (ht : TrigOk p) (hne : p.all ≠ []) :
       · rw [h]; exact Woodpecker.trigFind_trigsOf p
 
 /-- What Drone keeps of a main job before the metadata: no names, no artifacts flag on needs, no retry or timeout,
-and no runner label but the `os/arch` platform. -/
+and no runner label but the `os/arch` platform and the tags. -/
 def droneStripMain (j : Core.Job) : Core.Job :=
   { j with name := "", needs := j.needs.map fun n => { n with artifacts := false },
-           runner := ((platformOf j.runner).map platDrop).toList,
+           runner := ((platformOf j.runner).map platDrop).toList ++ tagsOf j.runner,
            steps := j.steps.map Woodpecker.stripName, retry := 0, timeout := 0 }
 
 /-- A finally job keeps its needs with the flags, because the `pipeline.finally` marker carries them. -/
 def droneStripFin (j : Core.Job) : Core.Job :=
-  { j with name := "", runner := ((platformOf j.runner).map platDrop).toList,
+  { j with name := "", runner := ((platformOf j.runner).map platDrop).toList ++ tagsOf j.runner,
            steps := j.steps.map Woodpecker.stripName, retry := 0, timeout := 0 }
 
 theorem parseStepD_dstep (j : Core.Job) (s : Core.Step) : parseStepD (dstep j s) = Woodpecker.stripName s := by
@@ -686,8 +695,8 @@ theorem restoreSteps_drone (p : Pipe) (j : Core.Job) (hj : j ∈ p.all) (hn : (p
   Woodpecker.restoreSteps_wp p j hj hn hs
 
 theorem runner_rt (r : List String) :
-    ((if r = [] then (none : Option (List String)) else some r).getD ((platformOf r).map platDrop).toList) = r := by
-  split <;> simp_all [platformOf, Woodpecker.platformOf]
+    ((if r = [] then (none : Option (List String)) else some r).getD (((platformOf r).map platDrop).toList ++ tagsOf r)) = r := by
+  split <;> simp_all [platformOf, Woodpecker.platformOf, tagsOf]
 
 theorem restoreJob_droneMain (p : Pipe) (hn : (p.all.map Core.Job.id).Nodup)
     (hs : ∀ j ∈ p.all, (j.steps.map Core.Step.id).Nodup) (j : Core.Job) (hj : j ∈ p.all) :

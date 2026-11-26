@@ -628,7 +628,8 @@ def wpFileJson (f : Woodpecker.WFile) : Json :=
     ("finally", match f.fin with
       | some (ns, noIf) => Json.mkObj [("needs", Json.arr (ns.map needJ).toArray), ("no_if", noIf)]
       | none => Json.null),
-    ("tag_idx", optNat f.tagIdx), ("platform", match f.platform with | some x => Json.str x | none => Json.null)]
+    ("tag_idx", optNat f.tagIdx), ("platform", match f.platform with | some x => Json.str x | none => Json.null),
+    ("tags", strsJson f.tags)]
 
 open Pipemaster.Drone in
 def droneStepJson (s : Drone.DStep) : Json :=
@@ -642,7 +643,7 @@ def droneDocJson (d : Drone.DDoc) : Json :=
           ("status", strsJson t.status)]
       | none => Json.null),
     ("deps", strsJson d.deps), ("steps", Json.arr (d.steps.map droneStepJson).toArray), ("env", varsJson d.env),
-    ("platform", match d.platform with | some x => Json.str x | none => Json.null),
+    ("platform", match d.platform with | some x => Json.str x | none => Json.null), ("tags", strsJson d.tags),
     ("noop", d.noop), ("allow_failure", d.allowFailure),
     ("manual", match d.manual with | some ts => Json.arr (ts.map wpTrigJson).toArray | none => Json.null),
     ("finally", match d.fin with

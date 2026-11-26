@@ -42,6 +42,7 @@ type plan struct {
 // jobPlan holds the PipelineTask name and the Task name of one job.
 type jobPlan struct {
 	j       *ir.Job
+	nodeSel map[string]string
 	tname   string
 	kname   string
 	path    string

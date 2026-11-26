@@ -32,7 +32,8 @@ Not in the model, each on purpose:
 - A job that came from an Argo file: its Ext keys, template references and gates.
 
 The Argo parser keeps display names, retries and timeouts in the file, so the raw parse differs from the pipeline
-only in the runner label and in the needs of a finally job, which the metadata restores. -/
+only in the runner label and in the needs of a finally job, which the metadata restores. The emitter writes the
+runtime labels as template node selectors, outside the model, and the parser does not read them back. -/
 
 section Adapter
 
@@ -247,7 +248,7 @@ def rawArgo (d : ADoc) : Pipe :=
     jobs := d.tasks.map (parseJobA false)
     fin := d.fin.map (parseJobA true) }
 
-/-- The metadata layer of the Argo adapter: the core layer, the runner labels (caps.go JobRunner is lost) and the needs
+/-- The metadata layer of the Argo adapter: the core layer, the runner labels (caps.go JobRunner is external; the parser does not read the node selector back) and the needs
 of each finally job (emit_task.go exitDeps reports `job.needs` lost; meta.CollectLost keeps the whole list in
 `Lost.Job`). Retries, timeouts and names stay in the file. -/
 def argoMeta (p : Pipe) : Meta :=

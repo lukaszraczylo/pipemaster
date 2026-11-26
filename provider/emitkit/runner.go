@@ -1,6 +1,7 @@
 package emitkit
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/provider"
@@ -117,4 +118,29 @@ func ReportHosted(origin string, labels []string, noun string, external func(str
 		}
 	}
 	return WorkerTags(origin, labels)
+}
+
+// Runner tag key scheme: one label per runner tag with the value TagValue. Woodpecker labels and Drone node use
+// the bare tag as key. A Kubernetes node selector uses NodeKeyPrefix plus the tag, so a tag cannot collide with a
+// well-known node label.
+const (
+	TagValue      = "true"
+	NodeKeyPrefix = "runner.pipemaster.io/"
+	maxTagLen     = 63
+)
+
+var tagRE = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$`)
+
+// TagKey returns the label key of a runner tag. It returns false when the tag is not a valid label name in every
+// dialect that takes labels, so the caller must report the tag as lost.
+func TagKey(tag string) (string, bool) {
+	return tag, len(tag) <= maxTagLen && tagRE.MatchString(tag)
+}
+
+// NodeKey returns the Kubernetes node selector key of a runner tag, or false when the tag has no valid key.
+func NodeKey(tag string) (string, bool) {
+	if _, ok := TagKey(tag); !ok {
+		return "", false
+	}
+	return NodeKeyPrefix + tag, true
 }

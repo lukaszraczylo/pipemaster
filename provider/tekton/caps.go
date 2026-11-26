@@ -35,7 +35,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.StepAction:             {Level: caps.Emulated, Strategy: "StepAction ref per actions.Lookup verdict", Caveat: "unknown actions are lost"},
 		caps.ProjectMultiPipeline:   {Level: caps.Emulated, Strategy: "one Pipeline document per IR pipeline", Caveat: "each pipeline gets its own trigger"},
 		caps.ConfigName:             {Level: caps.Emulated, Strategy: "secrets through secretKeyRef on Secret ci-secrets, vars through configMapKeyRef on ConfigMap ci-vars", Caveat: "the Secret values and ConfigMap values are not written"},
-		caps.JobRunner:              {Level: caps.External, Strategy: "workers the operator provides", Caveat: "Tekton schedules pods, not runner labels"},
+		caps.JobRunner:              {Level: caps.External, Strategy: "workers the operator provides", Caveat: "each runner label becomes a taskRunSpecs podTemplate nodeSelector key runner.pipemaster.io/<label>=true in the generated TriggerTemplate; label the nodes to match"},
 		caps.JobEnvironment:         {Level: caps.Lost, Caveat: "Tekton has no environment name or URL"},
 		caps.JobEnvironmentApproval: {Level: caps.Lost, Caveat: "Tekton has no approval gate"},
 		caps.JobManual:              {Level: caps.Lost, Caveat: "Tekton has no manual job gate"},
