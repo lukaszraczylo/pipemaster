@@ -5,18 +5,38 @@ kind: Pipeline
 metadata:
   name: gitlab-ci
 spec:
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: build
       taskRef:
         name: gitlab-ci-build
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       retries: 1
     - name: common
       taskRef:
         name: gitlab-ci-common
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       retries: 1
     - name: prod
       taskRef:
         name: gitlab-ci-prod
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       runAfter:
         - build
         - common

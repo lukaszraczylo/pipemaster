@@ -6,6 +6,8 @@ origin:
 pipelines:
     - ext:
         concourse:
+            _carried:
+                - resources
             resources:
                 - name: source
                   source:
@@ -34,12 +36,16 @@ pipelines:
       triggers:
         - ext:
             concourse:
+                _carried:
+                    - resources
                 resources:
                     - schedule
           kind: schedule
           cron: 0 0 * * 0
         - ext:
             concourse:
+                _carried:
+                    - resources
                 resources:
                     - schedule-2
           kind: schedule
@@ -47,6 +53,9 @@ pipelines:
       jobs:
         - ext:
             concourse:
+                _carried:
+                    - gets
+                _checkout: {}
                 gets:
                     - get: source
                     - get: schedule

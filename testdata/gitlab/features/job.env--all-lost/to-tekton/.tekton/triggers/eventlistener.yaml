@@ -30,6 +30,8 @@ spec:
               value:
                 - key: ctx_sha
                   expression: body.after
+                - key: ctx_repo
+                  expression: body.repository.full_name
       bindings:
         - ref: gitlab-ci-github
       template:
@@ -55,6 +57,8 @@ spec:
               value:
                 - key: ctx_sha
                   expression: body.after
+                - key: ctx_repo
+                  expression: body.repository.full_name
       bindings:
         - ref: gitlab-ci-github
       template:

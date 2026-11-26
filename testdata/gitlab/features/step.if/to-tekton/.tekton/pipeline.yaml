@@ -6,10 +6,18 @@ spec:
   params:
     - name: ctx-event
       default: ""
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: build
       taskRef:
         name: gitlab-ci-build
       params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
         - name: ctx-event
           value: $(params.ctx-event)

@@ -1,5 +1,6 @@
 Loss report: drone -> gha
 [emulated] pipeline/drone job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/drone/job/ci job.runner: default runner label ubuntu-latest (the IR holds no runner label)
+[emulated] pipeline/drone/job/ci step.action: actions/checkout step (Drone clones the repository before the steps (https://docs.drone.io/pipeline/docker/syntax/cloning/); clone.depth maps to the step input, and GHA does not clone)
 [emulated] pipeline/drone/job/ci/step/build step.image: uses: docker://<image> with entrypoint and args
 [emulated] pipeline/drone/trigger/0 trigger.filter.branches: exclusions written as ! entries (GHA cannot combine branches and branches-ignore on one event)

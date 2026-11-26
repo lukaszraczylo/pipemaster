@@ -4,4 +4,8 @@ kind: TriggerBinding
 metadata:
   name: woodpecker-github
 spec:
-  params: []
+  params:
+    - name: ctx-sha
+      value: $(extensions.ctx_sha)
+    - name: ctx-repo
+      value: $(extensions.ctx_repo)

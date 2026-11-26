@@ -15,7 +15,7 @@ import (
 )
 
 // jobSkip lists the job Ext keys that the emitter writes itself.
-var jobSkip = map[string]bool{ExtGets: true, ExtGetsParallel: true, ExtTriggers: true, ExtTriggerIf: true}
+var jobSkip = map[string]bool{ExtGets: true, ExtGetsParallel: true, ExtTriggers: true, ExtTriggerIf: true, emitkit.CarriedKey: true, emitkit.CheckoutKey: true}
 
 // statusHooks maps a status function to the job hook that runs for it.
 var statusHooks = map[string]string{"success": "on_success", "failure": "on_failure", "always": "ensure"}

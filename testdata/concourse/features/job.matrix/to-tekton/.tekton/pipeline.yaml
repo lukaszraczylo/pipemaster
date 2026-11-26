@@ -4,10 +4,20 @@ metadata:
   name: ci
 spec:
   displayName: matrix
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: test
       taskRef:
         name: ci-test
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       matrix:
         include:
           - params:

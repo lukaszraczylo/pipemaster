@@ -6,6 +6,8 @@ origin:
 pipelines:
     - ext:
         concourse:
+            _carried:
+                - resources
             resources:
                 - name: source
                   source:
@@ -22,6 +24,8 @@ pipelines:
       triggers:
         - ext:
             concourse:
+                _carried:
+                    - resources
                 resources:
                     - source
           kind: push
@@ -30,6 +34,8 @@ pipelines:
                 - main
         - ext:
             concourse:
+                _carried:
+                    - resources
                 resources:
                     - source-tags
           kind: tag
@@ -40,6 +46,9 @@ pipelines:
         - timeout: 15m0s
           ext:
             concourse:
+                _carried:
+                    - gets
+                _checkout: {}
                 gets:
                     - get: source
                       trigger: true

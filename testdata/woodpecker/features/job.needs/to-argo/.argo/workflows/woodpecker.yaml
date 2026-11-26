@@ -1,5 +1,9 @@
+# pipemaster:emulated step.action pipeline/woodpecker/job/lint/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated step.image pipeline/woodpecker/job/lint
 # pipemaster:arg {"steps":{"lint":"ref: golangci/golangci-lint:v2\n"},"wrote":{"lint":"golangci/golangci-lint:v2"}}
+# pipemaster:emulated step.action pipeline/woodpecker/job/ship/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated step.image pipeline/woodpecker/job/ship
 # pipemaster:arg {"steps":{"ship":"ref: alpine:3.20\n"},"wrote":{"ship":"alpine:3.20"}}
 # pipemaster:emulated trigger.filter.branches pipeline/woodpecker/trigger/0
@@ -10,6 +14,12 @@ metadata:
   name: woodpecker
 spec:
   entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-sha
+        value: ""
+      - name: ctx-repo
+        value: ""
   templates:
     - name: main
       dag:
@@ -23,7 +33,8 @@ spec:
     - name: lint
       containerSet:
         containers:
-          - name: lint
+          - # pipemaster:id lint
+            name: main
             image: golangci/golangci-lint:v2
             command:
               - sh
@@ -34,13 +45,21 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+      inputs:
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       volumes:
         - emptyDir: {}
           name: workspace
     - name: ship
       containerSet:
         containers:
-          - name: ship
+          - # pipemaster:id ship
+            name: main
             image: alpine:3.20
             command:
               - sh
@@ -51,6 +70,13 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+      inputs:
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       volumes:
         - emptyDir: {}
           name: workspace

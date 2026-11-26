@@ -1,3 +1,5 @@
+# pipemaster:emulated step.action pipeline/woodpecker/job/ci/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"{\"name\":\"source-checkout\",\"params\":[{\"name\":\"url\",\"value\":\"https://github.com/$(params.ctx-repo).git\"},{\"name\":\"revision\",\"value\":\"$(params.ctx-sha)\"},{\"name\":\"output-path\",\"value\":\"/workspace\"}],\"ref\":{\"params\":[{\"name\":\"url\",\"value\":\"https://github.com/tektoncd-catalog/git-clone.git\"},{\"name\":\"revision\",\"value\":\"v1.7.1\"},{\"name\":\"pathInRepo\",\"value\":\"stepaction/git-clone/git-clone.yaml\"}],\"resolver\":\"git\"}}","at":0}
 # pipemaster:emulated step.if pipeline/woodpecker/job/ci/step/deploy
 apiVersion: tekton.dev/v1
 kind: Task
@@ -5,10 +7,31 @@ metadata:
   name: woodpecker-ci
 spec:
   params:
+    - name: ctx-repo
+    - name: ctx-sha
     - name: ctx-event
     - name: ctx-branch
     - name: ctx-actor
+  stepTemplate:
+    workingDir: /workspace
   steps:
+    - name: source-checkout
+      ref:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/tektoncd-catalog/git-clone.git
+          - name: revision
+            value: v1.7.1
+          - name: pathInRepo
+            value: stepaction/git-clone/git-clone.yaml
+      params:
+        - name: url
+          value: https://github.com/$(params.ctx-repo).git
+        - name: revision
+          value: $(params.ctx-sha)
+        - name: output-path
+          value: /workspace
     - name: deploy
       image: alpine:3.20
       script: |-

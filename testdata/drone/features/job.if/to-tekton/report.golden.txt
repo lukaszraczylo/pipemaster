@@ -1,2 +1,2 @@
 Loss report: drone -> tekton
-No losses: every feature converted natively.
+[emulated] pipeline/drone/job/ci/step/source-checkout step.action: StepAction ref to the tektoncd-catalog git-clone through the git resolver (the ctx-repo and ctx-sha params carry the repository and the commit)

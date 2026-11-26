@@ -8,6 +8,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
 	"github.com/lukaszraczylo/pipemaster/vars"
 )
@@ -44,6 +45,7 @@ type project struct {
 func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	proj, rep, err := adapter{}.parseSource(fsys)
 	vars.Strip(proj)
+	emitkit.DropSourceCheckout(proj, emitkit.GeneratedCheckouts(fsys))
 	return proj, rep, err
 }
 

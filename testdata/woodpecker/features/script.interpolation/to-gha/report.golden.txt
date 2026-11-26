@@ -1,6 +1,7 @@
 Loss report: woodpecker -> gha
 [emulated] pipeline/woodpecker job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/woodpecker/job/ci job.runner: default runner label ubuntu-latest (the IR holds no runner label)
+[emulated] pipeline/woodpecker/job/ci step.action: actions/checkout step (Woodpecker clones the repository before the steps (https://woodpecker-ci.org/docs/usage/workflow-syntax); the depth and recursive settings of the clone map to the step inputs, and GHA does not clone)
 [emulated] pipeline/woodpecker/job/ci/step/build script.interpolation: variable prelude (the script reads CI_COMMIT_BRANCH, which gha does not set; a prelude defines them from the gha values)
 [emulated] pipeline/woodpecker/job/ci/step/build step.image: uses: docker://<image> with entrypoint and args
 [emulated] pipeline/woodpecker/trigger/0 trigger.push: branches: '**' (GHA fires a push without filters for branches and tags; branches are named explicitly to leave tags out or beside a tag filter)

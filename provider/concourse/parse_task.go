@@ -12,6 +12,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/actions"
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -159,7 +160,8 @@ func (jb *jobBuilder) fileTask(st *ir.Step, k *sink, m *omap, file, written stri
 				jb.fileShell(ts, scratch)
 				ts.Script = jb.fileScript(ts, m, file, cfg, scratch, line)
 				st.Kind, st.Script, st.Shell, st.WorkDir, st.Image = ir.StepScript, ts.Script, ts.Shell, ts.WorkDir, ts.Image
-				jb.fileNotes(file, scratch, scratchRep, m, line)
+				jb.fileNotes(file, scratch, scratchRep, m, line, !isPowershell(ts.Shell))
+				jb.b.read[rel] = true
 				return params, true
 			}
 			why = "the task file has no script that the IR can hold"
@@ -326,6 +328,13 @@ func (jb *jobBuilder) fileLayout(ts *ir.Step, m *omap, file string, cfg *omap, s
 			}
 			continue
 		}
+		if g, ok := jb.gets[art]; ok {
+			if line, cloned := jb.cloneLine(g, in.dir); cloned {
+				lines = append(lines, line)
+				made = append(made, fmt.Sprintf("clone the repository of resource %s into %s (artifact %s); the image of the task must hold git", resourceName(g.m), in.dir, art))
+				continue
+			}
+		}
 		if in.optional {
 			made = append(made, "skip the optional input "+in.name+" (artifact "+art+" has no source)")
 			continue
@@ -365,7 +374,7 @@ func (jb *jobBuilder) fileLayout(ts *ir.Step, m *omap, file string, cfg *omap, s
 
 // fileNotes reports what a task file holds that the IR step does not: the keys with no IR field, run keys such as
 // user with their values, and the notes of the config reader.
-func (jb *jobBuilder) fileNotes(file string, scratch *sink, rep *report.Report, m *omap, line int) {
+func (jb *jobBuilder) fileNotes(file string, scratch *sink, rep *report.Report, m *omap, line int, layout bool) {
 	add := func(f caps.Feature, detail string) {
 		jb.k.Rep.Add(report.Entry{
 			IRPath: scratch.Path, Feature: f, Level: caps.Lost, Strategy: "kept in the task file",
@@ -373,7 +382,20 @@ func (jb *jobBuilder) fileNotes(file string, scratch *sink, rep *report.Report, 
 		})
 	}
 	if rest, ok := scratch.Out[ExtConfig].(map[string]any); ok && len(rest) > 0 {
-		add(caps.ExtPassthrough, fmt.Sprintf("task file %s: keys %s have no IR field; they stay in the task file", file, strings.Join(sortedKeys(rest), ", ")))
+		var keys []string
+		for _, key := range sortedKeys(rest) {
+			switch {
+			case (key == "inputs" || key == "outputs") && layout:
+				// fileLayout lays the directories out and reports what it made or could not make.
+			case key == "platform":
+				jb.platformNote("task file "+file, rest[key], scratch, line)
+			default:
+				keys = append(keys, key)
+			}
+		}
+		if len(keys) > 0 {
+			add(caps.ExtPassthrough, fmt.Sprintf("task file %s: keys %s have no IR field; they stay in the task file and no target runs them", file, strings.Join(keys, ", ")))
+		}
 	}
 	if run, ok := scratch.Out[ExtRun].(map[string]any); ok && len(run) > 0 {
 		var kv []string
@@ -717,4 +739,100 @@ func acrossBody(step *omap, mx *ir.Matrix) ([]any, bool) {
 		return nil, false
 	}
 	return []any{rest}, true
+}
+
+// platformNote reports the platform of a task file. A linux task runs on the runner of every target; any other
+// platform needs a runner of that kind, which the operator provides.
+func (jb *jobBuilder) platformNote(what string, v any, scratch *sink, line int) {
+	p, isText := v.(string)
+	if !isText {
+		p, _ = text(v)
+	}
+	if p == "linux" {
+		jb.k.Rep.Retained = append(jb.k.Rep.Retained, report.Entry{
+			IRPath: scratch.Path, Feature: caps.ExtPassthrough, Level: caps.Lost, Strategy: strategyExt,
+			Detail: what + ": platform linux runs on the runner of every target; the key stays in round-trip metadata", SourceLoc: jb.k.Loc(line),
+		})
+		return
+	}
+	jb.k.Rep.Add(report.Entry{
+		IRPath: scratch.Path, Feature: caps.JobRunner, Level: caps.External, Strategy: "runner of the platform",
+		Detail:    fmt.Sprintf("%s: platform %s needs a runner of that platform on the target; register one with a matching label and set it as the job runner", what, p),
+		SourceLoc: jb.k.Loc(line),
+	})
+}
+
+// sourceCheckout records in the job Ext that the job reads the repository that holds the pipeline: a leading get of
+// that repository. A target that fetches nothing by itself, such as GitHub Actions, needs a checkout for it. The
+// get stays in the Ext and the Concourse emitter writes it back, so the IR has no checkout step of its own.
+func (jb *jobBuilder) sourceCheckout(gets []any, hasSteps bool) {
+	if !hasSteps {
+		return
+	}
+	for _, g := range gets {
+		gm, isMap := g.(map[string]any)
+		if !isMap {
+			continue
+		}
+		name, _ := gm["get"].(string)
+		if info := jb.gets[name]; info.res == nil || !jb.b.isRepository(info.res) {
+			continue
+		}
+		val := map[string]any{}
+		if p, isParams := gm["params"].(map[string]any); isParams {
+			if n, err := strconv.Atoi(fmt.Sprint(p["depth"])); err == nil && n > 0 {
+				val["depth"] = n
+			}
+		}
+		jb.k.Out[emitkit.CheckoutKey] = val
+		return
+	}
+}
+
+// cloneLine is the script line that clones a git resource of another repository into dir. It needs a literal uri,
+// a source of uri and branch only, and no get params except depth; any other get has no clone form.
+func (jb *jobBuilder) cloneLine(g getInfo, dir string) (string, bool) {
+	if g.res == nil || !jb.b.builtin(g.res, typeGit) || jb.b.isRepository(g.res) {
+		return "", false
+	}
+	src := g.res.source()
+	if src == nil {
+		return "", false
+	}
+	for _, key := range src.Order {
+		if key != "uri" && key != "branch" {
+			return "", false
+		}
+	}
+	uri, _ := text(src.Vals["uri"])
+	branch, _ := text(src.Vals["branch"])
+	if uri == "" || strings.Contains(uri, varOpen) || strings.HasPrefix(uri, "-") || strings.Contains(branch, varOpen) || strings.HasPrefix(branch, "-") {
+		return "", false
+	}
+	depth := ""
+	for _, key := range g.m.Order {
+		switch key {
+		case "get", "resource", "trigger", "passed":
+		case "params":
+			p, ok := asMap(g.m.Vals[key])
+			if !ok || len(p.Order) != 1 || p.Order[0] != "depth" {
+				return "", false
+			}
+			d, _ := text(p.Vals["depth"])
+			if n, err := strconv.Atoi(d); err != nil || n <= 0 {
+				return "", false
+			}
+			depth = d
+		default:
+			return "", false
+		}
+	}
+	args := "git clone"
+	if depth != "" {
+		args += " --depth " + depth
+	}
+	if branch != "" {
+		args += " --branch " + shellQuote(branch)
+	}
+	return fmt.Sprintf("[ -e %[1]s ] || %[2]s -- %[3]s %[1]s", dir, args, shellQuote(uri)), true
 }

@@ -3,5 +3,5 @@ Loss report: gitlab -> forgejo
 [emulated] pipeline/gitlab-ci job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/gitlab-ci pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)
 [emulated] pipeline/gitlab-ci/job/test job.runner: default runner label ubuntu-latest (the IR holds no runner label)
-[emulated] pipeline/gitlab-ci/job/test step.action: actions/checkout step (GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs)
+[emulated] pipeline/gitlab-ci/job/test step.action: actions/checkout step (GitLab clones the repository before every job; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs, and GHA does not clone)
 [native] pipeline/gitlab-ci/job/test/synth/checkout step.action (printed as an absolute URL; an instance that cannot reach https://github.com needs the URL edited)

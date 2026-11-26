@@ -1,5 +1,5 @@
 # pipemaster:emulated trigger.filter.branches pipeline/ci
-# pipemaster:arg "- ext:\n    concourse:\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
+# pipemaster:arg "- ext:\n    concourse:\n        _carried:\n            - resources\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        _carried:\n            - resources\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
 kind: pipeline
 type: docker
 name: build

@@ -242,8 +242,15 @@ func (e *emitter) condition(path string, f caps.Feature, x expr.Expr, what strin
 	return items, status, true
 }
 
+// eventEquals is the text before a promote or rollback event name in a rendered condition.
+const eventEquals = "== '"
+
 func (e *emitter) disable(path string, f caps.Feature, x expr.Expr, what string) {
-	e.lose(path, f, "condition not expressible in Woodpecker CI; "+what+" disabled")
+	detail := "condition not expressible in Woodpecker CI; " + what + " disabled"
+	if s := expr.String(x); strings.Contains(s, eventEquals+"promote'") || strings.Contains(s, eventEquals+"rollback'") {
+		detail += "; a Drone promote or rollback is nearest to the Woodpecker deployment event, and the Drone target filter (https://docs.drone.io/pipeline/triggers/) has no Woodpecker form"
+	}
+	e.lose(path, f, detail)
 	if expr.HasOpaque(x) && f != caps.ExprOpaque {
 		e.lose(path, caps.ExprOpaque, "an opaque expression of another dialect has no Woodpecker form")
 	}
@@ -780,10 +787,10 @@ func (e *emitter) noteSourceEvents(pipelineID string) {
 	}
 	if len(names) > 0 {
 		e.emulate(path, caps.TriggerManual, "manual or deployment event",
-			"the source runs on these events when its file names no trigger; Woodpecker starts each as its nearest event: "+strings.Join(names, ", "))
+			"the source runs on these events and its file has no trigger form for them; Woodpecker starts each as its nearest event: "+strings.Join(names, ", "))
 	}
 	for _, g := range provider.GroupByFeature(lost) {
-		e.noteLost(path, g.Feature, "the source runs on the events "+strings.Join(g.Names, ", ")+" when its file names no trigger; Woodpecker has no event for them")
+		e.noteLost(path, g.Feature, "the source runs on the events "+strings.Join(g.Names, ", ")+" and its file has no trigger form for them; Woodpecker has no event for them")
 	}
 }
 

@@ -1,3 +1,4 @@
+# pipemaster:emulated ext.passthrough pipeline/.shared
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
@@ -5,10 +6,20 @@ metadata:
   name: shared
 spec:
   displayName: shared
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: run
       taskRef:
         name: shared-run
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
 ---
 # pipemaster:emulated project.multi_pipeline pipeline/ci
 apiVersion: tekton.dev/v1
@@ -17,7 +28,17 @@ metadata:
   name: ci
 spec:
   displayName: CI
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: build
       taskRef:
         name: ci-build
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)

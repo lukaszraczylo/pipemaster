@@ -1,0 +1,18 @@
+{
+  "features": [
+    "step.script",
+    "step.env"
+  ],
+  "events": [
+    "push-main"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": [
+    "repo.seed:seed",
+    "outputs.consume:1.2.3",
+    "loadvar.announce:1.2.3"
+  ],
+  "owners": {},
+  "requires": []
+}

@@ -39,6 +39,9 @@ func (e *Env) Convert(ctx context.Context, fx Fixture, target string) (*Converte
 	if code != 0 {
 		return c, nil
 	}
+	if err := copyRepoFiles(fx.Dir, out); err != nil {
+		return nil, fmt.Errorf("convert %s/%s to %s: %w", fx.Source, fx.Name, target, err)
+	}
 	i := strings.Index(text, "\n{")
 	if strings.HasPrefix(text, "{") {
 		i = -1

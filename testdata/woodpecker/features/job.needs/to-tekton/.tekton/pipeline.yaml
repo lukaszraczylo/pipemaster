@@ -3,12 +3,27 @@ kind: Pipeline
 metadata:
   name: woodpecker
 spec:
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: lint
       taskRef:
         name: woodpecker-lint
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
     - name: ship
       taskRef:
         name: woodpecker-ship
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       runAfter:
         - lint

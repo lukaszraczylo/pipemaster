@@ -1,5 +1,5 @@
 # pipemaster:emulated trigger.filter.branches pipeline/ci
-# pipemaster:arg "- ext:\n    concourse:\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
+# pipemaster:arg "- ext:\n    concourse:\n        _carried:\n            - resources\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        _carried:\n            - resources\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v4\nwith:\n    fetch-depth:\n        lit: \"0\"\n    token:\n        secret: PAT\nid: build-step-1\nkind: action\n","at":0}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2

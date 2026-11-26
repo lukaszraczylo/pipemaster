@@ -1,3 +1,4 @@
 Loss report: drone -> tekton
 [external] pipeline/drone/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [emulated] pipeline/drone/job/ci job.cache: shared workspace (the workspace is mounted at /pipemaster; cache paths are not copied in or out and nothing persists between runs; to persist, the operator binds a PVC (or an object store step) that outlives the PipelineRun)
+[emulated] pipeline/drone/job/ci/step/source-checkout step.action: StepAction ref to the tektoncd-catalog git-clone through the git resolver (the ctx-repo and ctx-sha params carry the repository and the commit)

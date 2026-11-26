@@ -45,6 +45,7 @@ func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) 
 
 func (a adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, error) {
 	p, vres := vars.Prepare(p, dialect)
+	p, checkouts := emitkit.WithSourceCheckout(p)
 	origin := ""
 	if p != nil {
 		origin = p.Origin.Provider
@@ -54,6 +55,7 @@ func (a adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, err
 		files: map[string][]*outDoc{}, owners: map[string]*outDoc{}, marked: map[ir.FeatureUse]bool{},
 		taken: map[string]bool{}, made: map[string]bool{}, skipped: map[string]bool{},
 	}
+	emitkit.RetainSourceCheckout(e.led, checkouts)
 	e.gated = emitkit.GatedSteps(p)
 	uses := ir.Features(p)
 	for _, u := range uses {

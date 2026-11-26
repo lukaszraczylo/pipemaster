@@ -1,6 +1,3 @@
 Loss report: concourse -> woodpecker
-[lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the Woodpecker file; it is kept in round-trip metadata)
-[lost] pipeline/ci/job/build ext.passthrough (Ext of provider concourse (gets) is not written to the Woodpecker file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-run ext.passthrough (Ext of provider concourse (config, input_mapping) is not written to the Woodpecker file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the Woodpecker file; it is kept in round-trip metadata)
 [external] pipeline/ci/job/build job.if: pull request test (Woodpecker holds the target branch in CI_COMMIT_BRANCH on a pull request, so the condition gains a pull request test; the source condition is kept in a marker)

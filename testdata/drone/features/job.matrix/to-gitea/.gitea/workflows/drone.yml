@@ -4,6 +4,8 @@
 # pipemaster:emulated job.runner pipeline/drone/job/ci
 # pipemaster:emulated step.image pipeline/drone/job/ci/step/test
 # pipemaster:arg {"kind":"script","image":{"Ref":"golang:$\u007b{ matrix.GO_VERSION }}","Entrypoint":null},"script":["go test ./...","echo $\u007b{ matrix.OS }}"],"run":true}
+# pipemaster:emulated job.artifacts pipeline/drone/job/ci
+# pipemaster:arg {"pre":1,"post":0}
 on:
   push:
     branches:
@@ -21,6 +23,7 @@ jobs:
           - linux
           - darwin
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated step.image pipeline/drone/job/ci/step/test
       - id: test
         run: docker run --rm -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" --entrypoint /bin/sh -- "$PIPEMASTER_IMAGE" -ec "$PIPEMASTER_SCRIPT"

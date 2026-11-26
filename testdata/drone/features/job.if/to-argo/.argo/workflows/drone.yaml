@@ -1,3 +1,5 @@
+# pipemaster:emulated step.action pipeline/drone/job/ci/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated step.image pipeline/drone/job/ci
 # pipemaster:arg {"steps":{"build":"ref: golang:1.25\n"},"wrote":{"build":"golang:1.25"}}
 apiVersion: argoproj.io/v1alpha1
@@ -9,6 +11,10 @@ spec:
   arguments:
     parameters:
       - name: ctx-event
+        value: ""
+      - name: ctx-sha
+        value: ""
+      - name: ctx-repo
         value: ""
       - name: ctx-actor
         value: ""
@@ -22,7 +28,8 @@ spec:
     - name: ci
       containerSet:
         containers:
-          - name: build
+          - # pipemaster:id build
+            name: main
             image: golang:1.25
             command:
               - sh
@@ -33,6 +40,13 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+      inputs:
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       volumes:
         - emptyDir: {}
           name: workspace

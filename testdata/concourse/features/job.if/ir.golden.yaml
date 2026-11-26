@@ -6,6 +6,8 @@ origin:
 pipelines:
     - ext:
         concourse:
+            _carried:
+                - resources
             resources:
                 - name: source
                   source:
@@ -16,6 +18,8 @@ pipelines:
       triggers:
         - ext:
             concourse:
+                _carried:
+                    - resources
                 resources:
                     - source
           kind: push
@@ -26,6 +30,9 @@ pipelines:
         - if: branch == 'main'
           ext:
             concourse:
+                _carried:
+                    - gets
+                _checkout: {}
                 gets:
                     - get: source
                       trigger: true

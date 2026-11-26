@@ -1,10 +1,8 @@
 Loss report: concourse -> forgejo
-[lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata)
-[lost] pipeline/ci/job/test ext.passthrough (Ext of provider concourse (gets) is not written to the GHA file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/test/step/test-step-1 ext.passthrough (Ext of provider concourse (config, input_mapping, tags) is not written to the GHA file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata)
 [emulated] pipeline/ci job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/ci pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)
 [emulated] pipeline/ci/job/test job.runner: default runner label ubuntu-latest (the IR holds no runner label)
+[emulated] pipeline/ci/job/test step.action: actions/checkout step (Concourse fetches the repository with the get of the job; the depth param of the get maps to the step input, and GHA does not clone)
 [emulated] pipeline/ci/job/test/step/test-step-1 step.image: uses: docker://<image> with entrypoint and args
+[native] pipeline/ci/job/test/synth/checkout step.action (printed as an absolute URL; an instance that cannot reach https://github.com needs the URL edited)

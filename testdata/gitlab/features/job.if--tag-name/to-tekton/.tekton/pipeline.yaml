@@ -6,6 +6,10 @@ spec:
   params:
     - name: ctx-tag
       default: ""
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: release
       taskRef:
@@ -13,6 +17,10 @@ spec:
       params:
         - name: ctx-tag
           value: $(params.ctx-tag)
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       when:
         - input: pipemaster-disabled
           operator: in

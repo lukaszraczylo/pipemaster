@@ -286,7 +286,7 @@ steps:
         line" ; touch PWNED_SENTINEL2
 `
 
-// ghaStep decodes the first step of the only job of an emitted GHA workflow.
+// ghaStep decodes the first step of the only job of an emitted GHA workflow, after the clone that a Drone, Woodpecker or GitLab source gets.
 func ghaStep(t *testing.T, files map[string][]byte) map[string]any {
 	t.Helper()
 	for n, b := range files {
@@ -302,7 +302,11 @@ func ghaStep(t *testing.T, files map[string][]byte) map[string]any {
 			t.Fatal(err)
 		}
 		for _, j := range doc.Jobs {
-			return j.Steps[0]
+			for _, st := range j.Steps {
+				if uses, _ := st["uses"].(string); !strings.Contains(uses, "actions/checkout") {
+					return st
+				}
+			}
 		}
 	}
 	t.Fatal("no workflow emitted")

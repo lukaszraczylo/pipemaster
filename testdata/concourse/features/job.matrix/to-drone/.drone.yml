@@ -1,5 +1,5 @@
 # pipemaster:emulated trigger.filter.branches pipeline/ci
-# pipemaster:arg "- ext:\n    concourse:\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
+# pipemaster:arg "- ext:\n    concourse:\n        _carried:\n            - resources\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        _carried:\n            - resources\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"matrix":{"FailFast":false,"Axes":[{"Name":"os","Values":["ubuntu-latest","macos-latest"]},{"Name":"go","Values":["1.24","1.25"]}],"Include":[[{"Key":"experimental","Value":"true"},{"Key":"go","Value":"1.25"},{"Key":"os","Value":"ubuntu-latest"}]],"Exclude":[[{"Key":"go","Value":"1.24"},{"Key":"os","Value":"macos-latest"}]],"MaxParallel":2},"job":"test","cell":[{"Key":"go","Value":"1.24"},{"Key":"os","Value":"ubuntu-latest"}],"held":[{"script":["echo $$\u007b{ matrix.go }}"],"pos":0}],"index":0}
 kind: pipeline
@@ -19,7 +19,7 @@ steps:
       - echo 1.24
 ---
 # pipemaster:emulated trigger.filter.branches pipeline/ci
-# pipemaster:arg "- ext:\n    concourse:\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
+# pipemaster:arg "- ext:\n    concourse:\n        _carried:\n            - resources\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        _carried:\n            - resources\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"job":"test","cell":[{"Key":"experimental","Value":"true"},{"Key":"go","Value":"1.25"},{"Key":"os","Value":"ubuntu-latest"}],"index":1}
 kind: pipeline
@@ -39,7 +39,7 @@ steps:
       - echo 1.25
 ---
 # pipemaster:emulated trigger.filter.branches pipeline/ci
-# pipemaster:arg "- ext:\n    concourse:\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
+# pipemaster:arg "- ext:\n    concourse:\n        _carried:\n            - resources\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        _carried:\n            - resources\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"job":"test","cell":[{"Key":"go","Value":"1.25"},{"Key":"os","Value":"macos-latest"}],"index":2}
 kind: pipeline

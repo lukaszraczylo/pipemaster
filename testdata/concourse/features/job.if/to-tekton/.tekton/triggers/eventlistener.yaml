@@ -29,6 +29,10 @@ spec:
               value:
                 - key: ctx_branch
                   expression: body.ref.replace('refs/heads/','',1)
+                - key: ctx_sha
+                  expression: body.after
+                - key: ctx_repo
+                  expression: body.repository.full_name
       bindings:
         - ref: ci-github
       template:

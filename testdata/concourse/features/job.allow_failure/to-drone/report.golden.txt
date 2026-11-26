@@ -1,10 +1,6 @@
 Loss report: concourse -> drone
 [lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
-[lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the Drone file; it is kept in round-trip metadata)
-[lost] pipeline/ci/job/flaky ext.passthrough (Ext of provider concourse (gets) is not written to the Drone file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/flaky/step/flaky-step-1 ext.passthrough (Ext of provider concourse (config, input_mapping, tags) is not written to the Drone file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the Drone file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider concourse (resources) is not written to the Drone file; it is kept in round-trip metadata)
 [emulated] pipeline/ci/job/flaky job.allow_failure: failure ignore on every step (later steps still run after a failed step)
 [emulated] pipeline/ci/trigger/0 trigger.filter.branches: ref filter (the filters of the triggers differ, so each is written as a ref: refs/heads/<pattern>, refs/tags/<pattern>, refs/pull/*/head for a pull request on GitHub)
 [emulated] pipeline/ci/trigger/1 trigger.filter.tags: ref filter refs/tags/<pattern> on the tag event (the glob dialect is doublestar; the parser reads it back as the tag trigger filter, and branch is not available on tag events)

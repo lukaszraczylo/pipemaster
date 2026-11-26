@@ -813,10 +813,11 @@ func withoutWorkspace(v any) any {
 	return v
 }
 
-// uniqueStepIDs numbers a repeated step ID, such as a second checkout, because the IR needs one ID per step.
+// uniqueStepIDs numbers a repeated step ID, such as a second checkout, because the IR needs one ID per step. A
+// container keeps its ID over a git artifact, because a marker finds the container by that ID.
 func (b *jobBuilder) uniqueStepIDs() {
 	seen := map[string]bool{}
-	for _, st := range b.job.Steps {
+	name := func(st *ir.Step) {
 		id := st.ID
 		for n := 2; seen[id]; n++ {
 			id = st.ID + "-" + strconv.Itoa(n)
@@ -829,5 +830,12 @@ func (b *jobBuilder) uniqueStepIDs() {
 			st.ID = id
 		}
 		seen[id] = true
+	}
+	for _, art := range []bool{false, true} {
+		for _, st := range b.job.Steps {
+			if _, isArt := b.gitArts[st]; isArt == art {
+				name(st)
+			}
+		}
 	}
 }

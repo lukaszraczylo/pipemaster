@@ -1,6 +1,8 @@
 # pipemaster:emulated job.runner pipeline/.shared/job/run
 # pipemaster:emulated step.image pipeline/.shared/job/run/step/run-step-1
 # pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo run"]}
+# pipemaster:emulated job.artifacts pipeline/.shared/job/run
+# pipemaster:arg {"pre":1,"post":0}
 name: shared
 on:
   # pipemaster:emulated trigger.manual pipeline/.shared
@@ -9,6 +11,7 @@ jobs:
   run:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated step.image pipeline/.shared/job/run/step/run-step-1
       - id: run-step-1
         uses: docker://ubuntu:latest

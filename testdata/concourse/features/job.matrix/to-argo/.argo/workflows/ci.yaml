@@ -1,3 +1,5 @@
+# pipemaster:emulated step.action pipeline/ci/job/test/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"fail_fast":false,"axes":[{"Name":"os","Values":["ubuntu-latest","macos-latest"]},{"Name":"go","Values":["1.24","1.25"]}],"include":[[{"Key":"experimental","Value":"true"},{"Key":"go","Value":"1.25"},{"Key":"os","Value":"ubuntu-latest"}]],"exclude":[[{"Key":"go","Value":"1.24"},{"Key":"os","Value":"macos-latest"}]],"max_parallel":2}
 # pipemaster:emulated step.image pipeline/ci/job/test
@@ -15,6 +17,12 @@ metadata:
     workflows.argoproj.io/title: matrix
 spec:
   entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-sha
+        value: ""
+      - name: ctx-repo
+        value: ""
   templates:
     - name: main
       dag:
@@ -42,7 +50,8 @@ spec:
     - name: test
       containerSet:
         containers:
-          - name: test-step-1
+          - # pipemaster:id test-step-1
+            name: main
             image: ubuntu:latest
             command:
               - sh
@@ -58,6 +67,12 @@ spec:
           - name: go
           - name: os
           - name: experimental
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       volumes:
         - emptyDir: {}
           name: workspace

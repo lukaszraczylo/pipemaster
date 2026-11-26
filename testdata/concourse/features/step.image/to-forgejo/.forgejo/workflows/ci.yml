@@ -4,11 +4,15 @@
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"kind":"script","image":{"Ref":"alpine:3.20","Entrypoint":null},"script":["make build"]}
+# pipemaster:emulated job.artifacts pipeline/ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.if pipeline/ci/job/deploy
 # pipemaster:arg {"from":"concourse","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/deploy
 # pipemaster:emulated step.image pipeline/ci/job/deploy/step/deploy-step-1
 # pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["make deploy"]}
+# pipemaster:emulated job.artifacts pipeline/ci/job/deploy
+# pipemaster:arg {"pre":1,"post":0}
 name: base
 on:
   push:
@@ -24,6 +28,7 @@ jobs:
     if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
+      - uses: https://github.com/actions/checkout@v7
       # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
       - id: build-step-1
         uses: docker://alpine:3.20
@@ -36,6 +41,7 @@ jobs:
     if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
+      - uses: https://github.com/actions/checkout@v7
       # pipemaster:emulated step.image pipeline/ci/job/deploy/step/deploy-step-1
       - id: deploy-step-1
         uses: docker://ubuntu:latest

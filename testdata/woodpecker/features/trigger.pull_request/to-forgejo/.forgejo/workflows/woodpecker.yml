@@ -2,6 +2,8 @@
 # pipemaster:emulated job.runner pipeline/woodpecker/job/ci
 # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/build
 # pipemaster:arg {"kind":"script","image":{"Ref":"golang:1.25","Entrypoint":null},"script":["go build ./..."]}
+# pipemaster:emulated job.artifacts pipeline/woodpecker/job/ci
+# pipemaster:arg {"pre":1,"post":0}
 on:
   pull_request:
 concurrency:
@@ -11,6 +13,7 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
+      - uses: https://github.com/actions/checkout@v7
       # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/build
       - id: build
         uses: docker://golang:1.25

@@ -78,6 +78,8 @@ type Workspace struct {
 	Dir string
 	SHA string
 	Ev  Event
+	// Converted is true when Dir holds pipemaster output, false when it holds the native source fixture.
+	Converted bool
 }
 
 // NewWorkspace copies src (without fixture.json) into a fresh git repository and positions it for the event: main

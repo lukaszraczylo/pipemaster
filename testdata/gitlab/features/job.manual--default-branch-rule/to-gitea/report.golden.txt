@@ -2,5 +2,5 @@ Loss report: gitlab -> gitea
 [emulated] pipeline/gitlab-ci/job/publish job.if: approximate expression translation (GitHub compares strings case-insensitively)
 [emulated] pipeline/gitlab-ci/job/publish job.manual: workflow_dispatch trigger
 [emulated] pipeline/gitlab-ci/job/publish job.runner: default runner label ubuntu-latest (the IR holds no runner label)
-[emulated] pipeline/gitlab-ci/job/publish step.action: actions/checkout step (GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs)
+[emulated] pipeline/gitlab-ci/job/publish step.action: actions/checkout step (GitLab clones the repository before every job; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs, and GHA does not clone)
 [native] pipeline/gitlab-ci/job/publish/synth/checkout step.action (resolves against DEFAULT_ACTIONS_URL; default github)

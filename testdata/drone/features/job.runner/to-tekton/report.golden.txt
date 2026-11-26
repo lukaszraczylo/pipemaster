@@ -1,3 +1,4 @@
 Loss report: drone -> tekton
 [lost] pipeline/drone/job/ci job.runner (the runner label linux/arm64 has no node selector key: a label key has 1 to 63 letters, digits, dots, underscores or dashes and starts and ends with a letter or digit)
 [external] pipeline/drone/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[emulated] pipeline/drone/job/ci/step/source-checkout step.action: StepAction ref to the tektoncd-catalog git-clone through the git resolver (the ctx-repo and ctx-sha params carry the repository and the commit)

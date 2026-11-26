@@ -1,12 +1,15 @@
 # pipemaster:emulated job.runner pipeline/deploy/job/ship
 # pipemaster:emulated step.image pipeline/deploy/job/ship/step/ship
 # pipemaster:arg {"kind":"script","image":{"Ref":"alpine:3.20","Entrypoint":null},"script":["./ship.sh"]}
+# pipemaster:emulated job.artifacts pipeline/deploy/job/ship
+# pipemaster:arg {"pre":1,"post":0}
 on:
   workflow_dispatch:
 jobs:
   ship:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated step.image pipeline/deploy/job/ship/step/ship
       - id: ship
         uses: docker://alpine:3.20

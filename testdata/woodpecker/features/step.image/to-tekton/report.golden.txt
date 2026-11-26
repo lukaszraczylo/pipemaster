@@ -1,4 +1,4 @@
 Loss report: woodpecker -> tekton
 [external] pipeline/woodpecker/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
-[emulated] pipeline/woodpecker/job/ci step.workdir: shared working directory (the steps run in /workspace, the volume that Tekton mounts in every step; the source runs its steps in one shared directory)
 [emulated] pipeline/woodpecker/job/ci/step/publish step.action: plugin image with PLUGIN_ variables (the settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a list of scalars is comma-joined, any other list or map is JSON; the image entrypoint runs and the step has no script; the plugin starts a Docker daemon, so it sets securityContext.privileged: true and the cluster policy must admit privileged pods)
+[emulated] pipeline/woodpecker/job/ci/step/source-checkout step.action: StepAction ref to the tektoncd-catalog git-clone through the git resolver (the ctx-repo and ctx-sha params carry the repository and the commit)

@@ -1,3 +1,4 @@
+# pipemaster:emulated trigger.schedule pipeline/ci/trigger/0
 apiVersion: argoproj.io/v1alpha1
 kind: CronWorkflow
 metadata:

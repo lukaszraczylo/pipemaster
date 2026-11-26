@@ -3,12 +3,27 @@ kind: Pipeline
 metadata:
   name: drone
 spec:
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: lint
       taskRef:
         name: drone-lint
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
     - name: ship
       taskRef:
         name: drone-ship
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       runAfter:
         - lint

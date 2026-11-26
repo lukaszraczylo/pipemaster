@@ -15,7 +15,16 @@ spec:
       type: string
       description: Image tag to deploy
       default: latest
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: deploy
       taskRef:
         name: gitlab-ci-deploy
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)

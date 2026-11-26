@@ -8,6 +8,10 @@ spec:
       default: ""
     - name: ctx-event
       default: ""
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: build
       taskRef:
@@ -17,3 +21,7 @@ spec:
           value: $(params.ctx-branch)
         - name: ctx-event
           value: $(params.ctx-event)
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)

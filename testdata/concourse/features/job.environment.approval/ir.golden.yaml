@@ -6,6 +6,8 @@ origin:
 pipelines:
     - ext:
         concourse:
+            _carried:
+                - resources
             resources:
                 - name: source
                   source:
@@ -18,6 +20,9 @@ pipelines:
             approval: true
           ext:
             concourse:
+                _carried:
+                    - gets
+                _checkout: {}
                 gets:
                     - get: source
           id: deploy

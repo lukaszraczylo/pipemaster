@@ -6,6 +6,8 @@ origin:
 pipelines:
     - ext:
         concourse:
+            _carried:
+                - resources
             resources:
                 - name: source-tags
                   source:
@@ -22,6 +24,8 @@ pipelines:
       triggers:
         - ext:
             concourse:
+                _carried:
+                    - resources
                 resources:
                     - source-tags-2
           kind: tag
@@ -30,6 +34,8 @@ pipelines:
                 - '!v*-rc*'
         - ext:
             concourse:
+                _carried:
+                    - resources
                 resources:
                     - source-tags
           kind: tag
@@ -39,6 +45,9 @@ pipelines:
       jobs:
         - ext:
             concourse:
+                _carried:
+                    - gets
+                _checkout: {}
                 gets:
                     - get: source-tags
                       trigger: true

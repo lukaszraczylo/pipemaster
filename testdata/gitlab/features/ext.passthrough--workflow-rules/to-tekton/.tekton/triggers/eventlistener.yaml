@@ -34,6 +34,10 @@ spec:
                   expression: ''''''
                 - key: ctx_event
                   expression: '''push'''
+                - key: ctx_sha
+                  expression: body.after
+                - key: ctx_repo
+                  expression: body.repository.full_name
       bindings:
         - ref: gitlab-ci-github
       template:
@@ -63,6 +67,10 @@ spec:
                   expression: body.ref.replace('refs/tags/','',1)
                 - key: ctx_event
                   expression: '''push'''
+                - key: ctx_sha
+                  expression: body.after
+                - key: ctx_repo
+                  expression: body.repository.full_name
       bindings:
         - ref: gitlab-ci-github
       template:

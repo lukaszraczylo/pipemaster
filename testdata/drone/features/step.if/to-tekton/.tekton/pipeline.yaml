@@ -8,6 +8,10 @@ spec:
       default: ""
     - name: ctx-event
       default: ""
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
     - name: ctx-actor
       default: ""
   tasks:
@@ -15,6 +19,10 @@ spec:
       taskRef:
         name: drone-ci
       params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
         - name: ctx-event
           value: $(params.ctx-event)
         - name: ctx-branch

@@ -4,12 +4,13 @@ package behave
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 )
 
 // celEval evaluates the small CEL subset that the converters write into EventListener filters and overlays:
-// string literals, body paths, replace/startsWith/endsWith, string(int(x)), +, ==, !=, &&, || and "in [list]".
+// string literals (also raw r'...'), body paths, replace/startsWith/endsWith/matches, string(int(x)), +, ==, !=, &&, || and "in [list]".
 // It returns an error for anything else, so the caller can record the event as blocked instead of guessing.
 func celEval(expr string, body map[string]any) (any, error) {
 	p := &celParser{src: expr, body: body}
@@ -152,6 +153,15 @@ func (p *celParser) postfix() (any, error) {
 			v = strings.Replace(s, fmt.Sprint(args[0]), fmt.Sprint(args[1]), n)
 		case "startsWith":
 			v = len(args) == 1 && strings.HasPrefix(s, fmt.Sprint(args[0]))
+		case "matches":
+			if len(args) != 1 {
+				return nil, fmt.Errorf("matches takes one argument")
+			}
+			re, rerr := regexp.Compile(fmt.Sprint(args[0]))
+			if rerr != nil {
+				return nil, fmt.Errorf("matches: %w", rerr)
+			}
+			v = re.MatchString(s)
 		case "endsWith":
 			v = len(args) == 1 && strings.HasSuffix(s, fmt.Sprint(args[0]))
 		default:
@@ -199,6 +209,15 @@ func (p *celParser) primary() (any, error) {
 		return nil, fmt.Errorf("unexpected end")
 	}
 	switch c := p.src[p.pos]; {
+	case c == 'r' && p.pos+1 < len(p.src) && p.src[p.pos+1] == '\'':
+		// A raw string keeps its backslashes, which a regular expression needs.
+		end := strings.IndexByte(p.src[p.pos+2:], '\'')
+		if end < 0 {
+			return nil, fmt.Errorf("unterminated string")
+		}
+		s := p.src[p.pos+2 : p.pos+2+end]
+		p.pos += end + 3
+		return s, nil
 	case c == '\'':
 		end := strings.IndexByte(p.src[p.pos+1:], '\'')
 		if end < 0 {

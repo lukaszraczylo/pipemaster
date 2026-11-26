@@ -3,10 +3,20 @@ kind: Pipeline
 metadata:
   name: woodpecker
 spec:
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: ci
       taskRef:
         name: woodpecker-ci
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       matrix:
         include:
           - params:

@@ -58,6 +58,8 @@ type jobBuilder struct {
 	used  map[string]bool
 	// outputs holds the task outputs that earlier file tasks of the job made as directories.
 	outputs map[string]string
+	// loadVars holds the names of the load_var steps that became script steps.
+	loadVars map[string]bool
 	// credNoted holds the image resources whose credentials the report named for this job.
 	credNoted map[string]bool
 	path      string
@@ -65,6 +67,8 @@ type jobBuilder struct {
 	caches []string
 	// inFile is true while the config of a task file is read.
 	inFile bool
+	// getsKept is true when a source get has a key that the target checkout ignores.
+	getsKept bool
 }
 
 func (b *pipeBuilder) job(m *omap) *builtJob {
@@ -113,8 +117,17 @@ func (b *pipeBuilder) job(m *omap) *builtJob {
 	jb.needs(bj, plan)
 	needCarry := jb.gateMarker(bj)
 	jb.k.Out[ExtGets] = gets
+	jb.sourceCheckout(gets, len(steps) > 0)
 	if len(gets) == 0 {
 		jb.k.Out[ExtGets] = []any{}
+	}
+	if v, ok := r.Take("public"); ok {
+		jb.k.Out["public"] = plain(v)
+		jb.k.Rep.Add(jb.entry(caps.ExtPassthrough, caps.External, strategyExt,
+			"public makes the builds visible to everyone. Visibility is a server setting of the target: the repository or project visibility on GitHub, GitLab, Gitea and Forgejo, the repository visibility on Drone and Woodpecker, and the dashboard access of Tekton and Argo", r.Line("public")))
+	}
+	if jb.getsKept {
+		jb.b.getsKept[jb.job] = true
 	}
 	jb.k.KeepRest(r)
 	j.Ext = jb.k.Ext()
@@ -261,11 +274,10 @@ func (jb *jobBuilder) describeGet(m *omap) any {
 		}
 	}
 	name, _ := text(m.Vals["get"])
-	detail := "get " + name + " is read as the job source and the pipeline trigger; it is kept in Ext"
 	if len(kept) > 0 {
-		detail = fmt.Sprintf("get %s: keys %s have no IR field; the get is kept in Ext", name, strings.Join(kept, ", "))
+		jb.getsKept = true
+		jb.k.Note(caps.ExtPassthrough, fmt.Sprintf("get %s: keys %s have no IR field; the target checkout ignores them and the get is kept in Ext", name, strings.Join(kept, ", ")), m.Lines["get"])
 	}
-	jb.k.Note(caps.ExtPassthrough, detail, m.Lines["get"])
 	return plain(m)
 }
 

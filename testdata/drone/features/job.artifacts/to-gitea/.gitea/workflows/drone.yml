@@ -5,7 +5,7 @@
 # pipemaster:emulated step.image pipeline/drone/job/ci/step/build
 # pipemaster:arg {"kind":"script","image":{"Ref":"golang:1.25","Entrypoint":null},"script":["go build ./..."]}
 # pipemaster:emulated job.artifacts pipeline/drone/job/ci
-# pipemaster:arg {"artifacts":[{"Name":"dist","Expire":"7d","Paths":["dist/"]}],"pre":0,"post":1}
+# pipemaster:arg {"artifacts":[{"Name":"dist","Expire":"7d","Paths":["dist/"]}],"pre":1,"post":1}
 on:
   push:
     branches:
@@ -15,6 +15,7 @@ jobs:
     if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated step.image pipeline/drone/job/ci/step/build
       - id: build
         uses: docker://golang:1.25

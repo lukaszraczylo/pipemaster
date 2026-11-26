@@ -1,8 +1,4 @@
 Loss report: concourse -> gitlab
-[lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the GitLab file; it is kept in round-trip metadata)
-[lost] pipeline/ci/job/test ext.passthrough (Ext of provider concourse (gets) is not written to the GitLab file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/test job.matrix (fail-fast and max-parallel have no GitLab equivalent)
 [lost] pipeline/ci/job/test/step/test-step-1 ext.passthrough (Ext of provider concourse (config, input_mapping, tags) is not written to the GitLab file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/test/step/test-step-1 step.image (GitLab sets the image per job, not per step; the job is not split because the job has a matrix)
-[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the GitLab file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider concourse (resources) is not written to the GitLab file; it is kept in round-trip metadata)

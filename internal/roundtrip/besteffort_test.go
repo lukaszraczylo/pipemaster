@@ -218,6 +218,9 @@ func TestRoundTripWithoutMetaBestEffort(t *testing.T) {
 					for i := range r.backRep.Entries {
 						r.backRep.Entries[i].IRPath = pipelineRE.ReplaceAllLiteralString(r.backRep.Entries[i].IRPath, "pipeline/"+r.src.Pipelines[0].ID)
 					}
+					for i := range r.backRep.Retained {
+						r.backRep.Retained[i].IRPath = pipelineRE.ReplaceAllLiteralString(r.backRep.Retained[i].IRPath, "pipeline/"+r.src.Pipelines[0].ID)
+					}
 				}
 				for _, d := range diffNodes(r.src, r.back) {
 					if !covered(d, r.srcRep, r.toRep, r.backRep) {
