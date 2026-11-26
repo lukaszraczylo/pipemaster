@@ -213,7 +213,7 @@
      "feature": "step.action",
      "level": "emulated",
      "strategy": "actions/checkout step",
-     "detail": "Concourse fetches the repository with the get of the job and GHA does not; the depth param of the get maps to fetch-depth"
+     "detail": "Concourse fetches the repository with the get of the job; the depth param of the get maps to the step input, and GHA does not clone"
     },
     {
      "path": "pipeline/parent/job/test",
