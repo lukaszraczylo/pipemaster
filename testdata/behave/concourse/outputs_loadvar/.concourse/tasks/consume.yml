@@ -1,0 +1,12 @@
+platform: linux
+image_resource:
+  type: registry-image
+  source: {repository: alpine, tag: "3.20"}
+inputs:
+  - name: out
+run:
+  path: sh
+  args:
+    - -ec
+    - |
+      echo "MARK outputs.consume:$(cat out/version)"

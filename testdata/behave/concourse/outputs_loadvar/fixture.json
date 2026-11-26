@@ -1,0 +1,17 @@
+{
+  "features": [
+    "step.script",
+    "step.env"
+  ],
+  "events": [
+    "push-main"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": [
+    "outputs.consume:1.2.3",
+    "loadvar.announce:1.2.3"
+  ],
+  "owners": {},
+  "requires": []
+}

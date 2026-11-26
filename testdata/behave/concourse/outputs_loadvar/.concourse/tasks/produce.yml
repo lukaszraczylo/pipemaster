@@ -1,0 +1,15 @@
+platform: linux
+image_resource:
+  type: registry-image
+  source: {repository: alpine, tag: "3.20"}
+inputs:
+  - name: source
+outputs:
+  - name: out
+run:
+  path: sh
+  args:
+    - -ec
+    - |
+      echo 1.2.3 > out/version
+      echo "MARK outputs.produce"
