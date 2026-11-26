@@ -286,7 +286,9 @@ func (e *concourseEngine) runFile(ctx context.Context, w *Workspace, file string
 		return nil, err
 	}
 	if w.Ev.Kind == kindTag {
-		builds = e.onlyTagJobs(ctx, pipe, builds)
+		if builds = e.onlyTagJobs(ctx, pipe, builds); len(builds) == 0 {
+			return &Trace{Duration: time.Since(start), NoPipeline: true, Log: "Concourse starts no build for a tag: no job gets a git resource with a tag_filter"}, nil
+		}
 	}
 	tr := &Trace{Duration: time.Since(start)}
 	for _, b := range builds {
@@ -312,7 +314,7 @@ func (e *concourseEngine) runFile(ctx context.Context, w *Workspace, file string
 
 // onlyTagJobs keeps the builds of the jobs that get a tag resource. The harness serves one repository that holds the
 // branch and the tag, so a branch job also builds; on Concourse a tag on an existing commit starts no branch build.
-// A pipeline with no job on a tag resource keeps every build, so a lost tag trigger still shows.
+// A pipeline with no job on a tag resource keeps no build, because no branch job may run work for a tag.
 func (e *concourseEngine) onlyTagJobs(ctx context.Context, pipe string, builds []buildInfo) []buildInfo {
 	out, code, err := e.conc.fly(ctx, time.Minute, "get-pipeline", "-p", pipe, "--json")
 	if err != nil || code != 0 {
@@ -344,9 +346,6 @@ func (e *concourseEngine) onlyTagJobs(ctx context.Context, pipe string, builds [
 				tagJobs[j.Name] = true
 			}
 		}
-	}
-	if len(tagJobs) == 0 {
-		return builds
 	}
 	return slices.DeleteFunc(builds, func(b buildInfo) bool { return !tagJobs[b.JobName] })
 }

@@ -57,12 +57,24 @@ func (a *actEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	if err != nil {
 		return nil, err
 	}
+	workflows, total, err := ghaWorkflows(w)
+	if err != nil {
+		return nil, blocked("the on: filters of the converted output cannot be evaluated: %v", err)
+	}
+	if total > 0 && len(workflows) == 0 {
+		return &Trace{Log: "GitHub starts no workflow: no on: filter admits the event " + w.Ev.Name, NoPipeline: true}, nil
+	}
 	evFile := filepath.Join(filepath.Dir(w.Dir), filepath.Base(w.Dir)+"-event.json")
 	if err := os.WriteFile(evFile, raw, 0o600); err != nil {
 		return nil, err
 	}
 	art := filepath.Join(filepath.Dir(w.Dir), filepath.Base(w.Dir)+"-artifacts")
 	args := []string{name, "-e", evFile, "--container-architecture", "linux/arm64", "--concurrent-jobs", "1", "--rm", "--artifact-server-path", art, "--artifact-server-port", strconv.FormatInt(actPortBase+a.env.ports.Add(1), 10)}
+	if total > len(workflows) {
+		for _, f := range workflows {
+			args = append(args, "-W", f)
+		}
+	}
 	for _, label := range []string{"ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04", "ubuntu-20.04"} {
 		args = append(args, "-P", label+"=node:20-bookworm-slim")
 	}

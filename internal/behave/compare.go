@@ -149,12 +149,10 @@ func effects(level caps.Level, f caps.Feature) ([]string, string) {
 		return []string{kindValue}, "a default image changes the tools of the step, not whether it exits"
 	case f == caps.StepAction && level == caps.External:
 		return []string{kindMissing, kindValue, kindExit}, "an action that the operator wires outside the file leaves its output out"
-	case conditionFeatures[f] && level == caps.Lost:
-		return []string{kindExtra}, "a lost condition runs more work"
-	case conditionFeatures[f] && level == caps.Emulated:
-		return []string{kindExtra}, "an emulated condition can run more work than the source"
+	case conditionFeatures[f] && level != caps.External:
+		return nil, "a condition verdict never explains extra work: a converted file must not run work that the source skips"
 	case conditionFeatures[f]:
-		return []string{kindExtra, kindMissing}, "a condition handled outside the file runs more or disables work"
+		return []string{kindMissing}, "a condition handled outside the file can disable work"
 	case handoffFeatures[f]:
 		return []string{kindMissing, kindValue, kindOrder, kindExit}, "an ordering or handoff change"
 	case failureFeatures[f] && level == caps.Emulated:

@@ -31,8 +31,12 @@ func TestJudge(t *testing.T) {
 		status string
 	}{
 		{name: "same", src: tr(0, "a"), tgt: tr(0, "a"), status: StatusPass},
-		{name: "lost condition adds work", src: tr(0, "branch.always"), tgt: tr(0, "branch.always", "branch.tag"),
-			rep: rep(entry(caps.Lost, caps.JobIf, "pipeline/ci/job/tag-only")), status: StatusExplained},
+		{name: "lost condition cannot explain extra work", src: tr(0, "branch.always"), tgt: tr(0, "branch.always", "branch.tag"),
+			rep: rep(entry(caps.Lost, caps.JobIf, "pipeline/ci/job/tag-only")), status: StatusFail},
+		{name: "emulated condition cannot explain extra work", src: tr(0, "branch.always"), tgt: tr(0, "branch.always", "branch.tag"),
+			rep: rep(entry(caps.Emulated, caps.JobIf, "pipeline/ci/job/tag-only")), status: StatusFail},
+		{name: "external condition cannot explain extra work", src: tr(0, "branch.always"), tgt: tr(0, "branch.always", "branch.tag"),
+			rep: rep(entry(caps.External, caps.JobIf, "pipeline/ci/job/tag-only")), status: StatusFail},
 		{name: "lost condition that disables the task removes work", src: tr(0, "branch.always", "branch.tag"), tgt: tr(0, "branch.always"),
 			rep: &report.Report{Entries: []report.Entry{{Level: caps.Lost, Feature: caps.JobIf, IRPath: "pipeline/ci/job/tag-only",
 				Detail: "the condition has no Tekton when form and no shell guard; the task never runs"}}}, status: StatusExplained},
