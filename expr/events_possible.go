@@ -111,3 +111,26 @@ func modeHolds(m Mode, s, lit string) bool {
 	}
 	return strings.Contains(s, lit)
 }
+
+// FoldEvent substitutes a run that one event starts: every test of the event ref becomes true or false, and the
+// result is folded. A condition that tests other refs keeps those tests. A Lit true or Lit false result means the
+// condition holds on every run of the event or on none.
+func FoldEvent(e Expr, ev string) Expr {
+	return foldConst(subEvent(e, ev))
+}
+
+func subEvent(e Expr, ev string) Expr {
+	switch v := e.(type) {
+	case Unary:
+		return Unary{Op: v.Op, X: subEvent(v.X, ev)}
+	case Binary:
+		if v.Op != OpAnd && v.Op != OpOr {
+			if t := eventTriBinary(v, ev); t != triUnknown {
+				return Lit{Kind: LitBool, Bool: t == triTrue}
+			}
+			return v
+		}
+		return Binary{Op: v.Op, L: subEvent(v.L, ev), R: subEvent(v.R, ev)}
+	}
+	return e
+}
