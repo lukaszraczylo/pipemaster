@@ -53,7 +53,7 @@ func volEntry(rep *report.Report, path string, f caps.Feature, level caps.Level)
 func TestClaimBetweenTemplatesBecomesAnArtifact(t *testing.T) {
 	pl, rep := parseYAML(t, sharedClaimWorkflow)
 	prod, cons := job(t, pl, "produce"), job(t, pl, "consume")
-	if len(prod.Artifacts) != 1 || prod.Artifacts[0].Name != "ws-work" || prod.Artifacts[0].Paths[0] != "pm-workspaces/work" {
+	if len(prod.Artifacts) != 1 || prod.Artifacts[0].Name != "ws-work-produce" || prod.Artifacts[0].Paths[0] != "pm-workspaces/work" {
 		t.Fatalf("producer artifacts = %+v", prod.Artifacts)
 	}
 	if len(cons.Needs) != 1 || !cons.Needs[0].Artifacts {

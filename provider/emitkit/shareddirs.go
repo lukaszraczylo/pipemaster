@@ -80,8 +80,7 @@ func (s SharedDirs) Link(jobs []*ir.Job, rep *report.Report) {
 				if s.addNeed(j, w) {
 					added[j.ID] = append(added[j.ID], w)
 				}
-				s.addArtifact(byID[w], name, dir, rep)
-				shared[w] = append(shared[w], SharedArtifactPrefix+name)
+				shared[w] = append(shared[w], s.addArtifact(byID[w], name, dir, rep))
 			}
 			if len(latest) == 0 {
 				continue
@@ -124,14 +123,18 @@ func (s SharedDirs) entry(job string, f caps.Feature, level caps.Level, detail s
 	return report.Entry{IRPath: "pipeline/" + s.Pipeline + "/job/" + job, Feature: f, Level: level, Strategy: "workspace directory as artifact", Detail: detail, SourceLoc: s.File}
 }
 
-// addArtifact adds the directory to the artifacts of the job that writes it.
-func (s SharedDirs) addArtifact(j *ir.Job, name, dir string, rep *report.Report) {
-	art := SharedArtifactPrefix + name
+// addArtifact adds the directory to the artifacts of the job that writes it and returns the artifact name. The
+// name holds the writer ID, because upload-artifact v4 and later keep an artifact immutable and a second upload
+// of one name in a run fails (https://github.com/actions/upload-artifact/blob/main/docs/MIGRATION.md: "In v4,
+// Artifacts are immutable unless deleted"). Each writer of a chain thus uploads its own name.
+func (s SharedDirs) addArtifact(j *ir.Job, name, dir string, rep *report.Report) string {
+	art := SharedArtifactPrefix + name + "-" + j.ID
 	if slices.ContainsFunc(j.Artifacts, func(a ir.Artifact) bool { return a.Name == art }) {
-		return
+		return art
 	}
 	j.Artifacts = append(j.Artifacts, ir.Artifact{Name: art, Paths: []string{dir}})
 	rep.Add(s.entry(j.ID, caps.JobArtifacts, caps.Emulated, "a later "+s.Noun+" reads "+name+" after this "+s.Noun+", so the directory "+dir+" is an artifact; the source shares the files through "+s.Medium+", the target through an artifact upload"))
+	return art
 }
 
 // reach lists the jobs that a job reaches along the edges.

@@ -56,7 +56,7 @@ func entryAt(rep *report.Report, path string, f caps.Feature, level caps.Level) 
 func TestWorkspaceBetweenTasksBecomesAnArtifact(t *testing.T) {
 	pl, rep := parseYAML(t, twoTaskWorkspace)
 	prod, cons := job(t, pl, "produce"), job(t, pl, "consume")
-	if len(prod.Artifacts) != 1 || prod.Artifacts[0].Name != "ws-shared" || prod.Artifacts[0].Paths[0] != "pm-workspaces/shared" {
+	if len(prod.Artifacts) != 1 || prod.Artifacts[0].Name != "ws-shared-produce" || prod.Artifacts[0].Paths[0] != "pm-workspaces/shared" {
 		t.Fatalf("producer artifacts = %+v", prod.Artifacts)
 	}
 	if len(cons.Needs) != 1 || !cons.Needs[0].Artifacts {

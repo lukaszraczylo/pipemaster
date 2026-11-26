@@ -1,0 +1,50 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  workspaces:
+    - name: shared
+  tasks:
+    - name: first
+      workspaces:
+        - name: ws
+          workspace: shared
+      taskSpec:
+        workspaces:
+          - name: ws
+        steps:
+          - name: write
+            image: alpine
+            script: |
+              echo one > $(workspaces.ws.path)/chain.txt
+              echo "MARK workspacechain.first"
+    - name: second
+      runAfter:
+        - first
+      workspaces:
+        - name: ws
+          workspace: shared
+      taskSpec:
+        workspaces:
+          - name: ws
+        steps:
+          - name: change
+            image: alpine
+            script: |
+              echo two >> $(workspaces.ws.path)/chain.txt
+              echo "MARK workspacechain.second"
+    - name: third
+      runAfter:
+        - second
+      workspaces:
+        - name: ws
+          workspace: shared
+      taskSpec:
+        workspaces:
+          - name: ws
+        steps:
+          - name: read
+            image: alpine
+            script: |
+              echo "MARK workspacechain.third:$(tr -d '\n' < $(workspaces.ws.path)/chain.txt)"
