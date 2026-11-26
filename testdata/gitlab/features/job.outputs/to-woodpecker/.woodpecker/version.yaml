@@ -1,6 +1,8 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/version
 when:
   - event: push
+labels:
+  ubuntu-latest: "true"
 steps:
   - name: version-step-1
     image: ubuntu:latest

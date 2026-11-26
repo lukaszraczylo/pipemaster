@@ -14,3 +14,15 @@ spec:
         pipelineRef:
           name: ci
         params: []
+        taskRunSpecs:
+          - pipelineTaskName: build
+            podTemplate:
+              nodeSelector:
+                runner.pipemaster.io/linux: "true"
+                runner.pipemaster.io/self-hosted: "true"
+                runner.pipemaster.io/x64: "true"
+          - pipelineTaskName: grouped
+            podTemplate:
+              nodeSelector:
+                group: big-runners
+                runner.pipemaster.io/linux: "true"

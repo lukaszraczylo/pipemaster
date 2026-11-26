@@ -1,2 +1,2 @@
 Loss report: drone -> woodpecker
-[external] pipeline/drone/job/ci job.runner: workers the operator provides (only a platform label has a Woodpecker form (labels.platform); other labels are lost)
+[external] pipeline/drone/job/ci job.runner: workers the operator provides (a platform label becomes labels.platform and every other label becomes a labels key with the value true; register an agent with WOODPECKER_AGENT_LABELS to match)

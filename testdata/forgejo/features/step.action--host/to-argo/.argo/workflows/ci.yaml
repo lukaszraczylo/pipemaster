@@ -7,6 +7,7 @@
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://codeberg.org\n    owner: org\n    repo: tool\n    path: sub\n    ref: v2\nid: build-step-3\nkind: action\n","hold":"{\"args\":[\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: Argo does not run the action org/tool/sub@v2' \\u003e\\u00262; exit 1\"],\"command\":[\"sh\",\"-ec\"],\"image\":\"alpine:3.22\",\"name\":\"build-step-3\",\"workingDir\":\"/workspace\"}","seq":2}
 # pipemaster:emulated step.script pipeline/ci/job/build
 # pipemaster:arg {}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
@@ -73,3 +74,5 @@ spec:
       volumes:
         - emptyDir: {}
           name: workspace
+      nodeSelector:
+        runner.pipemaster.io/docker: "true"

@@ -10,6 +10,8 @@
 kind: pipeline
 type: docker
 name: build
+node:
+  docker: "true"
 trigger:
   event:
     - push

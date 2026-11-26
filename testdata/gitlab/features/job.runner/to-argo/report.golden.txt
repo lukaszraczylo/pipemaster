@@ -1,5 +1,5 @@
 Loss report: gitlab -> argo
-[lost] pipeline/gitlab-ci/job/build job.runner (Argo schedules pods; a runner label has no form)
+[external] pipeline/gitlab-ci/job/build job.runner: workers the operator provides (label the nodes runner.pipemaster.io/docker=true, runner.pipemaster.io/linux=true for the runner labels and selector (template nodeSelector))
 [external] pipeline/gitlab-ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [external] pipeline/gitlab-ci/trigger/1 trigger.tag: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/gitlab-ci/job/build/step/script step.shell: container command sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)

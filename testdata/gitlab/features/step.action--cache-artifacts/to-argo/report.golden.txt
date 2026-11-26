@@ -1,7 +1,7 @@
 Loss report: gitlab -> argo
-[lost] pipeline/gitlab-ci/job/build job.runner (Argo schedules pods; a runner label has no form)
-[lost] pipeline/gitlab-ci/job/test job.runner (Argo schedules pods; a runner label has no form)
+[external] pipeline/gitlab-ci/job/build job.runner: workers the operator provides (label the nodes runner.pipemaster.io/ubuntu-latest=true for the runner labels and selector (template nodeSelector))
 [external] pipeline/gitlab-ci/job/build/step/build-step-3 job.artifacts: artifact repository (Argo saves and loads artifacts through an artifact repository, which the files do not configure; set one in the workflow-controller-configmap or with artifactRepositoryRef)
+[external] pipeline/gitlab-ci/job/test job.runner: workers the operator provides (label the nodes runner.pipemaster.io/ubuntu-latest=true for the runner labels and selector (template nodeSelector))
 [external] pipeline/gitlab-ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/gitlab-ci/job/build/step/build-step-1 step.action: PVC from volumeClaimTemplates; placeholder container (nothing persists between runs and the paths are not copied; the action is applied without a step; a container that runs true keeps its place)
 [emulated] pipeline/gitlab-ci/job/build/step/build-step-2 step.shell: container command sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)

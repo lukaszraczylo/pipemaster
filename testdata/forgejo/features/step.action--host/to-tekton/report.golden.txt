@@ -1,7 +1,7 @@
 Loss report: forgejo -> tekton
-[lost] pipeline/ci/job/build job.runner (Tekton schedules pods; the runner label docker has no form)
 [lost] pipeline/ci/job/build/step/build-step-2 step.action (missing input go-version)
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (no Tekton mapping for action org/tool/sub@v2)
+[external] pipeline/ci/job/build job.runner: workers the operator provides (label the nodes runner.pipemaster.io/docker=true for the runner labels and selector (taskRunSpecs podTemplate nodeSelector of the TriggerTemplate; a run started with tkn pipeline start skips it))
 [external] pipeline/ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [external] pipeline/ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.action: StepAction ref to the tektoncd-catalog git-clone through the git resolver (the ctx-repo and ctx-sha params carry the repository and the commit)

@@ -75,6 +75,7 @@ type jobCtx struct {
 	needed   map[string]bool
 	vars     map[string]string
 	safeTags map[string]bool
+	nodeSel  map[string]any
 	params   []paramBind
 }
 

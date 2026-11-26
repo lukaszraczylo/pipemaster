@@ -14,3 +14,9 @@ spec:
         pipelineRef:
           name: gitlab-ci
         params: []
+        taskRunSpecs:
+          - pipelineTaskName: build
+            podTemplate:
+              nodeSelector:
+                runner.pipemaster.io/docker: "true"
+                runner.pipemaster.io/linux: "true"

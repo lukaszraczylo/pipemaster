@@ -2,6 +2,7 @@ package argo
 
 import (
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ymap"
+	"maps"
 	"reflect"
 	"regexp"
 	"slices"
@@ -192,8 +193,39 @@ func (e *emitter) jobFeatures(tc *jobCtx) {
 	emitkit.ReportHosted(e.origin, r.Labels, "node selector",
 		func(st, d string) { e.external(path, caps.JobRunner, st, d) },
 		func(d string) { e.lose(path, caps.JobRunner, d) })
-	if len(emitkit.Unplaced(e.origin, r.Labels)) > 0 || r.Platform != "" || len(r.Selector) > 0 {
-		e.lose(path, caps.JobRunner, "Argo schedules pods; a runner label has no form")
+	var keys, lostMsgs []string
+	for _, l := range emitkit.Unplaced(e.origin, r.Labels) {
+		if k, ok := emitkit.NodeKey(l); ok {
+			if tc.nodeSel == nil {
+				tc.nodeSel = map[string]any{}
+			}
+			tc.nodeSel[k] = emitkit.TagValue
+			keys = append(keys, k+"="+emitkit.TagValue)
+			continue
+		}
+		lostMsgs = append(lostMsgs, "the runner label "+l+" has no node selector key: "+emitkit.TagHint)
+	}
+	for _, k := range slices.Sorted(maps.Keys(r.Selector)) {
+		v := r.Selector[k]
+		if !emitkit.ValidNodeLabel(k, v) {
+			lostMsgs = append(lostMsgs, "the runner selector "+k+"="+v+" is not a Kubernetes label, so a nodeSelector cannot hold it")
+			continue
+		}
+		if tc.nodeSel == nil {
+			tc.nodeSel = map[string]any{}
+		}
+		tc.nodeSel[k] = v
+		keys = append(keys, k+"="+v)
+	}
+	if len(keys) > 0 {
+		e.external(path, caps.JobRunner, "workers the operator provides", "label the nodes "+strings.Join(keys, ", ")+" for the runner labels and selector (template nodeSelector)")
+	}
+	if r.Platform != "" {
+		lostMsgs = append(lostMsgs, "Argo schedules pods; a runner platform has no form")
+	}
+	// The external entry goes first so the lost entry that follows holds both texts.
+	for _, m := range lostMsgs {
+		e.lose(path, caps.JobRunner, m)
 	}
 }
 
@@ -470,6 +502,18 @@ func (e *emitter) templateKeys(tc *jobCtx, tm *wmap, sx *stepCtx, jx map[string]
 	}
 	if ns, ok := jx["nodeSelector"]; ok {
 		rest["nodeSelector"] = ns
+	}
+	if len(tc.nodeSel) > 0 {
+		merged := map[string]any{}
+		if ns, ok := rest["nodeSelector"].(map[string]any); ok {
+			maps.Copy(merged, ns)
+		}
+		for k, v := range tc.nodeSel {
+			if _, dup := merged[k]; !dup {
+				merged[k] = v
+			}
+		}
+		rest["nodeSelector"] = merged
 	}
 	if err := tm.AddExtra(rest, nil); err != nil {
 		e.lose(path, caps.ExtPassthrough, "the template keys of the Argo file cannot be written: "+err.Error())

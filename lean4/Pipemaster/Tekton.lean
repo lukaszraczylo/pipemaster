@@ -29,7 +29,8 @@ Not in the model, each on purpose:
 - A job that came from a Tekton file: its Ext keys, remote task references and StepAction steps.
 
 The Tekton parser keeps display names, retries and timeouts in the file, so the raw parse differs from the pipeline
-only in the runner label, which Tekton loses (caps.go JobRunner) and the metadata restores. -/
+only in the runner label. The emitter writes the labels as node selectors of the TriggerTemplate, outside the
+model, and the parser does not read them back, so the metadata restores them. -/
 
 section Adapter
 
@@ -165,7 +166,7 @@ def rawTekton (d : TDoc) : Pipe :=
     fin := d.fin.map (parseJobT true) }
 
 /-- The metadata layer of the Tekton adapter: the core layer and the runner labels, which the emitter reports
-lost (caps.go JobRunner; meta.CollectLost keeps them in `Lost.Job`). Retries, timeouts and names stay in the
+external or lost (caps.go JobRunner; the parser reads neither, so the metadata keeps them). Retries, timeouts and names stay in the
 file, so the layer holds no more. -/
 def tektonMeta (p : Pipe) : Meta :=
   { metaOf p with

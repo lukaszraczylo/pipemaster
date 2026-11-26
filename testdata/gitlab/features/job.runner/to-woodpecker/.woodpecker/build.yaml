@@ -7,6 +7,9 @@ when:
   - event:
       - manual
       - cron
+labels:
+  docker: "true"
+  linux: "true"
 steps:
   - name: script
     image: ubuntu:latest

@@ -23,3 +23,12 @@ spec:
                 resources:
                   requests:
                     storage: 1Gi
+        taskRunSpecs:
+          - pipelineTaskName: build
+            podTemplate:
+              nodeSelector:
+                runner.pipemaster.io/ubuntu-latest: "true"
+          - pipelineTaskName: test
+            podTemplate:
+              nodeSelector:
+                runner.pipemaster.io/ubuntu-latest: "true"

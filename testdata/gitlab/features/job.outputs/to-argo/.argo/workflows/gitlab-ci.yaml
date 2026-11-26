@@ -1,5 +1,6 @@
 # pipemaster:emulated job.outputs pipeline/gitlab-ci/job/version
 # pipemaster:arg {"values":{"tag":"v1-$\u007b{ sha }}"}}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/version
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/version/step/version-step-1
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
@@ -50,3 +51,5 @@ spec:
       volumes:
         - emptyDir: {}
           name: workspace
+      nodeSelector:
+        runner.pipemaster.io/ubuntu-latest: "true"

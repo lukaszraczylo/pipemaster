@@ -5,6 +5,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -184,21 +185,29 @@ func valueOf(m *omap, key string) any {
 	return m.vals[key]
 }
 
-// node maps the runner labels of node to the runner selector when every value is a scalar.
+// node maps the runner labels of node when every value is a scalar. A key with the value true that is a valid label
+// name is a runner tag, the form that the emitter writes; any other key is the runner selector.
 func (d *doc) node(r *reader) {
 	m, ok := asMap(r.m.vals["node"])
 	if !ok {
 		return
 	}
 	sel := map[string]string{}
+	var tags []string
 	for _, k := range m.keys {
 		t, ok := text(m.vals[k])
 		if !ok {
 			return
 		}
-		sel[k] = unescape(t)
+		v := unescape(t)
+		if _, valid := emitkit.TagKey(k); valid && v == emitkit.TagValue {
+			tags = append(tags, k)
+			continue
+		}
+		sel[k] = v
 	}
 	r.take("node")
+	d.job.Runner.Labels = append(d.job.Runner.Labels, tags...)
 	if len(sel) > 0 {
 		d.job.Runner.Selector = sel
 	}

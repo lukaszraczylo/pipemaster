@@ -18,6 +18,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/argo"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 // The abstract documents below mirror lean4/Pipemaster/Argo.lean; their JSON keys are the ones GenVectors writes.
@@ -77,6 +78,7 @@ const (
 	featEnv       = "job.env"
 	featNoop      = "step.script"
 	featShell     = "step.shell"
+	featRunner    = "job.runner"
 	featPrefix    = "trigger."
 	jobSegment    = "/job/"
 	stepSegment   = "/step/"
@@ -254,9 +256,30 @@ type vTmpl struct {
 	timeout int
 }
 
+// checkNodeSelector accepts the template nodeSelector that the emitter writes for runner tags: every key is a tag
+// under the pipemaster prefix with the value true. The Lean model leaves the tags out of the file.
+func checkNodeSelector(n *yaml.Node) error {
+	if n == nil {
+		return nil
+	}
+	es, err := vectors.Entries(n)
+	if err != nil {
+		return err
+	}
+	for _, kv := range es {
+		if !strings.HasPrefix(kv.Key, emitkit.NodeKeyPrefix) || kv.Val.Value != emitkit.TagValue {
+			return fmt.Errorf("nodeSelector %q: %q is not a runner tag", kv.Key, kv.Val.Value)
+		}
+	}
+	return nil
+}
+
 func decodeTemplate(es []vectors.Entry) (vTmpl, error) {
 	t := vTmpl{steps: []vStep{}}
-	if err := onlyKeys(es, "template", "name", "containerSet", "timeout", "retryStrategy", "volumes"); err != nil {
+	if err := onlyKeys(es, "template", "name", "containerSet", "timeout", "retryStrategy", "volumes", "nodeSelector"); err != nil {
+		return t, err
+	}
+	if err := checkNodeSelector(lookup(es, "nodeSelector")); err != nil {
 		return t, err
 	}
 	cs, err := vectors.Entries(lookup(es, "containerSet"))
@@ -434,6 +457,8 @@ func applyMarks(d *vDoc, src []byte) error {
 			if len(t.Steps) != 1 || t.Steps[0].Name != noopName || strings.Join(t.Steps[0].Script, "\n") != noopCmd {
 				return fmt.Errorf("marker %s %s: container is not the placeholder", m.Feature, m.Path)
 			}
+		case featRunner:
+			// The note says the runner labels are template nodeSelector keys, which checkNodeSelector reads.
 		case featShell:
 			// The note says a step from a bash-default source runs through the wrapper; the decoder reads the wrapper itself.
 			if !isStep || !slices.ContainsFunc(t.Steps, func(s vStep) bool { return s.Name == stepID }) {

@@ -4,6 +4,8 @@
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\nid: test-step-1\nkind: action\n","at":0,"fail":true}
 when:
   - event: push
+labels:
+  ubuntu-latest: "true"
 depends_on:
   - build
 steps:

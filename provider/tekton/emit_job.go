@@ -1,6 +1,8 @@
 package tekton
 
 import (
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -57,12 +59,29 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 	emitkit.ReportHosted(e.origin, j.Runner.Labels, "node selector",
 		func(st, d string) { e.external(jp.path, caps.JobRunner, st, d) },
 		func(d string) { e.lose(jp.path, caps.JobRunner, d) })
-	rest := emitkit.Unplaced(e.origin, j.Runner.Labels)
-	switch {
-	case len(rest) > 0:
-		e.lose(jp.path, caps.JobRunner, "Tekton schedules pods; the runner label "+strings.Join(rest, ", ")+" has no form")
-	case j.Runner.Platform != "" || len(j.Runner.Selector) > 0:
-		e.lose(jp.path, caps.JobRunner, "Tekton schedules pods; the runner platform and selector have no form")
+	for _, l := range emitkit.Unplaced(e.origin, j.Runner.Labels) {
+		if k, ok := emitkit.NodeKey(l); ok {
+			if jp.nodeSel == nil {
+				jp.nodeSel = map[string]string{}
+			}
+			jp.nodeSel[k] = emitkit.TagValue
+			continue
+		}
+		jp.runnerLost = append(jp.runnerLost, "the runner label "+l+" has no node selector key: "+emitkit.TagHint)
+	}
+	for _, k := range slices.Sorted(maps.Keys(j.Runner.Selector)) {
+		v := j.Runner.Selector[k]
+		if !emitkit.ValidNodeLabel(k, v) {
+			jp.runnerLost = append(jp.runnerLost, "the runner selector "+k+"="+v+" is not a Kubernetes label, so a nodeSelector cannot hold it")
+			continue
+		}
+		if jp.nodeSel == nil {
+			jp.nodeSel = map[string]string{}
+		}
+		jp.nodeSel[k] = v
+	}
+	if j.Runner.Platform != "" {
+		jp.runnerLost = append(jp.runnerLost, "Tekton schedules pods; the runner platform has no form")
 	}
 	jc, viaChanges := tc.changesCond(jp.path, j.If)
 	if !viaChanges {

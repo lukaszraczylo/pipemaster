@@ -309,10 +309,29 @@ func (e *emitter) platform(m *ymap, c *docCtx, ext map[string]any) error {
 	emitkit.ReportHosted(e.origin, r.Labels, "platform",
 		func(st, d string) { e.external(c.jp, caps.JobRunner, st, d) },
 		func(d string) { e.lose(c.jp, caps.JobRunner, d) })
+	tagged := map[string]string{}
+	var tags, lostMsgs []string
 	for _, l := range emitkit.Unplaced(e.origin, r.Labels) {
-		if l != label {
-			e.lose(c.jp, caps.JobRunner, "the runner label "+l+" has no Drone form; only the os/arch platform does")
+		if l == label {
+			continue
 		}
+		if k, ok := emitkit.TagKey(l); ok {
+			if _, dup := r.Selector[k]; dup {
+				lostMsgs = append(lostMsgs, "the runner label "+l+" has the key of a runner selector entry; the selector value is kept")
+				continue
+			}
+			tagged[k] = emitkit.TagValue
+			tags = append(tags, k+":"+emitkit.TagValue)
+			continue
+		}
+		lostMsgs = append(lostMsgs, "the runner label "+l+" has no Drone node key: "+emitkit.TagHint)
+	}
+	if len(tags) > 0 {
+		e.external(c.jp, caps.JobRunner, "workers the operator provides", "register a Drone runner with DRONE_RUNNER_LABELS="+strings.Join(tags, ",")+" for the runner labels")
+	}
+	// The external entry goes first so the lost entry that follows holds both texts.
+	for _, m := range lostMsgs {
+		e.lose(c.jp, caps.JobRunner, m)
 	}
 	n := newYMap()
 	if label != "" {
@@ -331,6 +350,9 @@ func (e *emitter) platform(m *ymap, c *docCtx, ext map[string]any) error {
 	}
 	m.set(keyPlatform, nonEmpty(n))
 	sel := newYMap()
+	for _, k := range sortedKeys(tagged) {
+		sel.set(k, ystr(tagged[k]))
+	}
 	for _, k := range sortedKeys(r.Selector) {
 		sel.set(k, ystr(esc(r.Selector[k])))
 	}

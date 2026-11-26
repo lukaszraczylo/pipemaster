@@ -13,7 +13,7 @@ The caps table gives the verdict external for three features. Set each one in th
 ## Conversion notes
 
 - The emitter writes one workflow file for each job in `.woodpecker/`. The parser reads the first form that exists and does not merge forms.
-- Woodpecker keeps only an `os/arch` runner label (`labels.platform`). The round-trip metadata restores the other labels when the chain returns to the origin. If a later hop emits GHA, Gitea or Forgejo, the emitter writes the default label `ubuntu-latest` and reports an emulated `job.runner` entry.
+- An `os/arch` runner label becomes `labels.platform`. Every other runner label becomes a `labels` key with the value `true`, and the report names the `WOODPECKER_AGENT_LABELS` value that an agent must carry. A label that is not a valid key is lost. The parser keeps these keys in Ext, and the round-trip metadata restores the labels when the chain returns to the origin. If a later hop emits GHA, Gitea or Forgejo, the emitter writes the default label `ubuntu-latest` and reports an emulated `job.runner` entry.
 - Woodpecker substitutes `${NAME}` in the raw YAML and turns `$$` into a literal `$`. Thus the emitter writes `$` in script and environment text as `$$`. The parser reverses this.
 - Woodpecker filters use doublestar globs. If a GHA filter uses `+` or `?`, doublestar cannot express it. The emitter then writes an anchored regular expression in `evaluate`.
 - The runner is lost. Only a platform label becomes `labels.platform`.
@@ -44,7 +44,7 @@ The following table comes from `pipemaster caps --to woodpecker --format md`.
 | job.needs.artifacts | lost | (workflows do not share a workspace) |
 | job.outputs | lost | (Woodpecker steps cannot pass values to other workflows) |
 | job.retry | lost | (Woodpecker has no retry key; restarts are manual) |
-| job.runner | external | workers the operator provides (only a platform label has a Woodpecker form (labels.platform); other labels are lost) |
+| job.runner | external | workers the operator provides (a platform label becomes labels.platform and every other label becomes a labels key with the value true; register an agent with WOODPECKER_AGENT_LABELS to match) |
 | job.services | native |  |
 | job.timeout | external | repo setting Timeout (Woodpecker limits the whole pipeline, not a workflow) |
 | pipeline.concurrency | native | workflow concurrency limit 1 with group (cancel-in-progress has no Woodpecker form) |

@@ -2,9 +2,11 @@ package woodpecker
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -251,14 +253,11 @@ func (e *emitter) labels(m *wmap, c *wfCtx, ext map[string]any) error {
 			platform = l
 		}
 	}
+	var hostedStrategy string
+	var hostedExt, lostMsgs []string
 	emitkit.ReportHosted(e.origin, r.Labels, "backend label",
-		func(st, d string) { e.external(c.jp, caps.JobRunner, st, d) },
-		func(d string) { e.lose(c.jp, caps.JobRunner, d) })
-	for _, l := range emitkit.Unplaced(e.origin, r.Labels) {
-		if l != platform {
-			e.lose(c.jp, caps.JobRunner, "the runner label "+l+" has no Woodpecker form; only labels.platform does")
-		}
-	}
+		func(st, d string) { hostedStrategy = st; hostedExt = append(hostedExt, d) },
+		func(d string) { lostMsgs = append(lostMsgs, d) })
 	n := newMap()
 	if platform != "" {
 		v, err := e.text(nil, c.jp, caps.JobRunner, valueText, platform)
@@ -266,6 +265,44 @@ func (e *emitter) labels(m *wmap, c *wfCtx, ext map[string]any) error {
 			return err
 		}
 		n.set("platform", str(v))
+	}
+	var tags []string
+	for _, l := range emitkit.Unplaced(e.origin, r.Labels) {
+		if l == platform {
+			continue
+		}
+		if k, ok := emitkit.TagKey(l); ok && k != "platform" {
+			n.set(k, str(emitkit.TagValue))
+			tags = append(tags, k+"="+emitkit.TagValue)
+			continue
+		}
+		lostMsgs = append(lostMsgs, "the runner label "+l+" has no Woodpecker label key: "+emitkit.TagHint)
+	}
+	for _, k := range slices.Sorted(maps.Keys(r.Selector)) {
+		v := r.Selector[k]
+		if _, ok := emitkit.TagKey(k); !ok || k == "platform" || v == "" || n.has(k) {
+			lostMsgs = append(lostMsgs, "the runner selector "+k+"="+v+" has no Woodpecker label: the key must be a label key other than platform, and the value must not be empty")
+			continue
+		}
+		t, err := e.text(nil, c.jp, caps.JobRunner, valueText, v)
+		if err != nil {
+			return err
+		}
+		n.set(k, str(t))
+		tags = append(tags, k+"="+t)
+	}
+	setup := hostedExt
+	strategy := hostedStrategy
+	if len(tags) > 0 {
+		setup = append(setup, "register a Woodpecker agent with WOODPECKER_AGENT_LABELS="+strings.Join(tags, ",")+" for the runner labels")
+		strategy = joinNew(strategy, "workers the operator provides")
+	}
+	switch {
+	case len(lostMsgs) > 0:
+		// One lost entry holds every text, because the ledger keeps one entry per job and a lost entry replaces an earlier one.
+		e.lose(c.jp, caps.JobRunner, strings.Join(append(lostMsgs, setup...), "; "))
+	case len(setup) > 0:
+		e.external(c.jp, caps.JobRunner, strategy, strings.Join(setup, "; "))
 	}
 	if err := n.mergeMap(ext[keyLabels]); err != nil {
 		return err

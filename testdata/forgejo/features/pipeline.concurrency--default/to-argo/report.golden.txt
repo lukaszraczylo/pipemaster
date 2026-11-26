@@ -1,5 +1,5 @@
 Loss report: forgejo -> argo
-[lost] pipeline/ci/job/build job.runner (Argo schedules pods; a runner label has no form)
+[external] pipeline/ci/job/build job.runner: workers the operator provides (label the nodes runner.pipemaster.io/docker=true for the runner labels and selector (template nodeSelector))
 [external] pipeline/ci/trigger/0 trigger.pull_request: EventSource webhook secret (the trigger accepts a pull request from the same repository only; a fork would run its code with every secret; Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [external] pipeline/ci/trigger/1 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [external] pipeline/ci/trigger/2 trigger.tag: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)

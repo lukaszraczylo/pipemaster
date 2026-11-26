@@ -1,8 +1,8 @@
 Loss report: gitlab -> tekton
-[lost] pipeline/.shared/job/run job.runner (Tekton schedules pods; the runner label ubuntu-latest has no form)
+[lost] pipeline/.shared/job/run job.runner (the runner labels need a taskRunSpecs podTemplate nodeSelector (runner.pipemaster.io/ubuntu-latest=true) on the PipelineRun, and this output has no generated TriggerTemplate to hold it)
 [lost] pipeline/.shared/trigger/0 ext.passthrough (Ext of provider gha (event) is not written to the Tekton file; it is kept in round-trip metadata)
 [lost] pipeline/.shared/trigger/0 trigger.api (Tekton has no API trigger kind; only an EventListener entry of a Tekton file is kept)
-[lost] pipeline/ci/job/build job.runner (Tekton schedules pods; the runner label ubuntu-latest has no form)
+[external] pipeline/ci/job/build job.runner: workers the operator provides (label the nodes runner.pipemaster.io/ubuntu-latest=true for the runner labels and selector (taskRunSpecs podTemplate nodeSelector of the TriggerTemplate; a run started with tkn pipeline start skips it))
 [external] pipeline/ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [emulated] pipeline/.shared ext.passthrough: pipeline id renamed (pipeline id .shared is not a DNS-1123 label; written as shared)
 [emulated] pipeline/.shared/job/run/step/run-step-1 step.image: default image (the step names no image and Tekton requires one; alpine:3.22 runs it)

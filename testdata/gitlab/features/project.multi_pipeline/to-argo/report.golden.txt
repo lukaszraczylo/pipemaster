@@ -1,8 +1,8 @@
 Loss report: gitlab -> argo
-[lost] pipeline/.shared/job/run job.runner (Argo schedules pods; a runner label has no form)
 [lost] pipeline/.shared/trigger/0 ext.passthrough (Ext of provider gha (event) is not written to the Argo file; it is kept in round-trip metadata)
 [lost] pipeline/.shared/trigger/0 trigger.api (an api trigger that no Argo file held has no Argo form; no Sensor trigger is written)
-[lost] pipeline/ci/job/build job.runner (Argo schedules pods; a runner label has no form)
+[external] pipeline/.shared/job/run job.runner: workers the operator provides (label the nodes runner.pipemaster.io/ubuntu-latest=true for the runner labels and selector (template nodeSelector))
+[external] pipeline/ci/job/build job.runner: workers the operator provides (label the nodes runner.pipemaster.io/ubuntu-latest=true for the runner labels and selector (template nodeSelector))
 [external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/.shared ext.passthrough: pipeline id renamed (pipeline id .shared is not a DNS-1123 label; written as shared)
 [emulated] pipeline/.shared/job/run/step/run-step-1 step.shell: container command sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)
