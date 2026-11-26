@@ -10,5 +10,7 @@
   "unordered": false,
   "expect": [],
   "owners": {},
-  "requires": []
+  "requires": [
+    "manual"
+  ]
 }

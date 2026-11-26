@@ -155,6 +155,8 @@ func effects(level caps.Level, f caps.Feature) ([]string, string) {
 		return []string{kindMissing}, "a condition handled outside the file can disable work"
 	case handoffFeatures[f]:
 		return []string{kindMissing, kindValue, kindOrder, kindExit}, "an ordering or handoff change"
+	case f == caps.JobManual && level == caps.Lost:
+		return []string{kindExtra}, "a target with no manual gate starts the job by itself, so work that the source leaves to an operator runs"
 	case failureFeatures[f] && level == caps.Emulated:
 		return []string{kindOrder, kindExit}, "an emulated failure rule changes order and exit"
 	case failureFeatures[f]:
