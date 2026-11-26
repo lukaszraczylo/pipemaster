@@ -156,6 +156,9 @@ func (b *jobBuilder) addWorkspaceDirs() {
 	if len(b.tx.dataWS) == 0 || b.k.Out[ExtCatalogRef] != nil || len(b.job.Steps) == 0 {
 		return
 	}
+	if slices.ContainsFunc(b.job.Steps, func(st *ir.Step) bool { return st.Kind == ir.StepTask }) {
+		return
+	}
 	dirs := slices.Collect(maps.Values(b.tx.dataWS))
 	b.job.Steps = append([]*ir.Step{emitkit.DirsStep(b.job.ID, dirs, dialect, ExtWorkspaceDirs)}, b.job.Steps...)
 }
