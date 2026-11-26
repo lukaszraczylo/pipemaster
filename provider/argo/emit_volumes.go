@@ -1,8 +1,8 @@
 package argo
 
 import (
+	"regexp"
 	"slices"
-	"strings"
 
 	"go.yaml.in/yaml/v3"
 
@@ -40,7 +40,7 @@ func (e *emitter) withoutSharedVolumes(j *ir.Job) *ir.Job {
 var mountPathKeys = map[string]bool{"container": true, "script": true, "containerSet": true}
 
 // restoreMountPaths writes the mount path of each volume back in place of its directory in the texts of the
-// containers. dirs maps a directory to its mount path.
+// containers, with the checkout mount or the "../" run that leads from a step directory to the checkout root. dirs maps a directory to its mount path.
 func restoreMountPaths(tm *yaml.Node, dirs any) {
 	m, ok := dirs.(map[string]any)
 	if !ok || len(m) == 0 {
@@ -51,12 +51,16 @@ func restoreMountPaths(tm *yaml.Node, dirs any) {
 		order = append(order, d)
 	}
 	slices.SortFunc(order, func(a, b string) int { return len(b) - len(a) })
+	res := make(map[string]*regexp.Regexp, len(order))
+	for _, d := range order {
+		res[d] = regexp.MustCompile(`(?:` + regexp.QuoteMeta(workspaceMount) + `/)?(?:\.\./)*` + regexp.QuoteMeta(d))
+	}
 	var walk func(n *yaml.Node)
 	walk = func(n *yaml.Node) {
 		if n.Kind == yaml.ScalarNode {
 			for _, d := range order {
 				if p, ok := m[d].(string); ok {
-					n.Value = strings.ReplaceAll(n.Value, d, p)
+					n.Value = res[d].ReplaceAllLiteralString(n.Value, p)
 				}
 			}
 			return

@@ -28,6 +28,7 @@ type texts struct {
 	matrix   map[string]bool
 	inNames  map[string]string
 	hits     map[string]string
+	up       string
 	paths    []pathPair
 	kept     []string
 	tmpl     bool

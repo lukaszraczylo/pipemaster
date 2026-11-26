@@ -469,18 +469,20 @@ func (b *jobBuilder) stepOf(id string, r *reader, script bool) (*ir.Step, string
 			return nil, "", err
 		}
 	}
+	if t, ok := textOf(r.Take("workingDir")); ok && t != workspaceMount {
+		var err error
+		if st.WorkDir, err = b.tx.template(t); err != nil {
+			return nil, "", err
+		}
+	}
+	b.tx.up = emitkit.UpFrom(st.WorkDir)
+	defer func() { b.tx.up = "" }()
 	if script {
 		if err := b.scriptSource(st, r); err != nil {
 			return nil, "", err
 		}
 	} else if err := b.commandLine(st, k, r); err != nil {
 		return nil, "", err
-	}
-	if t, ok := textOf(r.Take("workingDir")); ok && t != workspaceMount {
-		var err error
-		if st.WorkDir, err = b.tx.template(t); err != nil {
-			return nil, "", err
-		}
 	}
 	if ev, ok := r.Take("env"); ok {
 		vars, from, err := b.envList(ev)

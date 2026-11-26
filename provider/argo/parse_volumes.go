@@ -127,7 +127,9 @@ func mountsOf(t *omap) []mount {
 type pathPair struct{ path, dir string }
 
 // planVolumes maps each volume that the template mounts to a directory of the checkout. The emitter's own
-// workspace and cache mounts, an unknown volume and a subPath that leaves the volume stay unmapped.
+// workspace and cache mounts, an unknown volume and a subPath that leaves the volume stay unmapped. A mount that
+// shares its directory with another path, or its path with another directory, stays unmapped: the text has no
+// spelling to tell the two apart on the way back.
 func (b *jobBuilder) planVolumes(t *omap) {
 	vols := maps.Clone(b.c.workflowVolumes())
 	for _, v := range volumeList(valueOf(t, "volumes")) {
@@ -147,6 +149,9 @@ func (b *jobBuilder) planVolumes(t *omap) {
 				continue
 			}
 			dir = path.Join(dir, clean)
+		}
+		if slices.ContainsFunc(pairs, func(p pathPair) bool { return p.path != m.path && p.dir == dir || p.path == m.path && p.dir != dir }) {
+			continue
 		}
 		b.vols[v.name], b.mapped[m] = v, true
 		b.c.mounted[b.job.ID] = append(b.c.mounted[b.job.ID], v.name)
@@ -293,7 +298,7 @@ func (x *texts) mapPaths(s string) string {
 			}
 			end := i + len(p.path)
 			if (i == 0 || !pathChar(rest[i-1])) && (end == len(rest) || !pathChar(rest[end]) || rest[end] == '/') {
-				out.WriteString(rest[:i] + p.dir)
+				out.WriteString(rest[:i] + path.Clean(x.up+p.dir))
 				hit = true
 			} else {
 				out.WriteString(rest[:end])
