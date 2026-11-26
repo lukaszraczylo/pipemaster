@@ -315,7 +315,7 @@ func TestSourceWorkspaceMapsToTheCheckoutAndReturnsExactly(t *testing.T) {
 		t.Fatalf("steps = %+v", j.Steps)
 	}
 	a, b := step(t, j, "a"), step(t, j, "b")
-	if a.WorkDir != "sub" || b.WorkDir != "" || strings.Join(a.Script, "\n") != "ls ./x\ncp ./conf /workspace/src2/conf" {
+	if a.WorkDir != "sub" || b.WorkDir != "" || strings.Join(a.Script, "\n") != "ls ../x\ncp ../conf /workspace/src2/conf" {
 		t.Fatalf("a = %+v, b = %+v", a, b)
 	}
 	files, _, err := tekton.New().Emit(p)
@@ -339,12 +339,12 @@ func TestSourceWorkspaceMapsToTheCheckoutAndReturnsExactly(t *testing.T) {
 	}
 }
 
-func TestWorkspaceWithoutACloneTaskIsNotMapped(t *testing.T) {
+func TestWorkspaceWithoutACloneTaskMapsToADataDirectory(t *testing.T) {
 	task := strings.Replace(sourceWSPipeline, "taskRef: {name: git-clone}", "taskRef: {name: other}", 1)
 	p, _ := parseFiles(t, map[string]string{"p.yaml": task, "t.yaml": sourceWSTask})
 	j := job(t, p.Pipelines[0], "use")
-	if len(j.Steps) != 2 || step(t, j, "a").WorkDir != "/workspace/src/sub" {
-		t.Fatalf("steps = %+v", j.Steps)
+	if len(j.Steps) != 3 || step(t, j, "a").WorkDir != "pm-workspaces/ws/sub" {
+		t.Fatalf("steps = %d, workdir = %q", len(j.Steps), step(t, j, "a").WorkDir)
 	}
 }
 

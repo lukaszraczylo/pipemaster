@@ -36,6 +36,7 @@ func (b *jobBuilder) body(t *omap) error {
 	r := newReader(t)
 	r.Take("name")
 	kind, _ := templateKind(t)
+	b.planVolumes(t)
 	if err := b.inputs(r); err != nil {
 		return err
 	}
@@ -48,8 +49,7 @@ func (b *jobBuilder) body(t *omap) error {
 		}
 	}
 	if v, ok := r.Take("volumes"); ok && !isWorkspaceVolumes(v) {
-		r.M.Vals["volumes"] = withoutWorkspace(v)
-		r.Release("volumes")
+		b.keepVolumes(withoutWorkspace(v), r.Line("volumes"))
 	}
 	if v, ok := r.Take("nodeSelector"); ok {
 		b.nodeSelector(v, r.Line("nodeSelector"))
@@ -67,6 +67,9 @@ func (b *jobBuilder) body(t *omap) error {
 		return err
 	}
 	b.k.KeepRest(r)
+	b.reportVolumes()
+	b.keepMountPaths()
+	b.addVolumeDirs()
 	b.uniqueStepIDs()
 	b.collapseSteps()
 	b.collapseActions()
@@ -466,18 +469,20 @@ func (b *jobBuilder) stepOf(id string, r *reader, script bool) (*ir.Step, string
 			return nil, "", err
 		}
 	}
+	if t, ok := textOf(r.Take("workingDir")); ok && t != workspaceMount {
+		var err error
+		if st.WorkDir, err = b.tx.template(t); err != nil {
+			return nil, "", err
+		}
+	}
+	b.tx.up = emitkit.UpFrom(st.WorkDir)
+	defer func() { b.tx.up = "" }()
 	if script {
 		if err := b.scriptSource(st, r); err != nil {
 			return nil, "", err
 		}
 	} else if err := b.commandLine(st, k, r); err != nil {
 		return nil, "", err
-	}
-	if t, ok := textOf(r.Take("workingDir")); ok && t != workspaceMount {
-		var err error
-		if st.WorkDir, err = b.tx.template(t); err != nil {
-			return nil, "", err
-		}
 	}
 	if ev, ok := r.Take("env"); ok {
 		vars, from, err := b.envList(ev)
@@ -488,6 +493,9 @@ func (b *jobBuilder) stepOf(id string, r *reader, script bool) (*ir.Step, string
 		if len(from.Order) > 0 {
 			k.Keep("valueFrom", from, caps.StepEnv, "env entries with valueFrom have no Value form; kept in Ext", r.Line("env"))
 		}
+	}
+	if v, ok := r.Take("volumeMounts"); ok {
+		b.keepMounts(k, v, r.Line("volumeMounts"))
 	}
 	k.KeepRest(r)
 	st.Ext = k.Ext()
@@ -665,7 +673,10 @@ func (b *jobBuilder) containerSet(r *reader) error {
 	if ownMounts {
 		cr.Take("volumeMounts")
 	}
-	if rest := restKeys(m, "containers", "volumeMounts"); len(rest) > 0 || (hasMounts && !ownMounts) {
+	if hasMounts && !ownMounts && b.allMapped(mounts) && len(restKeys(m, "containers", "volumeMounts")) == 0 {
+		cr.Take("volumeMounts")
+		b.k.Out[kindContainerSet] = plain(m.Subset([]string{"volumeMounts"}))
+	} else if rest := restKeys(m, "containers", "volumeMounts"); len(rest) > 0 || (hasMounts && !ownMounts) {
 		rest = restKeys(m, "containers")
 		for _, key := range rest {
 			cr.Take(key)

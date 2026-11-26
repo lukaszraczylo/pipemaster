@@ -29,7 +29,7 @@ func (tc *taskCtx) pluginStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 	if cond.guard != nil || cond.disabled {
 		return nil, false, nil
 	}
-	env, err := tc.envList(sc, sp, slices.Concat(vars, st.Env))
+	env, err := tc.envList(sc, sp, slices.Concat(vars, st.Env), nil)
 	if err != nil {
 		return nil, false, err
 	}

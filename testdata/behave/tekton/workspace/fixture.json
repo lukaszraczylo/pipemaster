@@ -1,0 +1,27 @@
+{
+  "features": [
+    "job.artifacts",
+    "job.needs.artifacts",
+    "job.needs"
+  ],
+  "events": [
+    "push-main"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": [
+    "workspace.consume:data"
+  ],
+  "owners": {
+    "workspace.produce": [
+      "produce"
+    ],
+    "workspace.consume": [
+      "consume",
+      "produce"
+    ]
+  },
+  "requires": [
+    "artifacts"
+  ]
+}

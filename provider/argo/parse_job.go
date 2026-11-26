@@ -32,6 +32,8 @@ type jobBuilder struct {
 	gitArts       map[*ir.Step]string
 	holds         map[string]string
 	outArts       map[string]string
+	vols          map[string]volume
+	mapped        map[mount]bool
 	path          string
 	fileOutputs   []string
 	finally       bool

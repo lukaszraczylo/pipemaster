@@ -23,6 +23,10 @@ type plCtx struct {
 	k      *sink
 	ids    map[string]string
 	srcWS  map[string]bool
+	wsDir  map[string]string
+	runWS  map[string]runBinding
+	binds  map[string][]string
+	pipeWS any
 	file   string
 	plID   string
 	ws     bool
@@ -48,7 +52,7 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 	pl := &ir.Pipeline{ID: id}
 	k := newSink(p.rep, src.doc.File, "pipeline/"+id)
 	r := newReader(src.spec)
-	c := &plCtx{p: p, k: k, ids: map[string]string{}, file: src.doc.File, plID: id}
+	c := &plCtx{p: p, k: k, ids: map[string]string{}, file: src.doc.File, plID: id, binds: map[string][]string{}}
 	if name, ok := textOf(r.Take("displayName")); ok {
 		pl.Name = name
 	}
@@ -69,6 +73,7 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 		return nil, fmt.Errorf("%s: Pipeline %q needs spec.tasks", src.doc.Loc(0), id)
 	}
 	finally, _ := r.Take("finally")
+	c.pipeWS, c.runWS = pipeWS, p.runBindings(src)
 	k.KeepRest(r)
 	envVars := c.copiedEnv(src, id)
 	if err := c.jobs(pl, tasks, finally); err != nil {
@@ -83,7 +88,7 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 			pipeWS = withoutWorkspace(pipeWS)
 		}
 		if pipeWS != nil {
-			k.Keep("workspaces", pipeWS, caps.ExtPassthrough, "pipeline workspaces have no IR field; kept in Ext", r.Line("workspaces"))
+			c.keepPipelineWorkspaces(pipeWS, r.Line("workspaces"))
 		}
 	}
 	pl.Ext = k.Ext()
