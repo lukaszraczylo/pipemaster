@@ -41,7 +41,7 @@ The following table comes from `pipemaster caps --to concourse --format md`.
 | ext.passthrough | native |  |
 | job.allow_failure | emulated | try around the plan (the job shows success, not failure) |
 | job.artifacts | emulated | workspace artifact handed from task to task (inputs and outputs of the same name) (only within one job; a job with no script step writes no workspace) |
-| job.cache | emulated | task config caches |
+| job.cache | native | task config caches |
 | job.container | native | image_resource on every task |
 | job.env | emulated | copied into the params of every task (a step variable of the same name wins) |
 | job.environment | lost | (Concourse has no environment name or URL) |

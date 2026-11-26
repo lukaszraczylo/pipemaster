@@ -416,7 +416,7 @@ func (tc *jobCtx) cacheMounts() []*yaml.Node {
 			sub := "p" + itoa(k+1)
 			out = append(out, mountNode(claim, artifactPath(strings.TrimPrefix(p, "~/")), sub))
 		}
-		tc.e.emulate(tc.jp.path, caps.JobCache, "PVC from volumeClaimTemplates", "the cache "+c.Key+" is a claim per job and holds the paths; it lives for one Workflow unless the claim is shared")
+		tc.e.emulate(tc.jp.path, caps.JobCache, "PVC from volumeClaimTemplates", "the cache "+c.Key+" is a claim per job and holds the paths; it lives for one Workflow; to persist, the operator provides a shared PVC or an artifact repository (S3) for the key")
 	}
 	return out
 }

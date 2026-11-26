@@ -37,7 +37,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.JobAllowFailure:        {Level: caps.Emulated, Strategy: "failure ignore on every step", Caveat: "later steps still run after a failed step"},
 		caps.JobEnvironment:         {Level: caps.Lost, Caveat: "Drone has no environment name or URL in the pipeline file"},
 		caps.JobEnvironmentApproval: {Level: caps.Emulated, Strategy: "trigger event promote with target set to the environment", Caveat: "a person starts the build with drone build promote"},
-		caps.JobCache:               {Level: caps.Emulated, Strategy: "shared workspace of the steps in one document", Caveat: "nothing persists between runs"},
+		caps.JobCache:               {Level: caps.Emulated, Strategy: "shared workspace of the steps in one document", Caveat: "nothing persists between runs; for persistence add a cache plugin step (for example drone-cache) with an S3-compatible bucket or a host volume, set up by the operator"},
 		caps.JobArtifacts:           {Level: caps.Emulated, Strategy: "shared workspace of the steps in one document", Caveat: "other documents cannot read the files"},
 		caps.JobOutputs:             {Level: caps.Lost, Caveat: "Drone steps cannot pass values to other pipelines"},
 		caps.StepAction:             {Level: caps.Emulated, Strategy: "per actions.Lookup verdict; a plugin step with settings", Caveat: "unknown actions are lost; the reference of a mapped checkout action is kept only in round-trip metadata, and without it a return to GHA writes no checkout step and drops its inputs such as fetch-depth"},

@@ -57,7 +57,7 @@ func (e *emitter) templateNode(path, s string) (*yaml.Node, error) {
 	return str(t), err
 }
 
-// preSteps are the steps that run before the job's own: the checkout, artifact downloads, then the cache restore.
+// preSteps are the steps that run before the job's own: the checkout, artifact downloads, then the cache restore; a push-only cache has no restore.
 func (e *emitter) preSteps(c jobCtx, jp string, j *ir.Job) ([]*yaml.Node, error) {
 	var out []*yaml.Node
 	if n, err := e.checkoutStep(c, jp, j); err != nil {
@@ -95,6 +95,9 @@ func (e *emitter) preSteps(c jobCtx, jp string, j *ir.Job) ([]*yaml.Node, error)
 		}
 	}
 	for _, ch := range j.Cache {
+		if ch.Policy == cachePolicyPush {
+			continue
+		}
 		n, err := e.cacheStep(jp, j, ch)
 		if err != nil {
 			return nil, err
@@ -169,9 +172,19 @@ func (e *emitter) producerArtifacts(pl *ir.Pipeline, id string) []string {
 	return nil
 }
 
-// postSteps are the upload steps that close the job.
+// postSteps are the cache saves of a push policy and the uploads that close the job.
 func (e *emitter) postSteps(jp string, j *ir.Job) ([]*yaml.Node, error) {
 	var out []*yaml.Node
+	for _, ch := range j.Cache {
+		if ch.Policy != cachePolicyPush {
+			continue
+		}
+		n, err := e.cacheStep(jp, j, ch)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
 	for i, a := range j.Artifacts {
 		ref, err := reverseAction("upload", "")
 		if err != nil {

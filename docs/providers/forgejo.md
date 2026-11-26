@@ -28,7 +28,7 @@ The following table comes from `pipemaster caps --to forgejo --format md`.
 | ext.passthrough | native |  |
 | job.allow_failure | native |  |
 | job.artifacts | emulated | upload-artifact step at job end |
-| job.cache | emulated | actions/cache step |
+| job.cache | native | actions/cache step; policy pull is actions/cache/restore, policy push is actions/cache/save at job end |
 | job.container | native |  |
 | job.env | native |  |
 | job.environment | lost | (Forgejo does not document environment) |
