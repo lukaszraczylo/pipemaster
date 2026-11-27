@@ -488,7 +488,8 @@ func (e *concourseEngine) settle(ctx context.Context, pipe string) ([]buildInfo,
 				lastCount, changedAt = len(builds), time.Now()
 			}
 			if len(builds) > 0 {
-				if pipelineSettled(e.jobStates(ctx, pipe), builds) {
+				// A failed read of the job states is no proof that the pipeline settled.
+				if jobs, ok := e.jobStates(ctx, pipe); ok && pipelineSettled(jobs, builds) {
 					settledPolls++
 				} else {
 					settledPolls = 0
@@ -515,17 +516,17 @@ func (e *concourseEngine) settle(ctx context.Context, pipe string) ([]buildInfo,
 	return builds, nil
 }
 
-// jobStates reads the jobs of the pipeline. A failed read gives no state, which settles on the builds alone.
-func (e *concourseEngine) jobStates(ctx context.Context, pipe string) []jobState {
+// jobStates reads the jobs of the pipeline. It reports false when fly or the JSON read fails.
+func (e *concourseEngine) jobStates(ctx context.Context, pipe string) ([]jobState, bool) {
 	out, code, err := e.conc.fly(ctx, time.Minute, "jobs", "-p", pipe, "--json")
 	if err != nil || code != 0 {
-		return nil
+		return nil, false
 	}
 	var js []jobState
 	if json.Unmarshal([]byte(out), &js) != nil {
-		return nil
+		return nil, false
 	}
-	return js
+	return js, true
 }
 
 func sortBuilds(b []buildInfo) {

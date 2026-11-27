@@ -148,8 +148,10 @@ func (e *woodpeckerEngine) Run(ctx context.Context, w *Workspace) (*Trace, error
 			return nil, err
 		}
 		if code != 0 && strings.Contains(out, wpNoWorkflows) {
-			// With depends_on stripped, only the when filter of the file can leave nothing to run.
+			// With depends_on stripped, only the when filter of the file can leave nothing to run. That run is clean and
+			// empty, so the harness cannot tell a when filter from a converter that dropped the workflow; the log says so.
 			code = 0
+			out += "\nharness: Woodpecker ran no workflow of " + filepath.Base(t) + ": the run is clean and empty\n"
 		} else {
 			tr.NoPipeline = false
 		}
