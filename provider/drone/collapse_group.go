@@ -521,16 +521,21 @@ func splitPipelines(docs []*doc) []*group {
 }
 
 // buildPipelines assembles the pipelines from the documents of a file.
-func buildPipelines(rep *report.Report, docs []*doc) ([]*ir.Pipeline, error) {
+func buildPipelines(rep *report.Report, docs []*doc) ([]*ir.Pipeline, []string, error) {
 	docs, renamed := mergeCells(rep, docs)
 	var out []*ir.Pipeline
+	var defaulted []string
 	for _, g := range splitPipelines(docs) {
-		out = append(out, g.build(rep, renamed))
+		pl := g.build(rep, renamed)
+		out = append(out, pl)
+		if g.defaultTriggers() {
+			defaulted = append(defaulted, pl.ID)
+		}
 	}
 	if len(out) == 0 {
 		out = append(out, &ir.Pipeline{ID: pipelineID})
 	}
-	return out, nil
+	return out, defaulted, nil
 }
 
 // build assembles one pipeline from its documents.

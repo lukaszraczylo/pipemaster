@@ -38,7 +38,7 @@ func TestDockerSteps(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			src := dockerProject(tt.with)
-			out, entries, orig := emitkit.DockerSteps(src)
+			out, entries, orig := emitkit.DockerSteps(src, true)
 			if src.Pipelines[0].Jobs[0].Steps[0].Kind != ir.StepAction {
 				t.Fatal("the source project changed")
 			}
@@ -60,10 +60,25 @@ func TestDockerSteps(t *testing.T) {
 }
 
 func TestDockerEmittedRejectsEditedStep(t *testing.T) {
-	_, _, orig := emitkit.DockerSteps(dockerProject(map[string]ir.Value{"entrypoint": lit("/bin/sh"), "args": lit("-c x")}))
+	_, _, orig := emitkit.DockerSteps(dockerProject(map[string]ir.Value{"entrypoint": lit("/bin/sh"), "args": lit("-c x")}), true)
 	o := orig["pipeline/p/job/j/step/s"]
 	edited := &ir.Step{Kind: ir.StepScript, Image: &ir.Image{Ref: "alpine:3.20", Entrypoint: []string{""}}, Script: []string{"other"}}
 	if emitkit.DockerEmitted(edited, o) {
 		t.Fatal("an edited script must not restore")
+	}
+}
+
+// Only a target that runs the image entrypoint before a script needs the empty entrypoint.
+func TestDockerStepEntrypointOnlyWhereTheTargetRunsIt(t *testing.T) {
+	with := map[string]ir.Value{"entrypoint": lit("/bin/sh"), "args": lit("-c x")}
+	for _, empty := range []bool{true, false} {
+		out, _, orig := emitkit.DockerSteps(dockerProject(with), empty)
+		st := out.Pipelines[0].Jobs[0].Steps[0]
+		if got := slices.Equal(st.Image.Entrypoint, []string{""}); got != empty {
+			t.Errorf("emptyEntrypoint=%v: entrypoint = %q", empty, st.Image.Entrypoint)
+		}
+		if !emitkit.DockerEmitted(st, orig["pipeline/p/job/j/step/s"]) {
+			t.Errorf("emptyEntrypoint=%v: the stored step does not match the step it produced", empty)
+		}
 	}
 }

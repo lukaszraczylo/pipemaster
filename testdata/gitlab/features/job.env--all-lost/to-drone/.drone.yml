@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/test
 kind: pipeline
 type: docker
@@ -8,6 +11,8 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
 steps:
   - name: script
     image: ubuntu:latest

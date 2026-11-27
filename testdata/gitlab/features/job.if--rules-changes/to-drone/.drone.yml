@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:lost job.if pipeline/gitlab-ci/job/build: ((branch == 'main') && changes('src/**/*', 'go.mod')) || ((event == 'merge_request_event') && changes('go.sum') && !((branch == 'main') && changes('src/**/*', 'go.mod')))
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/build
 kind: pipeline

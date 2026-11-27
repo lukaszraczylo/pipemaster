@@ -61,7 +61,7 @@ func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 			res.vals[ExtResources] = append(listOf(res.vals[ExtResources]), res1.value)
 		}
 	}
-	pls, err := buildPipelines(rep, docs)
+	pls, defaulted, err := buildPipelines(rep, docs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -69,6 +69,9 @@ func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	proj := &ir.Project{
 		Origin:    ir.Origin{Provider: dialect, Dialect: dialect, Files: []string{fileYML}},
 		Pipelines: pls,
+	}
+	for _, id := range defaulted {
+		proj.Origin.MarkDefaultTriggers(id)
 	}
 	if err := ir.Validate(proj); err != nil {
 		return nil, nil, err

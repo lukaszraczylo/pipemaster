@@ -10,6 +10,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	dexpr "github.com/lukaszraczylo/pipemaster/expr/drone"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -75,7 +76,12 @@ func (a adapter) emit(p *ir.Project) (map[string][]byte, *report.Report, map[str
 	if p != nil {
 		origin = p.Origin.Provider
 	}
-	e := &emitter{led: emitkit.NewLedger("ir", dialect, a.Caps()), origin: origin, stepIDs: map[string]string{}}
+	var noForm map[string][]provider.SourceEvent
+	var injected map[string]bool
+	if origin == provider.GitLab {
+		p, noForm, injected = withSourceDefaults(p)
+	}
+	e := &emitter{led: emitkit.NewLedger("ir", dialect, a.Caps()), origin: origin, stepIDs: map[string]string{}, injected: injected}
 	if lang, ok := expr.LangOf(origin); ok && origin != dialect {
 		e.sem = lang.Sem
 		if from := expr.SourceFor(origin, dexpr.Lang); from != nil && from.Class == dexpr.Lang.Class {
@@ -87,6 +93,7 @@ func (a adapter) emit(p *ir.Project) (map[string][]byte, *report.Report, map[str
 	for _, u := range uses {
 		e.led.Decide(u)
 	}
+	e.noteDefaultEvents(noForm)
 	pls := livePipelines(p)
 	plans := newPlanSet(pls, origin == dialect)
 	data, err := e.project(plans, pls)

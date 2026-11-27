@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/build
 kind: pipeline
 type: docker
@@ -6,6 +9,8 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
 steps:
   - name: script
     image: ubuntu:latest
@@ -14,6 +19,9 @@ steps:
         sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster '!reference [.remote-setup, script]
         make'
 ---
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:lost job.if pipeline/gitlab-ci/job/deploy: opaque(gitlab): - changes: '!reference [.remote-patterns]'\n  if: $$CI_COMMIT_TAG\n
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/deploy
 kind: pipeline

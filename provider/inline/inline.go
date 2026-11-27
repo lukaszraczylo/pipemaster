@@ -57,7 +57,7 @@ func DockerSteps(p *ir.Project, target string) (*ir.Project, []report.Entry, map
 	if provider.Family(target) == provider.GHA {
 		return p, nil, nil
 	}
-	return emitkit.DockerSteps(p)
+	return emitkit.DockerSteps(p, target == provider.GitLab)
 }
 
 // Native reports whether the target writes the child as the construct it came from.

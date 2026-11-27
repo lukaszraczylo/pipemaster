@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/build
 kind: pipeline
 type: docker
@@ -6,14 +9,19 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
 steps:
   - name: script
     image: ubuntu:latest
     commands:
       - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make build'
 ---
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/alert
-# pipemaster:arg {"if":"failure()","back":"(event == 'push') \u0026\u0026 failure()","triggers":"- kind: push\n- kind: tag\n"}
+# pipemaster:arg {"if":"failure()","back":"((event == 'push') || (event == 'schedule') || (event == 'workflow_dispatch')) \u0026\u0026 failure()","triggers":"- kind: manual\n- kind: push\n- kind: schedule\n- kind: tag\n"}
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/alert
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
 # pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}]}
@@ -24,6 +32,8 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
   status:
     - failure
 depends_on:
@@ -34,6 +44,9 @@ steps:
     commands:
       - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster './page.sh'
 ---
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/report
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
 # pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}],"noIf":true}
@@ -44,6 +57,8 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
   status:
     - success
     - failure

@@ -21,7 +21,9 @@ const (
 // DockerSteps returns p with each docker:// action step that only sets an entrypoint and arguments rewritten as the
 // script step that runs the command line, which every target has a form for. The third result holds the rewritten
 // steps as the source had them, by IR path. It returns p itself when there is none, and never changes p. A step with any other input, or an input that is not literal text, stays an action step.
-func DockerSteps(p *ir.Project) (*ir.Project, []report.Entry, map[string]*ir.Step) {
+// emptyEntrypoint is true for a target that runs the image entrypoint before a script (GitLab): the step then clears it.
+// Other targets run the script in place of the entrypoint, so the step names none.
+func DockerSteps(p *ir.Project, emptyEntrypoint bool) (*ir.Project, []report.Entry, map[string]*ir.Step) {
 	if p == nil || !slices.ContainsFunc(p.Pipelines, hasDockerStep) {
 		return p, nil, nil
 	}
@@ -51,6 +53,9 @@ func DockerSteps(p *ir.Project) (*ir.Project, []report.Entry, map[string]*ir.Ste
 					Level: caps.Emulated, Strategy: DockerRewrite,
 					Detail: "the step runs the image " + st.Action.Image + " with its entrypoint and arguments as one command line in a script step with no image entrypoint; the image needs a shell, and the step runs in the job workspace, not in the container layout that a docker action has; a return without the round-trip metadata keeps the script step",
 				})
+				if !emptyEntrypoint {
+					img.Entrypoint = nil
+				}
 				st.Kind, st.Image, st.Script, st.Action, st.With = ir.StepScript, img.Image, img.Script, nil, nil
 			}
 		}

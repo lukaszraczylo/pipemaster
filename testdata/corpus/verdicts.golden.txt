@@ -184,7 +184,7 @@
 24-gitlab-release-cli gitlab->woodpecker native= 105 emulated=  85 external=   1 lost=  70
 25-gitlab-semgrep gitlab->argo native=  32 emulated=  19 external=  14 lost=  11
 25-gitlab-semgrep gitlab->concourse native=  30 emulated=  20 external=   2 lost=  16
-25-gitlab-semgrep gitlab->drone native=  34 emulated=  14 external=   2 lost=   9
+25-gitlab-semgrep gitlab->drone native=  36 emulated=  14 external=   2 lost=  14
 25-gitlab-semgrep gitlab->forgejo native=  41 emulated=  31 external=   2 lost=  10
 25-gitlab-semgrep gitlab->gha native=  41 emulated=  31 external=   2 lost=   9
 25-gitlab-semgrep gitlab->gitea native=  41 emulated=  30 external=   2 lost=  10
