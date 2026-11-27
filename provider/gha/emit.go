@@ -37,11 +37,18 @@ func (a *adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, er
 	p, idRenames := withValidJobIDs(withNativeChildren(p, a.d.ID))
 	p, vres := vars.Prepare(p, a.d.ID)
 	p = bindRefEnv(p, a.d.ID)
+	fresh := provider.FreshGitLabDefaults(p, a.d.ID)
 	p, noForm, injected := provider.WithDefaultTriggers(p, a.d.ID)
-	p, srcEvents, srcLost := withGitLabSources(p, a.d.ID)
+	p, srcEvents, srcLost := withGitLabSources(p, a.d.ID, fresh)
 	e := &emitter{origin: originProvider(p), d: a.d, from: sourceDialect(originProvider(p)), led: emitkit.NewLedger("ir", a.d.ID, a.Caps()),
 		jobGuards: p.Origin.Guarded}
 	e.injected = injected
+	for id, arg := range srcEvents {
+		// A GitLab file with the default triggers keeps its push and tag triggers, so only the added kinds need a marker.
+		if len(arg.Kinds) > 0 && fresh[id] {
+			delete(e.injected, id)
+		}
+	}
 	e.srcEvents = srcEvents
 	e.srcLost = srcLost
 	uses := ir.Features(p)

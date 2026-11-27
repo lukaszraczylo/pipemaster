@@ -1,0 +1,10 @@
+default:
+  image: alpine:3.20
+plain:
+  script:
+    - echo "MARK mrjob.plain" | tee -a trace.log
+mr-only:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - echo "MARK mrjob.mr" | tee -a trace.log

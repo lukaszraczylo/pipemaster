@@ -41,7 +41,9 @@ type Dialect struct {
 	// event =~ /^v$/i, lean4/Pipemaster/Woodpecker.lean woodpecker_event_eq), so a same-class event == or != becomes one.
 	EventRx bool
 	// PRStates is true when the dialect's pull request event also covers the closed and metadata activity of a pull
-	// request (GHA, GitLab), so a Woodpecker target states the event as the whole family.
+	// request (GHA), so a Woodpecker target states the event as the whole family. GitLab has none: a merge request
+	// pipeline starts on create, on a push to the source branch and on Run pipeline
+	// (https://docs.gitlab.com/ci/pipelines/merge_request_pipelines/). lean4/Pipemaster/TranslateFacts.lean: famX_mono.
 	PRStates bool
 	// TagEvent is true when the dialect reports a tag push as its own event named tag (Woodpecker, Drone).
 	TagEvent bool

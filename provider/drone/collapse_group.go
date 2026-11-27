@@ -712,6 +712,9 @@ func (g *group) placeTriggers(rep *report.Report) []ir.Trigger {
 		plain := slices.DeleteFunc(slices.Clone(sel), func(d *doc) bool { return d.merged != nil })
 		if len(plain) > 0 && len(plain) < len(sel) {
 			list = sharedTriggers(plain)
+			if allDefaultMarked(sel) && !isDefaultEvents(plain, list) {
+				list = nil
+			}
 		}
 	}
 	restored := false

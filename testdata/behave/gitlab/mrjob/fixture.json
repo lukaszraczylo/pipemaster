@@ -1,0 +1,24 @@
+{
+  "features": [
+    "job.if",
+    "trigger.pull_request",
+    "trigger.push"
+  ],
+  "events": [
+    "push-main",
+    "tag",
+    "pr"
+  ],
+  "expect_failure": false,
+  "unordered": true,
+  "expect": [],
+  "owners": {
+    "mrjob.mr": [
+      "mr-only"
+    ],
+    "mrjob.plain": [
+      "plain"
+    ]
+  },
+  "requires": []
+}

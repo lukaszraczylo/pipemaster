@@ -60,3 +60,13 @@ func isDefaultEvents(docs []*doc, list []ir.Trigger) bool {
 	}
 	return true
 }
+
+// allDefaultMarked is true when every document carries the marker of the default event list. Such a document holds
+// the events of a source with no trigger, so no document can speak for the pipeline triggers.
+func allDefaultMarked(docs []*doc) bool {
+	return len(docs) > 0 && !slices.ContainsFunc(docs, func(d *doc) bool {
+		u, ok := d.marks.markedWith(caps.TriggerPush, pipelinePth)
+		var a defaultEventsArg
+		return !ok || len(d.marks.args[u]) != 1 || json.Unmarshal([]byte(d.marks.args[u][0]), &a) != nil || !slices.Equal(a.Events, sourceDefaultEvents)
+	})
+}

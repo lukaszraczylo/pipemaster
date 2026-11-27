@@ -91,7 +91,10 @@ func TestGitLabToWoodpeckerVectors(t *testing.T) {
 				lean []bool
 			}{{"", out.Wp}, {"_closed", out.WpClose}, {"_metadata", out.WpMeta}} {
 				g := woodpeckerHolds(t, wp, e.factWoodpeckerView(v.sfx))
-				if (g != out.Src[j] && !unsetEventNarrower(e, g, out.Src[j])) || (g != v.lean[j] && !unsetEventNarrower(e, g, v.lean[j])) {
+				// GitLab has no closed or metadata run, so such a run must never pass where the merge request run fails.
+				// The Go translation can state an event list that the Lean term does not, so it can only be narrower.
+				if v.sfx != "" && g && (!out.Src[j] || !v.lean[j]) || v.sfx == "" &&
+					(g != out.Src[j] && !unsetEventNarrower(e, g, out.Src[j]) || g != v.lean[j] && !unsetEventNarrower(e, g, v.lean[j])) {
 					t.Errorf("case %d env %d %s -> %s: Woodpecker%s = %v, GitLab = %v, Lean wp = %v", i, j, expr.String(src), expr.String(wp), v.sfx, g, out.Src[j], v.lean[j])
 				}
 			}

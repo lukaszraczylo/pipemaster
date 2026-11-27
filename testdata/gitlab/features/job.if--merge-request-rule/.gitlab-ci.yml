@@ -1,0 +1,10 @@
+default:
+  image: alpine:3.20
+build:
+  script:
+    - echo build
+mrjob:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - echo mr

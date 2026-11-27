@@ -1367,7 +1367,8 @@ theorem famE_glSub : ∀ e : E, Woodpecker.GlSub e = true → Woodpecker.GlSub (
   | _ => intro h; simpa [fam] using h
 
 /-- A GitLab condition in the subset, rewritten by `glPr`, has on every Woodpecker pull request event the truthiness
-it has in GitLab, when its event tests are ones the longer event value does not change. -/
+it has in GitLab, when its event tests are ones the longer event value does not change. GitLab has no closed or
+metadata run, so the translator does not use `fam` for it: see `glWpFamX_failsafe`. -/
 theorem glWpFam_sound (env : Env) (tgt : Option String) (sfx : String) {e e' : E} (hg : Woodpecker.GlSub e = true)
     (h : glPr e = some e') (hev : EvAgn e' = true) :
     holds .gitlab (Woodpecker.wpView (wpMapS env tgt sfx)) (fam e') = holds .gitlab (glEnv env) e := by
@@ -1394,6 +1395,332 @@ theorem famPrefix_sound : ∃ (env : Env) (tgt : Option String) (sfx : String), 
   · intro _; rfl
   · intro _ r hr; cases hr; decide
   · intro _ h; exact absurd rfl h
+
+
+/-! ### A source with no closed or metadata pull request states (GitLab)
+
+A GitLab merge request pipeline starts when the merge request is created, when its source branch gets a push and on
+Run pipeline (https://docs.gitlab.com/ci/pipelines/merge_request_pipelines/). It has no closed or metadata run, so a
+Woodpecker run of those states must pass no test that the source needs to pass. `famX neg` (Mirrors expr.prFamily
+(expr/translate_facts.go), with posFam false) keeps the exact test of the pull request event where a run must pass
+it, and writes the prefix test only where a run must fail it. `neg` is true under an odd number of negations. -/
+
+/-- Mirrors expr.prFamily (expr/translate_facts.go) for a source whose pull request event has no further states. -/
+def famX (neg : Bool) : E → E
+  | .not x => .not (famX (!neg) x)
+  | .and l r => .and (famX neg l) (famX neg r)
+  | .or l r => .or (famX neg l) (famX neg r)
+  | .rx (.ref .event) .exact s => .rx (.ref .event) (if s == prEv && neg then .prefix else .exact) s
+  | .nrx (.ref .event) .exact s => .nrx (.ref .event) (if s == prEv && !neg then .prefix else .exact) s
+  | .eq (.ref .event) (.str s) => if s == prEv && neg then .rx (.ref .event) .prefix s else .eq (.ref .event) (.str s)
+  | .ne (.ref .event) (.str s) => if s == prEv && !neg then .nrx (.ref .event) .prefix s else .ne (.ref .event) (.str s)
+  | e => e
+
+theorem famX_glSub : ∀ (e : E) (neg : Bool), Woodpecker.GlSub e = true → Woodpecker.GlSub (famX neg e) = true := by
+  intro e
+  induction e with
+  | not x ih => intro neg h; simpa [famX, Woodpecker.GlSub] using ih (!neg) (by simpa [Woodpecker.GlSub] using h)
+  | and l r ihl ihr =>
+    intro neg h
+    simp only [Woodpecker.GlSub, Bool.and_eq_true] at h
+    simp [famX, Woodpecker.GlSub, ihl neg h.1, ihr neg h.2]
+  | or l r ihl ihr =>
+    intro neg h
+    simp only [Woodpecker.GlSub, Bool.and_eq_true] at h
+    simp [famX, Woodpecker.GlSub, ihl neg h.1, ihr neg h.2]
+  | rx x m s ih =>
+    intro neg h
+    clear ih
+    cases x <;> try (simpa [famX] using h)
+    case ref r =>
+      cases r <;> cases m <;> cases neg <;> simp_all [famX, Woodpecker.GlSub] <;> split <;> simp_all [Woodpecker.GlSub]
+  | nrx x m s ih =>
+    intro neg h
+    clear ih
+    cases x <;> try (simpa [famX] using h)
+    case ref r =>
+      cases r <;> cases m <;> cases neg <;> simp_all [famX, Woodpecker.GlSub] <;> split <;> simp_all [Woodpecker.GlSub]
+  | eq l r ihl ihr =>
+    intro neg h
+    clear ihl ihr
+    cases l <;> try (simpa [famX] using h)
+    case ref r0 =>
+      cases r0 <;> cases r <;> cases neg <;> simp_all [famX, Woodpecker.GlSub] <;> split <;> simp_all [Woodpecker.GlSub]
+  | ne l r ihl ihr =>
+    intro neg h
+    clear ihl ihr
+    cases l <;> try (simpa [famX] using h)
+    case ref r0 =>
+      cases r0 <;> cases r <;> cases neg <;> simp_all [famX, Woodpecker.GlSub] <;> split <;> simp_all [Woodpecker.GlSub]
+  | _ => intro neg h; simpa [famX] using h
+
+/-- Every node of a subset condition is boolean-valued. -/
+theorem glSub_bool (v : View) : ∀ e : E, Woodpecker.GlSub e = true → ∃ b, eval .gitlab v e = .bool b := by
+  intro e
+  induction e with
+  | not x ih => intro _; exact ⟨_, rfl⟩
+  | and l r ihl ihr =>
+    intro h
+    simp only [Woodpecker.GlSub, Bool.and_eq_true] at h
+    obtain ⟨bl, hl⟩ := ihl h.1
+    obtain ⟨br, hr⟩ := ihr h.2
+    cases bl <;> simp [eval, hl, hr, logicalTruthy, rubyTruthy]
+  | or l r ihl ihr =>
+    intro h
+    simp only [Woodpecker.GlSub, Bool.and_eq_true] at h
+    obtain ⟨bl, hl⟩ := ihl h.1
+    obtain ⟨br, hr⟩ := ihr h.2
+    cases bl <;> simp [eval, hl, hr, logicalTruthy, rubyTruthy]
+  | rx x m s _ => intro _; exact ⟨_, rfl⟩
+  | nrx x m s _ => intro _; exact ⟨_, rfl⟩
+  | eq l r _ _ => intro _; exact ⟨_, rfl⟩
+  | ne l r _ _ => intro _; exact ⟨_, rfl⟩
+  | _ => intro h; simp [Woodpecker.GlSub] at h
+
+theorem holds_not_gl (v : View) (x : E) : holds .gitlab v (.not x) = !holds .gitlab v x := by
+  simp [holds, eval, truthy]
+
+theorem holds_and_gl (v : View) {l r : E} (hl : Woodpecker.GlSub l = true) (hr : Woodpecker.GlSub r = true) :
+    holds .gitlab v (.and l r) = (holds .gitlab v l && holds .gitlab v r) := by
+  obtain ⟨bl, el⟩ := glSub_bool v l hl
+  obtain ⟨br, er⟩ := glSub_bool v r hr
+  cases bl <;> simp [holds, eval, el, er, logicalTruthy, rubyTruthy, truthy]
+
+theorem holds_or_gl (v : View) {l r : E} (hl : Woodpecker.GlSub l = true) (hr : Woodpecker.GlSub r = true) :
+    holds .gitlab v (.or l r) = (holds .gitlab v l || holds .gitlab v r) := by
+  obtain ⟨bl, el⟩ := glSub_bool v l hl
+  obtain ⟨br, er⟩ := glSub_bool v r hr
+  cases bl <;> simp [holds, eval, el, er, logicalTruthy, rubyTruthy, truthy]
+
+/-- The exact test of the pull request event holds on a closed or metadata run only where it holds on the pull
+request run. -/
+theorem exactPr_mono (env : Env) (tgt : Option String) (sfx : String) :
+    matchV .exact prEv (refV (wpMapS env tgt sfx) .event) = true →
+      matchV .exact prEv (refV (wpMap env tgt) .event) = true := by
+  by_cases hp : env.event = some .pullRequest
+  · simp [refV, wpMap, mapEnv, hp, matchV, evGl, prEv, modeTest, lower]
+  · simp only [refV, wpMapS_event_np env tgt sfx hp]; exact id
+
+theorem eqPr_mono (env : Env) (tgt : Option String) (sfx : String) :
+    eqV .gitlab (refV (wpMapS env tgt sfx) .event) (.str prEv) = true →
+      eqV .gitlab (refV (wpMap env tgt) .event) (.str prEv) = true := by
+  by_cases hp : env.event = some .pullRequest
+  · simp [refV, wpMap, mapEnv, hp, eqV, evGl, prEv]
+  · simp only [refV, wpMapS_event_np env tgt sfx hp]; exact id
+
+/-- With the pull request tests that a run must pass left exact, a closed or metadata run passes no test that the pull
+request run does not pass, and fails every test that the pull request run fails by a negation. -/
+theorem famX_mono (env : Env) (tgt : Option String) (sfx : String) :
+    ∀ e : E, Woodpecker.GlSub e = true → EvAgn e = true →
+      (holds .gitlab (wpMapS env tgt sfx) (famX false e) = true → holds .gitlab (wpMap env tgt) e = true) ∧
+      (holds .gitlab (wpMap env tgt) e = true → holds .gitlab (wpMapS env tgt sfx) (famX true e) = true) := by
+  intro e
+  induction e with
+  | not x ih =>
+    intro hg hev
+    have ih := ih (by simpa [Woodpecker.GlSub] using hg) (by simpa [EvAgn] using hev)
+    simp only [famX, Bool.not_true, Bool.not_false, holds_not_gl, Bool.not_eq_true']
+    constructor
+    · intro h; by_contra hc; simp at hc; exact absurd (ih.2 hc) (by simp [h])
+    · intro h; by_contra hc; simp at hc; exact absurd (ih.1 hc) (by simp [h])
+  | and l r ihl ihr =>
+    intro hg hev
+    simp only [Woodpecker.GlSub, Bool.and_eq_true] at hg
+    simp only [EvAgn, Bool.and_eq_true] at hev
+    have a := ihl hg.1 hev.1
+    have b := ihr hg.2 hev.2
+    simp only [famX]
+    rw [holds_and_gl _ (famX_glSub _ _ hg.1) (famX_glSub _ _ hg.2), holds_and_gl _ (famX_glSub _ _ hg.1) (famX_glSub _ _ hg.2),
+      holds_and_gl _ hg.1 hg.2]
+    constructor
+    · intro h; simp only [Bool.and_eq_true] at h ⊢; exact ⟨a.1 h.1, b.1 h.2⟩
+    · intro h; simp only [Bool.and_eq_true] at h ⊢; exact ⟨a.2 h.1, b.2 h.2⟩
+  | or l r ihl ihr =>
+    intro hg hev
+    simp only [Woodpecker.GlSub, Bool.and_eq_true] at hg
+    simp only [EvAgn, Bool.and_eq_true] at hev
+    have a := ihl hg.1 hev.1
+    have b := ihr hg.2 hev.2
+    simp only [famX]
+    rw [holds_or_gl _ (famX_glSub _ _ hg.1) (famX_glSub _ _ hg.2), holds_or_gl _ (famX_glSub _ _ hg.1) (famX_glSub _ _ hg.2),
+      holds_or_gl _ hg.1 hg.2]
+    constructor
+    · intro h; simp only [Bool.or_eq_true] at h ⊢; exact h.imp a.1 b.1
+    · intro h; simp only [Bool.or_eq_true] at h ⊢; exact h.imp a.2 b.2
+  | rx x m s ih =>
+    intro hg hev
+    clear ih
+    cases x <;> try (simp [Woodpecker.GlSub] at hg; done)
+    case ref r =>
+      by_cases hr : r = .event
+      · subst hr
+        simp only [EvAgn, Bool.and_eq_true, beq_iff_eq, Bool.or_eq_true, decide_eq_true_eq] at hev
+        obtain ⟨rfl, h2⟩ := hev
+        by_cases hs : s = prEv
+        · subst hs
+          have hf := fam_leaf env tgt sfx false .exact prEv (by simp [prEv])
+          simp [rxNode, fam] at hf
+          constructor
+          · intro h
+            simp only [famX, holds, eval, truthy] at h ⊢
+            simpa using exactPr_mono env tgt sfx (by simpa using h)
+          · intro h
+            have : holds .gitlab (wpMapS env tgt sfx) (famX true (.rx (.ref .event) .exact prEv)) =
+                holds .gitlab (wpMap env tgt) (.rx (.ref .event) .exact prEv) := by
+              have e : famX true (.rx (.ref .event) .exact prEv) = .rx (.ref .event) .prefix prEv := by simp [famX]
+              rw [e]; unfold holds; rw [hf]
+            rw [this]; exact h
+        · have hl : s.length < 19 := h2.resolve_right hs
+          have hf := fam_leaf env tgt sfx false .exact s (by simp [hl])
+          simp [rxNode, fam, hs] at hf
+          have : ∀ b, famX b (.rx (.ref .event) .exact s) = .rx (.ref .event) .exact s := by
+            intro b; simp [famX, hs]
+          simp only [this, holds]; rw [hf]; exact ⟨id, id⟩
+      · have hn : NoEv (.rx (.ref r) m s) = true := by cases r <;> simp_all [NoEv, TranslateClass.refs]
+        have hf := fam_bridge_noEv env tgt sfx _ hn
+        rw [fam_noEv _ hn] at hf
+        have : ∀ b, famX b (.rx (.ref r) m s) = .rx (.ref r) m s := by
+          intro b; cases r <;> simp [famX] at hr ⊢
+        simp only [this, holds]; rw [hf]; exact ⟨id, id⟩
+  | nrx x m s ih =>
+    intro hg hev
+    clear ih
+    cases x <;> try (simp [Woodpecker.GlSub] at hg; done)
+    case ref r =>
+      by_cases hr : r = .event
+      · subst hr
+        simp only [EvAgn, Bool.and_eq_true, beq_iff_eq, Bool.or_eq_true, decide_eq_true_eq] at hev
+        obtain ⟨rfl, h2⟩ := hev
+        by_cases hs : s = prEv
+        · subst hs
+          have hf := fam_leaf env tgt sfx true .exact prEv (by simp [prEv])
+          simp [rxNode, fam] at hf
+          constructor
+          · intro h
+            have e : famX false (.nrx (.ref .event) .exact prEv) = .nrx (.ref .event) .prefix prEv := by simp [famX]
+            have : holds .gitlab (wpMapS env tgt sfx) (famX false (.nrx (.ref .event) .exact prEv)) =
+                holds .gitlab (wpMap env tgt) (.nrx (.ref .event) .exact prEv) := by
+              rw [e]; unfold holds; rw [hf]
+            rw [← this]; exact h
+          · intro h
+            have e : famX true (.nrx (.ref .event) .exact prEv) = .nrx (.ref .event) .exact prEv := by simp [famX]
+            rw [e]
+            simp only [holds, eval, truthy] at h ⊢
+            by_contra hc
+            have hc' : matchV .exact prEv (refV (wpMapS env tgt sfx) .event) = true := by simpa using hc
+            have := exactPr_mono env tgt sfx hc'
+            simp_all
+        · have hl : s.length < 19 := h2.resolve_right hs
+          have hf := fam_leaf env tgt sfx true .exact s (by simp [hl])
+          simp [rxNode, fam, hs] at hf
+          have : ∀ b, famX b (.nrx (.ref .event) .exact s) = .nrx (.ref .event) .exact s := by
+            intro b; simp [famX, hs]
+          simp only [this, holds]; rw [hf]; exact ⟨id, id⟩
+      · have hn : NoEv (.nrx (.ref r) m s) = true := by cases r <;> simp_all [NoEv, TranslateClass.refs]
+        have hf := fam_bridge_noEv env tgt sfx _ hn
+        rw [fam_noEv _ hn] at hf
+        have : ∀ b, famX b (.nrx (.ref r) m s) = .nrx (.ref r) m s := by
+          intro b; cases r <;> simp [famX] at hr ⊢
+        simp only [this, holds]; rw [hf]; exact ⟨id, id⟩
+  | eq l r ihl ihr =>
+    intro hg hev
+    clear ihl ihr
+    cases l <;> try (simp [Woodpecker.GlSub] at hg; done)
+    case ref r0 =>
+      cases r <;> try (simp [Woodpecker.GlSub] at hg; done)
+      case str s =>
+        by_cases hr : r0 = .event
+        · subst hr
+          simp only [EvAgn, Bool.or_eq_true, decide_eq_true_eq, beq_iff_eq] at hev
+          by_cases hs : s = prEv
+          · subst hs
+            have hf := (fam_leaf_eq env tgt sfx prEv (by simp [prEv])).1
+            simp [fam] at hf
+            constructor
+            · intro h
+              have e : famX false (.eq (.ref .event) (.str prEv)) = .eq (.ref .event) (.str prEv) := by simp [famX]
+              rw [e] at h
+              simp only [holds, eval, truthy] at h ⊢
+              exact eqPr_mono env tgt sfx (by simpa using h)
+            · intro h
+              have e : famX true (.eq (.ref .event) (.str prEv)) = .rx (.ref .event) .prefix prEv := by simp [famX]
+              rw [e]; unfold holds; rw [hf]; exact h
+          · have hl : s.length < 19 := hev.resolve_right hs
+            have hf := (fam_leaf_eq env tgt sfx s (by simp [hl])).1
+            simp [fam, hs] at hf
+            have : ∀ b, famX b (.eq (.ref .event) (.str s)) = .eq (.ref .event) (.str s) := by
+              intro b; simp [famX, hs]
+            simp only [this, holds]; rw [hf]; exact ⟨id, id⟩
+        · have hn : NoEv (.eq (.ref r0) (.str s)) = true := by cases r0 <;> simp_all [NoEv, TranslateClass.refs]
+          have hf := fam_bridge_noEv env tgt sfx _ hn
+          rw [fam_noEv _ hn] at hf
+          have : ∀ b, famX b (.eq (.ref r0) (.str s)) = .eq (.ref r0) (.str s) := by
+            intro b; cases r0 <;> simp [famX] at hr ⊢
+          simp only [this, holds]; rw [hf]; exact ⟨id, id⟩
+  | ne l r ihl ihr =>
+    intro hg hev
+    clear ihl ihr
+    cases l <;> try (simp [Woodpecker.GlSub] at hg; done)
+    case ref r0 =>
+      cases r <;> try (simp [Woodpecker.GlSub] at hg; done)
+      case str s =>
+        by_cases hr : r0 = .event
+        · subst hr
+          simp only [EvAgn, Bool.or_eq_true, decide_eq_true_eq, beq_iff_eq] at hev
+          by_cases hs : s = prEv
+          · subst hs
+            have hf := (fam_leaf_eq env tgt sfx prEv (by simp [prEv])).2
+            simp [fam] at hf
+            constructor
+            · intro h
+              have e : famX false (.ne (.ref .event) (.str prEv)) = .nrx (.ref .event) .prefix prEv := by simp [famX]
+              rw [e] at h
+              unfold holds at h ⊢
+              rw [hf] at h; exact h
+            · intro h
+              have e : famX true (.ne (.ref .event) (.str prEv)) = .ne (.ref .event) (.str prEv) := by simp [famX]
+              rw [e]
+              simp only [holds, eval, truthy] at h ⊢
+              by_contra hc
+              have hc' : eqV .gitlab (refV (wpMapS env tgt sfx) .event) (.str prEv) = true := by simpa using hc
+              have := eqPr_mono env tgt sfx hc'
+              simp_all
+          · have hl : s.length < 19 := hev.resolve_right hs
+            have hf := (fam_leaf_eq env tgt sfx s (by simp [hl])).2
+            simp [fam, hs] at hf
+            have : ∀ b, famX b (.ne (.ref .event) (.str s)) = .ne (.ref .event) (.str s) := by
+              intro b; simp [famX, hs]
+            simp only [this, holds]; rw [hf]; exact ⟨id, id⟩
+        · have hn : NoEv (.ne (.ref r0) (.str s)) = true := by cases r0 <;> simp_all [NoEv, TranslateClass.refs]
+          have hf := fam_bridge_noEv env tgt sfx _ hn
+          rw [fam_noEv _ hn] at hf
+          have : ∀ b, famX b (.ne (.ref r0) (.str s)) = .ne (.ref r0) (.str s) := by
+            intro b; cases r0 <;> simp [famX] at hr ⊢
+          simp only [this, holds]; rw [hf]; exact ⟨id, id⟩
+  | _ => intro h; simp [Woodpecker.GlSub] at h
+
+/-- Why the exact test stays: on a closed run the prefix form of the merge request test is true and the exact form
+is false, and the source has no closed run. -/
+theorem famX_closed_blocked : ∃ (env : Env) (tgt : Option String),
+    holds .gitlab (wpMapS env tgt "_closed") (famX false (.rx (.ref .event) .exact prEv)) = false ∧
+    holds .gitlab (wpMapS env tgt "_closed") (fam (.rx (.ref .event) .exact prEv)) = true := by
+  refine ⟨⟨some "7/merge", some .branch, some .pullRequest, none, none⟩, some "main", by decide +kernel, by decide +kernel⟩
+
+/-- A GitLab condition in the subset, rewritten by `glPr`, never passes on a closed or metadata Woodpecker run
+where the merge request pipeline fails it. -/
+theorem glWpFamX_failsafe (env : Env) (tgt : Option String) (sfx : String) {e e' : E}
+    (hg : Woodpecker.GlSub e = true) (h : glPr e = some e') (hev : EvAgn e' = true) :
+    holds .gitlab (Woodpecker.wpView (wpMapS env tgt sfx)) (famX false e') = true →
+      holds .gitlab (glEnv env) e = true := by
+  have hs := famX_glSub e' false (glPr_glSub e e' hg h)
+  intro hh
+  unfold holds at hh ⊢
+  rw [Woodpecker.eval_woodpecker (wpMapS env tgt sfx) (Woodpecker.wpView (wpMapS env tgt sfx)) _ hs
+    (fun r _ => rfl)] at hh
+  have := (famX_mono env tgt sfx e' (glPr_glSub e e' hg h) hev).1
+  unfold holds at this
+  rw [← glPr_eval env tgt e e' h]
+  exact this hh
 
 
 /-! ### CI_COMMIT_REF_NAME in a merge request pipeline

@@ -609,7 +609,7 @@ func (e *emitter) tagRefs(tp string, in ir.Filter) (wpexpr.Filter, string) {
 func (e *emitter) jobWhen(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) ([]whenEntry, error) {
 	e.inexact = ""
 	base := e.triggerEntries(pl)
-	base, err := e.gitlabDefaultEvents(pl, base)
+	base, err := e.gitlabDefaultEvents(pl, jp, base)
 	if err != nil {
 		return nil, err
 	}
@@ -673,7 +673,7 @@ func (e *emitter) reachable(pl *ir.Pipeline, jp string, entries []whenEntry) ([]
 			continue
 		}
 		add := expr.EventsPossible(cond, allEvents)
-		if e.origin == "gitlab" && !gitlabHasWorkflow(pl) && len(add) > 0 {
+		if e.origin == "gitlab" && !gitlabHasWorkflow(pl) && isDefaultPushTag(pl.Triggers) && len(add) > 0 {
 			out[i].Event.Include = append(slices.Clone(ent.Event.Include), add...)
 			widened = true
 			e.emulate(jp, caps.JobIf, "event "+strings.Join(add, ", "), "the condition names events that the default push and tag triggers lack; GitLab runs a pipeline with no workflow:rules for every source, so the entry lists them")
@@ -1007,10 +1007,16 @@ type defaultEventsArg struct {
 	Events []string `json:"default_events"`
 }
 
+// gitlabDefaultArg marks a workflow whose event lists come from the default events of a GitLab pipeline, so the parser
+// reads the entries without them.
+type gitlabDefaultArg struct {
+	Default bool `json:"gitlab_default"`
+}
+
 // gitlabDefaultEvents adds the events a GitLab pipeline with no workflow:rules also runs on. The IR holds only its push
 // and tag triggers, so the other events that map to a Woodpecker event join as one entry, and a marker keeps the
 // original triggers for the way back.
-func (e *emitter) gitlabDefaultEvents(pl *ir.Pipeline, base []whenEntry) ([]whenEntry, error) {
+func (e *emitter) gitlabDefaultEvents(pl *ir.Pipeline, jp string, base []whenEntry) ([]whenEntry, error) {
 	if e.origin != provider.GitLab || gitlabHasWorkflow(pl) || !isDefaultPushTag(pl.Triggers) {
 		return base, nil
 	}
@@ -1025,6 +1031,9 @@ func (e *emitter) gitlabDefaultEvents(pl *ir.Pipeline, base []whenEntry) ([]when
 		return base, nil
 	}
 	if err := e.markTriggers(caps.TriggerManual, "pipeline/"+pl.ID, pl.Triggers); err != nil {
+		return nil, err
+	}
+	if err := e.markArg(caps.TriggerPush, jp, gitlabDefaultArg{Default: true}); err != nil {
 		return nil, err
 	}
 	return append(base, whenEntry{Item: wpexpr.Item{Event: wpexpr.Filter{Include: extra}}}), nil

@@ -20,6 +20,8 @@ type sourceEventsArg struct {
 	// Conds holds, by job ID, the condition that withGitLabSources gated with the workflow rules and what it became.
 	Conds map[string]condBack `json:"source_conds,omitempty"`
 	Kinds []ir.TriggerKind    `json:"source_events"`
+	// Gated lists the jobs that got the gate of the pull request trigger, which the parser removes with it.
+	Gated []string `json:"gated,omitempty"`
 }
 
 // condBack is the job condition of the source (If, empty for none) and the gated condition that replaced it (Back).
@@ -34,7 +36,7 @@ type condBack struct {
 // that they admit on some branch or tag gets its trigger, and every job gets the rule condition for a run of that source,
 // so no job runs where GitLab starts none. An api or trigger source under such a condition comes back as lost, because a
 // repository_dispatch run has no ref of its own to test.
-func withGitLabSources(p *ir.Project, target string) (*ir.Project, map[string]sourceEventsArg, map[string][]provider.SourceEvent) {
+func withGitLabSources(p *ir.Project, target string, injected map[string]bool) (*ir.Project, map[string]sourceEventsArg, map[string][]provider.SourceEvent) {
 	if p == nil || p.Origin.Provider != provider.GitLab || provider.SameFamily(p.Origin.Provider, target) {
 		return p, nil, nil
 	}
@@ -89,7 +91,11 @@ func withGitLabSources(p *ir.Project, target string) (*ir.Project, map[string]so
 		if len(types) > 0 {
 			added = append(added, ir.Trigger{Kind: ir.TriggerAPI, Ext: ir.Ext{provider.Family(target): map[string]any{"types": types}}})
 		}
+		kinds := injectedKinds(pl, injected)
 		if len(added) == 0 {
+			if len(kinds) > 0 {
+				args[pl.ID] = sourceEventsArg{Kinds: kinds, Gated: gatedIDs(pl)}
+			}
 			continue
 		}
 		if out == nil {
@@ -102,6 +108,8 @@ func withGitLabSources(p *ir.Project, target string) (*ir.Project, map[string]so
 		arg := sourceEventsArg{}
 		arg.Conds = gateJobs(&cp, gates)
 		out.Pipelines[i] = &cp
+		arg.Kinds = append(arg.Kinds, kinds...)
+		arg.Gated = gatedIDs(&cp)
 		for _, t := range added {
 			arg.Kinds = append(arg.Kinds, t.Kind)
 		}
@@ -211,4 +219,30 @@ func (e *emitter) loseSources(pl *ir.Pipeline) {
 		e.lose("pipeline/"+pl.ID, ev.Feature, "the workflow rules admit the "+ev.Name+" source only on some branches, tags or variables, and "+
 			e.d.title()+" has no ref filter for it; the jobs for that source do not start")
 	}
+}
+
+// injectedKinds lists the triggers that provider.WithDefaultTriggers added to a GitLab pipeline with the default
+// triggers, which the parser drops again: the GitLab parser gives such a pipeline push and tag only.
+func injectedKinds(pl *ir.Pipeline, injected map[string]bool) []ir.TriggerKind {
+	if !injected[pl.ID] || !provider.IsGitLabInjected(pl) {
+		return nil
+	}
+	var out []ir.TriggerKind
+	for _, t := range pl.Triggers {
+		if t.Kind == ir.TriggerManual || t.Kind == ir.TriggerPR {
+			out = append(out, t.Kind)
+		}
+	}
+	return out
+}
+
+// gatedIDs lists the jobs of pl that carry the gate of the pull request trigger.
+func gatedIDs(pl *ir.Pipeline) []string {
+	var out []string
+	for _, j := range pl.Jobs {
+		if j != nil && provider.InjectedGate(j.If) {
+			out = append(out, j.ID)
+		}
+	}
+	return out
 }

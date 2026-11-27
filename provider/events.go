@@ -147,6 +147,20 @@ func WithDefaultTriggers(p *ir.Project, target string) (*ir.Project, map[string]
 			injected[pl.ID] = true
 			continue
 		}
+		if p.Origin.Provider == GitLab && !SameFamily(p.Origin.Provider, target) && IsGitLabDefault(pl) {
+			cp, lost := gitlabDefaultTriggers(pl, target)
+			if out == nil {
+				c := *p
+				c.Pipelines = append([]*ir.Pipeline(nil), p.Pipelines...)
+				out = &c
+			}
+			out.Pipelines[i] = cp
+			injected[pl.ID] = true
+			if len(lost) > 0 {
+				unmapped[pl.ID] = append(unmapped[pl.ID], lost...)
+			}
+			continue
+		}
 		events := DefaultEvents(pl, p.Origin.Provider)
 		if len(events) == 0 || SameFamily(p.Origin.Provider, target) {
 			continue

@@ -27,6 +27,7 @@ func NewMeta(sourceID string, proj *ir.Project, target provider.Provider, rep *r
 		Source:   sourceID,
 		Target:   target.ID(),
 		Dialect:  proj.Origin.Dialect,
+		Gated:    provider.GatedJobs(proj, target.ID()),
 		Ext:      meta.Collect(proj),
 		Residual: meta.CollectResidual(proj),
 		Calls:    nilIfEmpty(inlined.Calls),
@@ -76,11 +77,13 @@ func restore(proj *ir.Project, m *meta.Meta, keepEdits bool) (orphans, kept []st
 	}
 	if keepEdits {
 		orphans, kept = meta.ReattachKeepingEdits(proj, m)
+		provider.RestoreGates(proj, m.Gated)
 		// The edited jobs win, so the inlined jobs stay as they are instead of collapsing into the stored call.
 		kept = append(kept, slices.Sorted(maps.Keys(m.Calls))...)
 		return orphans, kept
 	}
 	orphans = meta.Reattach(proj, m)
+	provider.RestoreGates(proj, m.Gated)
 	return append(orphans, restoreCalls(proj, m.Calls)...), nil
 }
 
