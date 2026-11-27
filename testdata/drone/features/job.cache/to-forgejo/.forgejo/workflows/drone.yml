@@ -24,7 +24,7 @@ jobs:
       - uses: https://github.com/actions/cache@v6
         with:
           path: ~/go/pkg/mod
-          key: go-mod-run-${{ github.run_id }}
+          key: go-mod-run-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: go-mod-run-
       # pipemaster:emulated step.image pipeline/drone/job/ci/step/build
       - id: build
