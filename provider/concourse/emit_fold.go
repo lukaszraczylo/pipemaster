@@ -3,6 +3,7 @@ package concourse
 import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
+	"github.com/lukaszraczylo/pipemaster/provider"
 )
 
 // runKind says which kind of git version starts the job: a tag version (tag) or a branch push. It is unknown for
@@ -44,14 +45,18 @@ func (jx *jobEmitter) foldRun(c expr.Expr) (expr.Expr, runVerdict) {
 	if !known {
 		return c, runUnknown
 	}
+	tagEvent := jx.pe.e.originTagEvent()
 	ev := "push"
-	if tag {
+	switch {
+	case tag && tagEvent:
 		ev = "tag"
+	case tag:
+		ev = expr.TagPush
 	}
 	if v := decideRun(c, ev, tag); v != runUnknown {
 		return c, v
 	}
-	f := expr.FoldRun(c, tag)
+	f := expr.FoldRunAs(c, tag, tagEvent)
 	if l, ok := f.(expr.Lit); ok {
 		return c, verdictOf(expr.LitTruthy(l))
 	}
@@ -84,4 +89,11 @@ func (jx *jobEmitter) foldMark(name string, orig, final expr.Expr) {
 func (jx *jobEmitter) alwaysHolds(c expr.Expr) bool {
 	_, v := jx.foldRun(c)
 	return v == runAlways
+}
+
+// originTagEvent is true when the source reports a tag push as an event of its own (Woodpecker, Drone). A GHA or
+// GitLab source reports it as a push on a tag ref. An unknown source keeps the tag event.
+func (e *emitter) originTagEvent() bool {
+	d, ok := expr.LangOf(provider.Family(e.origin))
+	return !ok || d.TagEvent
 }

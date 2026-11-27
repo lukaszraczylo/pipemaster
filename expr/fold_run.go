@@ -17,6 +17,20 @@ func FoldRun(e Expr, tag bool) Expr {
 	return foldConst(substRun(e, tag))
 }
 
+// FoldRunAs is FoldRun for a source whose event vocabulary is known. A source with no tag event (tagEvent false:
+// GHA, GitLab) reports a tag push as the push event on a tag ref, so on a tag run the event is push, not tag.
+func FoldRunAs(e Expr, tag, tagEvent bool) Expr {
+	if tag && !tagEvent {
+		e, _ = rebuild(e, func(x Expr) (Expr, bool) {
+			if isRef(x, CtxEvent) {
+				return strLit(runEvent(false)), true
+			}
+			return nil, false
+		})
+	}
+	return FoldRun(e, tag)
+}
+
 func substRun(e Expr, tag bool) Expr {
 	switch v := e.(type) {
 	case Ref:

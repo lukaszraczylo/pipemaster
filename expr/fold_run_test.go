@@ -41,3 +41,26 @@ func TestFoldRun(t *testing.T) {
 		})
 	}
 }
+
+// A source with no tag event reports a tag push as a push run on a tag ref.
+func TestFoldRunAsTagPush(t *testing.T) {
+	for _, tc := range []struct {
+		name, in, want string
+	}{
+		{"push event holds on a tag push", "event == 'push'", "true"},
+		{"push and tag ref", "event == 'push' && ref_type == 'tag'", "true"},
+		{"push and branch test is false on a tag", "event == 'push' && branch == 'main'", "false"},
+		{"not push is false", "event != 'push'", "false"},
+		{"tag name test stays", "event == 'push' && tag == 'v1'", "tag == 'v1'"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in, err := expr.ParseCanonical(tc.in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := expr.String(expr.FoldRunAs(in, true, false)); got != tc.want {
+				t.Fatalf("FoldRunAs(%s) = %s, want %s", tc.in, got, tc.want)
+			}
+		})
+	}
+}

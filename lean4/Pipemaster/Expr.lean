@@ -187,5 +187,12 @@ def eval (sem : Sem) (v : View) : E → Val
 /-- Truthiness of the result: what an `if` condition does with it. -/
 def holds (sem : Sem) (v : View) (e : E) : Bool := truthy (eval sem v e)
 
+/-- A tag push of a GHA or GitLab source is a push run on a tag ref: both dialects test the event as push. Mirrors
+expr.FoldRunAs (expr/fold_run.go), which keeps event push on a tag run of a source with no tag event. -/
+theorem tagPush_event_is_push (n s x : Option String) :
+    holds .gha (ghaView ⟨n, some .tag, some .push, s, x⟩) (.eq (.ref .event) (.str "push")) = true ∧
+    holds .gitlab (mapEnv ⟨n, some .tag, some .push, s, x⟩) (.eq (.ref .event) (.str "push")) = true := by
+  constructor <;> rfl
+
 end Expr
 end Pipemaster
