@@ -248,8 +248,8 @@ func woodpeckerWorkflows(dir, target string) ([]string, map[string]droneStatus, 
 			return nil, nil, err
 		}
 		var d struct {
-			When      yaml.Node `yaml:"when"`
 			DependsOn []wpDep   `yaml:"depends_on"`
+			When      yaml.Node `yaml:"when"`
 		}
 		if err := yaml.Unmarshal(raw, &d); err != nil {
 			return nil, nil, fmt.Errorf("parse %s: %w", rel, err)
