@@ -18,6 +18,12 @@
     ],
     "mrjob.plain": [
       "plain"
+    ],
+    "mrjob.cleanup": [
+      "cleanup"
+    ],
+    "mrjob.onfail": [
+      "onfail"
     ]
   },
   "requires": []

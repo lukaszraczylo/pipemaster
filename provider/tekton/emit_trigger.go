@@ -46,6 +46,7 @@ type filterArg struct {
 	Branches ir.Filter      `json:"branches"`
 	Tags     ir.Filter      `json:"tags"`
 	Paths    ir.Filter      `json:"paths"`
+	Actions  []string       `json:"actions,omitempty"`
 }
 
 // globRegex turns a glob into an anchored RE2 text. It admits only `*` (not across `/`), `**`, `?` and literals;
@@ -96,6 +97,31 @@ func matchAny(target string, globs []string) (string, bool) {
 // filterTarget is a ref text with the ref prefix removed.
 func trimRef(prefix string) string { return "body.ref.replace('" + prefix + "','',1)" }
 
+// actionsExpr is the action test of a pull request filter: the default set when actions is empty.
+func actionsExpr(actions []string) string {
+	if len(actions) == 0 {
+		return prActionsExpr
+	}
+	return "body.action in ['" + strings.Join(actions, "','") + "']"
+}
+
+// triggerActions reads the pull request actions that a source names, as GHA types.
+func triggerActions(t ir.Trigger) []string {
+	m, _ := t.Ext["gha"].(map[string]any)
+	var out []string
+	switch v := m["types"].(type) {
+	case []string:
+		out = slices.Clone(v)
+	case []any:
+		for _, x := range v {
+			if s, ok := x.(string); ok {
+				out = append(out, s)
+			}
+		}
+	}
+	return out
+}
+
 // celFilter writes the CEL filter of a trigger. ok is false when a glob has no exact regex.
 func celFilter(a filterArg) (string, bool) {
 	var conds []string
@@ -114,7 +140,7 @@ func celFilter(a filterArg) (string, bool) {
 			return "", false
 		}
 	case ir.TriggerPR:
-		conds = append(conds, prActionsExpr, prSameRepoExpr)
+		conds = append(conds, actionsExpr(a.Actions), prSameRepoExpr)
 		if !branch("body.pull_request.base.ref") {
 			return "", false
 		}
@@ -290,6 +316,9 @@ func cronFile(d *outDoc) string {
 func (e *emitter) eventTrigger(pp *plan, i int, path string, t ir.Trigger, ctxs []string, bname, tname string) (*yaml.Node, error) {
 	tn := triggerName(pp, t.Kind, i)
 	arg := filterArg{Kind: t.Kind, Branches: t.Branches, Tags: t.Tags, Paths: t.Paths, Name: tn}
+	if t.Kind == ir.TriggerPR {
+		arg.Actions = triggerActions(t)
+	}
 	filter, ok := celFilter(arg)
 	if !ok {
 		filter = "false"

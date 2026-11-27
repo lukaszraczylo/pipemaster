@@ -127,6 +127,12 @@ func flatten(e expr.Expr, op string) []expr.Expr {
 }
 
 func entryOf(e expr.Expr) (Entry, bool) {
+	if u, ok := e.(expr.Unary); ok && u.Op == expr.OpNot {
+		if b, ok := u.X.(expr.Binary); ok && b.Op == expr.OpEq {
+			in, v, ok := compare(b)
+			return Entry{Input: in, Operator: OpNotIn, Values: []string{v}}, ok
+		}
+	}
 	if b, ok := e.(expr.Binary); ok && b.Op == expr.OpNe {
 		in, v, ok := compare(b)
 		return Entry{Input: in, Operator: OpNotIn, Values: []string{v}}, ok

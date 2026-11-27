@@ -8,3 +8,11 @@ mr-only:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   script:
     - echo "MARK mrjob.mr" | tee -a trace.log
+cleanup:
+  when: always
+  script:
+    - echo "MARK mrjob.cleanup" | tee -a trace.log
+onfail:
+  when: on_failure
+  script:
+    - echo "MARK mrjob.onfail" | tee -a trace.log

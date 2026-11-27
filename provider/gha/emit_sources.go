@@ -239,7 +239,7 @@ func injectedKinds(pl *ir.Pipeline, injected map[string]bool) []ir.TriggerKind {
 // gatedIDs lists the jobs of pl that carry the gate of the pull request trigger.
 func gatedIDs(pl *ir.Pipeline) []string {
 	var out []string
-	for _, j := range pl.Jobs {
+	for _, j := range append(slices.Clone(pl.Jobs), pl.Finally...) {
 		if j != nil && provider.InjectedGate(j.If) {
 			out = append(out, j.ID)
 		}
