@@ -104,7 +104,12 @@ func gitlabDefaultTriggers(pl *ir.Pipeline, target string) (*ir.Pipeline, []Sour
 			unmapped = append(unmapped, ev)
 		}
 	}
-	if prTarget(target) && namesMergeRequest(pl) {
+	named := namesMergeRequest(pl)
+	if target == Concourse && named {
+		// A Concourse git resource has no pull request version, so the job of that source never starts.
+		unmapped = append(unmapped, gitlabMergeRequest)
+	}
+	if prTarget(target) && named {
 		cp.Triggers = append(cp.Triggers, ir.Trigger{Kind: ir.TriggerPR})
 		cp.Jobs = make([]*ir.Job, len(pl.Jobs))
 		for i, j := range pl.Jobs {

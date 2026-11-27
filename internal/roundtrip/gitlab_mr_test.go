@@ -76,3 +76,14 @@ func TestGitLabDefaultTriggersTektonArgoGetManual(t *testing.T) {
 		})
 	}
 }
+
+// Concourse has no pull request event, so the merge request job never runs there and the report must say so.
+func TestGitLabMergeRequestRuleConcourseReportsTheEvent(t *testing.T) {
+	_, msg := convertMR(t, "concourse")
+	for _, line := range strings.Split(msg, "\n") {
+		if strings.Contains(line, "trigger.pull_request") && strings.Contains(line, "merge_request_event") && strings.HasPrefix(strings.TrimSpace(line), "[lost]") {
+			return
+		}
+	}
+	t.Errorf("the report has no lost trigger.pull_request entry for merge_request_event:\n%s", msg)
+}
