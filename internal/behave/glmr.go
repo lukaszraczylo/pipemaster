@@ -3,17 +3,23 @@
 package behave
 
 import (
+	"slices"
+
 	"go.yaml.in/yaml/v3"
 )
 
 // glReserved are the top-level keys of a GitLab file that are no job.
 var glReserved = map[string]bool{
 	"stages": true, "variables": true, "default": true, "include": true, "workflow": true, "image": true,
-	"services": true, "cache": true, "before_script": true, "after_script": true, "pages": false,
+	"services": true, "cache": true, "before_script": true, "after_script": true,
 }
 
 // glJobKeysKeepingRules are the keys that decide on their own whether a job joins a pipeline.
-var glJobKeysKeepingRules = []string{"rules", "only", "except", "extends", "trigger"}
+var glJobKeysKeepingRules = []string{"rules", "extends", "trigger"}
+
+// glMRRef is the only/except keyword for merge request pipelines
+// (https://docs.gitlab.com/ci/yaml/deprecated_keywords/, only:refs / except:refs).
+const glMRRef = "merge_requests"
 
 // mergeRequestJobs applies GitLab's own pipeline-creation rule to a file for a merge request event: without
 // workflow:rules, a job joins a merge request pipeline only when its rules match CI_PIPELINE_SOURCE ==
@@ -41,6 +47,11 @@ func mergeRequestJobs(raw []byte) ([]byte, bool, error) {
 			remaining = true
 			continue
 		}
+		if hasKey(job, []string{"only", "except"}) && joinsMergeRequest(job) {
+			remaining = true
+			continue
+		}
+		dropKeys(job, "only", "except")
 		never := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{
 			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "when"}, {Kind: yaml.ScalarNode, Tag: "!!str", Value: "never"},
 		}}
@@ -61,4 +72,53 @@ func hasKey(m *yaml.Node, keys []string) bool {
 		}
 	}
 	return false
+}
+
+// joinsMergeRequest decides a job with only or except and no rules. Without only, a job takes the default refs of
+// branches and tags, so it joins no merge request pipeline. With only, it joins when only lists merge_requests and
+// except does not.
+func joinsMergeRequest(job *yaml.Node) bool {
+	return refsInclude(keyValue(job, "only")) && !refsInclude(keyValue(job, "except"))
+}
+
+// refsInclude reads the refs of an only or except value, a list or a map with a refs list, for merge_requests.
+func refsInclude(v *yaml.Node) bool {
+	if v == nil {
+		return false
+	}
+	if v.Kind == yaml.MappingNode {
+		v = keyValue(v, "refs")
+		if v == nil {
+			return false
+		}
+	}
+	if v.Kind == yaml.ScalarNode {
+		return v.Value == glMRRef
+	}
+	for _, n := range v.Content {
+		if n.Value == glMRRef {
+			return true
+		}
+	}
+	return false
+}
+
+func keyValue(m *yaml.Node, key string) *yaml.Node {
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == key {
+			return m.Content[i+1]
+		}
+	}
+	return nil
+}
+
+// dropKeys removes keys from a mapping, because GitLab refuses a job that has both rules and only or except.
+func dropKeys(m *yaml.Node, keys ...string) {
+	kept := m.Content[:0]
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if !slices.Contains(keys, m.Content[i].Value) {
+			kept = append(kept, m.Content[i], m.Content[i+1])
+		}
+	}
+	m.Content = kept
 }

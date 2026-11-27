@@ -558,6 +558,15 @@ func (e *gitlabEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 		if !active {
 			return &Trace{Log: "GitLab creates no merge request pipeline: no job has a merge request rule", NoPipeline: true}, nil
 		}
+		// GitLab creates no pipeline when the rules of every job are false. A run that starts jobs and prints no marker is
+		// no empty pipeline, and the runner must judge it as it is.
+		running, err := e.startingJobs(ctx, w, rewritten, vars, "mr")
+		if err != nil {
+			return nil, err
+		}
+		if !slices.Contains(slices.Collect(maps.Values(running)), true) {
+			return &Trace{Log: "GitLab creates no merge request pipeline: the rules of every job are false for this event", NoPipeline: true}, nil
+		}
 	}
 	if err := os.WriteFile(file, rewritten, 0o600); err != nil { // #nosec G703 -- a file of the harness workspace
 		return nil, err
@@ -567,8 +576,6 @@ func (e *gitlabEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 		return nil, err
 	}
 	tr.Log = childLog + tr.Log
-	// The rules of every job are false in a merge request pipeline, so GitLab creates none.
-	tr.NoPipeline = w.Ev.Kind == kindPR && tr.Exit == 0 && len(tr.Markers) == 0
 	return tr, nil
 }
 
