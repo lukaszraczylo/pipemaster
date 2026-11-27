@@ -116,7 +116,7 @@ func plural(n int) string {
 }
 
 func entryCount(m *meta.Meta) int {
-	return len(m.Ext) + len(m.Residual) + len(m.Lost) + len(m.Calls)
+	return len(m.Ext) + len(m.Residual) + len(m.Lost) + len(m.Calls) + len(m.DockerSteps)
 }
 
 // AddOrphans reports each stored path that matches no node in the converted pipeline.

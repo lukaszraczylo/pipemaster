@@ -176,6 +176,19 @@ func inlineCovers(e report.Entry, d irDiff) bool {
 	return false
 }
 
+// dockerCovers is true when the emulated entry of a docker step explains the difference: a return without metadata
+// keeps the script step that the emit wrote in its place.
+func dockerCovers(e report.Entry, d irDiff) bool {
+	if e.Strategy != emitkit.DockerRewrite || e.Level != caps.Emulated || e.IRPath != d.Path {
+		return false
+	}
+	switch d.Field {
+	case "Kind", "Action", "With", "Image", "Script":
+		return true
+	}
+	return false
+}
+
 // covered reports whether a lost or external entry at the node, or below it, names a feature that
 // accounts for the differing field.
 func covered(d irDiff, reps ...*report.Report) bool {
@@ -190,7 +203,7 @@ func covered(d irDiff, reps ...*report.Report) bool {
 			if e.Level >= caps.External && isDisabledCall(e, d) {
 				return true
 			}
-			if inlineCovers(e, d) {
+			if inlineCovers(e, d) || dockerCovers(e, d) {
 				return true
 			}
 		}
