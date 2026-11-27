@@ -1,6 +1,8 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/cleanup
 # pipemaster:emulated trigger.manual pipeline/gitlab-ci
 # pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/cleanup
+# pipemaster:arg {"gitlab_default":true}
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
 # pipemaster:arg {"needs":[{"JobID":"compile","Artifacts":false,"Optional":false}],"noIf":true}
 when:

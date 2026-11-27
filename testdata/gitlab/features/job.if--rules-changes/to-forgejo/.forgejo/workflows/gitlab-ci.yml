@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
 # pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/build
 # pipemaster:arg {"src":"((branch == 'main') \u0026\u0026 changes('src/**/*', 'go.mod')) || ((event == 'merge_request_event') \u0026\u0026 changes('go.sum') \u0026\u0026 !((branch == 'main') \u0026\u0026 changes('src/**/*', 'go.mod')))","guard":true}
@@ -7,6 +10,7 @@
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated step.script pipeline/gitlab-ci/job/pipemaster-changes
 on:
+  workflow_dispatch:
   push:
 concurrency:
   group: ${{ github.run_id }}

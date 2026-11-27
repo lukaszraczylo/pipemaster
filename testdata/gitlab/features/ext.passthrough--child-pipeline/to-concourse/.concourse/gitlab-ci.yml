@@ -1,3 +1,5 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/step/script/carry
 # pipemaster:arg {"digest":"b031fe97ca33ecbd3ab02ef7b3daed552051b278e3a390168ad1737b473f6423","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/compile/carry
@@ -35,7 +37,7 @@
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/integration-seed-tag
 # pipemaster:arg {"twin_of":"integration-seed"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"9eedbe629bb3e9c44e1c303140d216e3211d0092487d268e0fa5d96f3c5e6840","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"9eedbe629bb3e9c44e1c303140d216e3211d0092487d268e0fa5d96f3c5e6840","carry":"id: gitlab-ci\ntriggers:\n    - kind: manual\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/compile/step/script
@@ -51,7 +53,7 @@
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/integration-seed/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/ship/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/ship/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2
 resources:
   - name: source
     type: git

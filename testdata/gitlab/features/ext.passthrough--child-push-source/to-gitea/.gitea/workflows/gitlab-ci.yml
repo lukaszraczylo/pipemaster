@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/build
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
@@ -16,6 +19,7 @@
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/po-x
 # pipemaster:arg {"pre":1,"post":0}
 on:
+  workflow_dispatch:
   push:
 jobs:
   build:

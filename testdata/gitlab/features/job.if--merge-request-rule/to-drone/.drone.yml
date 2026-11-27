@@ -1,0 +1,30 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+# pipemaster:arg {"Ref":"alpine:3.20","Entrypoint":null,"taken":1}
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+    - tag
+steps:
+  - name: script
+    image: alpine:3.20
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo build'
+---
+# pipemaster:lost job.if pipeline/gitlab-ci/job/mrjob: event == 'merge_request_event'
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/mrjob
+# pipemaster:arg {"Ref":"alpine:3.20","Entrypoint":null,"taken":1}
+kind: pipeline
+type: docker
+name: mrjob
+trigger:
+  event:
+    exclude:
+      - '**'
+steps:
+  - name: script
+    image: alpine:3.20
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo mr'

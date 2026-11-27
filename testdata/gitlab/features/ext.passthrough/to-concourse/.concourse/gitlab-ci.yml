@@ -1,3 +1,5 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
 # pipemaster:arg {"digest":"746284e6caaac39707df8564f17167cffacc4ff5be1ed03ed91de27e81c30817","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
@@ -17,7 +19,7 @@
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/prod-tag
 # pipemaster:arg {"twin_of":"prod"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: SHARED\n      value:\n        lit: \"1\"\n"}
+# pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: gitlab-ci\ntriggers:\n    - kind: manual\n    - kind: push\n    - kind: tag\nenv:\n    - name: SHARED\n      value:\n        lit: \"1\"\n"}
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
@@ -26,7 +28,7 @@
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/common/step/script
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/prod
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/prod/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2
 resources:
   - name: source
     type: git

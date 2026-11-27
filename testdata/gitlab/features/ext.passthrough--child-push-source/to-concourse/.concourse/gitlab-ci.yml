@@ -1,3 +1,5 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
 # pipemaster:arg {"digest":"b031fe97ca33ecbd3ab02ef7b3daed552051b278e3a390168ad1737b473f6423","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
@@ -21,7 +23,7 @@
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/po-x-tag
 # pipemaster:arg {"twin_of":"po-x"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"82c7f7f356196368bf46818c879d5b6ddf2a7e7c9141c1fd2d1791cfaca29ab5","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"82c7f7f356196368bf46818c879d5b6ddf2a7e7c9141c1fd2d1791cfaca29ab5","carry":"id: gitlab-ci\ntriggers:\n    - kind: manual\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
@@ -33,7 +35,7 @@
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/po-x
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/po-x/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/po-x/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2
 resources:
   - name: source
     type: git

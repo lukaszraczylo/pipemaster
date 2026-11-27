@@ -1,11 +1,14 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:arg {"vars":"- name: REGION\n  value:\n    lit: eu\n","names":["REGION"]}
 # pipemaster:emulated step.script pipeline/gitlab-ci
 # pipemaster:arg {"task":"noop"}
-# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/2
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
