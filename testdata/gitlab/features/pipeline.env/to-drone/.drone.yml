@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:arg "- name: GOFLAGS\n  value:\n    lit: -mod=readonly\n- name: DEPLOY_ENV\n  value:\n    lit: staging\n"
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/build
@@ -11,6 +14,8 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
 steps:
   - name: script
     image: ubuntu:latest

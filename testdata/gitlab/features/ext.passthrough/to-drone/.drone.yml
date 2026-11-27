@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:arg "- name: SHARED\n  value:\n    lit: \"1\"\n"
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/build
@@ -11,12 +14,17 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
 steps:
   - name: script
     image: alpine:3
     commands:
       - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make'
 ---
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:arg "- name: SHARED\n  value:\n    lit: \"1\"\n"
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/common
@@ -30,12 +38,17 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
 steps:
   - name: script
     image: alpine:3
     commands:
       - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo common'
 ---
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:arg "- name: SHARED\n  value:\n    lit: \"1\"\n"
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/prod
@@ -49,6 +62,8 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
 depends_on:
   - build
   - common

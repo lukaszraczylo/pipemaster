@@ -139,8 +139,13 @@ func (e *emitter) markArg(f caps.Feature, path string, v any) error {
 	if err != nil {
 		return err
 	}
-	e.mark(f, path)
-	e.head = append(e.head, container.Escape(line, dollarEsc))
+	m, arg := emitkit.Marker(f, path), container.Escape(line, dollarEsc)
+	for i := 0; i+1 < len(e.head); i++ {
+		if e.head[i] == m && e.head[i+1] == arg {
+			return nil
+		}
+	}
+	e.head = append(e.head, m, arg)
 	return nil
 }
 

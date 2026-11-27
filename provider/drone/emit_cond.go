@@ -751,6 +751,9 @@ type jobCond struct {
 func (e *emitter) jobSet(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (jobCond, error) {
 	var out jobCond
 	filtered := false
+	if err := e.markDefaultTriggers(pl); err != nil {
+		return jobCond{}, err
+	}
 	if len(pl.Triggers) > 0 {
 		cs, ok := e.triggerSet(e.classify(pl))
 		if !ok {

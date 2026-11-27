@@ -50,6 +50,8 @@ type emitter struct {
 	// from is the source dialect of a condition that shares the Drone class, so its event names map to Drone's.
 	from *expr.Dialect
 	head []string
+	// injected names the pipelines whose triggers were made from the default events of their source.
+	injected map[string]bool
 	// lostWork holds the path of every step that lost script or image work; a lost action is a failing step.
 	lostWork []string
 	// cut is set when an image or workdir lost an expression; the step or service being written owns it.
