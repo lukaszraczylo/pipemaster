@@ -23,6 +23,9 @@ var droneTriggerKeys = []string{"event", "branch", "ref"}
 // evaluate is an error, never an admitted run.
 func (r droneRun) triggerMatches(trigger map[string]any) (bool, error) {
 	for key, raw := range trigger {
+		if key == keyStatus {
+			continue
+		}
 		if !slices.Contains(droneTriggerKeys, key) {
 			return false, fmt.Errorf("the trigger key %q is not evaluated by the harness", key)
 		}
@@ -37,6 +40,44 @@ func (r droneRun) triggerMatches(trigger map[string]any) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+// keyStatus is the trigger key that tests the status of the build so far, success only by default
+// (https://docs.drone.io/pipeline/triggers/#by-status). The harness evaluates it while it runs the pipelines.
+const keyStatus = "status"
+
+const (
+	statusSuccess = "success"
+	statusFailure = "failure"
+)
+
+// droneStatus is the status condition of a pipeline trigger.
+type droneStatus struct{ inc, exc []string }
+
+// statusOf reads the status condition of a trigger.
+func statusOf(trigger map[string]any) (droneStatus, error) {
+	raw, ok := trigger[keyStatus]
+	if !ok {
+		return droneStatus{inc: []string{statusSuccess}}, nil
+	}
+	inc, exc, err := droneCondition(raw)
+	if err != nil {
+		return droneStatus{}, fmt.Errorf("trigger %s: %w", keyStatus, err)
+	}
+	for _, v := range append(slices.Clone(inc), exc...) {
+		if v != statusSuccess && v != statusFailure {
+			return droneStatus{}, fmt.Errorf("trigger %s: the value %q is unknown", keyStatus, v)
+		}
+	}
+	return droneStatus{inc: inc, exc: exc}, nil
+}
+
+// admits reports whether a pipeline with this status condition starts when the build so far is build.
+func (s droneStatus) admits(build string) bool {
+	if slices.Contains(s.exc, build) {
+		return false
+	}
+	return len(s.inc) == 0 || slices.Contains(s.inc, build)
 }
 
 // droneCondition reads a condition: a string, a list, or a map with include and exclude.

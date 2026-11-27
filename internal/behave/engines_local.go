@@ -132,7 +132,7 @@ func (e *woodpeckerEngine) Run(ctx context.Context, w *Workspace) (*Trace, error
 		args = append(args, "--commit-refspec", w.Ev.Branch+":"+w.Ev.Target)
 	}
 	args = append(args, "--pipeline-event", event, "--commit-branch", branch, "--commit-ref", ref)
-	targets, err := woodpeckerWorkflows(w.Dir, target)
+	targets, status, err := woodpeckerWorkflows(w.Dir, target)
 	if err != nil {
 		return nil, blocked("no usable Woodpecker workflows in the converted output: %v", err)
 	}
@@ -145,7 +145,14 @@ func (e *woodpeckerEngine) Run(ctx context.Context, w *Workspace) (*Trace, error
 	}
 	tr := &Trace{NoPipeline: true}
 	start := time.Now()
+	build := statusSuccess
 	for i, run := range runs {
+		if !status[targets[i]].admits(build) {
+			// woodpecker-cli exec runs one file and has no status of other workflows, so the harness applies the
+			// status filter of the workflow.
+			tr.Log += "harness: workflow " + filepath.Base(targets[i]) + " skipped: its status filter does not admit a build that is " + build + "\n"
+			continue
+		}
 		out, code, err := e.env.run(ctx, runOpts{Dir: w.Dir, Timeout: timeoutLocal}, bin, append(slices.Clone(args), run)...)
 		if err != nil {
 			return nil, err
@@ -160,9 +167,8 @@ func (e *woodpeckerEngine) Run(ctx context.Context, w *Workspace) (*Trace, error
 		}
 		tr.Log += out
 		tr.Markers = append(tr.Markers, markers(payloadLines(out, wpLine))...)
-		if code != 0 {
-			tr.Exit = code
-			break
+		if code != 0 && tr.Exit == 0 {
+			tr.Exit, build = code, statusFailure
 		}
 	}
 	tr.Duration = time.Since(start)
@@ -215,18 +221,19 @@ func stripDependsOn(raw []byte) ([]byte, error) {
 
 // woodpeckerWorkflows lists what to pass to woodpecker-cli exec, one file at a time in depends_on order:
 // the CLI runs the files of a directory in name order and ignores the dependencies. A single file is its own list.
-func woodpeckerWorkflows(dir, target string) ([]string, error) {
+func woodpeckerWorkflows(dir, target string) ([]string, map[string]droneStatus, error) {
 	info, err := os.Stat(filepath.Join(dir, target))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if !info.IsDir() {
-		return []string{target}, nil
+		return []string{target}, nil, nil
 	}
 	entries, err := os.ReadDir(filepath.Join(dir, target))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	status := map[string]droneStatus{}
 	var names []string
 	files := map[string]string{}
 	deps := map[string][]string{}
@@ -238,24 +245,88 @@ func woodpeckerWorkflows(dir, target string) ([]string, error) {
 		rel := filepath.Join(target, en.Name())
 		raw, err := os.ReadFile(filepath.Join(dir, rel)) // #nosec G304 -- a workspace file of the harness
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		var d struct {
-			DependsOn []string `yaml:"depends_on"`
+			When      yaml.Node `yaml:"when"`
+			DependsOn []wpDep   `yaml:"depends_on"`
 		}
 		if err := yaml.Unmarshal(raw, &d); err != nil {
-			return nil, fmt.Errorf("parse %s: %w", rel, err)
+			return nil, nil, fmt.Errorf("parse %s: %w", rel, err)
+		}
+		if status[rel], err = wpStatus(&d.When); err != nil {
+			return nil, nil, fmt.Errorf("parse %s: %w", rel, err)
 		}
 		name := strings.TrimSuffix(en.Name(), ext)
 		names = append(names, name)
 		files[name] = rel
-		deps[name] = d.DependsOn
+		for _, dep := range d.DependsOn {
+			deps[name] = append(deps[name], dep.Name)
+		}
 	}
 	var out []string
 	for _, n := range topoOrder(names, deps) {
 		out = append(out, files[n])
 	}
+	return out, status, nil
+}
+
+// wpStatus reads the status filter of a workflow when: success only for an entry with none
+// (https://woodpecker-ci.org/docs/usage/workflow-syntax#status). Entries with different status lists need the event
+// match of each entry, which the harness does not evaluate, so they are an error.
+func wpStatus(when *yaml.Node) (droneStatus, error) {
+	var entries []yaml.Node
+	switch when.Kind {
+	case 0:
+		return droneStatus{inc: []string{statusSuccess}}, nil
+	case yaml.SequenceNode:
+		for _, n := range when.Content {
+			entries = append(entries, *n)
+		}
+	default:
+		entries = []yaml.Node{*when}
+	}
+	var out droneStatus
+	for i := range entries {
+		var e struct {
+			Status any `yaml:"status"`
+		}
+		if err := entries[i].Decode(&e); err != nil {
+			return droneStatus{}, err
+		}
+		trig := map[string]any{}
+		if e.Status != nil {
+			trig[keyStatus] = e.Status
+		}
+		s, err := statusOf(trig)
+		if err != nil {
+			return droneStatus{}, err
+		}
+		if i > 0 && (!slices.Equal(s.inc, out.inc) || !slices.Equal(s.exc, out.exc)) {
+			return droneStatus{}, fmt.Errorf("the when entries have different status lists, which the harness does not evaluate")
+		}
+		out = s
+	}
 	return out, nil
+}
+
+// wpDep is one depends_on entry of a Woodpecker workflow: a workflow name, or a map with the name and the optional
+// flag (https://woodpecker-ci.org/docs/usage/workflow-syntax#optional-dependencies-in-depends_on).
+type wpDep struct{ Name string }
+
+func (d *wpDep) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind == yaml.ScalarNode {
+		d.Name = n.Value
+		return nil
+	}
+	var m struct {
+		Name string `yaml:"name"`
+	}
+	if err := n.Decode(&m); err != nil {
+		return err
+	}
+	d.Name = m.Name
+	return nil
 }
 
 // ---- Drone
@@ -267,28 +338,32 @@ var droneLine = regexp.MustCompile(`^\[[^\]:]+:\d+\] (.*)$`)
 // dronePipelines lists the pipeline names of a Drone file in an order that follows depends_on, because drone exec
 // runs one named pipeline and ignores the dependencies. It keeps only the pipelines whose trigger admits the run,
 // because drone exec ignores the trigger too.
-func dronePipelines(path string, run droneRun) ([]string, error) {
+func dronePipelines(path string, run droneRun) ([]string, map[string]droneStatus, error) {
 	raw, err := os.ReadFile(path) // #nosec G304 -- the workspace file of the harness
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	docs, err := parseDroneDocs(string(raw))
 	if err != nil {
-		return nil, fmt.Errorf("parse %s: %w", path, err)
+		return nil, nil, fmt.Errorf("parse %s: %w", path, err)
 	}
+	status := map[string]droneStatus{}
 	var names []string
 	deps := map[string][]string{}
 	for _, d := range docs {
 		ok, err := run.triggerMatches(d.Trigger)
 		if err != nil {
-			return nil, fmt.Errorf("pipeline %s: %w", d.Name, err)
+			return nil, nil, fmt.Errorf("pipeline %s: %w", d.Name, err)
 		}
 		if ok {
+			if status[d.Name], err = statusOf(d.Trigger); err != nil {
+				return nil, nil, fmt.Errorf("pipeline %s: %w", d.Name, err)
+			}
 			names = append(names, d.Name)
 			deps[d.Name] = d.DependsOn
 		}
 	}
-	return topoOrder(names, deps), nil
+	return topoOrder(names, deps), status, nil
 }
 
 // topoOrder puts each name after the names it depends on and otherwise keeps the given order. A dependency that
@@ -332,7 +407,7 @@ func (e *droneEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	case kindPR:
 		event, branch = "pull_request", w.Ev.Target
 	}
-	names, err := dronePipelines(file, droneRun{event: event, branch: branch, ref: w.Ev.Ref()})
+	names, status, err := dronePipelines(file, droneRun{event: event, branch: branch, ref: w.Ev.Ref()})
 	if err != nil {
 		return nil, blocked("no usable .drone.yml in the converted output: %v", err)
 	}
@@ -355,7 +430,12 @@ func (e *droneEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	}
 	tr := &Trace{}
 	start := time.Now()
+	build := statusSuccess
 	for _, n := range names {
+		if !status[n].admits(build) {
+			tr.Log += "pipeline " + n + " skipped: its status condition does not admit a build that is " + build + "\n"
+			continue
+		}
 		args := []string{"exec", "--pipeline", n, "--event", event, "--branch=" + branch, "--env-file", envFile, pipeFile}
 		out, code, err := e.env.run(ctx, runOpts{Dir: w.Dir, Timeout: timeoutLocal}, bin, args...)
 		if err != nil {
@@ -363,9 +443,8 @@ func (e *droneEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 		}
 		tr.Log += out
 		tr.Markers = append(tr.Markers, markers(payloadLines(out, droneLine))...)
-		if code != 0 {
-			tr.Exit = code
-			break
+		if code != 0 && tr.Exit == 0 {
+			tr.Exit, build = code, statusFailure
 		}
 	}
 	tr.Duration = time.Since(start)
