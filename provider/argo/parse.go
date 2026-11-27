@@ -119,6 +119,7 @@ func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	p.cronTriggers(byName, byCron)
 	p.sensorTriggers(byName)
 	p.manualMarkers(pls, srcOf)
+	p.dropDefaultTriggers(pls, srcOf)
 	sort.SliceStable(pls, func(i, j int) bool { return pls[i].ID < pls[j].ID })
 	p.attachResources(pls[0])
 	proj := &ir.Project{Origin: ir.Origin{Provider: dialect, Dialect: dialect, Files: files}, Pipelines: pls}

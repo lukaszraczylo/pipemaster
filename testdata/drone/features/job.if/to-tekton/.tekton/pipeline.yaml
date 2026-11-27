@@ -1,3 +1,5 @@
+# pipemaster:emulated trigger.push pipeline/drone
+# pipemaster:arg {"default_triggers":true}
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:

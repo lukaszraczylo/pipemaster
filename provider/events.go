@@ -2,6 +2,7 @@ package provider
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
@@ -151,6 +152,11 @@ func WithDefaultTriggers(p *ir.Project, target string) (*ir.Project, map[string]
 		return p, nil, nil
 	}
 	return out, unmapped, injected
+}
+
+// NoFormDetail words the report entry for source default events that the target has no trigger form for.
+func NoFormDetail(names []string, title string) string {
+	return "the source runs on the events " + strings.Join(names, ", ") + " and its file has no trigger form for them; " + title + " has no event for them, and the file names no schedule to copy"
 }
 
 // EventGroup lists the source events that one trigger feature reports.

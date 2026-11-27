@@ -11,6 +11,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ymap"
@@ -62,19 +63,21 @@ func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) 
 
 func (a adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, error) {
 	p, vres := vars.Prepare(p, dialect)
+	p, noForm, injected := provider.WithDefaultTriggers(p, dialect)
 	origin := ""
 	if p != nil {
 		origin = p.Origin.Provider
 	}
 	e := &emitter{
 		led: emitkit.NewLedger("ir", dialect, a.Caps()), origin: origin, own: origin == dialect,
-		owners: map[string]*outDoc{}, marked: map[ir.FeatureUse]bool{}, fileTaken: map[string]bool{},
+		owners: map[string]*outDoc{}, marked: map[ir.FeatureUse]bool{}, fileTaken: map[string]bool{}, injected: injected,
 	}
 	e.gated = emitkit.GatedSteps(p)
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)
 	}
+	e.noteDefaultEvents(noForm)
 	pls := livePipelines(p)
 	for i, pl := range pls {
 		e.pipeline(pl, i == 0)
@@ -116,8 +119,10 @@ type emitter struct {
 	fileTaken map[string]bool
 	extra     map[string]any
 	origin    string
-	files     []*outFile
-	own       bool
+	// injected names the pipelines whose triggers were made from the default events of their source.
+	injected map[string]bool
+	files    []*outFile
+	own      bool
 }
 
 // outFile is one output file with its document.
@@ -341,4 +346,13 @@ func sortedSet(m map[string]bool) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// noteDefaultEvents reports the default events of the source that have no IR trigger.
+func (e *emitter) noteDefaultEvents(noForm map[string][]provider.SourceEvent) {
+	for id, events := range noForm {
+		for _, g := range provider.GroupByFeature(events) {
+			e.lose("pipeline/"+id, g.Feature, provider.NoFormDetail(g.Names, "Concourse"))
+		}
+	}
 }

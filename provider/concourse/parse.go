@@ -246,6 +246,7 @@ func (b *pipeBuilder) build(top *omap) (*ir.Pipeline, error) {
 	if b.carryPipeline(top, rawList, pl) {
 		undoTriggers()
 	}
+	b.dropDefaultTriggers(pl)
 	b.finallyHooks(pl, built)
 	b.orphanNames()
 	b.secretNote()
