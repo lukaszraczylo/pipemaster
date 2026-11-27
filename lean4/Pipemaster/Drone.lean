@@ -1054,6 +1054,7 @@ theorem tagOf_some {v t : String} (h : tagOf v = some t) : v = tagPrefix ++ t :=
 inductive FE where
   | eq (k v : String)
   | glob (k pat : String)
+  | pre (k p : String)
   | not (e : FE)
   | and (l r : FE)
   | or (l r : FE)
@@ -1063,9 +1064,13 @@ structure Filt where
   incl : List String
   excl : List String
 
-/-- Mirrors drone.valueExpr (expr/drone/filter.go). -/
+/-- The ref filter of every tag (expr/drone/filter.go anyTagGlob). -/
+def anyTagGlob : String := tagPrefix ++ "**"
+
+/-- Mirrors drone.valueExpr (expr/drone/filter.go). The ref filter of every tag becomes a prefix test (anyTag). -/
 def valueE (key v : String) : FE :=
-  if isLiteral v then
+  if key = "ref" ∧ v = anyTagGlob then .pre "ref" tagPrefix
+  else if isLiteral v then
     match tagOf v with
     | some t => if key = "ref" ∧ t ≠ "" then .eq "tag" t else .eq key v
     | none => .eq key v
@@ -1103,6 +1108,7 @@ variable (G : String → String → Bool) (env : String → String)
 def evalE : FE → Bool
   | .eq k v => env k == v
   | .glob k pat => G pat (env k)
+  | .pre k p => (env k).startsWith p
   | .not e => !evalE e
   | .and l r => evalE l && evalE r
   | .or l r => evalE l || evalE r
@@ -1120,9 +1126,14 @@ def matchF (f : Filt) (v : String) : Bool :=
 variable {G env}
 
 theorem valueE_eval (hG : ∀ pat v, isLiteral pat = true → G pat v = (pat == v))
-    (htag : ∀ t, t ≠ "" → ((env "tag" == t) = (env "ref" == tagPrefix ++ t))) (key v : String) :
+    (htag : ∀ t, t ≠ "" → ((env "tag" == t) = (env "ref" == tagPrefix ++ t)))
+    (hany : G anyTagGlob (env "ref") = (env "ref").startsWith tagPrefix) (key v : String) :
     evalE G env (valueE key v) = G v (env key) := by
   unfold valueE
+  by_cases hp : key = "ref" ∧ v = anyTagGlob
+  · obtain ⟨rfl, rfl⟩ := hp
+    simp [evalE, hany]
+  simp only [hp, ite_false]
   by_cases hl : isLiteral v = true
   · simp only [hl, ite_true]
     rw [hG v _ hl]
@@ -1140,7 +1151,8 @@ theorem valueE_eval (hG : ∀ pat v, isLiteral pat = true → G pat v = (pat == 
   · simp [hl, evalE]
 
 theorem orChain_eval (hG : ∀ pat v, isLiteral pat = true → G pat v = (pat == v))
-    (htag : ∀ t, t ≠ "" → ((env "tag" == t) = (env "ref" == tagPrefix ++ t))) (key : String) (vs : List String) :
+    (htag : ∀ t, t ≠ "" → ((env "tag" == t) = (env "ref" == tagPrefix ++ t)))
+    (hany : G anyTagGlob (env "ref") = (env "ref").startsWith tagPrefix) (key : String) (vs : List String) :
     evalAny G env (orChain key vs) = vs.any (fun pat => G pat (env key)) := by
   have gen : ∀ (o : Option FE) (vs : List String),
       evalAny G env (vs.foldl (fun o v => orO o (some (valueE key v))) o) =
@@ -1151,8 +1163,8 @@ theorem orChain_eval (hG : ∀ pat v, isLiteral pat = true → G pat v = (pat ==
     | cons a t ih =>
       rw [List.foldl_cons, ih, List.any_cons]
       cases o with
-      | none => simp [orO, evalAny, valueE_eval hG htag]
-      | some x => simp [orO, evalAny, evalE, valueE_eval hG htag, Bool.or_assoc]
+      | none => simp [orO, evalAny, valueE_eval hG htag hany]
+      | some x => simp [orO, evalAny, evalE, valueE_eval hG htag hany, Bool.or_assoc]
   unfold orChain
   rw [gen]
   simp [evalAny]
@@ -1169,10 +1181,11 @@ theorem orChain_some (key : String) (vs : List String) (h : vs ≠ []) : ∃ x, 
 
 /-- The filter lemma: the expression of `FilterExpr` evaluates to the `Match` result. -/
 theorem filterE_eval (hG : ∀ pat v, isLiteral pat = true → G pat v = (pat == v))
-    (htag : ∀ t, t ≠ "" → ((env "tag" == t) = (env "ref" == tagPrefix ++ t))) (key : String) (f : Filt) :
+    (htag : ∀ t, t ≠ "" → ((env "tag" == t) = (env "ref" == tagPrefix ++ t)))
+    (hany : G anyTagGlob (env "ref") = (env "ref").startsWith tagPrefix) (key : String) (f : Filt) :
     evalAll G env (filterE key f) = matchF G f (env key) := by
-  have hi := orChain_eval hG htag key f.incl
-  have he := orChain_eval hG htag key f.excl
+  have hi := orChain_eval hG htag hany key f.incl
+  have he := orChain_eval hG htag hany key f.excl
   unfold filterE matchF
   by_cases hI : f.incl = [] <;> by_cases hE : f.excl = []
   · simp [hI, hE, evalAll]
@@ -1201,7 +1214,8 @@ theorem filterE_eval (hG : ∀ pat v, isLiteral pat = true → G pat v = (pat ==
 
 /-- `ToExpr` (without the event key and the status call): the conjunction holds exactly when every key matches. -/
 theorem toE_eval (hG : ∀ pat v, isLiteral pat = true → G pat v = (pat == v))
-    (htag : ∀ t, t ≠ "" → ((env "tag" == t) = (env "ref" == tagPrefix ++ t))) (fs : List (String × Filt)) :
+    (htag : ∀ t, t ≠ "" → ((env "tag" == t) = (env "ref" == tagPrefix ++ t)))
+    (hany : G anyTagGlob (env "ref") = (env "ref").startsWith tagPrefix) (fs : List (String × Filt)) :
     evalAll G env (toE fs) = fs.all (fun kf => matchF G kf.2 (env kf.1)) := by
   have gen : ∀ (o : Option FE) (fs : List (String × Filt)),
       evalAll G env (fs.foldl (fun o kf => andO o (filterE kf.1 kf.2)) o) =
@@ -1210,7 +1224,7 @@ theorem toE_eval (hG : ∀ pat v, isLiteral pat = true → G pat v = (pat == v))
     induction fs generalizing o with
     | nil => simp
     | cons kf t ih =>
-      rw [List.foldl_cons, ih, List.all_cons, ← filterE_eval hG htag]
+      rw [List.foldl_cons, ih, List.all_cons, ← filterE_eval hG htag hany]
       cases o with
       | none => cases h : filterE kf.1 kf.2 <;> simp [andO, evalAll]
       | some x => cases h : filterE kf.1 kf.2 <;> simp [andO, evalAll, evalE, Bool.and_assoc]

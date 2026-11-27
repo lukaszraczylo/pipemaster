@@ -253,7 +253,9 @@ theorem eval_assume {fa : Bool} {env : Env} (F : Fact fa env) :
   | or l r ihl ihr => simp [assume, eval, ihl, ihr]
   | _ => rfl
 
-/-- The expressions that translate once the facts are stated (Mirrors expr.TranslatableFacts (expr/translate_facts.go)). -/
+/-- The expressions that translate once the facts are stated (Mirrors expr.TranslatableFacts (expr/translate_facts.go)).
+The model states the condition as written. Go also accepts a condition whose rewrite of expr/variants.go translates,
+so the model is a sufficient condition for the Go result, not an exact one. -/
 def TranslatableFacts (fa : Bool) (e : E) : Prop := Translatable (assume fa e)
 
 /-- Under the facts, the translation of the rewritten condition has the truthiness of the source on
@@ -485,7 +487,8 @@ def guardOk : E → Bool
   | .or l r => guardOk l && guardOk r
   | _ => true
 
-/-- Mirrors expr.TranslatableFacts (expr/translate_facts.go) for a Woodpecker target. -/
+/-- Mirrors expr.TranslatableFacts (expr/translate_facts.go) for a Woodpecker target, for the condition as written.
+The rewrites of expr/variants.go are outside the model, as for TranslatableFacts. -/
 def TranslatableWp (fa : Bool) (e : E) : Prop := guardOk e = true ∧ Translatable (assume fa e)
 
 
