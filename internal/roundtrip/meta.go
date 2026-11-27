@@ -93,6 +93,8 @@ func dropDefaultTriggers(proj *ir.Project) {
 			pl.Triggers = nil
 		}
 	}
+	// One pass only: a later layer restores triggers that this pass must not drop again.
+	proj.Origin.DefaultTriggers = nil
 }
 
 // restoreCalls replaces the jobs that an inline wrote with the stored call job and its child pipeline, and puts

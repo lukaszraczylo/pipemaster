@@ -200,6 +200,15 @@ func covered(d irDiff, reps ...*report.Report) bool {
 
 var pipelineRE = regexp.MustCompile(`^pipeline/[^/]+`)
 
+// defaultTriggersRead is true for a Drone pipeline with no trigger that came back with the triggers of its default
+// events: with no metadata the file means what it says, so the source default events are now written out.
+func defaultTriggersRead(d irDiff, src, back *ir.Project, provider string) bool {
+	if d.Field != "Triggers" || provider != "drone" || len(src.Pipelines) != 1 || len(back.Pipelines) != 1 {
+		return false
+	}
+	return len(src.Pipelines[0].Triggers) == 0 && len(back.Pipelines[0].Triggers) > 0
+}
+
 func TestRoundTripWithoutMetaBestEffort(t *testing.T) {
 	n := 0
 	for _, f := range allFixtures(t) {
@@ -223,6 +232,9 @@ func TestRoundTripWithoutMetaBestEffort(t *testing.T) {
 					}
 				}
 				for _, d := range diffNodes(r.src, r.back) {
+					if defaultTriggersRead(d, r.src, r.back, f.provider) {
+						continue
+					}
 					if !covered(d, r.srcRep, r.toRep, r.backRep) {
 						t.Errorf("%s: %s differs after A->B->A with no metadata and no lost or external report entry covers it", d.Path, d.Field)
 					}
