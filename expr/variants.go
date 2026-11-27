@@ -43,10 +43,62 @@ func variants(e Expr, from, to Dialect) []variant {
 	var out []variant
 	for _, b := range bases {
 		if x, f, ok := prBranchVariant(b.e, b.from, to); ok {
-			out = append(out, variant{e: x, from: f, fix: b.fix})
+			out = append(out, variant{e: x, from: f, fix: withoutDeadBaseRef(b.e, b.fix)})
 		}
 	}
 	return append(out, bases...)
+}
+
+// withoutDeadBaseRef drops the target branch terms that prBranchVariant added, when the source cannot hold on a
+// pull request: no pull request run exists for them to cover.
+func withoutDeadBaseRef(src Expr, fix func(Expr) Expr) func(Expr) Expr {
+	if len(EventsPossible(src, []string{"pull_request"})) > 0 || usesBaseRef(src) {
+		return fix
+	}
+	return func(t Expr) Expr {
+		if fix != nil {
+			t = fix(t)
+		}
+		return dropBaseRefTerms(t)
+	}
+}
+
+func isBaseRefRef(e Expr) bool {
+	r, ok := e.(Ref)
+	return ok && pathName(r) == CtxPRBaseRef
+}
+
+func usesBaseRef(e Expr) bool {
+	found := false
+	walkRefs(e, func(r Ref) bool {
+		found = found || pathName(r) == CtxPRBaseRef
+		return true
+	})
+	return found
+}
+
+// dropBaseRefTerms removes each operand of && and || that tests the pull request target branch.
+func dropBaseRefTerms(e Expr) Expr {
+	switch v := e.(type) {
+	case Unary:
+		return Unary{Op: v.Op, X: dropBaseRefTerms(v.X)}
+	case Binary:
+		if v.Op == OpAnd || v.Op == OpOr {
+			switch {
+			case isBaseRefTest(v.L):
+				return dropBaseRefTerms(v.R)
+			case isBaseRefTest(v.R):
+				return dropBaseRefTerms(v.L)
+			}
+		}
+		return Binary{Op: v.Op, L: dropBaseRefTerms(v.L), R: dropBaseRefTerms(v.R)}
+	}
+	return e
+}
+
+func isBaseRefTest(e Expr) bool {
+	b, ok := e.(Binary)
+	return ok && (isBaseRefRef(b.L) || isBaseRefRef(b.R))
 }
 
 // eventVariants adds the variants of the event test to variants. The Lean model of Translate does not state them, so
