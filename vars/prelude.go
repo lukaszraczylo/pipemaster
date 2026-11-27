@@ -435,7 +435,9 @@ var defaultKinds = []string{kindPush, kindPR, kindTag, kindSchedule, kindManual}
 
 // admitted lists the event kinds on which job j of pl can run. The triggers give the base set, and a job
 // condition that needs a branch removes the other kinds: a tag run has no branch, and Drone matches a branch
-// filter against the target of the run (drone v2.25.0 trigger/skip.go:24-26).
+// filter against the target of the run (drone v2.25.0 trigger/skip.go:24-26). A GitLab schedule has a target
+// "branch or tag" (https://docs.gitlab.com/ci/pipelines/schedules/); the page does not say that a branch variable
+// is set, so a schedule run counts as branchless here.
 func admitted(pl *ir.Pipeline, j *ir.Job) map[string]bool {
 	kinds := map[string]bool{}
 	if pl == nil || len(pl.Triggers) == 0 {
