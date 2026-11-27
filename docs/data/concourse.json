@@ -200,6 +200,13 @@
      "path": "pipeline/parent/job/set-feature-pipelines",
      "feature": "step.action",
      "level": "emulated",
+     "strategy": "assumed repository",
+     "detail": "the resource branches has the literal uri https://github.com/concourse/examples, and it is the only uri of the pipeline, so the checkout assumes https://github.com/concourse/examples is the repository that holds the converted pipeline; if the pipeline builds another repository, replace the checkout with a clone of https://github.com/concourse/examples"
+    },
+    {
+     "path": "pipeline/parent/job/set-feature-pipelines",
+     "feature": "step.action",
+     "level": "emulated",
      "strategy": "actions/checkout step",
      "detail": "Concourse fetches the repository with the get of the job; the depth param of the get maps to the step input, and GHA does not clone"
     },
@@ -390,6 +397,13 @@
      "level": "emulated",
      "strategy": "job condition on the pushes its gets watch",
      "detail": "job set-feature-pipelines triggers on branches; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && (before_sha == '0000000000000000000000000000000000000000') && ((branch =~ '^feat/') || (branch =~ '^feature/')); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
+    },
+    {
+     "path": "pipeline/parent/job/set-feature-pipelines",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "assumed repository",
+     "detail": "the resource branches has the literal uri https://github.com/concourse/examples, and it is the only uri of the pipeline, so the checkout assumes https://github.com/concourse/examples is the repository that holds the converted pipeline; if the pipeline builds another repository, replace the checkout with a clone of https://github.com/concourse/examples"
     },
     {
      "path": "pipeline/parent/job/test",
@@ -590,6 +604,13 @@
      "level": "emulated",
      "strategy": "job condition on the pushes its gets watch",
      "detail": "job set-feature-pipelines triggers on branches; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && (before_sha == '0000000000000000000000000000000000000000') && ((branch =~ '^feat/') || (branch =~ '^feature/')); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
+    },
+    {
+     "path": "pipeline/parent/job/set-feature-pipelines",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "assumed repository",
+     "detail": "the resource branches has the literal uri https://github.com/concourse/examples, and it is the only uri of the pipeline, so the checkout assumes https://github.com/concourse/examples is the repository that holds the converted pipeline; if the pipeline builds another repository, replace the checkout with a clone of https://github.com/concourse/examples"
     },
     {
      "path": "pipeline/parent/job/test",
@@ -797,6 +818,13 @@
      "level": "emulated",
      "strategy": "job condition on the pushes its gets watch",
      "detail": "job set-feature-pipelines triggers on branches; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && (before_sha == '0000000000000000000000000000000000000000') && ((branch =~ '^feat/') || (branch =~ '^feature/')); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
+    },
+    {
+     "path": "pipeline/parent/job/set-feature-pipelines",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "assumed repository",
+     "detail": "the resource branches has the literal uri https://github.com/concourse/examples, and it is the only uri of the pipeline, so the checkout assumes https://github.com/concourse/examples is the repository that holds the converted pipeline; if the pipeline builds another repository, replace the checkout with a clone of https://github.com/concourse/examples"
     },
     {
      "path": "pipeline/parent/job/test",
@@ -1038,6 +1066,13 @@
      "level": "emulated",
      "strategy": "job condition on the pushes its gets watch",
      "detail": "job set-feature-pipelines triggers on branches; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && (before_sha == '0000000000000000000000000000000000000000') && ((branch =~ '^feat/') || (branch =~ '^feature/')); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
+    },
+    {
+     "path": "pipeline/parent/job/set-feature-pipelines",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "assumed repository",
+     "detail": "the resource branches has the literal uri https://github.com/concourse/examples, and it is the only uri of the pipeline, so the checkout assumes https://github.com/concourse/examples is the repository that holds the converted pipeline; if the pipeline builds another repository, replace the checkout with a clone of https://github.com/concourse/examples"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines/step/across",
@@ -1303,6 +1338,13 @@
      "level": "emulated",
      "strategy": "job condition on the pushes its gets watch",
      "detail": "job set-feature-pipelines triggers on branches; the pipeline trigger is the union of every job trigger, so the job runs only when (event == 'push') && (before_sha == '0000000000000000000000000000000000000000') && ((branch =~ '^feat/') || (branch =~ '^feature/')); a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case"
+    },
+    {
+     "path": "pipeline/parent/job/set-feature-pipelines",
+     "feature": "step.action",
+     "level": "emulated",
+     "strategy": "assumed repository",
+     "detail": "the resource branches has the literal uri https://github.com/concourse/examples, and it is the only uri of the pipeline, so the checkout assumes https://github.com/concourse/examples is the repository that holds the converted pipeline; if the pipeline builds another repository, replace the checkout with a clone of https://github.com/concourse/examples"
     },
     {
      "path": "pipeline/parent/job/set-feature-pipelines",
