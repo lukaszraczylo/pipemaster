@@ -13,6 +13,8 @@ The caps table gives the verdict external for three features. Each one needs a s
 ## Conversion notes
 
 - The caps table holds the details of each emulated and lost feature. For example, a step has no `shell` or `timeout` field, and a job name survives only as its key.
+- A GitLab file with no `workflow:` runs on the default events of GitLab. The source events of that file get triggers on every target, and the report lists each event that the target cannot express.
+- GitLab clones the repository before the steps. A target that does not clone by itself gets a checkout step. On GitHub Actions this is an `actions/checkout` step that the report marks as emulated. The clone settings of the source map to the step inputs. See `provider/emitkit/checkout.go`.
 - GitLab sets the image per job. A job whose steps run in several images becomes one job for each run of steps that share an image. The jobs are chained with `needs`, and each hands the project directory to the next as artifacts. A job with one image takes it as the job image.
 - A GitLab downstream pipeline starts from a trigger job in the upstream project, so `trigger.pipeline_done` is lost.
 - GitLab sets the job token scope in the project settings, so `pipeline.permissions` is lost.
