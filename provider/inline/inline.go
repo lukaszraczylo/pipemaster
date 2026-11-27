@@ -318,6 +318,9 @@ func addNeed(needs []ir.Need, gate *ir.Job) []ir.Need {
 // dropCall removes a call whose child the rewrite cannot carry. The call job stays without its child, so the
 // emitter's own fail-loud path reports the work as missing.
 func (f *flattener) dropCall(j *ir.Job, path, kind string) {
+	if j.Child != nil && j.Child.Pipeline != nil {
+		emitkit.MarkCallUnrunnable(j)
+	}
 	j.Child = nil
 	f.res.Entries = append(f.res.Entries, report.Entry{
 		IRPath: path, Feature: callFeature(kind), Level: caps.Lost, Strategy: EntryStrategy,

@@ -8,6 +8,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -358,6 +359,23 @@ func TestFlattenMatrix(t *testing.T) {
 	}
 	if rec, ok := res.Calls["pipeline/ci/job/release"]; !ok || rec.Job.Child == nil || len(rec.Inlined) != 0 {
 		t.Errorf("the record must keep the call with its child so a return restores the file: %+v", res.Calls)
+	}
+	var step *ir.Step
+	for _, st := range find(t, flat, "release").Steps {
+		if st.Kind == ir.StepPipelineCall {
+			step = st
+		}
+	}
+	if step == nil {
+		t.Fatalf("the dropped call must keep its call step: %+v", find(t, flat, "release").Steps)
+	}
+	if why := emitkit.CallReason(step, "GitLab"); !strings.Contains(why, "matrix") || strings.Contains(why, "remote") {
+		t.Errorf("call reason = %q, want the matrix reason, not the remote-file one", why)
+	}
+	for _, st := range res.Calls["pipeline/ci/job/release"].Job.Steps {
+		if _, ok := st.Ext[emitkit.ExtCallUnrunnable]; ok {
+			t.Errorf("the stored call must not carry the marker: %+v", st.Ext)
+		}
 	}
 }
 
