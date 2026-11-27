@@ -125,6 +125,13 @@ var inertFeatures = map[caps.Feature]bool{
 	caps.ExtPassthrough: true,
 }
 
+// unstartedTriggers start runs of a kind that the harness never starts: it starts push, tag and pull request runs
+// only, so a verdict on one of these triggers cannot change a run that the harness compares.
+var unstartedTriggers = map[caps.Feature]bool{
+	caps.TriggerSchedule: true, caps.TriggerManual: true, caps.TriggerAPI: true, caps.TriggerPipelineDone: true,
+	caps.TriggerResource: true,
+}
+
 // handoffFeatures order or feed jobs.
 var handoffFeatures = map[caps.Feature]bool{caps.JobNeeds: true, caps.JobNeedsArtifacts: true, caps.JobArtifacts: true}
 
@@ -144,6 +151,8 @@ func effects(level caps.Level, f caps.Feature) ([]string, string) {
 	switch {
 	case inertFeatures[f]:
 		return nil, "does not change a run"
+	case unstartedTriggers[f]:
+		return nil, "the harness starts push, tag and pull request runs only"
 	case f == caps.StepShell && level == caps.Emulated:
 		return []string{kindMissing, kindValue, kindExit}, "an image without the shell stops the step, and the work after it is missing"
 	case f == caps.StepImage && level == caps.Emulated:
