@@ -110,7 +110,5 @@ jobs:
             path: sh
             args:
               - -ec
-              - |-
-                echo 'pipemaster: skipped: the step condition has no shell form'; exit 0 # pipemaster:guard the step condition has no shell form
-                echo push
+              - echo push
             dir: workspace
