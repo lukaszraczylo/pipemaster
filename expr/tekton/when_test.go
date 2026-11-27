@@ -65,12 +65,24 @@ func TestToWhenAcceptsLiteralOnTheLeft(t *testing.T) {
 	}
 }
 
+// A negated equality is a notin entry, which reads back as an inequality.
+func TestToWhenNegatedEquality(t *testing.T) {
+	got, ok := tekton.ToWhen(expr.Unary{Op: expr.OpNot, X: eq("branch", "a")})
+	want := []tekton.Entry{{Input: "$(params.ctx-branch)", Operator: "notin", Values: []string{"a"}}}
+	if !ok || !reflect.DeepEqual(got, want) {
+		t.Fatalf("ToWhen = %#v, %v; want %#v", got, ok, want)
+	}
+	if back := tekton.FromWhen(got); !reflect.DeepEqual(back, ne("branch", "a")) {
+		t.Errorf("FromWhen = %#v", back)
+	}
+}
+
 func TestToWhenRefusals(t *testing.T) {
 	for name, e := range map[string]expr.Expr{
 		"or of two refs":        or(eq("branch", "a"), eq("tag", "b")),
 		"or of inequalities":    or(ne("branch", "a"), ne("branch", "b")),
 		"mixed chain":           or(eq("branch", "a"), ne("branch", "b")),
-		"not":                   expr.Unary{Op: expr.OpNot, X: eq("branch", "a")},
+		"not of a call":         expr.Unary{Op: expr.OpNot, X: expr.Call{Name: "success"}},
 		"or of and":             or(and(eq("branch", "a"), eq("tag", "b")), eq("repo", "c")),
 		"call":                  expr.Call{Name: "success"},
 		"bare ref":              ref("branch"),

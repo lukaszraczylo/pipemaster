@@ -1,7 +1,7 @@
 # pipemaster:emulated trigger.push pipeline/gitlab-ci
 # pipemaster:arg {"default_triggers":true,"manual":true}
 # pipemaster:emulated job.if pipeline/gitlab-ci
-# pipemaster:arg {"ref_type_jobs":{"build":{"if":"!(event == 'pull_request')","back":"event != 'pull_request'"},"cleanup":{"if":"!(event == 'pull_request')","back":"event != 'pull_request'"},"onfail":{"if":"!(event == 'pull_request') \u0026\u0026 failure()","back":"(event != 'pull_request') \u0026\u0026 @opaque('tekton', '{\"input\":\"$(tasks.status)\",\"operator\":\"in\",\"values\":[\"Failed\"]}')"}}}
+# pipemaster:arg {"ref_type_jobs":{"build":{"if":"!(event == 'pull_request')","back":"event != 'pull_request'"},"cleanup":{"if":"!(event == 'pull_request')","back":"event != 'pull_request'"},"onfail":{"if":"!(event == 'pull_request') \u0026\u0026 failure()","back":"(event != 'pull_request') \u0026\u0026 failure()"}}}
 # pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 apiVersion: tekton.dev/v1
 kind: Pipeline

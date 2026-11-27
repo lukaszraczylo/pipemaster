@@ -798,11 +798,43 @@ func collapseJobIf(c *collapseCtx) bool {
 		return false
 	}
 	t, ok := expr.TranslateFacts(src, *from, wpexpr.Lang, expr.Facts{Branch: a.Branch})
-	if !ok || (!sameCondition(c.j.If, t) && !sameCondition(c.j.If, wpexpr.ReadIf(t))) {
+	if !ok {
+		return false
+	}
+	got := withoutStatus(c.j.If, a.Full != "")
+	if !sameCondition(got, t) && !sameCondition(got, wpexpr.ReadIf(t)) {
 		return false
 	}
 	c.j.If = src
+	if a.Full != "" {
+		full, err := expr.ParseCanonical(a.Full)
+		if err != nil {
+			return false
+		}
+		c.j.If = full
+	}
 	return true
+}
+
+// withoutStatus drops the status conjunct that the status entry of a workflow reads back as.
+// Only always() goes unless the marker holds the whole condition, so a status that a file edit added stays.
+func withoutStatus(x expr.Expr, all bool) expr.Expr {
+	b, ok := x.(expr.Binary)
+	if !ok || b.Op != expr.OpAnd {
+		return x
+	}
+	switch {
+	case isStatusCall(b.L, all):
+		return b.R
+	case isStatusCall(b.R, all):
+		return b.L
+	}
+	return x
+}
+
+func isStatusCall(x expr.Expr, all bool) bool {
+	c, ok := x.(expr.Call)
+	return ok && len(c.Args) == 0 && (c.Name == "always" || all && (c.Name == statusFail || c.Name == statusOK))
 }
 
 // sameCondition reports whether two conditions print as the same Woodpecker text: a !~ test is written, and read

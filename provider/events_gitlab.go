@@ -326,6 +326,9 @@ func withoutGate(c expr.Expr) expr.Expr {
 	return expr.Binary{Op: expr.OpAnd, L: l, R: r}
 }
 
+// IsGate is true for a test that the run is not a pull request, in any spelling of the event.
+func IsGate(c expr.Expr) bool { return isGate(c) }
+
 // isGate is true for a test that the run is not a pull request, in any spelling of the event.
 func isGate(c expr.Expr) bool {
 	isPR := func(b expr.Binary) bool {

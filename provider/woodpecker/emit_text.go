@@ -44,7 +44,9 @@ type emitter struct {
 	stepIDs map[string]string
 	// inexact is the first trigger filter feature of the workflow being written whose globs changed meaning.
 	inexact caps.Feature
-	head    []string
+	// gateFull is the whole job condition when the marker of the workflow being written holds only its gate.
+	gateFull string
+	head     []string
 	// lostWork holds the path of every step that lost script, action or image work.
 	lostWork []string
 	// said holds the strategy and detail last noted per emulated use.

@@ -467,6 +467,8 @@ func regexTest(ref string, f ir.Filter) (string, bool) {
 // carries the condition in its source dialect when the translation changed its text.
 type gateArg struct {
 	Paths *changesArg `json:"paths,omitempty"`
+	// Full is the whole condition, when the marker holds only the part without the status calls.
+	Full string `json:"full,omitempty"`
 	srcArg
 	Gate bool `json:"gate"`
 }
@@ -647,7 +649,15 @@ func (e *emitter) jobWhen(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (
 	if finally && status == nil {
 		status = []string{statusOK, statusFail}
 	}
-	entries, err := e.reachable(pl, jp, e.mergeCond(jp, j.If, base, cond))
+	srcCond := j.If
+	e.gateFull = ""
+	if j.If != nil && hasStatusCall(j.If) {
+		// The marker holds the pull request gate, which a status call beside it would hide.
+		if rest, _, ok := splitStatus(j.If); ok && rest != nil && provider.IsGate(rest) {
+			srcCond, e.gateFull = rest, expr.String(j.If)
+		}
+	}
+	entries, err := e.reachable(pl, jp, e.mergeCond(jp, srcCond, base, cond))
 	if err != nil {
 		return nil, err
 	}
@@ -712,7 +722,7 @@ func (e *emitter) mergeCond(jp string, orig expr.Expr, base []whenEntry, cond []
 		}
 		if src, hasSrc, facts := e.jobSource(orig); hasSrc {
 			e.notePullRequestTest(jp, caps.JobIf, facts)
-			if err := e.markArg(caps.JobIf, jp, gateArg{srcArg: src}); err != nil {
+			if err := e.markArg(caps.JobIf, jp, gateArg{srcArg: src, Full: e.gateFull}); err != nil {
 				e.comment("job condition marker not carried: " + err.Error())
 			}
 		}
@@ -738,7 +748,7 @@ func (e *emitter) mergeCond(jp string, orig expr.Expr, base []whenEntry, cond []
 	src, hasSrc, facts := e.jobSource(orig)
 	e.notePullRequestTest(jp, caps.JobIf, facts)
 	if len(out) == 1 || hasSrc {
-		if err := e.markArg(caps.JobIf, jp, gateArg{srcArg: src, Gate: len(out) == 1}); err != nil {
+		if err := e.markArg(caps.JobIf, jp, gateArg{srcArg: src, Gate: len(out) == 1, Full: e.gateFull}); err != nil {
 			e.comment("job condition marker not carried: " + err.Error())
 		}
 	}

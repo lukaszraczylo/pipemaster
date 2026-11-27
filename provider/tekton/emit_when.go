@@ -204,7 +204,7 @@ func (tc *taskCtx) cond(path string, f caps.Feature, e expr.Expr, sc scope) cond
 		if f == caps.JobIf {
 			written := e
 			if hasNegEq(e) {
-				written = exprtekton.FromWhen(en)
+				written = negEqToNe(e)
 			}
 			tc.noteRefType(orig, written)
 		}
@@ -227,6 +227,20 @@ func (tc *taskCtx) cond(path string, f caps.Feature, e expr.Expr, sc scope) cond
 	}
 	tc.e.lose(path, f, why+"; the "+map[caps.Feature]string{caps.JobIf: "task", caps.StepIf: "step"}[f]+" never runs")
 	return condition{disabled: true, when: exprtekton.DisabledWhen()}
+}
+
+// negEqToNe spells each negated equality of e as the inequality that a notin entry reads back as.
+func negEqToNe(e expr.Expr) expr.Expr {
+	switch v := e.(type) {
+	case expr.Unary:
+		if b, ok := v.X.(expr.Binary); ok && v.Op == expr.OpNot && b.Op == expr.OpEq {
+			return expr.Binary{Op: expr.OpNe, L: b.L, R: b.R}
+		}
+		return expr.Unary{Op: v.Op, X: negEqToNe(v.X)}
+	case expr.Binary:
+		return expr.Binary{Op: v.Op, L: negEqToNe(v.L), R: negEqToNe(v.R)}
+	}
+	return e
 }
 
 // hasNegEq reports whether e holds a negated equality, which a notin entry reads back as a != test.
