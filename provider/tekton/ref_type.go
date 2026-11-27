@@ -1,6 +1,8 @@
 package tekton
 
 import (
+	"slices"
+
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
@@ -42,7 +44,7 @@ func restoreRefTypes(pl *ir.Pipeline, head string) {
 	if !readMarks(head).arg(caps.JobIf, "pipeline/"+pl.ID, &a) {
 		return
 	}
-	for _, j := range pl.Jobs {
+	for _, j := range append(slices.Clone(pl.Jobs), pl.Finally...) {
 		w, ok := a.Jobs[j.ID]
 		if !ok || j.If == nil || expr.String(j.If) != w.Back {
 			continue

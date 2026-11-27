@@ -1,0 +1,87 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+pipelines:
+    - ext:
+        gitlab:
+            stages:
+                - build
+                - test
+                - .post
+      id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - container:
+            ref: alpine:3.20
+          ext:
+            gitlab:
+                stage: build
+          id: build
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - echo build
+        - if: event == 'merge_request_event'
+          container:
+            ref: alpine:3.20
+          ext:
+            gitlab:
+                _derived_needs: true
+                stage: test
+          id: mrjob
+          needs:
+            - job: build
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - echo mr
+      finally:
+        - container:
+            ref: alpine:3.20
+          ext:
+            gitlab:
+                _derived_needs: true
+                stage: .post
+          id: cleanup
+          needs:
+            - job: build
+            - job: mrjob
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - echo cleanup
+        - if: failure()
+          container:
+            ref: alpine:3.20
+          ext:
+            gitlab:
+                _derived_needs: true
+                stage: .post
+          id: onfail
+          needs:
+            - job: build
+            - job: mrjob
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - echo onfail

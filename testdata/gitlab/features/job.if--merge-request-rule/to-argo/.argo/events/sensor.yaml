@@ -11,9 +11,8 @@ spec:
           - path: body.action
             type: string
             value:
-              - opened
-              - reopened
-              - synchronize
+              - ^opened$
+              - ^synchronize$
         exprs:
           - expr: head == base
             fields:

@@ -1,0 +1,97 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/build
+# pipemaster:arg {"Ref":"alpine:3.20","Entrypoint":null,"taken":1}
+kind: pipeline
+type: docker
+name: build
+trigger:
+  event:
+    - push
+    - tag
+    - cron
+    - custom
+steps:
+  - name: script
+    image: alpine:3.20
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo build'
+---
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
+# pipemaster:lost job.if pipeline/gitlab-ci/job/mrjob: event == 'merge_request_event'
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/mrjob
+# pipemaster:arg {"Ref":"alpine:3.20","Entrypoint":null,"taken":1}
+kind: pipeline
+type: docker
+name: mrjob
+trigger:
+  event:
+    exclude:
+      - '**'
+depends_on:
+  - build
+steps:
+  - name: script
+    image: alpine:3.20
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo mr'
+---
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/cleanup
+# pipemaster:arg {"Ref":"alpine:3.20","Entrypoint":null,"taken":1}
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false},{"JobID":"mrjob","Artifacts":false,"Optional":false}],"noIf":true}
+kind: pipeline
+type: docker
+name: cleanup
+trigger:
+  event:
+    - push
+    - tag
+    - cron
+    - custom
+  status:
+    - success
+    - failure
+depends_on:
+  - build
+  - mrjob
+steps:
+  - name: script
+    image: alpine:3.20
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo cleanup'
+---
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/onfail
+# pipemaster:arg {"if":"failure()","back":"((event == 'push') || (event == 'schedule') || (event == 'workflow_dispatch')) \u0026\u0026 failure()","triggers":"- kind: manual\n- kind: push\n- kind: schedule\n- kind: tag\n"}
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/onfail
+# pipemaster:arg {"Ref":"alpine:3.20","Entrypoint":null,"taken":1}
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false},{"JobID":"mrjob","Artifacts":false,"Optional":false}]}
+kind: pipeline
+type: docker
+name: onfail
+trigger:
+  event:
+    - push
+    - tag
+    - cron
+    - custom
+  status:
+    - failure
+depends_on:
+  - build
+  - mrjob
+steps:
+  - name: script
+    image: alpine:3.20
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo onfail'

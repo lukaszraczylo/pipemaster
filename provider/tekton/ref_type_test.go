@@ -21,7 +21,7 @@ func TestTagPrefixConditionIsWrittenAsRefTypeAndComesBack(t *testing.T) {
 		guard   bool
 	}{
 		{tagPrefix("refs/tags/"), "tag prefix", true, false},
-		{expr.Unary{Op: expr.OpNot, X: tagPrefix("refs/tags/")}, "negated tag prefix", true, true},
+		{expr.Unary{Op: expr.OpNot, X: tagPrefix("refs/tags/")}, "negated tag prefix", true, false},
 		{expr.Binary{Op: expr.OpOr, L: tagPrefix("refs/tags/"), R: expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{expr.CtxBranch}}, R: expr.Lit{Kind: expr.LitStr, Str: "main"}}}, "or with a branch test is a shell guard", true, true},
 		{tagPrefix("refs/tags/v"), "a longer tag prefix has no ref type form", false, false},
 	}

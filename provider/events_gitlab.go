@@ -15,6 +15,10 @@ import (
 // is not part of it.
 var gitlabMergeRequest = SourceEvent{Name: "merge_request_event", Kind: ir.TriggerPR, Woodpecker: "pull_request", Same: true, Feature: caps.TriggerPullRequest}
 
+// gitlabPRActions are the pull request actions that start a merge request pipeline: the merge request is created
+// or its source branch gets a push.
+var gitlabPRActions = []string{"opened", "synchronize"}
+
 // prGate keeps a job with no rules out of a merge request pipeline. It is a negated equality, a shape that no GitLab
 // rule has, so a restore tells it from a condition of the source.
 var prGate expr.Expr = expr.Unary{Op: expr.OpNot, X: expr.Binary{
@@ -110,19 +114,57 @@ func gitlabDefaultTriggers(pl *ir.Pipeline, target string) (*ir.Pipeline, []Sour
 		unmapped = append(unmapped, gitlabMergeRequest)
 	}
 	if prTarget(target) && named {
-		cp.Triggers = append(cp.Triggers, ir.Trigger{Kind: ir.TriggerPR})
-		cp.Jobs = make([]*ir.Job, len(pl.Jobs))
-		for i, j := range pl.Jobs {
-			cp.Jobs[i] = j
-			if j != nil && j.If == nil {
-				c := *j
-				c.If = prGate
-				cp.Jobs[i] = &c
-			}
-		}
+		cp.Triggers = append(cp.Triggers, ir.Trigger{Kind: ir.TriggerPR, Ext: ir.Ext{"gha": map[string]any{"types": slices.Clone(gitlabPRActions)}}})
+		cp.Jobs = gateJobList(pl.Jobs)
+		cp.Finally = gateJobList(pl.Finally)
 	}
 	ir.NormalizeTriggers(cp.Triggers)
 	return &cp, unmapped
+}
+
+// gateJobList returns jobs with the gate ANDed into every job that has no rules of the source.
+func gateJobList(jobs []*ir.Job) []*ir.Job {
+	if jobs == nil {
+		return nil
+	}
+	out := make([]*ir.Job, len(jobs))
+	for i, j := range jobs {
+		out[i] = j
+		if j != nil && ruleless(j.If) {
+			c := *j
+			c.If = andGate(j.If)
+			out[i] = &c
+		}
+	}
+	return out
+}
+
+// andGate ANDs the gate into c, which is nil or a status condition. The gate comes first, as a GitLab parse puts the
+// rule condition before the status of a job.
+func andGate(c expr.Expr) expr.Expr {
+	if c == nil {
+		return prGate
+	}
+	return expr.Binary{Op: expr.OpAnd, L: prGate, R: c}
+}
+
+// ruleless is true for a job condition that a job with no rules has: none, or only job status functions such as
+// always() and failure(), which the when key of the job makes.
+func ruleless(c expr.Expr) bool {
+	switch v := c.(type) {
+	case nil:
+		return true
+	case expr.Call:
+		switch v.Name {
+		case "always", "failure", "success", "cancelled":
+			return len(v.Args) == 0
+		}
+	case expr.Unary:
+		return v.Op == expr.OpNot && ruleless(v.X)
+	case expr.Binary:
+		return (v.Op == expr.OpAnd || v.Op == expr.OpOr) && ruleless(v.L) && ruleless(v.R)
+	}
+	return false
 }
 
 // GatedJobs lists, as pipeline ID and job ID joined by a slash, the jobs of a GitLab project that an emit to target
@@ -137,9 +179,11 @@ func GatedJobs(p *ir.Project, target string) []string {
 			continue
 		}
 		cp, _ := gitlabDefaultTriggers(pl, target)
-		for i, j := range pl.Jobs {
-			if j != nil && j.If == nil && cp.Jobs[i] != nil && cp.Jobs[i].If != nil {
-				out = append(out, pl.ID+"/"+j.ID)
+		for _, l := range [][2][]*ir.Job{{pl.Jobs, cp.Jobs}, {pl.Finally, cp.Finally}} {
+			for i, j := range l[0] {
+				if j != nil && l[1][i] != j {
+					out = append(out, pl.ID+"/"+j.ID)
+				}
 			}
 		}
 	}
@@ -151,7 +195,7 @@ func GatedJobs(p *ir.Project, target string) []string {
 func RestoreGates(p *ir.Project, gated []string) {
 	for _, pl := range p.Pipelines {
 		var ids []string
-		for _, j := range pl.Jobs {
+		for _, j := range append(slices.Clone(pl.Jobs), pl.Finally...) {
 			if j != nil && slices.Contains(gated, pl.ID+"/"+j.ID) {
 				ids = append(ids, j.ID)
 			}
@@ -167,12 +211,13 @@ func StripGates(pl *ir.Pipeline, ids []string) {
 	if len(ids) == 0 {
 		return
 	}
-	for _, j := range pl.Jobs {
+	all := append(slices.Clone(pl.Jobs), pl.Finally...)
+	for _, j := range all {
 		if j != nil && slices.Contains(ids, j.ID) {
 			j.If = withoutGate(j.If)
 		}
 	}
-	for _, j := range pl.Jobs {
+	for _, j := range all {
 		if j == nil {
 			continue
 		}
@@ -186,7 +231,17 @@ func StripGates(pl *ir.Pipeline, ids []string) {
 }
 
 // InjectedGate is true for the condition that WithDefaultTriggers puts on a job with no rules.
-func InjectedGate(c expr.Expr) bool { return c != nil && expr.String(c) == expr.String(prGate) }
+// The gate can sit as a conjunct beside a status condition.
+func InjectedGate(c expr.Expr) bool {
+	if c == nil {
+		return false
+	}
+	if expr.String(c) == expr.String(prGate) {
+		return true
+	}
+	b, ok := c.(expr.Binary)
+	return ok && b.Op == expr.OpAnd && (InjectedGate(b.L) || InjectedGate(b.R))
+}
 
 // prNameGitLab spells the pull request event of an event test as GitLab does.
 func prNameGitLab(c expr.Expr) expr.Expr {
@@ -270,6 +325,9 @@ func withoutGate(c expr.Expr) expr.Expr {
 	}
 	return expr.Binary{Op: expr.OpAnd, L: l, R: r}
 }
+
+// IsGate is true for a test that the run is not a pull request, in any spelling of the event.
+func IsGate(c expr.Expr) bool { return isGate(c) }
 
 // isGate is true for a test that the run is not a pull request, in any spelling of the event.
 func isGate(c expr.Expr) bool {

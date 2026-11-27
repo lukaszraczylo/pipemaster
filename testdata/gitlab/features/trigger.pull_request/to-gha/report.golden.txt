@@ -1,3 +1,4 @@
 Loss report: gitlab -> gha
 [emulated] pipeline/gitlab-ci/job/test job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/gitlab-ci/job/test step.action: actions/checkout step (GitLab clones the repository before every job; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs, and GHA does not clone)
+[emulated] pipeline/gitlab-ci/trigger/0 trigger.pull_request: pull_request: types: [opened, synchronize] (GitLab runs a merge request pipeline in the fork project, but a GHA pull_request run from a fork is a run of the base repository; the jobs that admit the pull request also run for fork pull requests)

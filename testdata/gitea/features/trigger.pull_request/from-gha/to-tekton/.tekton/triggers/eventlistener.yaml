@@ -1,5 +1,5 @@
 # pipemaster:emulated trigger.pull_request pipeline/ci/trigger/0
-# pipemaster:arg {"kind":"pr","name":"ci-pr-0","branches":{"Include":null,"Exclude":null},"tags":{"Include":null,"Exclude":null},"paths":{"Include":null,"Exclude":null}}
+# pipemaster:arg {"kind":"pr","name":"ci-pr-0","branches":{"Include":null,"Exclude":null},"tags":{"Include":null,"Exclude":null},"paths":{"Include":null,"Exclude":null},"actions":["opened","synchronize"]}
 apiVersion: triggers.tekton.dev/v1beta1
 kind: EventListener
 metadata:
@@ -23,7 +23,7 @@ spec:
             name: cel
           params:
             - name: filter
-              value: body.action in ['opened','synchronize','reopened'] && body.pull_request.head.repo.full_name == body.repository.full_name
+              value: body.action in ['opened','synchronize'] && body.pull_request.head.repo.full_name == body.repository.full_name
       bindings:
         - ref: ci-github
       template:

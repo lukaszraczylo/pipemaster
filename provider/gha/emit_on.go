@@ -303,6 +303,9 @@ func (e *emitter) prEvent(b *onBuilder, path string, t *ir.Trigger) error {
 	if err := m.addExtra(ext, map[string]bool{extEvent: true}); err != nil {
 		return err
 	}
+	if e.origin == provider.GitLab && name == evPR {
+		e.emulate(path, caps.TriggerPullRequest, "pull_request: types: [opened, synchronize]", "GitLab runs a merge request pipeline in the fork project, but a GHA pull_request run from a fork is a run of the base repository; the jobs that admit the pull request also run for fork pull requests")
+	}
 	b.add(path, caps.TriggerPullRequest, name, orNull(m))
 	return nil
 }

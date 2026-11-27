@@ -1,0 +1,17 @@
+# pipemaster:emulated job.needs pipeline/gitlab-ci/job/cleanup
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false},{"JobID":"mrjob","Artifacts":false,"Optional":false}]}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/cleanup/step/script
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitlab-ci-cleanup
+spec:
+  stepTemplate:
+    image: alpine:3.20
+  steps:
+    - name: script
+      script: |-
+        #!/bin/sh
+        if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
+        set -e
+        echo cleanup

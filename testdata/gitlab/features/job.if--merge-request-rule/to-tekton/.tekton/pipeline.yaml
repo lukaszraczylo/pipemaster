@@ -1,5 +1,7 @@
 # pipemaster:emulated trigger.push pipeline/gitlab-ci
 # pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated job.if pipeline/gitlab-ci
+# pipemaster:arg {"ref_type_jobs":{"build":{"if":"!(event == 'pull_request')","back":"event != 'pull_request'"}}}
 # pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 apiVersion: tekton.dev/v1
 kind: Pipeline
@@ -18,12 +20,15 @@ spec:
       taskRef:
         name: gitlab-ci-build
       params:
-        - name: ctx-event
-          value: $(params.ctx-event)
         - name: ctx-repo
           value: $(params.ctx-repo)
         - name: ctx-sha
           value: $(params.ctx-sha)
+      when:
+        - input: $(params.ctx-event)
+          operator: notin
+          values:
+            - pull_request
     - name: mrjob
       taskRef:
         name: gitlab-ci-mrjob
