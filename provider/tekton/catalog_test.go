@@ -113,7 +113,7 @@ func TestCatalogLookup(t *testing.T) {
 func TestCatalogCheckoutParams(t *testing.T) {
 	p, rep := parseFiles(t, map[string]string{"p.yaml": catalogPipeline(`    taskRef: {name: git-clone}
     params:
-    - {name: URL, value: https://example.com/r.git}
+    - {name: URL, value: https://github.com/o/r.git}
     - {name: REVISION, value: v1}
     - {name: DEPTH, value: "0"}
     - {name: SUBMODULES, value: "false"}
@@ -130,14 +130,53 @@ func TestCatalogCheckoutParams(t *testing.T) {
 			t.Errorf("with[%s] = %+v, want %s", k, st.With[k], v)
 		}
 	}
-	if !hasEntry(rep, "param URL of the catalog task git-clone has no checkout input") {
-		t.Error("a url outside github.com is not reported")
-	}
 	if hasEntry(rep, "param SUBDIRECTORY") {
 		t.Error("subdirectory maps to path")
 	}
 	if hasEntry(rep, "param DELETE_EXISTING") {
 		t.Error("a param at its catalog default needs no entry")
+	}
+}
+
+func TestCatalogCheckoutForeignUrlIsCloned(t *testing.T) {
+	tests := []struct{ url, want string }{
+		{"https://gitlab.com/o/r.git", `git remote add origin "https://gitlab.com/o/r.git"`},
+		{"$(params.repo_url)", `git remote add origin "${{ inputs.repo_url }}"`},
+		{"https://github.com/o/r/extra.git", `git remote add origin "https://github.com/o/r/extra.git"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.url, func(t *testing.T) {
+			p, rep := parseFiles(t, map[string]string{"p.yaml": catalogPipeline(`    taskRef: {name: git-clone}
+    params:
+    - {name: url, value: ` + tt.url + `}
+    - {name: revision, value: v1}
+    - {name: depth, value: "5"}
+`)})
+			j := job(t, p.Pipelines[0], "t")
+			if len(j.Steps) != 1 || j.Steps[0].Kind != ir.StepScript || j.Steps[0].Action != nil {
+				t.Fatalf("a clone of %s is not a script step: %+v", tt.url, j.Steps)
+			}
+			got := strings.Join(j.Steps[0].Script, "\n")
+			for _, w := range []string{tt.want, `git fetch -q --depth 5 origin "v1"`, "git checkout -q FETCH_HEAD"} {
+				if !strings.Contains(got, w) {
+					t.Errorf("script lacks %q:\n%s", w, got)
+				}
+			}
+			if hasEntry(rep, "has no checkout input") {
+				t.Errorf("the url is read: %+v", rep.Entries)
+			}
+		})
+	}
+}
+
+func TestCatalogCheckoutForeignUrlWithSparseFailsLoud(t *testing.T) {
+	_, _, err := tekton.New().Parse(repo(map[string]string{".tekton/p.yaml": catalogPipeline(`    taskRef: {name: git-clone}
+    params:
+    - {name: url, value: https://gitlab.com/o/r.git}
+    - {name: sparseCheckoutDirectories, value: docs}
+`)}))
+	if err == nil {
+		t.Fatal("a sparse list of a foreign clone has no spelling and must fail")
 	}
 }
 

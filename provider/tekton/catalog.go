@@ -334,11 +334,15 @@ func (b *jobBuilder) checkout(rm *omap, t *catalogTask, list []any) error {
 	with := map[string]ir.Value{}
 	bound := map[string]bool{}
 	var unmapped []string
+	foreignURL, foreign := foreignClone(list)
 	for _, e := range list {
 		m := asMapOrNil(e)
 		name, _ := text(valueOf(m, "name"))
 		key := paramKey(name)
 		val, isText := text(m.Vals["value"])
+		if foreign && key == "url" {
+			continue
+		}
 		if in, mapped := t.inputs[key]; mapped && isText {
 			if v, ok := b.checkoutValue(in.To, val); ok {
 				if v != nil {
@@ -372,9 +376,11 @@ func (b *jobBuilder) checkout(rm *omap, t *catalogTask, list []any) error {
 	if len(with) == 0 {
 		with = nil
 	}
-	b.job.Steps = append(b.job.Steps, &ir.Step{
-		ID: fmt.Sprintf("%s-step-%d", b.job.ID, catalogStepIndex), Kind: ir.StepAction, Action: &ref, With: with,
-	})
+	id := fmt.Sprintf("%s-step-%d", b.job.ID, catalogStepIndex)
+	if foreign {
+		return b.foreignCloneStep(id, foreignURL, with, list)
+	}
+	b.job.Steps = append(b.job.Steps, &ir.Step{ID: id, Kind: ir.StepAction, Action: &ref, With: with})
 	return nil
 }
 

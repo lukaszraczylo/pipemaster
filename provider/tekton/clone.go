@@ -25,17 +25,48 @@ const (
 // cloneRepo reads a clone url as the repository input of the checkout. The url of the pipeline's own repository
 // is the ctx-repo param, and the checkout needs no input for it. Another host has no spelling.
 func cloneRepo(x *texts, url string) (v ir.Value, own, ok bool) {
-	if !strings.HasPrefix(url, cloneHost) || !strings.HasSuffix(url, repoSuffix) {
-		return v, false, false
-	}
-	rest := strings.TrimSuffix(strings.TrimPrefix(url, cloneHost), repoSuffix)
-	switch {
-	case rest == ownRepoParam:
-		return v, true, true
-	case !strings.Contains(rest, paramPrefix) && strings.Count(rest, "/") != 1:
-		return v, false, false
+	rest, own, ok := cloneSpelling(url)
+	if !ok || own {
+		return v, own, ok
 	}
 	return x.value(rest), false, true
+}
+
+// cloneSpelling classifies a clone url: rest is the owner/name text of a GitHub url, own is true for the url of
+// the pipeline's own repository, and ok is false for a url that the checkout has no input for.
+func cloneSpelling(url string) (rest string, own, ok bool) {
+	if !strings.HasPrefix(url, cloneHost) || !strings.HasSuffix(url, repoSuffix) {
+		return "", false, false
+	}
+	rest = strings.TrimSuffix(strings.TrimPrefix(url, cloneHost), repoSuffix)
+	switch {
+	case rest == ownRepoParam:
+		return "", true, true
+	case !strings.Contains(rest, paramPrefix) && strings.Count(rest, "/") != 1:
+		return "", false, false
+	}
+	return rest, false, true
+}
+
+// foreignClone reports whether a git-clone param list names a url that the checkout cannot spell. The clone
+// then fetches another repository, and a checkout of the pipeline repository would run the wrong code.
+func foreignClone(list []any) (string, bool) {
+	for _, e := range list {
+		m := asMapOrNil(e)
+		if m == nil {
+			continue
+		}
+		name, _ := text(valueOf(m, "name"))
+		if paramKey(name) != "url" {
+			continue
+		}
+		if val, isText := text(m.Vals["value"]); isText && val != "" {
+			if _, _, ok := cloneSpelling(val); !ok {
+				return val, true
+			}
+		}
+	}
+	return "", false
 }
 
 // cloneSparse turns the comma list of git-clone into the line list of the checkout.
