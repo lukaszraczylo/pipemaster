@@ -11,6 +11,8 @@ pipelines:
       jobs:
         - ext:
             gitlab:
+                _carried:
+                    - cache
                 cache:
                     - key:
                         files:

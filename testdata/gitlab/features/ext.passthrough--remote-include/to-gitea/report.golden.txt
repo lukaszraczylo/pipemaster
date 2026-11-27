@@ -1,6 +1,5 @@
 Loss report: gitlab -> gitea
 [lost] pipeline/gitlab-ci ext.passthrough (Ext of provider gitlab (include) is not written to the GHA file; it is kept in round-trip metadata)
-[lost] pipeline/gitlab-ci/job/build ext.passthrough (Ext of provider gitlab (extends) is not written to the GHA file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci/job/build/step/script step.script (the line !reference [.remote-setup, script] depends on a remote GitLab include and has no GHA form)
 [lost] pipeline/gitlab-ci/job/deploy ext.passthrough (Ext of provider gitlab (rules) is not written to the GHA file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci/job/deploy job.if (condition not expressible in GitHub Actions; job disabled)

@@ -6,6 +6,8 @@ origin:
 pipelines:
     - ext:
         gitlab:
+            _carried:
+                - hidden
             hidden:
                 .go-cache:
                     variables:
@@ -18,6 +20,8 @@ pipelines:
       jobs:
         - ext:
             gitlab:
+                _carried:
+                    - extends
                 extends:
                     - .go-cache
           id: lint

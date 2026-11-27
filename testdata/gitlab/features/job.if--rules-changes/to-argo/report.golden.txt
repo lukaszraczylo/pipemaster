@@ -1,5 +1,4 @@
 Loss report: gitlab -> argo
-[lost] pipeline/gitlab-ci/job/build ext.passthrough (Ext of provider gitlab (rules) is not written to the Argo file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci/job/build job.if (a reference of the condition has no Argo spelling; the task is disabled with when {{= false }})
 [external] pipeline/gitlab-ci/job/build/step/source-checkout step.action: input git artifact at /workspace (the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; a private repository needs usernameSecret and passwordSecret, or sshPrivateKeySecret, on the git artifact; the file names none)
 [external] pipeline/gitlab-ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)

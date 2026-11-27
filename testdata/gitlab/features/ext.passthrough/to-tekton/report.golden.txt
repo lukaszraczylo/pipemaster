@@ -1,7 +1,7 @@
 Loss report: gitlab -> tekton
-[lost] pipeline/gitlab-ci ext.passthrough (Ext of provider gitlab (hidden, include) is not written to the Tekton file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci ext.passthrough (Ext of provider gitlab (include) is not written to the Tekton file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci/job/build ext.passthrough (Ext of provider gitlab (coverage) is not written to the Tekton file; it is kept in round-trip metadata)
-[lost] pipeline/gitlab-ci/job/prod ext.passthrough (Ext of provider gitlab (extends, interruptible, resource_group) is not written to the Tekton file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci/job/prod ext.passthrough (Ext of provider gitlab (interruptible, resource_group) is not written to the Tekton file; it is kept in round-trip metadata)
 [external] pipeline/gitlab-ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [external] pipeline/gitlab-ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [emulated] pipeline/gitlab-ci pipeline.env: stepTemplate env (the pipeline env is copied into the stepTemplate of every Task)

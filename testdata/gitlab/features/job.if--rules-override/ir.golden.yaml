@@ -6,6 +6,8 @@ origin:
 pipelines:
     - ext:
         gitlab:
+            _carried:
+                - hidden
             hidden:
                 .tests:
                     rules:
@@ -17,6 +19,8 @@ pipelines:
       jobs:
         - ext:
             gitlab:
+                _carried:
+                    - extends
                 _rules_always: true
                 extends:
                     - .tests

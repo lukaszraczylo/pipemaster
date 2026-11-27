@@ -1,7 +1,6 @@
 Loss report: gitlab -> woodpecker
 [lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline and its file has no trigger form for them; Woodpecker has no event for them)
 [lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat and its file has no trigger form for them; Woodpecker has no event for them)
-[lost] pipeline/gitlab-ci/job/build ext.passthrough (Ext of provider gitlab (rules) is not written to the Woodpecker file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci/job/build job.if (condition not expressible in Woodpecker CI; the workflow disabled)
 [emulated] pipeline/gitlab-ci trigger.manual: manual or deployment event (the source runs on these events and its file has no trigger form for them; Woodpecker starts each as its nearest event: api as manual, trigger as manual)
 [emulated] pipeline/gitlab-ci/job/build job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
