@@ -8,10 +8,10 @@
 # pipemaster:arg {"id":"script","written":"script-3","kind":"step"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script-3/carry
 # pipemaster:arg {"digest":"d8af446ebb7c8cc404b93459c063e15a1bf0bc52a4f5da48d315aa2b53605863","carry":"id: script\nkind: script\n"}
-# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
-# pipemaster:arg {"job":"build","digest":"62abb73fa37a702df364ab7a003bd5e087b188beeda2908a03e350139d142f59","tasks":["script-2","script-3"]}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
 # pipemaster:arg {"digest":"ccfab8ae4a946aa84558740d822f7063866e2831f07fc012ce0841001afc97a8","carry":"id: build\n"}
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:arg {"job":"build","digest":"62abb73fa37a702df364ab7a003bd5e087b188beeda2908a03e350139d142f59","tasks":["script-2","script-3"]}
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
