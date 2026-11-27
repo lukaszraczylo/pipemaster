@@ -2,7 +2,12 @@
 
 package behave
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"reflect"
+	"testing"
+)
 
 func TestGhaAdmits(t *testing.T) {
 	push := Event{Kind: kindPush, Branch: "main"}
@@ -32,5 +37,53 @@ func TestGhaAdmits(t *testing.T) {
 				t.Fatalf("ghaAdmits = %v, %v, want %v", got, err, tc.want)
 			}
 		})
+	}
+}
+
+func TestGhaAdmitsRefusesGlobFormsItCannotEvaluate(t *testing.T) {
+	pr := &Workspace{Ev: Event{Kind: kindPR, Branch: "feature/x", Target: "main"}}
+	push := &Workspace{Ev: Event{Kind: kindPush, Branch: "main"}}
+	for name, tc := range map[string]struct {
+		file string
+		w    *Workspace
+	}{
+		"question mark in a pull request filter": {"on:\n  pull_request:\n    branches: ['ma?n']\n", pr},
+		"plus in a push filter":                  {"on:\n  push:\n    branches: ['ma+in']\n", push},
+		"negated pattern":                        {"on:\n  push:\n    branches: ['!main']\n", push},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got, err := ghaAdmits([]byte(tc.file), tc.w); err == nil {
+				t.Fatalf("ghaAdmits = %v, nil, want an error", got)
+			}
+		})
+	}
+}
+
+func TestGhaWorkflows(t *testing.T) {
+	dir := t.TempDir()
+	wf := filepath.Join(dir, ".github", "workflows")
+	if err := os.MkdirAll(wf, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{
+		"a.yml":  "on:\n  push:\n    branches: [main]\n",
+		"b.yaml": "on:\n  push:\n    tags: ['v*']\n",
+		"c.yml":  "on: pull_request\n",
+	}
+	for n, body := range files {
+		if err := os.WriteFile(filepath.Join(wf, n), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w := &Workspace{Dir: dir, Ev: Event{Kind: kindPush, Branch: "main"}}
+	got, total, err := ghaWorkflows(w)
+	if err != nil || total != 3 || !reflect.DeepEqual(got, []string{filepath.Join(wf, "a.yml")}) {
+		t.Fatalf("ghaWorkflows = %v, %d, %v", got, total, err)
+	}
+	if err := os.WriteFile(filepath.Join(wf, "d.yml"), []byte("on:\n  push:\n    branches: ['!x']\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := ghaWorkflows(w); err == nil {
+		t.Fatal("ghaWorkflows accepted a filter it cannot evaluate")
 	}
 }

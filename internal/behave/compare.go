@@ -131,7 +131,8 @@ var handoffFeatures = map[caps.Feature]bool{caps.JobNeeds: true, caps.JobNeedsAr
 // failureFeatures change how a failure counts.
 var failureFeatures = map[caps.Feature]bool{caps.JobAllowFailure: true, caps.StepContinueOnError: true}
 
-// disableWords mark (the wording is the emitters; no typed flag in report.Entry marks the case) a loss detail of an emitter that turns a condition it cannot state into work that never runs.
+// disableWords match the detail text of a loss in which an emitter turns a condition it cannot state into work that never runs.
+// report.Entry has no typed flag for this case, so the match depends on the emitter wording.
 var disableWords = []string{"never runs", "disabled"}
 
 func disablesWork(detail string) bool {

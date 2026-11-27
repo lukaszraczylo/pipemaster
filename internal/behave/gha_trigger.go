@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -61,8 +62,14 @@ func ghaAdmits(raw []byte, w *Workspace) (bool, error) {
 	bIgnore, tIgnore := ghaFilter(cfg, "branches-ignore"), ghaFilter(cfg, "tags-ignore")
 	branchKind := len(branches)+len(bIgnore) > 0
 	tagKind := len(tags)+len(tIgnore) > 0
+	if err := ghaCheckGlobs(branches, tags, bIgnore, tIgnore); err != nil {
+		return false, err
+	}
 	if event == kindPR {
-		return !branchKind || condMatchesOK(branch, branches, bIgnore), nil
+		if !branchKind {
+			return true, nil
+		}
+		return condMatches(branch, branches, bIgnore)
 	}
 	if !branchKind && !tagKind {
 		return true, nil
@@ -73,10 +80,19 @@ func ghaAdmits(raw []byte, w *Workspace) (bool, error) {
 	return refAdmitted(branch, branches, bIgnore, branchKind)
 }
 
-// condMatchesOK is condMatches for a filter that the harness has already checked to be evaluable.
-func condMatchesOK(name string, inc, exc []string) bool {
-	ok, err := condMatches(name, inc, exc)
-	return err == nil && ok
+// ghaCheckGlobs refuses the filter patterns whose GitHub meaning differs from globMatch. In a GitHub filter ?
+// matches zero or one of the preceding character, + matches one or more of it, and a leading ! negates the
+// pattern (https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions#filter-pattern-cheat-sheet).
+// globMatch reads ? as one character and + as a literal, so the harness does not guess.
+func ghaCheckGlobs(lists ...[]string) error {
+	for _, l := range lists {
+		for _, p := range l {
+			if strings.ContainsAny(p, "?+") || strings.HasPrefix(p, "!") {
+				return fmt.Errorf("the filter pattern %q uses a GitHub glob form that the harness does not evaluate", p)
+			}
+		}
+	}
+	return nil
 }
 
 // refAdmitted admits a name that a filter of its kind admits. A kind with no filter admits nothing when the other kind has one.
@@ -99,7 +115,10 @@ func ghaFilter(cfg map[string]any, key string) []string {
 
 // ghaWorkflows returns the workflow files of the workspace that admit the run, and how many files exist.
 func ghaWorkflows(w *Workspace) (admitted []string, total int, err error) {
-	files, _ := filepath.Glob(filepath.Join(w.Dir, ".github", "workflows", "*.y*ml"))
+	files, gerr := filepath.Glob(filepath.Join(w.Dir, ".github", "workflows", "*.y*ml"))
+	if gerr != nil {
+		return nil, 0, fmt.Errorf("list the workflow files: %w", gerr)
+	}
 	for _, f := range files {
 		raw, rerr := os.ReadFile(f) // #nosec G304 -- a workspace file of the harness
 		if rerr != nil {

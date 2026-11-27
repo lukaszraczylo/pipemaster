@@ -321,6 +321,8 @@ func (e *droneEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	branch, event := w.Ev.Branch, "push"
 	switch w.Ev.Kind {
 	case kindTag:
+		// Drone documents DRONE_COMMIT_BRANCH as possibly empty for tag events
+		// (https://docs.drone.io/pipeline/environment/reference/drone-commit-branch/).
 		event, branch = "tag", ""
 	case kindPR:
 		event, branch = "pull_request", w.Ev.Target

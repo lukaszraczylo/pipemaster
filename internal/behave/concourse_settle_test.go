@@ -58,3 +58,23 @@ func TestRegistryFailure(t *testing.T) {
 		}
 	}
 }
+
+func TestKeepTagJobs(t *testing.T) {
+	pipe := `{"resources":[{"name":"src-tag","source":{"tag_filter":"v*"}},{"name":"src","source":{"branch":"main"}}],
+"jobs":[{"name":"rel","plan":[{"get":"src-tag"}]},{"name":"br","plan":[{"get":"src"}]}]}`
+	builds := []buildInfo{{JobName: "rel"}, {JobName: "br"}}
+	got, err := keepTagJobs(pipe, builds)
+	if err != nil || len(got) != 1 || got[0].JobName != "rel" {
+		t.Fatalf("keepTagJobs = %v, %v, want the rel build only", got, err)
+	}
+	if got, err := keepTagJobs(pipe, nil); err != nil || len(got) != 0 {
+		t.Fatalf("zero builds: keepTagJobs = %v, %v, want none", got, err)
+	}
+	none := `{"resources":[{"name":"src","source":{}}],"jobs":[{"name":"br","plan":[{"get":"src"}]}]}`
+	if got, err := keepTagJobs(none, []buildInfo{{JobName: "br"}}); err != nil || len(got) != 0 {
+		t.Fatalf("no tag job: keepTagJobs = %v, %v, want none", got, err)
+	}
+	if _, err := keepTagJobs("not json", builds); err == nil {
+		t.Fatal("keepTagJobs kept the builds of a pipeline it cannot read")
+	}
+}

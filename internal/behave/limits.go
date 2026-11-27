@@ -59,12 +59,13 @@ func limit(fx Fixture, target, event string) string {
 	return ""
 }
 
-// concoursePRWhy cites the git resource: its check returns the commits of one branch or the tags that match
-// tag_filter, so a pull request has no version unless the file declares a pull request resource
-// (https://github.com/concourse/git-resource/blob/v1.9.1/README.md, "check: Check for new commits"). The converted file
-// declares none, because a pull request resource is a separate resource type (github-pr-resource).
+// concoursePRWhy cites two sources. The git resource check returns the commits of one branch or the tags that match
+// tag_filter, so it yields no pull request version (https://github.com/concourse/git-resource/blob/v1.9.1/README.md,
+// "check: Check for new commits"). Pull requests are the job of a separate resource type, github-pr-resource
+// (https://github.com/telia-oss/github-pr-resource), and the converted file declares none.
 const concoursePRWhy = "Concourse has no pull request event: the converted file has no pull request resource, so no resource version stands for it " +
-	"(https://github.com/concourse/git-resource/blob/v1.9.1/README.md, check: the versions are commits of one branch or tags)"
+	"(https://github.com/concourse/git-resource/blob/v1.9.1/README.md, check: the versions are commits of one branch or tags; " +
+	"pull requests need the separate resource type https://github.com/telia-oss/github-pr-resource)"
 
 // argoArtifactsWhy cites the Argo Workflows rule: "To run Argo workflows that use artifacts, you must configure
 // and use an artifact repository." (https://argo-workflows.readthedocs.io/en/latest/configure-artifact-repository/).
