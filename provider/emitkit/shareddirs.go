@@ -181,6 +181,7 @@ func (s SharedDirs) record(j *ir.Job, arts, needs, implicit []string) {
 		rec[k] = list
 	}
 	d[s.Key] = rec
+	Carry(d, s.Key)
 	j.Ext[s.Dialect] = d
 }
 

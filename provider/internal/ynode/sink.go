@@ -5,6 +5,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
@@ -15,6 +16,8 @@ type Sink struct {
 	Dialect string
 	Path    string
 	File    string
+	// Carried lists the kept keys whose behaviour the IR already holds.
+	Carried []string
 }
 
 // NewSink starts a sink for one IR path of a file.
@@ -59,8 +62,12 @@ func (k *Sink) Ext() ir.Ext {
 	if len(k.Out) == 0 {
 		return nil
 	}
+	emitkit.Carry(k.Out, k.Carried...)
 	return ir.Ext{k.Dialect: k.Out}
 }
+
+// Carry marks kept keys as held by the IR; a key that Keep did not store is ignored.
+func (k *Sink) Carry(keys ...string) { k.Carried = append(k.Carried, keys...) }
 
 // KeepMeta keeps the metadata of a document except its name.
 func (k *Sink) KeepMeta(key string, top *Map, what string, line int) {

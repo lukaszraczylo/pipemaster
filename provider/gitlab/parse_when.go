@@ -31,7 +31,7 @@ func (s *state) jobWhenRules(info *jobInfo, r *reader) error {
 	keyword := when
 	var cond expr.Expr
 	manualFromRules := false
-	keepRules := false
+	keepRules, rulesDropped := false, false
 	if rulesNode != nil {
 		var rr ruleResult
 		ok := false
@@ -45,7 +45,7 @@ func (s *state) jobWhenRules(info *jobInfo, r *reader) error {
 				r.keep(ExtRulesAlways, true)
 			}
 			if rr.dropped {
-				keepRules = true
+				keepRules, rulesDropped = true, true
 				s.note(s.jobPath(j.ID), caps.JobManual, "manual arm dropped; the rules stay in Ext[gitlab][rules]",
 					"the rules mix automatic and manual arms and the IR has one manual flag per job: the job runs on the automatic arms only and no manual start is written", rulesNode)
 			}
@@ -100,6 +100,9 @@ func (s *state) jobWhenRules(info *jobInfo, r *reader) error {
 		r.keep("rules", v)
 		s.note(s.jobPath(j.ID), caps.ExtPassthrough, "kept in Ext[gitlab][rules]", "the rules text stays in Ext so a return to GitLab writes it unchanged; other targets get the compiled condition", rulesNode)
 		r.keep(ExtRulesFP, rulesFP(j.If, j.Manual))
+		if !rulesDropped {
+			r.carried = append(r.carried, "rules")
+		}
 		if keyword != whenOnSuccess {
 			r.keep(ExtRulesWhen, keyword)
 		}

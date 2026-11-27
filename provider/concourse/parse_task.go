@@ -612,6 +612,7 @@ func (jb *jobBuilder) checkoutStep(m *omap, gets []*omap, used map[string]bool) 
 	k.Out[ExtKind] = "in_parallel"
 	k.Out[ExtStep] = plain(m)
 	k.Out[ExtTaskDigest] = taskDigest(st, "")
+	k.Carry(ExtKind, ExtStep)
 	st.Ext = k.Ext()
 	jb.k.Rep.Add(report.Entry{
 		IRPath: jb.path + "/step/" + st.ID, Feature: caps.StepAction, Level: caps.Emulated, Strategy: "checkout step",

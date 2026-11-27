@@ -118,6 +118,7 @@ func (b *jobBuilder) document(doc *rawDoc, name string) error {
 	}
 	if name != b.c.plID+"-"+b.job.ID {
 		b.k.Out["task_name"] = name
+		b.k.Carry("task_name")
 	}
 	spec, ok := asMap(doc.Top.Vals["spec"])
 	if !ok {

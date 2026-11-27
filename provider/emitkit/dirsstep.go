@@ -24,7 +24,7 @@ func DirsStep(jobID string, dirs []string, dialect, ext string) *ir.Step {
 	}
 	return &ir.Step{
 		ID: jobID + DirsStepSuffix, Kind: ir.StepScript, Script: []string{"mkdir -p " + strings.Join(words, " ")},
-		Ext: ir.Ext{dialect: map[string]any{ext: true}},
+		Ext: ir.Ext{dialect: map[string]any{ext: true, CarriedKey: []any{ext}}},
 	}
 }
 

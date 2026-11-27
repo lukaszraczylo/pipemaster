@@ -84,6 +84,7 @@ func (s *state) parseJob(name string, merged, raw *yaml.Node, def []entry) (*job
 			list[i] = n
 		}
 		r.keep(extExtends, list)
+		r.carried = append(r.carried, extExtends)
 	}
 	if err := s.jobInherit(s.jobPath(j.ID), r); err != nil {
 		return nil, err
