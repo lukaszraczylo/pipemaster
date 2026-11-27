@@ -82,6 +82,8 @@ const jobContinueWhy = "act 0.2.90 does not count a failed job with continue-on-
 
 // actJobContinue reports a workflow in dir where a job with continue-on-error has a dependent job.
 func actJobContinue(dir string) string {
+	// Glob fails only on a bad pattern, and this pattern is constant. A file that cannot be read keeps the cell
+	// running, so an act limitation then shows as a FAIL, not as a hidden pass.
 	files, _ := filepath.Glob(filepath.Join(dir, ".github", "workflows", "*.y*ml"))
 	for _, f := range files {
 		raw, err := os.ReadFile(f) // #nosec G304 G122 -- a workflow of the harness workspace
