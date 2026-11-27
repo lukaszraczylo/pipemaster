@@ -15,6 +15,9 @@
 on:
   workflow_dispatch:
   pull_request:
+    types:
+      - opened
+      - synchronize
   push:
 concurrency:
   group: ${{ github.run_id }}

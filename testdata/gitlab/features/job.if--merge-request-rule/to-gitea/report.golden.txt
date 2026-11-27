@@ -12,6 +12,6 @@ Loss report: gitlab -> gitea
 [emulated] pipeline/gitlab-ci/job/mrjob job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/gitlab-ci/job/mrjob step.action: actions/checkout step (GitLab clones the repository before every job; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs, and GHA does not clone)
 [emulated] pipeline/gitlab-ci/job/mrjob/step/script step.shell: bash-if-present wrapper (the source runs the step under bash when the image has it, and a runner such as act runs a step with no shell under sh; the script re-executes under bash when the image has bash, else under sh -e)
+[emulated] pipeline/gitlab-ci/trigger/1 trigger.pull_request: pull_request: types: [opened, synchronize] (GitLab runs a merge request pipeline in the fork project, but a GHA pull_request run from a fork is a run of the base repository; the jobs that admit the pull request also run for fork pull requests)
 [native] pipeline/gitlab-ci/job/build/synth/checkout step.action (resolves against DEFAULT_ACTIONS_URL; default github)
 [native] pipeline/gitlab-ci/job/mrjob/synth/checkout step.action (resolves against DEFAULT_ACTIONS_URL; default github)
-[native] pipeline/gitlab-ci/trigger/1 trigger.pull_request (the ref is refs/pull/N/head, not the merge ref)

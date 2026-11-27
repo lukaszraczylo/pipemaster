@@ -1,0 +1,33 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/cleanup
+# pipemaster:arg {"Ref":"alpine:3.20","Entrypoint":null}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/cleanup
+# pipemaster:arg {"gitlab_default":true}
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false},{"JobID":"mrjob","Artifacts":false,"Optional":false}],"noIf":true}
+when:
+  - event: push
+    status:
+      - success
+      - failure
+  - event: tag
+    status:
+      - success
+      - failure
+  - event:
+      - manual
+      - cron
+    status:
+      - success
+      - failure
+depends_on:
+  - name: build
+    optional: true
+  - name: mrjob
+    optional: true
+steps:
+  - name: script
+    image: alpine:3.20
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo cleanup'

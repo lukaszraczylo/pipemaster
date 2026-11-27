@@ -1,0 +1,85 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","pr","schedule","api"],"gated":["build","cleanup","onfail"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/5
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:arg {"src":"!(event == 'merge_request_event')","guard":true}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/mrjob
+# pipemaster:arg {"src":"event == 'merge_request_event'","guard":true}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/mrjob
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/mrjob
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/cleanup
+# pipemaster:arg {"src":"!(event == 'merge_request_event')","guard":true}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/cleanup
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/cleanup
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/cleanup
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false},{"JobID":"mrjob","Artifacts":false,"Optional":false}]}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/onfail
+# pipemaster:arg {"src":"!(event == 'merge_request_event')","guard":true}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/onfail
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/onfail
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/onfail
+# pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false},{"JobID":"mrjob","Artifacts":false,"Optional":false}]}
+on:
+  workflow_dispatch:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+  push:
+  repository_dispatch:
+    types:
+      - api
+      - trigger
+jobs:
+  build:
+    if: '!(github.event_name == ''pull_request'') && !github.event.deleted'
+    runs-on: ubuntu-latest
+    container: alpine:3.20
+    steps:
+      - uses: actions/checkout@v7
+      # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
+      - id: script
+        run: sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"' pipemaster 'echo build'
+  mrjob:
+    needs:
+      - build
+    if: github.event_name == 'pull_request' && !github.event.deleted
+    runs-on: ubuntu-latest
+    container: alpine:3.20
+    steps:
+      - uses: actions/checkout@v7
+      # pipemaster:emulated step.shell pipeline/gitlab-ci/job/mrjob/step/script
+      - id: script
+        run: sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"' pipemaster 'echo mr'
+  # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+  cleanup:
+    needs:
+      - build
+      - mrjob
+    if: always() && !(github.event_name == 'pull_request') && !github.event.deleted
+    runs-on: ubuntu-latest
+    container: alpine:3.20
+    steps:
+      - uses: actions/checkout@v7
+      # pipemaster:emulated step.shell pipeline/gitlab-ci/job/cleanup/step/script
+      - id: script
+        run: sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"' pipemaster 'echo cleanup'
+  # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+  onfail:
+    needs:
+      - build
+      - mrjob
+    if: always() && (!(github.event_name == 'pull_request') && failure()) && !github.event.deleted
+    runs-on: ubuntu-latest
+    container: alpine:3.20
+    steps:
+      - uses: actions/checkout@v7
+      # pipemaster:emulated step.shell pipeline/gitlab-ci/job/onfail/step/script
+      - id: script
+        run: sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"' pipemaster 'echo onfail'
