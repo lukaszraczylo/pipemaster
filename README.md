@@ -107,7 +107,7 @@ Secret names map between providers. Secret values, runner registration, webhooks
 | Target | What it runs |
 | --- | --- |
 | `make check` | `go test -short ./...` (a deterministic sample of the chain matrix), `golangci-lint` and the Lean checks. It needs the pinned linters, so run `make linters` first. |
-| `make matrix` | The full chain matrix with a 40 minute timeout. It took about 608 seconds at nine providers, which is over the 10 minute default of `go test`. |
+| `make matrix` | The full chain matrix with a 40 minute timeout. On 2026-11-27 it took 505 seconds at nine providers on a loaded 16-core machine, which is close to the 10 minute default of `go test`. |
 | `make behave` | The behaviour tests. They run each converted pipeline on a real engine (act, gitlab-ci-local, Drone, Woodpecker, Tekton, Argo and Concourse) and compare its trace with the trace of the source. The run is opt-in, uses the Kiri container runtime and has a timeout of 3 hours. `make behave-tools` installs the engines. The latest run is in [testdata/behave/RESULTS.md](testdata/behave/RESULTS.md). |
 | `make linters` | Builds or downloads the pinned linters into `.tools/bin`: actionlint, woodpecker-cli, drone, kubeconform, argo and fly. |
 | `make lint-real` | Every test except the chain matrix, without `-short`, with every pinned linter required, then `golangci-lint`. |
