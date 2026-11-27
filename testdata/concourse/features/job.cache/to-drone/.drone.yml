@@ -12,8 +12,10 @@ steps:
   - name: compile
     image: golang:latest
     commands:
+      - '[ -e source ] || ln -s "$$PWD" source'
       - go build ./...
   - name: test
     image: golang:latest
     commands:
+      - '[ -e source ] || ln -s "$$PWD" source'
       - go test ./...

@@ -32,10 +32,14 @@ spec:
           value: /workspace
     - name: compile
       image: golang:latest
-      script: go build ./...
+      script: |-
+        [ -e source ] || ln -s "$PWD" source
+        go build ./...
     - name: test
       image: golang:latest
-      script: go test ./...
+      script: |-
+        [ -e source ] || ln -s "$PWD" source
+        go test ./...
   workspaces:
     - name: pipemaster-workspace
       mountPath: /pipemaster

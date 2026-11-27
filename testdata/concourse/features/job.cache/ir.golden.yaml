@@ -41,25 +41,39 @@ pipelines:
                 ref: golang:latest
               ext:
                 concourse:
+                    _carried:
+                        - config
+                        - layout
                     config:
                         inputs:
                             - name: source
                         platform: linux
+                    layout:
+                        lines:
+                            - '[ -e source ] || ln -s "$PWD" source'
               id: compile
               kind: script
               script:
+                - '[ -e source ] || ln -s "$PWD" source'
                 - go build ./...
             - image:
                 ref: golang:latest
               ext:
                 concourse:
+                    _carried:
+                        - config
+                        - layout
                     config:
                         inputs:
                             - name: source
                         platform: linux
+                    layout:
+                        lines:
+                            - '[ -e source ] || ln -s "$PWD" source'
               id: test
               kind: script
               script:
+                - '[ -e source ] || ln -s "$PWD" source'
                 - go test ./...
           cache:
             - paths:
