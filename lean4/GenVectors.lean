@@ -897,10 +897,11 @@ def concJobJson (j : Concourse.CJob) : Json :=
 open Pipemaster.Concourse in
 def concDocJson (d : Concourse.CDoc) : Json :=
   Json.mkObj [("file", d.file), ("carry", coreJson d.carry), ("jobs", Json.arr (d.jobs.map concJobJson).toArray),
-    ("fin_job", d.finJob), ("fin_tasks", strsJson d.finTasks)]
+    ("fin_job", d.finJob), ("fin_tasks", strsJson d.finTasks),
+    ("fin_copies", Json.arr (d.finCopies.map fun c => Json.mkObj [("job", c.1), ("tasks", strsJson c.2)]).toArray)]
 
 /-- Pipelines that exercise what Concourse adds to the Woodpecker set: a need on a job with no step (the producer, the
-consumer and both), a three-job chain with a finally job on its sink, finally steps whose IDs clash with the steps of
+consumer and both), a three-job chain with a finally job on its sink and a failure copy on the other jobs, a fan-out and a fan-in with finally jobs (lost), finally steps whose IDs clash with the steps of
 the sink job (the emitter appends `-2`, `-3`), a pipeline with two sinks (the finally job has no hook), job and step
 names with digits, dashes and underscores, and script lines that read like markers. -/
 def concExtraPipes : List Core.Pipe :=
@@ -915,6 +916,9 @@ def concExtraPipes : List Core.Pipe :=
    pushAll [cj "a", { cj "b" with needs := needOn "a" false }, { cj "c" with needs := needOn "b" false }] [cj "f"],
    pushAll [cj "a", { cj "b" with needs := needOn "a" false }, { cj "c" with needs := [⟨"a", false⟩, ⟨"b", true⟩] }]
      [{ cj "f" with onFailure := true }],
+   pushAll [cj "a", { cj "b" with needs := needOn "a" false }, { cj "c" with needs := needOn "a" false }] [cj "f"],
+   pushAll [{ cj "a" with steps := two }, { cj "b" with needs := needOn "a" false }, { cj "c" with needs := needOn "b" false }]
+     [cj "f", cj "g"],
    pushAll [clash] [cj "f"], pushAll [{ cj "a" with steps := two }] [cj "f", cj "g"],
    pushAll [{ cj "a" with steps := two }, cj "b"] [cj "f"],
    pushAll [cj "a", cj "b"] [{ cj "f" with steps := [] }],

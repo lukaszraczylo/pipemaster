@@ -404,7 +404,7 @@ func TestFinallyWithNoSingleSinkIsLost(t *testing.T) {
 	p := project(scriptJob("a", "true"), scriptJob("b", "true"))
 	p.Pipelines[0].Finally = []*ir.Job{scriptJob("cleanup", "rm -rf x")}
 	files, rep := emit(t, p)
-	if strings.Contains(files[".concourse/ci.yml"], "ensure") || !hasFeatureEntry(rep, string(caps.PipelineFinally), "single sink") {
+	if strings.Contains(files[".concourse/ci.yml"], "ensure") || !hasFeatureEntry(rep, string(caps.PipelineFinally), "one chain") {
 		t.Fatalf("finally must be lost: %v\n%s", rep.Entries, files[".concourse/ci.yml"])
 	}
 }

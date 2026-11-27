@@ -66,20 +66,25 @@ func (pe *pipeEmitter) jobs() []*yaml.Node {
 			e.emulate(pe.path+"/job/"+j.ID, caps.ExtPassthrough, "job name changed", "the job ID "+j.ID+" is not a Concourse identifier or collides after conversion; the job is "+name)
 		}
 	}
-	needed := map[string]bool{}
+	needed := map[string]int{}
 	for _, j := range pe.pl.Jobs {
 		for _, n := range j.Needs {
-			needed[n.JobID] = true
+			needed[n.JobID]++
 		}
 	}
+	pe.chain = true
 	for _, j := range pe.pl.Jobs {
-		if !needed[j.ID] {
+		if needed[j.ID] == 0 {
 			pe.sinks = append(pe.sinks, j)
+		}
+		if len(j.Needs) > 1 || needed[j.ID] > 1 {
+			pe.chain = false
 		}
 		if extOf(j.Ext)[serialKey] != nil || extOf(j.Ext)[serialGroupsKey] != nil {
 			pe.serial = pe.serial || e.own
 		}
 	}
+	pe.chain = pe.chain && len(pe.sinks) == 1
 	pe.noteFinally()
 	var out []*yaml.Node
 	all := pe.sources
@@ -101,6 +106,7 @@ func (pe *pipeEmitter) jobs() []*yaml.Node {
 	for _, j := range pe.pl.Jobs {
 		out = append(out, pe.job(j))
 	}
+	pe.markFinally()
 	if pe.tagSplit {
 		out = append(out, pe.tagTwins(all, tags)...)
 	}
@@ -134,6 +140,7 @@ func (pe *pipeEmitter) tagTwins(all, tags []*source) []*yaml.Node {
 	for _, j := range pe.pl.Jobs {
 		out = append(out, pe.job(j))
 	}
+	pe.markFinally()
 	pe.doc.Head = pe.doc.Head[:pushDoc]
 	pe.jobName, pe.sources, pe.primary, pe.twinPass = pushNames, all, pushPrimary, false
 	for _, j := range pe.pl.Jobs {
@@ -148,28 +155,47 @@ const (
 	serialGroupsKey = "serial_groups"
 )
 
-// noteFinally reports where the finally jobs go: to the single sink job; a pipeline with no single sink loses them.
+// noteFinally reports where the finally jobs go. A run of a chain stops at its first failed job, so the sink holds
+// every finally job and each other job holds the failure and always ones in on_failure: they run once per run. Any
+// other shape of several jobs can fail in two jobs of one run, so the finally jobs are lost.
 func (pe *pipeEmitter) noteFinally() {
 	pl, e := pe.pl, pe.e
 	if len(pl.Finally) == 0 {
 		return
 	}
-	if len(pe.sinks) != 1 {
+	if !pe.chain {
 		for _, f := range pl.Finally {
-			e.lose(pe.path+"/job/"+f.ID, caps.PipelineFinally, "the pipeline has no single sink job to hold the finally steps in an ensure hook; the job is not written")
+			e.lose(pe.path+"/job/"+f.ID, caps.PipelineFinally, "the jobs of the pipeline are not one chain, so no hook placement runs the finally steps once per run; the job is not written")
 		}
-		e.lose(pe.path, caps.PipelineFinally, "the pipeline has no single sink job to hold the finally steps in an ensure hook")
+		e.lose(pe.path, caps.PipelineFinally, "the jobs of the pipeline are not one chain, so no hook placement runs the finally steps once per run")
 		return
 	}
-	e.emulate(pe.path, caps.PipelineFinally, "ensure hook on the sink job", "the finally jobs run as hooks of the job "+pe.jobName[pe.sinks[0].ID]+", the only job that no other job needs")
+	sink := pe.jobName[pe.sinks[0].ID]
+	e.emulate(pe.path, caps.PipelineFinally, "hooks on the jobs of the chain", "the finally jobs run as hooks of the sink job "+sink+", the only job that no other job needs; the other jobs of the chain run the failure and always finally jobs in their on_failure hook, because a failed job stops the jobs after it")
 }
 
-// finallyFor lists the finally jobs that the job holds as hooks.
-func (pe *pipeEmitter) finallyFor(j *ir.Job) []*ir.Job {
-	if len(pe.sinks) != 1 || pe.sinks[0] != j {
-		return nil
+// finallyFor lists the finally jobs that the job holds as hooks, and whether the job is the sink.
+func (pe *pipeEmitter) finallyFor(j *ir.Job) (finally []*ir.Job, sink bool) {
+	if !pe.chain {
+		return nil, false
 	}
-	return pe.pl.Finally
+	return pe.pl.Finally, pe.sinks[0] == j
+}
+
+// markFinally writes the marker of the finally jobs that the hooks of the pass hold, then clears the pass.
+func (pe *pipeEmitter) markFinally() {
+	var a finallyArg
+	for _, c := range pe.finCopies {
+		if c.sink {
+			a.Job, a.Tasks, a.Digest = c.Job, c.Tasks, c.Digest
+		} else {
+			a.Copies = append(a.Copies, c.finallyCopy)
+		}
+	}
+	pe.finCopies = nil
+	if a.Job != "" {
+		pe.e.markArg(caps.PipelineFinally, pe.mpath, a)
+	}
 }
 
 // job writes one job.
@@ -206,7 +232,8 @@ func (pe *pipeEmitter) job(j *ir.Job) *yaml.Node {
 		}
 	}
 	if len(jx.finallyTasks) > 0 {
-		e.markArg(caps.PipelineFinally, pe.mpath, finallyArg{Job: jx.name, Tasks: jx.finallyTasks, Digest: digestOf(hookText)})
+		_, sink := pe.finallyFor(j)
+		pe.finCopies = append(pe.finCopies, finallyHold{finallyCopy{Job: jx.name, Tasks: jx.finallyTasks, Digest: digestOf(hookText)}, sink})
 	}
 	if jx.ext != nil {
 		if err := m.AddExtra(jx.ext, jobSkip); err != nil {
@@ -389,8 +416,9 @@ func (jx *jobEmitter) plan() []*yaml.Node {
 		jx.hookStep(st)
 	}
 	jx.reportUnplacedNeeds()
-	for _, f := range jx.pe.finallyFor(j) {
-		jx.finallyJob(f)
+	finally, sink := jx.pe.finallyFor(j)
+	for _, f := range finally {
+		jx.finallyJob(f, sink)
 	}
 	if jx.mx != nil && len(body) > 0 {
 		body = []*yaml.Node{jx.mx.wrap(body)}
@@ -434,20 +462,29 @@ func (jx *jobEmitter) wrap(nodes []*yaml.Node) []*yaml.Node {
 
 func durationText(d *ir.Duration) string { return time.Duration(*d).String() }
 
-// finallyJob adds the steps of a finally job to the hook that its condition names.
-func (jx *jobEmitter) finallyJob(f *ir.Job) {
+// finallyJob adds the steps of a finally job to the hook that its condition names. A job that is not the sink holds
+// only the failure and always finally jobs, in on_failure, and leaves the reports to the sink.
+func (jx *jobEmitter) finallyJob(f *ir.Job, sink bool) {
 	e := jx.pe.e
 	fp := jx.pe.path + "/job/" + f.ID
-	hook := "ensure"
+	st := "always"
 	if f.If != nil {
-		st, ok := statusOf(f.If)
-		if !ok {
-			e.lose(fp, caps.JobIf, "the condition of the finally job has no hook form; the job is not written")
+		var ok bool
+		if st, ok = statusOf(f.If); !ok {
+			if sink {
+				e.lose(fp, caps.JobIf, "the condition of the finally job has no hook form; the job is not written")
+			}
 			return
 		}
-		hook = statusHooks[st]
 	}
-	if !jx.pe.e.own {
+	hook := statusHooks[st]
+	if !sink {
+		if st == "success" {
+			return
+		}
+		hook = statusHooks["failure"]
+	}
+	if sink && !jx.pe.e.own {
 		e.foreignExt(fp, f.Ext)
 	}
 	saved := jx.j

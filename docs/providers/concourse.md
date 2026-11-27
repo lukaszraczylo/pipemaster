@@ -61,7 +61,7 @@ The following table comes from `pipemaster caps --to concourse --format md`.
 | job.timeout | emulated | timeout on a do wrapper of the plan |
 | pipeline.concurrency | emulated | serial_groups on the jobs (cancel-in-progress is lost; a second build waits) |
 | pipeline.env | emulated | copied into the params of every task (a step variable of the same name wins) |
-| pipeline.finally | emulated | job hook (ensure) on the single sink job (several finally steps wrap in do; a pipeline with no single sink job loses the finally steps) |
+| pipeline.finally | emulated | job hook on the sink job of a chain, and on_failure hook on its other jobs (several finally steps wrap in do; the other jobs of the chain run only the failure and always finally steps, in on_failure; a pipeline whose jobs are not one chain loses the finally steps) |
 | pipeline.inputs | lost | (a Concourse pipeline has no run-time inputs; fly set-pipeline vars apply at set time) |
 | pipeline.permissions | lost | (permissions come from the team and the credential manager) |
 | project.multi_pipeline | emulated | one pipeline file per IR pipeline under .concourse/ (each pipeline needs its own fly set-pipeline and gets its own triggers) |

@@ -19,7 +19,7 @@ holds each carry as the IR value it decodes to.
 
 What the parser takes from the file and what from the carry (parse_marker.go carryJob, carryStep, carryPipeline):
 - File: the pipeline ID (the file name), each job name, each need (the `passed` list), each script that the args can say, the task names and
-  the ensure hook of the sink job.
+  the ensure hook of the sink job and the on_failure hook of the other jobs of a chain.
 - Carry: the pipeline name, the triggers and the finally jobs (carryPipeline); for each job every field but its ID,
   name, steps and need jobs (carryJob); for each task its ID, name and env, and its script when the args cannot say it (carryStep).
 - Display names: a job name comes from its `display.name` marker, so `disp` holds it.
@@ -70,13 +70,15 @@ structure CJob where
 
 /-- One pipeline file: `file` is the base name (the pipeline ID), `carry` the pipeline carry (name, triggers and
 finally jobs, with no jobs), and `finJob` and `finTasks` the `pipeline.finally` marker: the job that holds the finally
-steps as hook tasks, and the task names (empty when no hook). -/
+steps as hook tasks, and the task names (empty when no hook), and `finCopies` the same for the other jobs of the chain:
+the job name and the task names of the copy in its `on_failure` hook. -/
 structure CDoc where
   file : String
   carry : Core.Pipe
   jobs : List CJob
   finJob : String
   finTasks : List String
+  finCopies : List (String × List String)
   deriving DecidableEq, Repr
 
 /-! ### The task names of the finally steps -/
@@ -155,20 +157,35 @@ theorem uniqFrom_disjoint (acc bs : List String) : ∀ n ∈ uniqFrom acc bs, n 
 
 /-! ### Emission -/
 
-/-- Mirrors concourse.pipeEmitter.finallyFor (provider/concourse/emit_job.go): the finally steps are the hooks of the
-job that no other job needs, when there is exactly one. -/
+/-- The jobs form one chain: each job has at most one need and at most one dependent (concourse.pipeEmitter.jobs,
+emit_job.go). One run then fails in at most one job, and the jobs after it never start. -/
+def isChain (p : Pipe) : Bool :=
+  p.jobs.all fun j =>
+    decide (j.needs.length ≤ 1) &&
+      decide ((p.jobs.filter fun k => k.needs.any fun n => n.job == j.id).length ≤ 1)
+
+/-- Mirrors concourse.pipeEmitter.finallyFor (provider/concourse/emit_job.go): the job that no other job needs, when
+there is exactly one. -/
 def sinkJob (p : Pipe) : Option Core.Job :=
   match p.jobs.filter (fun j => !(p.jobs.any fun k => k.needs.any fun n => n.job == j.id)) with
   | [j] => some j
   | _ => none
 
+/-- The sink of a chain: the job that holds all the finally steps. A pipeline whose jobs are not one chain has none,
+and its finally jobs are lost from the file (the carry keeps them). -/
+def chainSink (p : Pipe) : Option Core.Job := if isChain p then sinkJob p else none
+
 def finSteps (p : Pipe) : List Core.Step := p.fin.flatMap (·.steps)
 
-/-- The names of the hook tasks: the finally step IDs, after the step IDs of the sink job (emit_job.go finallyJob;
-the finally steps share `taken` with the plan of the sink job). -/
+/-- The names of the hook tasks in the job `j`: the finally step IDs, after the step IDs of `j` (emit_job.go
+finallyJob; the finally steps share `taken` with the plan of the job). -/
+def copyNames (p : Pipe) (j : Core.Job) : List String :=
+  uniqFrom (j.steps.map (·.id)) ((finSteps p).map (·.id))
+
+/-- The names of the hook tasks of the sink. -/
 def hookNames (p : Pipe) : List String :=
-  match sinkJob p with
-  | some j => uniqFrom (j.steps.map (·.id)) ((finSteps p).map (·.id))
+  match chainSink p with
+  | some j => copyNames p j
   | none => []
 
 /-- A script that the args of a task read back differently: the parser drops one trailing newline and splits a line
@@ -187,6 +204,14 @@ def cstep (n : String) (s : Core.Step) : CTask :=
 
 def hookTasks (p : Pipe) : List CTask := ((finSteps p).zip (hookNames p)).map fun (s, n) => cstep n s
 
+/-- The hook tasks of the job `j`: in a chain, the finally steps as the `on_failure` copy. -/
+def copyTasks (p : Pipe) (j : Core.Job) : List CTask := ((finSteps p).zip (copyNames p j)).map fun (s, n) => cstep n s
+
+/-- The `pipeline.finally` copies of the jobs that are not the sink (emit_job.go markFinally). -/
+def finCopies (p : Pipe) : List (String × List String) :=
+  if hookNames p = [] then []
+  else (p.jobs.filter fun j => chainSink p ≠ some j).map fun j => (j.id, copyNames p j)
+
 /-- Mirrors concourse.pipeEmitter.job (provider/concourse/emit_job.go), concourse.jobEmitter.gets
 (emit_gets.go) and concourse.jobEmitter.carryJob (emit_carry.go): the job `j` of the pipeline `p`. The `passed` list
 holds the need jobs in order, on the shared source `get` that every job writes. -/
@@ -195,7 +220,7 @@ def cjob (p : Pipe) (j : Core.Job) : CJob where
   disp := j.name
   passed := j.needs.map (·.job)
   body := j.steps.map fun s => cstep s.id s
-  hook := if sinkJob p = some j then hookTasks p else []
+  hook := if chainSink p = some j then hookTasks p else if (chainSink p).isSome then copyTasks p j else []
   carry := { j with steps := [] }
 
 /-- Mirrors concourse.Emit (provider/concourse/emit.go) on the core subset: one file. -/
@@ -203,8 +228,9 @@ def toConcourse (p : Pipe) : CDoc where
   file := p.id
   carry := { p with jobs := [] }
   jobs := p.jobs.map (cjob p)
-  finJob := if hookNames p = [] then "" else ((sinkJob p).map (·.id)).getD ""
+  finJob := if hookNames p = [] then "" else ((chainSink p).map (·.id)).getD ""
   finTasks := hookNames p
+  finCopies := finCopies p
 
 /-! ### Parsing -/
 
@@ -219,8 +245,12 @@ def readNeeds (j : CJob) : List Core.Need :=
     (j.passed.zip j.carry.needs).map fun (n, c) => ⟨n, c.artifacts⟩
   else j.passed.map fun n => ⟨n, false⟩
 
+/-- The task `t` of the job `j` is one that the `pipeline.finally` marker names. -/
+def dropped (d : CDoc) (j : CJob) (t : CTask) : Bool :=
+  (j.name == d.finJob && d.finTasks.contains t.name) || d.finCopies.any fun c => c.1 == j.name && c.2.contains t.name
+
 /-- Mirrors concourse.pipeBuilder.finallyHooks and concourse.jobBuilder.carryJob (parse_marker.go): the hook tasks that
-the marker names are taken out of the steps of the job that holds them. -/
+the marker names are taken out of the steps of the job that holds them: the sink, or a job with a copy. -/
 def readJob (d : CDoc) (j : CJob) : Core.Job where
   id := j.name
   name := j.disp
@@ -228,8 +258,7 @@ def readJob (d : CDoc) (j : CJob) : Core.Job where
   env := j.carry.env
   runner := j.carry.runner
   steps :=
-    (if j.name == d.finJob then (j.body ++ j.hook).filter (fun t => !d.finTasks.contains t.name) else j.body ++ j.hook).map
-      readTask
+    ((j.body ++ j.hook).filter (fun t => !dropped d j t)).map readTask
   retry := j.carry.retry
   timeout := j.carry.timeout
   manual := j.carry.manual
@@ -278,7 +307,7 @@ instance (sc : List String) : Decidable (ScriptOk sc) := by unfold ScriptOk; exa
 
 /-- What Concourse needs beyond `Wf`: a main job (a pipeline with none gets a placeholder, emit_pipeline.go), main job
 names and every task name that the emitter writes unchanged, and scripts that the parser reads back. Finally steps are
-written as hook tasks only when one job is the sink, and their scripts are carried whole, so only their names matter. -/
+written as hook tasks only when the jobs form one chain, and their scripts are carried whole, so only their names matter. -/
 def ConcourseOk (p : Pipe) : Prop :=
   p.jobs ≠ [] ∧ (∀ j ∈ p.jobs, CcId j.id ∧ ∀ s ∈ j.steps, StepOk s ∧ ScriptOk s.script) ∧
     ∀ j ∈ p.fin, ∀ s ∈ j.steps, StepOk s
@@ -327,11 +356,45 @@ theorem sinkJob_mem (p : Pipe) (k : Core.Job) (h : sinkJob p = some k) : k ∈ p
     exact (List.mem_filter.1 this).1
   · cases h
 
-theorem hookNames_ne_nil (p : Pipe) (h : hookNames p ≠ []) : ∃ k, sinkJob p = some k := by
+theorem chainSink_mem (p : Pipe) (k : Core.Job) (h : chainSink p = some k) : k ∈ p.jobs := by
+  unfold chainSink at h
+  split at h
+  · exact sinkJob_mem p k h
+  · cases h
+
+theorem hookNames_ne_nil (p : Pipe) (h : hookNames p ≠ []) : ∃ k, chainSink p = some k := by
   unfold hookNames at h
-  cases hs : sinkJob p with
+  cases hs : chainSink p with
   | none => simp [hs] at h
   | some k => exact ⟨k, rfl⟩
+
+/-- With no hook names, no job has a hook task: the pipeline has no chain, or no finally step. -/
+theorem hookNames_nil_cases (p : Pipe) (h : hookNames p = []) : chainSink p = none ∨ finSteps p = [] := by
+  unfold hookNames at h
+  cases hs : chainSink p with
+  | none => exact Or.inl rfl
+  | some k =>
+    right
+    simp only [hs, copyNames] at h
+    have := length_uniqFrom (k.steps.map (·.id)) ((finSteps p).map (·.id))
+    rw [h] at this
+    simpa using this.symm
+
+theorem finCopies_elim (p : Pipe) (c : String × List String) (hc : c ∈ finCopies p) :
+    ∃ j ∈ p.jobs, chainSink p ≠ some j ∧ c = (j.id, copyNames p j) := by
+  unfold finCopies at hc
+  by_cases h : hookNames p = []
+  · simp [h] at hc
+  · rw [if_neg h] at hc
+    obtain ⟨j, hj, rfl⟩ := List.mem_map.1 hc
+    obtain ⟨hj1, hj2⟩ := List.mem_filter.1 hj
+    exact ⟨j, hj1, by simpa using hj2, rfl⟩
+
+theorem finCopies_mem (p : Pipe) (j : Core.Job) (hj : j ∈ p.jobs) (hne : chainSink p ≠ some j) (h : hookNames p ≠ []) :
+    (j.id, copyNames p j) ∈ finCopies p := by
+  unfold finCopies
+  rw [if_neg h]
+  exact List.mem_map.2 ⟨j, List.mem_filter.2 ⟨hj, by simpa using hne⟩, rfl⟩
 
 /-- Two main jobs with one ID are one job. -/
 theorem jobs_id_inj (p : Pipe) (hn : (jobIds p.all).Nodup) {a b : Core.Job} (ha : a ∈ p.jobs) (hb : b ∈ p.jobs)
@@ -341,50 +404,119 @@ theorem jobs_id_inj (p : Pipe) (hn : (jobIds p.all).Nodup) {a b : Core.Job} (ha 
     exact hn.1
   exact List.inj_on_of_nodup_map hj ha hb h
 
-/-- The steps of a job that the parser reads, after the hook tasks are taken out, are the steps that the emitter wrote. -/
+/-- The steps of a job that the parser reads, after the hook tasks are taken out, are the steps that the emitter wrote:
+the sink and every other job of a chain hold finally tasks that the marker names, and no plan task has such a name. -/
 theorem readSteps_cjob (p : Pipe) (hn : (jobIds p.all).Nodup) (j : Core.Job) (hj : j ∈ p.jobs) :
-    (if (cjob p j).name == (toConcourse p).finJob then
-        ((cjob p j).body ++ (cjob p j).hook).filter (fun t => !(toConcourse p).finTasks.contains t.name)
-      else (cjob p j).body ++ (cjob p j).hook) = (cjob p j).body := by
+    ((cjob p j).body ++ (cjob p j).hook).filter (fun t => !dropped (toConcourse p) (cjob p j) t) = (cjob p j).body := by
   by_cases h : hookNames p = []
-  · have hz : hookTasks p = [] := by simp [hookTasks, h]
-    simp [cjob, toConcourse, h, hz]
+  · have hhook : (cjob p j).hook = [] := by
+      rcases hookNames_nil_cases p h with hc | hf
+      · simp [cjob, hc]
+      · simp [cjob, hookTasks, copyTasks, hf]
+    have hd : ∀ t, dropped (toConcourse p) (cjob p j) t = false := by
+      intro t
+      simp [dropped, toConcourse, h, finCopies]
+    rw [hhook, List.append_nil]
+    exact List.filter_eq_self.2 fun t _ => by simp [hd t]
   · obtain ⟨k, hk⟩ := hookNames_ne_nil p h
     have hfj : (toConcourse p).finJob = k.id := by simp [toConcourse, h, hk]
     have hft : (toConcourse p).finTasks = hookNames p := rfl
-    by_cases hjk : sinkJob p = some j
+    have hfc : (toConcourse p).finCopies = finCopies p := rfl
+    have hkm := chainSink_mem p k hk
+    have hbody : ∀ t ∈ (cjob p j).body, t.name ∈ j.steps.map (·.id) := by
+      intro t ht
+      obtain ⟨s, hs, rfl⟩ := List.mem_map.1 ht
+      exact List.mem_map_of_mem (f := Core.Step.id) hs
+    by_cases hjk : chainSink p = some j
     · have hkj : k = j := by rw [hk] at hjk; exact Option.some.inj hjk
       subst hkj
       have hh : (cjob p k).hook = hookTasks p := by simp [cjob, hk]
-      have hb : ∀ t ∈ k.steps.map (fun s => cstep s.id s), t.name ∉ hookNames p := by
+      have hcopy : ∀ t : CTask, (finCopies p).any (fun c => c.1 == k.id && c.2.contains t.name) = false := by
+        intro t
+        refine List.any_eq_false.2 fun c hc => ?_
+        obtain ⟨j', hj', hne, rfl⟩ := finCopies_elim p c hc
+        have hid : j'.id ≠ k.id := by
+          intro he
+          exact hne (by rw [hk, jobs_id_inj p hn hj' hkm he])
+        simp [hid]
+      have hb : ∀ t ∈ (cjob p k).body, t.name ∉ hookNames p := by
         intro t ht
-        obtain ⟨s, hs, rfl⟩ := List.mem_map.1 ht
         have := uniqFrom_disjoint (k.steps.map (·.id)) ((finSteps p).map (·.id))
-        simp only [hookNames, hk] at this ⊢
-        intro hm
-        exact this _ hm (List.mem_map_of_mem (f := Core.Step.id) hs)
+        have hm := hbody t ht
+        simp only [hookNames, hk, copyNames]
+        intro hm'
+        exact this _ hm' hm
       have hc : ∀ t ∈ hookTasks p, t.name ∈ hookNames p := by
         intro t ht
         obtain ⟨⟨s, nm⟩, hm, rfl⟩ := List.mem_map.1 ht
         exact (List.of_mem_zip hm).2
-      have e1 : List.filter (fun t => !(hookNames p).contains t.name) (k.steps.map (fun s => cstep s.id s)) =
-          k.steps.map (fun s => cstep s.id s) := by
+      have e1 : List.filter (fun t => !dropped (toConcourse p) (cjob p k) t) (cjob p k).body = (cjob p k).body := by
         refine List.filter_eq_self.2 fun t ht => ?_
         have := hb t ht
-        simpa using this
-      have e2 : List.filter (fun t => !(hookNames p).contains t.name) (hookTasks p) = [] := by
+        have hd : dropped (toConcourse p) (cjob p k) t = false := by
+          unfold dropped
+          have h1 : (toConcourse p).finTasks.contains t.name = false := by rw [hft]; simpa using this
+          have h2 : (toConcourse p).finCopies.any (fun c => c.1 == (cjob p k).name && c.2.contains t.name) = false := by
+            rw [hfc]; exact hcopy t
+          rw [h1, h2]
+          simp
+        simp [hd]
+      have e2 : List.filter (fun t => !dropped (toConcourse p) (cjob p k) t) (hookTasks p) = [] := by
         refine List.filter_eq_nil_iff.2 fun t ht => ?_
         have := hc t ht
-        simpa using this
-      simp only [cjob, hjk, hfj, hft, beq_self_eq_true, ite_true, List.filter_append, e1, e2, List.append_nil]
-    · have hkm := sinkJob_mem p k hk
-      have hne : j.id ≠ k.id := by
+        have hd : dropped (toConcourse p) (cjob p k) t = true := by
+          unfold dropped
+          have h1 : ((cjob p k).name == (toConcourse p).finJob) = true := by rw [hfj]; simp [cjob]
+          have h2 : (toConcourse p).finTasks.contains t.name = true := by rw [hft]; simpa using this
+          rw [h1, h2]
+          simp
+        simp [hd]
+      rw [List.filter_append, hh, e1, e2, List.append_nil]
+    · have hne : j.id ≠ k.id := by
         intro he
         exact hjk (by rw [hk, jobs_id_inj p hn hj hkm he])
-      have hh : (cjob p j).hook = [] := by simp [cjob, hjk]
+      have hh : (cjob p j).hook = copyTasks p j := by
+        simp only [cjob]
+        rw [if_neg hjk, if_pos (by simp [hk])]
+      have hmem := finCopies_mem p j hj hjk h
       have hnm : ((cjob p j).name == (toConcourse p).finJob) = false := by
         simp [cjob, hfj, hne]
-      simp [hnm, hh]
+      have hcopy : ∀ t ∈ (cjob p j).body, ((toConcourse p).finCopies.any
+          fun c => c.1 == (cjob p j).name && c.2.contains t.name) = false := by
+        intro t ht
+        refine List.any_eq_false.2 fun c hc => ?_
+        rw [hfc] at hc
+        obtain ⟨j', hj', _, rfl⟩ := finCopies_elim p c hc
+        by_cases he : j'.id = j.id
+        · have hjj := jobs_id_inj p hn hj' hj he
+          subst hjj
+          have := uniqFrom_disjoint (j'.steps.map (·.id)) ((finSteps p).map (·.id))
+          have hm := hbody t ht
+          simp only [copyNames]
+          simp only [Bool.and_eq_true, beq_iff_eq, List.contains_iff_mem, not_and]
+          intro _ hm'
+          exact this _ hm' hm
+        · simp [cjob, he]
+      have e1 : List.filter (fun t => !dropped (toConcourse p) (cjob p j) t) (cjob p j).body = (cjob p j).body := by
+        refine List.filter_eq_self.2 fun t ht => ?_
+        have := hcopy t ht
+        have hd : dropped (toConcourse p) (cjob p j) t = false := by
+          unfold dropped
+          rw [hnm, this]
+          rfl
+        simp [hd]
+      have e2 : List.filter (fun t => !dropped (toConcourse p) (cjob p j) t) (copyTasks p j) = [] := by
+        refine List.filter_eq_nil_iff.2 fun t ht => ?_
+        obtain ⟨⟨s, nm⟩, hm, rfl⟩ := List.mem_map.1 ht
+        have hn' : nm ∈ copyNames p j := (List.of_mem_zip hm).2
+        have : (toConcourse p).finCopies.any (fun c => c.1 == (cjob p j).name && c.2.contains (cstep nm s).name) = true := by
+          rw [hfc]
+          exact List.any_eq_true.2 ⟨_, hmem, by simp [cjob, cstep, hn']⟩
+        have hd : dropped (toConcourse p) (cjob p j) (cstep nm s) = true := by
+          unfold dropped
+          rw [this, Bool.or_true]
+        simp [hd]
+      rw [List.filter_append, hh, e1, e2, List.append_nil]
 
 theorem readJob_cjob (p : Pipe) (hn : (jobIds p.all).Nodup) (j : Core.Job) (hj : j ∈ p.jobs)
     (hsc : ∀ s ∈ j.steps, s.script ≠ []) :

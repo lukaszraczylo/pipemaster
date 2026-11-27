@@ -82,7 +82,7 @@ func TestCapsCaveats(t *testing.T) {
 		caps.JobNeedsArtifacts:      {"s3", "registry"},
 		caps.JobArtifacts:           {"workspace"},
 		caps.PipelineConcurrency:    {"serial_groups", "cancel-in-progress"},
-		caps.PipelineFinally:        {"hook", "single sink"},
+		caps.PipelineFinally:        {"hook", "chain"},
 		caps.JobRunner:              {"tags", "workers"},
 		caps.ConfigName:             {"((name))", "credential manager"},
 		caps.JobCache:               {"caches"},
