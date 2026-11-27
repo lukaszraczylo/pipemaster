@@ -40,8 +40,11 @@ type Meta struct {
 	Emitted map[string]Lost `yaml:"emitted,omitempty"`
 	// Calls holds each child call that the emit inlined into jobs, by the IR path of the call job. A return to
 	// the source provider replaces the inlined jobs with the stored call job.
-	Calls  map[string]Call `yaml:"calls,omitempty"`
-	Source string          `yaml:"source,omitempty"`
+	Calls map[string]Call `yaml:"calls,omitempty"`
+	// DockerSteps holds each docker:// action step that the emit rewrote as a script step, as the source had it,
+	// by source IR path. A return to the source provider puts the action step back.
+	DockerSteps map[string]*ir.Step `yaml:"docker_steps,omitempty"`
+	Source      string              `yaml:"source,omitempty"`
 	// Target is the provider whose files Files hashes. A layer written before this field existed has none.
 	Target  string `yaml:"target,omitempty"`
 	Dialect string `yaml:"dialect,omitempty"`

@@ -20,8 +20,7 @@ clone:
     settings:
       depth: 0
 steps:
-  - name: build-step-3
-    image: golang:1.24
+  - image: golang:1.24
     commands:
       - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: no Woodpecker mapping for action docker://alpine:3.20'' >&2; exit 1'
   - name: local

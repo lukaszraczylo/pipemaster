@@ -1,0 +1,19 @@
+{
+  "features": [
+    "step.action"
+  ],
+  "events": [
+    "push-main",
+    "push-branch"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": [],
+  "owners": {
+    "dockerstep.run": [
+      "build-step-1",
+      "build"
+    ]
+  },
+  "requires": []
+}

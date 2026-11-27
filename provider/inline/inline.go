@@ -9,6 +9,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/meta"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -41,11 +42,22 @@ type Result struct {
 // Emit runs emit on the project that Flatten returns and adds the entries of the rewrite to its report.
 func Emit(p *ir.Project, target string, emit func(*ir.Project) (map[string][]byte, *report.Report, error)) (map[string][]byte, *report.Report, error) {
 	flat, res := Flatten(p, target)
+	flat, docker, _ := DockerSteps(flat, target)
+	res.Entries = append(res.Entries, docker...)
 	files, rep, err := emit(flat)
 	if rep != nil {
 		rep.Entries = append(rep.Entries, res.Entries...)
 	}
 	return files, rep, err
+}
+
+// DockerSteps rewrites the docker:// steps of p that target cannot run as actions, which is every target outside
+// the GHA family. It returns the rewritten steps as the source had them, by IR path.
+func DockerSteps(p *ir.Project, target string) (*ir.Project, []report.Entry, map[string]*ir.Step) {
+	if provider.Family(target) == provider.GHA {
+		return p, nil, nil
+	}
+	return emitkit.DockerSteps(p)
 }
 
 // Native reports whether the target writes the child as the construct it came from.
