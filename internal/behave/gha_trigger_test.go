@@ -44,12 +44,12 @@ func TestGhaAdmitsRefusesGlobFormsItCannotEvaluate(t *testing.T) {
 	pr := &Workspace{Ev: Event{Kind: kindPR, Branch: "feature/x", Target: "main"}}
 	push := &Workspace{Ev: Event{Kind: kindPush, Branch: "main"}}
 	for name, tc := range map[string]struct {
-		file string
 		w    *Workspace
+		file string
 	}{
-		"question mark in a pull request filter": {"on:\n  pull_request:\n    branches: ['ma?n']\n", pr},
-		"plus in a push filter":                  {"on:\n  push:\n    branches: ['ma+in']\n", push},
-		"negated pattern":                        {"on:\n  push:\n    branches: ['!main']\n", push},
+		"question mark in a pull request filter": {pr, "on:\n  pull_request:\n    branches: ['ma?n']\n"},
+		"plus in a push filter":                  {push, "on:\n  push:\n    branches: ['ma+in']\n"},
+		"negated pattern":                        {push, "on:\n  push:\n    branches: ['!main']\n"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if got, err := ghaAdmits([]byte(tc.file), tc.w); err == nil {
