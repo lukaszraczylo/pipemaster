@@ -69,7 +69,10 @@ type whenSpec struct {
 	sharedStatus bool
 	// stripped is true when a marker named the evaluate text of a trigger filter, so what is left is the job condition.
 	stripped bool
-	disabled bool
+	// gitlabDefault is true when a marker says the event lists hold the default events of a GitLab pipeline, whose
+	// triggers are the bare push and tag.
+	gitlabDefault bool
+	disabled      bool
 }
 
 // configure sets how the trigger reading treats the when, from the markers of its file.
@@ -108,6 +111,7 @@ func (s *whenSpec) configure(m *marks) {
 // dropEvents reads the entries as if they had no event filter: the emitter listed the events of a GitLab pipeline with
 // the default triggers in each of them.
 func (s *whenSpec) dropEvents() {
+	s.gitlabDefault = true
 	var kept []itemInfo
 	for _, it := range s.items {
 		it.item.Event = wpexpr.Filter{}
@@ -200,7 +204,9 @@ func (s *whenSpec) sharedEvaluate() string {
 
 // gates says whether a gate that every entry repeats belongs to the job, not to each trigger. A lone workflow with
 // one entry keeps the whole entry as its condition.
-func (s *whenSpec) gates() bool { return len(s.items) >= 2 || s.multi || s.stripped || s.gated }
+func (s *whenSpec) gates() bool {
+	return len(s.items) >= 2 || s.multi || s.stripped || s.gated || s.gitlabDefault
+}
 
 func (s *whenSpec) sharedStatusList() bool {
 	if len(s.items) < 1 || !s.items[0].hasStatus {
@@ -436,6 +442,9 @@ func irFilter(f wpexpr.Filter, isPath, lenient bool) (ir.Filter, bool) {
 func (s *whenSpec) triggers() ([]ir.Trigger, bool) {
 	if s == nil || len(s.items) == 0 || len(s.runsOn) > 0 {
 		return nil, false
+	}
+	if s.gitlabDefault {
+		return []ir.Trigger{{Kind: ir.TriggerPush}, {Kind: ir.TriggerTag}}, true
 	}
 	var out []ir.Trigger
 	for _, raw := range s.items {
