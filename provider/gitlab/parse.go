@@ -142,6 +142,7 @@ func (s *state) parsePipeline(root *yaml.Node, remote []any) (*ir.Pipeline, []*j
 	}
 	if len(hidden) > 0 {
 		r.keep(extHidden, hidden)
+		r.carried = append(r.carried, extHidden)
 	}
 	def, err := s.defaults(root)
 	if err != nil {

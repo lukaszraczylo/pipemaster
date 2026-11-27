@@ -121,6 +121,7 @@ func (b *jobBuilder) workingDir(st *ir.Step, k *sink, r *reader, id string) erro
 	if rel, ok := b.sourceDir(t); ok {
 		st.WorkDir = rel
 		k.Out[ExtWorkspaceDir], k.Out[ExtWorkspaceDirIR] = t, rel
+		k.Carry(ExtWorkspaceDir, ExtWorkspaceDirIR)
 		return nil
 	}
 	var err error
@@ -230,6 +231,7 @@ func (b *jobBuilder) script(st *ir.Step, k *sink, t string) ([]exprtekton.EnvVar
 	if b.tx.wsHits != hits {
 		k.Out[ExtScriptSource] = anyStrings(undone)
 		k.Out[ExtScriptIR] = strings.Join(st.Script, "\n")
+		k.Carry(ExtScriptSource, ExtScriptIR)
 	}
 	return guardEnv, nil
 }
@@ -259,6 +261,7 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, cmd, args any) error {
 	k.Out[ExtScriptLine] = line
 	k.Out[ExtCommand] = plain(cmd)
 	k.Out[ExtArgs] = plain(args)
+	k.Carry(ExtScriptLine, ExtCommand, ExtArgs)
 	k.Note(caps.StepScript, "command and args are written as one script line; both lists are kept in Ext", 0)
 	return nil
 }
@@ -279,6 +282,7 @@ func (b *jobBuilder) envWithout(st *ir.Step, k *sink, r *reader, skip []exprtekt
 	st.Env = vars
 	if len(ws) > 0 {
 		k.Out[ExtEnvWorkspace] = ws
+		k.Carry(ExtEnvWorkspace)
 	}
 	if len(from) > 0 {
 		k.Keep("valueFrom", from, caps.StepEnv, "env entries with valueFrom have no Value form; kept in Ext", r.Line("env"))
@@ -439,6 +443,7 @@ func (b *jobBuilder) stepTemplate(v any, line int) error {
 		b.job.Env = vars
 		if len(ws) > 0 {
 			b.k.Out[ExtEnvWorkspace] = ws
+			b.k.Carry(ExtEnvWorkspace)
 			b.tplEnv = slices.Sorted(maps.Keys(ws))
 		}
 		if len(from) > 0 {

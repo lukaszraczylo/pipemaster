@@ -18,6 +18,8 @@ pipelines:
       jobs:
         - ext:
             gitlab:
+                _carried:
+                    - extends
                 extends:
                     - .remote-base
                 stage: build

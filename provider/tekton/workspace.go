@@ -240,7 +240,9 @@ func (b *jobBuilder) keepWorkspaces(key string, v any, names []string, line int)
 	}
 	if len(rest) > 0 || len(names) == 0 {
 		b.k.Note(caps.ExtPassthrough, "workspaces "+strings.Join(rest, ", ")+" have no IR field and the Pipeline binds them to no directory; kept in Ext", line)
+		return
 	}
+	b.k.Carry(key)
 }
 
 // keepPipelineWorkspaces keeps the Pipeline workspace list in Ext and reports each workspace that no task maps.
@@ -260,5 +262,7 @@ func (c *plCtx) keepPipelineWorkspaces(v any, line int) {
 	}
 	if len(rest) > 0 {
 		c.k.Note(caps.ExtPassthrough, "pipeline workspaces "+strings.Join(rest, ", ")+" are bound by no task, so they have no directory; kept in Ext", line)
+		return
 	}
+	c.k.Carry("workspaces")
 }

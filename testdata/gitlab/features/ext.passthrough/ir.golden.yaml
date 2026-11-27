@@ -7,6 +7,8 @@ origin:
 pipelines:
     - ext:
         gitlab:
+            _carried:
+                - hidden
             hidden:
                 .deploy:
                     script:
@@ -65,6 +67,8 @@ pipelines:
             attempts: 2
           ext:
             gitlab:
+                _carried:
+                    - extends
                 _derived_needs: true
                 extends:
                     - .deploy

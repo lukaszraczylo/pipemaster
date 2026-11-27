@@ -1,6 +1,7 @@
 package emitkit
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
@@ -86,6 +87,41 @@ func carriedKeys(raw any) []string {
 		}
 	}
 	sort.Strings(out)
+	return out
+}
+
+// Carry adds each key of keys that m holds to the CarriedKey list of m.
+func Carry(m map[string]any, keys ...string) {
+	var l []any
+	switch old := m[CarriedKey].(type) {
+	case []any:
+		l = old
+	case []string:
+		for _, s := range old {
+			l = append(l, s)
+		}
+	}
+	for _, k := range keys {
+		if _, has := m[k]; has && !slices.Contains(l, any(k)) {
+			l = append(l, k)
+		}
+	}
+	if len(l) > 0 {
+		m[CarriedKey] = l
+	}
+}
+
+// WithoutCarried returns m without the CarriedKey entry, so an emitter never writes the list into a file.
+func WithoutCarried(m map[string]any) map[string]any {
+	if _, has := m[CarriedKey]; !has {
+		return m
+	}
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		if k != CarriedKey {
+			out[k] = v
+		}
+	}
 	return out
 }
 

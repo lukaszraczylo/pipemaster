@@ -11,6 +11,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -349,6 +350,7 @@ func (b *jobBuilder) finish() {
 	}
 	if len(list) > 0 {
 		b.k.Out[ExtImplicitNeeds] = list
+		b.k.Carry(ExtImplicitNeeds)
 	}
 	b.legacyParams()
 	b.boundParams()
@@ -384,6 +386,7 @@ func (b *jobBuilder) legacyParams() {
 	}
 	if len(only) > 0 {
 		b.k.Out[ExtLegacyParams] = only
+		b.k.Carry(ExtLegacyParams)
 	}
 }
 
@@ -401,6 +404,7 @@ func (b *jobBuilder) boundParams() {
 	}
 	if len(bound) > 0 {
 		b.k.Out[ExtBoundParams] = bound
+		b.k.Carry(ExtBoundParams)
 	}
 }
 
@@ -476,7 +480,7 @@ func (b *jobBuilder) addSourceCheckout() {
 		return
 	}
 	id := b.job.ID + "-checkout"
-	st := &ir.Step{ID: id, Kind: ir.StepAction, Action: &ref, Ext: ir.Ext{dialect: map[string]any{ExtSourceCheckout: true}}}
+	st := &ir.Step{ID: id, Kind: ir.StepAction, Action: &ref, Ext: ir.Ext{dialect: map[string]any{ExtSourceCheckout: true, emitkit.CarriedKey: []any{ExtSourceCheckout}}}}
 	b.job.Steps = append([]*ir.Step{st}, b.job.Steps...)
 	b.c.p.rep.Add(report.Entry{
 		IRPath: b.path, Feature: caps.StepAction, Level: caps.Emulated, Strategy: checkoutStrategy,

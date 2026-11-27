@@ -341,4 +341,5 @@ func (b *jobBuilder) keepMountPaths() {
 		out[dir] = p
 	}
 	b.k.Out[ExtMountPaths] = out
+	b.k.Carry(ExtMountPaths)
 }

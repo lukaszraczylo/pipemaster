@@ -16,6 +16,8 @@ pipelines:
       jobs:
         - ext:
             tekton:
+                _carried:
+                    - task_name
                 task_name: shared-run
           id: run
           steps:

@@ -12,6 +12,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
@@ -24,6 +25,8 @@ type reader struct {
 	ents []entry
 	// nulls are keys set to null, which unset what a parent job gave; they go to Ext untouched.
 	nulls []string
+	// carried are the Ext keys whose behaviour the IR already holds.
+	carried []string
 }
 
 func (s *state) reader(n *yaml.Node, what string) (*reader, error) {
@@ -104,6 +107,7 @@ func (r *reader) ext() (ir.Ext, error) {
 	if out == nil {
 		return nil, nil
 	}
+	emitkit.Carry(out, r.carried...)
 	return ir.Ext{dialect: out}, nil
 }
 

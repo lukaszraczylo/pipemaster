@@ -235,8 +235,23 @@ func (s *state) jobCache(j *ir.Job, r *reader) error {
 	}
 	if anyExtra {
 		r.keep(extCache, extras)
+		if keyOnly(extras) {
+			r.carried = append(r.carried, extCache)
+		}
 	}
 	return nil
+}
+
+// keyOnly reports whether the only key that any cache entry keeps in Ext is the raw key, which the IR holds as a derived key.
+func keyOnly(extras []any) bool {
+	for _, e := range extras {
+		for k := range e.(map[string]any) {
+			if k != "key" {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // flattenSeq lists the items of n with nested sequences spliced in, which is how GitLab reads a list built from an anchor.

@@ -12,6 +12,8 @@ pipelines:
         - if: ((branch == 'main') && changes('src/**/*', 'go.mod')) || ((event == 'merge_request_event') && changes('go.sum') && !((branch == 'main') && changes('src/**/*', 'go.mod')))
           ext:
             gitlab:
+                _carried:
+                    - rules
                 _rules_fp: ((branch == 'main') && changes('src/**/*', 'go.mod')) || ((event == 'merge_request_event') && changes('go.sum') && !((branch == 'main') && changes('src/**/*', 'go.mod')))|false
                 rules:
                     - changes:

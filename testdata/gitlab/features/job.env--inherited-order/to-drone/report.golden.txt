@@ -1,6 +1,4 @@
 Loss report: gitlab -> drone
-[lost] pipeline/gitlab-ci ext.passthrough (Ext of provider gitlab (hidden) is not written to the Drone file; it is kept in round-trip metadata)
-[lost] pipeline/gitlab-ci/job/lint ext.passthrough (Ext of provider gitlab (extends) is not written to the Drone file; it is kept in round-trip metadata)
 [emulated] pipeline/gitlab-ci/job/lint job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
 [emulated] pipeline/gitlab-ci/job/lint/step/script script.interpolation: variable prelude (the script reads CI_PROJECT_DIR, which drone does not set; a prelude defines them from the drone values; drone does not expand variable values, so the prelude sets GOCACHE, GOMODCACHE again in the shell)
 [emulated] pipeline/gitlab-ci/job/lint/step/script step.shell: bash-if-present wrapper command (the source runs the step under bash when the image has it; Drone pipes commands to /bin/sh, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh)
