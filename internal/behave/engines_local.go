@@ -145,7 +145,7 @@ func (e *woodpeckerEngine) Run(ctx context.Context, w *Workspace) (*Trace, error
 	}
 	tr := &Trace{NoPipeline: true}
 	start := time.Now()
-	for _, run := range runs {
+	for i, run := range runs {
 		out, code, err := e.env.run(ctx, runOpts{Dir: w.Dir, Timeout: timeoutLocal}, bin, append(slices.Clone(args), run)...)
 		if err != nil {
 			return nil, err
@@ -154,7 +154,7 @@ func (e *woodpeckerEngine) Run(ctx context.Context, w *Workspace) (*Trace, error
 			// With depends_on stripped, only the when filter of the file can leave nothing to run. That run is clean and
 			// empty, so the harness cannot tell a when filter from a converter that dropped the workflow; the log says so.
 			code = 0
-			out += "\nharness: Woodpecker ran no workflow of " + filepath.Base(t) + ": the run is clean and empty\n"
+			out += "\nharness: Woodpecker ran no workflow of " + filepath.Base(targets[i]) + ": the run is clean and empty\n"
 		} else {
 			tr.NoPipeline = false
 		}
