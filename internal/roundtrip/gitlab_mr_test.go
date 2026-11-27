@@ -87,3 +87,22 @@ func TestGitLabMergeRequestRuleConcourseReportsTheEvent(t *testing.T) {
 	}
 	t.Errorf("the report has no lost trigger.pull_request entry for merge_request_event:\n%s", msg)
 }
+
+// A docker step rewritten as a script step names no entrypoint where the script replaces it, so no report entry
+// claims a loss.
+func TestDockerStepHasNoFalseImageLoss(t *testing.T) {
+	for _, target := range []string{"woodpecker", "drone", "tekton", "argo", "concourse"} {
+		t.Run(target, func(t *testing.T) {
+			out := t.TempDir()
+			code, _, msg := runOut("convert", "../../testdata/behave/gha/dockerstep", "--from", "gha", "--to", target, "-o", out)
+			if code != 0 {
+				t.Fatalf("convert = %d\n%s", code, msg)
+			}
+			for _, line := range strings.Split(msg, "\n") {
+				if strings.HasPrefix(strings.TrimSpace(line), "[lost]") && strings.Contains(line, "entrypoint") {
+					t.Errorf("false loss: %s", line)
+				}
+			}
+		})
+	}
+}
