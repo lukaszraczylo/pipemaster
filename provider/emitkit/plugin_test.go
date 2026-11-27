@@ -67,3 +67,22 @@ func contains(s, sub string) bool {
 	}
 	return false
 }
+
+func TestExtSettings(t *testing.T) {
+	ext := ir.Ext{
+		"drone":      map[string]any{"settings": map[string]any{"a": "1"}},
+		"woodpecker": map[string]any{"settings": "not a map"},
+		"gitlab":     "not a map",
+	}
+	if got := emitkit.ExtSettings(ext, "drone"); got["a"] != "1" {
+		t.Errorf("drone settings = %v", got)
+	}
+	for _, d := range []string{"woodpecker", "gitlab", "absent"} {
+		if got := emitkit.ExtSettings(ext, d); got != nil {
+			t.Errorf("%s settings = %v, want nil", d, got)
+		}
+	}
+	if got := emitkit.ExtSettings(nil, "drone"); got != nil {
+		t.Errorf("nil ext = %v, want nil", got)
+	}
+}

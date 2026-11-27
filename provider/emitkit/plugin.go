@@ -20,6 +20,13 @@ const (
 	listSeparator   = ","
 )
 
+// ExtSettings returns the plugin settings that the IR holds only in the Ext of one provider (the dialect key), or nil.
+func ExtSettings(ext ir.Ext, dialect string) map[string]any {
+	m, _ := ext[dialect].(map[string]any)
+	kept, _ := m[extSettings].(map[string]any)
+	return kept
+}
+
 var envName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // PluginRuns reports whether a step is a plugin that runs its image entrypoint: an image, settings and no script.
@@ -64,8 +71,7 @@ func PluginEnv(st *ir.Step) ([]ir.Var, string) {
 		}
 	}
 	for _, key := range slices.Sorted(maps.Keys(st.Ext)) {
-		m, _ := st.Ext[key].(map[string]any)
-		kept, _ := m[extSettings].(map[string]any)
+		kept := ExtSettings(st.Ext, key)
 		for _, setting := range slices.Sorted(maps.Keys(kept)) {
 			raw := kept[setting]
 			text, why := settingText(setting, raw)

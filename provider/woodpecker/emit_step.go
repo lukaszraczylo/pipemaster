@@ -492,7 +492,7 @@ func (e *emitter) pluginStep(c *wfCtx, sp string, st *ir.Step, idx int) (*wmap, 
 		}
 		set.set(k, n)
 	}
-	if err := set.mergeMap(extOf(st.Ext)[settKey]); err != nil {
+	if err := set.mergeMap(emitkit.ExtSettings(st.Ext, dialect)); err != nil {
 		return nil, err
 	}
 	if !set.empty() {
