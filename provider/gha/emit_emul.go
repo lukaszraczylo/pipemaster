@@ -21,11 +21,13 @@ const (
 	gitlabDefaultCacheKey = "default"
 	cacheScopeCaveat      = "GitHub restores only caches of the current branch, the base branch of a pull request and the default branch, while a GitLab key with no branch part is shared across branches"
 	cacheRunSep           = "-run-"
-	cacheRunID            = "${{ github.run_id }}"
-	hashFilesCall         = "hashfiles("
-	monthDays             = 30
-	weekDays              = 7
-	hoursPerDay           = 24
+	// cacheRunID is run_id plus run_attempt: run_id stays the same on a re-run, so it alone would repeat the key
+	// (https://docs.github.com/en/actions/reference/workflows-and-actions/contexts).
+	cacheRunID    = "${{ github.run_id }}-${{ github.run_attempt }}"
+	hashFilesCall = "hashfiles("
+	monthDays     = 30
+	weekDays      = 7
+	hoursPerDay   = 24
 )
 
 var expireRE = regexp.MustCompile(`^(\d+)\s*(hours?|days?|weeks?|months?)$`)
@@ -116,7 +118,7 @@ func (e *emitter) preSteps(c jobCtx, jp string, j *ir.Job) ([]*yaml.Node, error)
 // cacheRollDetail names the effect of a rewritten key. GitHub scoping:
 // https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching
 func cacheRollDetail(shared bool) string {
-	d := "the key is <key>-run-<run_id> and the restore prefix is <key>-run-: each run saves a new cache and restores the newest by prefix, because actions/cache never overwrites a key; " + cacheScopeCaveat
+	d := "the key is <key>-run-<run_id>-<run_attempt> and the restore prefix is <key>-run-: each run saves a new cache and restores the newest by prefix, because actions/cache never overwrites a key; two jobs of one run that share a key race on the same key and the first to save wins, where on GitLab the last upload wins; the new entries grow toward the 10 GB repository cache limit and evict the least recently used caches, including caches of other keys; " + cacheScopeCaveat
 	if shared {
 		d = "the source has no key, so GitLab shares one cache named default across jobs; " + d
 	}
@@ -174,7 +176,7 @@ func (e *emitter) cacheStep(jp string, ch ir.Cache) (*yaml.Node, error) {
 }
 
 // cacheKeys writes the key and the restore-keys. actions/cache never overwrites an existing key, but GitLab uploads
-// the cache again after every run, so a key with no content hash becomes the rolling pair <key>-run-<run_id> and
+// the cache again after every run, so a key with no content hash becomes the rolling pair <key>-run-<run_id>-<run_attempt> and
 // <key>-run-: each run saves a new entry and the next run restores the newest. The "-run-" part keeps the prefix of
 // "main" from matching the keys of "main-hotfix". A hashFiles key already names its content. The bool is true
 // when a key was rewritten.
