@@ -66,13 +66,12 @@ func (b *jobBuilder) foreignCloneStep(id, url string, with map[string]ir.Value, 
 	if d := words["depth"]; d != "" && d != "0" {
 		fetch += " --depth " + d
 	}
-	fetch += ` origin "` + firstNonEmpty(words["revision"], "HEAD") + `"`
+	fetch += ` "` + words["url"] + `" "` + firstNonEmpty(words["revision"], "HEAD") + `"`
 	script := []string{
 		`git init -q "` + target + `"`,
 		`cd "` + target + `"`,
-		`git remote add origin "` + words["url"] + `"`,
 		fetch,
-		"git checkout -q FETCH_HEAD",
+		"git checkout -q --force FETCH_HEAD",
 	}
 	if subs != "false" {
 		script = append(script, "git submodule update --init --recursive")

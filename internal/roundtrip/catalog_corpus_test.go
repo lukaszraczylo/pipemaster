@@ -49,8 +49,7 @@ func TestCorpus69CatalogTasksHaveNoPlaceholder(t *testing.T) {
 			"id: build-image-checkout",
 			"id: yaml-lint-checkout",
 			"oc patch deployment ${{ inputs.deployment-name }}",
-			`origin "${{ inputs.git-revision }}"`,
-			`git remote add origin "${{ inputs.git-url }}"`,
+			`"${{ inputs.git-url }}" "${{ inputs.git-revision }}"`,
 			"container: quay.io/buildah/stable:v1",
 			"PARAM_IMAGE: ${{ inputs.IMAGE }}",
 			`buildah "--storage-driver=${PARAM_STORAGE_DRIVER}" bud`,
@@ -135,7 +134,7 @@ func TestCorpus69LocalTaskJobsWork(t *testing.T) {
 	items := commandItems(t, emitCorpus69Files(t, provider.GitLab))
 	assertOneCommandItem(t, items, "Applying manifests in k8s directory")
 	assertOneCommandItem(t, items, "oc patch deployment")
-	if !strings.Contains(jobs["gha apply-manifests"], `git remote add origin "${{ inputs.git-url }}"`) || strings.Contains(jobs["gha apply-manifests"], "uses: actions/checkout@") {
+	if !strings.Contains(jobs["gha apply-manifests"], `"${{ inputs.git-url }}" "${{ inputs.git-revision }}"`) || strings.Contains(jobs["gha apply-manifests"], "uses: actions/checkout@") {
 		t.Error("the GHA apply-manifests job must run the clone of the pipeline input url, not check out the pipeline repository")
 	}
 	if !strings.Contains(jobs["gitlab update"], "$deployment_name") || !strings.Contains(jobs["gha update-deployment"], "${{ inputs.deployment-name }}") {

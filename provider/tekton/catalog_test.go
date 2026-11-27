@@ -140,9 +140,9 @@ func TestCatalogCheckoutParams(t *testing.T) {
 
 func TestCatalogCheckoutForeignUrlIsCloned(t *testing.T) {
 	tests := []struct{ url, want string }{
-		{"https://gitlab.com/o/r.git", `git remote add origin "https://gitlab.com/o/r.git"`},
-		{"$(params.repo_url)", `git remote add origin "${{ inputs.repo_url }}"`},
-		{"https://github.com/o/r/extra.git", `git remote add origin "https://github.com/o/r/extra.git"`},
+		{"https://gitlab.com/o/r.git", `"https://gitlab.com/o/r.git"`},
+		{"$(params.repo_url)", `"${{ inputs.repo_url }}"`},
+		{"https://github.com/o/r/extra.git", `"https://github.com/o/r/extra.git"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.url, func(t *testing.T) {
@@ -157,7 +157,7 @@ func TestCatalogCheckoutForeignUrlIsCloned(t *testing.T) {
 				t.Fatalf("a clone of %s is not a script step: %+v", tt.url, j.Steps)
 			}
 			got := strings.Join(j.Steps[0].Script, "\n")
-			for _, w := range []string{tt.want, `git fetch -q --depth 5 origin "v1"`, "git checkout -q FETCH_HEAD"} {
+			for _, w := range []string{tt.want, `git fetch -q --depth 5 ` + tt.want + ` "v1"`, "git checkout -q --force FETCH_HEAD"} {
 				if !strings.Contains(got, w) {
 					t.Errorf("script lacks %q:\n%s", w, got)
 				}
@@ -383,7 +383,7 @@ func TestWorkspaceReaderRunsTheSameCloneOfAnotherRepository(t *testing.T) {
 		name, url, want string
 		script          bool
 	}{
-		{name: "url with no checkout input", url: "https://gitlab.com/o/r.git", script: true, want: `git remote add origin "https://gitlab.com/o/r.git"`},
+		{name: "url with no checkout input", url: "https://gitlab.com/o/r.git", script: true, want: `"https://gitlab.com/o/r.git"`},
 		{name: "other GitHub repository", url: "https://github.com/o/r.git", want: "o/r"},
 	}
 	for _, tt := range tests {

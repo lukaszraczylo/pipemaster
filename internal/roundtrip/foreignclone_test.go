@@ -79,7 +79,7 @@ func TestForeignCloneRunsInAShellOfThePinnedImage(t *testing.T) {
 					t.Errorf("%s output lacks %q:\n%s", to, n, text)
 				}
 			}
-			if !strings.Contains(text, `git remote add origin "https://gitlab.com/o/r.git"`) {
+			if !strings.Contains(text, `git fetch -q --depth 1 "https://gitlab.com/o/r.git" "v1"`) {
 				t.Errorf("%s output does not clone the url", to)
 			}
 			for _, bad := range []string{"actions/checkout", "PIPEMASTER_CHECKOUT_"} {
