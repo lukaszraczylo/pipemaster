@@ -46,14 +46,26 @@ func canonicalCtx(w *Workspace) map[string]string {
 	if w.Ev.Kind == kindPR {
 		branch = w.Ev.Target
 	}
-	return map[string]string{
+	refType := "branch"
+	if w.Ev.Kind == kindTag {
+		refType = "tag"
+	}
+	ctx := map[string]string{
 		"ctx-ref":      w.Ev.Ref(),
 		"ctx-ref-name": strings.TrimPrefix(strings.TrimPrefix(w.Ev.Ref(), "refs/heads/"), "refs/tags/"),
+		"ctx-ref-type": refType,
 		"ctx-branch":   branch,
 		"ctx-tag":      w.Ev.Tag,
 		"ctx-sha":      w.SHA,
 		"ctx-event":    event,
+		"ctx-repo":     repoFullName,
 	}
+	if w.Ev.Kind == kindPR {
+		ctx["ctx-pr-number"] = "1"
+		ctx["ctx-pr-head-ref"] = w.Ev.Branch
+		ctx["ctx-pr-base-ref"] = w.Ev.Target
+	}
+	return ctx
 }
 
 // readDocs reads every YAML document of a file.
