@@ -1,0 +1,31 @@
+{
+  "features": [
+    "job.if",
+    "pipeline.finally"
+  ],
+  "events": [
+    "push-main"
+  ],
+  "expect_failure": true,
+  "unordered": true,
+  "expect": [
+    "onfail.build",
+    "onfail.recover",
+    "onfail.cleanup"
+  ],
+  "owners": {
+    "onfail.build": [
+      "build"
+    ],
+    "onfail.recover": [
+      "recover"
+    ],
+    "onfail.cleanup": [
+      "cleanup"
+    ],
+    "onfail.deploy": [
+      "deploy"
+    ]
+  },
+  "requires": []
+}
