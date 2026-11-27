@@ -86,6 +86,7 @@ func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	}
 	p.triggers(byName)
 	p.cronJobs(byName)
+	p.dropDefaultTriggers(byName)
 	for name, d := range p.tasks {
 		if !p.taskUsed[name] {
 			p.resources = append(p.resources, d)

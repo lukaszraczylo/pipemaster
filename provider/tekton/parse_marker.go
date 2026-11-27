@@ -28,7 +28,7 @@ func markedFilters(head string) []filterArg {
 				continue
 			}
 			var a filterArg
-			if json.Unmarshal([]byte(lines[0]), &a) == nil {
+			if json.Unmarshal([]byte(lines[0]), &a) == nil && a.Kind != "" {
 				out = append(out, a)
 			}
 		}

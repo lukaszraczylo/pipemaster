@@ -7,6 +7,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 )
 
@@ -61,6 +62,9 @@ func (e *emitter) pipeline(pl *ir.Pipeline, first bool) {
 	}
 	if !e.own {
 		e.foreignExt(pp, pl.Ext)
+	}
+	if e.injected[pl.ID] {
+		e.markArg(caps.TriggerPush, pe.mpath, provider.DefaultTriggersArg{Default: true})
 	}
 	pe.loadExt(first)
 	pe.pipelineMeta()

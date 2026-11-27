@@ -11,6 +11,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -46,6 +47,7 @@ func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) 
 func (a adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, error) {
 	p, vres := vars.Prepare(p, dialect)
 	p, checkouts := emitkit.WithSourceCheckout(p)
+	p, noForm, injected := provider.WithDefaultTriggers(p, dialect)
 	origin := ""
 	if p != nil {
 		origin = p.Origin.Provider
@@ -53,7 +55,7 @@ func (a adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, err
 	e := &emitter{
 		led: emitkit.NewLedger("ir", dialect, a.Caps()), origin: origin, own: origin == dialect,
 		files: map[string][]*outDoc{}, owners: map[string]*outDoc{}, marked: map[ir.FeatureUse]bool{},
-		taken: map[string]bool{}, made: map[string]bool{}, skipped: map[string]bool{},
+		taken: map[string]bool{}, made: map[string]bool{}, skipped: map[string]bool{}, injected: injected,
 	}
 	emitkit.RetainSourceCheckout(e.led, checkouts)
 	e.gated = emitkit.GatedSteps(p)
@@ -61,6 +63,7 @@ func (a adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, err
 	for _, u := range uses {
 		e.led.Decide(u)
 	}
+	e.noteDefaultEvents(noForm)
 	if err := e.project(livePipelines(p)); err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", dialect, err)
 	}
@@ -107,6 +110,8 @@ type emitter struct {
 	// Ext is not written a second time.
 	taken map[string]bool
 	made  map[string]bool
+	// injected names the pipelines whose triggers were made from the default events of their source.
+	injected map[string]bool
 	// pendingEL holds the EventListeners that a Tekton file kept as resources, by name.
 	pendingEL map[string][]resourceDoc
 	// lostWork holds the path of every step that lost script, action or image work.
@@ -333,4 +338,13 @@ func (e *emitter) node(path, what string, v any) *yaml.Node {
 // withdrawCheckout retracts the parser's entry that says the job got its own checkout step.
 func (e *emitter) withdrawCheckout(jobPath string) {
 	e.withdrawn = append(e.withdrawn, report.Entry{IRPath: jobPath, Feature: caps.StepAction, Strategy: checkoutStrategy})
+}
+
+// noteDefaultEvents reports the default events of the source that have no IR trigger.
+func (e *emitter) noteDefaultEvents(noForm map[string][]provider.SourceEvent) {
+	for id, events := range noForm {
+		for _, g := range provider.GroupByFeature(events) {
+			e.lose("pipeline/"+id, g.Feature, provider.NoFormDetail(g.Names, "Tekton"))
+		}
+	}
 }
