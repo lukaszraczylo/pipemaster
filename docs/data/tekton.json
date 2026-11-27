@@ -33,12 +33,6 @@
    ],
    "report": [
     {
-     "path": "pipeline/build-and-deploy",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (workspaces) is not written to the GHA file; it is kept in round-trip metadata"
-    },
-    {
      "path": "pipeline/build-and-deploy/job/apply-manifests",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -49,13 +43,7 @@
      "path": "pipeline/build-and-deploy/job/apply-manifests",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (legacy_params, task_name, task_params, task_workspaces, workspaces) is not written to the GHA file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (args, command, script_line, workspace_dir, workspace_dir_ir) is not written to the GHA file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (task_params) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
@@ -65,22 +53,16 @@
      "detail": "command and args are written as one script line; both lists are kept in Ext"
     },
     {
-     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply-manifests-checkout",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (source_checkout) is not written to the GHA file; it is kept in round-trip metadata"
-    },
-    {
      "path": "pipeline/build-and-deploy/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the GHA file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the GHA file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -107,13 +89,7 @@
      "path": "pipeline/build-and-deploy/job/update-deployment",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (bound_params, legacy_params, task_name, task_params) is not written to the GHA file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (args, command, script_line) is not written to the GHA file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (task_params) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
@@ -133,13 +109,13 @@
      "path": "pipeline/pipeline-tutorial-check-pr",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (pipelineRun, workspaces) is not written to the GHA file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (pipelineRun) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the GHA file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
@@ -159,7 +135,7 @@
      "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (array_params, catalog_ref, params, workspaces) is not written to the GHA file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (array_params, catalog_ref, params) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/build-image",
@@ -321,19 +297,13 @@
      "path": "pipeline/build-and-deploy/job/apply-manifests",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (legacy_params, task_name, task_params, task_workspaces, workspaces) is not written to the GitLab file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (task_params) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests",
      "feature": "job.if",
      "level": "lost",
      "detail": "pipeline build-and-deploy has no trigger GitLab can express; job disabled"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (args, command, script_line, workspace_dir, workspace_dir_ir) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
@@ -349,16 +319,10 @@
      "detail": "command and args are written as one script line; both lists are kept in Ext"
     },
     {
-     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply-manifests-checkout",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (source_checkout) is not written to the GitLab file; it is kept in round-trip metadata"
-    },
-    {
      "path": "pipeline/build-and-deploy/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the GitLab file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/build-image",
@@ -370,7 +334,7 @@
      "path": "pipeline/build-and-deploy/job/fetch-repository",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the GitLab file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -409,19 +373,13 @@
      "path": "pipeline/build-and-deploy/job/update-deployment",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (bound_params, legacy_params, task_name, task_params) is not written to the GitLab file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (task_params) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/update-deployment",
      "feature": "job.if",
      "level": "lost",
      "detail": "pipeline build-and-deploy has no trigger GitLab can express; job disabled"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (args, command, script_line) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
@@ -453,7 +411,7 @@
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the GitLab file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
@@ -485,7 +443,7 @@
      "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (array_params, catalog_ref, params, workspaces) is not written to the GitLab file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (array_params, catalog_ref, params) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
@@ -631,12 +589,6 @@
    "report": [
     {
      "path": "pipeline/build-and-deploy",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/build-and-deploy",
      "feature": "pipeline.inputs",
      "level": "lost",
      "detail": "Woodpecker has no typed pipeline inputs"
@@ -652,13 +604,7 @@
      "path": "pipeline/build-and-deploy/job/apply-manifests",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (legacy_params, task_name, task_params, task_workspaces, workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (args, command, script_line, workspace_dir, workspace_dir_ir) is not written to the Woodpecker file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (task_params) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
@@ -668,16 +614,10 @@
      "detail": "command and args are written as one script line; both lists are kept in Ext"
     },
     {
-     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply-manifests-checkout",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (source_checkout) is not written to the Woodpecker file; it is kept in round-trip metadata"
-    },
-    {
      "path": "pipeline/build-and-deploy/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/build-image/step/build-and-push",
@@ -689,7 +629,7 @@
      "path": "pipeline/build-and-deploy/job/fetch-repository",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -734,13 +674,7 @@
      "path": "pipeline/build-and-deploy/job/update-deployment",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (bound_params, legacy_params, task_name, task_params) is not written to the Woodpecker file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (args, command, script_line) is not written to the Woodpecker file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (task_params) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
@@ -766,7 +700,7 @@
      "path": "pipeline/pipeline-tutorial-check-pr",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (pipelineRun, workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (pipelineRun) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr",
@@ -778,7 +712,7 @@
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
@@ -816,7 +750,7 @@
      "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (array_params, catalog_ref, params, workspaces) is not written to the Woodpecker file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (array_params, catalog_ref, params) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/build-image",
@@ -902,12 +836,6 @@
    "report": [
     {
      "path": "pipeline/build-and-deploy",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (workspaces) is not written to the Drone file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/build-and-deploy",
      "feature": "pipeline.inputs",
      "level": "lost",
      "detail": "Drone has no typed pipeline inputs"
@@ -923,13 +851,7 @@
      "path": "pipeline/build-and-deploy/job/apply-manifests",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (legacy_params, task_name, task_params, task_workspaces, workspaces) is not written to the Drone file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (args, command, script_line, workspace_dir, workspace_dir_ir) is not written to the Drone file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (task_params) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
@@ -939,16 +861,10 @@
      "detail": "command and args are written as one script line; both lists are kept in Ext"
     },
     {
-     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply-manifests-checkout",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (source_checkout) is not written to the Drone file; it is kept in round-trip metadata"
-    },
-    {
      "path": "pipeline/build-and-deploy/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the Drone file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/build-image/step/build-and-push",
@@ -960,7 +876,7 @@
      "path": "pipeline/build-and-deploy/job/fetch-repository",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the Drone file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -1005,13 +921,7 @@
      "path": "pipeline/build-and-deploy/job/update-deployment",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (bound_params, legacy_params, task_name, task_params) is not written to the Drone file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (args, command, script_line) is not written to the Drone file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (task_params) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
@@ -1037,7 +947,7 @@
      "path": "pipeline/pipeline-tutorial-check-pr",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (pipelineRun, workspaces) is not written to the Drone file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (pipelineRun) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr",
@@ -1049,7 +959,7 @@
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the Drone file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
@@ -1087,7 +997,7 @@
      "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (array_params, catalog_ref, params, workspaces) is not written to the Drone file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (array_params, catalog_ref, params) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/build-image",
@@ -1211,12 +1121,6 @@
    ],
    "report": [
     {
-     "path": "pipeline/build-and-deploy",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (workspaces) is not written to the Argo file; it is kept in round-trip metadata"
-    },
-    {
      "path": "pipeline/build-and-deploy/job/apply-manifests",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -1227,13 +1131,7 @@
      "path": "pipeline/build-and-deploy/job/apply-manifests",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (legacy_params, task_name, task_params, task_workspaces, workspaces) is not written to the Argo file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (args, command, script_line, workspace_dir, workspace_dir_ir) is not written to the Argo file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (task_params) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
@@ -1243,22 +1141,16 @@
      "detail": "command and args are written as one script line; both lists are kept in Ext"
     },
     {
-     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply-manifests-checkout",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (source_checkout) is not written to the Argo file; it is kept in round-trip metadata"
-    },
-    {
      "path": "pipeline/build-and-deploy/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the Argo file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the Argo file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -1291,13 +1183,7 @@
      "path": "pipeline/build-and-deploy/job/update-deployment",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (bound_params, legacy_params, task_name, task_params) is not written to the Argo file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (args, command, script_line) is not written to the Argo file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (task_params) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
@@ -1317,13 +1203,13 @@
      "path": "pipeline/pipeline-tutorial-check-pr",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (pipelineRun, workspaces) is not written to the Argo file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (pipelineRun) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the Argo file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
@@ -1349,7 +1235,7 @@
      "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (array_params, catalog_ref, params, workspaces) is not written to the Argo file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (array_params, catalog_ref, params) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply-manifests-checkout",
@@ -1464,7 +1350,7 @@
    "files": [
     {
      "path": ".concourse/build-and-deploy.yml",
-     "text": "# pipemaster:emulated step.action pipeline/build-and-deploy/job/apply-manifests/step/apply-manifests-checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\next:\\n    tekton:\\n        source_checkout: true\\nid: apply-manifests-checkout\\nkind: action\\n\",\"get\":\"source\",\"params\":\"null\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/apply-manifests/step/apply/carry\n# pipemaster:arg {\"digest\":\"753c49d807a0ba45f8b5f9e47c822bbe09d9bb667ffc04930abe140b6ef5ae14\",\"carry\":\"image:\\n    ref: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\\nid: apply\\nkind: script\\nscript:\\n    - |-\\n      /bin/bash -c 'echo Applying manifests in k8s directory\\n      oc apply -f k8s\\n      echo -----------------------------------'\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/apply-manifests/carry\n# pipemaster:arg {\"digest\":\"bc313bf43e12f233dcb5c3ef9ec5b1cb6773fc46a8f98b93701f42ab423675dc\",\"carry\":\"id: apply-manifests\\nneeds:\\n    - job: build-image\\n\"}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/build-image/step/build-image-checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: build-image-checkout\\nkind: action\\n\",\"get\":\"source\",\"params\":\"null\"}\n# pipemaster:lost env PARAM_IMAGE: inputs.IMAGE\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/build-image/step/build-and-push/carry\n# pipemaster:arg {\"digest\":\"cce3a2654c6f0c66df8f6e777e47b85d22306c05d14456c2d8c734934fa5bc57\",\"carry\":\"id: build-and-push\\nkind: script\\nenv:\\n    - name: PARAM_IMAGE\\n      value:\\n        expr: inputs.IMAGE\\n    - name: PARAM_STORAGE_DRIVER\\n      value:\\n        lit: overlay\\n    - name: PARAM_DOCKERFILE\\n      value:\\n        lit: ./Dockerfile\\n    - name: PARAM_CONTEXT\\n      value:\\n        lit: .\\n    - name: PARAM_TLSVERIFY\\n      value:\\n        lit: \\\"true\\\"\\n    - name: PARAM_FORMAT\\n      value:\\n        lit: oci\\n    - name: PARAM_BUILD_EXTRA_ARGS\\n      value:\\n        lit: \\\"\\\"\\n    - name: PARAM_PUSH_EXTRA_ARGS\\n      value:\\n        lit: \\\"\\\"\\n    - name: PARAM_SKIP_PUSH\\n      value:\\n        lit: \\\"false\\\"\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/build-image/carry\n# pipemaster:arg {\"digest\":\"d05db7d5f008bcd2d20aa4f7d3d295d09d91dc2fef95bebd66402bb7f9b481b7\",\"carry\":\"container:\\n    ref: quay.io/buildah/stable:v1\\nid: build-image\\nneeds:\\n    - job: fetch-repository\\n\"}\n# pipemaster:lost env PIPEMASTER_CHECKOUT_REF: inputs.git-revision\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1/carry\n# pipemaster:arg {\"digest\":\"aa36aef91b8b08f453da1351a0c2fa7ce501bf099541349d4c97a6268aeafd28\",\"carry\":\"image:\\n    ref: alpine/git:v2.54.1@sha256:29cff25811f790b9f72fc266bf8009a5a911714c0e03c31c47339c50909d9aef\\nid: fetch-repository-step-1\\nkind: script\\nscript:\\n    - |\\n      : \\\"${PIPEMASTER_CHECKOUT_REF?pipemaster: lost: step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1: input ref has no value on this target}\\\"\\n      set -e\\n      for v in \\\"${PIPEMASTER_CHECKOUT_REF:-}\\\" \\\"${PIPEMASTER_CHECKOUT_PATH:-}\\\" \\\"${PIPEMASTER_CHECKOUT_REPOSITORY:-}\\\"; do\\n        case \\\"$v\\\" in -*) echo \\\"pipemaster: refused: checkout value $v starts with - and would be read by git as an option\\\" \\u003e\\u00262; exit 1 ;; esac\\n      done\\n      dir=\\\"${PIPEMASTER_CHECKOUT_PATH:-.}\\\"\\n      depth=\\\"${PIPEMASTER_CHECKOUT_DEPTH:-1}\\\"\\n      if [ -z \\\"${PIPEMASTER_CHECKOUT_NATIVE:-}\\\" ]; then\\n        if [ -n \\\"${PIPEMASTER_CHECKOUT_REPOSITORY:-}\\\" ]; then\\n          git clone -- \\\"${PIPEMASTER_CHECKOUT_HOST:-https://github.com}/${PIPEMASTER_CHECKOUT_REPOSITORY}.git\\\" \\\"$dir\\\"\\n        elif [ \\\"$dir\\\" != . ]; then\\n          git worktree add --detach -- \\\"$dir\\\" HEAD\\n        fi\\n        if [ -n \\\"${PIPEMASTER_CHECKOUT_REF:-}\\\" ]; then\\n          if [ \\\"$depth\\\" = 0 ]; then\\n            git -C \\\"$dir\\\" fetch -- origin \\\"$PIPEMASTER_CHECKOUT_REF\\\"\\n          else\\n            git -C \\\"$dir\\\" fetch --depth=\\\"$depth\\\" -- origin \\\"$PIPEMASTER_CHECKOUT_REF\\\"\\n          fi\\n          git -C \\\"$dir\\\" checkout --force FETCH_HEAD\\n        fi\\n      fi\\n      if [ -n \\\"${PIPEMASTER_CHECKOUT_SPARSE:-}\\\" ]; then\\n        set -f\\n        old=\\\"$IFS\\\"\\n        IFS='\\n      '\\n        set -- $PIPEMASTER_CHECKOUT_SPARSE\\n        IFS=\\\"$old\\\"\\n        git -C \\\"$dir\\\" sparse-checkout set -- \\\"$@\\\"\\n      fi\\nenv:\\n    - name: PIPEMASTER_CHECKOUT_HOST\\n      value:\\n        lit: https://github.com\\n    - name: PIPEMASTER_CHECKOUT_REF\\n      value:\\n        expr: inputs.git-revision\\n\"}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nwith:\\n    ref:\\n        expr: inputs.git-revision\\n    submodules:\\n        lit: \\\"true\\\"\\nid: fetch-repository-step-1\\nkind: action\\n\",\"task\":\"fetch-repository-step-1\",\"hold\":\"{\\\"config\\\":{\\\"image_resource\\\":{\\\"source\\\":{\\\"digest\\\":\\\"sha256:29cff25811f790b9f72fc266bf8009a5a911714c0e03c31c47339c50909d9aef\\\",\\\"repository\\\":\\\"alpine/git\\\",\\\"tag\\\":\\\"v2.54.1\\\"},\\\"type\\\":\\\"registry-image\\\"},\\\"inputs\\\":[{\\\"name\\\":\\\"workspace\\\"}],\\\"outputs\\\":[{\\\"name\\\":\\\"workspace\\\"}],\\\"params\\\":{\\\"PIPEMASTER_CHECKOUT_HOST\\\":\\\"https://github.com\\\"},\\\"platform\\\":\\\"linux\\\",\\\"run\\\":{\\\"args\\\":[\\\"-ec\\\",\\\": \\\\\\\"${PIPEMASTER_CHECKOUT_REF?pipemaster: lost: step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1: input ref has no value on this target}\\\\\\\"\\\\nset -e\\\\nfor v in \\\\\\\"${PIPEMASTER_CHECKOUT_REF:-}\\\\\\\" \\\\\\\"${PIPEMASTER_CHECKOUT_PATH:-}\\\\\\\" \\\\\\\"${PIPEMASTER_CHECKOUT_REPOSITORY:-}\\\\\\\"; do\\\\n  case \\\\\\\"$v\\\\\\\" in -*) echo \\\\\\\"pipemaster: refused: checkout value $v starts with - and would be read by git as an option\\\\\\\" \\\\u003e\\\\u00262; exit 1 ;; esac\\\\ndone\\\\ndir=\\\\\\\"${PIPEMASTER_CHECKOUT_PATH:-.}\\\\\\\"\\\\ndepth=\\\\\\\"${PIPEMASTER_CHECKOUT_DEPTH:-1}\\\\\\\"\\\\nif [ -z \\\\\\\"${PIPEMASTER_CHECKOUT_NATIVE:-}\\\\\\\" ]; then\\\\n  if [ -n \\\\\\\"${PIPEMASTER_CHECKOUT_REPOSITORY:-}\\\\\\\" ]; then\\\\n    git clone -- \\\\\\\"${PIPEMASTER_CHECKOUT_HOST:-https://github.com}/${PIPEMASTER_CHECKOUT_REPOSITORY}.git\\\\\\\" \\\\\\\"$dir\\\\\\\"\\\\n  elif [ \\\\\\\"$dir\\\\\\\" != . ]; then\\\\n    git worktree add --detach -- \\\\\\\"$dir\\\\\\\" HEAD\\\\n  fi\\\\n  if [ -n \\\\\\\"${PIPEMASTER_CHECKOUT_REF:-}\\\\\\\" ]; then\\\\n    if [ \\\\\\\"$depth\\\\\\\" = 0 ]; then\\\\n      git -C \\\\\\\"$dir\\\\\\\" fetch -- origin \\\\\\\"$PIPEMASTER_CHECKOUT_REF\\\\\\\"\\\\n    else\\\\n      git -C \\\\\\\"$dir\\\\\\\" fetch --depth=\\\\\\\"$depth\\\\\\\" -- origin \\\\\\\"$PIPEMASTER_CHECKOUT_REF\\\\\\\"\\\\n    fi\\\\n    git -C \\\\\\\"$dir\\\\\\\" checkout --force FETCH_HEAD\\\\n  fi\\\\nfi\\\\nif [ -n \\\\\\\"${PIPEMASTER_CHECKOUT_SPARSE:-}\\\\\\\" ]; then\\\\n  set -f\\\\n  old=\\\\\\\"$IFS\\\\\\\"\\\\n  IFS='\\\\n'\\\\n  set -- $PIPEMASTER_CHECKOUT_SPARSE\\\\n  IFS=\\\\\\\"$old\\\\\\\"\\\\n  git -C \\\\\\\"$dir\\\\\\\" sparse-checkout set -- \\\\\\\"$@\\\\\\\"\\\\nfi\\\\n\\\"],\\\"dir\\\":\\\"workspace\\\",\\\"path\\\":\\\"sh\\\"}},\\\"input_mapping\\\":{\\\"workspace\\\":\\\"source\\\"},\\\"task\\\":\\\"fetch-repository-step-1\\\"}\"}\n# pipemaster:emulated job.manual pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:arg {\"manual\":false,\"held\":true}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/fetch-repository/carry\n# pipemaster:arg {\"digest\":\"27bedde78220dfdc1f5b683850136860a35b589b7ed556c34d97e40fdcbc9b53\",\"carry\":\"id: fetch-repository\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/update-deployment/step/patch/carry\n# pipemaster:arg {\"digest\":\"539d48b22d9b90e7dbbd986b51357cd279276d7edcef7540d155349090a8de88\",\"carry\":\"image:\\n    ref: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\\nid: patch\\nkind: script\\nscript:\\n    - |-\\n      /bin/bash -c \\\"oc patch deployment $\\u007b{ inputs.deployment-name }} --patch='{\\\\\\\"spec\\\\\\\":{\\\\\\\"template\\\\\\\":{\\\\\\\"spec\\\\\\\":{\\n        \\\\\\\"containers\\\\\\\":[{\\n          \\\\\\\"name\\\\\\\": \\\\\\\"$\\u007b{ inputs.deployment-name }}\\\\\\\",\\n          \\\\\\\"image\\\\\\\":\\\\\\\"$\\u007b{ inputs.IMAGE }}\\\\\\\"\\n        }]\\n      }}}}'\\n\\n      # issue: https://issues.redhat.com/browse/SRVKP-2387\\n      # images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\\n      # as a workaround update a label in template, which triggers redeploy pods\\n      # target label: \\\\\\\"spec.template.metadata.labels.patched_at\\\\\\\"\\n      # NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\\n      patched_at_timestamp=\\\\`date +%s\\\\`\\n      oc patch deployment $\\u007b{ inputs.deployment-name }} --patch='{\\\\\\\"spec\\\\\\\":{\\\\\\\"template\\\\\\\":{\\\\\\\"metadata\\\\\\\":{\\n        \\\\\\\"labels\\\\\\\":{\\n          \\\\\\\"patched_at\\\\\\\": '\\\\\\\\\\\\\\\"\\\\$patched_at_timestamp\\\\\\\\\\\\\\\"'\\n        }\\n      }}}}'\\\"\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/update-deployment/carry\n# pipemaster:arg {\"digest\":\"cd7381675291cf1e2a9ec3eb5ed5a77fe9834f9693d7e65b47e2b79d647510d7\",\"carry\":\"id: update-deployment\\nneeds:\\n    - job: apply-manifests\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/carry\n# pipemaster:arg {\"digest\":\"1a201a0ae730789ae46088d417f4c7351cbc72cf21ab56db1b2d90a8d3f84622\",\"carry\":\"id: build-and-deploy\\ninputs:\\n    - name: deployment-name\\n      type: string\\n      description: name of the deployment to be patched\\n      required: true\\n    - name: git-url\\n      type: string\\n      description: url of the git repo for the code of deployment\\n      required: true\\n    - name: git-revision\\n      type: string\\n      default: master\\n      description: revision to be used from repo of the code for deployment\\n    - name: IMAGE\\n      type: string\\n      description: image to be build from the code\\n      required: true\\n\"}\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/apply-manifests/step/apply\n# pipemaster:emulated trigger.manual pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/update-deployment/step/patch\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\njobs:\n  - name: apply-manifests\n    plan:\n      - get: source\n        passed:\n          - build-image\n        trigger: true\n      - task: apply\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: image-registry.openshift-image-registry.svc:5000/openshift/cli\n              tag: latest\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                /bin/bash -c 'echo Applying manifests in k8s directory\n                oc apply -f k8s\n                echo -----------------------------------'\n            dir: workspace\n  - name: build-image\n    plan:\n      - get: source\n        passed:\n          - fetch-repository\n        trigger: true\n      - task: build-and-push\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: quay.io/buildah/stable\n              tag: v1\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          params:\n            PARAM_STORAGE_DRIVER: overlay\n            PARAM_DOCKERFILE: ./Dockerfile\n            PARAM_CONTEXT: .\n            PARAM_TLSVERIFY: \"true\"\n            PARAM_FORMAT: oci\n            PARAM_BUILD_EXTRA_ARGS: \"\"\n            PARAM_PUSH_EXTRA_ARGS: \"\"\n            PARAM_SKIP_PUSH: \"false\"\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" bud ${PARAM_BUILD_EXTRA_ARGS} \"--format=${PARAM_FORMAT}\" \"--tls-verify=${PARAM_TLSVERIFY}\" -f \"${PARAM_DOCKERFILE}\" -t \"${PARAM_IMAGE}\" \"${PARAM_CONTEXT}\"\n                [ \"${PARAM_SKIP_PUSH}\" = \"true\" ] && echo \"Push skipped\" && exit 0\n                buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" push \"--tls-verify=${PARAM_TLSVERIFY}\" ${PARAM_PUSH_EXTRA_ARGS} \"${PARAM_IMAGE}\" \"docker://${PARAM_IMAGE}\"\n            dir: workspace\n  - name: fetch-repository\n    plan:\n      - get: source\n      - task: fetch-repository-step-1\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: alpine/git\n              tag: v2.54.1\n              digest: sha256:29cff25811f790b9f72fc266bf8009a5a911714c0e03c31c47339c50909d9aef\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          params:\n            PIPEMASTER_CHECKOUT_HOST: https://github.com\n          run:\n            path: sh\n            args:\n              - -ec\n              - |\n                : \"${PIPEMASTER_CHECKOUT_REF?pipemaster: lost: step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1: input ref has no value on this target}\"\n                set -e\n                for v in \"${PIPEMASTER_CHECKOUT_REF:-}\" \"${PIPEMASTER_CHECKOUT_PATH:-}\" \"${PIPEMASTER_CHECKOUT_REPOSITORY:-}\"; do\n                  case \"$v\" in -*) echo \"pipemaster: refused: checkout value $v starts with - and would be read by git as an option\" >&2; exit 1 ;; esac\n                done\n                dir=\"${PIPEMASTER_CHECKOUT_PATH:-.}\"\n                depth=\"${PIPEMASTER_CHECKOUT_DEPTH:-1}\"\n                if [ -z \"${PIPEMASTER_CHECKOUT_NATIVE:-}\" ]; then\n                  if [ -n \"${PIPEMASTER_CHECKOUT_REPOSITORY:-}\" ]; then\n                    git clone -- \"${PIPEMASTER_CHECKOUT_HOST:-https://github.com}/${PIPEMASTER_CHECKOUT_REPOSITORY}.git\" \"$dir\"\n                  elif [ \"$dir\" != . ]; then\n                    git worktree add --detach -- \"$dir\" HEAD\n                  fi\n                  if [ -n \"${PIPEMASTER_CHECKOUT_REF:-}\" ]; then\n                    if [ \"$depth\" = 0 ]; then\n                      git -C \"$dir\" fetch -- origin \"$PIPEMASTER_CHECKOUT_REF\"\n                    else\n                      git -C \"$dir\" fetch --depth=\"$depth\" -- origin \"$PIPEMASTER_CHECKOUT_REF\"\n                    fi\n                    git -C \"$dir\" checkout --force FETCH_HEAD\n                  fi\n                fi\n                if [ -n \"${PIPEMASTER_CHECKOUT_SPARSE:-}\" ]; then\n                  set -f\n                  old=\"$IFS\"\n                  IFS='\n                '\n                  set -- $PIPEMASTER_CHECKOUT_SPARSE\n                  IFS=\"$old\"\n                  git -C \"$dir\" sparse-checkout set -- \"$@\"\n                fi\n            dir: workspace\n  - name: update-deployment\n    plan:\n      - get: source\n        passed:\n          - apply-manifests\n        trigger: true\n      - task: patch\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: image-registry.openshift-image-registry.svc:5000/openshift/cli\n              tag: latest\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                # pipemaster:lost /bin/bash -c \"oc patch deployment {{ inputs.deployment-name }} --patch='{\\\"spec\\\":{\\\"template\\\":{\\\"spec\\\":{\\n  \\\"containers\\\":[{\\n    \\\"name\\\": \\\"{{ inputs.deployment-name }}\\\",\\n    \\\"image\\\":\\\"{{ inputs.IMAGE }}\\\"\\n  }]\\n}}}}'\\n\\n# issue: https://issues.redhat.com/browse/SRVKP-2387\\n# images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\\n# as a workaround update a label in template, which triggers redeploy pods\\n# target label: \\\"spec.template.metadata.labels.patched_at\\\"\\n# NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\\npatched_at_timestamp=\\`date +%s\\`\\noc patch deployment {{ inputs.deployment-name }} --patch='{\\\"spec\\\":{\\\"template\\\":{\\\"metadata\\\":{\\n  \\\"labels\\\":{\\n    \\\"patched_at\\\": '\\\\\\\"\\$patched_at_timestamp\\\\\\\"'\\n  }\\n}}}}'\"\n                printf '%s\\n' 'pipemaster: lost: script.interpolation pipeline/build-and-deploy/job/update-deployment/step/patch: no Concourse spelling for expression inputs.deployment-name, inputs.deployment-name, inputs.IMAGE, inputs.deployment-name; the line is replaced by a line that ' >&2; exit 1\n            dir: workspace\n"
+     "text": "# pipemaster:emulated step.action pipeline/build-and-deploy/job/apply-manifests/step/apply-manifests-checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\next:\\n    tekton:\\n        _carried:\\n            - source_checkout\\n        source_checkout: true\\nid: apply-manifests-checkout\\nkind: action\\n\",\"get\":\"source\",\"params\":\"null\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/apply-manifests/step/apply/carry\n# pipemaster:arg {\"digest\":\"753c49d807a0ba45f8b5f9e47c822bbe09d9bb667ffc04930abe140b6ef5ae14\",\"carry\":\"image:\\n    ref: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\\nid: apply\\nkind: script\\nscript:\\n    - |-\\n      /bin/bash -c 'echo Applying manifests in k8s directory\\n      oc apply -f k8s\\n      echo -----------------------------------'\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/apply-manifests/carry\n# pipemaster:arg {\"digest\":\"bc313bf43e12f233dcb5c3ef9ec5b1cb6773fc46a8f98b93701f42ab423675dc\",\"carry\":\"id: apply-manifests\\nneeds:\\n    - job: build-image\\n\"}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/build-image/step/build-image-checkout\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nid: build-image-checkout\\nkind: action\\n\",\"get\":\"source\",\"params\":\"null\"}\n# pipemaster:lost env PARAM_IMAGE: inputs.IMAGE\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/build-image/step/build-and-push/carry\n# pipemaster:arg {\"digest\":\"cce3a2654c6f0c66df8f6e777e47b85d22306c05d14456c2d8c734934fa5bc57\",\"carry\":\"id: build-and-push\\nkind: script\\nenv:\\n    - name: PARAM_IMAGE\\n      value:\\n        expr: inputs.IMAGE\\n    - name: PARAM_STORAGE_DRIVER\\n      value:\\n        lit: overlay\\n    - name: PARAM_DOCKERFILE\\n      value:\\n        lit: ./Dockerfile\\n    - name: PARAM_CONTEXT\\n      value:\\n        lit: .\\n    - name: PARAM_TLSVERIFY\\n      value:\\n        lit: \\\"true\\\"\\n    - name: PARAM_FORMAT\\n      value:\\n        lit: oci\\n    - name: PARAM_BUILD_EXTRA_ARGS\\n      value:\\n        lit: \\\"\\\"\\n    - name: PARAM_PUSH_EXTRA_ARGS\\n      value:\\n        lit: \\\"\\\"\\n    - name: PARAM_SKIP_PUSH\\n      value:\\n        lit: \\\"false\\\"\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/build-image/carry\n# pipemaster:arg {\"digest\":\"d05db7d5f008bcd2d20aa4f7d3d295d09d91dc2fef95bebd66402bb7f9b481b7\",\"carry\":\"container:\\n    ref: quay.io/buildah/stable:v1\\nid: build-image\\nneeds:\\n    - job: fetch-repository\\n\"}\n# pipemaster:lost env PIPEMASTER_CHECKOUT_REF: inputs.git-revision\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1/carry\n# pipemaster:arg {\"digest\":\"aa36aef91b8b08f453da1351a0c2fa7ce501bf099541349d4c97a6268aeafd28\",\"carry\":\"image:\\n    ref: alpine/git:v2.54.1@sha256:29cff25811f790b9f72fc266bf8009a5a911714c0e03c31c47339c50909d9aef\\nid: fetch-repository-step-1\\nkind: script\\nscript:\\n    - |\\n      : \\\"${PIPEMASTER_CHECKOUT_REF?pipemaster: lost: step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1: input ref has no value on this target}\\\"\\n      set -e\\n      for v in \\\"${PIPEMASTER_CHECKOUT_REF:-}\\\" \\\"${PIPEMASTER_CHECKOUT_PATH:-}\\\" \\\"${PIPEMASTER_CHECKOUT_REPOSITORY:-}\\\"; do\\n        case \\\"$v\\\" in -*) echo \\\"pipemaster: refused: checkout value $v starts with - and would be read by git as an option\\\" \\u003e\\u00262; exit 1 ;; esac\\n      done\\n      dir=\\\"${PIPEMASTER_CHECKOUT_PATH:-.}\\\"\\n      depth=\\\"${PIPEMASTER_CHECKOUT_DEPTH:-1}\\\"\\n      if [ -z \\\"${PIPEMASTER_CHECKOUT_NATIVE:-}\\\" ]; then\\n        if [ -n \\\"${PIPEMASTER_CHECKOUT_REPOSITORY:-}\\\" ]; then\\n          git clone -- \\\"${PIPEMASTER_CHECKOUT_HOST:-https://github.com}/${PIPEMASTER_CHECKOUT_REPOSITORY}.git\\\" \\\"$dir\\\"\\n        elif [ \\\"$dir\\\" != . ]; then\\n          git worktree add --detach -- \\\"$dir\\\" HEAD\\n        fi\\n        if [ -n \\\"${PIPEMASTER_CHECKOUT_REF:-}\\\" ]; then\\n          if [ \\\"$depth\\\" = 0 ]; then\\n            git -C \\\"$dir\\\" fetch -- origin \\\"$PIPEMASTER_CHECKOUT_REF\\\"\\n          else\\n            git -C \\\"$dir\\\" fetch --depth=\\\"$depth\\\" -- origin \\\"$PIPEMASTER_CHECKOUT_REF\\\"\\n          fi\\n          git -C \\\"$dir\\\" checkout --force FETCH_HEAD\\n        fi\\n      fi\\n      if [ -n \\\"${PIPEMASTER_CHECKOUT_SPARSE:-}\\\" ]; then\\n        set -f\\n        old=\\\"$IFS\\\"\\n        IFS='\\n      '\\n        set -- $PIPEMASTER_CHECKOUT_SPARSE\\n        IFS=\\\"$old\\\"\\n        git -C \\\"$dir\\\" sparse-checkout set -- \\\"$@\\\"\\n      fi\\nenv:\\n    - name: PIPEMASTER_CHECKOUT_HOST\\n      value:\\n        lit: https://github.com\\n    - name: PIPEMASTER_CHECKOUT_REF\\n      value:\\n        expr: inputs.git-revision\\n\"}\n# pipemaster:emulated step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1\n# pipemaster:arg {\"step\":\"action:\\n    kind: repo\\n    host: https://github.com\\n    owner: actions\\n    repo: checkout\\n    ref: v7\\nwith:\\n    ref:\\n        expr: inputs.git-revision\\n    submodules:\\n        lit: \\\"true\\\"\\nid: fetch-repository-step-1\\nkind: action\\n\",\"task\":\"fetch-repository-step-1\",\"hold\":\"{\\\"config\\\":{\\\"image_resource\\\":{\\\"source\\\":{\\\"digest\\\":\\\"sha256:29cff25811f790b9f72fc266bf8009a5a911714c0e03c31c47339c50909d9aef\\\",\\\"repository\\\":\\\"alpine/git\\\",\\\"tag\\\":\\\"v2.54.1\\\"},\\\"type\\\":\\\"registry-image\\\"},\\\"inputs\\\":[{\\\"name\\\":\\\"workspace\\\"}],\\\"outputs\\\":[{\\\"name\\\":\\\"workspace\\\"}],\\\"params\\\":{\\\"PIPEMASTER_CHECKOUT_HOST\\\":\\\"https://github.com\\\"},\\\"platform\\\":\\\"linux\\\",\\\"run\\\":{\\\"args\\\":[\\\"-ec\\\",\\\": \\\\\\\"${PIPEMASTER_CHECKOUT_REF?pipemaster: lost: step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1: input ref has no value on this target}\\\\\\\"\\\\nset -e\\\\nfor v in \\\\\\\"${PIPEMASTER_CHECKOUT_REF:-}\\\\\\\" \\\\\\\"${PIPEMASTER_CHECKOUT_PATH:-}\\\\\\\" \\\\\\\"${PIPEMASTER_CHECKOUT_REPOSITORY:-}\\\\\\\"; do\\\\n  case \\\\\\\"$v\\\\\\\" in -*) echo \\\\\\\"pipemaster: refused: checkout value $v starts with - and would be read by git as an option\\\\\\\" \\\\u003e\\\\u00262; exit 1 ;; esac\\\\ndone\\\\ndir=\\\\\\\"${PIPEMASTER_CHECKOUT_PATH:-.}\\\\\\\"\\\\ndepth=\\\\\\\"${PIPEMASTER_CHECKOUT_DEPTH:-1}\\\\\\\"\\\\nif [ -z \\\\\\\"${PIPEMASTER_CHECKOUT_NATIVE:-}\\\\\\\" ]; then\\\\n  if [ -n \\\\\\\"${PIPEMASTER_CHECKOUT_REPOSITORY:-}\\\\\\\" ]; then\\\\n    git clone -- \\\\\\\"${PIPEMASTER_CHECKOUT_HOST:-https://github.com}/${PIPEMASTER_CHECKOUT_REPOSITORY}.git\\\\\\\" \\\\\\\"$dir\\\\\\\"\\\\n  elif [ \\\\\\\"$dir\\\\\\\" != . ]; then\\\\n    git worktree add --detach -- \\\\\\\"$dir\\\\\\\" HEAD\\\\n  fi\\\\n  if [ -n \\\\\\\"${PIPEMASTER_CHECKOUT_REF:-}\\\\\\\" ]; then\\\\n    if [ \\\\\\\"$depth\\\\\\\" = 0 ]; then\\\\n      git -C \\\\\\\"$dir\\\\\\\" fetch -- origin \\\\\\\"$PIPEMASTER_CHECKOUT_REF\\\\\\\"\\\\n    else\\\\n      git -C \\\\\\\"$dir\\\\\\\" fetch --depth=\\\\\\\"$depth\\\\\\\" -- origin \\\\\\\"$PIPEMASTER_CHECKOUT_REF\\\\\\\"\\\\n    fi\\\\n    git -C \\\\\\\"$dir\\\\\\\" checkout --force FETCH_HEAD\\\\n  fi\\\\nfi\\\\nif [ -n \\\\\\\"${PIPEMASTER_CHECKOUT_SPARSE:-}\\\\\\\" ]; then\\\\n  set -f\\\\n  old=\\\\\\\"$IFS\\\\\\\"\\\\n  IFS='\\\\n'\\\\n  set -- $PIPEMASTER_CHECKOUT_SPARSE\\\\n  IFS=\\\\\\\"$old\\\\\\\"\\\\n  git -C \\\\\\\"$dir\\\\\\\" sparse-checkout set -- \\\\\\\"$@\\\\\\\"\\\\nfi\\\\n\\\"],\\\"dir\\\":\\\"workspace\\\",\\\"path\\\":\\\"sh\\\"}},\\\"input_mapping\\\":{\\\"workspace\\\":\\\"source\\\"},\\\"task\\\":\\\"fetch-repository-step-1\\\"}\"}\n# pipemaster:emulated job.manual pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:arg {\"manual\":false,\"held\":true}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/fetch-repository/carry\n# pipemaster:arg {\"digest\":\"27bedde78220dfdc1f5b683850136860a35b589b7ed556c34d97e40fdcbc9b53\",\"carry\":\"id: fetch-repository\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/update-deployment/step/patch/carry\n# pipemaster:arg {\"digest\":\"539d48b22d9b90e7dbbd986b51357cd279276d7edcef7540d155349090a8de88\",\"carry\":\"image:\\n    ref: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest\\nid: patch\\nkind: script\\nscript:\\n    - |-\\n      /bin/bash -c \\\"oc patch deployment $\\u007b{ inputs.deployment-name }} --patch='{\\\\\\\"spec\\\\\\\":{\\\\\\\"template\\\\\\\":{\\\\\\\"spec\\\\\\\":{\\n        \\\\\\\"containers\\\\\\\":[{\\n          \\\\\\\"name\\\\\\\": \\\\\\\"$\\u007b{ inputs.deployment-name }}\\\\\\\",\\n          \\\\\\\"image\\\\\\\":\\\\\\\"$\\u007b{ inputs.IMAGE }}\\\\\\\"\\n        }]\\n      }}}}'\\n\\n      # issue: https://issues.redhat.com/browse/SRVKP-2387\\n      # images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\\n      # as a workaround update a label in template, which triggers redeploy pods\\n      # target label: \\\\\\\"spec.template.metadata.labels.patched_at\\\\\\\"\\n      # NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\\n      patched_at_timestamp=\\\\`date +%s\\\\`\\n      oc patch deployment $\\u007b{ inputs.deployment-name }} --patch='{\\\\\\\"spec\\\\\\\":{\\\\\\\"template\\\\\\\":{\\\\\\\"metadata\\\\\\\":{\\n        \\\\\\\"labels\\\\\\\":{\\n          \\\\\\\"patched_at\\\\\\\": '\\\\\\\\\\\\\\\"\\\\$patched_at_timestamp\\\\\\\\\\\\\\\"'\\n        }\\n      }}}}'\\\"\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/job/update-deployment/carry\n# pipemaster:arg {\"digest\":\"cd7381675291cf1e2a9ec3eb5ed5a77fe9834f9693d7e65b47e2b79d647510d7\",\"carry\":\"id: update-deployment\\nneeds:\\n    - job: apply-manifests\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy/carry\n# pipemaster:arg {\"digest\":\"1a201a0ae730789ae46088d417f4c7351cbc72cf21ab56db1b2d90a8d3f84622\",\"carry\":\"id: build-and-deploy\\ninputs:\\n    - name: deployment-name\\n      type: string\\n      description: name of the deployment to be patched\\n      required: true\\n    - name: git-url\\n      type: string\\n      description: url of the git repo for the code of deployment\\n      required: true\\n    - name: git-revision\\n      type: string\\n      default: master\\n      description: revision to be used from repo of the code for deployment\\n    - name: IMAGE\\n      type: string\\n      description: image to be build from the code\\n      required: true\\n\"}\n# pipemaster:emulated ext.passthrough pipeline/build-and-deploy\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/apply-manifests/step/apply\n# pipemaster:emulated trigger.manual pipeline/build-and-deploy/job/fetch-repository\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1\n# pipemaster:emulated step.script pipeline/build-and-deploy/job/update-deployment/step/patch\nresources:\n  - name: source\n    type: git\n    source:\n      uri: ((git-uri))\njobs:\n  - name: apply-manifests\n    plan:\n      - get: source\n        passed:\n          - build-image\n        trigger: true\n      - task: apply\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: image-registry.openshift-image-registry.svc:5000/openshift/cli\n              tag: latest\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                /bin/bash -c 'echo Applying manifests in k8s directory\n                oc apply -f k8s\n                echo -----------------------------------'\n            dir: workspace\n  - name: build-image\n    plan:\n      - get: source\n        passed:\n          - fetch-repository\n        trigger: true\n      - task: build-and-push\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: quay.io/buildah/stable\n              tag: v1\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          params:\n            PARAM_STORAGE_DRIVER: overlay\n            PARAM_DOCKERFILE: ./Dockerfile\n            PARAM_CONTEXT: .\n            PARAM_TLSVERIFY: \"true\"\n            PARAM_FORMAT: oci\n            PARAM_BUILD_EXTRA_ARGS: \"\"\n            PARAM_PUSH_EXTRA_ARGS: \"\"\n            PARAM_SKIP_PUSH: \"false\"\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" bud ${PARAM_BUILD_EXTRA_ARGS} \"--format=${PARAM_FORMAT}\" \"--tls-verify=${PARAM_TLSVERIFY}\" -f \"${PARAM_DOCKERFILE}\" -t \"${PARAM_IMAGE}\" \"${PARAM_CONTEXT}\"\n                [ \"${PARAM_SKIP_PUSH}\" = \"true\" ] && echo \"Push skipped\" && exit 0\n                buildah \"--storage-driver=${PARAM_STORAGE_DRIVER}\" push \"--tls-verify=${PARAM_TLSVERIFY}\" ${PARAM_PUSH_EXTRA_ARGS} \"${PARAM_IMAGE}\" \"docker://${PARAM_IMAGE}\"\n            dir: workspace\n  - name: fetch-repository\n    plan:\n      - get: source\n      - task: fetch-repository-step-1\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: alpine/git\n              tag: v2.54.1\n              digest: sha256:29cff25811f790b9f72fc266bf8009a5a911714c0e03c31c47339c50909d9aef\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          params:\n            PIPEMASTER_CHECKOUT_HOST: https://github.com\n          run:\n            path: sh\n            args:\n              - -ec\n              - |\n                : \"${PIPEMASTER_CHECKOUT_REF?pipemaster: lost: step.action pipeline/build-and-deploy/job/fetch-repository/step/fetch-repository-step-1: input ref has no value on this target}\"\n                set -e\n                for v in \"${PIPEMASTER_CHECKOUT_REF:-}\" \"${PIPEMASTER_CHECKOUT_PATH:-}\" \"${PIPEMASTER_CHECKOUT_REPOSITORY:-}\"; do\n                  case \"$v\" in -*) echo \"pipemaster: refused: checkout value $v starts with - and would be read by git as an option\" >&2; exit 1 ;; esac\n                done\n                dir=\"${PIPEMASTER_CHECKOUT_PATH:-.}\"\n                depth=\"${PIPEMASTER_CHECKOUT_DEPTH:-1}\"\n                if [ -z \"${PIPEMASTER_CHECKOUT_NATIVE:-}\" ]; then\n                  if [ -n \"${PIPEMASTER_CHECKOUT_REPOSITORY:-}\" ]; then\n                    git clone -- \"${PIPEMASTER_CHECKOUT_HOST:-https://github.com}/${PIPEMASTER_CHECKOUT_REPOSITORY}.git\" \"$dir\"\n                  elif [ \"$dir\" != . ]; then\n                    git worktree add --detach -- \"$dir\" HEAD\n                  fi\n                  if [ -n \"${PIPEMASTER_CHECKOUT_REF:-}\" ]; then\n                    if [ \"$depth\" = 0 ]; then\n                      git -C \"$dir\" fetch -- origin \"$PIPEMASTER_CHECKOUT_REF\"\n                    else\n                      git -C \"$dir\" fetch --depth=\"$depth\" -- origin \"$PIPEMASTER_CHECKOUT_REF\"\n                    fi\n                    git -C \"$dir\" checkout --force FETCH_HEAD\n                  fi\n                fi\n                if [ -n \"${PIPEMASTER_CHECKOUT_SPARSE:-}\" ]; then\n                  set -f\n                  old=\"$IFS\"\n                  IFS='\n                '\n                  set -- $PIPEMASTER_CHECKOUT_SPARSE\n                  IFS=\"$old\"\n                  git -C \"$dir\" sparse-checkout set -- \"$@\"\n                fi\n            dir: workspace\n  - name: update-deployment\n    plan:\n      - get: source\n        passed:\n          - apply-manifests\n        trigger: true\n      - task: patch\n        input_mapping:\n          workspace: source\n        config:\n          platform: linux\n          image_resource:\n            type: registry-image\n            source:\n              repository: image-registry.openshift-image-registry.svc:5000/openshift/cli\n              tag: latest\n          inputs:\n            - name: workspace\n          outputs:\n            - name: workspace\n          run:\n            path: sh\n            args:\n              - -ec\n              - |-\n                # pipemaster:lost /bin/bash -c \"oc patch deployment {{ inputs.deployment-name }} --patch='{\\\"spec\\\":{\\\"template\\\":{\\\"spec\\\":{\\n  \\\"containers\\\":[{\\n    \\\"name\\\": \\\"{{ inputs.deployment-name }}\\\",\\n    \\\"image\\\":\\\"{{ inputs.IMAGE }}\\\"\\n  }]\\n}}}}'\\n\\n# issue: https://issues.redhat.com/browse/SRVKP-2387\\n# images are deployed with tag. on rebuild of the image tags are not updated, hence redeploy is not happening\\n# as a workaround update a label in template, which triggers redeploy pods\\n# target label: \\\"spec.template.metadata.labels.patched_at\\\"\\n# NOTE: this workaround works only if the pod spec has imagePullPolicy: Always\\npatched_at_timestamp=\\`date +%s\\`\\noc patch deployment {{ inputs.deployment-name }} --patch='{\\\"spec\\\":{\\\"template\\\":{\\\"metadata\\\":{\\n  \\\"labels\\\":{\\n    \\\"patched_at\\\": '\\\\\\\"\\$patched_at_timestamp\\\\\\\"'\\n  }\\n}}}}'\"\n                printf '%s\\n' 'pipemaster: lost: script.interpolation pipeline/build-and-deploy/job/update-deployment/step/patch: no Concourse spelling for expression inputs.deployment-name, inputs.deployment-name, inputs.IMAGE, inputs.deployment-name; the line is replaced by a line that ' >&2; exit 1\n            dir: workspace\n"
     },
     {
      "path": ".concourse/pipeline-tutorial-check-pr.yml",
@@ -1472,12 +1358,6 @@
     }
    ],
    "report": [
-    {
-     "path": "pipeline/build-and-deploy",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
-    },
     {
      "path": "pipeline/build-and-deploy",
      "feature": "pipeline.inputs",
@@ -1494,13 +1374,7 @@
      "path": "pipeline/build-and-deploy/job/apply-manifests",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (legacy_params, task_name, task_params, task_workspaces, workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (args, command, script_line, workspace_dir, workspace_dir_ir) is not written to the Concourse file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (task_params) is not written to the Concourse file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply",
@@ -1510,16 +1384,10 @@
      "detail": "command and args are written as one script line; both lists are kept in Ext"
     },
     {
-     "path": "pipeline/build-and-deploy/job/apply-manifests/step/apply-manifests-checkout",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (source_checkout) is not written to the Concourse file; it is kept in round-trip metadata"
-    },
-    {
      "path": "pipeline/build-and-deploy/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the Concourse file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/build-image/step/build-and-push",
@@ -1531,7 +1399,7 @@
      "path": "pipeline/build-and-deploy/job/fetch-repository",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the Concourse file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/fetch-repository",
@@ -1570,13 +1438,7 @@
      "path": "pipeline/build-and-deploy/job/update-deployment",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (bound_params, legacy_params, task_name, task_params) is not written to the Concourse file; it is kept in round-trip metadata"
-    },
-    {
-     "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider tekton (args, command, script_line) is not written to the Concourse file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (task_params) is not written to the Concourse file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/update-deployment/step/patch",
@@ -1602,7 +1464,7 @@
      "path": "pipeline/pipeline-tutorial-check-pr",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (pipelineRun, workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (pipelineRun) is not written to the Concourse file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr",
@@ -1613,7 +1475,7 @@
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (catalog_ref, params, workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (catalog_ref, params) is not written to the Concourse file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/pipeline-tutorial-check-pr/job/fetch",
@@ -1645,7 +1507,7 @@
      "path": "pipeline/pipeline-tutorial-check-pr/job/yaml-lint",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider tekton (array_params, catalog_ref, params, workspaces) is not written to the Concourse file; it is kept in round-trip metadata"
+     "detail": "Ext of provider tekton (array_params, catalog_ref, params) is not written to the Concourse file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/build-and-deploy/job/build-image",
@@ -1660,6 +1522,13 @@
      "level": "external",
      "strategy": "set up outside the file",
      "detail": "pushing the image needs registry credentials, which the catalog task reads from a dockerconfig workspace; the file sets no registry login"
+    },
+    {
+     "path": "pipeline/build-and-deploy",
+     "feature": "ext.passthrough",
+     "level": "emulated",
+     "strategy": "git-uri variable",
+     "detail": "the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager"
     },
     {
      "path": "pipeline/build-and-deploy/job/apply-manifests",

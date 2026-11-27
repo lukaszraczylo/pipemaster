@@ -42,12 +42,6 @@
      "detail": "Ext of provider concourse (resources) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/build/step/checkout",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (kind, step) is not written to the GHA file; it is kept in round-trip metadata"
-    },
-    {
      "path": "pipeline/parent/job/set-feature-pipelines",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -90,12 +84,6 @@
      "feature": "step.action",
      "level": "lost",
      "detail": "a step of kind plugin has no GHA form; the step fails with a message"
-    },
-    {
-     "path": "pipeline/parent/job/test/step/checkout",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (kind, step) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/trigger/1",
@@ -283,12 +271,6 @@
      "detail": "Ext of provider concourse (resources) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/build/step/checkout",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (kind, step) is not written to the GitLab file; it is kept in round-trip metadata"
-    },
-    {
      "path": "pipeline/parent/job/set-feature-pipelines",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -325,12 +307,6 @@
      "feature": "step.action",
      "level": "lost",
      "detail": "step kind plugin has no GitLab form"
-    },
-    {
-     "path": "pipeline/parent/job/test/step/checkout",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (kind, step) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent",
@@ -482,12 +458,6 @@
      "detail": "condition not expressible in Woodpecker CI; the workflow disabled"
     },
     {
-     "path": "pipeline/parent/job/build/step/checkout",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (kind, step) is not written to the Woodpecker file; it is kept in round-trip metadata"
-    },
-    {
      "path": "pipeline/parent/job/set-feature-pipelines",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -536,12 +506,6 @@
      "feature": "job.if",
      "level": "lost",
      "detail": "condition not expressible in Woodpecker CI; the workflow disabled"
-    },
-    {
-     "path": "pipeline/parent/job/test/step/checkout",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (kind, step) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent",
@@ -681,12 +645,6 @@
      "detail": "Ext of provider concourse (resources) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
-     "path": "pipeline/parent/job/build/step/checkout",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (kind, step) is not written to the Drone file; it is kept in round-trip metadata"
-    },
-    {
      "path": "pipeline/parent/job/set-feature-pipelines",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -729,12 +687,6 @@
      "feature": "step.action",
      "level": "lost",
      "detail": "a plugin step needs an image"
-    },
-    {
-     "path": "pipeline/parent/job/test/step/checkout",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (kind, step) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent/trigger/0",
@@ -1191,12 +1143,6 @@
      "detail": "a reference of the condition has no Argo spelling; the task is disabled with when {{= false }}"
     },
     {
-     "path": "pipeline/parent/job/build/step/checkout",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (kind, step) is not written to the Argo file; it is kept in round-trip metadata"
-    },
-    {
      "path": "pipeline/parent/job/set-feature-pipelines",
      "feature": "ext.passthrough",
      "level": "lost",
@@ -1245,12 +1191,6 @@
      "feature": "job.if",
      "level": "lost",
      "detail": "a reference of the condition has no Argo spelling; the task is disabled with when {{= false }}"
-    },
-    {
-     "path": "pipeline/parent/job/test/step/checkout",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider concourse (kind, step) is not written to the Argo file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/parent",

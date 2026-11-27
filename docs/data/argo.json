@@ -33,7 +33,7 @@
      "path": "pipeline/buildkit/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider argo (depends, mount_paths) is not written to the GHA file; it is kept in round-trip metadata"
+     "detail": "Ext of provider argo (depends) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image",
@@ -47,12 +47,6 @@
      "feature": "job.if",
      "level": "lost",
      "detail": "condition not expressible in GitHub Actions; job disabled"
-    },
-    {
-     "path": "pipeline/buildkit/job/build-image/step/build-image-workspace-dirs",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider argo (workspace_dirs) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image/step/main",
@@ -80,12 +74,6 @@
      "level": "lost",
      "strategy": "kept in Ext[argo]",
      "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
-    },
-    {
-     "path": "pipeline/buildkit/job/git-clone/step/git-clone-workspace-dirs",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider argo (workspace_dirs) is not written to the GHA file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/git-clone/step/main",
@@ -178,7 +166,7 @@
      "path": "pipeline/buildkit/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider argo (depends, mount_paths) is not written to the GitLab file; it is kept in round-trip metadata"
+     "detail": "Ext of provider argo (depends) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image",
@@ -192,12 +180,6 @@
      "feature": "job.if",
      "level": "lost",
      "detail": "condition not expressible in GitLab CI; job disabled"
-    },
-    {
-     "path": "pipeline/buildkit/job/build-image/step/build-image-workspace-dirs",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider argo (workspace_dirs) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image/step/main",
@@ -225,12 +207,6 @@
      "level": "lost",
      "strategy": "kept in Ext[argo]",
      "detail": "command and args are written as one script line; the lists hold a tag and are not kept"
-    },
-    {
-     "path": "pipeline/buildkit/job/git-clone/step/git-clone-workspace-dirs",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider argo (workspace_dirs) is not written to the GitLab file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/git-clone/step/main",
@@ -331,7 +307,7 @@
      "path": "pipeline/buildkit/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider argo (depends, mount_paths) is not written to the Woodpecker file; it is kept in round-trip metadata"
+     "detail": "Ext of provider argo (depends) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image",
@@ -345,12 +321,6 @@
      "feature": "job.if",
      "level": "lost",
      "detail": "condition not expressible in Woodpecker CI; the workflow disabled"
-    },
-    {
-     "path": "pipeline/buildkit/job/build-image/step/build-image-workspace-dirs",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider argo (workspace_dirs) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image/step/main",
@@ -390,12 +360,6 @@
      "feature": "step.workdir",
      "level": "lost",
      "detail": "no Woodpecker spelling for expression inputs.path"
-    },
-    {
-     "path": "pipeline/buildkit/job/git-clone/step/git-clone-workspace-dirs",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider argo (workspace_dirs) is not written to the Woodpecker file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/git-clone/step/main",
@@ -487,7 +451,7 @@
      "path": "pipeline/buildkit/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider argo (depends, mount_paths) is not written to the Drone file; it is kept in round-trip metadata"
+     "detail": "Ext of provider argo (depends) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image",
@@ -501,12 +465,6 @@
      "feature": "job.if",
      "level": "lost",
      "detail": "condition not expressible in Drone CI; the document disabled"
-    },
-    {
-     "path": "pipeline/buildkit/job/build-image/step/build-image-workspace-dirs",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider argo (workspace_dirs) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image/step/main",
@@ -546,12 +504,6 @@
      "feature": "step.workdir",
      "level": "lost",
      "detail": "no Drone spelling for expression inputs.path"
-    },
-    {
-     "path": "pipeline/buildkit/job/git-clone/step/git-clone-workspace-dirs",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider argo (workspace_dirs) is not written to the Drone file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/git-clone/step/main",
@@ -656,7 +608,7 @@
      "path": "pipeline/buildkit/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider argo (depends, mount_paths) is not written to the Tekton file; it is kept in round-trip metadata"
+     "detail": "Ext of provider argo (depends) is not written to the Tekton file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image",
@@ -775,7 +727,7 @@
      "path": "pipeline/buildkit/job/build-image",
      "feature": "ext.passthrough",
      "level": "lost",
-     "detail": "Ext of provider argo (depends, mount_paths) is not written to the Concourse file; it is kept in round-trip metadata"
+     "detail": "Ext of provider argo (depends) is not written to the Concourse file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image",
@@ -789,12 +741,6 @@
      "feature": "job.if",
      "level": "lost",
      "detail": "the condition has no shell test form; the job has no triggering get, so a person starts it"
-    },
-    {
-     "path": "pipeline/buildkit/job/build-image/step/build-image-workspace-dirs",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider argo (workspace_dirs) is not written to the Concourse file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/build-image/step/main",
@@ -834,12 +780,6 @@
      "feature": "step.workdir",
      "level": "lost",
      "detail": "the working directory holds an expression, which a task dir cannot hold; the step runs in the checkout"
-    },
-    {
-     "path": "pipeline/buildkit/job/git-clone/step/git-clone-workspace-dirs",
-     "feature": "ext.passthrough",
-     "level": "lost",
-     "detail": "Ext of provider argo (workspace_dirs) is not written to the Concourse file; it is kept in round-trip metadata"
     },
     {
      "path": "pipeline/buildkit/job/git-clone/step/main",
