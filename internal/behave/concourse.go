@@ -288,15 +288,18 @@ func (e *concourseEngine) runFile(ctx context.Context, w *Workspace, file string
 	if err != nil {
 		return nil, err
 	}
+	dropped := ""
 	if w.Ev.Kind == kindTag {
+		all := builds
 		if builds, err = e.onlyTagJobs(ctx, pipe, builds); err != nil {
 			return nil, err
 		}
+		dropped = droppedBuilds(all, builds)
 		if len(builds) == 0 {
-			return &Trace{Duration: time.Since(start), NoPipeline: true, Log: "Concourse starts no build for a tag: no job gets a git resource with a tag_filter"}, nil
+			return &Trace{Duration: time.Since(start), NoPipeline: true, Log: "Concourse starts no build for a tag: no job gets a git resource with a tag_filter" + dropped}, nil
 		}
 	}
-	tr := &Trace{Duration: time.Since(start)}
+	tr := &Trace{Duration: time.Since(start), Log: dropped}
 	for _, b := range builds {
 		if b.Status != "succeeded" {
 			tr.Exit = 1
@@ -338,6 +341,20 @@ func (e *concourseEngine) onlyTagJobs(ctx context.Context, pipe string, builds [
 		return nil, fmt.Errorf("read the pipeline to find its tag jobs: fly exit %d: %s", code, tail(stripANSI(out), 200))
 	}
 	return keepTagJobs(out, builds)
+}
+
+// droppedBuilds names the builds that onlyTagJobs removed, so the trace shows them.
+func droppedBuilds(all, kept []buildInfo) string {
+	var names []string
+	for _, b := range all {
+		if !slices.ContainsFunc(kept, func(k buildInfo) bool { return k.ID == b.ID }) {
+			names = append(names, fmt.Sprintf("%s#%s", b.JobName, b.Name))
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	return "\nharness dropped these branch-job builds for a tag event: " + strings.Join(names, ", ") + "\n"
 }
 
 // keepTagJobs drops the builds of the jobs that get no resource with a tag_filter, from the JSON of fly get-pipeline.

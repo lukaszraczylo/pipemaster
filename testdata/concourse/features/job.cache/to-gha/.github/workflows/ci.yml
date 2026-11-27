@@ -23,7 +23,7 @@ jobs:
           path: |
             .cache/go
             vendor
-          key: default-run-${{ github.run_id }}
+          key: default-run-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: default-run-
       # pipemaster:emulated step.image pipeline/ci/job/build/step/compile
       - id: compile

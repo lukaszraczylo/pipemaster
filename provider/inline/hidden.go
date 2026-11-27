@@ -96,7 +96,8 @@ func unsetLine(shell string, names []string) (line string, posix, ok bool) {
 }
 
 // unsetInScripts makes the script steps of j read each hidden variable as unset, not as empty: the empty value
-// differs from unset for ${NAME-x}, ${NAME+x} and test -v, and a value that a run sets by hand must not reach the script.
+// differs from unset for ${NAME-x}, ${NAME+x} and test -v. Only the names that the files declare are unset: a value
+// that a run sets by hand under an undeclared name still reaches the script.
 // A step whose shell has no unset form keeps its script and gets a report entry.
 func (f *flattener) unsetInScripts(j *ir.Job, hidden []ir.Var) {
 	if len(hidden) == 0 {

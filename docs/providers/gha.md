@@ -27,7 +27,7 @@ The following table comes from `pipemaster caps --to gha --format md`.
 | ext.passthrough | native |  |
 | job.allow_failure | native |  |
 | job.artifacts | emulated | upload-artifact step at job end |
-| job.cache | emulated | actions/cache step; policy pull is actions/cache/restore, policy push is actions/cache/save at job end (a key with no hashFiles call becomes a rolling key (<key>-run-<run_id>, restored by prefix) so each run saves a cache as GitLab does; GitHub restores only caches of the current branch, the base branch of a pull request and the default branch, while a GitLab key with no branch part is shared across branches) |
+| job.cache | emulated | actions/cache step; policy pull is actions/cache/restore, policy push is actions/cache/save at job end (a key with no hashFiles call becomes a rolling key (<key>-run-<run_id>-<run_attempt>, restored by prefix) so each run saves a cache as GitLab does; GitHub restores only caches of the current branch, the base branch of a pull request and the default branch, while a GitLab key with no branch part is shared across branches) |
 | job.container | native |  |
 | job.env | native |  |
 | job.environment | native |  |
