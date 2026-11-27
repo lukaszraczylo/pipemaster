@@ -1,5 +1,8 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/publish
-# pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:arg "- kind: manual\n- kind: push\n- kind: schedule\n- kind: tag\n"
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/publish
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/publish
 kind: pipeline

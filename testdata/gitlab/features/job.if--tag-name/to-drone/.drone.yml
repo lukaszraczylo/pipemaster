@@ -1,5 +1,8 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/release
-# pipemaster:arg {"if":"tag","back":"(event == 'push') \u0026\u0026 startsWith(ref, 'refs/tags/')","triggers":"- kind: push\n- kind: tag\n"}
+# pipemaster:arg {"if":"tag","back":"((event == 'push') || (event == 'schedule') || (event == 'workflow_dispatch')) \u0026\u0026 startsWith(ref, 'refs/tags/')","triggers":"- kind: manual\n- kind: push\n- kind: schedule\n- kind: tag\n"}
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/release
 kind: pipeline
 type: docker
@@ -8,6 +11,8 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
   ref:
     - refs/tags/**
 steps:
