@@ -142,6 +142,6 @@ func copyTree(src, dst string) error {
 
 // exists reports whether a path exists under dir.
 func exists(dir string, parts ...string) bool {
-	_, err := os.Stat(filepath.Join(append([]string{dir}, parts...)...))
+	_, err := os.Stat(filepath.Join(append([]string{dir}, parts...)...)) // #nosec G703 -- callers pass fixed names under a harness dir
 	return err == nil
 }

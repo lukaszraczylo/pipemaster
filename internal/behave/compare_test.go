@@ -26,11 +26,11 @@ func TestJudge(t *testing.T) {
 		src    *Trace
 		tgt    *Trace
 		rep    *report.Report
+		fx     *Fixture
 		name   string
 		log    string
 		event  string
 		status string
-		fx     *Fixture
 	}{
 		{name: "same", src: tr(0, "a"), tgt: tr(0, "a"), status: StatusPass},
 		{name: "lost condition cannot explain extra work", src: tr(0, "branch.always"), tgt: tr(0, "branch.always", "branch.tag"),

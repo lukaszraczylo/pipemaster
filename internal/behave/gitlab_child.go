@@ -80,7 +80,7 @@ func (e *gitlabEngine) startingJobs(ctx context.Context, w *Workspace, doc []byt
 	if err := os.WriteFile(path, doc, 0o600); err != nil { // #nosec G703 -- a file of the harness workspace
 		return nil, err
 	}
-	defer os.Remove(path) // #nosec G104 -- a scratch file of the harness workspace
+	defer func() { _ = os.Remove(path) }()
 	args := []string{"--file", name, "--state-dir", ".gitlab-ci-local-pm-list", "--list-json"}
 	out, code, err := e.env.run(ctx, runOpts{Dir: w.Dir, Timeout: timeoutLocal}, e.env.GitlabCILocal(), append(args, varArgs(vars)...)...)
 	if err != nil {
