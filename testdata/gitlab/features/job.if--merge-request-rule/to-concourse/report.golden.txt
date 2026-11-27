@@ -1,6 +1,7 @@
 Loss report: gitlab -> concourse
 [lost] pipeline/gitlab-ci trigger.api (the source runs on the events api, trigger and its file has no trigger form for them; Concourse has no event for them, and the file names no schedule to copy)
 [lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline and its file has no trigger form for them; Concourse has no event for them, and the file names no schedule to copy)
+[lost] pipeline/gitlab-ci trigger.pull_request (the source runs on the events merge_request_event and its file has no trigger form for them; Concourse has no event for them, and the file names no schedule to copy)
 [lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat and its file has no trigger form for them; Concourse has no event for them, and the file names no schedule to copy)
 [lost] pipeline/gitlab-ci trigger.schedule (the source runs on the events schedule and its file has no trigger form for them; Concourse has no event for them, and the file names no schedule to copy)
 [lost] pipeline/gitlab-ci/trigger/1 trigger.filter.branches (the push trigger has no branch filter, and a git resource follows one branch; the resource follows the default branch of the repository)
