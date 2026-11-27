@@ -1,0 +1,20 @@
+{
+  "features": [
+    "job.needs",
+    "step.action"
+  ],
+  "events": [
+    "push-main"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": [
+    "foreignclone.readme:yes"
+  ],
+  "owners": {
+    "foreignclone.readme": [
+      "check"
+    ]
+  },
+  "requires": []
+}

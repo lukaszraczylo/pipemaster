@@ -18,19 +18,21 @@ const pacPrefix = "pipelinesascode.tekton.dev/"
 
 // plCtx is the pipeline being read: the task names that references can point at.
 type plCtx struct {
-	env    map[string]ir.Var
-	p      *project
-	k      *sink
-	ids    map[string]string
-	srcWS  map[string]bool
-	wsDir  map[string]string
-	runWS  map[string]runBinding
-	binds  map[string][]string
-	pipeWS any
-	file   string
-	plID   string
-	ws     bool
-	envBad bool
+	env   map[string]ir.Var
+	p     *project
+	k     *sink
+	ids   map[string]string
+	srcWS map[string]bool
+	// srcClone maps a source workspace to the clone of another repository that filled it.
+	srcClone map[string]*sourceClone
+	wsDir    map[string]string
+	runWS    map[string]runBinding
+	binds    map[string][]string
+	pipeWS   any
+	file     string
+	plID     string
+	ws       bool
+	envBad   bool
 }
 
 func (c *plCtx) taskID(name string) (string, bool) {

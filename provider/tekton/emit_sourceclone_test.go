@@ -46,3 +46,22 @@ func TestSourceCloneIsWrittenAsTektonClone(t *testing.T) {
 		})
 	}
 }
+
+func TestImageNamedByContextIsLostOnSchedulesAndManualRuns(t *testing.T) {
+	for _, kind := range []ir.TriggerKind{ir.TriggerSchedule, ir.TriggerManual, ir.TriggerPush} {
+		t.Run(string(kind), func(t *testing.T) {
+			j := scriptJob("build", "ls")
+			j.Steps[0].Image.Ref = "alpine:${{ ref_name }}"
+			p := project(j)
+			p.Pipelines[0].Triggers = []ir.Trigger{{Kind: kind, Cron: "0 3 * * *"}}
+			_, rep := emitRaw(t, p)
+			var found bool
+			for _, e := range rep.Entries {
+				found = found || (strings.Contains(e.Detail, "pod pulls the image before any script runs") && strings.Contains(e.Detail, "ctx-ref-name"))
+			}
+			if want := kind != ir.TriggerPush; found != want {
+				t.Fatalf("entry present = %v, want %v: %+v", found, want, rep.Entries)
+			}
+		})
+	}
+}

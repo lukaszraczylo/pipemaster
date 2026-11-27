@@ -324,6 +324,10 @@ func (e *emitter) common(c *wfCtx, sp string, st *ir.Step, m *wmap) error {
 		return err
 	}
 	m.set(imageKey, str(img))
+	if st.Image != nil && len(st.Image.Entrypoint) > 0 && st.Kind == ir.StepScript && onlyEmpty(st.Image.Entrypoint) {
+		e.lose(sp, caps.StepImage, "an empty entrypoint changes nothing on a Woodpecker command step, so it is not written")
+		return nil
+	}
 	if st.Image != nil && len(st.Image.Entrypoint) > 0 {
 		ep, err := e.entrypoint(sp, st.Image.Entrypoint)
 		if err != nil {
@@ -333,6 +337,12 @@ func (e *emitter) common(c *wfCtx, sp string, st *ir.Step, m *wmap) error {
 		return nil
 	}
 	return nil
+}
+
+// onlyEmpty is true for an entrypoint that only clears the one of the image. Woodpecker replaces the entrypoint
+// of a command step, and an empty entrypoint makes the container fail to start.
+func onlyEmpty(ep []string) bool {
+	return !slices.ContainsFunc(ep, func(s string) bool { return s != "" })
 }
 
 func (e *emitter) scriptStep(c *wfCtx, sp string, st *ir.Step) (*wmap, error) {

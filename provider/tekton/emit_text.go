@@ -3,6 +3,7 @@ package tekton
 import (
 	"maps"
 	"regexp"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -301,11 +302,23 @@ func (tc *taskCtx) text(sc *stepScope, path string, f caps.Feature, m textMode, 
 		return "", false, err
 	}
 	out, lost := tc.convert(sc, path, m, parts)
+	if f == caps.StepImage || f == caps.JobContainer || f == caps.JobServices {
+		tc.noteImageCtx(path, out)
+	}
 	for _, l := range lost {
 		tc.e.lose(path, f, "no Tekton spelling for expression "+l)
 		tc.e.comment(path, string(f)+" "+path+": {{ "+l+" }}")
 	}
 	return out, len(lost) == 0, nil
+}
+
+// noteImageCtx records the ctx-* params that the converted image text reads.
+func (tc *taskCtx) noteImageCtx(path, img string) {
+	for _, p := range ctxParams() {
+		if strings.Contains(img, paramPrefix+p+paramClose) && !slices.Contains(tc.pp.imageCtx[path], p) {
+			tc.pp.imageCtx[path] = append(tc.pp.imageCtx[path], p)
+		}
+	}
 }
 
 // scriptLine converts one script line. why is empty when the line stays; otherwise it names the expressions that

@@ -113,7 +113,7 @@ func TestCatalogLookup(t *testing.T) {
 func TestCatalogCheckoutParams(t *testing.T) {
 	p, rep := parseFiles(t, map[string]string{"p.yaml": catalogPipeline(`    taskRef: {name: git-clone}
     params:
-    - {name: URL, value: https://example.com/r.git}
+    - {name: URL, value: https://github.com/o/r.git}
     - {name: REVISION, value: v1}
     - {name: DEPTH, value: "0"}
     - {name: SUBMODULES, value: "false"}
@@ -130,14 +130,53 @@ func TestCatalogCheckoutParams(t *testing.T) {
 			t.Errorf("with[%s] = %+v, want %s", k, st.With[k], v)
 		}
 	}
-	if !hasEntry(rep, "param URL of the catalog task git-clone has no checkout input") {
-		t.Error("a url outside github.com is not reported")
-	}
 	if hasEntry(rep, "param SUBDIRECTORY") {
 		t.Error("subdirectory maps to path")
 	}
 	if hasEntry(rep, "param DELETE_EXISTING") {
 		t.Error("a param at its catalog default needs no entry")
+	}
+}
+
+func TestCatalogCheckoutForeignUrlIsCloned(t *testing.T) {
+	tests := []struct{ url, want string }{
+		{"https://gitlab.com/o/r.git", `"https://gitlab.com/o/r.git"`},
+		{"$(params.repo_url)", `"${{ inputs.repo_url }}"`},
+		{"https://github.com/o/r/extra.git", `"https://github.com/o/r/extra.git"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.url, func(t *testing.T) {
+			p, rep := parseFiles(t, map[string]string{"p.yaml": catalogPipeline(`    taskRef: {name: git-clone}
+    params:
+    - {name: url, value: ` + tt.url + `}
+    - {name: revision, value: v1}
+    - {name: depth, value: "5"}
+`)})
+			j := job(t, p.Pipelines[0], "t")
+			if len(j.Steps) != 1 || j.Steps[0].Kind != ir.StepScript || j.Steps[0].Action != nil {
+				t.Fatalf("a clone of %s is not a script step: %+v", tt.url, j.Steps)
+			}
+			got := strings.Join(j.Steps[0].Script, "\n")
+			for _, w := range []string{tt.want, `git fetch -q --depth 5 ` + tt.want + ` "v1"`, "git checkout -q --force FETCH_HEAD"} {
+				if !strings.Contains(got, w) {
+					t.Errorf("script lacks %q:\n%s", w, got)
+				}
+			}
+			if hasEntry(rep, "has no checkout input") {
+				t.Errorf("the url is read: %+v", rep.Entries)
+			}
+		})
+	}
+}
+
+func TestCatalogCheckoutForeignUrlWithSparseFailsLoud(t *testing.T) {
+	_, _, err := tekton.New().Parse(repo(map[string]string{".tekton/p.yaml": catalogPipeline(`    taskRef: {name: git-clone}
+    params:
+    - {name: url, value: https://gitlab.com/o/r.git}
+    - {name: sparseCheckoutDirectories, value: docs}
+`)}))
+	if err == nil {
+		t.Fatal("a sparse list of a foreign clone has no spelling and must fail")
 	}
 }
 
@@ -336,6 +375,50 @@ func TestSourceWorkspaceMapsToTheCheckoutAndReturnsExactly(t *testing.T) {
 	}
 	if strings.Contains(all.String(), "use-checkout") {
 		t.Errorf("the file names the checkout step that it does not write:\n%s", all.String())
+	}
+}
+
+func TestWorkspaceReaderRunsTheSameCloneOfAnotherRepository(t *testing.T) {
+	tests := []struct {
+		name, url, want string
+		script          bool
+	}{
+		{name: "url with no checkout input", url: "https://gitlab.com/o/r.git", script: true, want: `"https://gitlab.com/o/r.git"`},
+		{name: "other GitHub repository", url: "https://github.com/o/r.git", want: "o/r"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pl := strings.Replace(sourceWSPipeline, "    taskRef: {name: git-clone}\n", "    taskRef: {name: git-clone}\n    params:\n    - {name: url, value: "+tt.url+"}\n", 1)
+			p, _ := parseFiles(t, map[string]string{"p.yaml": pl, "t.yaml": sourceWSTask})
+			fetch, use := job(t, p.Pipelines[0], "fetch"), job(t, p.Pipelines[0], "use")
+			if len(fetch.Steps) != 1 {
+				t.Fatalf("the clone job has %d steps, want the clone alone: %+v", len(fetch.Steps), fetch.Steps)
+			}
+			first := use.Steps[0]
+			if tt.script {
+				if first.Kind != ir.StepScript || !strings.Contains(strings.Join(first.Script, "\n"), tt.want) {
+					t.Fatalf("the reader does not run the clone script: %+v", first)
+				}
+			} else if first.Action == nil || first.Action.Repo != "checkout" || first.With["repository"].Lit != tt.want {
+				t.Fatalf("the reader does not check out %s: %+v", tt.want, first)
+			}
+			for _, st := range use.Steps[1:] {
+				if st.Action != nil && st.Action.Repo == "checkout" {
+					t.Fatalf("the reader also checks out the pipeline repository: %+v", st)
+				}
+			}
+			files, _, err := tekton.New().Emit(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var all strings.Builder
+			for _, f := range files {
+				all.Write(f)
+			}
+			if strings.Contains(all.String(), "use-checkout") {
+				t.Errorf("the reader clone reached the Tekton file as a step:\n%s", all.String())
+			}
+		})
 	}
 }
 

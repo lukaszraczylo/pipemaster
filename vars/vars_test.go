@@ -7,6 +7,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/report"
 	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
@@ -210,5 +211,28 @@ func TestOpen(t *testing.T) {
 		if got := vars.Open(c.text); got != c.want {
 			t.Errorf("Open(%q) = %v, want %v", c.text, got, c.want)
 		}
+	}
+}
+
+func TestPrepareReportsATagArmGuardTheOriginCannotWrite(t *testing.T) {
+	for _, origin := range []string{provider.GitLab, provider.GHA} {
+		t.Run(origin, func(t *testing.T) {
+			in := shellStep(`echo hi`)
+			in.Origin.Provider = origin
+			in.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPush}, {Kind: ir.TriggerTag}}
+			in.Pipelines[0].Jobs[0].Container = &ir.Image{Ref: "reg/$DRONE_COMMIT_BRANCH:v1"}
+			p, res := vars.Prepare(in, provider.Tekton)
+			got := p.Pipelines[0].Jobs[0].Steps[0].Script[0]
+			guarded := strings.Contains(got, "has another value on tag events")
+			reported := false
+			rep := &report.Report{}
+			res.Report(rep)
+			for _, e := range rep.Entries {
+				reported = reported || strings.Contains(e.Detail, "no guard for tag events")
+			}
+			if !guarded && !reported {
+				t.Fatalf("the tag arm has neither a guard nor a report entry: %q, %+v", got, rep.Entries)
+			}
+		})
 	}
 }
