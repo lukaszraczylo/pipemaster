@@ -87,6 +87,7 @@ type jobBuilder struct {
 	whenNeeds    map[string]bool
 	job          *ir.Job
 	px           *texts
+	srcClone     *sourceClone
 	tx           *texts
 	explicit     map[string]bool
 	c            *plCtx
@@ -116,6 +117,7 @@ func (c *plCtx) job(m *omap, finally bool) (*ir.Job, error) {
 	b.k = newSink(c.p.rep, c.file, b.path)
 	b.ws = c.p.workspaceOf(m, b.path)
 	b.tx.srcWS = c.taskSourceWorkspaces(m)
+	b.srcClone = c.taskSourceClone(m)
 	b.tx.dataWS, b.wsPipe = c.taskWorkspaces(m)
 	c.binds[id] = slices.Sorted(maps.Values(b.wsPipe))
 	c.ws = c.ws || b.ws != nil
@@ -428,6 +430,7 @@ func workspaceBindings(pt *omap) [][2]string {
 // sourceWorkspaces finds the pipeline workspaces that a catalog git-clone task writes the clone to.
 func (c *plCtx) sourceWorkspaces(tasks []*omap) map[string]bool {
 	out := map[string]bool{}
+	c.srcClone = map[string]*sourceClone{}
 	for _, m := range tasks {
 		rm := asMapOrNil(m.Vals["taskRef"])
 		if rm == nil {
@@ -440,8 +443,13 @@ func (c *plCtx) sourceWorkspaces(tasks []*omap) map[string]bool {
 			continue
 		}
 		if t, ok, err := catalogEntry(rm); err == nil && ok && t.isCheckout {
+			pl, _ := m.Vals["params"].([]any)
+			other := otherClone(pl)
 			for _, b := range workspaceBindings(m) {
 				out[b[1]] = true
+				if other {
+					c.srcClone[b[1]] = &sourceClone{list: pl, task: t}
+				}
 			}
 		}
 	}
@@ -459,6 +467,16 @@ func (c *plCtx) taskSourceWorkspaces(pt *omap) map[string]bool {
 	return out
 }
 
+// taskSourceClone gives the params of the foreign git-clone that filled a source workspace of the PipelineTask.
+func (c *plCtx) taskSourceClone(pt *omap) *sourceClone {
+	for _, b := range workspaceBindings(pt) {
+		if sc, ok := c.srcClone[b[1]]; ok {
+			return sc
+		}
+	}
+	return nil
+}
+
 // addSourceCheckout gives a job whose Task reads the source workspace its own checkout step. The workspace that
 // the clone filled is not shared between the jobs of a target with one runner per job. The Tekton emitter skips
 // the step, because the clone task of the pipeline already fills the workspace.
@@ -471,11 +489,15 @@ func (b *jobBuilder) addSourceCheckout() {
 			return
 		}
 	}
+	id := b.job.ID + "-checkout"
+	if b.srcClone != nil {
+		b.sourceCloneStep(id)
+		return
+	}
 	ref, ok := actions.Reverse(actionCheckout)
 	if !ok {
 		return
 	}
-	id := b.job.ID + "-checkout"
 	st := &ir.Step{ID: id, Kind: ir.StepAction, Action: &ref, Ext: ir.Ext{dialect: map[string]any{ExtSourceCheckout: true}}}
 	b.job.Steps = append([]*ir.Step{st}, b.job.Steps...)
 	b.c.p.rep.Add(report.Entry{

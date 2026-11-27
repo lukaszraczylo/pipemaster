@@ -135,8 +135,8 @@ func TestCorpus69LocalTaskJobsWork(t *testing.T) {
 	items := commandItems(t, emitCorpus69Files(t, provider.GitLab))
 	assertOneCommandItem(t, items, "Applying manifests in k8s directory")
 	assertOneCommandItem(t, items, "oc patch deployment")
-	if !strings.Contains(jobs["gha apply-manifests"], "uses: actions/checkout@") {
-		t.Error("the GHA apply-manifests job needs its own checkout")
+	if !strings.Contains(jobs["gha apply-manifests"], `git remote add origin "${{ inputs.git-url }}"`) || strings.Contains(jobs["gha apply-manifests"], "uses: actions/checkout@") {
+		t.Error("the GHA apply-manifests job must run the clone of the pipeline input url, not check out the pipeline repository")
 	}
 	if !strings.Contains(jobs["gitlab update"], "$deployment_name") || !strings.Contains(jobs["gha update-deployment"], "${{ inputs.deployment-name }}") {
 		t.Error("update-deployment must read the hyphenated input in both targets")

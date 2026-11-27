@@ -331,16 +331,40 @@ func (b *jobBuilder) checkout(rm *omap, t *catalogTask, list []any) error {
 	if !ok {
 		return fmt.Errorf("the action registry has no checkout")
 	}
+	foreignURL, foreign := foreignClone(list)
+	with, unmapped := b.checkoutWith(t, list, foreign)
+	b.keepCatalog(rm, t)
+	sort.Strings(unmapped)
+	for _, name := range unmapped {
+		b.c.p.rep.Add(report.Entry{
+			IRPath: b.path, Feature: caps.StepAction, Level: caps.Lost, Strategy: droppedStrategy,
+			Detail:    "param " + name + " of the catalog task " + t.name + " has no checkout input and is not applied",
+			SourceLoc: b.c.file,
+		})
+	}
+	if len(with) == 0 {
+		with = nil
+	}
+	id := fmt.Sprintf("%s-step-%d", b.job.ID, catalogStepIndex)
+	if foreign {
+		return b.foreignCloneStep(id, foreignURL, with, list)
+	}
+	b.job.Steps = append(b.job.Steps, &ir.Step{ID: id, Kind: ir.StepAction, Action: &ref, With: with})
+	return nil
+}
+
+// checkoutWith maps the params of a git-clone task to the inputs of the checkout. The params with no input are
+// returned by name. skipURL leaves the url out, for a clone that a script runs.
+func (b *jobBuilder) checkoutWith(t *catalogTask, list []any, skipURL bool) (map[string]ir.Value, []string) {
 	with := map[string]ir.Value{}
 	bound := map[string]bool{}
 	var unmapped []string
-	foreignURL, foreign := foreignClone(list)
 	for _, e := range list {
 		m := asMapOrNil(e)
 		name, _ := text(valueOf(m, "name"))
 		key := paramKey(name)
 		val, isText := text(m.Vals["value"])
-		if foreign && key == "url" {
+		if skipURL && key == "url" {
 			continue
 		}
 		if in, mapped := t.inputs[key]; mapped && isText {
@@ -364,24 +388,7 @@ func (b *jobBuilder) checkout(rm *omap, t *catalogTask, list []any) error {
 			with[in.To] = ir.Value{Lit: in.Default}
 		}
 	}
-	b.keepCatalog(rm, t)
-	sort.Strings(unmapped)
-	for _, name := range unmapped {
-		b.c.p.rep.Add(report.Entry{
-			IRPath: b.path, Feature: caps.StepAction, Level: caps.Lost, Strategy: droppedStrategy,
-			Detail:    "param " + name + " of the catalog task " + t.name + " has no checkout input and is not applied",
-			SourceLoc: b.c.file,
-		})
-	}
-	if len(with) == 0 {
-		with = nil
-	}
-	id := fmt.Sprintf("%s-step-%d", b.job.ID, catalogStepIndex)
-	if foreign {
-		return b.foreignCloneStep(id, foreignURL, with, list)
-	}
-	b.job.Steps = append(b.job.Steps, &ir.Step{ID: id, Kind: ir.StepAction, Action: &ref, With: with})
-	return nil
+	return with, unmapped
 }
 
 // checkoutValue reads a bound param as the value of a checkout input. A nil value means the param has no effect.
