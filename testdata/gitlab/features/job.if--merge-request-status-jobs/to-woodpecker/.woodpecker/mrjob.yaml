@@ -6,8 +6,6 @@
 # pipemaster:arg {"gitlab_default":true}
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/mrjob
 # pipemaster:arg {"src":"event == 'merge_request_event'","from":"gitlab","gate":false}
-# pipemaster:emulated trigger.manual pipeline/gitlab-ci
-# pipemaster:arg "- kind: push\n- kind: tag\n"
 when:
   - event:
       - push
