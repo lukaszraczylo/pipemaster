@@ -51,6 +51,22 @@ func TestGitLabImageEntrypointIsLostWithReason(t *testing.T) {
 	}
 }
 
+func TestEmptyStepEntrypointOnACommandStepIsNotWritten(t *testing.T) {
+	step := &ir.Step{ID: "s", Kind: ir.StepScript, Image: &ir.Image{Ref: "alpine/git:v2", Entrypoint: []string{""}}, Script: []string{"git version"}}
+	p := &ir.Project{Pipelines: []*ir.Pipeline{{ID: "ci", Jobs: []*ir.Job{{ID: "j", Steps: []*ir.Step{step}}}}}}
+	files, rep := emitFiles(t, p)
+	var all strings.Builder
+	for _, body := range files {
+		all.WriteString(body)
+	}
+	if strings.Contains(all.String(), "entrypoint") || !strings.Contains(all.String(), "image: alpine/git:v2") {
+		t.Errorf("an empty entrypoint stops the container from starting:\n%s", all.String())
+	}
+	if !reportDetailHas(rep, "empty entrypoint changes nothing") {
+		t.Errorf("the dropped entrypoint has no report entry: %+v", rep.Entries)
+	}
+}
+
 func TestGitLabEmptyEntrypointIsNotLost(t *testing.T) {
 	src := "build:\n  image:\n    name: x\n    entrypoint: [\"\"]\n  script:\n    - make\n"
 	p := parseProject(t, "gitlab", map[string]string{".gitlab-ci.yml": src})
