@@ -54,3 +54,33 @@ func TestFoldEventInsideCallAndNegation(t *testing.T) {
 		})
 	}
 }
+
+func TestEventsPossibleTagPush(t *testing.T) {
+	event, refType := ref(expr.CtxEvent), ref(expr.CtxRefType)
+	for _, tc := range []struct {
+		e    expr.Expr
+		name string
+		want bool
+	}{
+		{bin(expr.OpEq, event, str("push")), "push event", true},
+		{bin(expr.OpEq, event, str("tag")), "tag event", true},
+		{bin(expr.OpEq, event, str("pull_request")), "pull request event", false},
+		{bin(expr.OpNe, event, str("push")), "not push event", false},
+		{bin(expr.OpEq, refType, str("tag")), "tag ref type", true},
+		{bin(expr.OpEq, refType, str("branch")), "branch ref type", false},
+		{bin(expr.OpNe, refType, str("tag")), "not tag ref type", false},
+		{bin(expr.OpMatch, event, str("(?i)^pu")), "push pattern", true},
+		{bin(expr.OpMatch, event, str("(?i)^pull")), "pull pattern", false},
+		{bin(expr.OpNoMatch, event, str("(?i)^push$")), "not push pattern", false},
+		{bin(expr.OpAnd, bin(expr.OpEq, event, str("push")), bin(expr.OpEq, refType, str("branch"))), "push on a branch", false},
+		{bin(expr.OpOr, bin(expr.OpEq, event, str("push")), bin(expr.OpEq, refType, str("branch"))), "push or branch", true},
+		{bin(expr.OpEq, ref(expr.CtxRefName), str("main")), "unknown test", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := len(expr.EventsPossible(tc.e, []string{expr.TagPush})) > 0
+			if got != tc.want {
+				t.Errorf("EventsPossible(%s) on a tag push = %v, want %v", expr.String(tc.e), got, tc.want)
+			}
+		})
+	}
+}

@@ -341,8 +341,8 @@ func TestWoodpeckerRandomAgreement(t *testing.T) {
 			return
 		}
 		back, ok := expr.Translate(woodpecker.ReadIf(out), woodpecker.Lang, gitlab.Lang)
-		// The way back also states the pull request target branch, which no GitLab view in this test sets.
-		if !ok || !reflect.DeepEqual(back, e) && holdsOf(t, back, env.gitlabView(), gitlab.Lang.Sem) != want {
+		// The way back also states the pull request target branch; dropping those terms must give the source back.
+		if !ok || !reflect.DeepEqual(withoutBaseRef(back), e) {
 			t.Fatalf("%s did not return from Woodpecker: %v, %v", expr.String(e), back, ok)
 		}
 	})
@@ -357,4 +357,37 @@ func unsetEventNarrower(e canonEnv, got, src bool) bool { return e.Event == nil 
 func isEventList(e expr.Expr) bool {
 	s := expr.String(e)
 	return strings.Contains(s, "^push$") || strings.Contains(s, "^tag$")
+}
+
+// isBaseRefTest is true for a comparison on the pull request target branch.
+func isBaseRefTest(e expr.Expr) bool {
+	b, ok := e.(expr.Binary)
+	if !ok {
+		return false
+	}
+	for _, side := range []expr.Expr{b.L, b.R} {
+		if r, ok := side.(expr.Ref); ok && strings.Join(r.Path, ".") == expr.CtxPRBaseRef {
+			return true
+		}
+	}
+	return false
+}
+
+// withoutBaseRef removes the pull request target branch terms that the way back from Woodpecker adds to a branch test.
+func withoutBaseRef(e expr.Expr) expr.Expr {
+	switch v := e.(type) {
+	case expr.Binary:
+		if v.Op == expr.OpOr || v.Op == expr.OpAnd {
+			switch {
+			case isBaseRefTest(v.L):
+				return withoutBaseRef(v.R)
+			case isBaseRefTest(v.R):
+				return withoutBaseRef(v.L)
+			}
+		}
+		return expr.Binary{Op: v.Op, L: withoutBaseRef(v.L), R: withoutBaseRef(v.R)}
+	case expr.Unary:
+		return expr.Unary{Op: v.Op, X: withoutBaseRef(v.X)}
+	}
+	return e
 }

@@ -23,6 +23,8 @@ const (
 	markStepID    = "pipemaster-split-ok"
 	markDir       = ".pipemaster-split"
 	markHashLen   = 8
+	// markSafeMax keeps the whole marker name within 255 bytes: the safe part, "-", the hash and ".ok".
+	markSafeMax   = 255 - 1 - markHashLen - len(".ok")
 	markExclude   = markDir + "/**/*"
 	splitStrategy = "one job per run of steps that share an image, chained by needs; the workspace passes on as artifacts"
 	liftStrategy  = "the shared image of the steps is the job image"
@@ -339,6 +341,8 @@ func markName(id string) string {
 		}
 		return '_'
 	}, id)
+	// Every byte of safe is ASCII, so the cut cannot split a character.
+	safe = safe[:min(len(safe), markSafeMax)]
 	sum := sha256.Sum256([]byte(id))
 	return safe + "-" + hex.EncodeToString(sum[:])[:markHashLen]
 }

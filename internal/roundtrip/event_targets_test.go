@@ -319,6 +319,10 @@ func TestPushStepRunsOnABranchPushOnGitLab(t *testing.T) {
 		}
 		script = append(script, strings.TrimPrefix(l, "      "))
 	}
+	// A step that needs the push event cannot run on a merge request, so the guard needs no target branch term.
+	if guard := strings.Join(script, "\n"); strings.Contains(guard, "CI_MERGE_REQUEST") {
+		t.Errorf("the push guard holds a merge request term:\n%s", guard)
+	}
 	runs := []struct {
 		name string
 		env  []string

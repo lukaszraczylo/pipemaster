@@ -347,8 +347,11 @@ func markFileOf(t *testing.T, doc, id string) string {
 	return m[1]
 }
 
+// maxFileNameBytes is the longest file name that Linux and macOS file systems accept.
+const maxFileNameBytes = 255
+
 func TestImageSplitMarkerNamesSurviveAnyJobName(t *testing.T) {
-	for _, name := range []string{"rspec 1/3", "a b", "ü", "a/b", "a_b", "x'y", "$(touch pwn)"} {
+	for _, name := range []string{"rspec 1/3", "a b", "ü", "a/b", "a_b", "x'y", "$(touch pwn)", strings.Repeat("long-job-", 30)} {
 		t.Run(name, func(t *testing.T) {
 			j := glJob(name, imgStep("a", "go:1", "echo a >> log"), imgStep("b", "node:20", "false"), imgStep("c", "go:1", "echo c >> log"))
 			j.AllowFailure = true
@@ -361,13 +364,17 @@ func TestImageSplitMarkerNamesSurviveAnyJobName(t *testing.T) {
 					if strings.ContainsAny(x[1], "/ '$") || x[1] == "" {
 						t.Errorf("unsafe marker name %q", x[1])
 					}
+					if len(x[1]) > maxFileNameBytes {
+						t.Errorf("marker name is %d bytes, the limit is %d", len(x[1]), maxFileNameBytes)
+					}
 				}
 			}
-			codes, log := runParts(t, doc, first, name+"-2", name+"-3")
+			dir := t.TempDir()
+			codes, log := runPartsIn(t, dir, doc, first, name+"-2", name+"-3")
 			if codes[0] != 0 || codes[1] == 0 || codes[2] != 0 || log != "a\n" {
 				t.Errorf("codes %v, log %q: the first job must pass, the second fail, the last skip", codes, log)
 			}
-			if _, err := os.Stat("pwn"); err == nil {
+			if _, err := os.Stat(filepath.Join(dir, "pwn")); err == nil {
 				t.Error("a job name ran as a command")
 			}
 		})
