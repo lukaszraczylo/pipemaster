@@ -40,26 +40,27 @@ func (w whenEntry) empty() bool {
 		w.Instance.Empty() && w.path.Empty() && len(w.status) == 0
 }
 
-func filterNode(f wpexpr.Filter) *yaml.Node {
-	escAll := func(vs []string) []string {
-		out := make([]string, len(vs))
-		for i, v := range vs {
-			out[i] = esc(v)
-		}
-		return out
+func escList(vs []string) []string {
+	out := make([]string, len(vs))
+	for i, v := range vs {
+		out[i] = esc(v)
 	}
+	return out
+}
+
+func filterNode(f wpexpr.Filter) *yaml.Node {
 	if len(f.Exclude) == 0 {
-		if vs := escAll(f.Include); len(vs) == 1 {
+		if vs := escList(f.Include); len(vs) == 1 {
 			return str(vs[0])
 		}
-		return strSeq(escAll(f.Include))
+		return strSeq(escList(f.Include))
 	}
 	// The object form takes lists only (path.include and path.exclude in the pinned schema).
 	m := newMap()
 	if len(f.Include) > 0 {
-		m.set("include", strSeq(escAll(f.Include)))
+		m.set("include", strSeq(escList(f.Include)))
 	}
-	m.set("exclude", strSeq(escAll(f.Exclude)))
+	m.set("exclude", strSeq(escList(f.Exclude)))
 	return m.n
 }
 
@@ -67,10 +68,10 @@ func filterNode(f wpexpr.Filter) *yaml.Node {
 func pathNoEmptyNode(f wpexpr.Filter) *yaml.Node {
 	m := newMap()
 	if len(f.Include) > 0 {
-		m.set("include", strSeq(f.Include))
+		m.set("include", strSeq(escList(f.Include)))
 	}
 	if len(f.Exclude) > 0 {
-		m.set("exclude", strSeq(f.Exclude))
+		m.set("exclude", strSeq(escList(f.Exclude)))
 	}
 	m.set("on_empty", boolNode(false))
 	return m.n
