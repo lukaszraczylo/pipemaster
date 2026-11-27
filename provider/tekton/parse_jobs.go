@@ -131,6 +131,7 @@ func (c *plCtx) job(m *omap, finally bool) (*ir.Job, error) {
 		return nil, fmt.Errorf("task %s: %w", name, err)
 	}
 	b.addSourceCheckout()
+	b.reportExtraSourceWorkspaces(m)
 	b.addWorkspaceDirs()
 	b.reportWorkspaces()
 	b.k.KeepRest(r)
@@ -479,6 +480,24 @@ func (c *plCtx) taskSourceClone(pt *omap) *sourceClone {
 		}
 	}
 	return nil
+}
+
+// reportExtraSourceWorkspaces reports each source workspace of the Task after the first. The job has one
+// checkout, so the workspaces share one directory and the clone that filled the later ones is not in the job.
+func (b *jobBuilder) reportExtraSourceWorkspaces(pt *omap) {
+	seen := 0
+	for _, wb := range workspaceBindings(pt) {
+		if !b.c.srcWS[wb[1]] {
+			continue
+		}
+		if seen++; seen == 1 {
+			continue
+		}
+		b.c.p.rep.Add(report.Entry{
+			IRPath: b.path, Feature: caps.StepAction, Level: caps.Lost, Strategy: "second source workspace dropped",
+			Detail: "the Task binds the source workspace " + wb[1] + " as " + wb[0] + " besides an earlier one; the job has one checkout, so $(workspaces." + wb[0] + ".path) reads the same directory and the clone of " + wb[1] + " is not in the job", SourceLoc: b.c.file,
+		})
+	}
 }
 
 // addSourceCheckout gives a job whose Task reads the source workspace its own checkout step. The workspace that

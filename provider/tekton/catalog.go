@@ -258,6 +258,10 @@ func (b *jobBuilder) addSource(t *catalogTask) {
 	if !t.source {
 		return
 	}
+	if b.srcClone != nil {
+		b.sourceCloneStep(b.job.ID + "-checkout")
+		return
+	}
 	ref, ok := actions.Reverse(actionCheckout)
 	if !ok {
 		return
