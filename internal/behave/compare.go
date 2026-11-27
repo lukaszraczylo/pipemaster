@@ -212,6 +212,15 @@ func owns(irPath string, owners map[string][]string, marker string) bool {
 	return false
 }
 
+// shellErrors are what a shell or a container runtime prints when the step shell is missing or rejects the script.
+var shellErrors = []string{"can't execute", "executable file not found", "Syntax error", "not found", "bad substitution"}
+
+// shellFailed is true when the target log shows a shell error, the evidence an emulated shell verdict needs: the
+// wrapper runs the script under sh when the image has no bash, so a step without such an error ran its script.
+func shellFailed(tgtLog string) bool {
+	return slices.ContainsFunc(shellErrors, func(s string) bool { return strings.Contains(tgtLog, s) })
+}
+
 // printsLoud is true when the target log holds the fail-loud line of the entry, the strongest evidence of a cause.
 func printsLoud(tgtLog string, e report.Entry) bool {
 	return strings.Contains(tgtLog, failLoudMark+string(e.Feature)+" "+e.IRPath)
@@ -246,6 +255,9 @@ func explainFact(fx Fixture, event string, rep *report.Report, tgtLog string, f 
 		}
 		if _, isTrigger := triggerRun[e.Feature]; isTrigger && e.Level == caps.External {
 			ef, why = nil, "the harness starts the run itself, so a trigger that the operator sets up changes no run"
+		}
+		if e.Feature == caps.StepShell && e.Level == caps.Emulated && !shellFailed(tgtLog) {
+			continue
 		}
 		loud := printsLoud(tgtLog, e)
 		if loud {
