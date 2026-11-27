@@ -2,6 +2,8 @@ package tekton
 
 import (
 	"encoding/json"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -47,6 +49,18 @@ func sourceKey(x map[string]any) string {
 	n, _ := x["name"].(string)
 	r, _ := x["triggerRef"].(string)
 	return l + "\x00" + n + "\x00" + r
+}
+
+// imageCtxLost reports an image that names a ctx-* param on a run that fills none: a schedule post has an empty
+// body and a manual run passes no param, so the image reference is incomplete and the pod cannot start.
+func (e *emitter) imageCtxLost(pp *plan, path string, kind ir.TriggerKind) {
+	f := caps.TriggerSchedule
+	if kind == ir.TriggerManual {
+		f = caps.TriggerManual
+	}
+	for _, ip := range slices.Sorted(maps.Keys(pp.imageCtx)) {
+		e.lose(path, f, "the image at "+ip+" reads "+strings.Join(pp.imageCtx[ip], ", ")+", which a "+string(kind)+" run leaves empty; the pod pulls the image before any script runs, so the run fails. Pass the value with a param or write the image without it")
+	}
 }
 
 // triggers writes the EventListeners, the bindings, the templates and the CronJobs of every pipeline.
@@ -164,6 +178,9 @@ func (e *emitter) pipelineTriggers(pp *plan, crons *[]*outDoc) (binding, templat
 		x := map[string]any{}
 		if e.own {
 			x = extOf(t.Ext)
+		}
+		if t.Kind == ir.TriggerManual || t.Kind == ir.TriggerSchedule {
+			e.imageCtxLost(pp, path, t.Kind)
 		}
 		if t.Kind == ir.TriggerManual {
 			e.note(path, caps.TriggerManual, caps.External, "tkn pipeline start "+pp.name, "a person starts the run with `tkn pipeline start "+pp.name+"`")

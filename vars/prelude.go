@@ -185,6 +185,8 @@ func (pr *preparer) step(st *ir.Step, outer []ir.Var, fieldLost []string) *ir.St
 		if arm, isArm := strings.CutPrefix(l, armMark); isArm {
 			if g, ok := pr.armGuard(arm, tagName); ok {
 				after = append(after, g)
+			} else if kind, name, _ := strings.Cut(arm, "|"); kind == kindTag {
+				pr.note(st, caps.Lost, "", "variable "+name+" in a field has another value on tag events on "+pr.target+", and "+pr.origin+" has no tag variable to test at run time, so the step has no guard for tag events and runs with the wrong value")
 			}
 			continue
 		}

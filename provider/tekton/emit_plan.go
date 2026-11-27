@@ -30,6 +30,9 @@ type plan struct {
 	renamed map[string]string
 	// ctx names the reserved ctx-* params that some task reads.
 	ctx map[string]bool
+	// imageCtx maps the path of an image to the ctx-* params that its text reads. The pod pulls the image
+	// before any script runs, so a run that leaves a param empty cannot start.
+	imageCtx map[string][]string
 	// refTypes holds the job conditions written as a test of the ref type.
 	refTypes map[string]refTypeJob
 	// changes holds the path plans that the generated task pipemaster-changes computes.
@@ -67,7 +70,7 @@ func ctxParams() []string {
 func (e *emitter) planNames(pls []*ir.Pipeline) {
 	pnames := map[string]bool{}
 	for _, pl := range pls {
-		pp := &plan{pl: pl, path: "pipeline/" + pl.ID, byID: map[string]*jobPlan{}, inputs: map[string]string{}, ctx: map[string]bool{}}
+		pp := &plan{pl: pl, path: "pipeline/" + pl.ID, byID: map[string]*jobPlan{}, inputs: map[string]string{}, ctx: map[string]bool{}, imageCtx: map[string][]string{}}
 		pp.name = e.dnsName(pnames, pp.path, "pipeline id", pl.ID, maxName, true)
 		e.planInputs(pp)
 		tnames := map[string]bool{}
