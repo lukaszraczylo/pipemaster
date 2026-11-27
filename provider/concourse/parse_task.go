@@ -228,7 +228,7 @@ func shellOptions(ts *ir.Step, scratch *sink) []string {
 // directory field of a target applies before the first script line and the directory can be an input.
 func (jb *jobBuilder) fileScript(ts *ir.Step, m *omap, file string, cfg *omap, scratch *sink, line int) []string {
 	opts := shellOptions(ts, scratch)
-	layout := jb.fileLayout(ts, m, file, cfg, scratch, line)
+	layout := jb.fileLayout(ts, m, "task file "+file, true, cfg, scratch, line)
 	var enter []string
 	if ts.WorkDir != "" && len(layout) > 0 {
 		enter = append(enter, "cd "+shellQuote(ts.WorkDir))
@@ -299,7 +299,7 @@ func appendParent(lines []string, dir string) []string {
 // them, and reports exactly what the lines make. The repository input links to the checkout, an output is a
 // directory at its path, and an input that an earlier task made links to that directory when the paths differ.
 // input_mapping and output_mapping rename the artifacts, and an optional input with no source is skipped.
-func (jb *jobBuilder) fileLayout(ts *ir.Step, m *omap, file string, cfg *omap, scratch *sink, line int) []string {
+func (jb *jobBuilder) fileLayout(ts *ir.Step, m *omap, what string, withOutputs bool, cfg *omap, scratch *sink, line int) []string {
 	if isPowershell(ts.Shell) {
 		return nil
 	}
@@ -342,6 +342,9 @@ func (jb *jobBuilder) fileLayout(ts *ir.Step, m *omap, file string, cfg *omap, s
 		lost = append(lost, "input "+in.name+" (artifact "+art+" comes from a resource or a step that the target does not run)")
 	}
 	for _, out := range ioEntries(cfg.Vals["outputs"]) {
+		if !withOutputs {
+			break
+		}
 		art := out.name
 		if mapped, ok := outMap[out.name]; ok {
 			art = mapped
@@ -357,7 +360,7 @@ func (jb *jobBuilder) fileLayout(ts *ir.Step, m *omap, file string, cfg *omap, s
 	if len(made) > 0 {
 		jb.k.Rep.Add(report.Entry{
 			IRPath: scratch.Path, Feature: caps.StepWorkdir, Level: caps.Emulated, Strategy: "directories made by script lines",
-			Detail: "task file " + file + ": the first script lines " + strings.Join(made, "; ") +
+			Detail: what + ": the first script lines " + strings.Join(made, "; ") +
 				". A link to the checkout is an untracked entry in the working tree, which tools that walk the tree also see",
 			SourceLoc: jb.k.Loc(line),
 		})
@@ -365,7 +368,7 @@ func (jb *jobBuilder) fileLayout(ts *ir.Step, m *omap, file string, cfg *omap, s
 	if len(lost) > 0 {
 		jb.k.Rep.Add(report.Entry{
 			IRPath: scratch.Path, Feature: caps.StepWorkdir, Level: caps.Lost, Strategy: "kept in the task file",
-			Detail:    "task file " + file + ": " + strings.Join(lost, "; ") + "; no script line makes them, and the script reads them as directories of the working directory",
+			Detail:    what + ": " + strings.Join(lost, "; ") + "; no script line makes them, and the script reads them as directories of the working directory",
 			SourceLoc: jb.k.Loc(line),
 		})
 	}
@@ -779,6 +782,7 @@ func (jb *jobBuilder) sourceCheckout(gets []any, hasSteps bool) {
 		if info := jb.gets[name]; info.res == nil || !jb.b.isRepository(info.res) {
 			continue
 		}
+		jb.assumedRepository(jb.gets[name].res)
 		val := map[string]any{}
 		if p, isParams := gm["params"].(map[string]any); isParams {
 			if n, err := strconv.Atoi(fmt.Sprint(p["depth"])); err == nil && n > 0 {
@@ -836,4 +840,56 @@ func (jb *jobBuilder) cloneLine(g getInfo, dir string) (string, bool) {
 		args += " --branch " + shellQuote(branch)
 	}
 	return fmt.Sprintf("[ -e %[1]s ] || %[2]s -- %[3]s %[1]s", dir, args, shellQuote(uri)), true
+}
+
+// layoutInline is true for an inline task whose inputs the parser lays out in the script: a task with a script
+// that a shell runs and no workspace input, which only the emitter writes.
+func (jb *jobBuilder) layoutInline(st *ir.Step, form bool, cfg *omap) bool {
+	if form || jb.inFile || len(st.Script) == 0 || isPowershell(st.Shell) {
+		return false
+	}
+	for _, in := range ioEntries(cfg.Vals["inputs"]) {
+		if in.name == workspaceName {
+			return false
+		}
+	}
+	return true
+}
+
+// inlineLayout puts the lines that lay out the inputs of an inline task before its script, as fileScript does for a
+// task file. A run.dir moves into the script, because the directory can be an input. The Ext holds the lines, so the
+// emitter writes the task as it was.
+func (jb *jobBuilder) inlineLayout(st *ir.Step, k *sink, m, cfg *omap, line int) {
+	if len(ioEntries(cfg.Vals["inputs"])) == 0 {
+		return
+	}
+	layout := jb.fileLayout(st, m, "inline task", false, cfg, k, line)
+	if len(layout) == 0 {
+		return
+	}
+	held := map[string]any{}
+	if st.WorkDir != "" {
+		layout = append(layout, "cd "+shellQuote(st.WorkDir))
+		held["workdir"] = st.WorkDir
+		st.WorkDir = ""
+	}
+	held["lines"] = stringsAny(layout)
+	k.Out[ExtLayout] = held
+	carry(k.Out, ExtLayout)
+	st.Script = append(layout, st.Script...)
+}
+
+// assumedRepository says that a literal repository uri is taken for the repository of the converted pipeline. A
+// pipeline that lives in another repository than the code it builds has the same shape, and the file does not tell them apart.
+func (jb *jobBuilder) assumedRepository(r *resource) {
+	uri, _ := text(r.source().Vals["uri"])
+	if !literalURI(uri) {
+		return
+	}
+	jb.k.Rep.Add(report.Entry{
+		IRPath: jb.path, Feature: caps.StepAction, Level: caps.Emulated, Strategy: "assumed repository",
+		Detail: "the resource " + r.name + " has the literal uri " + uri + ", and it is the only uri of the pipeline, so the checkout assumes " + uri +
+			" is the repository that holds the converted pipeline; if the pipeline builds another repository, replace the checkout with a clone of " + uri,
+		SourceLoc: jb.k.Loc(lineOf(r)),
+	})
 }

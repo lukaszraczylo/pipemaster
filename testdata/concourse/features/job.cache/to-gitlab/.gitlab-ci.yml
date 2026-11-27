@@ -10,8 +10,10 @@ build:
   needs: []
   script:
     # pipemaster:step compile
+    - '[ -e source ] || ln -s "$PWD" source'
     - go build ./...
     # pipemaster:step test
+    - '[ -e source ] || ln -s "$PWD" source'
     - go test ./...
   cache:
     - paths:

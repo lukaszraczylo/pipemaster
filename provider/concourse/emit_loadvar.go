@@ -41,3 +41,19 @@ func anyStrings(v any) []string {
 	}
 	return out
 }
+
+// withoutLayout returns the step as it was before the parser laid out the inputs of an inline task: the layout
+// lines are gone and run.dir is back. A step whose script no longer starts with the lines stays as it is.
+func withoutLayout(st *ir.Step, ext map[string]any) *ir.Step {
+	held, _ := ext[ExtLayout].(map[string]any)
+	lines := anyStrings(held["lines"])
+	if len(lines) == 0 || len(st.Script) < len(lines) || !slices.Equal(st.Script[:len(lines)], lines) {
+		return st
+	}
+	cp := *st
+	cp.Script = st.Script[len(lines):]
+	if wd, _ := held["workdir"].(string); wd != "" {
+		cp.WorkDir = wd
+	}
+	return &cp
+}
