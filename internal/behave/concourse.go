@@ -306,8 +306,15 @@ func (e *concourseEngine) runFile(ctx context.Context, w *Workspace, file string
 		}
 	}
 	if len(builds) == 0 {
-		tr.Exit = 1
-		tr.Log = fmt.Sprintf("Concourse started no job build in %s. Resources with no version: %s", concNoBuild, e.emptyResources(ctx, pipe))
+		empty := e.emptyResources(ctx, pipe)
+		tr.Log = fmt.Sprintf("Concourse started no job build in %s. Resources with no version: %s", concNoBuild, empty)
+		// Every resource has a version, so no job has a triggering get for this run: the file starts nothing, which
+		// the comparison judges. A resource with no version is a start failure.
+		if empty == "none" {
+			tr.NoPipeline = true
+		} else {
+			tr.Exit = 1
+		}
 	}
 	return tr, nil
 }
