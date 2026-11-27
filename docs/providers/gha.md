@@ -11,6 +11,8 @@ The only external verdict is `job.environment.approval`. Configure required revi
 - The parser reads the first directory that exists in its list and does not merge directories. For `gha` the list holds only `.github/workflows`.
 - A bare `owner/repo@ref` action resolves to `https://github.com`. The default action hosts of all providers are in [versions.md](../versions.md).
 - The action registry in [mappings.yaml](../../actions/mappings.yaml) maps each `uses:` reference to the construct of every other provider. An action with no mapping for the target is lost.
+- A source that clones the repository by itself (GitLab, Drone, Woodpecker, Concourse) gets an `actions/checkout` step, because GitHub Actions does not clone. The report marks the step as emulated.
+- A cache key with no `hashFiles` call becomes a rolling key. GitHub restores only the caches of the current branch, the base branch of a pull request and the default branch. A GitLab key with no branch part is shared across branches. The caps table row for `job.cache` states this.
 - Gitea and Forgejo reuse the GitHub Actions parser and emitter with a table of differences. See [Gitea](gitea.md) and [Forgejo](forgejo.md).
 
 ## Feature support

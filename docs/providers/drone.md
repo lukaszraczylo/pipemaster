@@ -11,6 +11,8 @@ The caps table gives the verdict external for two features:
 
 ## Conversion notes
 
+- A Drone pipeline with no trigger, or with only `exclude:`, runs on the default events of Drone. The source events of those pipelines get triggers on every target. The report lists each event that the target cannot express. The same rule applies to a GitLab file with no `workflow:`. See `WithDefaultTriggers` in `provider/events.go`.
+- Drone clones the repository before the steps. A target that does not clone by itself gets a checkout step. On GitHub Actions this is an `actions/checkout` step that the report marks as emulated. The clone settings of the source map to the step inputs. See `provider/emitkit/checkout.go`.
 - Drone replaces `${NAME}` in the raw YAML before it parses the file. The literal `$` escape is `$$`.
 - A matrix becomes one pipeline document per cell. Each document carries a marker, so a return conversion can fold the cells into one matrix job.
 - The Drone OSS server does not evaluate `paths` filters. The converter reports them as lost and never emits them.
