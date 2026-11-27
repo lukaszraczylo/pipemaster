@@ -110,7 +110,11 @@ func TestConcoursePluginImageKeepsTagAndDigest(t *testing.T) {
 			cfg, _ := taskNamed(t, plan, "notify")["config"].(map[string]any)
 			res, _ := cfg["image_resource"].(map[string]any)
 			src, _ := res["source"].(map[string]any)
-			got := [3]string{strOfAny(src["repository"]), strOfAny(src["tag"]), strOfAny(src["digest"])}
+			ver, _ := res["version"].(map[string]any)
+			if _, has := src["digest"]; has {
+				t.Errorf("the registry-image source has no digest key:\n%s", text)
+			}
+			got := [3]string{strOfAny(src["repository"]), strOfAny(src["tag"]), strOfAny(ver["digest"])}
 			if got != [3]string{tt.repo, tt.tag, tt.digest} {
 				t.Errorf("repository, tag, digest = %q, want %q\n%s", got, [3]string{tt.repo, tt.tag, tt.digest}, text)
 			}
