@@ -86,6 +86,10 @@ func triggerKey(t *Trigger) string {
 	return b.String()
 }
 
+// NormalizeTriggers puts triggers into the order that Normalize gives them, so code that adds triggers to a parsed
+// project keeps the canonical order.
+func NormalizeTriggers(ts []Trigger) { normalizeTriggers(ts) }
+
 func normalizeTriggers(ts []Trigger) {
 	sort.SliceStable(ts, func(a, b int) bool { return triggerKey(&ts[a]) < triggerKey(&ts[b]) })
 }

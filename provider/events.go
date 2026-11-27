@@ -165,6 +165,8 @@ func WithDefaultTriggers(p *ir.Project, target string) (*ir.Project, map[string]
 			}
 			cp.Triggers = append(cp.Triggers, ir.Trigger{Kind: ev.Kind})
 		}
+		// A parser returns normalized triggers, so a re-read file keeps the order that this emit writes.
+		ir.NormalizeTriggers(cp.Triggers)
 		out.Pipelines[i] = &cp
 	}
 	if out == nil {
