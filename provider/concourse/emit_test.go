@@ -69,6 +69,35 @@ func TestStepImageKeepsRepositoryAndTag(t *testing.T) {
 	}
 }
 
+func TestStepImageDigestIsTheResourceVersion(t *testing.T) {
+	const digest = "sha256:29cff258cbdd4b4c8b3b5e4f0bb6d0b3f1e7f5ad0b1c7c6b8a2d3e4f5a6b7c8d"
+	for _, tc := range []struct {
+		name, ref, tag string
+	}{
+		{"tag and digest", "alpine/git:v2.54.1@" + digest, "v2.54.1"},
+		{"digest only", "alpine/git@" + digest, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			j := scriptJob("build", "make")
+			j.Steps[0].Image = &ir.Image{Ref: tc.ref}
+			files, _ := emit(t, project(j))
+			task := dict(list(jobDoc(t, pipelineDoc(t, files), "build")["plan"])[1])
+			img := dict(dict(task["config"])["image_resource"])
+			src := dict(img["source"])
+			if _, has := src["digest"]; has {
+				t.Fatalf("the registry-image source has no digest key: %v", img)
+			}
+			if dict(img["version"])["digest"] != digest || src["repository"] != "alpine/git" || (tc.tag != "" && src["tag"] != tc.tag) {
+				t.Fatalf("image_resource = %v", img)
+			}
+			back, _ := reparse(t, files)
+			if got := back.Pipelines[0].Jobs[0].Steps[0].Image; got == nil || got.Ref != tc.ref {
+				t.Fatalf("parsed back image = %+v, want %s", got, tc.ref)
+			}
+		})
+	}
+}
+
 func TestNeedsAreAPassedGetOfTheSharedSource(t *testing.T) {
 	a, b := scriptJob("a", "true"), scriptJob("b", "true")
 	c := scriptJob("c", "true")

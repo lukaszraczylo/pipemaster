@@ -436,8 +436,19 @@ func imageRef(v any, file bool) (string, bool) {
 	if typ != "registry-image" && (!file || typ != "docker-image") {
 		return "", false
 	}
+	digest := ""
 	for _, key := range m.Order {
-		if key != "type" && key != "source" {
+		switch key {
+		case "type", "source":
+		case keyVersion:
+			vm, isMap := asMap(m.Vals[keyVersion])
+			if !isMap || len(vm.Order) != 1 || vm.Order[0] != "digest" {
+				return "", false
+			}
+			if digest, ok = text(vm.Vals["digest"]); !ok || digest == "" || strings.Contains(digest, varOpen) {
+				return "", false
+			}
+		default:
 			return "", false
 		}
 	}
@@ -452,7 +463,7 @@ func imageRef(v any, file bool) (string, bool) {
 			}
 		}
 	}
-	return refOfSource(src, "", nil)
+	return refOfSource(src, digest, nil)
 }
 
 // env merges the config params and the step params into the step env; step params win. A value with no Value

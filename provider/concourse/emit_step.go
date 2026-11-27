@@ -561,12 +561,16 @@ func imageNode(repo, digest, tag string) *yaml.Node {
 	if tag != "" {
 		src.SetStr("tag", tag)
 	}
-	if digest != "" {
-		src.SetStr("digest", digest)
-	}
 	m := newMap()
 	m.SetStr("type", "registry-image")
 	m.Set("source", src.N)
+	// The registry-image source has no digest key; an anonymous resource pins the digest as its version
+	// (https://github.com/concourse/registry-image-resource#use-in-tasks).
+	if digest != "" {
+		v := newMap()
+		v.SetStr("digest", digest)
+		m.Set(keyVersion, v.N)
+	}
 	return m.N
 }
 
