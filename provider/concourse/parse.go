@@ -63,6 +63,7 @@ func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		return nil, rep, fmt.Errorf("concourse: no pipeline with a jobs list found under %s/", dirName)
 	}
 	var pls []*ir.Pipeline
+	var defaulted []string
 	read := map[string]bool{}
 	byID := map[string]string{}
 	for _, src := range pipes {
@@ -80,10 +81,16 @@ func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 			return nil, nil, fmt.Errorf("%s: %w", src.name, err)
 		}
 		pls = append(pls, pl)
+		if pb.defaultTriggers {
+			defaulted = append(defaulted, pl.ID)
+		}
 		maps.Copy(read, pb.read)
 	}
 	keepOtherFiles(rep, pls[0], others, otherNames, read)
 	proj := &ir.Project{Origin: ir.Origin{Provider: dialect, Dialect: dialect, Files: files}, Pipelines: pls}
+	for _, id := range defaulted {
+		proj.Origin.MarkDefaultTriggers(id)
+	}
 	if err := ir.Validate(proj); err != nil {
 		return nil, nil, err
 	}
@@ -191,6 +198,8 @@ type pipeBuilder struct {
 	jobNames []string
 	// resLost is true when a resource has a key that no target runs.
 	resLost bool
+	// defaultTriggers is true when the file marks its triggers as made from the default events of the source.
+	defaultTriggers bool
 }
 
 func newPipelineBuilder(rep *report.Report, file, id string) *pipeBuilder {
@@ -246,7 +255,7 @@ func (b *pipeBuilder) build(top *omap) (*ir.Pipeline, error) {
 	if b.carryPipeline(top, rawList, pl) {
 		undoTriggers()
 	}
-	b.dropDefaultTriggers(pl)
+	b.noteDefaultTriggers(pl)
 	b.finallyHooks(pl, built)
 	b.orphanNames()
 	b.secretNote()

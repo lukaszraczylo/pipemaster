@@ -637,7 +637,7 @@ func (s *state) restoreTriggers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[
 		}
 		var d provider.DefaultTriggersArg
 		if m[1] == strconv.Itoa(defaultMarkIndex) && json.Unmarshal([]byte(args[u][0]), &d) == nil && d.Default {
-			pl.Triggers = nil
+			s.defaulted = append(s.defaulted, pl.ID)
 			return
 		}
 		var w wireTrigger

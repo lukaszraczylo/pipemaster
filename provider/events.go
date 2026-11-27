@@ -115,6 +115,20 @@ func firedEvents(pl *ir.Pipeline, events []SourceEvent) []SourceEvent {
 // the default events of its source, so reading the file back restores a pipeline with no trigger.
 type DefaultTriggersArg struct {
 	Default bool `json:"default_triggers"`
+	// Manual is set when the triggers include a manual start, which a file of some dialects does not show.
+	Manual bool `json:"manual,omitempty"`
+}
+
+// DefaultMarker is the marker argument for pl, whose triggers were made from the default events of its source.
+func DefaultMarker(pl *ir.Pipeline) DefaultTriggersArg {
+	return DefaultTriggersArg{Default: true, Manual: slices.ContainsFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerManual })}
+}
+
+// RestoreManual appends the manual trigger that the marker records, if the parsed pipeline has none.
+func (a DefaultTriggersArg) RestoreManual(pl *ir.Pipeline) {
+	if a.Manual && !slices.ContainsFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerManual }) {
+		pl.Triggers = append(pl.Triggers, ir.Trigger{Kind: ir.TriggerManual})
+	}
 }
 
 // WithDefaultTriggers gives each pipeline with no trigger the IR triggers of its source's default events, unless the
@@ -128,6 +142,11 @@ func WithDefaultTriggers(p *ir.Project, target string) (*ir.Project, map[string]
 	unmapped := map[string][]SourceEvent{}
 	injected := map[string]bool{}
 	for i, pl := range p.Pipelines {
+		if pl != nil && p.Origin.DefaultTriggers[pl.ID] && SameFamily(p.Origin.Provider, target) {
+			// The file was read back with the triggers that an earlier emit made; it keeps the marker.
+			injected[pl.ID] = true
+			continue
+		}
 		events := DefaultEvents(pl, p.Origin.Provider)
 		if len(events) == 0 || SameFamily(p.Origin.Provider, target) {
 			continue
@@ -149,7 +168,7 @@ func WithDefaultTriggers(p *ir.Project, target string) (*ir.Project, map[string]
 		out.Pipelines[i] = &cp
 	}
 	if out == nil {
-		return p, nil, nil
+		return p, nil, injected
 	}
 	return out, unmapped, injected
 }

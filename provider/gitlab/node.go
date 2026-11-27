@@ -33,9 +33,11 @@ type state struct {
 	splitImg map[*ir.Job]map[string]ir.Image
 	rep      *report.Report
 	remote   []string
-	nodes    int
-	includes int
-	restored bool
+	// defaulted lists the IDs of the pipelines whose triggers carry the default-events marker.
+	defaulted []string
+	nodes     int
+	includes  int
+	restored  bool
 	// child is true for the root file of a child pipeline.
 	child bool
 }

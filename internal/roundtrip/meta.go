@@ -61,6 +61,9 @@ func RestoreKeepingEdits(proj *ir.Project, m *meta.Meta) (orphans, kept []string
 }
 
 func restore(proj *ir.Project, m *meta.Meta, keepEdits bool) (orphans, kept []string) {
+	if m.Source != "" {
+		dropDefaultTriggers(proj)
+	}
 	RestoreIDs(proj, m.IDs)
 	if m.Source != "" {
 		proj.Origin.Provider, proj.Origin.Dialect = m.Source, m.Dialect
@@ -79,6 +82,19 @@ func restore(proj *ir.Project, m *meta.Meta, keepEdits bool) (orphans, kept []st
 	}
 	orphans = meta.Reattach(proj, m)
 	return append(orphans, restoreCalls(proj, m.Calls)...), nil
+}
+
+// dropDefaultTriggers removes the triggers that an emitter made from the default events of a Drone or GitLab
+// source. The metadata names that source, so the pipeline reads back with no trigger. It runs before RestoreIDs,
+// while the pipeline IDs are the parsed ones.
+func dropDefaultTriggers(proj *ir.Project) {
+	for _, pl := range proj.Pipelines {
+		if pl != nil && proj.Origin.DefaultTriggers[pl.ID] {
+			pl.Triggers = nil
+		}
+	}
+	// One pass only: a later layer restores triggers that this pass must not drop again.
+	proj.Origin.DefaultTriggers = nil
 }
 
 // restoreCalls replaces the jobs that an inline wrote with the stored call job and its child pipeline, and puts

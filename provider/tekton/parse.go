@@ -86,7 +86,7 @@ func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	}
 	p.triggers(byName)
 	p.cronJobs(byName)
-	p.dropDefaultTriggers(byName)
+	defaulted := p.defaultTriggerIDs(byName)
 	for name, d := range p.tasks {
 		if !p.taskUsed[name] {
 			p.resources = append(p.resources, d)
@@ -103,6 +103,9 @@ func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	proj := &ir.Project{
 		Origin:    ir.Origin{Provider: dialect, Dialect: dialect, Files: files},
 		Pipelines: pls,
+	}
+	for _, id := range defaulted {
+		proj.Origin.MarkDefaultTriggers(id)
 	}
 	if err := ir.Validate(proj); err != nil {
 		return nil, nil, err
