@@ -16,7 +16,5 @@
       "check"
     ]
   },
-  "requires": [
-    "artifacts"
-  ]
+  "requires": []
 }

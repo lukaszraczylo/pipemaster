@@ -136,13 +136,16 @@ func (e *woodpeckerEngine) Run(ctx context.Context, w *Workspace) (*Trace, error
 	if err != nil {
 		return nil, blocked("no usable Woodpecker workflows in the converted output: %v", err)
 	}
-	tr := &Trace{NoPipeline: true}
-	start := time.Now()
-	for _, t := range targets {
-		run, err := woodpeckerRunCopy(w.Dir, t)
-		if err != nil {
+	// A step can replace the working tree, so every copy is written before the first workflow runs.
+	runs := make([]string, len(targets))
+	for i, t := range targets {
+		if runs[i], err = woodpeckerRunCopy(w.Dir, t); err != nil {
 			return nil, err
 		}
+	}
+	tr := &Trace{NoPipeline: true}
+	start := time.Now()
+	for _, run := range runs {
 		out, code, err := e.env.run(ctx, runOpts{Dir: w.Dir, Timeout: timeoutLocal}, bin, append(slices.Clone(args), run)...)
 		if err != nil {
 			return nil, err
@@ -337,10 +340,19 @@ func (e *droneEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	if err := os.WriteFile(envFile, []byte(vars), 0o600); err != nil {
 		return nil, err
 	}
+	// A step can replace the working tree, so the pipeline file is read from a copy outside it.
+	pipeFile := w.Dir + ".drone.yml"
+	raw, err := os.ReadFile(file) // #nosec G304 -- the converted file of the run workspace
+	if err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(pipeFile, raw, 0o600); err != nil { // #nosec G703 -- a copy beside the run workspace
+		return nil, err
+	}
 	tr := &Trace{}
 	start := time.Now()
 	for _, n := range names {
-		args := []string{"exec", "--pipeline", n, "--event", event, "--branch=" + branch, "--env-file", envFile, ".drone.yml"}
+		args := []string{"exec", "--pipeline", n, "--event", event, "--branch=" + branch, "--env-file", envFile, pipeFile}
 		out, code, err := e.env.run(ctx, runOpts{Dir: w.Dir, Timeout: timeoutLocal}, bin, args...)
 		if err != nil {
 			return nil, err
@@ -362,8 +374,9 @@ type gitlabEngine struct{ env *Env }
 
 var glLine = regexp.MustCompile(`^\S+\s+> (.*)$`)
 
-// kiriShim works around two Kiri docker quirks: "docker cp ctr:/dir/. dest" copies the directory itself, and a
-// copy into a container needs the target parent to exist (the harness bakes it into the images).
+// kiriShim works around three Kiri docker quirks: "docker cp ctr:/dir/. dest" copies the directory itself, a
+// copy into a container needs the target parent to exist (the harness bakes it into the images), and
+// "--entrypoint \"\"" fails to start the container (the baked images have no entrypoint already).
 const kiriShim = `#!/bin/bash
 D="${PM_DOCKER:-docker}"
 [ -n "$PM_SHIM_LOG" ] && echo "$@" >> "$PM_SHIM_LOG"
@@ -388,7 +401,12 @@ fi
 if [ "$1" = cp ] && [[ "$2" != *:* ]] && [[ "$2" == */. ]] && [[ "$3" == *:* ]]; then
   for e in "${2%/.}"/* "${2%/.}"/.[!.]*; do [ -e "$e" ] && [ "$(basename "$e")" != .git ] || continue; "$D" cp "$e" "$3/" || exit $?; done; exit 0
 fi
-exec "$D" "$@"
+args=(); skip=0
+for a in "$@"; do
+  if [ "$skip" = 1 ]; then skip=0; if [ -z "$a" ]; then unset 'args[${#args[@]}-1]'; continue; fi; fi
+  args+=("$a"); [ "$a" = --entrypoint ] && skip=1
+done
+exec "$D" ${args[@]+"${args[@]}"}
 `
 
 const defaultImage = "alpine:3.20"

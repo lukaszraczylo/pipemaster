@@ -8,13 +8,20 @@ spec:
   tasks:
     - name: fetch
       taskRef:
-        name: git-clone
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/tektoncd-catalog/git-clone.git
+          - name: revision
+            value: v1.7.1
+          - name: pathInRepo
+            value: task/git-clone/git-clone.yaml
       workspaces:
         - name: output
           workspace: shared
       params:
         - name: url
-          value: https://github.com/tektoncd-catalog/git-clone.git
+          value: https://github.com/tektoncd-catalog/git-clone
         - name: revision
           value: v1.7.1
     - name: check
