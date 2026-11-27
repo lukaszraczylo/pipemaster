@@ -30,10 +30,14 @@ type pipeEmitter struct {
 	file     string
 	sources  []*source
 	sinks    []*ir.Job
-	tagSplit bool
+	// finCopies lists the jobs of the pass whose hooks hold finally tasks.
+	finCopies []finallyHold
+	tagSplit  bool
 	// twinPass is true while the tag twins are written.
 	twinPass bool
 	serial   bool
+	// chain is true when the jobs form one linear path, so one run fails in at most one job.
+	chain bool
 }
 
 // pipeline writes one IR pipeline as one file.

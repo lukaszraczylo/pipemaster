@@ -791,30 +791,36 @@ func (b *pipeBuilder) finallyHooks(pl *ir.Pipeline, built []*builtJob) {
 	if !b.arg(b.path(), caps.PipelineFinally, &a) {
 		return
 	}
-	var sink *builtJob
+	byName := map[string]*builtJob{}
 	for _, bj := range built {
-		if bj.name == a.Job {
-			sink = bj
+		byName[bj.name] = bj
+	}
+	holds := append([]finallyCopy{{Job: a.Job, Digest: a.Digest, Tasks: a.Tasks}}, a.Copies...)
+	taskSets := make([]map[string]bool, len(holds))
+	for i, h := range holds {
+		bj := byName[h.Job]
+		taskSets[i] = map[string]bool{}
+		for _, t := range h.Tasks {
+			taskSets[i][t] = true
 		}
-	}
-	taskSet := map[string]bool{}
-	for _, t := range a.Tasks {
-		taskSet[t] = true
-	}
-	found := 0
-	if sink != nil {
-		for _, st := range sink.job.Steps {
-			if taskSet[sink.written[st]] {
-				found++
+		found := 0
+		if bj != nil {
+			for _, st := range bj.job.Steps {
+				if taskSets[i][bj.written[st]] {
+					found++
+				}
 			}
 		}
+		if bj == nil || bj.hookDigest != h.Digest || found != len(h.Tasks) {
+			pl.Finally = nil
+			b.ignored(b.path(), caps.PipelineFinally, "the hooks of the job "+h.Job+" were edited after pipemaster wrote them; the finally jobs are not restored and the hook steps stay")
+			return
+		}
 	}
-	if sink == nil || sink.hookDigest != a.Digest || found != len(a.Tasks) {
-		pl.Finally = nil
-		b.ignored(b.path(), caps.PipelineFinally, "the hooks of the job "+a.Job+" were edited after pipemaster wrote them; the finally jobs are not restored and the hook steps stay")
-		return
+	for i, h := range holds {
+		bj := byName[h.Job]
+		bj.job.Steps = slices.DeleteFunc(bj.job.Steps, func(st *ir.Step) bool { return taskSets[i][bj.written[st]] })
 	}
-	sink.job.Steps = slices.DeleteFunc(sink.job.Steps, func(st *ir.Step) bool { return taskSet[sink.written[st]] })
 }
 
 // mergeTagTwins folds each tag twin into the job it follows: the twin leaves the pipeline and its triggering

@@ -92,12 +92,27 @@ type disabledArg struct {
 	Script string `json:"script"`
 }
 
-// finallyArg names the job whose hooks hold the finally jobs, the tasks that stand for them, and the digest of
+// finallyArg names the sink job whose hooks hold the finally jobs, the tasks that stand for them, and the digest of
 // the hooks, so the parser removes those tasks only when the hooks are unedited.
 type finallyArg struct {
+	Job    string        `json:"job"`
+	Digest string        `json:"digest"`
+	Tasks  []string      `json:"tasks"`
+	Copies []finallyCopy `json:"copies,omitempty"`
+}
+
+// finallyCopy names a job of the chain that holds the failure and always finally tasks in its on_failure hook, and
+// the digest of its hooks.
+type finallyCopy struct {
 	Job    string   `json:"job"`
 	Digest string   `json:"digest"`
 	Tasks  []string `json:"tasks"`
+}
+
+// finallyHold is a job whose hooks hold finally tasks; sink marks the job that holds all of them.
+type finallyHold struct {
+	finallyCopy
+	sink bool
 }
 
 // tagTwinSuffix ends the name of the twin of a job that follows the tag resources.

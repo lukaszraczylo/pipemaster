@@ -41,7 +41,7 @@ func (adapter) Caps() caps.Matrix {
 		caps.JobManual:              {Level: caps.Emulated, Strategy: "job with no triggering get, started by a person", Caveat: "no approver identity; " + triggerSet},
 		caps.JobCache:               {Level: caps.Emulated, Strategy: "task config caches", Caveat: "a task cache is kept per worker, job and task step, so a new worker starts cold; it has no key, restore keys or policy"},
 		caps.JobArtifacts:           {Level: caps.Emulated, Strategy: "workspace artifact handed from task to task (inputs and outputs of the same name)", Caveat: "only within one job; a job with no script step writes no workspace"},
-		caps.PipelineFinally:        {Level: caps.Emulated, Strategy: "job hook (ensure) on the single sink job", Caveat: "several finally steps wrap in do; a pipeline with no single sink job loses the finally steps"},
+		caps.PipelineFinally:        {Level: caps.Emulated, Strategy: "job hook on the sink job of a chain, and on_failure hook on its other jobs", Caveat: "several finally steps wrap in do; the other jobs of the chain run only the failure and always finally steps, in on_failure; a pipeline whose jobs are not one chain loses the finally steps"},
 		caps.PipelineConcurrency:    {Level: caps.Emulated, Strategy: "serial_groups on the jobs", Caveat: "cancel-in-progress is lost; a second build waits"},
 		caps.JobEnv:                 {Level: caps.Emulated, Strategy: "copied into the params of every task", Caveat: "a step variable of the same name wins"},
 		caps.PipelineEnv:            {Level: caps.Emulated, Strategy: "copied into the params of every task", Caveat: "a step variable of the same name wins"},
