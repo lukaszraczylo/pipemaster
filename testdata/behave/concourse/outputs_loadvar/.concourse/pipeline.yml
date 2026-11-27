@@ -15,6 +15,7 @@ jobs:
         file: source/.concourse/tasks/consume.yml
       - load_var: ver
         file: out/version
+        reveal: true
       - task: announce
         config:
           platform: linux
