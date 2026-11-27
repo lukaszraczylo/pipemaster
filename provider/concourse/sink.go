@@ -43,6 +43,9 @@ const (
 	// ExtLoadRefs holds the script lines that read load_var values into the params of a task; the emitter drops
 	// them and writes the params back.
 	ExtLoadRefs = "load_refs"
+	// ExtLayout holds the script lines that lay out the inputs of an inline task and the run.dir that the lines
+	// replaced; the emitter drops them and writes the inputs and run.dir back.
+	ExtLayout = "layout"
 	// ExtStep and ExtKind keep a step the IR cannot model: the verbatim step and its kind key.
 	ExtStep = "step"
 	ExtKind = "kind"

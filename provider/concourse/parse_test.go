@@ -302,7 +302,7 @@ func TestHooks(t *testing.T) {
 func TestInlineTaskMapping(t *testing.T) {
 	pl, rep := parseYAML(t, oneJob("  - task: unit\n    timeout: 30m\n    params: {LEVEL: debug, TOKEN: ((deploy-token)), REGION: ((region)), LOCAL: ((.:x)), MIXED: \"a-((b))\"}\n    config:\n      platform: linux\n      image_resource: {type: registry-image, source: {repository: golang, tag: \"1.22\"}}\n      params: {LEVEL: info, BASE: x}\n      inputs: [{name: repo}]\n      run: {path: bash, dir: repo, args: [-ec, \"set -x\\ngo test ./...\"]}\n"))
 	s := step(t, job(t, pl, "build"), "unit")
-	if s.Kind != ir.StepScript || s.Shell != "bash" || s.WorkDir != "repo" || !reflect.DeepEqual(s.Script, []string{"set -x", "go test ./..."}) {
+	if s.Kind != ir.StepScript || s.Shell != "bash" || s.WorkDir != "" || !reflect.DeepEqual(s.Script, []string{`[ -e repo ] || ln -s "$PWD" repo`, "cd 'repo'", "set -x", "go test ./..."}) {
 		t.Fatalf("step = %+v", s)
 	}
 	if s.Image == nil || s.Image.Ref != "golang:1.22" {
@@ -340,7 +340,7 @@ func TestInlineTaskMapping(t *testing.T) {
 	if cfg, _ := e["config"].(map[string]any); cfg["platform"] != "linux" || cfg["inputs"] == nil {
 		t.Errorf("residual config = %v", e["config"])
 	}
-	for _, want := range []string{"LOCAL", "task config keys inputs"} {
+	for _, want := range []string{"LOCAL", "link repo to the checkout"} {
 		if !hasEntry(rep, want) {
 			t.Errorf("no entry mentions %q", want)
 		}

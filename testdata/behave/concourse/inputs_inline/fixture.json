@@ -1,0 +1,16 @@
+{
+  "features": [
+    "step.script"
+  ],
+  "events": [
+    "push-main"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": [
+    "inputs.cd:seed",
+    "inputs.dir:seed"
+  ],
+  "owners": {},
+  "requires": []
+}

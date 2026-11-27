@@ -195,6 +195,9 @@ func (jb *jobBuilder) taskStep(m *omap) *ir.Step {
 		}
 	}
 	jb.env(st, k, cfgParams, r)
+	if !hasFile && jb.layoutInline(st, form, cfg) {
+		jb.inlineLayout(st, k, m, cfg, m.Lines["config"])
+	}
 	if hasFile && st.Kind == ir.StepScript {
 		k.Out[emitkit.CarriedKey] = []any{"file", keyImage, ExtTaskDigest, ExtFileParams}
 	}
@@ -246,6 +249,9 @@ func (jb *jobBuilder) config(st *ir.Step, k *sink, cfg *omap, line int, form boo
 	if len(rest.Order) > 0 {
 		var noted []string
 		for _, key := range rest.Order {
+			if key == "inputs" && jb.layoutInline(st, form, cfg) {
+				continue
+			}
 			if key == "platform" {
 				if !jb.inFile {
 					jb.platformNote("inline task", cfg.Vals[key], k, line)
