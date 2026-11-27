@@ -38,8 +38,10 @@ func (a *adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, er
 	p, vres := vars.Prepare(p, a.d.ID)
 	p = bindRefEnv(p, a.d.ID)
 	fresh := provider.FreshGitLabDefaults(p, a.d.ID)
+	// The gated jobs come from the source conditions: a rule of the source can have the shape of the gate.
+	gated := provider.GatedJobs(p, a.d.ID)
 	p, noForm, injected := provider.WithDefaultTriggers(p, a.d.ID)
-	p, srcEvents, srcLost := withGitLabSources(p, a.d.ID, fresh)
+	p, srcEvents, srcLost := withGitLabSources(p, a.d.ID, fresh, gated)
 	e := &emitter{origin: originProvider(p), d: a.d, from: sourceDialect(originProvider(p)), led: emitkit.NewLedger("ir", a.d.ID, a.Caps()),
 		jobGuards: p.Origin.Guarded}
 	e.injected = injected

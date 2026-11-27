@@ -36,7 +36,7 @@ type condBack struct {
 // that they admit on some branch or tag gets its trigger, and every job gets the rule condition for a run of that source,
 // so no job runs where GitLab starts none. An api or trigger source under such a condition comes back as lost, because a
 // repository_dispatch run has no ref of its own to test.
-func withGitLabSources(p *ir.Project, target string, injected map[string]bool) (*ir.Project, map[string]sourceEventsArg, map[string][]provider.SourceEvent) {
+func withGitLabSources(p *ir.Project, target string, injected map[string]bool, gated []string) (*ir.Project, map[string]sourceEventsArg, map[string][]provider.SourceEvent) {
 	if p == nil || p.Origin.Provider != provider.GitLab || provider.SameFamily(p.Origin.Provider, target) {
 		return p, nil, nil
 	}
@@ -94,7 +94,7 @@ func withGitLabSources(p *ir.Project, target string, injected map[string]bool) (
 		kinds := injectedKinds(pl, injected)
 		if len(added) == 0 {
 			if len(kinds) > 0 {
-				args[pl.ID] = sourceEventsArg{Kinds: kinds, Gated: gatedIDs(pl)}
+				args[pl.ID] = sourceEventsArg{Kinds: kinds, Gated: gatedIDs(pl, gated)}
 			}
 			continue
 		}
@@ -109,7 +109,7 @@ func withGitLabSources(p *ir.Project, target string, injected map[string]bool) (
 		arg.Conds = gateJobs(&cp, gates)
 		out.Pipelines[i] = &cp
 		arg.Kinds = append(arg.Kinds, kinds...)
-		arg.Gated = gatedIDs(&cp)
+		arg.Gated = gatedIDs(&cp, gated)
 		for _, t := range added {
 			arg.Kinds = append(arg.Kinds, t.Kind)
 		}
@@ -236,11 +236,12 @@ func injectedKinds(pl *ir.Pipeline, injected map[string]bool) []ir.TriggerKind {
 	return out
 }
 
-// gatedIDs lists the jobs of pl that carry the gate of the pull request trigger.
-func gatedIDs(pl *ir.Pipeline) []string {
+// gatedIDs lists the jobs of pl that carry the gate of the pull request trigger, from gated as provider.GatedJobs
+// lists them.
+func gatedIDs(pl *ir.Pipeline, gated []string) []string {
 	var out []string
 	for _, j := range append(slices.Clone(pl.Jobs), pl.Finally...) {
-		if j != nil && provider.InjectedGate(j.If) {
+		if j != nil && slices.Contains(gated, pl.ID+"/"+j.ID) {
 			out = append(out, j.ID)
 		}
 	}

@@ -230,19 +230,6 @@ func StripGates(pl *ir.Pipeline, ids []string) {
 	}
 }
 
-// InjectedGate is true for the condition that WithDefaultTriggers puts on a job with no rules.
-// The gate can sit as a conjunct beside a status condition.
-func InjectedGate(c expr.Expr) bool {
-	if c == nil {
-		return false
-	}
-	if expr.String(c) == expr.String(prGate) {
-		return true
-	}
-	b, ok := c.(expr.Binary)
-	return ok && b.Op == expr.OpAnd && (InjectedGate(b.L) || InjectedGate(b.R))
-}
-
 // prNameGitLab spells the pull request event of an event test as GitLab does.
 func prNameGitLab(c expr.Expr) expr.Expr {
 	switch v := c.(type) {

@@ -58,3 +58,31 @@ func TestGitLabStatusJobsStayOffPullRequestArgo(t *testing.T) {
 		t.Errorf("the sensor admits reopened:\n%s", s)
 	}
 }
+
+// A job that keeps itself out of merge request pipelines with a when: never rule is not a job the emit gated, so the
+// return keeps its rule.
+const gitlabNeverOnMR = `image: alpine:3.20
+build:
+  script: [echo build]
+nosched:
+  script: [echo nosched]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+mrjob:
+  script: [echo mr]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+`
+
+func TestNeverOnMergeRequestRuleSurvivesTheRoundTrip(t *testing.T) {
+	for _, via := range []string{"gha", "tekton", "argo", "woodpecker", "drone"} {
+		t.Run(via, func(t *testing.T) {
+			code, out, msg := runOut("roundtrip", writeGitlab(t, gitlabNeverOnMR), "--via", via)
+			if code != 0 || out != "no differences\n" {
+				t.Fatalf("code=%d out=%q\n%s", code, out, msg)
+			}
+		})
+	}
+}
