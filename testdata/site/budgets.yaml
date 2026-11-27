@@ -45,12 +45,12 @@ mixed-lost-steps:
   woodpecker: {placeholder: 7, lost_line: 0, disabled: 1}
 tekton:
   argo: {placeholder: 0, lost_line: 0, disabled: 0}
-  # fail-loud clone of a pipeline-input url (corpus 69); was a silent own-repository clone
-  concourse: {placeholder: 0, lost_line: 4, disabled: 0}
-  drone: {placeholder: 0, lost_line: 3, disabled: 0}
+  # fail-loud clone of a pipeline-input url (corpus 69), now also in the catalog build-image job; was a silent own-repository clone
+  concourse: {placeholder: 0, lost_line: 6, disabled: 0}
+  drone: {placeholder: 0, lost_line: 4, disabled: 0}
   gha: {placeholder: 0, lost_line: 0, disabled: 0}
   gitlab: {placeholder: 0, lost_line: 0, disabled: 7}
-  woodpecker: {placeholder: 0, lost_line: 3, disabled: 0}
+  woodpecker: {placeholder: 0, lost_line: 4, disabled: 0}
 woodpecker:
   argo: {placeholder: 3, lost_line: 0, disabled: 0}
   concourse: {placeholder: 2, lost_line: 0, disabled: 0}

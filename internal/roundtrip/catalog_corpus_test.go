@@ -45,7 +45,6 @@ func TestCorpus69CatalogTasksHaveNoPlaceholder(t *testing.T) {
 		want []string
 	}{
 		{provider.GHA, []string{
-			"uses: actions/checkout@",
 			"id: build-image-checkout",
 			"id: yaml-lint-checkout",
 			"oc patch deployment ${{ inputs.deployment-name }}",
@@ -80,7 +79,7 @@ func TestCorpus69CatalogTasksHaveNoPlaceholder(t *testing.T) {
 					t.Errorf("%s output holds the placeholder %q", c.to, bad)
 				}
 			}
-			for _, w := range []string{"needs a privileged runner", "pushing the image needs registry credentials", "the job clones the pipeline repository itself"} {
+			for _, w := range []string{"needs a privileged runner", "pushing the image needs registry credentials"} {
 				if !strings.Contains(rep, w) {
 					t.Errorf("report lacks %q", w)
 				}
