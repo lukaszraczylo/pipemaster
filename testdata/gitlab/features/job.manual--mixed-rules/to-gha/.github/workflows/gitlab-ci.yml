@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/release
 # pipemaster:arg {"src":"branch == 'dev'","guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/release
@@ -5,7 +8,12 @@
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/release
 # pipemaster:arg {"pre":1,"post":0}
 on:
+  workflow_dispatch:
   push:
+  repository_dispatch:
+    types:
+      - api
+      - trigger
 jobs:
   release:
     if: github.ref_type == 'branch' && github.ref_name == 'dev' && !github.event.deleted

@@ -1,6 +1,7 @@
 package roundtrip_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -143,13 +144,20 @@ func TestGitLabWorkflowBranchRuleGatesTheManualRun(t *testing.T) {
 	}
 }
 
-// A job whose condition names no API source adds no event the source never named.
-func TestGitLabDefaultSourcesAddOnlyNamedEvents(t *testing.T) {
-	out, _ := convert(t, "gitlab", "gha", ".gitlab-ci.yml", "build:\n  script: [make]\n  rules:\n    - if: '$CI_COMMIT_BRANCH == \"main\"'\n")
-	for _, no := range []string{"repository_dispatch", "schedule:", "workflow_dispatch"} {
-		if strings.Contains(out, no) {
-			t.Errorf("%s added for a job that tests a branch only:\n%s", no, out)
+// A GitLab pipeline with no workflow block runs every job on every pipeline source, so a job that tests a branch
+// only still gets the manual and API triggers. The schedule gets no cron: GitLab keeps it in the project settings.
+func TestGitLabDefaultSourcesReachEveryJob(t *testing.T) {
+	out, rep := convert(t, "gitlab", "gha", ".gitlab-ci.yml", "build:\n  script: [make]\n  rules:\n    - if: '$CI_COMMIT_BRANCH == \"main\"'\n")
+	for _, want := range []string{"workflow_dispatch", "repository_dispatch"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("%s missing for a job that GitLab runs on every source:\n%s", want, out)
 		}
+	}
+	if strings.Contains(out, "schedule:") || strings.Contains(out, "cron:") {
+		t.Errorf("a schedule was invented:\n%s", out)
+	}
+	if !slices.ContainsFunc(rep.Entries, func(e report.Entry) bool { return e.Feature == caps.TriggerSchedule && e.Level == caps.External }) {
+		t.Errorf("the schedule source is not reported as external:\n%+v", rep.Entries)
 	}
 }
 

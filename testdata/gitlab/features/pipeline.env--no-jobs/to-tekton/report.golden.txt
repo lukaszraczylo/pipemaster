@@ -1,4 +1,9 @@
 Loss report: gitlab -> tekton
-[external] pipeline/gitlab-ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
-[external] pipeline/gitlab-ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[lost] pipeline/gitlab-ci trigger.api (the source runs on the events api, trigger and its file has no trigger form for them; Tekton has no event for them, and the file names no schedule to copy)
+[lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline and its file has no trigger form for them; Tekton has no event for them, and the file names no schedule to copy)
+[lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat and its file has no trigger form for them; Tekton has no event for them, and the file names no schedule to copy)
+[lost] pipeline/gitlab-ci trigger.schedule (the source runs on the events schedule and its file has no trigger form for them; Tekton has no event for them, and the file names no schedule to copy)
+[external] pipeline/gitlab-ci/trigger/0 trigger.manual: tkn pipeline start gitlab-ci (a person starts the run with `tkn pipeline start gitlab-ci`)
+[external] pipeline/gitlab-ci/trigger/1 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[external] pipeline/gitlab-ci/trigger/2 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [emulated] pipeline/gitlab-ci pipeline.env: stepTemplate env (the pipeline env is copied into the stepTemplate of every Task)

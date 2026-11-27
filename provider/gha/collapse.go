@@ -102,13 +102,15 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 		case caps.TriggerAPI:
 			dropSynthEvent(pl, u.IRPath, provider.Family(e.d.ID))
 		case caps.TriggerPush:
-			var src sourceEventsArg
-			if len(args[u]) == 1 && u.IRPath == "pipeline/"+pl.ID && json.Unmarshal([]byte(args[u][0]), &src) == nil && len(src.Kinds) > 0 {
-				dropSourceEvents(pl, src)
-				sources = append(sources, src)
+			for _, a := range args[u] {
+				var src sourceEventsArg
+				if u.IRPath == "pipeline/"+pl.ID && json.Unmarshal([]byte(a), &src) == nil && len(src.Kinds) > 0 {
+					dropSourceEvents(pl, src)
+					sources = append(sources, src)
+				}
 			}
 			var d provider.DefaultTriggersArg
-			if len(args[u]) == 1 && json.Unmarshal([]byte(args[u][0]), &d) == nil && d.Default {
+			if slices.ContainsFunc(args[u], func(a string) bool { return json.Unmarshal([]byte(a), &d) == nil && d.Default }) {
 				if u.IRPath == "pipeline/"+pl.ID {
 					defaulted = true
 				}
@@ -121,6 +123,7 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 	}
 	for _, src := range sources {
 		restoreGatedConds(pl, src)
+		provider.StripGates(pl, src.Gated)
 	}
 	return condsFrom, guarded, defaulted
 }

@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/build
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
@@ -5,7 +8,12 @@
 # pipemaster:emulated job.cache pipeline/gitlab-ci/job/build
 # pipemaster:arg {"cache":[{"Key":"$\u007b{ hashFiles('go.sum') }}","Policy":"pull-push","Paths":[".cache/go-build"],"FallbackKeys":null}],"pre":2,"post":0}
 on:
+  workflow_dispatch:
   push:
+  repository_dispatch:
+    types:
+      - api
+      - trigger
 jobs:
   build:
     if: '!github.event.deleted'

@@ -48,6 +48,7 @@ func (a adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, err
 	p, vres := vars.Prepare(p, dialect)
 	p, checkouts := emitkit.WithSourceCheckout(p)
 	p, noForm, injected := provider.WithDefaultTriggers(p, dialect)
+	p = provider.CanonEventNames(p)
 	origin := ""
 	if p != nil {
 		origin = p.Origin.Provider

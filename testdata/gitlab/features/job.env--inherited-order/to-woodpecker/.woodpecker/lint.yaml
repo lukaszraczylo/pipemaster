@@ -1,6 +1,8 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/lint
 # pipemaster:emulated trigger.manual pipeline/gitlab-ci
 # pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/lint
+# pipemaster:arg {"gitlab_default":true}
 # pipemaster:emulated job.env pipeline/gitlab-ci/job/lint
 # pipemaster:arg "- name: GOCACHE\n  value:\n    lit: $$CI_PROJECT_DIR/.cache/go-build\n- name: GOMODCACHE\n  value:\n    lit: $$CI_PROJECT_DIR/.cache/go-mod\n"
 when:

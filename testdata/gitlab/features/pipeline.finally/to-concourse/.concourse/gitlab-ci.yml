@@ -1,3 +1,5 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
 # pipemaster:arg {"digest":"b031fe97ca33ecbd3ab02ef7b3daed552051b278e3a390168ad1737b473f6423","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated display.name pipeline/gitlab-ci/job/build/step/script-2
@@ -15,7 +17,7 @@
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nfinally:\n    - if: failure()\n      id: alert\n      needs:\n        - job: build\n      steps:\n        - id: script\n          kind: script\n          script:\n            - ./page.sh\n    - id: report\n      needs:\n        - job: build\n      steps:\n        - id: script\n          kind: script\n          script:\n            - ./notify.sh\n"}
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: manual\n    - kind: push\n    - kind: tag\nfinally:\n    - if: failure()\n      id: alert\n      needs:\n        - job: build\n      steps:\n        - id: script\n          kind: script\n          script:\n            - ./page.sh\n    - id: report\n      needs:\n        - job: build\n      steps:\n        - id: script\n          kind: script\n          script:\n            - ./notify.sh\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/alert
@@ -27,7 +29,7 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/report/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/report/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/report/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2
 resources:
   - name: source
     type: git

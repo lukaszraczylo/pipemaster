@@ -1,3 +1,5 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/step/script/carry
 # pipemaster:arg {"digest":"0ecf926402f145e573baf27d7ab7ce1f12c314082e09fcafcee5189a835e69fe","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/deploy
@@ -7,12 +9,12 @@
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/deploy-tag
 # pipemaster:arg {"twin_of":"deploy"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: manual\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/deploy/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/deploy/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2
 resources:
   - name: source
     type: git

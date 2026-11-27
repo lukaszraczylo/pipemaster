@@ -1,3 +1,5 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
 # pipemaster:arg {"digest":"a8874d57fcb4e77a3120a2e3ef5ab71c65f1e92a3906bace903450908a0d03e0","carry":"id: script\nkind: script\nscript:\n    - 'export PIPEMASTER_VARS=2; : \"${CI_COMMIT_BRANCH:?pipemaster: lost: variable CI_COMMIT_BRANCH has no concourse source}\"; : \"${GITLAB_USER_LOGIN:?pipemaster: lost: variable GITLAB_USER_LOGIN has no concourse source}\"; : pipemaster-end; echo \"building $\u007b{ sha }} on ${CI_COMMIT_BRANCH} for $GITLAB_USER_LOGIN\"'\n    - echo \"keeps $HOME and ${UNMAPPED}\"\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
@@ -5,12 +7,12 @@
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/build-tag
 # pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: manual\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2
 resources:
   - name: source
     type: git

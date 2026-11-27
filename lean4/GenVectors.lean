@@ -460,7 +460,7 @@ def glPrCase (e : E) : Json × Json :=
   let out := match glPr e with
     | none => Json.mkObj [("tr", Json.null)]
     | some t0 =>
-      let t := fam t0
+      let t := famX false t0
       let wpAt (sfx : String) := Json.arr (glEnvs.map (fun env => Json.bool (holds .gitlab (Woodpecker.wpView (wpMapS env wpTarget sfx)) t))).toArray
       Json.mkObj [("tr", exprJson t), ("tr_plain", exprJson t0), ("src", Json.arr (src.map Json.bool).toArray),
         ("wp", wpAt ""), ("wp_closed", wpAt "_closed"), ("wp_metadata", wpAt "_metadata"),

@@ -576,6 +576,9 @@ func collapsePipeline(rep *report.Report, pl *ir.Pipeline, wfs []*workflow) {
 	for _, w := range wfs {
 		if _, ok := w.marks.markedWith(caps.JobManual, ""); ok {
 			w.job.Manual = true
+			if isManualEvent(w.job.If) {
+				w.job.If = nil
+			}
 		}
 		if u, ok := w.marks.markedWith(caps.PipelineFinally, ""); ok {
 			var a finallyArg
@@ -595,6 +598,17 @@ func collapsePipeline(rep *report.Report, pl *ir.Pipeline, wfs []*workflow) {
 	}
 	pl.Jobs = slices.DeleteFunc(pl.Jobs, func(j *ir.Job) bool { return slices.Contains(finally, j) })
 	pl.Finally = finally
+}
+
+// isManualEvent is true for the bare test that a manual workflow carries when the pipeline lists no manual trigger.
+func isManualEvent(x expr.Expr) bool {
+	b, ok := x.(expr.Binary)
+	if !ok || b.Op != "==" {
+		return false
+	}
+	r, rok := b.L.(expr.Ref)
+	l, lok := b.R.(expr.Lit)
+	return rok && lok && len(r.Path) == 1 && r.Path[0] == "event" && l.Str == eventMan
 }
 
 func isAlways(x expr.Expr) bool {

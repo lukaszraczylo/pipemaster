@@ -223,7 +223,9 @@ func TestDeletionGuardIsStrippedOnTheWayBack(t *testing.T) {
 		if got := string(files[".gitlab-ci.yml"]); strings.HasPrefix(got, "workflow:") {
 			direct = strings.Replace(direct, "job:", "workflow:\n  rules:\n    - if: $CI_PIPELINE_SOURCE == \"push\" && $CI_COMMIT_BRANCH\n    - if: $CI_PIPELINE_SOURCE == \"push\" && $CI_COMMIT_TAG\njob:", 1)
 		}
-		if got := "### .gitlab-ci.yml\n" + string(files[".gitlab-ci.yml"]); got != direct {
+		// The default-trigger marker is a comment: it tells a later parser that the triggers came from a default.
+		file := strings.Replace(string(files[".gitlab-ci.yml"]), "# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/9999\n# pipemaster:arg {\"default_triggers\":true}\n", "", 1)
+		if got := "### .gitlab-ci.yml\n" + file; got != direct {
 			t.Errorf("not exact for %q:\n--- direct\n%s\n--- via gha\n%s", doc, direct, got)
 		}
 	}

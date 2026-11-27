@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/compile
 # pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/compile
@@ -11,7 +14,12 @@
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/cleanup
 # pipemaster:arg {"needs":[{"JobID":"compile","Artifacts":false,"Optional":false}]}
 on:
+  workflow_dispatch:
   push:
+  repository_dispatch:
+    types:
+      - api
+      - trigger
 jobs:
   compile:
     if: '!github.event.deleted'

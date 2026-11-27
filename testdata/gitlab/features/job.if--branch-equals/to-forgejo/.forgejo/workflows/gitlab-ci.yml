@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
 # pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/deploy
 # pipemaster:arg {"src":"branch == 'main'","guard":true}
@@ -6,6 +9,7 @@
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/deploy
 # pipemaster:arg {"pre":1,"post":0}
 on:
+  workflow_dispatch:
   push:
 concurrency:
   group: ${{ github.run_id }}

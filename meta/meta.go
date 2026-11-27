@@ -53,7 +53,10 @@ type Meta struct {
 	SourceInvalid []string `yaml:"source_invalid,omitempty"`
 	// Guarded holds the source IR paths of the jobs whose deletion guard the GHA parser stripped. GuardScoped
 	// tells an empty list from a source that kept no such record, where every job from another provider is guarded.
-	Guarded     []string `yaml:"guarded,omitempty"`
+	Guarded []string `yaml:"guarded,omitempty"`
+	// Gated holds the jobs, as pipeline ID and job ID, that the emit gated for a pull request trigger that it made
+	// from the default events of a GitLab source, so a return to GitLab removes the gate.
+	Gated       []string `yaml:"gated,omitempty"`
 	Version     int      `yaml:"version,omitempty"`
 	GuardScoped bool     `yaml:"guard_scoped,omitempty"`
 }

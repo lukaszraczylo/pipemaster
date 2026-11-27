@@ -1,5 +1,9 @@
 Loss report: gitlab -> forgejo
+[lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline and its file has no trigger form for them; Forgejo has no event for them)
+[lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat and its file has no trigger form for them; Forgejo has no event for them)
 [lost] pipeline/gitlab-ci/job/deploy job.environment (Forgejo does not document environment)
+[lost] pipeline/gitlab-ci/trigger/4 trigger.api (event repository_dispatch is not supported by Forgejo; the trigger is dropped)
+[external] pipeline/gitlab-ci/trigger/3 trigger.schedule: add on: schedule: - cron: <the cron of your GitLab pipeline schedule> to the workflow: GitLab keeps the schedule in the project settings, so the workflow has no schedule event and the job starts by workflow_dispatch (the schedule names no cron expression)
 [emulated] pipeline/gitlab-ci job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/gitlab-ci pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)
 [emulated] pipeline/gitlab-ci/job/deploy job.runner: default runner label ubuntu-latest (the IR holds no runner label)

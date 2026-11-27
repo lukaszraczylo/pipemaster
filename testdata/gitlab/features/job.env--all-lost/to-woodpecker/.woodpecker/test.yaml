@@ -1,6 +1,8 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/test
 # pipemaster:emulated trigger.manual pipeline/gitlab-ci
 # pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/test
+# pipemaster:arg {"gitlab_default":true}
 # pipemaster:emulated job.env pipeline/gitlab-ci/job/test
 # pipemaster:arg "- name: IMAGE\n  value:\n    expr: format('$$CI_REGISTRY_IMAGE/tmp:{0}', sha)\n"
 when:

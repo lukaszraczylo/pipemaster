@@ -2,6 +2,8 @@
 # pipemaster:arg {"Ref":"golang:1.22","Entrypoint":[""]}
 # pipemaster:emulated trigger.manual pipeline/gitlab-ci
 # pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/build
+# pipemaster:arg {"gitlab_default":true}
 when:
   - event: push
   - event: tag

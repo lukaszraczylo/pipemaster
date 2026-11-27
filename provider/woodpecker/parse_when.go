@@ -2,6 +2,7 @@ package woodpecker
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -87,6 +88,10 @@ func (s *whenSpec) configure(m *marks) {
 			s.lenient = s.lenient || g.Paths != nil
 			s.stripChanges(g.Paths)
 		}
+		var gd gitlabDefaultArg
+		if u.Feature == caps.TriggerPush && decodeArg(m.args[u], &gd) && gd.Default {
+			s.dropEvents()
+		}
 		var d defaultEventsArg
 		if u.Feature == caps.TriggerPush && decodeArg(m.args[u], &d) && len(d.Events) > 0 {
 			s.dropDefaultEvents(d.Events)
@@ -98,6 +103,19 @@ func (s *whenSpec) configure(m *marks) {
 			s.ignoreStatus = true
 		}
 	}
+}
+
+// dropEvents reads the entries as if they had no event filter: the emitter listed the events of a GitLab pipeline with
+// the default triggers in each of them.
+func (s *whenSpec) dropEvents() {
+	var kept []itemInfo
+	for _, it := range s.items {
+		it.item.Event = wpexpr.Filter{}
+		if !slices.ContainsFunc(kept, func(k itemInfo) bool { return reflect.DeepEqual(k, it) }) {
+			kept = append(kept, it)
+		}
+	}
+	s.items = kept
 }
 
 // dropDefaultEvents reads the event list that the emitter wrote for a source with no event filter as no filter.

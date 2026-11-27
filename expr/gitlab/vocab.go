@@ -91,7 +91,7 @@ func init() { expr.RegisterLang(&Lang) }
 var Lang = expr.Dialect{
 	ID:       Dialect,
 	Class:    expr.ClassGitLab,
-	PRStates: true,
+	PRStates: false,
 	Vocab:    Vocab,
 	Sem:      Semantics,
 	Events:   Events,

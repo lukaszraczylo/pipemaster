@@ -1,6 +1,14 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
 # pipemaster:emulated step.script pipeline/gitlab-ci
 on:
+  workflow_dispatch:
   push:
+  repository_dispatch:
+    types:
+      - api
+      - trigger
 env:
   REGION: eu
 jobs:

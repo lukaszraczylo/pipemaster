@@ -2,6 +2,8 @@
 # pipemaster:arg {"Ref":"alpine:3","Entrypoint":null}
 # pipemaster:emulated trigger.manual pipeline/gitlab-ci
 # pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/build
+# pipemaster:arg {"gitlab_default":true}
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:arg "- name: SHARED\n  value:\n    lit: \"1\"\n"
 when:

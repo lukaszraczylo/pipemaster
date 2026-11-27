@@ -1,7 +1,12 @@
 Loss report: gitlab -> argo
-[external] pipeline/gitlab-ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
-[external] pipeline/gitlab-ci/trigger/1 trigger.tag: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[lost] pipeline/gitlab-ci trigger.api (the source runs on the events api, trigger and its file has no trigger form for them; Argo has no event for them, and the file names no schedule to copy)
+[lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline and its file has no trigger form for them; Argo has no event for them, and the file names no schedule to copy)
+[lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat and its file has no trigger form for them; Argo has no event for them, and the file names no schedule to copy)
+[lost] pipeline/gitlab-ci trigger.schedule (the source runs on the events schedule and its file has no trigger form for them; Argo has no event for them, and the file names no schedule to copy)
+[external] pipeline/gitlab-ci/trigger/0 trigger.manual: argo submit --from workflowtemplate/gitlab-ci (start a run with: argo submit --from workflowtemplate/gitlab-ci; the Workflow object needs a ServiceAccount with the rights in .argo/rbac/)
+[external] pipeline/gitlab-ci/trigger/1 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[external] pipeline/gitlab-ci/trigger/2 trigger.tag: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/gitlab-ci pipeline.env: copied into the env of every container (a step variable of the same name wins)
 [emulated] pipeline/gitlab-ci step.script: placeholder task (the pipeline has no job and an Argo DAG needs one task; a task that runs true stands in)
-[emulated] pipeline/gitlab-ci/trigger/0 trigger.filter.branches
 [emulated] pipeline/gitlab-ci/trigger/1 trigger.filter.branches
+[emulated] pipeline/gitlab-ci/trigger/2 trigger.filter.branches

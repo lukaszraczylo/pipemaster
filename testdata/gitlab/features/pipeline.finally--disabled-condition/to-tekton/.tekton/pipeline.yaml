@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:

@@ -40,7 +40,12 @@ var defaultEventCases = []defaultEventCase{
 	},
 	{
 		name: "gitlab no workflow", from: provider.GitLab, file: ".gitlab-ci.yml", src: defaultGitlabJob,
-		// The GitLab parser itself reads a file with no workflow block as push and tag, as the GHA emitter sees it.
+		// The GitLab parser reads a file with no workflow block as push and tag. The web source adds the manual
+		// trigger, and the sources with no form on the target are reported.
+		lost: map[caps.Feature][]string{
+			caps.TriggerSchedule: {"schedule"}, caps.TriggerAPI: {"api", "trigger"},
+			caps.TriggerPipelineDone: {"pipeline", "parent_pipeline"}, caps.TriggerResource: {"external", "chat"},
+		},
 		fires: []string{"push", "tag"},
 	},
 }

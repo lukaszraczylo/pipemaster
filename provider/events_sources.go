@@ -12,8 +12,11 @@ import (
 // tests no source names none, so a job with no source test adds no event; a test such as `source != push` names every
 // other source.
 func GitLabNamedSources(pl *ir.Pipeline) []SourceEvent {
-	if pl == nil || !hasWorkflow(pl) && !defaultPushTag(pl.Triggers) {
+	if pl == nil || !hasWorkflow(pl) && !injectedPushTag(pl.Triggers) {
 		return nil
+	}
+	if IsGitLabInjected(pl) {
+		return firedEvents(pl, gitlabEvents)
 	}
 	names := make([]string, len(gitlabEvents))
 	for i, ev := range gitlabEvents {
@@ -46,13 +49,22 @@ func GitLabNamedSources(pl *ir.Pipeline) []SourceEvent {
 
 // DefaultPushTag is true for the two bare triggers that the GitLab parser gives a pipeline with no workflow rules, or
 // with rules that have no trigger form. The parser then ANDs the workflow condition into every job.
-func DefaultPushTag(pl *ir.Pipeline) bool { return defaultPushTag(pl.Triggers) }
+func DefaultPushTag(pl *ir.Pipeline) bool { return injectedPushTag(pl.Triggers) }
 
 // defaultPushTag is true for the two bare triggers that the GitLab parser gives a pipeline with no workflow rules.
-func defaultPushTag(ts []ir.Trigger) bool {
-	return len(ts) == 2 && ts[0].Kind == ir.TriggerPush && ts[1].Kind == ir.TriggerTag &&
+func defaultPushTag(ts []ir.Trigger) bool { return bareTriggers(ts, false) }
+
+// injectedPushTag is defaultPushTag for triggers that WithDefaultTriggers has already extended.
+func injectedPushTag(ts []ir.Trigger) bool { return bareTriggers(ts, true) }
+
+func bareTriggers(ts []ir.Trigger, injected bool) bool {
+	has := func(k ir.TriggerKind) bool {
+		return slices.ContainsFunc(ts, func(t ir.Trigger) bool { return t.Kind == k })
+	}
+	return has(ir.TriggerPush) && has(ir.TriggerTag) &&
 		!slices.ContainsFunc(ts, func(t ir.Trigger) bool {
-			return len(t.Branches.Include)+len(t.Branches.Exclude)+len(t.Tags.Include)+len(t.Tags.Exclude)+len(t.Paths.Include)+len(t.Paths.Exclude) > 0
+			bare := t.Kind == ir.TriggerPush || t.Kind == ir.TriggerTag || injected && (t.Kind == ir.TriggerManual || t.Kind == ir.TriggerPR)
+			return !bare || len(t.Branches.Include)+len(t.Branches.Exclude)+len(t.Tags.Include)+len(t.Tags.Exclude)+len(t.Paths.Include)+len(t.Paths.Exclude) > 0
 		})
 }
 
