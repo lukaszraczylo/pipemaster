@@ -15,8 +15,12 @@ import (
 // DeleteTries is how often a delete runs before the namespace stays tracked for the sweep.
 const DeleteTries = 3
 
-// deleteTimeout bounds one delete call, which runs on a context that no cancel of the run can stop.
-const deleteTimeout = time.Minute
+// Delete limits: one try waits at most tryTimeout, and all tries of one namespace wait at most releaseBudget, so a
+// hung delete holds the cleanup for one minute and not for DeleteTries times the try timeout.
+const (
+	tryTimeout    = 30 * time.Second
+	releaseBudget = time.Minute
+)
 
 // Op creates or deletes the namespace ns on the cluster.
 type Op func(ctx context.Context, ns string) error
@@ -26,6 +30,8 @@ type Guard struct {
 	create, del Op
 	open        map[string]struct{}
 	prefix      string
+	tryTimeout  time.Duration
+	budget      time.Duration
 	counter     atomic.Int64
 	stamp       int64
 	mu          sync.Mutex
@@ -33,7 +39,7 @@ type Guard struct {
 
 // New returns a Guard whose namespaces start with prefix.
 func New(prefix string, create, del Op) *Guard {
-	return &Guard{create: create, del: del, prefix: prefix, stamp: time.Now().Unix(), open: map[string]struct{}{}}
+	return &Guard{create: create, del: del, prefix: prefix, tryTimeout: tryTimeout, budget: releaseBudget, stamp: time.Now().Unix(), open: map[string]struct{}{}}
 }
 
 // Namespace creates a fresh namespace and returns it with its cleanup. The namespace is tracked before the create
@@ -55,11 +61,14 @@ func (g *Guard) Namespace(ctx context.Context) (string, func(), error) {
 }
 
 // release deletes one tracked namespace on a context that no cancel or timeout of the run can stop. It retries,
-// because a namespace that stays behind is the failure this exists to prevent. It returns the last failure.
+// because a namespace that stays behind is the failure this exists to prevent. The tries share one time budget. It
+// returns the last failure.
 func (g *Guard) release(ns string) error {
 	var last error
+	all, stop := context.WithTimeout(context.Background(), g.budget)
+	defer stop()
 	for range DeleteTries {
-		c, cancel := context.WithTimeout(context.Background(), deleteTimeout)
+		c, cancel := context.WithTimeout(all, g.tryTimeout)
 		last = g.del(c, ns)
 		cancel()
 		if last == nil {
@@ -67,6 +76,9 @@ func (g *Guard) release(ns string) error {
 			delete(g.open, ns)
 			g.mu.Unlock()
 			return nil
+		}
+		if all.Err() != nil {
+			break
 		}
 	}
 	return fmt.Errorf("delete namespace %s after %d tries: %w", ns, DeleteTries, last)

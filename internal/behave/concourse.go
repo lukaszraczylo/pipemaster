@@ -247,7 +247,10 @@ type buildInfo struct {
 }
 
 func (e *concourseEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
-	files, _ := filepath.Glob(filepath.Join(w.Dir, ".concourse", "*.y*ml"))
+	files, err := filepath.Glob(filepath.Join(w.Dir, ".concourse", "*.y*ml"))
+	if err != nil {
+		return nil, fmt.Errorf("list the .concourse files: %w", err)
+	}
 	if len(files) != 1 {
 		return nil, fmt.Errorf("the output has %d files in .concourse, want one", len(files))
 	}
@@ -286,7 +289,10 @@ func (e *concourseEngine) runFile(ctx context.Context, w *Workspace, file string
 		return nil, err
 	}
 	if w.Ev.Kind == kindTag {
-		if builds = e.onlyTagJobs(ctx, pipe, builds); len(builds) == 0 {
+		if builds, err = e.onlyTagJobs(ctx, pipe, builds); err != nil {
+			return nil, err
+		}
+		if len(builds) == 0 {
 			return &Trace{Duration: time.Since(start), NoPipeline: true, Log: "Concourse starts no build for a tag: no job gets a git resource with a tag_filter"}, nil
 		}
 	}
@@ -321,12 +327,21 @@ func (e *concourseEngine) runFile(ctx context.Context, w *Workspace, file string
 
 // onlyTagJobs keeps the builds of the jobs that get a tag resource. The harness serves one repository that holds the
 // branch and the tag, so a branch job also builds; on Concourse a tag on an existing commit starts no branch build.
-// A pipeline with no job on a tag resource keeps no build, because no branch job may run work for a tag.
-func (e *concourseEngine) onlyTagJobs(ctx context.Context, pipe string, builds []buildInfo) []buildInfo {
+// A pipeline with no job on a tag resource keeps no build, because no branch job may run work for a tag. A pipeline
+// that fly cannot read is an error: keeping every build would let a branch job run work for a tag.
+func (e *concourseEngine) onlyTagJobs(ctx context.Context, pipe string, builds []buildInfo) ([]buildInfo, error) {
 	out, code, err := e.conc.fly(ctx, time.Minute, "get-pipeline", "-p", pipe, "--json")
-	if err != nil || code != 0 {
-		return builds
+	if err != nil {
+		return nil, fmt.Errorf("read the pipeline to find its tag jobs: %w", err)
 	}
+	if code != 0 {
+		return nil, fmt.Errorf("read the pipeline to find its tag jobs: fly exit %d: %s", code, tail(stripANSI(out), 200))
+	}
+	return keepTagJobs(out, builds)
+}
+
+// keepTagJobs drops the builds of the jobs that get no resource with a tag_filter, from the JSON of fly get-pipeline.
+func keepTagJobs(pipelineJSON string, builds []buildInfo) ([]buildInfo, error) {
 	var cfg struct {
 		Resources []struct {
 			Source map[string]any `json:"source"`
@@ -337,8 +352,8 @@ func (e *concourseEngine) onlyTagJobs(ctx context.Context, pipe string, builds [
 			Plan []map[string]any `json:"plan"`
 		} `json:"jobs"`
 	}
-	if json.Unmarshal([]byte(out), &cfg) != nil {
-		return builds
+	if err := json.Unmarshal([]byte(pipelineJSON), &cfg); err != nil {
+		return nil, fmt.Errorf("parse the pipeline to find its tag jobs: %w", err)
 	}
 	tagRes := map[string]bool{}
 	for _, r := range cfg.Resources {
@@ -354,7 +369,7 @@ func (e *concourseEngine) onlyTagJobs(ctx context.Context, pipe string, builds [
 			}
 		}
 	}
-	return slices.DeleteFunc(builds, func(b buildInfo) bool { return !tagJobs[b.JobName] })
+	return slices.DeleteFunc(builds, func(b buildInfo) bool { return !tagJobs[b.JobName] }), nil
 }
 
 func (e *concourseEngine) resources(ctx context.Context, pipe string) []string {
@@ -473,7 +488,8 @@ func (e *concourseEngine) settle(ctx context.Context, pipe string) ([]buildInfo,
 				lastCount, changedAt = len(builds), time.Now()
 			}
 			if len(builds) > 0 {
-				if pipelineSettled(e.jobStates(ctx, pipe), builds) {
+				// A failed read of the job states is no proof that the pipeline settled.
+				if jobs, ok := e.jobStates(ctx, pipe); ok && pipelineSettled(jobs, builds) {
 					settledPolls++
 				} else {
 					settledPolls = 0
@@ -500,17 +516,17 @@ func (e *concourseEngine) settle(ctx context.Context, pipe string) ([]buildInfo,
 	return builds, nil
 }
 
-// jobStates reads the jobs of the pipeline. A failed read gives no state, which settles on the builds alone.
-func (e *concourseEngine) jobStates(ctx context.Context, pipe string) []jobState {
+// jobStates reads the jobs of the pipeline. It reports false when fly or the JSON read fails.
+func (e *concourseEngine) jobStates(ctx context.Context, pipe string) ([]jobState, bool) {
 	out, code, err := e.conc.fly(ctx, time.Minute, "jobs", "-p", pipe, "--json")
 	if err != nil || code != 0 {
-		return nil
+		return nil, false
 	}
 	var js []jobState
 	if json.Unmarshal([]byte(out), &js) != nil {
-		return nil
+		return nil, false
 	}
-	return js
+	return js, true
 }
 
 func sortBuilds(b []buildInfo) {

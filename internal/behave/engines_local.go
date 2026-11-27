@@ -148,8 +148,10 @@ func (e *woodpeckerEngine) Run(ctx context.Context, w *Workspace) (*Trace, error
 			return nil, err
 		}
 		if code != 0 && strings.Contains(out, wpNoWorkflows) {
-			// With depends_on stripped, only the when filter of the file can leave nothing to run.
+			// With depends_on stripped, only the when filter of the file can leave nothing to run. That run is clean and
+			// empty, so the harness cannot tell a when filter from a converter that dropped the workflow; the log says so.
 			code = 0
+			out += "\nharness: Woodpecker ran no workflow of " + filepath.Base(t) + ": the run is clean and empty\n"
 		} else {
 			tr.NoPipeline = false
 		}
@@ -321,6 +323,8 @@ func (e *droneEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 	branch, event := w.Ev.Branch, "push"
 	switch w.Ev.Kind {
 	case kindTag:
+		// Drone documents DRONE_COMMIT_BRANCH as possibly empty for tag events
+		// (https://docs.drone.io/pipeline/environment/reference/drone-commit-branch/).
 		event, branch = "tag", ""
 	case kindPR:
 		event, branch = "pull_request", w.Ev.Target
@@ -556,6 +560,15 @@ func (e *gitlabEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 		if !active {
 			return &Trace{Log: "GitLab creates no merge request pipeline: no job has a merge request rule", NoPipeline: true}, nil
 		}
+		// GitLab creates no pipeline when the rules of every job are false. A run that starts jobs and prints no marker is
+		// no empty pipeline, and the runner must judge it as it is.
+		running, err := e.startingJobs(ctx, w, rewritten, vars, "mr")
+		if err != nil {
+			return nil, err
+		}
+		if !slices.Contains(slices.Collect(maps.Values(running)), true) {
+			return &Trace{Log: "GitLab creates no merge request pipeline: the rules of every job are false for this event", NoPipeline: true}, nil
+		}
 	}
 	if err := os.WriteFile(file, rewritten, 0o600); err != nil { // #nosec G703 -- a file of the harness workspace
 		return nil, err
@@ -565,8 +578,6 @@ func (e *gitlabEngine) Run(ctx context.Context, w *Workspace) (*Trace, error) {
 		return nil, err
 	}
 	tr.Log = childLog + tr.Log
-	// The rules of every job are false in a merge request pipeline, so GitLab creates none.
-	tr.NoPipeline = w.Ev.Kind == kindPR && tr.Exit == 0 && len(tr.Markers) == 0
 	return tr, nil
 }
 
