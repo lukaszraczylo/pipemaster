@@ -1095,6 +1095,13 @@
      "detail": "the source runs the step under bash when the image has it, and a runner such as act runs a step with no shell under sh; the script re-executes under bash when the image has bash, else under sh -e"
     },
     {
+     "path": "pipeline/gitlab-ci/trigger/0",
+     "feature": "trigger.pull_request",
+     "level": "emulated",
+     "strategy": "pull_request: types: [opened, synchronize]",
+     "detail": "GitLab runs a merge request pipeline in the fork project, but a GHA pull_request run from a fork is a run of the base repository; the jobs that admit the pull request also run for fork pull requests"
+    },
+    {
      "path": "pipeline/gitlab-ci/trigger/2",
      "feature": "trigger.tag",
      "level": "emulated",
