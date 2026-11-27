@@ -139,12 +139,13 @@ func gateJobList(jobs []*ir.Job) []*ir.Job {
 	return out
 }
 
-// andGate ANDs the gate into c, which is nil or a status condition.
+// andGate ANDs the gate into c, which is nil or a status condition. The gate comes first, as a GitLab parse puts the
+// rule condition before the status of a job.
 func andGate(c expr.Expr) expr.Expr {
 	if c == nil {
 		return prGate
 	}
-	return expr.Binary{Op: expr.OpAnd, L: c, R: prGate}
+	return expr.Binary{Op: expr.OpAnd, L: prGate, R: c}
 }
 
 // ruleless is true for a job condition that a job with no rules has: none, or only job status functions such as

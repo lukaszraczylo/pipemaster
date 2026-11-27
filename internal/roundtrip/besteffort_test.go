@@ -14,6 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/inline"
@@ -222,6 +223,36 @@ func defaultTriggersRead(d irDiff, src, back *ir.Project, provider string) bool 
 	return len(src.Pipelines[0].Triggers) == 0 && len(back.Pipelines[0].Triggers) > 0
 }
 
+// statusRulesRead is true for the If or Ext of a job that holds the GitLab rules of a finally job with a condition. The
+// emitter writes them with when: always or when: on_failure, and the GitLab parser keeps such rules as opaque text
+// with the list in Ext (TestRulesFallbackOpaque).
+func statusRulesRead(d irDiff, back *ir.Project) bool {
+	if d.Field != "If" && d.Field != "Ext" {
+		return false
+	}
+	for _, pl := range back.Pipelines {
+		for _, j := range append(slices.Clone(pl.Jobs), pl.Finally...) {
+			if "pipeline/"+pl.ID+"/job/"+j.ID != d.Path {
+				continue
+			}
+			o, ok := j.If.(expr.Opaque)
+			gl, _ := j.Ext["gitlab"].(map[string]any)
+			rules, _ := gl["rules"].([]any)
+			if !ok || o.Dialect != "gitlab" || len(rules) == 0 {
+				return false
+			}
+			for _, r := range rules {
+				m, _ := r.(map[string]any)
+				if w, _ := m["when"].(string); w != "always" && w != "on_failure" {
+					return false
+				}
+			}
+			return true
+		}
+	}
+	return false
+}
+
 func TestRoundTripWithoutMetaBestEffort(t *testing.T) {
 	n := 0
 	for _, f := range allFixtures(t) {
@@ -246,6 +277,9 @@ func TestRoundTripWithoutMetaBestEffort(t *testing.T) {
 				}
 				for _, d := range diffNodes(r.src, r.back) {
 					if defaultTriggersRead(d, r.src, r.back, f.provider) {
+						continue
+					}
+					if statusRulesRead(d, r.back) {
 						continue
 					}
 					if !covered(d, r.srcRep, r.toRep, r.backRep) {

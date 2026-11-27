@@ -22,7 +22,7 @@ func TestGitLabStatusJobsStayOffPullRequestGHA(t *testing.T) {
 	wf := readFile(t, convertMRStatus(t, "gha"), ".github", "workflows", "gitlab-ci.yml")
 	for _, want := range []string{
 		"if: always() && !(github.event_name == 'pull_request') && !github.event.deleted",
-		"if: always() && (failure() && !(github.event_name == 'pull_request')) && !github.event.deleted",
+		"if: always() && (!(github.event_name == 'pull_request') && failure()) && !github.event.deleted",
 		"- opened\n      - synchronize",
 	} {
 		if !strings.Contains(wf, want) {

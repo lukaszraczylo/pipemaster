@@ -1,6 +1,7 @@
 package roundtrip_test
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -66,6 +67,9 @@ func hasTriggerEntry(rep *report.Report, f caps.Feature) bool {
 	})
 }
 
+// notinValues matches the values of a Tekton when entry that excludes an event: a task that skips push is not a push trigger.
+var notinValues = regexp.MustCompile(`operator: notin\n\s+values:\n(\s+- .*\n)+`)
+
 // TestDefaultEventsOnEventTargets: Tekton, Argo and Concourse turn the default events of a Drone or GitLab source
 // into triggers, report every event with no form, and never write a schedule the source does not hold.
 func TestDefaultEventsOnEventTargets(t *testing.T) {
@@ -101,7 +105,7 @@ func TestDefaultEventsOnEventTargets(t *testing.T) {
 						t.Errorf("no pull_request trigger written:\n%s", out)
 					}
 				}
-				if !slices.Contains(c.fires, "push") && to != provider.Concourse && strings.Contains(out, "- push") {
+				if !slices.Contains(c.fires, "push") && to != provider.Concourse && strings.Contains(notinValues.ReplaceAllString(out, ""), "- push") {
 					t.Errorf("a push trigger was written, the source does not run on push:\n%s", out)
 				}
 			})
