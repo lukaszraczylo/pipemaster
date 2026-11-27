@@ -6,11 +6,10 @@ import (
 	"github.com/lukaszraczylo/pipemaster/provider"
 )
 
-// dropDefaultTriggers restores a pipeline with no trigger when the file marks its triggers as made from the
-// default events of the source.
-func (b *pipeBuilder) dropDefaultTriggers(pl *ir.Pipeline) {
+// noteDefaultTriggers records that the file marks its triggers as made from the default events of the source.
+func (b *pipeBuilder) noteDefaultTriggers(pl *ir.Pipeline) {
 	var a provider.DefaultTriggersArg
-	if b.arg(b.path(), caps.TriggerPush, &a) && a.Default {
-		pl.Triggers = nil
+	if b.defaultTriggers = b.arg(b.path(), caps.TriggerPush, &a) && a.Default; b.defaultTriggers {
+		a.RestoreManual(pl)
 	}
 }

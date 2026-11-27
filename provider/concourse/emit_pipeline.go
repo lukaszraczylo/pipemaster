@@ -64,7 +64,7 @@ func (e *emitter) pipeline(pl *ir.Pipeline, first bool) {
 		e.foreignExt(pp, pl.Ext)
 	}
 	if e.injected[pl.ID] {
-		e.markArg(caps.TriggerPush, pe.mpath, provider.DefaultTriggersArg{Default: true})
+		e.markArg(caps.TriggerPush, pe.mpath, provider.DefaultMarker(pl))
 	}
 	pe.loadExt(first)
 	pe.pipelineMeta()

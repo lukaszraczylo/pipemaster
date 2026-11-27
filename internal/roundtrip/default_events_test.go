@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
+	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -102,30 +104,97 @@ func TestDefaultEventsOnEventTargets(t *testing.T) {
 	}
 }
 
-// TestDefaultEventsParseBackAsNoTrigger: the marker of a synthesised trigger set brings the pipeline back with no
-// trigger, so a trip A to B to A keeps the source as it was.
-func TestDefaultEventsParseBackAsNoTrigger(t *testing.T) {
+// parseBack emits proj to target and parses the files back with no metadata.
+func parseBack(t *testing.T, proj *ir.Project, target string) (map[string][]byte, *ir.Project, *report.Report) {
+	t.Helper()
+	files, rep, err := prov(t, target).Emit(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, _, err := prov(t, target).Parse(toFS(files))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return files, back, rep
+}
+
+// TestDefaultEventsSurviveParseWithoutMeta: a file read back with no metadata keeps the triggers that the emitter made
+// from the default events of the source, so a person who commits only the target directory still gets a pipeline
+// that starts, and the file emits again as it was.
+func TestDefaultEventsSurviveParseWithoutMeta(t *testing.T) {
+	targets := []string{provider.GHA, provider.GitLab, provider.Tekton, provider.Argo, provider.Concourse}
 	for _, c := range defaultEventCases[:2] {
-		for _, to := range []string{provider.Tekton, provider.Argo, provider.Concourse} {
+		for _, to := range targets {
+			if provider.SameFamily(c.from, to) {
+				continue
+			}
 			t.Run(c.name+" via "+to, func(t *testing.T) {
 				proj, _, err := prov(t, c.from).Parse(toFS(map[string][]byte{c.file: []byte(c.src)}))
 				if err != nil {
 					t.Fatal(err)
 				}
-				files, _, err := prov(t, to).Emit(proj)
+				_, back, _ := parseBack(t, proj, to)
+				for _, pl := range back.Pipelines {
+					if len(pl.Triggers) == 0 {
+						t.Errorf("pipeline %s parsed back with no trigger", pl.ID)
+					}
+				}
+				again, _, err := prov(t, to).Emit(back)
 				if err != nil {
 					t.Fatal(err)
 				}
-				back, _, err := prov(t, to).Parse(toFS(files))
+				back2, _, err := prov(t, to).Parse(toFS(again))
 				if err != nil {
 					t.Fatal(err)
 				}
+				got, want := triggerKinds(back2), triggerKinds(back)
+				// Concourse has no event form for a pull request or a tag, and the emit reports both as lost.
+				if to == provider.Concourse {
+					if len(got) == 0 {
+						t.Errorf("the pipeline has no trigger after re-emit; it had %v", want)
+					}
+				} else if !slices.Equal(got, want) {
+					t.Errorf("the triggers change on re-emit: %v, then %v", want, got)
+				}
+			})
+		}
+	}
+}
+
+// TestDefaultEventsParseBackAsNoTriggerWithMeta: with the metadata that names the Drone or GitLab source, the marker of
+// a synthesised trigger set brings the pipeline back with no trigger, so a trip A to B to A keeps the source.
+func TestDefaultEventsParseBackAsNoTriggerWithMeta(t *testing.T) {
+	targets := []string{provider.GHA, provider.GitLab, provider.Tekton, provider.Argo, provider.Concourse}
+	for _, c := range defaultEventCases[:2] {
+		for _, to := range targets {
+			if provider.SameFamily(c.from, to) {
+				continue
+			}
+			t.Run(c.name+" via "+to, func(t *testing.T) {
+				proj, _, err := prov(t, c.from).Parse(toFS(map[string][]byte{c.file: []byte(c.src)}))
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, back, rep := parseBack(t, proj, to)
+				roundtrip.Restore(back, roundtrip.NewMeta(c.from, proj, prov(t, to), rep))
 				for _, pl := range back.Pipelines {
 					if len(pl.Triggers) != 0 {
-						t.Errorf("pipeline %s parsed back with triggers %+v", pl.ID, pl.Triggers)
+						t.Errorf("pipeline %s restored with triggers %+v", pl.ID, pl.Triggers)
 					}
 				}
 			})
 		}
 	}
+}
+
+// triggerKinds lists the trigger kinds of every pipeline, sorted.
+func triggerKinds(p *ir.Project) []string {
+	var out []string
+	for _, pl := range p.Pipelines {
+		for _, tr := range pl.Triggers {
+			out = append(out, pl.ID+":"+string(tr.Kind))
+		}
+	}
+	slices.Sort(out)
+	return out
 }

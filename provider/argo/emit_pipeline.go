@@ -58,7 +58,7 @@ func (e *emitter) pipelineDoc(pp *plan) error {
 	pp.doc = d
 	e.add(workflowsDir+pp.name+".yaml", d, pp.path)
 	if e.injected[pl.ID] {
-		if err := e.markArg(caps.TriggerPush, pp.path, provider.DefaultTriggersArg{Default: true}); err != nil {
+		if err := e.markArg(caps.TriggerPush, pp.path, provider.DefaultMarker(pl)); err != nil {
 			return err
 		}
 	}

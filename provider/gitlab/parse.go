@@ -99,6 +99,9 @@ func (adapter) parseSource(fsys fs.FS, rootName string) (*ir.Project, *report.Re
 	if len(pls) == 1 {
 		s.guardJobs(pls[0])
 	}
+	for _, id := range s.defaulted {
+		proj.Origin.MarkDefaultTriggers(id)
+	}
 	if err := ir.Validate(proj); err != nil {
 		return nil, nil, nil, s.locate(err, infos)
 	}

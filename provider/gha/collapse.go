@@ -19,7 +19,7 @@ import (
 
 // collapseMarkers undoes the emulations another provider's emitter marked in the file, so a pipeline that
 // travelled through GHA and came back carries no trace of the detour.
-func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string, rep *report.Report, restoreConds bool) (condsFrom string, guarded []string) {
+func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string, rep *report.Report, restoreConds bool) (condsFrom string, guarded []string, defaulted bool) {
 	carriedDone := map[string]bool{}
 	finallyPaths := map[string]bool{}
 	var sources []sourceEventsArg
@@ -110,7 +110,7 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 			var d provider.DefaultTriggersArg
 			if len(args[u]) == 1 && json.Unmarshal([]byte(args[u][0]), &d) == nil && d.Default {
 				if u.IRPath == "pipeline/"+pl.ID {
-					pl.Triggers = nil
+					defaulted = true
 				}
 				break
 			}
@@ -122,7 +122,7 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 	for _, src := range sources {
 		restoreGatedConds(pl, src)
 	}
-	return condsFrom, guarded
+	return condsFrom, guarded, defaulted
 }
 
 func markedJob(pl *ir.Pipeline, path string) *ir.Job {

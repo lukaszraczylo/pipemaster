@@ -20,10 +20,21 @@ type Project struct {
 type Origin struct {
 	// Guarded is set by the GHA parser, non-nil even when empty: Provider then names the dialect of restored
 	// conditions, not of every job, and the map holds the IR paths of the jobs whose deletion guard it stripped.
-	Guarded  map[string]bool `yaml:"-"`
-	Provider string          `yaml:"provider,omitempty"`
-	Dialect  string          `yaml:"dialect,omitempty"`
-	Files    []string        `yaml:"files,omitempty"`
+	Guarded map[string]bool `yaml:"-"`
+	// DefaultTriggers holds the IDs of the pipelines whose triggers the emitter made from the default events of a
+	// Drone or GitLab source. The metadata restore drops them; without metadata they stay, as the file says.
+	DefaultTriggers map[string]bool `yaml:"-"`
+	Provider        string          `yaml:"provider,omitempty"`
+	Dialect         string          `yaml:"dialect,omitempty"`
+	Files           []string        `yaml:"files,omitempty"`
+}
+
+// MarkDefaultTriggers records that the triggers of pipeline id came from the default events of the source.
+func (o *Origin) MarkDefaultTriggers(id string) {
+	if o.DefaultTriggers == nil {
+		o.DefaultTriggers = map[string]bool{}
+	}
+	o.DefaultTriggers[id] = true
 }
 
 // Pipeline is one workflow, pipeline or CI file.

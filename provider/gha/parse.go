@@ -111,7 +111,10 @@ func (a *adapter) parseFiles(fsys fs.FS, files []string, rep *report.Report, res
 		if err != nil {
 			return nil, scan, err
 		}
-		from, guarded := collapseMarkers(&emitter{d: a.d, led: emitkit.NewLedger("", a.d.ID, a.Caps())}, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src), rep, restoreConds)
+		from, guarded, defaulted := collapseMarkers(&emitter{d: a.d, led: emitkit.NewLedger("", a.d.ID, a.Caps())}, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src), rep, restoreConds)
+		if defaulted {
+			proj.Origin.MarkDefaultTriggers(pl.ID)
+		}
 		for _, g := range guarded {
 			proj.Origin.Guarded[g] = true
 		}
