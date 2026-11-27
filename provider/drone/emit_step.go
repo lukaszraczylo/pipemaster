@@ -609,7 +609,7 @@ func (e *emitter) pluginStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
 		}
 		set.set(k, n)
 	}
-	if err := set.mergeMap(extOf(st.Ext)[keySettings]); err != nil {
+	if err := set.mergeMap(emitkit.ExtSettings(st.Ext, dialect)); err != nil {
 		return nil, err
 	}
 	if !set.empty() {

@@ -131,6 +131,12 @@ func subEvent(e Expr, ev string) Expr {
 			return v
 		}
 		return Binary{Op: v.Op, L: subEvent(v.L, ev), R: subEvent(v.R, ev)}
+	case Call:
+		args := make([]Expr, len(v.Args))
+		for i, a := range v.Args {
+			args[i] = subEvent(a, ev)
+		}
+		return Call{Name: v.Name, Args: args}
 	}
 	return e
 }

@@ -218,6 +218,44 @@ func TestRestoreReportsACallWhoseJobsAreGone(t *testing.T) {
 	}
 }
 
+func TestRestoreCallsNeedsEveryInlinedJob(t *testing.T) {
+	for _, tc := range []struct {
+		mutate     func(pl *ir.Pipeline)
+		name       string
+		wantOrphan bool
+	}{
+		{name: "all inlined jobs in jobs", mutate: func(*ir.Pipeline) {}},
+		{name: "one inlined job missing", wantOrphan: true, mutate: func(pl *ir.Pipeline) {
+			dropped := false
+			pl.Jobs = slices.DeleteFunc(pl.Jobs, func(j *ir.Job) bool {
+				hit := !dropped && strings.HasPrefix(j.ID, "call-")
+				dropped = dropped || hit
+				return hit
+			})
+		}},
+		{name: "inlined jobs moved to finally", mutate: func(pl *ir.Pipeline) {
+			for _, j := range pl.Jobs {
+				if strings.HasPrefix(j.ID, "call-") {
+					pl.Finally = append(pl.Finally, j)
+				}
+			}
+			pl.Jobs = slices.DeleteFunc(pl.Jobs, func(j *ir.Job) bool { return strings.HasPrefix(j.ID, "call-") })
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, back, m := inlined(t)
+			tc.mutate(back.Pipelines[0])
+			orphans := roundtrip.Restore(back, m)
+			if got := slices.Contains(orphans, "pipeline/gitlab-ci/job/call"); got != tc.wantOrphan {
+				t.Fatalf("orphans = %v, want call orphaned = %v", orphans, tc.wantOrphan)
+			}
+			if restored := childJobsOf(back) == 1; restored == tc.wantOrphan {
+				t.Errorf("call restored = %v with orphan = %v", restored, tc.wantOrphan)
+			}
+		})
+	}
+}
+
 func TestRestoreKeepingEditsLeavesTheInlinedJobs(t *testing.T) {
 	_, back, m := inlined(t)
 	_, kept := roundtrip.RestoreKeepingEdits(back, m)

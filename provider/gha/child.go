@@ -103,12 +103,15 @@ func (r *callResolver) resolve(pl *ir.Pipeline, stack []*ir.Pipeline) {
 
 // nativeCalls lists the targets that write the child as the job-level uses: it came from: the source dialect alone,
 // so a file returns as the user wrote it. No other target takes the call natively, Gitea and Forgejo included, because the
-// converter claims no support it cannot cite. GitHub documents local calls
-// (https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations: reusable workflows
-// "in the same repository as the calling repository can be referenced with just the path and filename"), and so does
-// Forgejo (https://forgejo.org/docs/latest/user/actions/reference/, jobs.<job_id>.uses: "./.forgejo/workflows/reusable.yml
-// - refers to a workflow file within the same repository as the current workflow is defined"). The Gitea docs
-// (https://docs.gitea.com/usage/actions/comparison) do not mention them, so a Gitea file only keeps its own call on a return to Gitea.
+// converter claims no support it cannot cite. GitHub documents the local form
+// (https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax, jobs.<job_id>.uses:
+// "./.github/workflows/{filename} for reusable workflows in the same repository") and the limits of a call tree
+// (https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations: "You can connect
+// up to ten levels of workflows" and "You can call a maximum of 50 unique reusable workflows from a single workflow file").
+// Forgejo documents local calls too (https://forgejo.org/docs/latest/user/actions/reference/, jobs.<job_id>.uses:
+// "./.forgejo/workflows/reusable.yml - refers to a workflow file within the same repository as the current workflow is
+// defined"). The Gitea docs (https://docs.gitea.com/usage/actions/comparison) do not mention them, so a Gitea file only
+// keeps its own call on a return to Gitea.
 func nativeCalls(dialect string) []string { return []string{dialect} }
 
 // localCall is the call step of a job whose uses: names a local file.

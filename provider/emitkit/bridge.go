@@ -64,12 +64,31 @@ func includeFiles(v any) string {
 	return ""
 }
 
+// ExtCallUnrunnable is the Ext key on a call step whose child the rewrite read but could not run inline.
+const ExtCallUnrunnable = "pipemaster.call_unrunnable"
+
+// MarkCallUnrunnable marks the call step of a job whose child was read but cannot run inline, so CallReason
+// gives the matrix reason instead of the remote-file one.
+func MarkCallUnrunnable(j *ir.Job) {
+	for _, st := range j.Steps {
+		if st != nil && st.Kind == ir.StepPipelineCall {
+			if st.Ext == nil {
+				st.Ext = ir.Ext{}
+			}
+			st.Ext[ExtCallUnrunnable] = true
+		}
+	}
+}
+
 // CallReason says why a call of another workflow has no target form: the converter reads a local reusable
-// workflow that is in the input, so a call that reaches the emitter is remote or its file is missing. It is empty
-// for a step that is no call.
+// workflow that is in the input, so a call that reaches the emitter is remote or its file is missing, unless the
+// rewrite marked it unrunnable. It is empty for a step that is no call.
 func CallReason(st *ir.Step, target string) string {
 	if st == nil || st.Kind != ir.StepPipelineCall || st.Action == nil {
 		return ""
+	}
+	if _, ok := st.Ext[ExtCallUnrunnable]; ok {
+		return "the step calls the reusable workflow " + callRef(st.Action) + "; the workflow is in the input, but its matrix meets a matrix of the call job and " + target + " cannot run it inline, so the work of that workflow is missing"
 	}
 	return "the step calls the reusable workflow " + callRef(st.Action) + "; the file is remote or not in the input, and " + target + " has no call of another pipeline, so the work of that workflow is missing"
 }
