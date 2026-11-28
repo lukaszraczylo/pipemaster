@@ -1,6 +1,5 @@
 Loss report: concourse -> argo
-[lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the Argo file; it is kept in round-trip metadata)
-[lost] pipeline/ci/job/build ext.passthrough (Ext of provider concourse (gets) is not written to the Argo file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-step-1 ext.passthrough (Ext of provider concourse (config, input_mapping, tags) is not written to the Argo file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the Argo file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider concourse (resources) is not written to the Argo file; it is kept in round-trip metadata)
+[external] pipeline/ci/job/build/step/source-checkout step.action: input git artifact at /workspace (the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; a private repository needs usernameSecret and passwordSecret, or sshPrivateKeySecret, on the git artifact; the file names none)
+[external] pipeline/ci/trigger/0 trigger.schedule: empty context parameters (the CronWorkflow ci-1 starts the template with no value for ctx-repo, ctx-sha; a checkout then clones https://github.com/.git. Pass the values with argo submit -p, or set them under spec.workflowSpec.arguments)
+[external] pipeline/ci/trigger/1 trigger.schedule: empty context parameters (the CronWorkflow ci-2 starts the template with no value for ctx-repo, ctx-sha; a checkout then clones https://github.com/.git. Pass the values with argo submit -p, or set them under spec.workflowSpec.arguments)

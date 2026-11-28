@@ -2,6 +2,7 @@ package woodpecker
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -12,20 +13,23 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
 	placeholderName = "noop"
-	stepKey         = "step-"
-	failKey         = "failure"
-	envKey          = "environment"
-	settKey         = "settings"
-	cmdsKey         = "commands"
-	imageKey        = "image"
-	dirKey          = "directory"
-	nameKey         = "name"
-	entryKey        = "entrypoint"
-	extDerive       = ExtDerivedID
+	// noopScript runs in a step that only keeps the workflow valid and stands for no source work.
+	noopScript = "true"
+	stepKey    = "step-"
+	failKey    = "failure"
+	envKey     = "environment"
+	settKey    = "settings"
+	cmdsKey    = "commands"
+	imageKey   = "image"
+	dirKey     = "directory"
+	nameKey    = "name"
+	entryKey   = "entrypoint"
+	extDerive  = ExtDerivedID
 )
 
 // stepDone is one emitted step: the node and the map key it has in map form.
@@ -59,7 +63,7 @@ func (e *emitter) steps(c *wfCtx) (*yaml.Node, error) {
 		}
 	}
 	c.mapForm = mapForm
-	for i, st := range c.j.Steps {
+	for i, st := range sourceOrder(c.j.Steps) {
 		if st == nil {
 			continue
 		}
@@ -131,12 +135,15 @@ func (e *emitter) step(c *wfCtx, st *ir.Step, idx int) (stepDone, error) {
 		m, err = e.actionStep(c, sp, st, idx)
 		carried = true
 	case st.Kind == ir.StepPlugin:
-		m, err = e.pluginStep(c, sp, st)
+		m, err = e.pluginStep(c, sp, st, idx)
 	case st.Kind == ir.StepScript || len(st.Script) > 0:
 		m, err = e.scriptStep(c, sp, st)
 	default:
-		e.lose(sp, caps.StepAction, "step kind "+string(st.Kind)+" has no Woodpecker form")
+		why := "step kind " + string(st.Kind) + " has no Woodpecker form"
+		e.lose(sp, caps.StepAction, why)
 		e.comment("step " + sp + " kind " + string(st.Kind))
+		m, err = e.failingStep(c, sp, st, idx, caps.StepAction, why)
+		carried = true
 	}
 	if err != nil {
 		return stepDone{}, err
@@ -144,7 +151,7 @@ func (e *emitter) step(c *wfCtx, st *ir.Step, idx int) (stepDone, error) {
 	if m == nil {
 		if !carried {
 			e.unapplied(sp, st)
-			err = e.markAction(sp, st, idx, "")
+			err = e.markAction(sp, st, idx, "", false)
 		}
 		return stepDone{}, err
 	}
@@ -206,10 +213,14 @@ func (e *emitter) finishStep(c *wfCtx, sp string, st *ir.Step, idx int, body *wm
 	} else {
 		m.set(keyWhen, e.stepWhen(sp, st.If))
 	}
-	skip := map[string]bool{envKey: true, settKey: true, keyWhen: true}
+	skip := map[string]bool{envKey: true, settKey: true, keyWhen: true, ExtBashDefault: true}
 	d := stepDone{node: m.n, key: key, src: st.ID, anon: anon}
 	if c.mapForm && key != st.ID {
 		d.read = key
+	}
+	if dep, ok := ext[ExtDependsOn]; ok {
+		ext = maps.Clone(ext)
+		ext[keyDependsOn] = dep
 	}
 	return d, m.addExtra(ext, skip)
 }
@@ -266,7 +277,7 @@ func (e *emitter) stepEnv(c *wfCtx, sp string, st *ir.Step, b *bindings, ext map
 		e.external(sp, caps.ScriptInterpolation, "environment variable for input", "input "+name+" is read as the variable "+name+", which nothing sets; define it in the Woodpecker environment")
 	}
 	if len(b.refs) > 0 {
-		if err := e.markArg(caps.ScriptInterpolation, sp, posArg{Pos: c.pos, Refs: b.refs}); err != nil {
+		if err := e.markArg(caps.ScriptInterpolation, sp, posArg{Pos: c.pos, Refs: b.refs, Q: b.quoted}); err != nil {
 			return nil, err
 		}
 	}
@@ -313,6 +324,10 @@ func (e *emitter) common(c *wfCtx, sp string, st *ir.Step, m *wmap) error {
 		return err
 	}
 	m.set(imageKey, str(img))
+	if st.Image != nil && len(st.Image.Entrypoint) > 0 && st.Kind == ir.StepScript && onlyEmpty(st.Image.Entrypoint) {
+		e.lose(sp, caps.StepImage, "an empty entrypoint changes nothing on a Woodpecker command step, so it is not written")
+		return nil
+	}
 	if st.Image != nil && len(st.Image.Entrypoint) > 0 {
 		ep, err := e.entrypoint(sp, st.Image.Entrypoint)
 		if err != nil {
@@ -324,25 +339,53 @@ func (e *emitter) common(c *wfCtx, sp string, st *ir.Step, m *wmap) error {
 	return nil
 }
 
+// onlyEmpty is true for an entrypoint that only clears the one of the image. Woodpecker replaces the entrypoint
+// of a command step, and an empty entrypoint makes the container fail to start.
+func onlyEmpty(ep []string) bool {
+	return !slices.ContainsFunc(ep, func(s string) bool { return s != "" })
+}
+
 func (e *emitter) scriptStep(c *wfCtx, sp string, st *ir.Step) (*wmap, error) {
 	b := &bindings{}
+	seen := map[string]int{}
 	var lines []*yaml.Node
 	texts := slices.Clone(commandTexts(st))
 	why := make([]string, len(texts))
+	var stmt vars.Statement
+	ctxs := make([]string, len(texts))
 	for i, l := range texts {
 		texts[i] = emitkit.NeutralizeResultWrite(e.lose, sp, l)
-		_, lost, err := e.command(&bindings{}, texts[i])
+		ctxs[i] = stmt.Prefix()
+		out, lost, err := e.command(&bindings{}, texts[i], ctxs[i])
 		if err != nil {
 			return nil, err
 		}
 		why[i] = noSpelling(lost)
+		if why[i] != "" {
+			stmt.Reset()
+		} else {
+			stmt.Add(out)
+		}
 	}
-	for _, i := range e.commentSpans(sp, texts, why) {
-		out, _, err := e.command(b, texts[i])
+	var outs []string
+	for _, p := range e.commentSpans(sp, texts, why) {
+		if p.Lost {
+			fl := emitkit.FailLoud(caps.ScriptInterpolation, sp, p.Detail)
+			outs = append(outs, fl)
+			lines = append(lines, block(fl))
+			continue
+		}
+		b.hits = nil
+		out, _, err := e.command(b, texts[p.Index], ctxs[p.Index])
 		if err != nil {
 			return nil, err
 		}
+		outs = append(outs, out)
 		lines = append(lines, block(out))
+		b.place(out, seen)
+	}
+	if len(lines) > 0 && e.bashWrap(st) {
+		lines = []*yaml.Node{block(provider.BashWrapCommand(esc(provider.BashOrShScript), joinCommands(outs)))}
 	}
 	if len(lines) == 0 {
 		e.comment("step.script " + sp + ": the step has no command left")
@@ -432,19 +475,20 @@ func (e *emitter) stepLosses(sp string, st *ir.Step) {
 	if st.Timeout != nil {
 		e.lose(sp, caps.StepTimeout, "Woodpecker has no step timeout")
 	}
-	if st.Shell != "" {
+	if st.Shell != "" && !e.bashWrap(st) {
 		e.lose(sp, caps.StepShell, "Woodpecker runs commands in the image shell, not "+st.Shell)
 	}
-	if strings.TrimSpace(st.Shell) == "" && len(st.Script) > 0 && provider.BashDefault(e.origin) {
-		e.emulate(sp, caps.StepShell, "commands run under the image sh", "the source runs the step under bash when the image has it; Woodpecker runs commands through /bin/sh -e of the image, and no key picks bash, so bash-only syntax fails when the image sh is dash")
+	if e.bashWrap(st) {
+		e.emulate(sp, caps.StepShell, "bash-if-present wrapper command", "the source runs the step under bash when the image has it; Woodpecker runs commands through /bin/sh -e of the image, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh")
 	}
 }
 
-func (e *emitter) pluginStep(c *wfCtx, sp string, st *ir.Step) (*wmap, error) {
+func (e *emitter) pluginStep(c *wfCtx, sp string, st *ir.Step, idx int) (*wmap, error) {
 	if st.Image == nil || st.Image.Ref == "" {
-		e.lose(sp, caps.StepAction, "a plugin step needs an image")
+		why := "a plugin step needs an image"
+		e.lose(sp, caps.StepAction, why)
 		e.comment("step " + sp + ": plugin without an image")
-		return nil, nil
+		return e.failingStep(c, sp, st, idx, caps.StepAction, why)
 	}
 	m := newMap()
 	if err := e.common(c, sp, st, m); err != nil {
@@ -458,7 +502,7 @@ func (e *emitter) pluginStep(c *wfCtx, sp string, st *ir.Step) (*wmap, error) {
 		}
 		set.set(k, n)
 	}
-	if err := set.mergeMap(extOf(st.Ext)[settKey]); err != nil {
+	if err := set.mergeMap(emitkit.ExtSettings(st.Ext, dialect)); err != nil {
 		return nil, err
 	}
 	if !set.empty() {
@@ -481,9 +525,20 @@ func (e *emitter) settingNode(sp string, v ir.Value) (*yaml.Node, error) {
 
 // placeholder is the one step of a workflow that has none Woodpecker can run; Woodpecker rejects a workflow without steps.
 func (e *emitter) placeholder(c *wfCtx) (stepDone, error) {
-	e.emulate(c.jp, caps.StepScript, "no-op step", "Woodpecker needs a step; no step of the job has a Woodpecker form, so a no-op step stands in")
+	script, why := noopScript, "the job has no steps; a no-op step keeps the workflow valid"
+	if reason, ok := emitkit.BridgeWork(c.j); ok && len(c.j.Steps) == 0 {
+		script = emitkit.FailLoud(caps.StepScript, c.jp, reason)
+		why = reason + "; a step that prints the loss and exits 1 keeps the workflow valid and the pipeline honest"
+		e.emulate(c.jp, caps.StepScript, "failing step", "Woodpecker needs a step; "+reason+", so a step that prints the loss and exits 1 stands in")
+	} else if e.lostStepWork(c.jp) {
+		script = emitkit.FailLoud(caps.StepScript, c.jp, "no step of the job has a Woodpecker form")
+		why = "no step of the job has a Woodpecker form; a step that prints the loss and exits 1 keeps the workflow valid and the pipeline honest"
+		e.emulate(c.jp, caps.StepScript, "failing step", "Woodpecker needs a step; no step of the job has a Woodpecker form, so a step that prints the loss and exits 1 stands in")
+	} else {
+		e.emulate(c.jp, caps.StepScript, "no-op step", "Woodpecker needs a step; the job has no step to run, so a no-op step stands in")
+	}
 	e.mark(caps.StepScript, c.jp)
-	e.lose(c.jp+"/step/script", caps.StepScript, "the job has no steps; a no-op step keeps the workflow valid")
+	e.noteLost(c.jp+"/step/script", caps.StepScript, why)
 	m := newMap()
 	m.set(nameKey, str(placeholderName))
 	img, err := e.stepImage(c, c.jp, &ir.Step{})
@@ -491,6 +546,31 @@ func (e *emitter) placeholder(c *wfCtx) (stepDone, error) {
 		return stepDone{}, err
 	}
 	m.set(imageKey, str(img))
-	m.set(cmdsKey, strSeq([]string{"true"}))
+	m.set(cmdsKey, strSeq([]string{script}))
 	return stepDone{node: m.n, key: placeholderName}, nil
+}
+
+// bashWrap is true when a step with no shell runs under bash-if-present: the source default is bash, or a
+// Woodpecker file held the wrapper.
+func (e *emitter) bashWrap(st *ir.Step) bool {
+	if len(st.Script) == 0 || emitkit.IsFailLoud(st.Script) {
+		return false
+	}
+	if strings.TrimSpace(st.Shell) != "" {
+		return false
+	}
+	if b, _ := extOf(st.Ext)[ExtBashDefault].(bool); b {
+		return true
+	}
+	return !provider.SameFamily(e.origin, dialect) && provider.BashDefault(e.origin)
+}
+
+// joinCommands makes one script of the commands: each command ends with one newline, and a trailing newline of a
+// command text is not doubled.
+func joinCommands(cmds []string) string {
+	lines := make([]string, len(cmds))
+	for i, c := range cmds {
+		lines[i] = strings.TrimSuffix(c, "\n")
+	}
+	return strings.Join(lines, "\n")
 }

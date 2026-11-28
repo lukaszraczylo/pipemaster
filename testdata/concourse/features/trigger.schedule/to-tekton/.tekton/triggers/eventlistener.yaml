@@ -14,6 +14,12 @@ spec:
           params:
             - name: filter
               value: header.canonical('X-Pipemaster-Schedule') == 'ci/0'
+            - name: overlays
+              value:
+                - key: ctx_sha
+                  expression: ''''''
+                - key: ctx_repo
+                  expression: ''''''
       bindings:
         - ref: ci-github
       template:
@@ -25,6 +31,12 @@ spec:
           params:
             - name: filter
               value: header.canonical('X-Pipemaster-Schedule') == 'ci/1'
+            - name: overlays
+              value:
+                - key: ctx_sha
+                  expression: ''''''
+                - key: ctx_repo
+                  expression: ''''''
       bindings:
         - ref: ci-github
       template:

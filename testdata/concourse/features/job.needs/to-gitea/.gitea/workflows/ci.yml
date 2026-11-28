@@ -1,12 +1,24 @@
+# pipemaster:emulated job.if pipeline/ci/job/lint
+# pipemaster:arg {"from":"concourse","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/lint
 # pipemaster:emulated step.image pipeline/ci/job/lint/step/lint-step-1
 # pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo lint"]}
+# pipemaster:emulated job.artifacts pipeline/ci/job/lint
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/ci/job/ship
+# pipemaster:arg {"from":"concourse","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/ship
 # pipemaster:emulated step.image pipeline/ci/job/ship/step/ship-step-1
 # pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo ship"]}
+# pipemaster:emulated job.artifacts pipeline/ci/job/ship
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/ci/job/test
+# pipemaster:arg {"from":"concourse","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/test
 # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
 # pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["echo test"]}
+# pipemaster:emulated job.artifacts pipeline/ci/job/test
+# pipemaster:arg {"pre":1,"post":0}
 name: needs
 on:
   push:
@@ -16,8 +28,10 @@ on:
       - '*'
 jobs:
   lint:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated step.image pipeline/ci/job/lint/step/lint-step-1
       - id: lint-step-1
         uses: docker://ubuntu:latest
@@ -28,8 +42,10 @@ jobs:
     needs:
       - lint
       - test
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated step.image pipeline/ci/job/ship/step/ship-step-1
       - id: ship-step-1
         uses: docker://ubuntu:latest
@@ -37,8 +53,10 @@ jobs:
           entrypoint: /bin/sh
           args: -ec 'echo ship'
   test:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
       - id: test-step-1
         uses: docker://ubuntu:latest

@@ -1,3 +1,4 @@
 Loss report: drone -> concourse
-[lost] pipeline/drone/job/ci job.if (the reference event has no spelling in a Concourse task; the job has no triggering get, so a person starts it)
+[lost] pipeline/drone/job/ci job.if (the reference actor has no spelling in a Concourse task; the job has no triggering get, so a person starts it)
+[lost] pipeline/drone/trigger/0 trigger.filter.branches (the push trigger has no branch filter, and a git resource follows one branch; the resource follows the default branch of the repository)
 [emulated] pipeline/drone ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)

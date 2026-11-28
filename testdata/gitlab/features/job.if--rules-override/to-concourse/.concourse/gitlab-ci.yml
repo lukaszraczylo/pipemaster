@@ -1,13 +1,18 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/unit/step/script/carry
 # pipemaster:arg {"digest":"08917fa4c36d150ee75feb747f4feb128af9ce77cea5a702efe3a5261a6d9667","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/unit/carry
-# pipemaster:arg {"digest":"6682bbb8992c9d8987a29ae7e3fdf942ab46dfd18e55c82ecfef8387ac24bd10","carry":"id: unit\n"}
+# pipemaster:arg {"digest":"bd71d33d9137799e3d6a31ae46063a5aab111b21bf47086dac62ce27a326d17a","carry":"id: unit\n"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/unit-tag
+# pipemaster:arg {"twin_of":"unit"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/unit
+# pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: manual\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/unit/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/unit/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2
 resources:
   - name: source
     type: git
@@ -23,11 +28,35 @@ jobs:
     plan:
       - get: source
         trigger: true
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make test
+            dir: workspace
+  - name: unit-tag
+    plan:
       - get: source-tags
         trigger: true
       - task: script
         input_mapping:
-          workspace: source
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

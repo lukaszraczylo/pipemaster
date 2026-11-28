@@ -1,9 +1,12 @@
+# pipemaster:emulated job.if pipeline/ci/job/flaky
+# pipemaster:arg {"from":"argo","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/flaky
 name: allow
 on:
   push:
 jobs:
   flaky:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:

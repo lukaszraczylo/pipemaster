@@ -1,15 +1,20 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/publish/step/script/carry
 # pipemaster:arg {"digest":"d0524b3e89a990bdd0aebfc25f2217c7abaa76590889aecf508771b065028198","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/publish
 # pipemaster:arg {"manual":true,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/publish/carry
-# pipemaster:arg {"digest":"868dd324f79c885d49d825be8fbae5a075c5f91b99dbb175a5b90e9307db3d7e","carry":"if: branch == gitlab.CI_DEFAULT_BRANCH\nid: publish\nmanual: true\n"}
+# pipemaster:arg {"digest":"199659b0ace87b81336a10509ead9ac21c97ce65e0f2ca5c7cb6084fe9a9561c","carry":"if: branch == default_branch\nid: publish\nmanual: true\n"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/publish-tag
+# pipemaster:arg {"twin_of":"publish"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: gitlab-ci\ntriggers:\n    - kind: manual\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/publish/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/publish/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2
 resources:
   - name: source
     type: git
@@ -24,10 +29,34 @@ jobs:
   - name: publish
     plan:
       - get: source
-      - get: source-tags
       - task: script
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make publish
+            dir: workspace
+  - name: publish-tag
+    plan:
+      - get: source-tags
+      - task: script
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

@@ -21,15 +21,27 @@ const (
 
 // emitter carries the state of one Emit call: the ledger, and the lost-text comments waiting for a node.
 type emitter struct {
-	led      *emitkit.Ledger
-	from     *expr.Dialect
-	comments []string
-	marks    []string
-	// stepIDs maps the step IDs of the job being written to the IDs written.
-	stepIDs map[string]string
-	// pluginVars holds the PLUGIN_ variables of the plugin step being written, for stepTail to add to its env.
-	pluginVars *yaml.Node
-	d          Dialect
+	// injected names the pipelines whose triggers come from the default events of their source.
+	injected       map[string]bool
+	srcEvents      map[string]sourceEventsArg
+	srcLost        map[string][]provider.SourceEvent
+	origin         string
+	jobGuards      map[string]bool
+	from           *expr.Dialect
+	led            *emitkit.Ledger
+	stepIDs        map[string]string
+	pluginVars     *yaml.Node
+	passEnv        []string
+	guarded        map[string]bool
+	guardJob       string
+	marks          []string
+	comments       []string
+	changeAtoms    []changeAtom
+	d              Dialect
+	guardMarked    bool
+	inContainer    bool
+	changesNeeded  bool
+	changesBlocked bool
 }
 
 // sourceDialect is the expression dialect of a project's origin; nil means GHA semantics already hold.
@@ -41,6 +53,9 @@ func (e *emitter) source(path string, f caps.Feature, x expr.Expr) (expr.Expr, b
 	if e.from == nil || isStatus(x) {
 		return x, true
 	}
+	if expr.HasChanges(x) {
+		return e.sourceChanges(path, f, x)
+	}
 	if b, ok := x.(expr.Binary); ok && b.Op == expr.OpAnd && (isStatus(b.L) || isStatus(b.R)) {
 		l, lok := e.source(path, f, b.L)
 		r, rok := e.source(path, f, b.R)
@@ -49,29 +64,45 @@ func (e *emitter) source(path string, f caps.Feature, x expr.Expr) (expr.Expr, b
 	if t, ok := expr.TranslateFacts(x, *e.from, exprgha.Lang, expr.Facts{}); ok {
 		// An exact translation can still change the shape, such as a tag test that GHA spells with ref_type.
 		if (f == caps.JobIf || f == caps.StepIf) && expr.String(t) != expr.String(x) {
-			if err := e.markArg(f, path, srcArg{Src: expr.String(x), From: markFrom(e.from)}); err != nil {
-				e.comment("expression source not carried: " + err.Error())
-			}
+			e.markSource(f, path, x)
 		}
 		return t, true
 	}
 	t, cav, ok := expr.TranslateApprox(x, *e.from, exprgha.Lang)
 	if !ok {
+		if expr.StatesFullRef(x) {
+			return x, true
+		}
 		return nil, false
 	}
 	e.emulate(path, f, "approximate expression translation", strings.Join(cav, "; "))
 	if f == caps.JobIf || f == caps.StepIf {
-		if err := e.markArg(f, path, srcArg{Src: expr.String(x), From: markFrom(e.from)}); err != nil {
-			e.comment("expression source not carried: " + err.Error())
-		}
+		e.markSource(f, path, x)
 	}
 	return t, true
 }
 
+// markSource carries the condition as the source wrote it. The marker of a job condition also tells that the
+// emitter ANDs the deletion guard onto it.
+func (e *emitter) markSource(f caps.Feature, path string, x expr.Expr) {
+	guard := f == caps.JobIf && path == e.guardJob
+	if err := e.markArg(f, path, srcArg{Src: expr.String(x), From: markFrom(e.from), Guard: guard}); err != nil {
+		e.comment("expression source not carried: " + err.Error())
+	}
+	e.guardMarked = e.guardMarked || guard
+}
+
+// deletedGuard is the test that a push event does not delete the ref.
+func deletedGuard() expr.Expr {
+	return expr.Unary{Op: expr.OpNot, X: expr.Ref{Path: []string{expr.CtxDeleted}}}
+}
+
 // srcArg carries a condition as the source dialect wrote it, which the emitted one only approximates.
+// Guard marks the deletion guard the emitter ANDed onto the job condition; it carries no Src.
 type srcArg struct {
-	Src  string `json:"src"`
-	From string `json:"from,omitempty"`
+	Src   string `json:"src,omitempty"`
+	From  string `json:"from,omitempty"`
+	Guard bool   `json:"guard,omitempty"`
 }
 
 // markFrom names the source dialect in a marker. GitLab is the default and stays unnamed.
@@ -114,6 +145,10 @@ func (e *emitter) disable(path string, f caps.Feature, x expr.Expr, what string)
 
 func (e *emitter) lose(path string, f caps.Feature, detail string) {
 	e.led.Note(ir.FeatureUse{IRPath: path, Feature: f}, caps.Support{Level: caps.Lost}, detail)
+}
+
+func (e *emitter) external(path string, f caps.Feature, strategy, detail string) {
+	e.led.Note(ir.FeatureUse{IRPath: path, Feature: f}, caps.Support{Level: caps.External, Strategy: strategy}, detail)
 }
 
 func (e *emitter) emulate(path string, f caps.Feature, strategy, detail string) {

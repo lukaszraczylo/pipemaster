@@ -2,6 +2,10 @@
 kind: pipeline
 type: docker
 name: build
+node:
+  linux: "true"
+  self-hosted: "true"
+  x64: "true"
 trigger:
   event:
     - push
@@ -10,13 +14,14 @@ steps:
   - name: build-step-1
     image: ubuntu:latest
     commands:
-      - echo ok
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo ok'
 ---
 # pipemaster:emulated job.container pipeline/ci/job/grouped
 kind: pipeline
 type: docker
 name: grouped
 node:
+  linux: "true"
   group: big-runners
 trigger:
   event:
@@ -26,4 +31,4 @@ steps:
   - name: grouped-step-1
     image: ubuntu:latest
     commands:
-      - echo ok
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo ok'

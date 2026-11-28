@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/compile
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
 # pipemaster:arg [{"Name":"","Expire":"","Paths":["bin/"]}]
@@ -8,12 +11,17 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
 steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make'
 ---
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/docs
 kind: pipeline
 type: docker
@@ -22,14 +30,19 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
 depends_on:
   - compile
 steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make docs
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make docs'
 ---
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/unit
 kind: pipeline
 type: docker
@@ -38,10 +51,12 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
 depends_on:
   - compile
 steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make test
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make test'

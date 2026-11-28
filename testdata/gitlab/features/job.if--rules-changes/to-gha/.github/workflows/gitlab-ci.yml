@@ -1,0 +1,93 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:arg {"src":"((branch == 'main') \u0026\u0026 changes('src/**/*', 'go.mod')) || ((event == 'merge_request_event') \u0026\u0026 changes('go.sum') \u0026\u0026 !((branch == 'main') \u0026\u0026 changes('src/**/*', 'go.mod')))","guard":true}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated step.script pipeline/gitlab-ci/job/pipemaster-changes
+on:
+  workflow_dispatch:
+  push:
+  repository_dispatch:
+    types:
+      - api
+      - trigger
+jobs:
+  pipemaster-changes:
+    if: '!github.event.deleted'
+    runs-on: ubuntu-latest
+    outputs:
+      c65065151: ${{ steps.changes.outputs.c65065151 }}
+      cd6c3e186: ${{ steps.changes.outputs.cd6c3e186 }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          RE_c65065151: ^(src/(.*/)?[^/]*|go\.mod)$
+          RE_cd6c3e186: ^(go\.sum)$
+        run: |-
+          set -eu
+          files="$(mktemp)"
+          all=false
+          for rev in "${BEFORE:-}" "${AFTER:-}" "${BASE:-}" "${HEAD:-}"; do
+            case "$rev" in -*) echo "pipemaster-changes: refusing the commit value $rev, which starts with a dash" >&2; exit 1 ;; esac
+          done
+          diff_paths() {
+            git -c core.quotepath=off diff -z --name-only --no-renames --end-of-options "$@" > "$files" ||
+              { echo "pipemaster-changes: cannot compute the changed paths for $*" >&2; exit 1; }
+          }
+          case "$EVENT" in
+            push)
+              if [ "$REF_TYPE" = tag ] || [ "$BEFORE" = 0000000000000000000000000000000000000000 ]; then
+                all=true
+              else
+                if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+                  git fetch --no-tags --quiet origin --end-of-options "$BEFORE" || echo "pipemaster-changes: git fetch failed for $BEFORE" >&2
+                fi
+                if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+                  echo "pipemaster-changes: the commit before the push ($BEFORE) is not in the clone, as after a force push; GitLab documents no verdict for this" >&2
+                  exit 1
+                fi
+                diff_paths "$BEFORE" "$AFTER"
+              fi ;;
+            pull_request)
+              diff_paths "$BASE...$HEAD" ;;
+            *)
+              all=true ;;
+          esac
+          emit() {
+            # Each NUL-separated name is matched as a whole string: bash [[ =~ ]] anchors at the string ends, where grep
+            # would also anchor at a newline inside a name.
+            hit=false
+            if [ "$all" = true ]; then
+              hit=true
+            else
+              while IFS= read -r -d '' name; do
+                if [[ $name =~ $2 ]]; then hit=true; break; fi
+              done < "$files"
+            fi
+            echo "$1=$hit" >> "$GITHUB_OUTPUT"
+          }
+          emit c65065151 "$RE_c65065151"
+          emit cd6c3e186 "$RE_cd6c3e186"
+  build:
+    needs:
+      - pipemaster-changes
+    if: ((needs.pipemaster-changes.outputs.c65065151 == 'true') && ((needs.pipemaster-changes.outputs.cd6c3e186 == 'true') && (github.ref_type == 'branch' && github.ref_name == 'main' || github.event_name == 'pull_request' && !(github.ref_type == 'branch' && github.ref_name == 'main')) || (needs.pipemaster-changes.outputs.cd6c3e186 == 'false') && (github.ref_type == 'branch' && github.ref_name == 'main')) || (needs.pipemaster-changes.outputs.c65065151 == 'false') && ((needs.pipemaster-changes.outputs.cd6c3e186 == 'true') && github.event_name == 'pull_request')) && !github.event.deleted
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: script
+        run: make
+        shell: bash

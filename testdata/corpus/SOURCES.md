@@ -4,7 +4,7 @@ Real-world CI pipelines stored verbatim for `TestCorpus` (`internal/roundtrip/co
 The directory of an entry is `testdata/corpus/<#>-<gha, gitea, forgejo, gitlab, woodpecker, drone, tekton, argo or concourse>-<slug>`.
 Every file is byte-identical to the file at the pinned commit; the test run does not edit them.
 
-- Fetch date: 2026-11-18 for entries 01 to 27, 2026-11-19 for entries 28 to 40 and 2026-11-20 for entries 41 to 50 and 2026-11-21 for entries 51 to 71 and 2026-11-22 for entries 72 to 79 and 2026-11-23 for entries 81 to 86.
+- Fetch date: 2026-11-18 for entries 01 to 27, 2026-11-19 for entries 28 to 40 and 2026-11-20 for entries 41 to 50 and 2026-11-21 for entries 51 to 71 and 2026-11-22 for entries 72 to 79 and 2026-11-23 for entries 81 to 86 and 2026-11-24 for entry 87.
 - Each repository is public, and its licence was read before use: from the host API (GitHub `license.spdx_id`, GitLab `license.key`), or, for entries 28 to 40,
   from the `LICENSE` file of the repository at the pinned commit.
   Every licence is MIT, Apache-2.0, BSD-3-Clause or, for entry 60 only, MPL-2.0. Entries 63 to 71 are Apache-2.0. Entry 72 is BSD-3-Clause, entry 73, 74 and 75 are Apache-2.0, entries 76 and 78 are MIT, entry 77 is Apache-2.0 and entry 79 is BSD-3-Clause.
@@ -88,7 +88,7 @@ Every file is byte-identical to the file at the pinned commit; the test run does
 | 66 | results | Tekton | <https://github.com/tektoncd/results> | `9d8626118d5582ae95b28107afbdd5b6ba551c9c` | Apache-2.0 | `tekton/ci.yaml`<br>`tekton/results-release-pipeline.yaml` |
 | 67 | chains | Tekton | <https://github.com/tektoncd/chains> | `afaaeac09fa09245a2f77bab556f0f6370db60f7` | Apache-2.0 | `release/release-pipeline.yaml` |
 | 68 | build-definitions | Tekton | <https://github.com/konflux-ci/build-definitions> | `8fed8ffff0ff01a8bd8d5ca2049e538c642f2d05` | Apache-2.0 | `.tekton/tasks/buildah.yaml`<br>`pipelines/enterprise-contract.yaml` |
-| 69 | pipelines-tutorial | Tekton | <https://github.com/openshift/pipelines-tutorial> | `4ebfb3d6f4e195de106f0f59a2506f4edffdfcf7` | Apache-2.0 | `01_pipeline/04_pipeline.yaml`<br>`01_pipeline/01_apply_manifest_task.yaml`<br>`.tekton/pipelinerun.yaml` |
+| 69 | pipelines-tutorial | Tekton | <https://github.com/openshift/pipelines-tutorial> | `4ebfb3d6f4e195de106f0f59a2506f4edffdfcf7` | Apache-2.0 | `01_pipeline/04_pipeline.yaml`<br>`01_pipeline/01_apply_manifest_task.yaml`<br>`01_pipeline/02_update_deployment_task.yaml`<br>`.tekton/pipelinerun.yaml` |
 | 70 | git-clone | Tekton | <https://github.com/tektoncd-catalog/git-clone> | `e1b1fafc3a0c1704a69beb894d65a8b3e090d5d8` | Apache-2.0 | `task/git-clone/git-clone.yaml`<br>`stepaction/git-clone/git-clone.yaml` |
 | 71 | catalog | Tekton | <https://github.com/tektoncd/catalog> | `112374ce1262b133a77300bd8133445722605e04` | Apache-2.0 | `task/git-clone/0.10/git-clone.yaml` |
 | 72 | ci-example | Argo | <https://github.com/pipekit/argo-workflows-ci-example> | `4f0e92c4a90d788ba22ca617dae52a547d869b4b` | BSD-3-Clause | `bootstrap/workflow-templates/nfs/ci-workflow.yml` |
@@ -106,6 +106,7 @@ Every file is byte-identical to the file at the pinned commit; the test run does
 | 84 | setup-runtime-resource | Concourse | <https://github.com/SoluReal/setup-runtime-resource> | `30302fcc420a45abbd1488489087b116527ecd73` | MIT | `ci/pipeline.yml` (stored as `.concourse/pipeline.yml`) |
 | 85 | cli-ci | Concourse | <https://github.com/cloudfoundry/cli-ci> | `7f253f00b18907571ab18f16476d5431f8ddea3a` | Apache-2.0 | `ci/cli-release/pipeline.yml` (stored as `.concourse/cli-release.yml`)<br>`ci/cli-v8-toolsmiths/pipeline.yml` (stored as `.concourse/cli-v8-toolsmiths.yml`) |
 | 86 | capi-ci | Concourse | <https://github.com/cloudfoundry/capi-ci> | `889f7ae99544ba51a1b2a60f758a51b01c5a377b` | Apache-2.0 | `ci/cve-pipeline.yml` (stored as `.concourse/cve-pipeline.yml`) |
+| 87 | examples (with task files) | Concourse | <https://github.com/concourse/examples> | `a3d23a6a73977baa2d4a8dbd24a3048f4f98b131` | Apache-2.0 | `pipelines/multi-branch/parent.yml` (stored as `.concourse/parent.yml`)<br>`tasks/go-test.yml`<br>`tasks/go-build.yml`<br>`apps/golang/binary-test.yml` |
 
 Woodpecker entries (41 to 50):
 
@@ -141,7 +142,7 @@ Argo entries (72 to 75):
 - Entries 76 to 79 are rows 2, 4, 5 and 6 of section 8 of `docs/superpowers/research/argo.md`, copied byte for byte from the pinned commit into `.argo/` with the file name of the source path. Entry 76 holds two ClusterWorkflowTemplates and no workflow, entry 77 holds a template with no entrypoint, a Sensor and a webhook EventSource, and entry 79 holds a Workflow that only names a WorkflowTemplate. Those shapes parse into a pipeline with no job, with the documents kept in Ext.
 - Not stored, because the pinned file does not parse or does not round trip: `ci-workflow-s3.yml` of pipekit (a `parameters` key under `spec`, which the Argo schema rejects), `git-checkout-pr.yml` of pipekit (its tags read workflow parameters that no file declares), and `cron-workflow.yaml` of argo-workflows (the schedule is every minute, which the GHA linter rejects). The Helm-templated files of the research list are not stored. The entry numbers are not reused.
 
-Concourse entries (80 to 86):
+Concourse entries (80 to 87):
 
 - Rows 1, 2, 3, 5, 6, 7 and 8 of section 8 of `docs/superpowers/research/concourse.md`. The raw URL is `https://raw.githubusercontent.com/<repository>/<commit>/<path>`. Every file is byte-identical to the file at the pinned commit, and `fly validate-pipeline --strict` (fly 8.3.3) accepts each one except entries 80 and 82, which the next bullet explains.
 - The licence text was read at the pinned commit before use: Apache License 2.0 (`LICENSE`, and `LICENCE` for entry 82) for the Apache-2.0 entries, and the MIT text for entries 83 and 84. Each file holds only `((var))` references.
@@ -149,3 +150,4 @@ Concourse entries (80 to 86):
 - The two files of entry 85 take distinct names because a pipeline ID is the file base name and both sources are called `pipeline.yml`.
 - Entries 80 (row 1) and 82 (row 3) fail `fly validate-pipeline --strict` as stored, and the plain command accepts both. Entry 80 names the set_pipeline identifier `((instance_pipeline_name))`, which fly 8.3.3 reports as a deprecation, and strict mode turns that into an error. The converted Concourse file keeps the identifier and fails for the same reason. Entry 82 holds top-level keys that only carry YAML anchors, and strict mode reports them as unknown fields. The converted Concourse file omits those keys, reports each one as lost, passes the schema and passes strict mode. Row 4 and the flagged rows are not used.
 - Entry 86 is also the file `testdata/concourse/capi-ci-cve-pipeline.yml`, which the parser tests read.
+- Entry 87 is entry 80 with the three task files that its jobs reference, at the paths of the upstream repository (`tasks/go-test.yml`, `tasks/go-build.yml` and `apps/golang/binary-test.yml`), so the parser reads the task files that `file: repo/...` names. The files were fetched with `gh api repos/concourse/examples/contents/<path>?ref=<commit>` and stored byte-identical. SHA-256: `.concourse/parent.yml` `952697266151e6c550fd13fd1cc5bbb45f01a4095811c54e2f586949f4ad6f1f`, `tasks/go-test.yml` `b1505d07371ebefb767a70b91c61472a63e7bd8a1a26bf2541b53335bc072ba4`, `tasks/go-build.yml` `4d9a8b3f3f7527e7f0cb965ff914bab486492f921272aeb4781dd2079eda3c87`, `apps/golang/binary-test.yml` `cbc5f3c2f1288104a47d222bb61c784b663331fd79622fba44ff4fd431a16b58`. The licence is Apache-2.0 (host API `license.spdx_id`), as for entry 80. Entry 87 fails `fly validate-pipeline --strict` for the same reason as entry 80.

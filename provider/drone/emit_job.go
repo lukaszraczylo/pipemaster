@@ -12,6 +12,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -28,28 +29,23 @@ var platformRE = regexp.MustCompile(`^[a-z0-9]+/[a-z0-9]+(/v[0-9]+)?$`)
 
 // docCtx is the state of one pipeline document while it is written.
 type docCtx struct {
-	pl      *ir.Pipeline
-	j       *ir.Job
-	plan    *docPlan
-	uploads map[string]bool
-	// written maps the IR ID of each written step to its name.
-	written map[string]string
-	guard   expr.Expr
-	// image is what a step without its own image runs in; a setup action replaces it for the steps after it.
-	image string
-	name  string
-	// depth is the clone depth that an actions/checkout step asked for; empty means the default clone.
-	depth string
-	jp    string
-	// secretVars are the variables that a document-level environment cannot hold; every step gets them.
+	guard      expr.Expr
+	changes    []expr.Expr
+	pl         *ir.Pipeline
+	j          *ir.Job
+	plan       *docPlan
+	uploads    map[string]bool
+	written    map[string]string
+	emul       *ir.Step
+	depth      string
+	name       string
+	jp         string
+	image      string
 	secretVars []ir.Var
-	// held is the text of the written steps that read a matrix name.
-	held []heldText
-	// pos is the place the step being written takes in the document.
-	pos int
-	// took counts the steps that ran in the job container image.
-	took   int
-	defImg bool
+	held       []heldText
+	pos        int
+	took       int
+	defImg     bool
 }
 
 // loseName reports a display name: the Drone pipeline name is its id.
@@ -78,6 +74,7 @@ func (e *emitter) document(c *docCtx) (*yaml.Node, error) {
 		cond = jobCond{set: disabledSet(), has: true}
 	}
 	c.guard = cond.guard
+	c.changes = changesAtoms(c.guard, j.Steps)
 	e.cellNotes(c)
 	env, err := e.docEnv(c, ext)
 	if err != nil {
@@ -309,6 +306,33 @@ func (e *emitter) platform(m *ymap, c *docCtx, ext map[string]any) error {
 			label = l
 		}
 	}
+	emitkit.ReportHosted(e.origin, r.Labels, "platform",
+		func(st, d string) { e.external(c.jp, caps.JobRunner, st, d) },
+		func(d string) { e.lose(c.jp, caps.JobRunner, d) })
+	tagged := map[string]string{}
+	var tags, lostMsgs []string
+	for _, l := range emitkit.Unplaced(e.origin, r.Labels) {
+		if l == label {
+			continue
+		}
+		if k, ok := emitkit.TagKey(l); ok {
+			if _, dup := r.Selector[k]; dup {
+				lostMsgs = append(lostMsgs, "the runner label "+l+" has the key of a runner selector entry; the selector value is kept")
+				continue
+			}
+			tagged[k] = emitkit.TagValue
+			tags = append(tags, k+":"+emitkit.TagValue)
+			continue
+		}
+		lostMsgs = append(lostMsgs, "the runner label "+l+" has no Drone node key: "+emitkit.TagHint)
+	}
+	if len(tags) > 0 {
+		e.external(c.jp, caps.JobRunner, "workers the operator provides", "register a Drone runner with DRONE_RUNNER_LABELS="+strings.Join(tags, ",")+" for the runner labels")
+	}
+	// The external entry goes first so the lost entry that follows holds both texts.
+	for _, m := range lostMsgs {
+		e.lose(c.jp, caps.JobRunner, m)
+	}
 	n := newYMap()
 	if label != "" {
 		parts := strings.Split(label, "/")
@@ -326,6 +350,9 @@ func (e *emitter) platform(m *ymap, c *docCtx, ext map[string]any) error {
 	}
 	m.set(keyPlatform, nonEmpty(n))
 	sel := newYMap()
+	for _, k := range sortedKeys(tagged) {
+		sel.set(k, ystr(tagged[k]))
+	}
 	for _, k := range sortedKeys(r.Selector) {
 		sel.set(k, ystr(esc(r.Selector[k])))
 	}

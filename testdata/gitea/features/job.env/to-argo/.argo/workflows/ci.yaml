@@ -1,11 +1,11 @@
 # pipemaster:emulated job.env pipeline/ci/job/build
 # pipemaster:arg {"vars":"- name: GOFLAGS\n  value:\n    lit: -trimpath\n- name: API\n  value:\n    secret: API_KEY\n","names":["GOFLAGS","API"]}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated config.name pipeline/ci/ref/secrets.API_KEY
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
-# pipemaster:emulated trigger.push pipeline/ci/trigger/1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate

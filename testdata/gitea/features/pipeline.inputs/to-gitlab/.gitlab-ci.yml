@@ -1,18 +1,19 @@
 # pipemaster:emulated pipeline.inputs pipeline/ci
-# pipemaster:arg [{"Name":"environment","Type":"choice","Default":"staging","Description":"Where to deploy","Required":true}]
+# pipemaster:arg [{"Name":"environment","Type":"choice","Default":"staging","Description":"Where to deploy","Required":true},{"Name":"dry-run","Type":"boolean","Default":"false","Description":"Skip the push","Required":false}]
 # pipemaster:emulated trigger.manual pipeline/ci/trigger/0
 # pipemaster:arg {"kind":"manual"}
 variables:
   environment:
     value: staging
     description: Where to deploy
+  dry_run:
+    value: "false"
+    description: Skip the push
 workflow:
   name: inputs
   rules:
     - if: $CI_PIPELINE_SOURCE == "web"
 build:
-  tags:
-    - ubuntu-latest
   needs: []
   script:
     # pipemaster:step build-step-1

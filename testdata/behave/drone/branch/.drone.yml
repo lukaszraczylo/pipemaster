@@ -1,0 +1,22 @@
+kind: pipeline
+type: docker
+trigger:
+  event: [push, tag, pull_request]
+name: default
+steps:
+  - name: always
+    image: alpine:3.20
+    commands:
+      - echo "MARK branch.always" | tee -a trace.log
+  - name: main-only
+    image: alpine:3.20
+    when:
+      branch: [main]
+    commands:
+      - echo "MARK branch.main" | tee -a trace.log
+  - name: tag-only
+    image: alpine:3.20
+    when:
+      event: [tag]
+    commands:
+      - echo "MARK branch.tag" | tee -a trace.log

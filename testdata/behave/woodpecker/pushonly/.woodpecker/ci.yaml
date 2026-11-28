@@ -1,0 +1,8 @@
+when:
+  - event: push
+
+steps:
+  - name: always
+    image: alpine:3.20
+    commands:
+      - echo "MARK pushonly.always" | tee -a trace.log

@@ -4,10 +4,13 @@
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/deploy
 # pipemaster:arg {"manual":true,"held":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/deploy/carry
-# pipemaster:arg {"digest":"994e361ae420d6a607ff0fada56c42f8ac7a09b601870fc3025d3de9a2ae29cf","carry":"id: deploy\nallow_failure: true\nmanual: true\n"}
+# pipemaster:arg {"digest":"3a42ae8c4f1f9697ee3bbc98597d1aebae5015847ba4a87ad745cd32674e5eb3","carry":"id: deploy\nallow_failure: true\nmanual: true\n"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/deploy-tag
+# pipemaster:arg {"twin_of":"deploy"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"3472175864f53f27f03f58bce2f4105e6fc382c5c12089bbb95b3cf6344a142a","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/deploy/step/script
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
@@ -26,10 +29,34 @@ jobs:
       - try:
           do:
             - get: source
-            - get: source-tags
             - task: script
               input_mapping:
                 workspace: source
+              config:
+                platform: linux
+                image_resource:
+                  type: registry-image
+                  source:
+                    repository: ubuntu
+                    tag: latest
+                inputs:
+                  - name: workspace
+                outputs:
+                  - name: workspace
+                run:
+                  path: sh
+                  args:
+                    - -ec
+                    - make deploy
+                  dir: workspace
+  - name: deploy-tag
+    plan:
+      - try:
+          do:
+            - get: source-tags
+            - task: script
+              input_mapping:
+                workspace: source-tags
               config:
                 platform: linux
                 image_resource:

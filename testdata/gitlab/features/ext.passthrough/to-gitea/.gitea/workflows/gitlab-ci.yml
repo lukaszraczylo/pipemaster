@@ -1,24 +1,35 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/build
 # pipemaster:arg {"On":null,"Attempts":2}
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/common
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/common
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/common
 # pipemaster:arg {"On":null,"Attempts":2}
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/common
 # pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/prod
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/prod
 # pipemaster:emulated job.retry pipeline/gitlab-ci/job/prod
 # pipemaster:arg {"On":null,"Attempts":2}
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/prod
 # pipemaster:arg {"pre":1,"post":0}
 on:
+  workflow_dispatch:
   push:
 env:
   SHARED: "1"
 jobs:
   build:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     container: alpine:3
     steps:
@@ -39,6 +50,7 @@ jobs:
           done
           exit "$pipemaster_rc"
   common:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     container: alpine:3
     steps:
@@ -62,6 +74,7 @@ jobs:
     needs:
       - build
       - common
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     container: alpine:3
     steps:

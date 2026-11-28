@@ -1,3 +1,5 @@
+# pipemaster:emulated step.action pipeline/woodpecker/job/ci/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated job.matrix pipeline/woodpecker/job/ci
 # pipemaster:arg {"include":[[{"Key":"GO_VERSION","Value":"1.24"},{"Key":"TAGS","Value":"nethttp"}],[{"Key":"GO_VERSION","Value":"1.25"},{"Key":"TAGS","Value":"netgo"}]]}
 # pipemaster:emulated step.image pipeline/woodpecker/job/ci
@@ -10,6 +12,12 @@ metadata:
   name: woodpecker
 spec:
   entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-sha
+        value: ""
+      - name: ctx-repo
+        value: ""
   templates:
     - name: main
       dag:
@@ -30,7 +38,8 @@ spec:
     - name: ci
       containerSet:
         containers:
-          - name: test
+          - # pipemaster:id test
+            name: main
             image: golang:{{inputs.parameters.GO_VERSION}}
             command:
               - sh
@@ -45,6 +54,12 @@ spec:
         parameters:
           - name: GO_VERSION
           - name: TAGS
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       volumes:
         - emptyDir: {}
           name: workspace

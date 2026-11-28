@@ -1,18 +1,41 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: gitlab-ci
 spec:
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: compile
       taskRef:
         name: gitlab-ci-compile
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
     - name: lint
       taskRef:
         name: gitlab-ci-lint
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
     - name: ship
       taskRef:
         name: gitlab-ci-ship
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       runAfter:
         - compile
         - lint
@@ -20,5 +43,10 @@ spec:
     - name: unit
       taskRef:
         name: gitlab-ci-unit
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       runAfter:
         - compile

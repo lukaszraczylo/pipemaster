@@ -1,6 +1,7 @@
 package woodpecker
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
@@ -32,7 +34,9 @@ const (
 
 // emitter carries the state of one Emit call: the ledger and the comment lines of the file being written.
 type emitter struct {
-	led *emitkit.Ledger
+	// gated holds the action steps that a later step reads, which no target may drop.
+	gated map[*ir.Step]bool
+	led   *emitkit.Ledger
 	// origin is the provider ID the project was parsed from.
 	origin string
 	from   *expr.Dialect
@@ -40,9 +44,15 @@ type emitter struct {
 	stepIDs map[string]string
 	// inexact is the first trigger filter feature of the workflow being written whose globs changed meaning.
 	inexact caps.Feature
-	head    []string
+	// gateFull is the whole job condition when the marker of the workflow being written holds only its gate.
+	gateFull string
+	head     []string
+	// lostWork holds the path of every step that lost script, action or image work.
+	lostWork []string
 	// said holds the strategy and detail last noted per emulated use.
 	said map[ir.FeatureUse][2]string
+	// eventsNoted holds the pipelines whose default source events the ledger already names.
+	eventsNoted map[string]bool
 	// matrixRefs lists the matrix names the workflow being written reads.
 	matrixRefs []string
 	// cut is set when an image, workdir or service field lost an expression; the step or service being written owns it.
@@ -60,7 +70,24 @@ func sourceDialect(origin string) *expr.Dialect { return expr.SourceFor(origin, 
 func use(path string, f caps.Feature) ir.FeatureUse { return ir.FeatureUse{IRPath: path, Feature: f} }
 
 func (e *emitter) lose(path string, f caps.Feature, detail string) {
+	e.noteLostWork(path, f)
+	e.noteLost(path, f, detail)
+}
+
+func (e *emitter) noteLost(path string, f caps.Feature, detail string) {
 	e.led.Note(use(path, f), caps.Support{Level: caps.Lost}, detail)
+}
+
+// noteLostWork remembers a step whose work has no Woodpecker form, so an empty job can tell it from one with no work.
+func (e *emitter) noteLostWork(path string, f caps.Feature) {
+	if strings.Contains(path, "/step/") && (f == caps.StepScript || f == caps.StepImage) {
+		e.lostWork = append(e.lostWork, path)
+	}
+}
+
+// lostStepWork is true when a step of the job at jp lost its work.
+func (e *emitter) lostStepWork(jp string) bool {
+	return slices.ContainsFunc(e.lostWork, func(p string) bool { return strings.HasPrefix(p, jp+"/step/") })
 }
 
 // emulate notes an emulation. A second note for the same path and feature adds its text to the first, so the
@@ -114,8 +141,13 @@ func (e *emitter) markArg(f caps.Feature, path string, v any) error {
 	if err != nil {
 		return err
 	}
-	e.mark(f, path)
-	e.head = append(e.head, container.Escape(line, dollarEsc))
+	m, arg := emitkit.Marker(f, path), container.Escape(line, dollarEsc)
+	for i := 0; i+1 < len(e.head); i++ {
+		if e.head[i] == m && e.head[i+1] == arg {
+			return nil
+		}
+	}
+	e.head = append(e.head, m, arg)
 	return nil
 }
 
@@ -127,7 +159,40 @@ func esc(s string) string { return container.Escape(s, dollarEsc) }
 
 // bindings are the references a step's text reads as run-time variables. The step must map each secret from a
 // secret; refs lists every converted reference as "<namespace>.<name>" so the parser can restore the text.
-type bindings struct{ secrets, vars, inputs, refs []string }
+type bindings struct {
+	// quoted holds, for each name, the ordinals among the ${NAME} of the script that the conversion wrote inside a
+	// quote break.
+	quoted map[string][]int
+	// hits lists the references that the command being written converted, with their place in its text.
+	hits                        []refHit
+	secrets, vars, inputs, refs []string
+}
+
+// refHit is one converted reference and the offset of its variable in the written command.
+type refHit struct {
+	name   string
+	off    int
+	broken bool
+}
+
+var escVarUseRE = regexp.MustCompile(`\$\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+
+// place numbers the ${NAME} of a written command among those of the script and records the ones that the
+// conversion wrote inside a quote break. seen counts the occurrences of each name so far.
+func (b *bindings) place(out string, seen map[string]int) {
+	for _, m := range escVarUseRE.FindAllStringSubmatchIndex(out, -1) {
+		name := out[m[2]:m[3]]
+		for _, h := range b.hits {
+			if h.off == m[0] && h.name == name && h.broken {
+				if b.quoted == nil {
+					b.quoted = map[string][]int{}
+				}
+				b.quoted[name] = append(b.quoted[name], seen[name])
+			}
+		}
+		seen[name]++
+	}
+}
 
 func (b *bindings) add(ns, name string) {
 	if b == nil {
@@ -175,6 +240,9 @@ func (e *emitter) refText(b *bindings, mode textMode, path []string) (string, bo
 			return "$${" + path[1] + "}", true
 		}
 	}
+	if mode == commandText && vars.ScriptRefLost(path, e.origin, dialect) {
+		return "", false
+	}
 	if dp, ok := wpexpr.Vocab.Dialect(path); ok && len(dp) == 1 {
 		return "${" + dp[0] + "}", true
 	}
@@ -192,7 +260,7 @@ func litText(l expr.Lit) string {
 }
 
 // convertParts joins the parts as Woodpecker text. lost holds the canonical text of each expression that has no spelling.
-func (e *emitter) convertParts(b *bindings, mode textMode, parts []expr.Part) (out string, lost []string) {
+func (e *emitter) convertParts(b *bindings, mode textMode, parts []expr.Part, ctx string) (out string, lost []string) {
 	var sb strings.Builder
 	for _, p := range parts {
 		switch x := p.Expr.(type) {
@@ -202,6 +270,18 @@ func (e *emitter) convertParts(b *bindings, mode textMode, parts []expr.Part) (o
 			sb.WriteString(esc(litText(x)))
 		case expr.Ref:
 			if t, ok := e.refText(b, mode, x.Path); ok {
+				if mode == commandText && strings.HasPrefix(t, "$$") {
+					hit := refHit{off: sb.Len()}
+					if broken := vars.BreakOut(ctx, sb.String(), t); broken != t {
+						t = broken
+						hit.off += len(vars.QuoteBreakOpen)
+						hit.broken = true
+					}
+					if b != nil && len(x.Path) == 2 && x.Path[0] != dialect && x.Path[0] != expr.PrefixMatrix {
+						hit.name = x.Path[1]
+						b.hits = append(b.hits, hit)
+					}
+				}
 				sb.WriteString(t)
 			} else {
 				lost = append(lost, expr.String(x))
@@ -219,7 +299,7 @@ func (e *emitter) text(b *bindings, path string, f caps.Feature, mode textMode, 
 	if err != nil {
 		return "", err
 	}
-	out, lost := e.convertParts(b, mode, parts)
+	out, lost := e.convertParts(b, mode, parts, "")
 	for _, l := range lost {
 		e.lose(path, f, "no Woodpecker spelling for expression "+l)
 		e.comment(string(f) + " " + path + ": {{ " + l + " }}")
@@ -232,18 +312,18 @@ func (e *emitter) text(b *bindings, path string, f caps.Feature, mode textMode, 
 
 // command converts one script entry. lost names the expressions Woodpecker cannot spell; the caller comments
 // the entry out whole, because dropping the part could change what the command does.
-func (e *emitter) command(b *bindings, s string) (out string, lost []string, err error) {
+func (e *emitter) command(b *bindings, s, ctx string) (out string, lost []string, err error) {
 	parts, err := expr.ParseScriptTemplate(s)
 	if err != nil {
 		return "", nil, err
 	}
-	out, lost = e.convertParts(b, commandText, parts)
+	out, lost = e.convertParts(b, commandText, parts, ctx)
 	return out, lost, nil
 }
 
-// commentSpans comments out every statement of texts that holds a lost entry and returns the entries that stay.
-func (e *emitter) commentSpans(path string, texts, why []string) []int {
-	return emitkit.DropLost(texts, why, func(detail, text string) {
+// commentSpans swaps every statement of texts that holds a lost entry for a failing piece and returns the pieces in order.
+func (e *emitter) commentSpans(path string, texts, why []string) []emitkit.Piece {
+	return emitkit.ReplaceLost(texts, why, func(detail, text string) {
 		e.lose(path, caps.ScriptInterpolation, detail)
 		e.comment("script.interpolation " + path + ": " + text)
 	})
@@ -263,7 +343,7 @@ func (e *emitter) valueNode(path string, v ir.Value) (*yaml.Node, error) {
 				parts = mixed
 			}
 		}
-		out, lost := e.convertParts(nil, valueText, parts)
+		out, lost := e.convertParts(nil, valueText, parts, "")
 		for _, l := range lost {
 			e.lose(path, caps.ExprOpaque, "no Woodpecker spelling for expression "+l)
 			e.comment("expr.opaque " + path + ": " + l)

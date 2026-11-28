@@ -235,8 +235,23 @@ func (s *state) jobCache(j *ir.Job, r *reader) error {
 	}
 	if anyExtra {
 		r.keep(extCache, extras)
+		if keyOnly(extras) {
+			r.carried = append(r.carried, extCache)
+		}
 	}
 	return nil
+}
+
+// keyOnly reports whether the only key that any cache entry keeps in Ext is the raw key, which the IR holds as a derived key.
+func keyOnly(extras []any) bool {
+	for _, e := range extras {
+		for k := range e.(map[string]any) {
+			if k != "key" {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // flattenSeq lists the items of n with nested sequences spliced in, which is how GitLab reads a list built from an anchor.
@@ -283,6 +298,19 @@ func (s *state) cacheEntry(n *yaml.Node) (c ir.Cache, rest map[string]any, err e
 	if p := r.take("policy"); p != nil {
 		if c.Policy, err = s.scalar(p, "cache policy"); err != nil {
 			return c, nil, err
+		}
+	}
+	if f := r.take("fallback_keys"); f != nil {
+		if f.Kind != yaml.SequenceNode {
+			r.release("fallback_keys")
+		} else {
+			for _, it := range f.Content {
+				fk, err := s.text(it, "cache fallback key")
+				if err != nil {
+					return c, nil, err
+				}
+				c.FallbackKeys = append(c.FallbackKeys, fk)
+			}
 		}
 	}
 	x, err := r.ext()

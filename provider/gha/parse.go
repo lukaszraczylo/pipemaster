@@ -18,6 +18,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 var (
@@ -27,6 +28,15 @@ var (
 
 // Parse reads every workflow file in the dialect's first existing directory into one pipeline each; the pipeline ID is the file stem.
 func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
+	proj, rep, err := a.parseSource(fsys)
+	vars.Strip(proj)
+	if err == nil {
+		attachCalls(proj, rep, a.d.ID)
+	}
+	return proj, rep, err
+}
+
+func (a *adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	files, err := a.readDir(fsys)
 	if err != nil {
 		return nil, nil, err
@@ -37,7 +47,6 @@ func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 		return nil, nil, err
 	}
 	switch {
-	case !scan.restored():
 	case scan.mixed():
 		// Restored conditions read in their source dialect and native ones in GHA's, and the project holds one
 		// dialect, so no file restores its source conditions.
@@ -52,7 +61,7 @@ func (a *adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 				Detail:  scan.mixedDetail(f, a.d.ID),
 			})
 		}
-	default:
+	case scan.restored():
 		// A restored condition reads in its source dialect, so a later emit must translate it again.
 		proj.Origin.Provider, proj.Origin.Dialect = scan.origins[0], scan.origins[0]
 	}
@@ -84,7 +93,7 @@ func (c condScan) mixedDetail(file, dialect string) string {
 // parseFiles parses each file into one pipeline. With restoreConds false, source condition markers are ignored.
 func (a *adapter) parseFiles(fsys fs.FS, files []string, rep *report.Report, restoreConds bool) (*ir.Project, condScan, error) {
 	var scan condScan
-	proj := &ir.Project{Origin: ir.Origin{Provider: a.d.ID, Dialect: a.d.ID, Files: files}}
+	proj := &ir.Project{Origin: ir.Origin{Provider: a.d.ID, Dialect: a.d.ID, Files: files, Guarded: map[string]bool{}}}
 	byStem := map[string]string{}
 	lines := map[string]int{}
 	for _, f := range files {
@@ -102,7 +111,14 @@ func (a *adapter) parseFiles(fsys fs.FS, files []string, rep *report.Report, res
 		if err != nil {
 			return nil, scan, err
 		}
-		if from := collapseMarkers(&emitter{d: a.d, led: emitkit.NewLedger("", a.d.ID, a.Caps())}, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src), rep, restoreConds); from != "" {
+		from, guarded, defaulted := collapseMarkers(&emitter{d: a.d, led: emitkit.NewLedger("", a.d.ID, a.Caps())}, pl, emitkit.ParseMarkers(src), emitkit.ParseArgs(src), rep, restoreConds)
+		if defaulted {
+			proj.Origin.MarkDefaultTriggers(pl.ID)
+		}
+		for _, g := range guarded {
+			proj.Origin.Guarded[g] = true
+		}
+		if from != "" {
 			scan.restoredFiles = append(scan.restoredFiles, f)
 			scan.origins = append(scan.origins, from)
 		} else if hasConds(pl) {

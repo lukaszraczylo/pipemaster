@@ -1,11 +1,19 @@
 workflow:
   name: ci
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 check:
-  tags:
-    - ubuntu-latest
   needs: []
   script:
     # pipemaster:step meta
     - echo "version=1" >> "$GITHUB_OUTPUT"
     # pipemaster:step check-step-2
+    # pipemaster:emulated step.if pipeline/ci/job/check/step/check-step-2
+    # pipemaster:arg "event !~ '(?i)^merge_request_event$'"
+    # pipemaster:arg {"src":"event != 'pull_request'"}
     # pipemaster:lost script.interpolation pipeline/ci/job/check/step/check-step-2: docker inspect {{ steps.meta.outputs.version }}
+    - |
+      if ! printf '%s\n' "$CI_PIPELINE_SOURCE" | grep -Eiq '^merge_request_event$'; then
+      printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/check/step/check-step-2: no GitLab variable for expression steps.meta.outputs.version; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
+      fi

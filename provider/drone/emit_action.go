@@ -1,6 +1,8 @@
 package drone
 
 import (
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -91,7 +93,9 @@ type globArg struct {
 type actionArg struct {
 	Step  string `json:"step"`
 	Image string `json:"image,omitempty"`
+	Stand string `json:"stand,omitempty"`
 	At    int    `json:"at"`
+	Fail  bool   `json:"fail,omitempty"`
 }
 
 // markTriggers writes a marker whose argument holds the pipeline triggers as the IR had them, because a file
@@ -135,18 +139,40 @@ func actionRef(a *ir.ActionRef) string {
 // becomes a clone setting, an image choice or the shared workspace, so the step itself is not written. Every
 // action step leaves a marker that holds it, so the parser can put it back where it stood.
 func (e *emitter) actionStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
-	image, err := e.mapAction(c, sp, st)
+	image, lost, err := e.mapAction(c, sp, st)
 	if err != nil {
 		return nil, err
 	}
-	return nil, e.markAction(sp, st, c.pos, image)
+	if lost != "" {
+		return e.failingStep(c, sp, st, caps.StepAction, lost)
+	}
+	if c.emul != nil {
+		return e.standStep(c, sp, st, c.pos)
+	}
+	return nil, e.markAction(sp, st, c.pos, image, false)
 }
 
-// mapAction applies the action to the document and returns the image it selected, if any.
-func (e *emitter) mapAction(c *docCtx, sp string, st *ir.Step) (string, error) {
+// failingStep writes the step that stands for a step with no Drone form: it prints the loss and exits 1, keeps
+// the condition and the failure policy of the source step, and the marker holds the source step.
+func (e *emitter) failingStep(c *docCtx, sp string, st *ir.Step, f caps.Feature, why string) (*ymap, error) {
+	fail := &ir.Step{ID: st.ID, Kind: ir.StepScript, Image: st.Image, Env: st.Env, Script: []string{emitkit.FailLoud(f, sp, why)}}
+	m, err := e.scriptStep(c, sp, fail)
+	if err != nil {
+		return nil, err
+	}
+	return m, e.markAction(sp, st, c.pos, "", true)
+}
+
+// mapAction applies the action to the document and returns the image it selected, if any. lost is the reason
+// when the action has no Drone form and a failing step must stand in for it.
+func (e *emitter) mapAction(c *docCtx, sp string, st *ir.Step) (image, lost string, err error) {
 	if st.Action == nil || st.Kind == ir.StepPipelineCall {
-		e.dropAction(sp, st, "step kind "+string(st.Kind)+" has no Drone form")
-		return "", nil
+		why := "step kind " + string(st.Kind) + " has no Drone form"
+		if r := emitkit.CallReason(st, "Drone"); r != "" {
+			why = r
+		}
+		e.dropAction(sp, st, why)
+		return "", why, nil
 	}
 	with := map[string]string{}
 	for k, v := range st.With {
@@ -158,9 +184,11 @@ func (e *emitter) mapAction(c *docCtx, sp string, st *ir.Step) (string, error) {
 		with[k] = s
 	}
 	t, ok := actions.Lookup(*st.Action, dialect, with)
+	ok = ok && !e.gated[st]
 	if !ok {
-		e.dropAction(sp, st, "no Drone mapping for action "+actionRef(st.Action))
-		return "", nil
+		why := "no Drone mapping for action " + actionRef(st.Action)
+		e.dropAction(sp, st, why)
+		return "", why, nil
 	}
 	e.led.Note(use(sp, caps.StepAction), t.Support, t.Support.Caveat)
 	for _, k := range t.Unmapped {
@@ -168,8 +196,7 @@ func (e *emitter) mapAction(c *docCtx, sp string, st *ir.Step) (string, error) {
 	}
 	if t.Support.Level == caps.Lost {
 		e.comment("step " + sp + " uses " + actionRef(st.Action) + ": " + t.Support.Caveat)
-		e.unapplied(sp, st)
-		return "", nil
+		return "", "the action has no Drone form: " + t.Support.Caveat, nil
 	}
 	if detail := "the action reference " + actionRef(st.Action) + " is not in the Drone file; it is kept in round-trip metadata"; t.WritesEquivalent() {
 		e.led.Retain(use(sp, caps.ExtPassthrough), detail)
@@ -177,12 +204,12 @@ func (e *emitter) mapAction(c *docCtx, sp string, st *ir.Step) (string, error) {
 		e.lose(sp, caps.ExtPassthrough, detail)
 	}
 	e.unapplied(sp, st)
-	return e.applyTarget(c, sp, t)
+	return e.applyTarget(c, sp, st, t)
 }
 
 // markAction writes the marker that holds a step the file does not have. The step keeps no condition: the IR
 // states conditions in the dialect of its origin, and a restored one would read in the wrong dialect.
-func (e *emitter) markAction(sp string, st *ir.Step, at int, image string) error {
+func (e *emitter) markAction(sp string, st *ir.Step, at int, image string, fail bool) error {
 	held := *st
 	held.If = nil
 	held.Ext = withoutBookkeeping(st.Ext)
@@ -190,7 +217,7 @@ func (e *emitter) markAction(sp string, st *ir.Step, at int, image string) error
 	if err != nil {
 		return err
 	}
-	return e.markArg(caps.StepAction, sp, actionArg{Step: body, At: at, Image: image})
+	return e.markArg(caps.StepAction, sp, actionArg{Step: body, At: at, Image: image, Fail: fail})
 }
 
 // withoutBookkeeping drops the keys a parser sets only to rebuild its own layout, and the Ext of other providers.
@@ -232,7 +259,6 @@ func (e *emitter) dropAction(sp string, st *ir.Step, why string) {
 		ref = actionRef(st.Action)
 	}
 	e.comment("step " + sp + " uses " + ref)
-	e.unapplied(sp, st)
 }
 
 // unapplied reports the step fields that have nothing to attach to once the action is not a step.
@@ -254,7 +280,7 @@ func (e *emitter) unapplied(sp string, st *ir.Step) {
 }
 
 // applyTarget applies a mapped action to the document and returns the image it selected, if any.
-func (e *emitter) applyTarget(c *docCtx, sp string, t actions.Target) (string, error) {
+func (e *emitter) applyTarget(c *docCtx, sp string, st *ir.Step, t actions.Target) (image, lost string, err error) {
 	switch t.Kind {
 	case actions.KindImplicit:
 		if d, ok := t.With["depth"].(string); ok {
@@ -263,10 +289,16 @@ func (e *emitter) applyTarget(c *docCtx, sp string, t actions.Target) (string, e
 	case actions.KindImage:
 		img, err := e.text(nil, sp, caps.StepAction, valueText, t.Image)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		c.image = img
-		return img, nil
+		return img, "", nil
+	case actions.KindScript:
+		if d, ok := t.With["depth"].(string); ok {
+			c.depth = d
+		}
+		c.emul = emitkit.ScriptStep(st, t, sp, c.image == "")
+		e.explainUnspelled(sp, st, t)
 	case actions.KindCache:
 	case actions.KindUpload:
 		name, _ := t.With["name"].(string)
@@ -276,10 +308,50 @@ func (e *emitter) applyTarget(c *docCtx, sp string, t actions.Target) (string, e
 		if !c.uploads[name] && (name != "" || len(c.uploads) == 0) {
 			e.lose(sp, caps.StepAction, "no upload of "+strings.TrimSpace("artifact "+name)+" in this document; documents do not share a workspace")
 			e.comment("step " + sp + " downloads " + name)
-			return "", nil
+			return "", "no upload of the artifact in this document", nil
 		}
 	default:
-		e.lose(sp, caps.StepAction, "action kind "+t.Kind+" has no Drone form")
+		why := "action kind " + t.Kind + " has no Drone form"
+		e.lose(sp, caps.StepAction, why)
+		return "", why, nil
 	}
-	return "", nil
+	return "", "", nil
+}
+
+// standStep writes the script step that stands for an action whose inputs a script carries. The marker holds
+// the action step and the script, so the parser puts the action back when the file still has the script.
+func (e *emitter) standStep(c *docCtx, sp string, st *ir.Step, idx int) (*ymap, error) {
+	cp := c.emul
+	c.emul = nil
+	m, err := e.scriptStep(c, sp, cp)
+	if err != nil {
+		return nil, err
+	}
+	return m, e.markStand(sp, st, idx, strings.Join(cp.Script, "\n"))
+}
+
+// markStand is markAction for a step that a script stands for.
+func (e *emitter) markStand(sp string, st *ir.Step, at int, script string) error {
+	held := *st
+	held.If = nil
+	held.Ext = withoutBookkeeping(st.Ext)
+	body, err := carryYAML(&held)
+	if err != nil {
+		return err
+	}
+	return e.markArg(caps.StepAction, sp, actionArg{Step: body, At: at, Stand: script})
+}
+
+// explainUnspelled reports why an emulated step stops: an input whose value has no Drone spelling is not set,
+// and the guard of the step then fails before git runs.
+func (e *emitter) explainUnspelled(sp string, st *ir.Step, t actions.Target) {
+	for _, in := range slices.Sorted(maps.Values(t.Env)) {
+		v := st.With[in]
+		if v.Kind != ir.ValueExpr {
+			continue
+		}
+		if _, lost := e.convertParts(nil, valueText, emitkit.ValueParts(v), ""); len(lost) > 0 {
+			e.lose(sp, caps.StepAction, "input "+in+" has no value on this target: its value "+strings.Join(lost, ", ")+" is a pipeline parameter or an expression with no Drone spelling, so the step stops before it runs git")
+		}
+	}
 }

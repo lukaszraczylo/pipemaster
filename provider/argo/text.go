@@ -27,6 +27,9 @@ type texts struct {
 	taskID   func(name string) (string, bool)
 	matrix   map[string]bool
 	inNames  map[string]string
+	hits     map[string]string
+	up       string
+	paths    []pathPair
 	kept     []string
 	tmpl     bool
 }
@@ -34,7 +37,7 @@ type texts struct {
 func newTexts(taskID func(string) (string, bool), tmpl bool) *texts {
 	return &texts{
 		bind: map[string][]expr.Part{}, defaults: map[string]string{}, used: map[string]bool{},
-		needs: map[string]bool{}, taskID: taskID, tmpl: tmpl,
+		needs: map[string]bool{}, taskID: taskID, tmpl: tmpl, hits: map[string]string{},
 	}
 }
 
@@ -114,6 +117,7 @@ func (x *texts) input(name string) ([]expr.Part, bool) {
 }
 
 func (x *texts) parts(s string) []expr.Part {
+	s = x.mapPaths(s)
 	var parts []expr.Part
 	var lit strings.Builder
 	flush := func() {
@@ -150,7 +154,7 @@ func (x *texts) parts(s string) []expr.Part {
 // template reads s as canonical script text.
 func (x *texts) template(s string) (string, error) {
 	if !strings.Contains(s, tagOpen) && !strings.Contains(s, "${{") {
-		return s, nil
+		return x.mapPaths(s), nil
 	}
 	return expr.PrintScriptTemplate(x.parts(s))
 }

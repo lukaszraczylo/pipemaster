@@ -1,6 +1,7 @@
 # pipemaster:emulated step.image pipeline/ci/job/version/step/tag
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:lost job.outputs pipeline/ci/job/version: {{ steps.tag.outputs.value }}
+# pipemaster:emulated job.runner pipeline/ci/job/version
 # pipemaster:emulated step.shell pipeline/ci/job/version/step/tag
 apiVersion: tekton.dev/v1
 kind: Task

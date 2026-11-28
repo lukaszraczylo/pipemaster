@@ -4,6 +4,7 @@
 # pipemaster:arg {"refs":[{"ref":"vars.REGION","name":"REGION","at":[0],"of":1}]}
 # pipemaster:emulated pipeline.env pipeline/ci/job/build
 # pipemaster:arg {"names":["API_TOKEN"]}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 apiVersion: tekton.dev/v1
 kind: Task

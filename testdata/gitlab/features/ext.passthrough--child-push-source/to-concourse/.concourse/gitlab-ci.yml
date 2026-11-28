@@ -1,0 +1,253 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
+# pipemaster:arg {"digest":"b031fe97ca33ecbd3ab02ef7b3daed552051b278e3a390168ad1737b473f6423","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
+# pipemaster:arg {"digest":"7958d5c1795091d13f1e30a6e1b4c97d1e7517d34d35ab6cf7a7421df182923f","carry":"id: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/po-created/step/fail/carry
+# pipemaster:arg {"digest":"98b0e633c694f4af1ef795ef62751ab8be12f98c48aa2a36b6095d521624a136","carry":"id: fail\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/po-created/step/pass/carry
+# pipemaster:arg {"digest":"df28c26268ddfd636a8e245e0ee8c76cdbf378413c634c3e54eb609adb89767e","carry":"id: pass\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/po-created/carry
+# pipemaster:arg {"digest":"e9857c3f6190e12c42e9d6cffa105e88cf3697d91eab4aa8a8755b8b33d39942","carry":"id: po-created\nneeds:\n    - job: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/po-x/step/script/carry
+# pipemaster:arg {"digest":"ef974f27428f9997450e88fdce7d767aa67810a0c0bfd5ec73b1938223eca3c0","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated job.manual pipeline/gitlab-ci/job/po-x
+# pipemaster:arg {"manual":false,"held":true,"cond":true}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/po-x/carry
+# pipemaster:arg {"digest":"4056435be498aa7302bf2a64ffca8b45c7b63d9fae60f50adf816832328db1f4","carry":"if: \"false\"\nid: po-x\nneeds:\n    - job: build\n    - job: po-created\n"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/po-created-tag
+# pipemaster:arg {"twin_of":"po-created"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/po-x-tag
+# pipemaster:arg {"twin_of":"po-x"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"82c7f7f356196368bf46818c879d5b6ddf2a7e7c9141c1fd2d1791cfaca29ab5","carry":"id: gitlab-ci\ntriggers:\n    - kind: manual\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/po-created/step/fail
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/po-created/step/fail
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/po-created/step/pass
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/po-created/step/pass
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/po-x
+# pipemaster:emulated step.image pipeline/gitlab-ci/job/po-x/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/po-x/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make build
+            dir: workspace
+  - name: po-created
+    plan:
+      - get: source
+        passed:
+          - build
+        trigger: true
+      - task: fail
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - exit 1
+            dir: workspace
+      - task: pass
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - "true"
+            dir: workspace
+  - name: po-x
+    plan:
+      - get: source
+        passed:
+          - build
+          - po-created
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make only
+            dir: workspace
+  - name: build-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make build
+            dir: workspace
+  - name: po-created-tag
+    plan:
+      - get: source-tags
+        passed:
+          - build-tag
+        trigger: true
+      - task: fail
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - exit 1
+            dir: workspace
+      - task: pass
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - "true"
+            dir: workspace
+  - name: po-x-tag
+    plan:
+      - get: source-tags
+        passed:
+          - build-tag
+          - po-created-tag
+      - task: script
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make only
+            dir: workspace

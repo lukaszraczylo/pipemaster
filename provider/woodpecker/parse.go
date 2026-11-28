@@ -10,6 +10,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
@@ -20,6 +21,12 @@ const (
 // Parse reads the workflows of the repo into one job per workflow. They form one pipeline with ID woodpecker,
 // unless markers name the pipelines an emitter folded into them.
 func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
+	proj, rep, err := adapter{}.parseSource(fsys)
+	vars.Strip(proj)
+	return proj, rep, err
+}
+
+func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	d, err := discover(fsys)
 	if err != nil {
 		return nil, nil, err
@@ -121,9 +128,6 @@ func (k *sink) keepRest(r *reader, feats map[string]caps.Feature) {
 			f = ff
 		}
 		detail := "key " + key + " has no IR field; kept in Ext"
-		if key == "depends_on" {
-			detail += "; step order follows the file and the step DAG is not applied"
-		}
 		k.keep(key, r.m.vals[key], f, detail, r.line(key))
 	}
 }

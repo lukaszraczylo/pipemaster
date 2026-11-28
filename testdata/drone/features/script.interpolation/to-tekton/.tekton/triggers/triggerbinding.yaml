@@ -5,7 +5,7 @@ metadata:
   name: drone-github
 spec:
   params:
-    - name: ctx-branch
-      value: $(extensions.ctx_branch)
     - name: ctx-sha
       value: $(extensions.ctx_sha)
+    - name: ctx-repo
+      value: $(extensions.ctx_repo)

@@ -149,6 +149,10 @@ func (c *plCtx) calls(v any, what string, prev []string) ([]*call, error) {
 		if name == "" {
 			return nil, fmt.Errorf("%s entry %d needs a name", what, i+1)
 		}
+		if tmpl, _ := text(m.Vals["template"]); what == "tasks" && name == changesTask && tmpl == changesTask {
+			c.src.used[changesTask] = true
+			continue
+		}
 		out = append(out, &call{m: m, name: name, id: c.callID(m, name), prev: prev})
 	}
 	return out, nil

@@ -1,5 +1,8 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/deploy
-# pipemaster:arg {"if":"branch == 'main'","back":"(event == 'push') \u0026\u0026 (branch == 'main')","triggers":"- kind: push\n- kind: tag\n"}
+# pipemaster:arg {"if":"branch == 'main'","back":"((event == 'push') || (event == 'schedule') || (event == 'workflow_dispatch')) \u0026\u0026 (branch == 'main')","triggers":"- kind: manual\n- kind: push\n- kind: schedule\n- kind: tag\n"}
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/deploy
 kind: pipeline
 type: docker
@@ -8,10 +11,12 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
   branch:
     - main
 steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make deploy
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make deploy'

@@ -397,7 +397,7 @@ footer .wrap { display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; justify-content:s
     </svg>
     <ol class="steps">
       <li><h3>Parse</h3><p>The parser of the source provider reads the files into the shared intermediate representation. A key that no IR field models goes into a per-provider extension, so the parser loses nothing.</p></li>
-      <li><h3>Emit</h3><p>The emitter of the target checks its capability matrix for every IR node. It writes the native form, builds an emulation, or records the gap.</p></li>
+      <li><h3>Emit</h3><p>The emitter of the target checks its capability matrix for every IR node. It writes the native form, builds an emulation, or records the gap. A Drone pipeline or GitLab file that names no trigger gets the triggers of its default events on every target.</p></li>
       <li><h3>Report</h3><p>Every decision that is not native becomes a report entry with the IR path, the feature, the verdict and the reason. <code>--strict</code> exits with code 3 when any entry exists.</p></li>
       <li><h3>Return</h3><p>The metadata file stores what the target cannot hold. Convert back and the source returns exactly. Chains such as GitHub Actions to GitLab CI to Gitea Actions to GitHub Actions return too, one layer per hop. An edited file makes the trip back stop with exit code 4.</p></li>
     </ol>
@@ -405,12 +405,13 @@ footer .wrap { display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; justify-content:s
 </section>
 
 <section id="proof" aria-labelledby="h-proof">
-  <p class="kicker">$ make check &amp;&amp; make chains &amp;&amp; make lint-real</p>
+  <p class="kicker">$ make check &amp;&amp; make matrix &amp;&amp; make behave</p>
   <h2 id="h-proof">How the claims are checked</h2>
   <div class="facts">
     <div class="fact"><h3>Round-trip matrix</h3><p>The tests convert every feature fixture through every provider pair and back, and compare the IR. The full chain matrix runs three-provider chains such as A to B to C to A, with sidecar and embedded metadata.</p></div>
-    <div class="fact"><h3>Real public pipelines</h3><p>A corpus of 83 public pipelines with compatible licences, attributed in <code>testdata/corpus/SOURCES.md</code>, goes through the same conversions.</p></div>
+    <div class="fact"><h3>Real public pipelines</h3><p>A corpus of 84 public pipelines with compatible licences, attributed in <code>testdata/corpus/SOURCES.md</code>, goes through the same conversions.</p></div>
     <div class="fact"><h3>The real linters</h3><p>Every emitted file passes the pinned schema of its provider. <code>make lint-real</code> also runs actionlint, woodpecker-cli, drone, kubeconform, argo and <code>fly validate-pipeline --strict</code> on the output.</p></div>
+    <div class="fact"><h3>Behaviour tests</h3><p><code>make behave</code> runs each converted pipeline on a real engine (act, gitlab-ci-local, Drone, Woodpecker, Tekton, Argo and Concourse) and compares its trace with the trace of the source. The latest run is in <a href="https://github.com/lukaszraczylo/pipemaster/blob/main/testdata/behave/RESULTS.md">testdata/behave/RESULTS.md</a>.</p></div>
     <div class="fact"><h3>A Lean 4 model</h3><p>A Lean 4 model of the IR and the adapters proves round trips (for example <code>cross_roundtrip</code> and <code>chain_roundtrip</code>), DAG layering and matrix expansion. The model generates test vectors that the Go tests must match. The proofs are about the model, not the Go code.</p></div>
   </div>
 </section>

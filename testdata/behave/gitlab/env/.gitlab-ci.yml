@@ -1,0 +1,9 @@
+default:
+  image: alpine:3.20
+vars:
+  variables:
+    FOO: bar
+  script:
+    - echo "MARK env.branch:$CI_COMMIT_REF_NAME" | tee -a trace.log
+    - echo "MARK env.sha:$(printf '%s' "$CI_COMMIT_SHA" | wc -c)" | tee -a trace.log
+    - echo "MARK env.foo:$FOO" | tee -a trace.log

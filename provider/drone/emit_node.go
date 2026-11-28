@@ -114,7 +114,7 @@ func sortedKeys[V any](m map[string]V) []string {
 // addExtra appends every Ext key that is not bookkeeping, not in skip and not already set, sorted by key.
 func (m *ymap) addExtra(ext map[string]any, skip map[string]bool) error {
 	for _, k := range sortedKeys(ext) {
-		if skip[k] || k == ExtCommands || m.has(k) {
+		if skip[k] || k == ExtCommands || k == ExtBashDefault || m.has(k) {
 			continue
 		}
 		n, err := plainNode(ext[k])

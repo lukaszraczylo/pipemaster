@@ -2,6 +2,8 @@
 #
 # actions:                      list, one entry per GitHub action
 #   - match: owner/repo         case-insensitive, any ref
+#     inputs: [names]           every input of the action at its pinned major version, from its action.yml.
+#                               Load fails when a gating, with, defaults or template name is not listed.
 #     path: sub/dir             optional; monorepo subpath, must match exactly.
 #                               An entry without path never matches a ref that has one.
 #     targets:                  keyed by provider id (gha, gitlab, ...)
@@ -27,6 +29,15 @@
 #             Target.Templated for the emitter to translate.
 #         support: {level: native|emulated|external|lost, strategy: "", caveat: ""}
 #
+# emulate: (entry level) inputs that no keyword carries. A step that sets one of them becomes a script step on
+#   every target but GHA. env maps script variables to inputs; the emitter sets them from the step's own values.
+#   host_env names the variable for the host of the action reference; external lists inputs that need
+#   something the operator creates (the level is then external).
+#
+# gating: (entry level, beside targets) input: [values]. A step whose input holds one of the values has no
+#   mapping on any target but GHA, because the input makes the step fail or branch and no other target keeps it.
+#   "*" stands for any value but empty and false.
+#
 # A missing image input (or only <input>-file) makes Lookup return level lost,
 # as does an image input that is an expression or not a plain Docker tag.
 # gha targets use kind passthrough: every input is kept verbatim.
@@ -36,6 +47,61 @@
 
 actions:
   - match: actions/checkout
+    # Inputs of https://github.com/actions/checkout/blob/v7/action.yml, read 2026-11-24.
+    inputs: [repository, ref, token, ssh-key, ssh-known-hosts, ssh-strict, ssh-user, persist-credentials, path, clean, filter, sparse-checkout, sparse-checkout-cone-mode, fetch-depth, fetch-tags, show-progress, lfs, submodules, set-safe-directory, github-server-url, allow-unsafe-pr-checkout]
+    emulate:
+      inputs: [ref, repository, path, sparse-checkout]
+      targets: [gitlab, woodpecker, drone, concourse]
+      env:
+        PIPEMASTER_CHECKOUT_REF: ref
+        PIPEMASTER_CHECKOUT_REPOSITORY: repository
+        PIPEMASTER_CHECKOUT_PATH: path
+        PIPEMASTER_CHECKOUT_SPARSE: sparse-checkout
+        PIPEMASTER_CHECKOUT_DEPTH: fetch-depth
+      defaults: {path: "."}
+      host_env: PIPEMASTER_CHECKOUT_HOST
+      external: [repository]
+      # One pin for every target: tag v2.54.1 (git 2.54, supports "--"), multi-arch index read with
+      # `docker manifest inspect` on 2026-11-24, digest from hub.docker.com/v2/repositories/alpine/git/tags/v2.54.1.
+      image: "alpine/git:v2.54.1@sha256:29cff25811f790b9f72fc266bf8009a5a911714c0e03c31c47339c50909d9aef"
+      after_native:
+        targets: [argo]
+        inputs: [sparse-checkout]
+        pass: [path]
+        env: PIPEMASTER_CHECKOUT_NATIVE
+      strategy: a script step after the clone of the runner runs git for ref, repository, path and sparse-checkout
+      caveat: the step needs git in its image; a repository other than the source needs a token or secret that the operator creates, and the host is github.com unless the action names another
+      script: |
+        set -e
+        for v in "${PIPEMASTER_CHECKOUT_REF:-}" "${PIPEMASTER_CHECKOUT_PATH:-}" "${PIPEMASTER_CHECKOUT_REPOSITORY:-}"; do
+          case "$v" in -*) echo "pipemaster: refused: checkout value $v starts with - and would be read by git as an option" >&2; exit 1 ;; esac
+        done
+        dir="${PIPEMASTER_CHECKOUT_PATH:-.}"
+        depth="${PIPEMASTER_CHECKOUT_DEPTH:-1}"
+        if [ -z "${PIPEMASTER_CHECKOUT_NATIVE:-}" ]; then
+          if [ -n "${PIPEMASTER_CHECKOUT_REPOSITORY:-}" ]; then
+            git clone -- "${PIPEMASTER_CHECKOUT_HOST:-https://github.com}/${PIPEMASTER_CHECKOUT_REPOSITORY}.git" "$dir"
+          elif [ "$dir" != . ]; then
+            git worktree add --detach -- "$dir" HEAD
+          fi
+          if [ -n "${PIPEMASTER_CHECKOUT_REF:-}" ]; then
+            if [ "$depth" = 0 ]; then
+              git -C "$dir" fetch -- origin "$PIPEMASTER_CHECKOUT_REF"
+            else
+              git -C "$dir" fetch --depth="$depth" -- origin "$PIPEMASTER_CHECKOUT_REF"
+            fi
+            git -C "$dir" checkout --force FETCH_HEAD
+          fi
+        fi
+        if [ -n "${PIPEMASTER_CHECKOUT_SPARSE:-}" ]; then
+          set -f
+          old="$IFS"
+          IFS='
+        '
+          set -- $PIPEMASTER_CHECKOUT_SPARSE
+          IFS="$old"
+          git -C "$dir" sparse-checkout set -- "$@"
+        fi
     targets:
       gha: {kind: passthrough, support: {level: native}}
       gitlab:
@@ -58,11 +124,18 @@ actions:
         kind: implicit
         with:
           fetch-depth: {to: depth, transform: depth}
+          ref: ref
+          repository: repository
+          path: path
+          sparse-checkout: {to: sparseCheckoutDirectories, transform: commas}
         support: {level: emulated, strategy: StepAction ref to the tektoncd-catalog git-clone through the git resolver, caveat: the ctx-repo and ctx-sha params carry the repository and the commit}
       argo:
         kind: implicit
         with:
           fetch-depth: {to: depth, transform: depth}
+          ref: ref
+          repository: repository
+          path: path
         support: {level: emulated, strategy: input git artifact at /workspace, caveat: "the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set"}
       concourse:
         kind: implicit
@@ -71,6 +144,11 @@ actions:
         support: {level: native, strategy: the source get of the job clones the repository before the tasks, caveat: submodules and other get params are not mapped}
 
   - match: actions/cache
+    # Inputs of https://github.com/actions/cache/blob/v6/action.yml, read 2026-11-24.
+    inputs: [path, key, restore-keys, upload-chunk-size, enableCrossOsArchive, fail-on-cache-miss, lookup-only, save-always]
+    gating:
+      fail-on-cache-miss: ["*"]
+      lookup-only: ["*"]
     targets:
       gha: {kind: passthrough, support: {level: native}}
       gitlab:
@@ -111,6 +189,10 @@ actions:
         support: {level: emulated, strategy: task caches, caveat: a cache lives on the worker that ran the task and the key is not used}
 
   - match: actions/upload-artifact
+    # Inputs of https://github.com/actions/upload-artifact/blob/v7/action.yml, read 2026-11-24.
+    inputs: [name, path, if-no-files-found, retention-days, compression-level, overwrite, include-hidden-files, archive]
+    gating:
+      if-no-files-found: [error]
     targets:
       gha: {kind: passthrough, support: {level: native}}
       gitlab:
@@ -152,6 +234,12 @@ actions:
         support: {level: emulated, strategy: the workspace output of the task, caveat: later tasks of the same job read the files and other jobs cannot}
 
   - match: actions/download-artifact
+    # Inputs of https://github.com/actions/download-artifact/blob/v8/action.yml, read 2026-11-24.
+    inputs: [name, artifact-ids, path, pattern, merge-multiple, github-token, repository, run-id, skip-decompress, digest-mismatch]
+    gating:
+      run-id: ["*"]
+      repository: ["*"]
+      pattern: ["*"]
     targets:
       gha: {kind: passthrough, support: {level: native}}
       gitlab:
@@ -180,6 +268,8 @@ actions:
         support: {level: emulated, strategy: the workspace input of the task, caveat: only an upload in the same job is visible}
 
   - match: actions/setup-go
+    # Inputs of https://github.com/actions/setup-go/blob/v6/action.yml, read 2026-11-24.
+    inputs: [go-version, go-version-file, check-latest, token, cache, cache-dependency-path, architecture, go-download-base-url]
     targets:
       gha: {kind: passthrough, support: {level: native}}
       gitlab:
@@ -208,6 +298,8 @@ actions:
         support: {level: emulated, strategy: image selection, caveat: later tasks without an image run in this image}
 
   - match: actions/setup-node
+    # Inputs of https://github.com/actions/setup-node/blob/v6/action.yml, read 2026-11-24.
+    inputs: [node-version, node-version-file, architecture, check-latest, registry-url, scope, token, cache, package-manager-cache, cache-dependency-path, mirror, mirror-token]
     targets:
       gha: {kind: passthrough, support: {level: native}}
       gitlab:
@@ -236,6 +328,8 @@ actions:
         support: {level: emulated, strategy: image selection, caveat: later tasks without an image run in this image}
 
   - match: actions/setup-python
+    # Inputs of https://github.com/actions/setup-python/blob/v6/action.yml, read 2026-11-24.
+    inputs: [python-version, python-version-file, cache, architecture, check-latest, token, cache-dependency-path, update-environment, allow-prereleases, freethreaded, pip-version, pip-install]
     targets:
       gha: {kind: passthrough, support: {level: native}}
       gitlab:
@@ -264,6 +358,8 @@ actions:
         support: {level: emulated, strategy: image selection, caveat: later tasks without an image run in this image}
 
   - match: actions/setup-java
+    # Inputs of https://github.com/actions/setup-java/blob/v5/action.yml, read 2026-11-24.
+    inputs: [java-version, java-version-file, distribution, java-package, architecture, jdk-file, jdkFile, check-latest, set-default, verify-signature, verify-signature-public-key, server-id, server-username, server-password, settings-path, overwrite-settings, gpg-private-key, gpg-passphrase, cache, cache-dependency-path, job-status, token, mvn-toolchain-id, mvn-toolchain-vendor, show-download-progress]
     targets:
       gha: {kind: passthrough, support: {level: native}}
       gitlab:

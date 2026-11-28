@@ -2,6 +2,8 @@ package tekton
 
 import (
 	"fmt"
+	"maps"
+	"path"
 	"slices"
 	"strings"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
+	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 const (
@@ -62,18 +65,19 @@ func (b *jobBuilder) step(m *omap, n int) (*ir.Step, error) {
 			st.Image = &ir.Image{Ref: img}
 		}
 	}
+	if err := b.workingDir(st, k, r, id); err != nil {
+		return nil, err
+	}
+	b.tx.up = emitkit.UpFrom(st.WorkDir)
+	defer func() { b.tx.up = "" }()
+	if b.tx.up != "" && len(b.tplEnv) > 0 {
+		k.Rep.Add(report.Entry{
+			IRPath: k.Path, Feature: caps.StepEnv, Level: caps.Lost, Strategy: "path stays relative to the checkout root", SourceLoc: k.File,
+			Detail: "the job env " + strings.Join(b.tplEnv, ", ") + " holds a workspace path relative to the checkout root, and the step working directory " + st.WorkDir + " resolves it under that directory on the target",
+		})
+	}
 	if err := b.command(st, k, r); err != nil {
 		return nil, fmt.Errorf("step %s: %w", id, err)
-	}
-	if v, ok := r.Take("workingDir"); ok {
-		t, isText := text(v)
-		if !isText {
-			return nil, fmt.Errorf("step %s: workingDir must be a string", id)
-		}
-		var err error
-		if st.WorkDir, err = b.tx.template(t); err != nil {
-			return nil, err
-		}
 	}
 	if v, ok := r.Take("timeout"); ok {
 		if d, ok := parseDuration(v); ok {
@@ -104,6 +108,27 @@ func (b *jobBuilder) step(m *omap, n int) (*ir.Step, error) {
 	return st, nil
 }
 
+// workingDir reads the working directory of a step.
+func (b *jobBuilder) workingDir(st *ir.Step, k *sink, r *reader, id string) error {
+	v, ok := r.Take("workingDir")
+	if !ok {
+		return nil
+	}
+	t, isText := text(v)
+	if !isText {
+		return fmt.Errorf("step %s: workingDir must be a string", id)
+	}
+	if rel, ok := b.sourceDir(t); ok {
+		st.WorkDir = rel
+		k.Out[ExtWorkspaceDir], k.Out[ExtWorkspaceDirIR] = t, rel
+		k.Carry(ExtWorkspaceDir, ExtWorkspaceDirIR)
+		return nil
+	}
+	var err error
+	st.WorkDir, err = b.tx.template(t)
+	return err
+}
+
 func firstOf(ss ...string) string {
 	for _, s := range ss {
 		if s != "" {
@@ -128,9 +153,11 @@ func (b *jobBuilder) command(st *ir.Step, k *sink, r *reader) error {
 	if v, ok := r.Take("ref"); ok {
 		st.Kind = ir.StepAction
 		k.Keep("ref", v, caps.StepAction, "a StepAction ref has no IR form; kept in Ext", r.Line("ref"))
-		if p, ok := r.Take("params"); ok {
+		p, hasParams := r.Take("params")
+		if hasParams {
 			k.Keep("params", p, caps.StepAction, "the params of a StepAction have no IR field; kept in Ext", r.Line("params"))
 		}
+		b.gitClone(st, v, p)
 		return b.env(st, k, r)
 	}
 	st.Kind = ir.StepScript
@@ -175,6 +202,9 @@ func (b *jobBuilder) script(st *ir.Step, k *sink, t string) ([]exprtekton.EnvVar
 		k.Out[ExtBashDefault] = true
 	} else if len(lines) > 0 && strings.HasPrefix(lines[0], shebang) {
 		st.Shell = strings.TrimSpace(strings.TrimPrefix(lines[0], shebang))
+		if name, viaEnv := strings.CutPrefix(st.Shell, envShebang); viaEnv && name != shellSh {
+			st.Shell = name
+		}
 		lines = lines[1:]
 	}
 	var guardEnv []exprtekton.EnvVar
@@ -183,12 +213,25 @@ func (b *jobBuilder) script(st *ir.Step, k *sink, t string) ([]exprtekton.EnvVar
 		lines = rest
 		guardEnv, _ = exprtekton.GuardEnv(cond)
 	}
+	hits := b.tx.wsHits
+	b.tx.markWS = true
+	defer func() { b.tx.markWS = false }()
+	var undone []string
 	for _, l := range lines {
+		l, n := b.markWorkspaceLiterals(l)
+		b.tx.wsHits += n
 		tl, err := b.tx.template(l)
 		if err != nil {
 			return nil, err
 		}
-		st.Script = append(st.Script, tl)
+		ir, file := splitWorkspaceMarks(tl, b.tx.dirOf)
+		st.Script = append(st.Script, ir)
+		undone = append(undone, file)
+	}
+	if b.tx.wsHits != hits {
+		k.Out[ExtScriptSource] = anyStrings(undone)
+		k.Out[ExtScriptIR] = strings.Join(st.Script, "\n")
+		k.Carry(ExtScriptSource, ExtScriptIR)
 	}
 	return guardEnv, nil
 }
@@ -213,10 +256,12 @@ func (b *jobBuilder) commandLine(st *ir.Step, k *sink, cmd, args any) error {
 			words = append(words, q)
 		}
 	}
-	st.Script = []string{strings.Join(words, " ")}
-	k.Out[ExtScriptLine] = st.Script[0]
+	line := strings.Join(words, " ")
+	st.Script = []string{line}
+	k.Out[ExtScriptLine] = line
 	k.Out[ExtCommand] = plain(cmd)
 	k.Out[ExtArgs] = plain(args)
+	k.Carry(ExtScriptLine, ExtCommand, ExtArgs)
 	k.Note(caps.StepScript, "command and args are written as one script line; both lists are kept in Ext", 0)
 	return nil
 }
@@ -229,19 +274,33 @@ func (b *jobBuilder) envWithout(st *ir.Step, k *sink, r *reader, skip []exprtekt
 	if !ok {
 		return nil
 	}
-	vars, from, err := b.envList(v, skip)
+	ws := map[string]any{}
+	vars, from, err := b.envList(v, skip, envScope{ws: ws, k: k, f: caps.StepEnv})
 	if err != nil {
 		return err
 	}
 	st.Env = vars
+	if len(ws) > 0 {
+		k.Out[ExtEnvWorkspace] = ws
+		k.Carry(ExtEnvWorkspace)
+	}
 	if len(from) > 0 {
 		k.Keep("valueFrom", from, caps.StepEnv, "env entries with valueFrom have no Value form; kept in Ext", r.Line("env"))
 	}
 	return nil
 }
 
-// envList reads a Kubernetes env list.
-func (b *jobBuilder) envList(v any, skip []exprtekton.EnvVar) ([]ir.Var, map[string]any, error) {
+// envScope says where an env list sits: the sink of its IR path, the feature of its verdict, and the map that
+// keeps the source text of a value that holds a workspace path. A nil ws keeps every value as written.
+type envScope struct {
+	ws map[string]any
+	k  *sink
+	f  caps.Feature
+}
+
+// envList reads a Kubernetes env list. With a non-nil ws, a literal value that holds a workspace path gets the
+// directory, and ws keeps the IR text and the source text under the variable name.
+func (b *jobBuilder) envList(v any, skip []exprtekton.EnvVar, sc envScope) ([]ir.Var, map[string]any, error) {
 	list, ok := v.([]any)
 	if !ok {
 		return nil, nil, fmt.Errorf("env must be a list")
@@ -269,9 +328,69 @@ func (b *jobBuilder) envList(v any, skip []exprtekton.EnvVar) ([]ir.Var, map[str
 		if slices.ContainsFunc(skip, func(g exprtekton.EnvVar) bool { return g.Name == name && g.Value == raw }) {
 			continue
 		}
-		vars = append(vars, ir.Var{Name: name, Value: b.tx.value(raw)})
+		vars = append(vars, ir.Var{Name: name, Value: b.envValue(name, raw, sc)})
 	}
 	return vars, from, nil
+}
+
+// envValue reads an env value. A literal that holds a workspace path is recorded in sc.ws. A value that the
+// parser cannot rewrite keeps the path as written, and the report names the effect.
+func (b *jobBuilder) envValue(name, raw string, sc envScope) ir.Value {
+	refs := b.workspaceRefs(raw)
+	if len(refs) == 0 {
+		return b.tx.value(raw)
+	}
+	if sc.ws != nil {
+		hits := b.tx.wsHits
+		marked, n := b.markWorkspaceLiterals(raw)
+		b.tx.wsHits += n
+		b.tx.markWS = true
+		v := b.tx.value(marked)
+		b.tx.markWS = false
+		if b.tx.wsHits != hits && v.Kind == ir.ValueLit {
+			irText, _ := splitWorkspaceMarks(v.Lit, b.tx.dirOf)
+			sc.ws[name] = []any{irText, raw}
+			return ir.Value{Lit: irText}
+		}
+	}
+	why := "a sidecar or an expression holds it"
+	if sc.ws != nil {
+		why = "the value is an expression"
+	}
+	b.keepWorkspacePath(sc, name, refs, why)
+	saved, savedData := b.tx.srcWS, b.tx.dataWS
+	b.tx.srcWS, b.tx.dataWS = nil, nil
+	defer func() { b.tx.srcWS, b.tx.dataWS = saved, savedData }()
+	return b.tx.value(raw)
+}
+
+// keepWorkspacePath reports an env value whose workspace path stays as written.
+func (b *jobBuilder) keepWorkspacePath(sc envScope, name string, refs []string, why string) {
+	dirs := make([]string, len(refs))
+	for i, r := range refs {
+		dirs[i], _ = b.tx.dirOf(r)
+	}
+	sc.k.Rep.Add(report.Entry{
+		IRPath: sc.k.Path, Feature: sc.f, Level: caps.Lost, Strategy: "path stays as written", SourceLoc: sc.k.File,
+		Detail: "env " + name + " holds the path of workspace " + strings.Join(refs, ", ") + " (" + why + "); the path stays as written and does not point at the directory " + strings.Join(dirs, ", ") + " that the workspace becomes on the target",
+	})
+}
+
+// workspaceRefs lists the mapped workspaces that a value names, as $(workspaces.x.path) or /workspace/x.
+func (b *jobBuilder) workspaceRefs(raw string) []string {
+	var out []string
+	add := func(name string) {
+		if _, ok := b.tx.dirOf(name); ok && !slices.Contains(out, name) {
+			out = append(out, name)
+		}
+	}
+	for _, m := range workspaceVar.FindAllStringSubmatch(raw, -1) {
+		add(m[1])
+	}
+	for _, m := range workspaceLiteral.FindAllString(raw, -1) {
+		add(m[strings.Index(m, workspaceDir+"/")+len(workspaceDir)+1:])
+	}
+	return out
 }
 
 // storeValue reads the Secret or ConfigMap key that the emitter writes for a secret or a variable.
@@ -316,13 +435,27 @@ func (b *jobBuilder) stepTemplate(v any, line int) error {
 		b.containerRef = ref
 	}
 	if ev, ok := r.Take("env"); ok {
-		vars, from, err := b.envList(ev, nil)
+		ws := map[string]any{}
+		vars, from, err := b.envList(ev, nil, envScope{ws: ws, k: b.k, f: caps.JobEnv})
 		if err != nil {
 			return err
 		}
 		b.job.Env = vars
+		if len(ws) > 0 {
+			b.k.Out[ExtEnvWorkspace] = ws
+			b.k.Carry(ExtEnvWorkspace)
+			b.tplEnv = slices.Sorted(maps.Keys(ws))
+		}
 		if len(from) > 0 {
 			b.k.Keep("valueFrom", from, caps.JobEnv, "stepTemplate env entries with valueFrom have no Value form; kept in Ext", r.Line("env"))
+		}
+	}
+	var shared sharedDirArg
+	if b.marks.arg(caps.StepWorkdir, b.path, &shared) && shared.Dir != "" {
+		if t, isText := text(m.Vals["workingDir"]); isText && t == shared.Dir {
+			r.Take("workingDir")
+		} else {
+			b.ignored(b.path, caps.StepWorkdir, "the shared working directory")
 		}
 	}
 	if rest := r.Rest(); len(rest) > 0 {
@@ -354,8 +487,18 @@ func (b *jobBuilder) sidecars(v any) error {
 			}
 			sv.Image.Ref = ref
 		}
+		if cv, ok := r.Take("command"); ok {
+			cmd, whole, err := b.sidecarCommand(cv)
+			if err != nil {
+				return err
+			}
+			sv.Image.Entrypoint = cmd
+			if !whole {
+				r.Release("command")
+			}
+		}
 		if ev, ok := r.Take("env"); ok {
-			vars, from, err := b.envList(ev, nil)
+			vars, from, err := b.envList(ev, nil, envScope{k: b.k, f: caps.JobServices})
 			if err != nil {
 				return err
 			}
@@ -381,6 +524,26 @@ func (b *jobBuilder) sidecars(v any) error {
 		b.k.Out["sidecars"] = plain(extra)
 	}
 	return nil
+}
+
+// sidecarCommand reads a sidecar command as the service entrypoint; whole is false when an item is not text.
+func (b *jobBuilder) sidecarCommand(v any) (cmd []string, whole bool, err error) {
+	list, ok := v.([]any)
+	if !ok {
+		return nil, false, nil
+	}
+	for _, it := range list {
+		t, tok := text(it)
+		if !tok {
+			return nil, false, nil
+		}
+		x, err := b.tx.template(t)
+		if err != nil {
+			return nil, false, err
+		}
+		cmd = append(cmd, x)
+	}
+	return cmd, true, nil
 }
 
 // results maps the Task results to outputs. The other result keys stay in Ext.
@@ -444,4 +607,79 @@ func (c ctxEnvs) restore(script string) string {
 		return script
 	}
 	return c.repl.Replace(script)
+}
+
+// sourceDir reads a working directory under a mapped workspace as a directory relative to the checkout.
+func (b *jobBuilder) sourceDir(t string) (string, bool) {
+	names := slices.Sorted(maps.Keys(b.tx.srcWS))
+	names = append(names, slices.Sorted(maps.Keys(b.tx.dataWS))...)
+	for _, ws := range names {
+		dir, _ := b.tx.dirOf(ws)
+		for _, root := range []string{workspaceDir + "/" + ws, varOpen + "workspaces." + ws + ".path" + varClose} {
+			if rest, ok := strings.CutPrefix(t, root); ok && (rest == "" || strings.HasPrefix(rest, "/")) {
+				rel := strings.TrimPrefix(path.Clean("/"+rest), "/")
+				if dir == checkoutDir {
+					return rel, true
+				}
+				return path.Join(dir, rel), true
+			}
+		}
+	}
+	return "", false
+}
+
+func anyStrings(ss []string) []any {
+	out := make([]any, len(ss))
+	for i, s := range ss {
+		out[i] = s
+	}
+	return out
+}
+
+// markWorkspaceLiterals brackets each literal path under a source workspace in a script line, so that the IR
+// gets the checkout directory and the file text keeps the path. It returns the number of paths it marked.
+func (b *jobBuilder) markWorkspaceLiterals(l string) (string, int) {
+	n := 0
+	out := workspaceLiteral.ReplaceAllStringFunc(l, func(m string) string {
+		at := strings.Index(m, workspaceDir+"/")
+		lead, ws := m[:at], m[at+len(workspaceDir)+1:]
+		if _, ok := b.tx.dirOf(ws); !ok {
+			return m
+		}
+		n++
+		return lead + litMark + ws + litMark
+	})
+	return out, n
+}
+
+// splitWorkspaceMarks resolves the marks of a template into the IR text, where a workspace path is the checkout
+// directory, and the text that keeps the workspace path as the file wrote it.
+func splitWorkspaceMarks(t string, dirOf func(string) (string, bool)) (ir, file string) {
+	var a, f strings.Builder
+	for len(t) > 0 {
+		i := strings.IndexAny(t, wsMark+litMark)
+		if i < 0 {
+			a.WriteString(t)
+			f.WriteString(t)
+			break
+		}
+		a.WriteString(t[:i])
+		f.WriteString(t[:i])
+		mark := t[i : i+1]
+		name, rest, ok := strings.Cut(t[i+1:], mark)
+		if !ok {
+			a.WriteString(t[i:])
+			f.WriteString(t[i:])
+			break
+		}
+		dir, _ := dirOf(name)
+		a.WriteString(dir)
+		if mark == wsMark {
+			f.WriteString(varOpen + "workspaces." + name + ".path" + varClose)
+		} else {
+			f.WriteString(workspaceDir + "/" + name)
+		}
+		t = rest
+	}
+	return a.String(), f.String()
 }

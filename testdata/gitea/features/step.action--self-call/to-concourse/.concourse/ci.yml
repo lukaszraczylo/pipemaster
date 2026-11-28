@@ -1,16 +1,20 @@
 # pipemaster:emulated step.action pipeline/ci/job/call/step/call-step-1
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'self:'\n    owner: org\n    repo: shared\n    path: .gitea/workflows/build.yml\n    ref: main\next:\n    gha:\n        _derived_id: true\nid: call-step-1\nkind: pipeline_call\n","task":"call-step-1","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"call-step-1\"}"}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'self:'\n    owner: org\n    repo: shared\n    path: .gitea/workflows/build.yml\n    ref: main\next:\n    gha:\n        _derived_id: true\nid: call-step-1\nkind: pipeline_call\n","task":"call-step-1","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/call/step/call-step-1: Concourse does not run the action org/shared/.gitea/workflows/build.yml@main' \\u003e\\u00262; exit 1\"],\"path\":\"sh\"}},\"task\":\"call-step-1\"}"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/call/carry
-# pipemaster:arg {"digest":"176ad586d40aa9296c62e380b4f8c7884cba86737229712a525c872a401ae90f","carry":"id: call\n"}
+# pipemaster:arg {"digest":"54c820a7443ebaceda01e692a7b678ca9a1a3ce9b8575bb4e10dc32eb85bd8cc","carry":"id: call\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/plain/step/plain-step-1/carry
-# pipemaster:arg {"digest":"a9122a9dfd1f81b5cd386c7e6930f0695dab54c1ba8db0dfe2f92361365067c4","carry":"id: plain-step-1\nkind: script\n"}
+# pipemaster:arg {"digest":"04bd094ac840a64273d9943357fb75f9ab9d0dc278c37ec43ae5fdceacc25ce7","carry":"id: plain-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/plain/carry
-# pipemaster:arg {"digest":"cf47054b032c25b7748112408b401a53fd9ba4344ea140c49fa8277e433250ea","carry":"id: plain\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"9129ae8bb4c2438b6e0e8eb0f5d672a51e8f94474e9941fe05b3026694d416fb","carry":"id: plain\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/call-tag
+# pipemaster:arg {"twin_of":"call"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/plain-tag
+# pipemaster:arg {"twin_of":"plain"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"42516277b815005ac96966b3b0f0c44c8d2d03296ba9d6d69ba87d78b52281ef","carry":"id: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"5a1ca2760fa977435b6255efc6207df5e74d108a4dbc55c38e55cd894904e094","carry":"id: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/plain
-# pipemaster:emulated trigger.push pipeline/ci/job/plain
 # pipemaster:emulated step.image pipeline/ci/job/plain/step/plain-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/plain/step/plain-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
@@ -29,8 +33,6 @@ jobs:
     plan:
       - get: source
         trigger: true
-      - get: source-tags
-        trigger: true
       - task: call-step-1
         config:
           platform: linux
@@ -43,12 +45,10 @@ jobs:
             path: sh
             args:
               - -ec
-              - "true"
+              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/call/step/call-step-1: Concourse does not run the action org/shared/.gitea/workflows/build.yml@main'' >&2; exit 1'
   - name: plain
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: plain-step-1
         input_mapping:
@@ -72,5 +72,46 @@ jobs:
               - pipemaster
               - echo ok
             dir: workspace
-        tags:
-          - ubuntu-latest
+  - name: call-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: call-step-1
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          run:
+            path: sh
+            args:
+              - -ec
+              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/call/step/call-step-1: Concourse does not run the action org/shared/.gitea/workflows/build.yml@main'' >&2; exit 1'
+  - name: plain-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: plain-step-1
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo ok
+            dir: workspace

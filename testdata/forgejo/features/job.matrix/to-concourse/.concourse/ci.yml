@@ -5,11 +5,13 @@
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"matrix":"fail_fast: false\naxes:\n    - name: os\n      values:\n        - ubuntu-latest\n        - macos-latest\n    - name: go\n      values:\n        - \"1.24\"\n        - \"1.25\"\ninclude:\n    - - key: experimental\n        value: \"true\"\n      - key: go\n        value: \"1.25\"\n      - key: os\n        value: ubuntu-latest\nexclude:\n    - - key: go\n        value: \"1.24\"\n      - key: os\n        value: macos-latest\nmax_parallel: 2\n","across":"[{\"max_in_flight\":2,\"values\":[{\"experimental\":\"\",\"go\":\"1.24\",\"os\":\"ubuntu-latest\"},{\"experimental\":\"true\",\"go\":\"1.25\",\"os\":\"ubuntu-latest\"},{\"experimental\":\"\",\"go\":\"1.25\",\"os\":\"macos-latest\"}],\"var\":\"matrix\"}]"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
-# pipemaster:arg {"digest":"1863be9d8711fa04bfb5cf5612434de4d1cbe687535315174d22d0dcf6912052","carry":"matrix:\n    fail_fast: false\n    axes:\n        - name: os\n          values:\n            - ubuntu-latest\n            - macos-latest\n        - name: go\n          values:\n            - \"1.24\"\n            - \"1.25\"\n    include:\n        - - key: experimental\n            value: \"true\"\n          - key: go\n            value: \"1.25\"\n          - key: os\n            value: ubuntu-latest\n    exclude:\n        - - key: go\n            value: \"1.24\"\n          - key: os\n            value: macos-latest\n    max_parallel: 2\nid: test\nrunner:\n    labels:\n        - $\u007b{ matrix.os }}\n"}
+# pipemaster:arg {"digest":"e89b22a88141c6a50be283d3a8e7f9852c4b45c349ceca530e8209cc3a35ea54","carry":"matrix:\n    fail_fast: false\n    axes:\n        - name: os\n          values:\n            - ubuntu-latest\n            - macos-latest\n        - name: go\n          values:\n            - \"1.24\"\n            - \"1.25\"\n    include:\n        - - key: experimental\n            value: \"true\"\n          - key: go\n            value: \"1.25\"\n          - key: os\n            value: ubuntu-latest\n    exclude:\n        - - key: go\n            value: \"1.24\"\n          - key: os\n            value: macos-latest\n    max_parallel: 2\nid: test\nrunner:\n    labels:\n        - $\u007b{ matrix.os }}\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/test-tag
+# pipemaster:arg {"twin_of":"test"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: matrix\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
-# pipemaster:emulated trigger.push pipeline/ci/job/test
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
@@ -28,12 +30,52 @@ jobs:
     plan:
       - get: source
         trigger: true
+      - do:
+          - task: test-step-1
+            input_mapping:
+              workspace: source
+            config:
+              platform: linux
+              image_resource:
+                type: registry-image
+                source:
+                  repository: ubuntu
+                  tag: latest
+              inputs:
+                - name: workspace
+              outputs:
+                - name: workspace
+              params:
+                PM_MATRIX_GO: ((.:matrix.go))
+              run:
+                path: sh
+                args:
+                  - -c
+                  - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+                  - pipemaster
+                  - echo ${PM_MATRIX_GO}
+                dir: workspace
+        across:
+          - var: matrix
+            values:
+              - go: "1.24"
+                os: ubuntu-latest
+                experimental: ""
+              - go: "1.25"
+                os: ubuntu-latest
+                experimental: "true"
+              - go: "1.25"
+                os: macos-latest
+                experimental: ""
+            max_in_flight: 2
+  - name: test-tag
+    plan:
       - get: source-tags
         trigger: true
       - do:
           - task: test-step-1
             input_mapping:
-              workspace: source
+              workspace: source-tags
             config:
               platform: linux
               image_resource:

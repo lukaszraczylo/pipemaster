@@ -11,4 +11,5 @@ steps:
   - name: build-step-1
     image: ubuntu:latest
     commands:
+      - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Drone spelling for expression ref_name; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'
       - '# pipemaster:lost script.interpolation: echo "{{ gha.github.workspace }}"'

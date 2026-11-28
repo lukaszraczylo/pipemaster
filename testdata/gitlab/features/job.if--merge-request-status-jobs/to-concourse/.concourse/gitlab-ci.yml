@@ -1,0 +1,348 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
+# pipemaster:arg {"digest":"ee2d460b8b824484809640ce875e7b1b7f21a09d411ceb0dbd5a1657c5a1cd3e","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated display.name pipeline/gitlab-ci/job/build/step/script-2
+# pipemaster:arg {"id":"script","written":"script-2","kind":"step"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script-2/carry
+# pipemaster:arg {"digest":"ad4716b477cb4cc84e3d2c4ba2e66b769c497cd720a5b722c826ba09c4adf519","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated display.name pipeline/gitlab-ci/job/build/step/script-3
+# pipemaster:arg {"id":"script","written":"script-3","kind":"step"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script-3/carry
+# pipemaster:arg {"digest":"181136c28ed70a8edc20eb661d9e33b440b83da33b20eee2f601116dc63c350c","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
+# pipemaster:arg {"digest":"702732ce2baa5c2917d7abf359a840b431d7edecbbfc3b54d2f6eab115ff1789","carry":"container:\n    ref: alpine:3.20\nid: build\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/mrjob/step/script/carry
+# pipemaster:arg {"digest":"224ab75f8e0d2b602859abcd8e07f1323296f926c6bedb21b89dbd77899b1a5e","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated display.name pipeline/gitlab-ci/job/mrjob/step/script-2
+# pipemaster:arg {"id":"script","written":"script-2","kind":"step"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/mrjob/step/script-2/carry
+# pipemaster:arg {"digest":"ad4716b477cb4cc84e3d2c4ba2e66b769c497cd720a5b722c826ba09c4adf519","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated display.name pipeline/gitlab-ci/job/mrjob/step/script-3
+# pipemaster:arg {"id":"script","written":"script-3","kind":"step"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/mrjob/step/script-3/carry
+# pipemaster:arg {"digest":"181136c28ed70a8edc20eb661d9e33b440b83da33b20eee2f601116dc63c350c","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated job.manual pipeline/gitlab-ci/job/mrjob
+# pipemaster:arg {"manual":false,"held":true,"cond":true}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/mrjob/carry
+# pipemaster:arg {"digest":"9837d5af3bbb3a3b90f06c71ff53ed559308a8a91911c0aaa1af0c63ff94639a","carry":"if: event == 'merge_request_event'\ncontainer:\n    ref: alpine:3.20\nid: mrjob\nneeds:\n    - job: build\n"}
+# pipemaster:emulated pipeline.finally pipeline/gitlab-ci
+# pipemaster:arg {"job":"mrjob","digest":"0ba2f7091593fbf356ba09e50d4e28766739e312752db9ae8bbf3e61ec3733c8","tasks":["script-2","script-3"],"copies":[{"job":"build","digest":"83c71b880578a6fa26d7cad5247f078b09ff94e236b5313fe6b49d5246d37a55","tasks":["script-2","script-3"]}]}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/mrjob-tag
+# pipemaster:arg {"twin_of":"mrjob"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
+# pipemaster:arg {"digest":"861708450c00cf03f4c7eb583c82133e092af5af6093be2a721c9418d903410a","carry":"id: gitlab-ci\ntriggers:\n    - kind: manual\n    - kind: push\n    - kind: tag\nfinally:\n    - container:\n        ref: alpine:3.20\n      id: cleanup\n      needs:\n        - job: build\n        - job: mrjob\n      steps:\n        - id: script\n          kind: script\n          script:\n            - echo cleanup\n    - if: failure()\n      container:\n        ref: alpine:3.20\n      id: onfail\n      needs:\n        - job: build\n        - job: mrjob\n      steps:\n        - id: script\n          kind: script\n          script:\n            - echo onfail\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/cleanup/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/cleanup/step/script
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/mrjob
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/mrjob/step/script
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/onfail
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/onfail/step/script
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/onfail/step/script
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+  - name: source-tags
+    type: git
+    source:
+      uri: ((git-uri))
+      tag_filter: '*'
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: alpine
+              tag: "3.20"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo build
+            dir: workspace
+    on_failure:
+      do:
+        - task: script-2
+          input_mapping:
+            workspace: source
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source:
+                repository: alpine
+                tag: "3.20"
+            inputs:
+              - name: workspace
+            outputs:
+              - name: workspace
+            run:
+              path: sh
+              args:
+                - -c
+                - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+                - pipemaster
+                - echo cleanup
+              dir: workspace
+        - task: script-3
+          input_mapping:
+            workspace: source
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source:
+                repository: alpine
+                tag: "3.20"
+            inputs:
+              - name: workspace
+            outputs:
+              - name: workspace
+            run:
+              path: sh
+              args:
+                - -c
+                - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+                - pipemaster
+                - echo onfail
+              dir: workspace
+  - name: mrjob
+    plan:
+      - get: source
+        passed:
+          - build
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: alpine
+              tag: "3.20"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo mr
+            dir: workspace
+    on_failure:
+      task: script-3
+      input_mapping:
+        workspace: source
+      config:
+        platform: linux
+        image_resource:
+          type: registry-image
+          source:
+            repository: alpine
+            tag: "3.20"
+        inputs:
+          - name: workspace
+        outputs:
+          - name: workspace
+        run:
+          path: sh
+          args:
+            - -c
+            - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+            - pipemaster
+            - echo onfail
+          dir: workspace
+    ensure:
+      task: script-2
+      input_mapping:
+        workspace: source
+      config:
+        platform: linux
+        image_resource:
+          type: registry-image
+          source:
+            repository: alpine
+            tag: "3.20"
+        inputs:
+          - name: workspace
+        outputs:
+          - name: workspace
+        run:
+          path: sh
+          args:
+            - -c
+            - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+            - pipemaster
+            - echo cleanup
+          dir: workspace
+  - name: build-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: alpine
+              tag: "3.20"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo build
+            dir: workspace
+    on_failure:
+      do:
+        - task: script-2
+          input_mapping:
+            workspace: source-tags
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source:
+                repository: alpine
+                tag: "3.20"
+            inputs:
+              - name: workspace
+            outputs:
+              - name: workspace
+            run:
+              path: sh
+              args:
+                - -c
+                - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+                - pipemaster
+                - echo cleanup
+              dir: workspace
+        - task: script-3
+          input_mapping:
+            workspace: source-tags
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source:
+                repository: alpine
+                tag: "3.20"
+            inputs:
+              - name: workspace
+            outputs:
+              - name: workspace
+            run:
+              path: sh
+              args:
+                - -c
+                - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+                - pipemaster
+                - echo onfail
+              dir: workspace
+  - name: mrjob-tag
+    plan:
+      - get: source-tags
+        passed:
+          - build-tag
+      - task: script
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: alpine
+              tag: "3.20"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo mr
+            dir: workspace
+    on_failure:
+      task: script-3
+      input_mapping:
+        workspace: source-tags
+      config:
+        platform: linux
+        image_resource:
+          type: registry-image
+          source:
+            repository: alpine
+            tag: "3.20"
+        inputs:
+          - name: workspace
+        outputs:
+          - name: workspace
+        run:
+          path: sh
+          args:
+            - -c
+            - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+            - pipemaster
+            - echo onfail
+          dir: workspace
+    ensure:
+      task: script-2
+      input_mapping:
+        workspace: source-tags
+      config:
+        platform: linux
+        image_resource:
+          type: registry-image
+          source:
+            repository: alpine
+            tag: "3.20"
+        inputs:
+          - name: workspace
+        outputs:
+          - name: workspace
+        run:
+          path: sh
+          args:
+            - -c
+            - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+            - pipemaster
+            - echo cleanup
+          dir: workspace

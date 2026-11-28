@@ -8,6 +8,7 @@ import (
 	dexpr "github.com/lukaszraczylo/pipemaster/expr/drone"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
@@ -56,8 +57,8 @@ func shellName(s string) (name string, n int) {
 
 // builtin reads a shell variable that Drone sets in the step environment as its canonical reference. Any other
 // name stays text: the IR has no reference for a variable the pipeline does not define.
-func builtin(name string) (expr.Ref, bool) {
-	if !isIdent(name) {
+func builtin(name string, script bool) (expr.Ref, bool) {
+	if !isIdent(name) || script && vars.ScriptText(name) {
 		return expr.Ref{}, false
 	}
 	r := dexpr.Ref(name)
@@ -67,7 +68,8 @@ func builtin(name string) (expr.Ref, bool) {
 	return r, true
 }
 
-func (x *texts) parts(s string) []expr.Part {
+// parts splits s into text and refs. In a script, names whose value depends on the event stay text.
+func (x *texts) parts(s string, script bool) []expr.Part {
 	var parts []expr.Part
 	var lit strings.Builder
 	flush := func() {
@@ -77,17 +79,23 @@ func (x *texts) parts(s string) []expr.Part {
 		}
 	}
 	ref := func(name string) bool {
-		r, ok := builtin(name)
+		r, ok := builtin(name, script)
 		if ok {
 			flush()
 			parts = append(parts, expr.Part{Expr: r})
 		}
 		return ok
 	}
+	var mask []bool
+	if script {
+		mask = vars.Protected(s)
+	}
+	// quoted reports whether the shell expands nothing at s[i], as inside single quotes.
+	quoted := func(i int) bool { return mask != nil && mask[i] }
 	for i := 0; i < len(s); {
 		switch {
 		case strings.HasPrefix(s[i:], dollarEsc):
-			if name, n := shellName(s[i+2:]); n > 0 && ref(name) {
+			if name, n := shellName(s[i+2:]); n > 0 && !quoted(i) && ref(name) {
 				i += 2 + n
 				break
 			}
@@ -101,7 +109,7 @@ func (x *texts) parts(s string) []expr.Part {
 				break
 			}
 			whole, name := s[i:i+end+1], s[i+2:i+end]
-			if r, ok := builtin(name); ok {
+			if r, ok := builtin(name, script); ok {
 				flush()
 				parts = append(parts, expr.Part{Expr: r})
 			} else {
@@ -110,7 +118,7 @@ func (x *texts) parts(s string) []expr.Part {
 			}
 			i += end + 1
 		case s[i] == '$':
-			if name, n := shellName(s[i+1:]); n > 0 && ref(name) {
+			if name, n := shellName(s[i+1:]); n > 0 && !quoted(i) && ref(name) {
 				i += 1 + n
 				break
 			}
@@ -122,6 +130,23 @@ func (x *texts) parts(s string) []expr.Part {
 		}
 	}
 	flush()
+	if script {
+		parts = foldQuoteBreaks(parts)
+	}
+	return parts
+}
+
+// foldQuoteBreaks undoes the quote break that the emitter writes around a variable in single-quoted text.
+func foldQuoteBreaks(parts []expr.Part) []expr.Part {
+	for i := 1; i+1 < len(parts); i++ {
+		if parts[i].Expr == nil || parts[i-1].Expr != nil || parts[i+1].Expr != nil {
+			continue
+		}
+		if strings.HasSuffix(parts[i-1].Text, vars.QuoteBreakOpen) && strings.HasPrefix(parts[i+1].Text, vars.QuoteBreakClose) {
+			parts[i-1].Text = strings.TrimSuffix(parts[i-1].Text, vars.QuoteBreakOpen)
+			parts[i+1].Text = strings.TrimPrefix(parts[i+1].Text, vars.QuoteBreakClose)
+		}
+	}
 	return parts
 }
 
@@ -130,12 +155,12 @@ func (x *texts) template(s string) (string, error) {
 	if !strings.Contains(s, dollar) {
 		return s, nil
 	}
-	return expr.PrintScriptTemplate(x.parts(s))
+	return expr.PrintScriptTemplate(x.parts(s, true))
 }
 
 // value reads s as a literal, or as an expression when it holds a reference.
 func (x *texts) value(s string) ir.Value {
-	parts := x.parts(s)
+	parts := x.parts(s, false)
 	var lit strings.Builder
 	for _, p := range parts {
 		if p.Expr != nil {

@@ -11,7 +11,7 @@ import (
 
 func TestJobConditionWithAnUnspellableRefIsAFailSafe(t *testing.T) {
 	j := scriptJob("test", "make")
-	j.If = eqRef("event", "push")
+	j.If = eqRef("actor", "octocat")
 	d := scriptJob("deploy", "make deploy")
 	d.Needs = []ir.Need{{JobID: "test"}}
 	p := project(j, d)
@@ -23,7 +23,7 @@ func TestJobConditionWithAnUnspellableRefIsAFailSafe(t *testing.T) {
 			t.Fatalf("the job triggers though its condition has no spelling: %v", s)
 		}
 	}
-	if strings.Contains(files[".concourse/ci.yml"], "exit 0 # pipemaster:guard") {
+	if strings.Contains(files[".concourse/ci.yml"], "echo 'pipemaster: skipped: the step condition has no shell form'; exit 0 # pipemaster:guard") {
 		t.Fatalf("a vacuous task stands for the job:\n%s", files[".concourse/ci.yml"])
 	}
 	if !hasFeatureEntry(rep, string(caps.JobIf), "") {

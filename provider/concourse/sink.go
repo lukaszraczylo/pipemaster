@@ -27,6 +27,8 @@ const (
 	ExtGets = "gets"
 	// ExtTriggers is the job Ext key of the trigger resource names of a job that the pipeline union is wider than.
 	ExtTriggers = "triggers"
+	// ExtTriggerIf is the job Ext key of the condition that the parser built from the triggers of the job.
+	ExtTriggerIf = "trigger_if"
 	// ExtGetsParallel is the job Ext key that says the source gets sat in one in_parallel step.
 	ExtGetsParallel = "gets_in_parallel"
 	// ExtResourcesRef is the trigger Ext key that lists the resource names the trigger came from.
@@ -36,6 +38,14 @@ const (
 	ExtCron = "cron"
 	// ExtUnreadable is the Ext key of an api trigger that says why the source trigger could not be read.
 	ExtUnreadable = "unreadable"
+	// ExtLoadScript is the script that stands for a load_var step; the step stays verbatim while the script is unchanged.
+	ExtLoadScript = "load_script"
+	// ExtLoadRefs holds the script lines that read load_var values into the params of a task; the emitter drops
+	// them and writes the params back.
+	ExtLoadRefs = "load_refs"
+	// ExtLayout holds the script lines that lay out the inputs of an inline task and the run.dir that the lines
+	// replaced; the emitter drops them and writes the inputs and run.dir back.
+	ExtLayout = "layout"
 	// ExtStep and ExtKind keep a step the IR cannot model: the verbatim step and its kind key.
 	ExtStep = "step"
 	ExtKind = "kind"

@@ -5,8 +5,10 @@ namespace Translate
 
 open Pipemaster.Expr
 
-/-! Translation between the GHA and GitLab expression dialects (expr.Translate, expr/translate.go).
-It is exact: the target gives the same truthiness as the source on every environment. -/
+/-! Translation between the GHA and GitLab expression dialects (expr.translate, expr/translate.go).
+It is exact: the target gives the same truthiness as the source on every environment. The model is the base
+translation only. The public expr.Translate first tries the rewrites of expr/variants.go (pull request branch
+pairs, tag and ref forms); those are outside the model, and variants_test.go checks them against the source. -/
 
 /-- A literal the case-insensitive regex can stand for: non-empty and ASCII (the model lowers ASCII only),
 with no backslash (GitLab patterns cannot spell a trailing one and read `\/` as a slash). -/
@@ -81,7 +83,7 @@ def trAffE (m : Mode) : E → E → Option E
   | .ref r, .str s => trAff m r s
   | _, _ => none
 
-/-- Mirrors expr.Translate (expr/translate.go) from gha to gitlab. -/
+/-- Mirrors expr.translate (expr/translate.go) from gha to gitlab: the base translation, without the variants. -/
 def tr : E → Option E
   | .ref .refName => some (.ref .refName)
   | .ref .sha => some (.ref .sha)
@@ -620,7 +622,7 @@ def trRx (neg : Bool) (r : Ref) (m : Mode) (s : String) : Option E :=
   | .tag => if okFor m s then some (negE neg (guardE .tag (predE m (.ref .refName) s))) else none
   | _ => none
 
-/-- Mirrors expr.Translate (expr/translate.go) from gitlab to gha. -/
+/-- Mirrors expr.translate (expr/translate.go) from gitlab to gha: the base translation, without the variants. -/
 def trR : E → Option E
   | .ref .refName => some (.ref .refName)
   | .ref .sha => some (.ref .sha)

@@ -1,7 +1,11 @@
 Loss report: gitlab -> forgejo
+[lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline and its file has no trigger form for them; Forgejo has no event for them)
+[lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat and its file has no trigger form for them; Forgejo has no event for them)
 [lost] pipeline/gitlab-ci/job/build ext.passthrough (Ext of provider gitlab (rules) is not written to the GHA file; it is kept in round-trip metadata)
 [lost] pipeline/gitlab-ci/job/build job.if (condition not expressible in GitHub Actions; job disabled)
+[lost] pipeline/gitlab-ci/trigger/4 trigger.api (event repository_dispatch is not supported by Forgejo; the trigger is dropped)
+[external] pipeline/gitlab-ci/trigger/3 trigger.schedule: add on: schedule: - cron: <the cron of your GitLab pipeline schedule> to the workflow: GitLab keeps the schedule in the project settings, so the workflow has no schedule event and the job starts by workflow_dispatch (the schedule names no cron expression)
 [emulated] pipeline/gitlab-ci pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)
 [emulated] pipeline/gitlab-ci/job/build job.runner: default runner label ubuntu-latest (the IR holds no runner label)
-[emulated] pipeline/gitlab-ci/job/build step.action: actions/checkout step (GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs)
+[emulated] pipeline/gitlab-ci/job/build step.action: actions/checkout step (GitLab clones the repository before every job; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs, and GHA does not clone)
 [native] pipeline/gitlab-ci/job/build/synth/checkout step.action (printed as an absolute URL; an instance that cannot reach https://github.com needs the URL edited)

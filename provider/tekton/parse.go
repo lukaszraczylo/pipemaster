@@ -8,7 +8,9 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const fallbackPipelineID = "tekton"
@@ -41,6 +43,13 @@ type project struct {
 
 // Parse reads the YAML files under .tekton/ into one pipeline per Pipeline or embedded PipelineRun.
 func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
+	proj, rep, err := adapter{}.parseSource(fsys)
+	vars.Strip(proj)
+	emitkit.DropSourceCheckout(proj, emitkit.GeneratedCheckouts(fsys))
+	return proj, rep, err
+}
+
+func (adapter) parseSource(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	rep := &report.Report{Source: dialect}
 	files, err := yamlFiles(fsys)
 	if err != nil {
@@ -77,6 +86,7 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	}
 	p.triggers(byName)
 	p.cronJobs(byName)
+	defaulted := p.defaultTriggerIDs(byName)
 	for name, d := range p.tasks {
 		if !p.taskUsed[name] {
 			p.resources = append(p.resources, d)
@@ -93,6 +103,9 @@ func (adapter) Parse(fsys fs.FS) (*ir.Project, *report.Report, error) {
 	proj := &ir.Project{
 		Origin:    ir.Origin{Provider: dialect, Dialect: dialect, Files: files},
 		Pipelines: pls,
+	}
+	for _, id := range defaulted {
+		proj.Origin.MarkDefaultTriggers(id)
 	}
 	if err := ir.Validate(proj); err != nil {
 		return nil, nil, err

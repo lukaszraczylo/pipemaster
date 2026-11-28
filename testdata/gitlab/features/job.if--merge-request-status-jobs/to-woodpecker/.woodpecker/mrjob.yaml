@@ -1,0 +1,29 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/mrjob
+# pipemaster:arg {"Ref":"alpine:3.20","Entrypoint":null}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/mrjob
+# pipemaster:arg {"gitlab_default":true}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/mrjob
+# pipemaster:arg {"src":"event == 'merge_request_event'","from":"gitlab","gate":false}
+when:
+  - event:
+      - push
+      - pull_request
+    evaluate: CI_PIPELINE_EVENT matches "(?i)^pull_request$$"
+  - event:
+      - tag
+      - pull_request
+    evaluate: CI_PIPELINE_EVENT matches "(?i)^pull_request$$"
+  - event:
+      - manual
+      - cron
+      - pull_request
+    evaluate: CI_PIPELINE_EVENT matches "(?i)^pull_request$$"
+depends_on:
+  - build
+steps:
+  - name: script
+    image: alpine:3.20
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo mr'

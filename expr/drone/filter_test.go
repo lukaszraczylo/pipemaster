@@ -36,6 +36,8 @@ func TestFilterExpr(t *testing.T) {
 		{drone.GlobOpaque("branch", "release/*"), "glob stays opaque", "branch",
 			drone.Filter{Include: []string{"release/*"}}},
 		{eq(r("tag"), "v1"), "ref of a tag is tag equality", "ref", drone.Filter{Include: []string{"refs/tags/v1"}}},
+		{expr.Call{Name: "startsWith", Args: []expr.Expr{r("ref"), expr.Lit{Kind: expr.LitStr, Str: "refs/tags/"}}},
+			"every tag is a prefix test of the ref", "ref", drone.Filter{Include: []string{"refs/tags/**"}}},
 		{eq(r("ref"), "refs/heads/main"), "ref of a branch stays ref", "ref",
 			drone.Filter{Include: []string{"refs/heads/main"}}},
 		{eq(r("ref"), "refs/tags/"), "empty tag name stays ref", "ref", drone.Filter{Include: []string{"refs/tags/"}}},
@@ -575,5 +577,34 @@ func TestAllowFoldReadsRefName(t *testing.T) {
 	line, err := drone.PrintGuard(bin(expr.OpOr, eq(name, "main"), eq(event, "pull_request")), folding, drone.AllowFold)
 	if err != nil || !strings.Contains(line, `[ "$DRONE_COMMIT_REF" = 'refs/heads/main' ] || [ "$DRONE_TAG" = 'main' ]`) {
 		t.Errorf("ref_name guard = %q, %v", line, err)
+	}
+}
+
+// The pair push and tag is the canonical push, so an exclude of both reads back as both, never as push alone.
+func TestEventExcludeOfPushAndTagRoundTrips(t *testing.T) {
+	for _, exclude := range [][]string{{"push", "tag"}, {"pull_request", "tag"}, {"push"}, {"tag"}} {
+		e, err := drone.FilterExpr("event", drone.Filter{Exclude: exclude})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c, ok := drone.FromExpr(e, drone.Semantics)
+		if !ok || !slices.Equal(c.Event.Exclude, exclude) || len(c.Event.Include) != 0 {
+			t.Errorf("exclude %v read back as %+v (ok=%v)", exclude, c.Event, ok)
+		}
+	}
+}
+
+func TestFromExprReadsATagRunAsTheTagRefGlob(t *testing.T) {
+	want := drone.Conditions{Ref: drone.Filter{Include: []string{"refs/tags/**"}}}
+	for name, e := range map[string]expr.Expr{
+		"truthy tag":      r("tag"),
+		"prefix of a ref": expr.Call{Name: "startsWith", Args: []expr.Expr{r("ref"), expr.Lit{Kind: expr.LitStr, Str: "refs/tags/"}}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, ok := drone.FromExpr(e, exact)
+			if !ok || !reflect.DeepEqual(got, want) {
+				t.Fatalf("FromExpr = %#v, %v; want %#v", got, ok, want)
+			}
+		})
 	}
 }

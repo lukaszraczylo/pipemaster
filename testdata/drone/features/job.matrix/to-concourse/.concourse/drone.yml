@@ -1,9 +1,9 @@
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/step/test/carry
-# pipemaster:arg {"digest":"c308da1719a465f1388b21a059712267b23e1190e70c170301aaaa0e23e276c1","carry":"image:\n    ref: golang:$\u007b{ matrix.GO_VERSION }}\nid: test\nkind: script\nscript:\n    - go test ./...\n    - echo $\u007b{ matrix.OS }}\n"}
+# pipemaster:arg {"digest":"5c7217289046ed557ba4cdbe44a07fc58bf18a3d384ed205f0832fa31547a2ca","carry":"image:\n    ref: golang:$\u007b{ matrix.GO_VERSION }}\nid: test\nkind: script\nscript:\n    - go test ./...\n    - echo $\u007b{ matrix.OS }}\n"}
 # pipemaster:emulated job.matrix pipeline/drone/job/ci
 # pipemaster:arg {"matrix":"axes:\n    - name: GO_VERSION\n      values:\n        - \"1.24\"\n        - \"1.25\"\n    - name: OS\n      values:\n        - linux\n        - darwin\n","across":"[{\"max_in_flight\":\"all\",\"values\":[\"1.24\",\"1.25\"],\"var\":\"GO_VERSION\"},{\"max_in_flight\":\"all\",\"values\":[\"linux\",\"darwin\"],\"var\":\"OS\"}]"}
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/carry
-# pipemaster:arg {"digest":"8bac11a3c904da9f197cc98f71df0c24e97cb877fa214bd0e5ef1a8dfb7d50ec","carry":"matrix:\n    axes:\n        - name: GO_VERSION\n          values:\n            - \"1.24\"\n            - \"1.25\"\n        - name: OS\n          values:\n            - linux\n            - darwin\nid: ci\n"}
+# pipemaster:arg {"digest":"1ac66f2a5974bfb34309c97052afbf7db971bae3e5e711d1c983f7f8e9afdb9b","carry":"matrix:\n    axes:\n        - name: GO_VERSION\n          values:\n            - \"1.24\"\n            - \"1.25\"\n        - name: OS\n          values:\n            - linux\n            - darwin\nid: ci\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: drone\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone
@@ -39,6 +39,7 @@ jobs:
                   - |-
                     go test ./...
                     # pipemaster:lost echo {{ matrix.OS }}
+                    printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/drone/job/ci/step/test: no Concourse spelling for expression matrix.OS; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
                 dir: workspace
         across:
           - var: GO_VERSION

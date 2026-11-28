@@ -1,7 +1,10 @@
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"{\"name\":\"source-checkout\",\"params\":[{\"name\":\"url\",\"value\":\"https://github.com/$(params.ctx-repo).git\"},{\"name\":\"revision\",\"value\":\"$(params.ctx-sha)\"},{\"name\":\"output-path\",\"value\":\"/workspace\"}],\"ref\":{\"params\":[{\"name\":\"url\",\"value\":\"https://github.com/tektoncd-catalog/git-clone.git\"},{\"name\":\"revision\",\"value\":\"v1.7.1\"},{\"name\":\"pathInRepo\",\"value\":\"stepaction/git-clone/git-clone.yaml\"}],\"resolver\":\"git\"}}","at":0}
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/build-step-1
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/build-step-2
 # pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/build-step-1
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/build-step-2
 apiVersion: tekton.dev/v1
@@ -10,8 +13,29 @@ metadata:
   name: gitlab-ci-build
 spec:
   params:
+    - name: ctx-repo
+    - name: ctx-sha
     - name: ctx-event
+  stepTemplate:
+    workingDir: /workspace
   steps:
+    - name: source-checkout
+      ref:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/tektoncd-catalog/git-clone.git
+          - name: revision
+            value: v1.7.1
+          - name: pathInRepo
+            value: stepaction/git-clone/git-clone.yaml
+      params:
+        - name: url
+          value: https://github.com/$(params.ctx-repo).git
+        - name: revision
+          value: $(params.ctx-sha)
+        - name: output-path
+          value: /workspace
     - name: build-step-1
       image: alpine:3.22
       script: |-

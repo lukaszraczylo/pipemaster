@@ -1,3 +1,5 @@
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"{\"name\":\"source-checkout\",\"params\":[{\"name\":\"url\",\"value\":\"https://github.com/$(params.ctx-repo).git\"},{\"name\":\"revision\",\"value\":\"$(params.ctx-sha)\"},{\"name\":\"output-path\",\"value\":\"/workspace\"}],\"ref\":{\"params\":[{\"name\":\"url\",\"value\":\"https://github.com/tektoncd-catalog/git-clone.git\"},{\"name\":\"revision\",\"value\":\"v1.7.1\"},{\"name\":\"pathInRepo\",\"value\":\"stepaction/git-clone/git-clone.yaml\"}],\"resolver\":\"git\"}}","at":0}
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
@@ -7,22 +9,42 @@ metadata:
   name: gitlab-ci-build
 spec:
   params:
+    - name: ctx-repo
     - name: ctx-sha
     - name: ctx-branch
     - name: ctx-actor
+  stepTemplate:
+    workingDir: /workspace
   steps:
+    - name: source-checkout
+      ref:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/tektoncd-catalog/git-clone.git
+          - name: revision
+            value: v1.7.1
+          - name: pathInRepo
+            value: stepaction/git-clone/git-clone.yaml
+      params:
+        - name: url
+          value: https://github.com/$(params.ctx-repo).git
+        - name: revision
+          value: $(params.ctx-sha)
+        - name: output-path
+          value: /workspace
     - name: script
       image: alpine:3.22
       script: |-
         #!/bin/sh
         if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
         set -e
-        echo "building ${PM_CTX_SHA} on ${PM_CTX_BRANCH} for ${PM_CTX_ACTOR}"
+        export PIPEMASTER_VARS=2; export CI_COMMIT_BRANCH="${PM_CTX_BRANCH}"; export GITLAB_USER_LOGIN="${PM_CTX_ACTOR}"; : pipemaster-end; echo "building ${PM_CTX_SHA} on ${CI_COMMIT_BRANCH} for $GITLAB_USER_LOGIN"
         echo "keeps $HOME and ${UNMAPPED}"
       env:
-        - name: PM_CTX_SHA
-          value: $(params.ctx-sha)
         - name: PM_CTX_BRANCH
           value: $(params.ctx-branch)
         - name: PM_CTX_ACTOR
           value: $(params.ctx-actor)
+        - name: PM_CTX_SHA
+          value: $(params.ctx-sha)

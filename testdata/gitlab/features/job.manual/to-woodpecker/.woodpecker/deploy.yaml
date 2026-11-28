@@ -1,4 +1,8 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/deploy
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/deploy
+# pipemaster:arg {"gitlab_default":true}
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/deploy
 # pipemaster:arg "- kind: push\n- kind: tag\n"
 # pipemaster:emulated job.allow_failure pipeline/gitlab-ci/job/deploy
@@ -8,5 +12,5 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make deploy
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make deploy'
     failure: ignore

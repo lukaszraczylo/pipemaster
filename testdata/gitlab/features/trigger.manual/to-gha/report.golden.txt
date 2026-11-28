@@ -1,3 +1,3 @@
 Loss report: gitlab -> gha
 [emulated] pipeline/gitlab-ci/job/adhoc job.runner: default runner label ubuntu-latest (the IR holds no runner label)
-[emulated] pipeline/gitlab-ci/job/adhoc step.action: actions/checkout step (GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs)
+[emulated] pipeline/gitlab-ci/job/adhoc step.action: actions/checkout step (GitLab clones the repository before every job; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs, and GHA does not clone)

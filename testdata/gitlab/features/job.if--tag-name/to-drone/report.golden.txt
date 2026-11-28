@@ -1,6 +1,8 @@
 Loss report: gitlab -> drone
-[lost] pipeline/gitlab-ci/job/release job.if (condition not expressible in Drone CI; the document disabled)
-[lost] pipeline/gitlab-ci/job/release/step/script step.shell (Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
-[lost] pipeline/gitlab-ci/trigger/0 trigger.push (the document is disabled, so the trigger is not written)
-[lost] pipeline/gitlab-ci/trigger/1 trigger.tag (the document is disabled, so the trigger is not written)
+[lost] pipeline/gitlab-ci trigger.api (the source runs on the events api, trigger and its file has no trigger form for them; Drone has no event for them, and the file names no schedule to copy)
+[lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline and its file has no trigger form for them; Drone has no event for them, and the file names no schedule to copy)
+[lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat and its file has no trigger form for them; Drone has no event for them, and the file names no schedule to copy)
+[external] pipeline/gitlab-ci/trigger/2 trigger.schedule: trigger event cron with the cron job name (Drone keeps the schedule in the repo settings: run drone cron add <repo> gitlab-ci-schedule-2 "")
 [emulated] pipeline/gitlab-ci/job/release job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
+[emulated] pipeline/gitlab-ci/job/release/step/script step.shell: bash-if-present wrapper command (the source runs the step under bash when the image has it; Drone pipes commands to /bin/sh, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh)
+[emulated] pipeline/gitlab-ci/trigger/0 trigger.manual: trigger event custom (a person starts the build through the API or drone build create)

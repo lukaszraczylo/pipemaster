@@ -1,3 +1,5 @@
 Loss report: forgejo -> gitlab
+[external] pipeline/ci/job/prod job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
+[external] pipeline/ci/job/test job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [emulated] pipeline/ci/job/prod job.outputs: dotenv artifact report
 [emulated] pipeline/ci/job/test job.matrix: expanded into one parallel:matrix entry per combination (include and exclude have no GitLab form, and a single include combination reads back as an axis list)

@@ -32,6 +32,8 @@ type jobBuilder struct {
 	gitArts       map[*ir.Step]string
 	holds         map[string]string
 	outArts       map[string]string
+	vols          map[string]volume
+	mapped        map[mount]bool
 	path          string
 	fileOutputs   []string
 	finally       bool
@@ -109,6 +111,9 @@ func (b *jobBuilder) header(r *reader) error {
 			return fmt.Errorf("dependencies must be a list of task names")
 		}
 		for _, n := range names {
+			if n == changesTask {
+				continue
+			}
 			if err := b.need(n); err != nil {
 				return fmt.Errorf("dependencies %w", err)
 			}
@@ -125,7 +130,12 @@ func (b *jobBuilder) header(r *reader) error {
 		if !isText {
 			return fmt.Errorf("when must be a string")
 		}
-		if w != disabledWhen() || !b.disabledMarker() {
+		var ch changesArg
+		if w != "" && markerArg(b.c.src.doc.Head, b.path, caps.JobIf, &ch) && ch.When == w {
+			if src, err := expr.ParseCanonical(ch.Src); err == nil {
+				b.job.If = andExpr(b.job.If, src)
+			}
+		} else if w != disabledWhen() || !b.disabledMarker() {
 			b.job.If = andExpr(b.job.If, b.when(w, r.Line("when")))
 		} else {
 			restoredIf = true
@@ -235,6 +245,16 @@ func (b *jobBuilder) when(w string, line int) expr.Expr {
 	if st, ok := workflowStatus(w); ok && b.finally {
 		return st
 	}
+	if m := statusFirstWhen.FindStringSubmatch(w); m != nil && b.finally {
+		if st, ok := workflowStatus("{{= workflow.status " + m[1] + " '" + m[2] + "' }}"); ok {
+			return expr.Binary{Op: expr.OpAnd, L: st, R: b.when("{{= "+m[3]+" }}", line)}
+		}
+	}
+	if m := statusLastWhen.FindStringSubmatch(w); m != nil && b.finally {
+		if st, ok := workflowStatus("{{= workflow.status " + m[2] + " '" + m[3] + "' }}"); ok {
+			return expr.Binary{Op: expr.OpAnd, L: b.when("{{= "+m[1]+" }}", line), R: st}
+		}
+	}
 	e := renameInputRefs(exprargo.FromWhen(w, exprargo.ScopeTask), b.c.inNames)
 	if o, isOpaque := e.(expr.Opaque); isOpaque {
 		b.c.p.rep.Add(report.Entry{
@@ -252,6 +272,12 @@ func (b *jobBuilder) when(w string, line int) expr.Expr {
 }
 
 var statusWhen = regexp.MustCompile(`^(?:\{\{\s*workflow\.status\s*\}\}\s*(==|!=)\s*(\w+)|\{\{=\s*workflow\.status\s*(==|!=)\s*['"](\w+)['"]\s*\}\})$`)
+
+// statusFirstWhen and statusLastWhen are a status test that the emitter joined with other conditions:
+// {{= (status) && (rest) }} and {{= (rest) && (status) }}.
+var statusLastWhen = regexp.MustCompile(`^\{\{=\s*(.+?)\s*&&\s*\(workflow\.status\s*(==|!=)\s*'(\w+)'\)\s*\}\}$`)
+
+var statusFirstWhen = regexp.MustCompile(`^\{\{=\s*\(workflow\.status\s*(==|!=)\s*'(\w+)'\)\s*&&\s*(.+?)\s*\}\}$`)
 
 // workflowStatus reads a test of workflow.status in an exit handler as a status function.
 func workflowStatus(w string) (expr.Expr, bool) {

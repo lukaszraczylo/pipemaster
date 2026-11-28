@@ -1,0 +1,16 @@
+default:
+  image: alpine:3.20
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline"
+stages: [a, b]
+always:
+  stage: a
+  script:
+    - echo "MARK child_rules.always" | tee -a trace.log
+main-only:
+  stage: b
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - echo "MARK child_rules.main" | tee -a trace.log

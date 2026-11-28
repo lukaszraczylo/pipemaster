@@ -1,6 +1,5 @@
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.filter.tags pipeline/ci/trigger/0
-# pipemaster:emulated trigger.push pipeline/ci/trigger/0
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/0
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate

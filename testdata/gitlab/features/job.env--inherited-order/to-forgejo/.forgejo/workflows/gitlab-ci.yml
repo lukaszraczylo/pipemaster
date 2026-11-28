@@ -1,14 +1,22 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
 # pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/lint
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/lint
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/lint/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/lint
 # pipemaster:arg {"pre":1,"post":0}
 on:
+  workflow_dispatch:
   push:
 concurrency:
   group: ${{ github.run_id }}
   cancel-in-progress: false
 jobs:
   lint:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     env:
       GOCACHE: $CI_PROJECT_DIR/.cache/go-build
@@ -16,4 +24,5 @@ jobs:
     steps:
       - uses: https://github.com/actions/checkout@v7
       - id: script
-        run: make lint
+        run: 'export PIPEMASTER_VARS=3; export CI_PROJECT_DIR="${GITHUB_WORKSPACE}"; export GOCACHE="$CI_PROJECT_DIR/.cache/go-build"; export GOMODCACHE="$CI_PROJECT_DIR/.cache/go-mod"; : pipemaster-end; make lint'
+        shell: bash

@@ -1,11 +1,24 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:arg {"env":"- name: GOFLAGS\n  value:\n    lit: -mod=readonly\n- name: DEPLOY_ENV\n  value:\n    lit: staging\n"}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: gitlab-ci
 spec:
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: build
       taskRef:
         name: gitlab-ci-build
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)

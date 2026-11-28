@@ -4,7 +4,11 @@ kind: TriggerTemplate
 metadata:
   name: gitlab-ci-run
 spec:
-  params: []
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   resourcetemplates:
     - apiVersion: tekton.dev/v1
       kind: PipelineRun
@@ -13,4 +17,14 @@ spec:
       spec:
         pipelineRef:
           name: gitlab-ci
-        params: []
+        params:
+          - name: ctx-sha
+            value: $(tt.params.ctx-sha)
+          - name: ctx-repo
+            value: $(tt.params.ctx-repo)
+        taskRunSpecs:
+          - pipelineTaskName: build
+            podTemplate:
+              nodeSelector:
+                runner.pipemaster.io/docker: "true"
+                runner.pipemaster.io/linux: "true"

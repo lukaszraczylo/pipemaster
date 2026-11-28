@@ -2,5 +2,7 @@ Loss report: gitea -> gitlab
 [lost] pipeline/ci display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [lost] pipeline/deploy display.name (GitLab CI has no display name here; the name is kept in round-trip metadata)
 [lost] pipeline/deploy/trigger/0 ext.passthrough (Ext of provider gha (inputs) is not written to the GitLab file; it is kept in round-trip metadata)
+[external] pipeline/ci/job/test job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
+[external] pipeline/deploy/job/deploy job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [emulated] pipeline/deploy pipeline.inputs: variable copied into every job of the pipeline (the pipeline marker keeps the input list)
 [emulated] pipeline/deploy project.multi_pipeline: jobs of every pipeline in one file under <pipeline>:<job> keys (each job carries its pipeline's trigger condition and a marker; workflow:rules is the union of all triggers)

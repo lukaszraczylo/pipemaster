@@ -1,2 +1,3 @@
 Loss report: gha -> gitlab
+[external] pipeline/ci/job/test job.runner: job tags (the job carries the tags $os; register a runner with these tags, or the job stays pending)
 [emulated] pipeline/ci/job/test job.matrix: expanded into one parallel:matrix entry per combination (include and exclude have no GitLab form, and a single include combination reads back as an axis list)

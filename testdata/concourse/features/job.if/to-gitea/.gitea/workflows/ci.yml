@@ -1,17 +1,21 @@
+# pipemaster:emulated job.if pipeline/ci/job/build
+# pipemaster:arg {"src":"branch == 'main'","from":"concourse","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-run
 # pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["make"]}
+# pipemaster:emulated job.artifacts pipeline/ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
 on:
   push:
     branches:
       - main
 jobs:
   build:
-    if: false
+    if: github.ref_type == 'branch' && github.ref_name == 'main' && !github.event.deleted
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated step.image pipeline/ci/job/build/step/build-run
-      # pipemaster:lost job.if pipeline/ci/job/build: branch == 'main'
       - id: build-run
         uses: docker://ubuntu:latest
         with:

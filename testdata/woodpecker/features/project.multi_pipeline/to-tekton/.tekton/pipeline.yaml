@@ -3,10 +3,20 @@ kind: Pipeline
 metadata:
   name: ci
 spec:
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: test
       taskRef:
         name: ci-test
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
 ---
 # pipemaster:emulated project.multi_pipeline pipeline/deploy
 # pipemaster:emulated trigger.manual pipeline/deploy/trigger/0
@@ -15,7 +25,17 @@ kind: Pipeline
 metadata:
   name: deploy
 spec:
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: ship
       taskRef:
         name: deploy-ship
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)

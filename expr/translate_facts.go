@@ -12,10 +12,14 @@ type Facts struct {
 	// Branch is true when no trigger can start a run on a tag ref. A run that is not a pull request then has a
 	// branch ref, and a pull request run names its ref <number>/merge.
 	Branch bool
+	// Exact refuses the event variants (variants_push.go, variants_dispatch.go): a caller that cannot carry the source
+	// condition to the way back needs a translation that reads back as it was.
+	Exact bool
 }
 
 const (
 	eventPR     = "pull_request"
+	eventPush   = "push"
 	refTypeName = "branch"
 )
 
@@ -65,12 +69,14 @@ func route(from, to Dialect) prRoute {
 //     lowers the condition gains the exclusion for GHA (AssumeGitLabRef).
 //   - A target with several pull request events (Dialect.PRFamily) states each pull request test as a prefix test.
 func TranslateFacts(e Expr, from, to Dialect, f Facts) (Expr, bool) {
-	for _, x := range rewrites(e, from, to, f) {
-		if t, ok := Translate(x, from, to); ok {
-			if to.PRFamily {
-				t = prFamily(t, to)
+	for _, v := range variantsFor(e, from, to, f) {
+		for _, x := range rewrites(v.e, v.from, to, f) {
+			if t, ok := translate(x, v.from, to, listsFor(v.e)); ok {
+				if to.PRFamily {
+					t = prFamily(t, to, v.from.PRStates, false)
+				}
+				return v.finish(t), true
 			}
-			return t, true
 		}
 	}
 	return nil, false
@@ -79,7 +85,9 @@ func TranslateFacts(e Expr, from, to Dialect, f Facts) (Expr, bool) {
 // TranslatableFacts reports whether TranslateFacts succeeds. It states the subset as the Lean model does:
 // guardOk, and the condition after the rewrite is Translatable (lean4/Pipemaster/TranslateFacts.lean).
 func TranslatableFacts(e Expr, from, to Dialect, f Facts) bool {
-	return slices.ContainsFunc(rewrites(e, from, to, f), func(x Expr) bool { return Translatable(x, from, to) })
+	return slices.ContainsFunc(variantsFor(e, from, to, f), func(v variant) bool {
+		return slices.ContainsFunc(rewrites(v.e, v.from, to, f), func(x Expr) bool { return translatable(x, v.from, to, listsFor(v.e)) })
+	})
 }
 
 // rewrites lists the conditions to try, best first. A GitLab-class source gets the pull request test in the
@@ -114,12 +122,12 @@ func rewriteFacts(e Expr, from, to Dialect, f Facts) (Expr, bool) {
 	case routeGLToBranch:
 		return AssumeGitLab(e, from)
 	case routeToGHA:
-		if riskyBranch(e, false, toGHARisk(from)) {
+		if !from.prPaired && riskyBranch(e, false, toGHARisk(from)) {
 			return nil, false
 		}
 		return AssumeGitLabRef(e, from, false)
 	case routeBranchToGL:
-		return e, !riskyBranch(e, false, branchToGLRisk)
+		return e, from.prPaired || !riskyBranch(e, false, branchToGLRisk)
 	}
 	return e, true
 }
@@ -268,6 +276,9 @@ func toGHARisk(from Dialect) func(effPos bool, m Mode, lit string) bool {
 // may hold the target branch and not.
 func branchToGLRisk(effPos bool, _ Mode, _ string) bool { return !effPos }
 
+// defaultBranchProbe stands for the default branch name in riskyBranch: a literal that no pull request ref <number>/merge equals.
+const defaultBranchProbe = "default-branch"
+
 // riskyBranch walks e and reports a branch test for which risk(effPos, mode, literal) is true. effPos is true
 // when the condition rises with the test: a match or equality under an even number of negations, or a negated
 // one under an odd number. Any other use of the branch ref is risky.
@@ -284,6 +295,10 @@ func riskyBranch(e Expr, odd bool, risk func(effPos bool, m Mode, lit string) bo
 		case OpMatch, OpNoMatch, OpEq, OpNe:
 			if m, lit, ok := branchLeaf(v); ok {
 				return risk((v.Op == OpMatch || v.Op == OpEq) != odd, m, lit)
+			}
+			if defaultBranchCmp(v) && (v.Op == OpEq || v.Op == OpNe) {
+				// A default branch is never named <number>/merge, so the test misses a GHA pull request ref like a literal that does.
+				return risk((v.Op == OpEq) != odd, ModeExact, defaultBranchProbe)
 			}
 		}
 	}
@@ -489,8 +504,11 @@ func nameLeaf(b Binary) (Mode, string, bool) {
 
 // prFamily (Mirrors fam: lean4/Pipemaster/TranslateFacts.lean) writes each test of the pull request event as a
 // prefix test, so that it holds for every pull request event of the dialect: pull_request_closed and
-// pull_request_metadata as well as pull_request.
-func prFamily(e Expr, to Dialect) Expr {
+// pull_request_metadata as well as pull_request. A source whose pull request event has no such states (Drone: it
+// never reports a closed pull request) keeps a test that a run must pass exact, since the prefix would admit events
+// the source never has; posFam says the source has them. A test that a run must fail (under a negation, or the
+// complement) takes the prefix whatever the source says: it excludes more. neg is true under an odd number of negations.
+func prFamily(e Expr, to Dialect, posFam, neg bool) Expr {
 	pr, ok := to.Events[eventPR]
 	if !ok {
 		return e
@@ -498,14 +516,15 @@ func prFamily(e Expr, to Dialect) Expr {
 	switch v := e.(type) {
 	case Unary:
 		if v.Op == OpNot {
-			return Unary{Op: OpNot, X: prFamily(v.X, to)}
+			return Unary{Op: OpNot, X: prFamily(v.X, to, posFam, !neg)}
 		}
 	case Binary:
 		switch v.Op {
 		case OpAnd, OpOr:
-			return Binary{Op: v.Op, L: prFamily(v.L, to), R: prFamily(v.R, to)}
+			return Binary{Op: v.Op, L: prFamily(v.L, to, posFam, neg), R: prFamily(v.R, to, posFam, neg)}
 		case OpEq, OpNe, OpMatch, OpNoMatch:
-			if t, ok := familyTest(v, pr); ok {
+			isA := v.Op == OpEq || v.Op == OpMatch
+			if t, ok := familyTest(v, pr); ok && (posFam || isA == neg) {
 				return t
 			}
 		}
@@ -541,4 +560,13 @@ func familyTest(b Binary, pr string) (Expr, bool) {
 		op = b.Op
 	}
 	return Binary{Op: op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: Pattern(ModePrefix, pr)}}, true
+}
+
+// listsFor is true when e names the event: its tests are the source's own, so a negated one must not pass the
+// events only the target has (eventListsRx). A condition with no event test gets only the pull request guards of
+// rewriteFacts, which exclude one event on purpose.
+func listsFor(e Expr) bool {
+	found := false
+	walkRefs(e, func(r Ref) bool { found = found || pathName(r) == CtxEvent; return !found })
+	return found
 }

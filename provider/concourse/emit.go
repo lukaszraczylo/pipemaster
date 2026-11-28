@@ -11,9 +11,12 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ymap"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
@@ -25,12 +28,15 @@ const (
 	workspaceName   = "workspace"
 	primaryName     = "source"
 	defaultPlatform = "linux"
-	placeholderCmd  = "true"
-	placeholderJob  = "placeholder"
-	disabledScript  = "exit 0 " + disabledTag
-	disabledTag     = "# pipemaster:guard the step condition has no shell form"
-	lostPrefix      = "# pipemaster:lost "
-	markerIgnored   = "marker ignored: "
+	// placeholderCmd runs where the source holds no work and the file only needs a task.
+	placeholderCmd = "true"
+	placeholderJob = "placeholder"
+	disabledScript = "echo 'pipemaster: skipped: the step condition has no shell form'; exit 0 " + disabledTag
+	// legacyDisabledScript is what an earlier version wrote; the parser still reads it.
+	legacyDisabledScript = "exit 0 " + disabledTag
+	disabledTag          = "# pipemaster:guard the step condition has no shell form"
+	lostPrefix           = "# pipemaster:lost "
+	markerIgnored        = "marker ignored: "
 )
 
 type (
@@ -52,18 +58,26 @@ var (
 // Emit writes the project as Concourse pipeline files under .concourse/, one per IR pipeline. Every feature use
 // goes through the ledger; Finish fails the call when one was never accounted for.
 func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	return inline.Emit(p, a.ID(), a.emitFlat)
+}
+
+func (a adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	p, vres := vars.Prepare(p, dialect)
+	p, noForm, injected := provider.WithDefaultTriggers(p, dialect)
 	origin := ""
 	if p != nil {
 		origin = p.Origin.Provider
 	}
 	e := &emitter{
 		led: emitkit.NewLedger("ir", dialect, a.Caps()), origin: origin, own: origin == dialect,
-		owners: map[string]*outDoc{}, marked: map[ir.FeatureUse]bool{}, fileTaken: map[string]bool{},
+		owners: map[string]*outDoc{}, marked: map[ir.FeatureUse]bool{}, fileTaken: map[string]bool{}, injected: injected,
 	}
+	e.gated = emitkit.GatedSteps(p)
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)
 	}
+	e.noteDefaultEvents(noForm)
 	pls := livePipelines(p)
 	for i, pl := range pls {
 		e.pipeline(pl, i == 0)
@@ -77,6 +91,7 @@ func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) 
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", dialect, err)
 	}
+	vres.Report(rep)
 	return files, rep, nil
 }
 
@@ -95,6 +110,8 @@ func livePipelines(p *ir.Project) []*ir.Pipeline {
 
 // emitter carries the state of one Emit call.
 type emitter struct {
+	// gated holds the action steps that a later step reads, which no target may drop.
+	gated     map[*ir.Step]bool
 	led       *emitkit.Ledger
 	said      map[ir.FeatureUse][2]string
 	owners    map[string]*outDoc
@@ -102,8 +119,10 @@ type emitter struct {
 	fileTaken map[string]bool
 	extra     map[string]any
 	origin    string
-	files     []*outFile
-	own       bool
+	// injected names the pipelines whose triggers were made from the default events of their source.
+	injected map[string]bool
+	files    []*outFile
+	own      bool
 }
 
 // outFile is one output file with its document.
@@ -327,4 +346,13 @@ func sortedSet(m map[string]bool) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// noteDefaultEvents reports the default events of the source that have no IR trigger.
+func (e *emitter) noteDefaultEvents(noForm map[string][]provider.SourceEvent) {
+	for id, events := range noForm {
+		for _, g := range provider.GroupByFeature(events) {
+			e.lose("pipeline/"+id, g.Feature, provider.NoFormDetail(g.Names, "Concourse"))
+		}
+	}
 }

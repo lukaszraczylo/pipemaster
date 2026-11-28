@@ -1,58 +1,85 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
 # pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/compile
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/compile
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
 # pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/lint
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/lint
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/lint/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/lint
 # pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/summary
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/summary
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/summary/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/summary
 # pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/unit
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/unit
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/unit/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/unit
 # pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/cleanup
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/cleanup
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/cleanup/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/cleanup
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/cleanup
 # pipemaster:arg {"needs":[{"JobID":"compile","Artifacts":false,"Optional":false}]}
 on:
+  workflow_dispatch:
   push:
 concurrency:
   group: ${{ github.run_id }}
   cancel-in-progress: false
 jobs:
   compile:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make build
+        shell: bash
   lint:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make lint
+        shell: bash
   summary:
     needs:
       - compile
       - lint
       - unit
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make report
+        shell: bash
   unit:
     needs:
       - compile
       - lint
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make test
+        shell: bash
   # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
   cleanup:
     needs:
@@ -60,9 +87,10 @@ jobs:
       - lint
       - summary
       - unit
-    if: always()
+    if: always() && !github.event.deleted
     runs-on: ubuntu-latest
     steps:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make clean
+        shell: bash

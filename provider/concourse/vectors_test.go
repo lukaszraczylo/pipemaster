@@ -11,6 +11,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/internal/vectors"
 	"github.com/lukaszraczylo/pipemaster/ir"
@@ -35,12 +36,17 @@ type (
 		Hook   []vTask    `json:"hook"`
 		Carry  ir.CoreJob `json:"carry"`
 	}
+	vCopy struct {
+		Job   string   `json:"job"`
+		Tasks []string `json:"tasks"`
+	}
 	vDoc struct {
-		File     string          `json:"file"`
-		FinJob   string          `json:"fin_job"`
-		Jobs     []vJob          `json:"jobs"`
-		FinTasks []string        `json:"fin_tasks"`
-		Carry    ir.CorePipeline `json:"carry"`
+		File      string          `json:"file"`
+		FinJob    string          `json:"fin_job"`
+		Jobs      []vJob          `json:"jobs"`
+		FinTasks  []string        `json:"fin_tasks"`
+		FinCopies []vCopy         `json:"fin_copies"`
+		Carry     ir.CorePipeline `json:"carry"`
 	}
 )
 
@@ -69,8 +75,9 @@ type (
 		Kind string `json:"kind"`
 	}
 	finallyArg struct {
-		Job   string   `json:"job"`
-		Tasks []string `json:"tasks"`
+		Job    string   `json:"job"`
+		Tasks  []string `json:"tasks"`
+		Copies []vCopy  `json:"copies"`
 	}
 )
 
@@ -197,11 +204,14 @@ func decodeTasks(n *yaml.Node, cs carries, jobPath string) ([]vTask, error) {
 }
 
 func decodeFile(name string, src []byte) (vDoc, error) {
-	d := vDoc{File: strings.TrimSuffix(path.Base(name), pipelineExt), Jobs: []vJob{}, FinTasks: []string{}}
+	d := vDoc{File: strings.TrimSuffix(path.Base(name), pipelineExt), Jobs: []vJob{}, FinTasks: []string{}, FinCopies: []vCopy{}}
 	pipe := "pipeline/" + d.File
 	cs, disp := carries{}, map[string]string{}
+	twins := map[string]bool{} // the tag twin of a job is outside the model; the parser folds it into its job
 	for _, m := range vectors.Marks(src) {
 		switch {
+		case m.Feature == string(caps.TriggerTag) && len(m.Args) > 0:
+			twins[m.Path] = true
 		case m.Feature == featCarry && strings.HasSuffix(m.Path, carryTail):
 			var a carryArg
 			if err := m.DecodeArg(&a); err != nil {
@@ -222,6 +232,7 @@ func decodeFile(name string, src []byte) (vDoc, error) {
 				return d, err
 			}
 			d.FinJob, d.FinTasks = a.Job, a.Tasks
+			d.FinCopies = append(d.FinCopies, a.Copies...)
 		}
 	}
 	body, ok := cs[pipe]
@@ -252,6 +263,9 @@ func decodeFile(name string, src []byte) (vDoc, error) {
 		}
 		j := vJob{Name: scalar(es, "name").Value, Passed: []string{}}
 		jp := pipe + jobSegment + j.Name
+		if twins[jp] {
+			continue
+		}
 		j.Disp = disp[jp]
 		cb, ok := cs[jp]
 		if !ok {

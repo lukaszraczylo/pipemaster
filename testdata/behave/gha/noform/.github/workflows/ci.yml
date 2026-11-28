@@ -1,0 +1,11 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "MARK noform.before" | tee -a trace.log
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: echo "MARK noform.after" | tee -a trace.log

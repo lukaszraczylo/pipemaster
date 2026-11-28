@@ -3,6 +3,7 @@ package tekton
 import (
 	"encoding/json"
 	"regexp"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -27,7 +28,7 @@ func markedFilters(head string) []filterArg {
 				continue
 			}
 			var a filterArg
-			if json.Unmarshal([]byte(lines[0]), &a) == nil {
+			if json.Unmarshal([]byte(lines[0]), &a) == nil && a.Kind != "" {
 				out = append(out, a)
 			}
 		}
@@ -97,7 +98,8 @@ func overlaysMatch(in interceptor, kind ir.TriggerKind) bool {
 		key, _ := text(valueOf(m, "key"))
 		ex, _ := text(valueOf(m, "expression"))
 		path, ok := ctxparam.Ref(strings.ReplaceAll(key, "_", "-"))
-		if !ok || ctxOverlay(kind, strings.Join(path, ".")) != ex {
+		name := strings.Join(path, ".")
+		if !ok || !slices.ContainsFunc(overlayDialects, func(d overlayDialect) bool { return ctxOverlay(kind, name, d) == ex }) {
 			return false
 		}
 	}

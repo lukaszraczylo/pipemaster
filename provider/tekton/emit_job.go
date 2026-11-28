@@ -1,6 +1,8 @@
 package tekton
 
 import (
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -10,9 +12,11 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
+	// noopScript runs in a step that only keeps the Task valid and stands for no source work.
 	noopScript   = "true"
 	noopStepName = "noop"
 	// placeholderStepID is the step ID that every provider reports for the step it adds to a job without steps.
@@ -38,12 +42,51 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 	j := jp.j
 	e.foreignExt(jp.path, j.Ext)
 	if pt, ok := e.remoteTask(pp, jp); ok {
+		for _, st := range j.Steps {
+			// The parser adds this checkout step to the job of a catalog task; the taskRef written back stands for it.
+			if st != nil && e.own {
+				e.skipped[jp.path+"/step/"+st.ID] = true
+				if st.Kind == ir.StepAction && st.ID == j.ID+"-checkout" {
+					e.withdrawCheckout(jp.path)
+				}
+			}
+		}
 		return pt, nil
 	}
 	tc := e.newTaskCtx(pp, jp)
 	tc.doc = &outDoc{}
 	e.owners[jp.path] = tc.doc
-	jc := tc.cond(jp.path, caps.JobIf, j.If, pipelineScope)
+	emitkit.ReportHosted(e.origin, j.Runner.Labels, "node selector",
+		func(st, d string) { e.external(jp.path, caps.JobRunner, st, d) },
+		func(d string) { e.lose(jp.path, caps.JobRunner, d) })
+	for _, l := range emitkit.Unplaced(e.origin, j.Runner.Labels) {
+		if k, ok := emitkit.NodeKey(l); ok {
+			if jp.nodeSel == nil {
+				jp.nodeSel = map[string]string{}
+			}
+			jp.nodeSel[k] = emitkit.TagValue
+			continue
+		}
+		jp.runnerLost = append(jp.runnerLost, "the runner label "+l+" has no node selector key: "+emitkit.TagHint)
+	}
+	for _, k := range slices.Sorted(maps.Keys(j.Runner.Selector)) {
+		v := j.Runner.Selector[k]
+		if !emitkit.ValidNodeLabel(k, v) {
+			jp.runnerLost = append(jp.runnerLost, "the runner selector "+k+"="+v+" is not a Kubernetes label, so a nodeSelector cannot hold it")
+			continue
+		}
+		if jp.nodeSel == nil {
+			jp.nodeSel = map[string]string{}
+		}
+		jp.nodeSel[k] = v
+	}
+	if j.Runner.Platform != "" {
+		jp.runnerLost = append(jp.runnerLost, "Tekton schedules pods; the runner platform has no form")
+	}
+	jc, viaChanges := tc.changesCond(jp.path, j.If)
+	if !viaChanges {
+		jc = tc.cond(jp.path, caps.JobIf, j.If, pipelineScope)
+	}
 	b := &stepBook{guard: jc.guard, names: map[string]bool{}}
 	if jc.guard != nil {
 		if err := tc.markJobGuard(jp.path, j.If, jc.guard); err != nil {
@@ -67,6 +110,15 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 		if st == nil {
 			continue
 		}
+		if tc.e.own && extOf(st.Ext)[ExtWorkspaceDirs] == true {
+			tc.e.skipped[jp.path+"/step/"+st.ID] = true
+			continue
+		}
+		if tc.e.own && extOf(st.Ext)[ExtSourceCheckout] == true {
+			tc.e.skipped[jp.path+"/step/"+st.ID] = true
+			tc.e.withdrawCheckout(jp.path)
+			continue
+		}
 		m, err := tc.step(b, st, jp.path+"/step/"+st.ID)
 		if err != nil {
 			return nil, err
@@ -85,8 +137,19 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 		return nil, err
 	}
 	if len(b.nodes) == 0 {
-		tc.e.lose(jp.path+"/step/"+placeholderStepID, caps.StepScript, "the job has no steps; a no-op step keeps the Task valid")
-		tc.e.emulate(jp.path, caps.StepScript, "placeholder step", "the job has no step and a Task needs one; a step that runs "+noopScript+" stands in")
+		script := noopScript
+		if reason, ok := emitkit.BridgeWork(jp.j); ok && len(jp.j.Steps) == 0 {
+			script = emitkit.FailLoud(caps.StepScript, jp.path, reason)
+			tc.e.noteLost(jp.path+"/step/"+placeholderStepID, caps.StepScript, reason+"; a step that prints the loss and exits 1 keeps the Task valid and the pipeline honest")
+			tc.e.emulate(jp.path, caps.StepScript, "failing step", "the job has no step and a Task needs one; "+reason+", so a step that prints the loss and exits 1 stands in")
+		} else if tc.e.lostStepWork(jp.path) {
+			script = emitkit.FailLoud(caps.StepScript, jp.path, "no step of the job has a Tekton form")
+			tc.e.noteLost(jp.path+"/step/"+placeholderStepID, caps.StepScript, "no step of the job has a Tekton form; a step that prints the loss and exits 1 keeps the Task valid and the pipeline honest")
+			tc.e.emulate(jp.path, caps.StepScript, "failing step", "the job has no step with a Tekton form and a Task needs one; a step that prints the loss and exits 1 stands in")
+		} else {
+			tc.e.lose(jp.path+"/step/"+placeholderStepID, caps.StepScript, "the job has no steps; a no-op step keeps the Task valid")
+			tc.e.emulate(jp.path, caps.StepScript, "placeholder step", "the job has no step and a Task needs one; a step that runs "+noopScript+" stands in")
+		}
 		image := firstNonEmpty(tc.containerRef, defaultImage)
 		if err := tc.e.markArg(caps.StepScript, jp.path, imageArg{Image: image}); err != nil {
 			return nil, err
@@ -94,7 +157,7 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (*wmap, error) {
 		m := newMap()
 		m.SetStr("name", noopStepName)
 		m.SetStr("image", image)
-		lines, sc := []string{noopScript}, newScope()
+		lines, sc := []string{script}, newScope()
 		if b.guard != nil {
 			var err error
 			if lines, err = exprtekton.AddGuard(lines, b.guard); err != nil {
@@ -130,15 +193,20 @@ func firstNonEmpty(ss ...string) string {
 	return ""
 }
 
-// remoteTask writes a job that came from a remote taskRef back as a PipelineTask with that reference.
+// remoteTask writes a job that came from a remote or catalog taskRef back as a PipelineTask with that reference.
 func (e *emitter) remoteTask(pp *plan, jp *jobPlan) (*wmap, bool) {
 	j := jp.j
-	if !e.own || len(j.Steps) != 1 || j.Steps[0].Kind != ir.StepTask {
+	if !e.own {
 		return nil, false
 	}
-	ref, ok := extOf(j.Steps[0].Ext)["taskRef"]
+	ref, ok := extOf(j.Ext)[ExtCatalogRef]
 	if !ok {
-		return nil, false
+		if len(j.Steps) != 1 || j.Steps[0].Kind != ir.StepTask {
+			return nil, false
+		}
+		if ref, ok = extOf(j.Steps[0].Ext)["taskRef"]; !ok {
+			return nil, false
+		}
 	}
 	pt := newMap()
 	pt.SetStr("name", jp.tname)
@@ -170,30 +238,40 @@ func (e *emitter) remoteTask(pp *plan, jp *jobPlan) (*wmap, bool) {
 // the job settings the workspace stands in for.
 func (tc *taskCtx) workspaceSteps(b *stepBook, clone int) error {
 	j := tc.jp.j
+	shared := tc.sharedWorkspaces(j)
 	var needs []string
 	var restore []string
 	for _, n := range j.Needs {
-		if !n.Artifacts {
+		if !n.Artifacts || (tc.e.own && slices.Contains(emitkit.SharedRecord(j, dialect, ExtWorkspaceArtifacts)["needs"], n.JobID)) {
 			continue
 		}
 		needs = append(needs, n.JobID)
 		if nj, ok := tc.pp.byID[n.JobID]; ok {
+			skip := tc.sharedWorkspaces(nj.j)
 			for _, a := range nj.j.Artifacts {
-				restore = append(restore, downloadScript(artifactName(artifactKey(nj.j, a)), "")...)
+				if !skip[a.Name] {
+					restore = append(restore, downloadScript(artifactName(artifactKey(nj.j, a)), "")...)
+				}
 			}
 		}
 	}
-	if len(j.Cache)+len(j.Artifacts)+len(needs) == 0 {
+	var arts []ir.Artifact
+	for _, a := range j.Artifacts {
+		if !shared[a.Name] {
+			arts = append(arts, a)
+		}
+	}
+	if len(j.Cache)+len(arts)+len(needs) == 0 {
 		return nil
 	}
 	tc.useWorkspace()
-	arg := workspaceArg{Workspace: workspaceName, Cache: j.Cache, Artifacts: j.Artifacts, Needs: needs}
+	arg := workspaceArg{Workspace: workspaceName, Cache: j.Cache, Artifacts: arts, Needs: needs}
 	if len(restore) > 0 {
 		step, script := tc.workspaceStep(restoreStep, restore)
 		b.nodes, arg.Restore = insertAt(b.nodes, clone, step), script
 	}
 	var save []string
-	for _, a := range j.Artifacts {
+	for _, a := range arts {
 		save = append(save, uploadScript(artifactName(artifactKey(j, a)), a.Paths)...)
 	}
 	if len(save) > 0 {
@@ -204,7 +282,7 @@ func (tc *taskCtx) workspaceSteps(b *stepBook, clone int) error {
 	for _, f := range []struct {
 		f  caps.Feature
 		ok bool
-	}{{caps.JobCache, len(j.Cache) > 0}, {caps.JobArtifacts, len(j.Artifacts) > 0}, {caps.JobNeedsArtifacts, len(needs) > 0}} {
+	}{{caps.JobCache, len(j.Cache) > 0}, {caps.JobArtifacts, len(arts) > 0}, {caps.JobNeedsArtifacts, len(needs) > 0}} {
 		if !f.ok {
 			continue
 		}
@@ -218,9 +296,22 @@ func (tc *taskCtx) workspaceSteps(b *stepBook, clone int) error {
 		tc.e.mark(f.f, tc.jp.path)
 	}
 	if len(j.Cache) > 0 {
-		tc.e.emulate(tc.jp.path, caps.JobCache, "shared workspace", "the workspace is mounted at "+workspaceMount+"; cache paths are not copied in or out and nothing persists between runs")
+		tc.e.emulate(tc.jp.path, caps.JobCache, "shared workspace", "the workspace is mounted at "+workspaceMount+"; cache paths are not copied in or out and nothing persists between runs; to persist, the operator binds a PVC (or an object store step) that outlives the PipelineRun")
 	}
 	return nil
+}
+
+// sharedWorkspaces names the artifacts of a job that stand for a workspace of the Tekton file. The file shares
+// those files through its own volume, so the emitter writes no copy step for them.
+func (tc *taskCtx) sharedWorkspaces(j *ir.Job) map[string]bool {
+	out := map[string]bool{}
+	if !tc.e.own {
+		return out
+	}
+	for _, n := range emitkit.SharedRecord(j, dialect, ExtWorkspaceArtifacts)["artifacts"] {
+		out[n] = true
+	}
+	return out
 }
 
 // artifactKey is the directory name of a job artifact: its name, or the job ID.
@@ -306,6 +397,7 @@ func (tc *taskCtx) taskDoc(b *stepBook) (*outDoc, error) {
 	if tc.e.own {
 		x = extOf(j.Ext)
 	}
+	tc.steps = len(b.nodes)
 	tpl, err := tc.stepTemplate(x)
 	if err != nil {
 		return nil, err
@@ -320,6 +412,9 @@ func (tc *taskCtx) taskDoc(b *stepBook) (*outDoc, error) {
 	_, body := tc.jobExt()
 	spec.Set("params", tc.paramNodes(x))
 	spec.Set("stepTemplate", tpl)
+	if tc.e.own {
+		legacySpelling(b.nodes, x[ExtLegacyParams])
+	}
 	spec.Set("steps", seqOf(b.nodes...))
 	spec.Set("sidecars", sidecars)
 	spec.Set("results", tc.resultNodes(x))
@@ -333,7 +428,20 @@ func (tc *taskCtx) taskDoc(b *stepBook) (*outDoc, error) {
 
 func (tc *taskCtx) paramNodes(x map[string]any) *yaml.Node {
 	out := seqOf()
+	keptNames := map[string]bool{}
+	if kept, ok := x["task_params"].([]any); ok {
+		for _, k := range kept {
+			if km, isMap := k.(map[string]any); isMap {
+				if n, isName := km["name"].(string); isName {
+					keptNames[n] = true
+				}
+			}
+		}
+	}
 	for _, p := range tc.params {
+		if keptNames[p] {
+			continue
+		}
 		m := newMap()
 		m.SetStr("name", p)
 		out.Content = append(out.Content, m.N)
@@ -399,7 +507,7 @@ func (tc *taskCtx) stepTemplate(x map[string]any) (*yaml.Node, error) {
 		m.SetStr("image", tc.containerRef)
 	}
 	sc := newScope()
-	jobEnv, err := tc.envList(sc, tc.jp.path, j.Env)
+	jobEnv, err := tc.envList(sc, tc.jp.path, j.Env, extOf(j.Ext)[ExtEnvWorkspace])
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +516,7 @@ func (tc *taskCtx) stepTemplate(x map[string]any) (*yaml.Node, error) {
 	for _, n := range jobEnv {
 		taken[envName(n)] = true
 	}
-	pipeEnv, err := tc.envList(sc, tc.pp.path, tc.pp.pl.Env)
+	pipeEnv, err := tc.envList(sc, tc.pp.path, tc.pp.pl.Env, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -430,6 +538,14 @@ func (tc *taskCtx) stepTemplate(x map[string]any) (*yaml.Node, error) {
 	}
 	if tc.checkout {
 		m.SetStr("workingDir", workspaceDir)
+	} else if tc.steps > 1 {
+		extra, _ := x["stepTemplate"].(map[string]any)
+		if _, own := extra["workingDir"]; !own {
+			m.SetStr("workingDir", workspaceDir)
+			if err := tc.sharedDirNote(); err != nil {
+				return nil, err
+			}
+		}
 	}
 	if extra, ok := x["stepTemplate"].(map[string]any); ok {
 		if err := m.AddExtra(extra, nil); err != nil {
@@ -462,7 +578,14 @@ func (tc *taskCtx) sidecars() (*yaml.Node, error) {
 		m := newMap()
 		m.SetStr("name", sv.Name)
 		m.SetStr("image", img)
-		env, err := tc.envList(sc, sp, sv.Env)
+		if cmd, ok, err := tc.commandText(sc, sp, sv.Image.Entrypoint); err != nil {
+			return nil, err
+		} else if ok {
+			m.Set("command", strSeq(cmd))
+		} else if len(sv.Image.Entrypoint) > 0 {
+			tc.e.lose(sp, caps.JobServices, "the service entrypoint has no Tekton sidecar command form")
+		}
+		env, err := tc.envList(sc, sp, sv.Env, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -478,6 +601,18 @@ func (tc *taskCtx) sidecars() (*yaml.Node, error) {
 		return nil, nil
 	}
 	return out, nil
+}
+
+// commandText converts each entrypoint item; ok is false when there is none, an item has no Tekton form or an item is empty (the docker way to clear an entrypoint, which a container command cannot say).
+func (tc *taskCtx) commandText(sc *stepScope, sp string, items []string) (out []string, ok bool, err error) {
+	for _, a := range items {
+		t, tok, err := tc.text(sc, sp, caps.JobServices, valueText, a)
+		if err != nil || !tok || t == "" {
+			return nil, false, err
+		}
+		out = append(out, t)
+	}
+	return out, len(out) > 0, nil
 }
 
 // ports writes the container ports of a service; a port text with a host part keeps the container part.
@@ -509,7 +644,7 @@ func (tc *taskCtx) ports(sp string, ps []string) *yaml.Node {
 
 // jobHandled lists the job Ext keys that the emitter writes in a place of its own.
 var jobHandled = map[string]bool{
-	ExtImplicitNeeds: true, "task_name": true, "matrix_include_names": true, "array_params": true, "unused_params": true,
+	ExtImplicitNeeds: true, ExtWorkspaceArtifacts: true, ExtEnvWorkspace: true, ExtCatalogRef: true, ExtLegacyParams: true, ExtBoundParams: true, "task_name": true, "matrix_include_names": true, "array_params": true, "unused_params": true,
 	"params": true, "stepTemplate": true, "results": true, "task_metadata": true, "task_params": true, "task_workspaces": true,
 	"task_description": true, "workspaces": true, "description": true,
 }
@@ -596,4 +731,17 @@ func (tc *taskCtx) markJobGuard(path string, orig, guard expr.Expr) error {
 		back = expr.String(e)
 	}
 	return tc.e.markArg(caps.JobIf, path, guardArg{If: expr.String(orig), Back: back})
+}
+
+// sharedDirArg marks the working directory that the emitter gave to every step of a Task with no checkout.
+type sharedDirArg struct {
+	Dir string `json:"dir"`
+}
+
+// sharedDirNote reports the shared working directory. Each Tekton step is its own container, so a file that one
+// step writes in the working directory of its image is gone in the next step. The directory /workspace is a volume
+// that Tekton mounts in every step.
+func (tc *taskCtx) sharedDirNote() error {
+	tc.e.emulate(tc.jp.path, caps.StepWorkdir, "shared working directory", "the steps run in "+workspaceDir+", the volume that Tekton mounts in every step; the source runs its steps in one shared directory")
+	return tc.e.markArg(caps.StepWorkdir, tc.jp.path, sharedDirArg{Dir: workspaceDir})
 }

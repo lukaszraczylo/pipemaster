@@ -2,9 +2,13 @@
 # pipemaster:arg {"kind":"push","branches":{"Include":["main"],"Exclude":null}}
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+# pipemaster:emulated step.image pipeline/ci/job/build
+# pipemaster:arg {"job":"build","parts":["build"],"own":["build-run"]}
 build:
+  image: ubuntu:latest
   needs: []
   script:
     # pipemaster:step build-run
-    - echo on $CI_COMMIT_BRANCH
+    # pipemaster:lost script.interpolation pipeline/ci/job/build/step/build-run: echo on {{ branch }}
+    - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-run: no GitLab variable for expression branch; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'

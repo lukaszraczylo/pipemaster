@@ -203,6 +203,117 @@ theorem woodpecker_event_rx {tA tB : Ev → String} (hA : TranslateClass.EvTab t
       simp [refV, ha', hb', matchV, modeTest, h1, h2]
   constructor <;> simp [holds, eval, truthy, key]
 
+/-- A GitLab-class event comparison `event == v` (or `!=`), where `v` is exactly the value the source table `tA` gives
+event `e`, keeps its result as the Woodpecker pattern test `event =~ /^w$/i` (or `!~`) with `w` the value the
+Woodpecker table `tB` gives `e`: the unset event is null in the source and "" in Woodpecker, and the tables are
+injective after lowering. This is the rewrite the translator makes for a target that reads no event equality
+(Mirrors expr.mapEventBinary (expr/lang.go)). -/
+theorem woodpecker_event_eq {tA tB : Ev → String} (hA : TranslateClass.EvTab tA) (hB : TranslateClass.EvTab tB)
+    (env : Env) {vA vB : View} (ha : vA .event = env.event.map tA)
+    (hb : vB .event = some ((env.event.map tB).getD ""))
+    {e : Ev} {l : String} (hl : l = tA e) :
+    holds .gitlab vB (.rx (.ref .event) .exact (tB e)) = holds .gitlab vA (.eq (.ref .event) (.str l)) ∧
+    holds .gitlab vB (.nrx (.ref .event) .exact (tB e)) = holds .gitlab vA (.ne (.ref .event) (.str l)) := by
+  subst hl
+  have key : matchV .exact (tB e) (refV vB .event) = eqV .gitlab (refV vA .event) (.str (tA e)) := by
+    cases hev : env.event with
+    | none =>
+      have ha' : vA .event = none := by rw [ha, hev]; rfl
+      have hb' : vB .event = some "" := by rw [hb, hev]; rfl
+      have hne : lower (tB e) ≠ "" := hB.ne e
+      have hA' : TranslateClass.foldS .gitlab (tA e) ≠ "" := TranslateClass.fold_ne hA .gitlab e
+      simp [refV, ha', hb', matchV, modeTest, lower_empty, Ne.symm hne, TranslateClass.eqV_null .gitlab hA']
+    | some e0 =>
+      have ha' : vA .event = some (tA e0) := by rw [ha, hev]; rfl
+      have hb' : vB .event = some (tB e0) := by rw [hb, hev]; rfl
+      have h1 := TranslateClass.fold_beq hA .gitlab e0 e
+      have h2 := TranslateClass.fold_beq hB .gha e0 e
+      simp only [TranslateClass.foldS] at h1 h2
+      simp [refV, ha', hb', matchV, modeTest, eqV, h1, h2]
+  constructor <;> simp [holds, eval, truthy, key]
+
+/-! ### A complement as a list of events
+
+Woodpecker has events the source never reports (`pull_request_closed`, `release`, `deployment`, ...), so a
+complement `event != v` cannot be `event !~ /^v$/i`: that passes them all. The translator (expr.eventListsRx) writes
+the other events the source reports, each as its Woodpecker spelling, joined by `||`. An event with no spelling drops
+out, which only narrows the list. The theorems quantify over every Woodpecker event string `w`, so the events with no
+source twin are covered, not assumed away. -/
+
+/-- The Woodpecker events of the complement (Mirrors expr.eventListExcept (expr/event_rx.go)): one exact pattern per spelling. -/
+def anyOf : List String → E
+  | [] => .bool false
+  | x :: xs => .or (.rx (.ref .event) .exact x) (anyOf xs)
+
+/-- Every event the model names. -/
+def evAll : List Ev := [.push, .pullRequest, .schedule, .workflowDispatch]
+
+theorem mem_evAll (e : Ev) : e ∈ evAll := by cases e <;> simp [evAll]
+
+/-- The list holds exactly when the event equals one of its spellings, ignoring case. -/
+theorem anyOf_holds {vB : View} {w : String} (hb : vB .event = some w) (ws : List String) :
+    holds .gitlab vB (anyOf ws) = true ↔ ∃ x ∈ ws, lower w = lower x := by
+  induction ws with
+  | nil => simp [anyOf, holds, eval, truthy]
+  | cons x xs ih =>
+    have hx : matchV .exact x (refV vB .event) = (lower w == lower x) := by
+      simp [refV, hb, matchV, modeTest]
+    by_cases h : (lower w == lower x) = true
+    · have h' : lower w = lower x := by simpa using h
+      simp [anyOf, holds, eval, truthy, logicalTruthy, rubyTruthy, hx, h, h']
+    · have h' : ¬ lower w = lower x := by simpa using h
+      have h2 : (lower w == lower x) = false := by simpa using h
+      simp only [anyOf, holds, eval, truthy, logicalTruthy, rubyTruthy, hx, h2, Bool.false_eq_true, ite_false] at ih ⊢
+      simpa [h'] using ih
+
+/-- An event that no spelling of the list names never passes it: the target-only events are out. -/
+theorem woodpecker_event_ne_target_only {vB : View} {w : String} (hb : vB .event = some w) (ws : List String)
+    (h : ∀ x ∈ ws, lower w ≠ lower x) : holds .gitlab vB (anyOf ws) = false := by
+  cases hh : holds .gitlab vB (anyOf ws)
+  · rfl
+  · obtain ⟨x, hx, hxe⟩ := (anyOf_holds hb ws).1 hh
+    exact absurd hxe (h x hx)
+
+/-- On a run whose Woodpecker event `w` is a spelling of the source event `ev`, the list of the other events'
+spellings holds exactly when the source test `event != tA e0` does, and its negation exactly when `event == tA e0`
+does. `sp` gives the spellings of an event; no spelling serves two events. -/
+theorem woodpecker_event_ne_list {tA : Ev → String} (hA : TranslateClass.EvTab tA) (sp : Ev → List String)
+    (hsp : ∀ a b x y, x ∈ sp a → y ∈ sp b → lower x = lower y → a = b) (e0 : Ev)
+    {vA vB : View} {ev : Ev} (ha : vA .event = some (tA ev)) {w : String} (hb : vB .event = some w)
+    (hw : w ∈ sp ev) :
+    holds .gitlab vB (anyOf ((evAll.filter (· ≠ e0)).flatMap sp)) =
+        holds .gitlab vA (.ne (.ref .event) (.str (tA e0))) ∧
+    holds .gitlab vB (.not (anyOf ((evAll.filter (· ≠ e0)).flatMap sp))) =
+        holds .gitlab vA (.eq (.ref .event) (.str (tA e0))) := by
+  have key : holds .gitlab vB (anyOf ((evAll.filter (· ≠ e0)).flatMap sp)) = true ↔ ev ≠ e0 := by
+    rw [anyOf_holds hb]
+    constructor
+    · rintro ⟨x, hx, hxe⟩ rfl
+      simp only [List.mem_flatMap, List.mem_filter, decide_eq_true_eq] at hx
+      obtain ⟨b, ⟨_, hb0⟩, hxb⟩ := hx
+      exact hb0 (hsp _ _ _ _ hw hxb hxe).symm
+    · intro hne
+      exact ⟨w, by
+        simp only [List.mem_flatMap, List.mem_filter, decide_eq_true_eq]
+        exact ⟨ev, ⟨mem_evAll ev, hne⟩, hw⟩, rfl⟩
+  have src : eqV .gitlab (refV vA .event) (.str (tA e0)) = true ↔ ev = e0 := by
+    simp only [refV, ha, eqV, beq_iff_eq]
+    constructor
+    · intro h; exact hA.inj _ _ (by rw [h])
+    · rintro rfl; rfl
+  have hL : holds .gitlab vB (anyOf ((evAll.filter (· ≠ e0)).flatMap sp)) = decide (ev ≠ e0) := by
+    rw [Bool.eq_iff_iff]; simpa using key
+  have hE : eqV .gitlab (refV vA .event) (.str (tA e0)) = decide (ev = e0) := by
+    rw [Bool.eq_iff_iff]; simpa using src
+  have hnot : ∀ l, holds .gitlab vB (.not l) = !holds .gitlab vB l := fun l => rfl
+  have hne : ∀ l r, holds .gitlab vA (.ne l r) = !eqV .gitlab (eval .gitlab vA l) (eval .gitlab vA r) :=
+    fun l r => rfl
+  have heq : ∀ l r, holds .gitlab vA (.eq l r) = eqV .gitlab (eval .gitlab vA l) (eval .gitlab vA r) :=
+    fun l r => rfl
+  constructor
+  · rw [hL, hne]; simp only [eval, hE]; simp
+  · rw [hnot, hL, heq]; simp only [eval, hE]; simp
+
 end ExprSubset
 
 /-! ## The adapter on the core subset
@@ -258,7 +369,8 @@ structure Trig where
 
 /-- A workflow file; `name` is the file stem. `jobEnv` is the `job.env` marker (empty when absent), `noop` the
 `step.script` marker of the job, `manual` the `job.manual` marker with its triggers, `fin` the `pipeline.finally`
-marker (needs and `noIf`), `tagIdx` the `trigger.filter.tags` marker, `platform` the `labels.platform` key. -/
+marker (needs and `noIf`), `tagIdx` the `trigger.filter.tags` marker, `platform` the `labels.platform` key, `tags`
+the other `labels` keys, each with the value `true`. -/
 structure WFile where
   name : String
   whens : List Entry
@@ -271,6 +383,7 @@ structure WFile where
   fin : Option (List Core.Need × Bool)
   tagIdx : Option Nat
   platform : Option String
+  tags : List String
   deriving DecidableEq, Repr
 
 /-! ### Constants of the emitter and parser -/
@@ -319,8 +432,22 @@ def platformLabel (l : String) : Bool :=
   | _ => false
 
 /-- Mirrors woodpecker.emitter.labels (provider/woodpecker/emit_job.go): the first runner label of the
-`os/arch` form becomes `labels.platform`; every other label is lost. -/
+`os/arch` form becomes `labels.platform`; every other label is a tag (see `tagsOf`). -/
 def platformOf (r : List String) : Option String := r.find? platformLabel
+
+/-- A character of the label-name class `[A-Za-z0-9._-]` (emitkit.tagRE, provider/emitkit/runner.go). -/
+def tagChar (c : Char) : Bool := c.isAlphanum || c == '.' || c == '_' || c == '-'
+
+/-- Mirrors emitkit.TagKey (provider/emitkit/runner.go): at most 63 characters, name characters only, and an
+alphanumeric first and last character. -/
+def tagKeyOk (l : String) : Bool :=
+  l.length ≤ 63 && l.toList.all tagChar && (l.toList.head?.map Char.isAlphanum).getD false &&
+    (l.toList.getLast?.map Char.isAlphanum).getD false
+
+/-- The runner labels that become `labels` keys beside the platform: a valid label name that is not the platform
+label and not the key `platform`. Any other label is lost. -/
+def tagsOf (r : List String) : List String :=
+  r.filter fun l => some l != platformOf r && tagKeyOk l && l != "platform"
 
 /-- The pipeline triggers in IR order (`ir.CorePipeline.Project`): pr, push, tag. -/
 def trigsOf (p : Pipe) : List Trig :=
@@ -377,6 +504,7 @@ def mainFile (p : Pipe) (j : Core.Job) : WFile where
   fin := none
   tagIdx := tagIdxOf p
   platform := platformOf j.runner
+  tags := tagsOf j.runner
 
 /-- Mirrors woodpecker.emitter.dependsOn (provider/woodpecker/emit_job.go): a finally workflow waits for every
 main workflow as optional. Its needs are on main jobs, so they add nothing, and it keeps them in the marker. -/
@@ -392,6 +520,7 @@ def finFile (p : Pipe) (j : Core.Job) : WFile where
   fin := some (j.needs, !j.onFailure)
   tagIdx := tagIdxOf p
   platform := platformOf j.runner
+  tags := tagsOf j.runner
 
 /-- Mirrors woodpecker.Emit (provider/woodpecker/emit.go) on the core subset: one file per job, main jobs first. -/
 def toWp (p : Pipe) : List WFile := p.jobs.map (mainFile p) ++ p.fin.map (finFile p)

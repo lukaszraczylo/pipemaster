@@ -118,7 +118,18 @@ func ParseGlob(o expr.Opaque) (key, pattern string, ok bool) {
 
 func strLit(s string) expr.Lit { return expr.Lit{Kind: expr.LitStr, Str: s} }
 
+// anyTagGlob is the ref filter of every tag: the prefix of a tag ref followed by the doublestar glob.
+const anyTagGlob = tagRefPrefix + "**"
+
+// anyTag is the canonical form of the ref filter of every tag.
+func anyTag() expr.Expr {
+	return expr.Call{Name: "startsWith", Args: []expr.Expr{keyRefs[KeyRef], strLit(tagRefPrefix)}}
+}
+
 func valueExpr(key, v string) (expr.Expr, error) {
+	if key == KeyRef && v == anyTagGlob {
+		return anyTag(), nil
+	}
 	if !IsLiteral(v) {
 		return GlobOpaque(key, v), nil
 	}
@@ -321,6 +332,14 @@ func (rd reader) valueOf(e expr.Expr) (key string, vs []string, ok bool) {
 	case expr.Opaque:
 		k, p, ok := ParseGlob(x)
 		return k, []string{p}, ok
+	case expr.Ref:
+		if slices.Equal(x.Path, tagRef.Path) {
+			return KeyRef, []string{anyTagGlob}, true
+		}
+	case expr.Call:
+		if reflect.DeepEqual(x, anyTag()) {
+			return KeyRef, []string{anyTagGlob}, rd.opt.exact(tagRefPrefix, rd.sem)
+		}
 	case expr.Binary:
 		if isPushOnly(x) {
 			return KeyEvent, []string{eventPush}, true
@@ -404,7 +423,7 @@ func FromExpr(e expr.Expr, sem expr.Semantics, opts ...Option) (Conditions, bool
 	}
 	seenStatus := false
 	for _, conj := range flattenAnd(e) {
-		if call, ok := conj.(expr.Call); ok {
+		if call, ok := conj.(expr.Call); ok && !reflect.DeepEqual(call, anyTag()) {
 			s, ok := statusList(call)
 			if !ok || seenStatus {
 				return Conditions{}, false

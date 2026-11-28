@@ -1,0 +1,20 @@
+when:
+  - event: [push, tag, pull_request]
+
+steps:
+  - name: last
+    image: alpine:3.20
+    depends_on: [mid]
+    commands:
+      - echo "MARK stepdeps.last:$(cat mid.txt)" | tee -a trace.log
+  - name: mid
+    image: alpine:3.20
+    depends_on: [first]
+    commands:
+      - echo "$(cat first.txt)-mid" > mid.txt
+      - echo "MARK stepdeps.mid" | tee -a trace.log
+  - name: first
+    image: alpine:3.20
+    commands:
+      - echo first > first.txt
+      - echo "MARK stepdeps.first" | tee -a trace.log

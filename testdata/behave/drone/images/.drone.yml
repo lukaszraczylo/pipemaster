@@ -1,0 +1,14 @@
+kind: pipeline
+type: docker
+trigger:
+  event: [push, tag, pull_request]
+name: default
+steps:
+  - name: a
+    image: alpine:3.20
+    commands:
+      - if [ -e /etc/alpine-release ]; then echo MARK images.a:alpine; else echo MARK images.a:other; fi
+  - name: b
+    image: busybox:1.36
+    commands:
+      - if [ -e /etc/alpine-release ]; then echo MARK images.b:alpine; else echo MARK images.b:busybox; fi

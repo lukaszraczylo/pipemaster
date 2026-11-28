@@ -521,16 +521,21 @@ func splitPipelines(docs []*doc) []*group {
 }
 
 // buildPipelines assembles the pipelines from the documents of a file.
-func buildPipelines(rep *report.Report, docs []*doc) ([]*ir.Pipeline, error) {
+func buildPipelines(rep *report.Report, docs []*doc) ([]*ir.Pipeline, []string, error) {
 	docs, renamed := mergeCells(rep, docs)
 	var out []*ir.Pipeline
+	var defaulted []string
 	for _, g := range splitPipelines(docs) {
-		out = append(out, g.build(rep, renamed))
+		pl := g.build(rep, renamed)
+		out = append(out, pl)
+		if g.defaultTriggers() {
+			defaulted = append(defaulted, pl.ID)
+		}
 	}
 	if len(out) == 0 {
 		out = append(out, &ir.Pipeline{ID: pipelineID})
 	}
-	return out, nil
+	return out, defaulted, nil
 }
 
 // build assembles one pipeline from its documents.
@@ -712,6 +717,9 @@ func (g *group) placeTriggers(rep *report.Report) []ir.Trigger {
 		plain := slices.DeleteFunc(slices.Clone(sel), func(d *doc) bool { return d.merged != nil })
 		if len(plain) > 0 && len(plain) < len(sel) {
 			list = sharedTriggers(plain)
+			if allDefaultMarked(sel) && !isDefaultEvents(plain, list) {
+				list = nil
+			}
 		}
 	}
 	restored := false
@@ -746,6 +754,9 @@ func (g *group) placeTriggers(rep *report.Report) []ir.Trigger {
 	}
 	for _, d := range g.docs {
 		d.placeCondition(list, restored)
+	}
+	if isDefaultEvents(sel, list) {
+		return nil
 	}
 	return list
 }

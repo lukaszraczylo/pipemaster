@@ -7,7 +7,10 @@ workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_PIPELINE_SOURCE == "schedule"
+# pipemaster:emulated step.image pipeline/ci/job/build
+# pipemaster:arg {"job":"build","parts":["build"],"own":["build-step-1"]}
 build:
+  image: ubuntu:latest
   needs: []
   script:
     # pipemaster:step build-step-1

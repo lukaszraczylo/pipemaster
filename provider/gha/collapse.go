@@ -13,19 +13,22 @@ import (
 	exprgha "github.com/lukaszraczylo/pipemaster/expr/gha"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
 // collapseMarkers undoes the emulations another provider's emitter marked in the file, so a pipeline that
 // travelled through GHA and came back carries no trace of the detour.
-func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string, rep *report.Report, restoreConds bool) (condsFrom string) {
+func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map[ir.FeatureUse][]string, rep *report.Report, restoreConds bool) (condsFrom string, guarded []string, defaulted bool) {
 	carriedDone := map[string]bool{}
 	finallyPaths := map[string]bool{}
+	var sources []sourceEventsArg
 	for _, u := range uses {
 		if u.Feature == caps.PipelineFinally {
 			finallyPaths[u.IRPath] = true
 		}
 	}
+	guarded = stripGuards(pl, rep, uses, args)
 	// Condition markers run last: they compare against the condition once the guards are gone.
 	slices.SortStableFunc(uses, func(a, b ir.FeatureUse) int { return condRank(a.Feature) - condRank(b.Feature) })
 	for _, u := range uses {
@@ -43,12 +46,26 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 				})
 				break
 			}
-			if j := markedJob(pl, u.IRPath); j != nil && len(j.Steps) == 1 && slices.Equal(j.Steps[0].Script, []string{noopScript}) {
+			if u.IRPath == "pipeline/"+pl.ID+"/job/"+changesJobID {
+				dropChangesJob(pl)
+				break
+			}
+			if j := markedJob(pl, u.IRPath); j != nil && len(j.Steps) == 1 && (slices.Equal(j.Steps[0].Script, []string{noopScript}) || emitkit.IsFailLoud(j.Steps[0].Script)) {
 				j.Steps = nil
+			}
+		case caps.StepShell:
+			if st := markedStep(pl, u.IRPath); st != nil && st.Shell == shellBash {
+				st.Shell = ""
+			} else if st != nil && st.Shell == "" {
+				if inner, ok := provider.BashUnwrapCommand(provider.BashOrShScript, strings.Join(st.Script, "\n")); ok {
+					st.Script = strings.Split(inner, "\n")
+				}
 			}
 		case caps.JobRunner:
 			if j := markedJob(pl, u.IRPath); j != nil && slices.Equal(j.Runner.Labels, []string{defaultRunner}) {
 				j.Runner.Labels = nil
+			} else if j != nil && len(j.Runner.Labels) > 1 && j.Runner.Labels[0] == selfHostedLabel {
+				j.Runner.Labels = j.Runner.Labels[1:]
 			}
 		case caps.JobCache, caps.JobArtifacts, caps.JobNeedsArtifacts:
 			if !carriedDone[u.IRPath] && len(args[u]) == 1 {
@@ -85,12 +102,30 @@ func collapseMarkers(e *emitter, pl *ir.Pipeline, uses []ir.FeatureUse, args map
 		case caps.TriggerAPI:
 			dropSynthEvent(pl, u.IRPath, provider.Family(e.d.ID))
 		case caps.TriggerPush:
+			for _, a := range args[u] {
+				var src sourceEventsArg
+				if u.IRPath == "pipeline/"+pl.ID && json.Unmarshal([]byte(a), &src) == nil && len(src.Kinds) > 0 {
+					dropSourceEvents(pl, src)
+					sources = append(sources, src)
+				}
+			}
+			var d provider.DefaultTriggersArg
+			if slices.ContainsFunc(args[u], func(a string) bool { return json.Unmarshal([]byte(a), &d) == nil && d.Default }) {
+				if u.IRPath == "pipeline/"+pl.ID {
+					defaulted = true
+				}
+				break
+			}
 			dropMatchAll(pl, ir.TriggerPush, func(t *ir.Trigger) *ir.Filter { return &t.Branches })
 		case caps.TriggerTag:
 			dropMatchAll(pl, ir.TriggerTag, func(t *ir.Trigger) *ir.Filter { return &t.Tags })
 		}
 	}
-	return condsFrom
+	for _, src := range sources {
+		restoreGatedConds(pl, src)
+		provider.StripGates(pl, src.Gated)
+	}
+	return condsFrom, guarded, defaulted
 }
 
 func markedJob(pl *ir.Pipeline, path string) *ir.Job {
@@ -227,6 +262,55 @@ func sourceCond(rep *report.Report, u ir.FeatureUse, args []string, parsed expr.
 	return parsed
 }
 
+// stripGuards removes the deletion guard the emitter ANDed onto each marked job condition, before any other
+// marker reads the condition, and returns the IR paths of the jobs it stripped. A guard without a marker is the
+// author's and stays.
+func stripGuards(pl *ir.Pipeline, rep *report.Report, uses []ir.FeatureUse, args map[ir.FeatureUse][]string) (guarded []string) {
+	var from string
+	for _, u := range uses {
+		if u.Feature != caps.JobIf || !strings.HasPrefix(u.IRPath, "pipeline/"+pl.ID+"/job/") {
+			continue
+		}
+		for _, a := range args[u] {
+			var s srcArg
+			if json.Unmarshal([]byte(a), &s) != nil || !s.Guard {
+				continue
+			}
+			src, ok := foreignLang(s.From)
+			switch {
+			case !ok:
+				rep.Add(ignoredMarker(u, fmt.Sprintf("the source dialect %q is not a registered GitLab-class dialect", markName(s.From))))
+				continue
+			case from != "" && from != src.ID:
+				rep.Add(ignoredMarker(u, fmt.Sprintf("the file already restores conditions from %q, not %q", from, src.ID)))
+				continue
+			}
+			if j := markedJob(pl, u.IRPath); j != nil {
+				if rest, ok := dropGuard(j.If); ok {
+					j.If = rest
+					from = src.ID
+					guarded = append(guarded, u.IRPath)
+					continue
+				}
+			}
+			rep.Add(ignoredMarker(u, "the deletion guard was edited after conversion, so the parsed condition stands"))
+		}
+	}
+	return guarded
+}
+
+// dropGuard returns x without the deletion guard that ends it; ok is false when x does not end with one.
+func dropGuard(x expr.Expr) (expr.Expr, bool) {
+	guard := expr.String(deletedGuard())
+	if x != nil && expr.String(x) == guard {
+		return nil, true
+	}
+	if b, ok := x.(expr.Binary); ok && b.Op == expr.OpAnd && expr.String(b.R) == guard {
+		return b.L, true
+	}
+	return nil, false
+}
+
 func ignoredMarker(u ir.FeatureUse, why string) report.Entry {
 	return report.Entry{IRPath: u.IRPath, Feature: u.Feature, Level: caps.Lost, Strategy: "marker ignored", Detail: "marker ignored: " + why}
 }
@@ -272,6 +356,9 @@ func restoreCond(src, parsed expr.Expr, from expr.Dialect) (expr.Expr, bool) {
 // rederives is true when the emitter would write src as the condition parsed.
 func rederives(src, parsed expr.Expr, from expr.Dialect) bool {
 	t, _, ok := expr.TranslateApprox(src, from, exprgha.Lang)
+	if expr.HasChanges(src) {
+		t, _, _, ok = translateChanges(src, from)
+	}
 	if !ok {
 		return false
 	}
@@ -395,7 +482,14 @@ func restoreFinallyNeeds(pl *ir.Pipeline, rep *report.Report, u ir.FeatureUse, a
 func collapseImage(e *emitter, pl *ir.Pipeline, rep *report.Report, u ir.FeatureUse, args []string) {
 	st := markedStep(pl, u.IRPath)
 	var a imageArg
-	if st == nil || len(args) != 1 || json.Unmarshal([]byte(args[0]), &a) != nil || st.Action == nil || st.Action.Kind != ir.ActionDocker {
+	if st == nil || len(args) != 1 || json.Unmarshal([]byte(args[0]), &a) != nil {
+		return
+	}
+	if a.Run {
+		collapseDockerRun(e, st, u, a, rep)
+		return
+	}
+	if st.Action == nil || st.Action.Kind != ir.ActionDocker {
 		return
 	}
 	ref, entrypoint, argText, err := e.imageParts(u.IRPath, &ir.Step{Image: &a.Image, Script: a.Script})
@@ -476,6 +570,21 @@ func collapseFilter(pl *ir.Pipeline, f caps.Feature, args []string) {
 		if sameFilter(*got, written) {
 			*got = want
 			return
+		}
+	}
+}
+
+// dropChangesJob removes the generated changed-paths job and the needs that name it.
+func dropChangesJob(pl *ir.Pipeline) {
+	isGen := func(j *ir.Job) bool { return j != nil && j.ID == changesJobID }
+	pl.Jobs = slices.DeleteFunc(pl.Jobs, isGen)
+	for _, j := range append(slices.Clone(pl.Jobs), pl.Finally...) {
+		if j == nil {
+			continue
+		}
+		j.Needs = slices.DeleteFunc(j.Needs, func(n ir.Need) bool { return n.JobID == changesJobID })
+		if len(j.Needs) == 0 {
+			j.Needs = nil
 		}
 	}
 }

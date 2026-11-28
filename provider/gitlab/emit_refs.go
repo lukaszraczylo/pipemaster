@@ -49,6 +49,22 @@ func refSites(pl *ir.Pipeline) []refSite {
 			str(pos+"/"+strconv.Itoa(i), &l[i])
 		}
 	}
+	// lines positions a script by line, as Parse reads it back: an element of several lines is a block item that
+	// Parse splits. The sites of such an element point at copies, because only Emit reads a multi-line element.
+	lines := func(pos string, l []string) {
+		n := 0
+		for i := range l {
+			if !strings.Contains(l[i], "\n") {
+				str(pos+"/"+strconv.Itoa(n), &l[i])
+				n++
+				continue
+			}
+			for _, part := range strings.Split(strings.TrimRight(l[i], "\n"), "\n") {
+				str(pos+"/"+strconv.Itoa(n), &part)
+				n++
+			}
+		}
+	}
 	vars := func(pos string, vs []ir.Var) {
 		for i := range vs {
 			out = append(out, refSite{pos: pos + "/" + strconv.Itoa(i), val: &vs[i].Value})
@@ -75,6 +91,9 @@ func refSites(pl *ir.Pipeline) []refSite {
 			cp := jp + "/cache/" + strconv.Itoa(i)
 			key(cp+"/key", &j.Cache[i].Key)
 			strs(cp+"/paths", j.Cache[i].Paths)
+			for k := range j.Cache[i].FallbackKeys {
+				key(cp+"/fallback/"+strconv.Itoa(k), &j.Cache[i].FallbackKeys[k])
+			}
 		}
 		for i := range j.Artifacts {
 			ap := jp + "/artifact/" + strconv.Itoa(i)
@@ -98,7 +117,7 @@ func refSites(pl *ir.Pipeline) []refSite {
 		for _, st := range j.Steps {
 			sp := jp + "/step/" + st.ID
 			vars(sp+"/env", st.Env)
-			strs(sp+"/script", st.Script)
+			lines(sp+"/script", st.Script)
 			str(sp+"/workdir", &st.WorkDir)
 			if st.Image != nil {
 				str(sp+"/image", &st.Image.Ref)
@@ -150,11 +169,25 @@ func hashedKeyText(key string) (string, bool) {
 // env.x all print as $x, so the namespace cannot be read back from the text alone.
 func refPairs(pl *ir.Pipeline) []refPair {
 	var out []refPair
+	// Script lines of one statement share quote state, so a line converts with the lines before it.
+	var ctx lineCtx
+	var ctxBase string
 	text := func(pos, s string) {
-		if parts, err := expr.ParseScriptTemplate(s); err != nil || !flattens(parts) {
+		if base := pos[:strings.LastIndexByte(pos, '/')+1]; base != ctxBase || !linePosRE.MatchString(pos) {
+			ctx, ctxBase = lineCtx{}, base
+		}
+		parts, err := expr.ParseScriptTemplate(s)
+		if err != nil || !flattens(parts) {
+			ctx.add(s)
 			return
 		}
-		if t, lost, err := convert(s); err == nil && len(lost) == 0 && t != s {
+		t, lost, err := convertIn(s, ctx.prefix())
+		if err != nil || len(lost) > 0 {
+			ctx = lineCtx{}
+			return
+		}
+		ctx.add(t)
+		if t != s {
 			out = append(out, refPair{pairText, pos, t, s})
 		}
 	}
@@ -263,7 +296,7 @@ func restoreLines(c *collapseCtx, owned map[*string]bool) {
 		}
 		owned[st.text] = true
 		cur := *st.text
-		if cur == p.S {
+		if cur == p.S || emitkit.IsFailLoudLine(cur) {
 			continue
 		}
 		if cur != p.G {
@@ -298,6 +331,9 @@ func collapseRefs(c *collapseCtx) bool {
 			cur = *st.text
 		case st.val.Kind == ir.ValueLit:
 			cur = st.val.Lit
+		case st.val.Kind == ir.ValueExpr:
+			// A step that a marker restored holds the source expression already.
+			continue
 		}
 		if cur == p.S {
 			continue

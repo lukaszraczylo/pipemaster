@@ -1,0 +1,5 @@
+default:
+  image: alpine:3.20
+show:
+  script:
+    - echo "MARK child_forward_unset.parent:${PARENT-unset}" | tee -a trace.log

@@ -1,0 +1,81 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  params:
+    - name: ctx-branch
+      default: ""
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
+  tasks:
+    - name: compile
+      taskRef:
+        name: gitlab-ci-compile
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
+    - name: ship
+      taskRef:
+        name: gitlab-ci-ship
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
+      runAfter:
+        - compile
+        - integration-check-api
+        - integration-check-ui
+    - name: integration-check-api
+      taskRef:
+        name: gitlab-ci-integration-check-api
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
+      runAfter:
+        - integration-seed
+      when:
+        - input: $(params.ctx-branch)
+          operator: in
+          values:
+            - main
+    - name: integration-check-ui
+      taskRef:
+        name: gitlab-ci-integration-check-ui
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
+      runAfter:
+        - integration-seed
+      when:
+        - input: $(params.ctx-branch)
+          operator: in
+          values:
+            - main
+    - name: integration-seed
+      taskRef:
+        name: gitlab-ci-integration-seed
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
+      runAfter:
+        - compile
+      when:
+        - input: $(params.ctx-branch)
+          operator: in
+          values:
+            - main

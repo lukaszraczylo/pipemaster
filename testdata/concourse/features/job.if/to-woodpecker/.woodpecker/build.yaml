@@ -1,8 +1,9 @@
-# pipemaster:lost job.if pipeline/ci/job/build: branch == 'main'
+# pipemaster:emulated job.if pipeline/ci/job/build
+# pipemaster:arg {"src":"branch == 'main'","from":"concourse","branch":true,"gate":true}
 when:
   - event: push
     branch: main
-    evaluate: "false"
+    evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "main"'
 steps:
   - name: build-run
     image: ubuntu:latest

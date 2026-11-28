@@ -407,5 +407,16 @@ func (p *project) sensorTrigger(t sensorTrigger, byName map[string]*ir.Pipeline)
 		tr.Ext = ir.Ext{dialect: data}
 		pl.Triggers = append(pl.Triggers, tr)
 	}
+	branchesOnly(pl)
 	return true
+}
+
+// branchesOnly reads the branch ref filter that the emitter adds to a push trigger as no filter: a push with no
+// branch filter is a push of a branch.
+func branchesOnly(pl *ir.Pipeline) {
+	for i := range pl.Triggers {
+		if t := &pl.Triggers[i]; t.Kind == ir.TriggerPush && slices.Equal(t.Branches.Include, []string{globDeep}) {
+			t.Branches.Include = nil
+		}
+	}
 }

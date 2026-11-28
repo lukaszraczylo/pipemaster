@@ -2,6 +2,7 @@ package tekton
 
 import (
 	"go.yaml.in/yaml/v3"
+	"slices"
 
 	"fmt"
 	"sort"
@@ -10,8 +11,11 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 // Output paths. The parser reads every YAML file under .tekton/, so the split is for people and for kustomize.
@@ -37,6 +41,14 @@ const (
 // Emit writes the project as Tekton files under .tekton/. Every feature use goes through the ledger; Finish
 // fails the call when one was never accounted for.
 func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	return inline.Emit(p, a.ID(), a.emitFlat)
+}
+
+func (a adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	p, vres := vars.Prepare(p, dialect)
+	p, checkouts := emitkit.WithSourceCheckout(p)
+	p, noForm, injected := provider.WithDefaultTriggers(p, dialect)
+	p = provider.CanonEventNames(p)
 	origin := ""
 	if p != nil {
 		origin = p.Origin.Provider
@@ -44,12 +56,15 @@ func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) 
 	e := &emitter{
 		led: emitkit.NewLedger("ir", dialect, a.Caps()), origin: origin, own: origin == dialect,
 		files: map[string][]*outDoc{}, owners: map[string]*outDoc{}, marked: map[ir.FeatureUse]bool{},
-		taken: map[string]bool{}, made: map[string]bool{},
+		taken: map[string]bool{}, made: map[string]bool{}, skipped: map[string]bool{}, injected: injected,
 	}
+	emitkit.RetainSourceCheckout(e.led, checkouts)
+	e.gated = emitkit.GatedSteps(p)
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)
 	}
+	e.noteDefaultEvents(noForm)
 	if err := e.project(livePipelines(p)); err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", dialect, err)
 	}
@@ -57,11 +72,16 @@ func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) 
 	if err != nil {
 		return nil, rep, fmt.Errorf("%s: %w", dialect, err)
 	}
+	rep.Entries = slices.DeleteFunc(rep.Entries, func(en report.Entry) bool {
+		return en.Feature == caps.StepAction && e.skipped[en.IRPath]
+	})
+	rep.Withdrawn = e.withdrawn
 	e.markEmulations(rep)
 	files, err := e.render()
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", dialect, err)
 	}
+	vres.Report(rep)
 	return files, rep, nil
 }
 
@@ -80,6 +100,8 @@ func livePipelines(p *ir.Project) []*ir.Pipeline {
 
 // emitter carries the state of one Emit call.
 type emitter struct {
+	// gated holds the action steps that a later step reads, which no target may drop.
+	gated  map[*ir.Step]bool
 	led    *emitkit.Ledger
 	said   map[ir.FeatureUse][2]string
 	files  map[string][]*outDoc
@@ -89,12 +111,20 @@ type emitter struct {
 	// Ext is not written a second time.
 	taken map[string]bool
 	made  map[string]bool
+	// injected names the pipelines whose triggers were made from the default events of their source.
+	injected map[string]bool
 	// pendingEL holds the EventListeners that a Tekton file kept as resources, by name.
 	pendingEL map[string][]resourceDoc
-	origin    string
+	// lostWork holds the path of every step that lost script, action or image work.
+	lostWork []string
+	origin   string
 	// keptEntries holds the names of EventListener entries that a Tekton file kept, so a generated one is not written twice.
 	keptEntries map[string]bool
 	plans       []*plan
+	// skipped holds the paths of the parser-added checkout steps that the file does not write.
+	skipped map[string]bool
+	// withdrawn holds the parser entries for the checkout steps that the file does not write.
+	withdrawn []report.Entry
 	// listeners are the EventListeners in order of first use.
 	listeners []*listener
 	// own is true when the project came from Tekton, so its Ext keys are ours to write back.
@@ -105,11 +135,27 @@ type emitter struct {
 func use(path string, f caps.Feature) ir.FeatureUse { return ir.FeatureUse{IRPath: path, Feature: f} }
 
 func (e *emitter) lose(path string, f caps.Feature, detail string) {
+	if strings.Contains(path, "/step/") && (f == caps.StepScript || f == caps.StepImage) {
+		e.lostWork = append(e.lostWork, path)
+	}
+	e.note(path, f, caps.Lost, "", detail)
+}
+
+// lostStepWork is true when a step of the job at jp lost its work.
+func (e *emitter) lostStepWork(jp string) bool {
+	return slices.ContainsFunc(e.lostWork, func(p string) bool { return strings.HasPrefix(p, jp+"/step/") })
+}
+
+func (e *emitter) noteLost(path string, f caps.Feature, detail string) {
 	e.note(path, f, caps.Lost, "", detail)
 }
 
 func (e *emitter) emulate(path string, f caps.Feature, strategy, detail string) {
 	e.note(path, f, caps.Emulated, strategy, detail)
+}
+
+func (e *emitter) external(path string, f caps.Feature, strategy, detail string) {
+	e.note(path, f, caps.External, strategy, detail)
 }
 
 func (e *emitter) note(path string, f caps.Feature, lv caps.Level, strategy, detail string) {
@@ -288,4 +334,18 @@ func (e *emitter) node(path, what string, v any) *yaml.Node {
 		return nil
 	}
 	return n
+}
+
+// withdrawCheckout retracts the parser's entry that says the job got its own checkout step.
+func (e *emitter) withdrawCheckout(jobPath string) {
+	e.withdrawn = append(e.withdrawn, report.Entry{IRPath: jobPath, Feature: caps.StepAction, Strategy: checkoutStrategy})
+}
+
+// noteDefaultEvents reports the default events of the source that have no IR trigger.
+func (e *emitter) noteDefaultEvents(noForm map[string][]provider.SourceEvent) {
+	for id, events := range noForm {
+		for _, g := range provider.GroupByFeature(events) {
+			e.lose("pipeline/"+id, g.Feature, provider.NoFormDetail(g.Names, "Tekton"))
+		}
+	}
 }

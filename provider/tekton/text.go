@@ -1,6 +1,7 @@
 package tekton
 
 import (
+	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -11,6 +12,23 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
+// legacyParamPrefix starts the deprecated spelling of a param variable, which Tekton reads like params.x.
+const legacyParamPrefix = "inputs.params."
+
+// checkoutDir is the directory that a job starts in on a target with one clone per job.
+const checkoutDir = "."
+
+// wsMark brackets the name of a workspace in a template while script() splits the text into its two spellings.
+const wsMark = "\x00"
+
+// litMark brackets the name of a workspace in a literal /workspace/<name> path of a script line.
+const litMark = "\x01"
+
+// workspaceLiteral matches the path of a workspace as a script writes it by hand. The path must start a shell
+// word: at the start of the text, after a space, a quote, or one of `= ( : ; | & < > { ` + "`" + `. Thus /mnt/workspace/x and a URL
+// path stay. A dot ends the name unless a name character follows it.
+var workspaceLiteral = regexp.MustCompile(`(?:^|[\s"'=(:;|&<>{` + "`" + `])/workspace/[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*`)
+
 const (
 	varOpen  = "$("
 	varClose = ")"
@@ -18,7 +36,10 @@ const (
 
 var (
 	// tektonVar is the first segment of every variable that Tekton substitutes; `$(date)` and the like are shell.
-	tektonVar = regexp.MustCompile(`^(params|tasks|results|workspaces|context|steps|credentials|artifacts)\.`)
+	tektonVar = regexp.MustCompile(`^(inputs\.params|params|tasks|results|workspaces|context|steps|credentials|artifacts)\.`)
+	// workspacePath reads $(workspaces.name.path).
+	workspaceVar  = regexp.MustCompile(`\$\(workspaces\.([A-Za-z0-9_.-]+)\.path\)`)
+	workspacePath = regexp.MustCompile(`^workspaces\.([A-Za-z0-9_.-]+)\.path$`)
 	// paramVar reads the three spellings of a param variable.
 	paramVar = regexp.MustCompile(`^params(?:\.([A-Za-z_][A-Za-z0-9_-]*)|\['([^']+)'\]|\["([^"]+)"\])$`)
 )
@@ -27,28 +48,28 @@ var (
 // becomes a canonical reference; any other Tekton variable stays shell text. A Task scope resolves $(params.x)
 // through what the PipelineTask binds to x.
 type texts struct {
-	// bind holds the parts that the PipelineTask binds to each Task param.
-	bind map[string][]expr.Part
-	// defaults holds the default of each Task param that has a string default.
+	legacy   map[string]bool
 	defaults map[string]string
-	// matrix names the Task params that a matrix axis binds.
-	matrix map[string]bool
-	// used names the bound params that a text read.
-	used map[string]bool
-	// needs names the tasks that a result reference points at, by Tekton name.
-	needs map[string]bool
-	// taskID maps a Tekton task name to the job ID; ok is false for a name that is no task of the pipeline.
-	taskID func(name string) (string, bool)
-	// kept lists the variables left as written.
-	kept []string
-	// task is true in a Task body, where a param name resolves through bind.
-	task bool
+	matrix   map[string]bool
+	used     map[string]bool
+	needs    map[string]bool
+	taskID   func(name string) (string, bool)
+	bind     map[string][]expr.Part
+	modern   map[string]bool
+	srcWS    map[string]bool
+	dataWS   map[string]string
+	up       string
+	kept     []string
+	wsHits   int
+	markWS   bool
+	task     bool
 }
 
 func newTexts(taskID func(string) (string, bool), task bool) *texts {
 	return &texts{
 		bind: map[string][]expr.Part{}, defaults: map[string]string{}, matrix: map[string]bool{},
 		used: map[string]bool{}, needs: map[string]bool{}, taskID: taskID, task: task,
+		legacy: map[string]bool{}, modern: map[string]bool{},
 	}
 }
 
@@ -83,8 +104,41 @@ func (x *texts) ref(word string) (expr.Ref, bool) {
 	return r, true
 }
 
+// dirOf is the IR directory of a Task workspace: the checkout for a source workspace, the workspace directory
+// for a data workspace.
+func (x *texts) dirOf(name string) (string, bool) {
+	dir, ok := x.dataWS[name]
+	if x.srcWS[name] {
+		dir, ok = checkoutDir, true
+	}
+	if ok && x.up != "" {
+		dir = path.Clean(x.up + dir)
+	}
+	return dir, ok
+}
+
 // variable reads the inside of one $(...) as parts; ok is false when the form stays text.
 func (x *texts) variable(inner string) ([]expr.Part, bool) {
+	if m := workspacePath.FindStringSubmatch(inner); m != nil && x.task {
+		if dir, ok := x.dirOf(m[1]); ok {
+			x.wsHits++
+			if x.markWS {
+				return []expr.Part{{Text: wsMark + m[1] + wsMark}}, true
+			}
+			return []expr.Part{{Text: dir}}, true
+		}
+	}
+	if rest, ok := strings.CutPrefix(inner, legacyParamPrefix); ok {
+		if !x.task {
+			return nil, false
+		}
+		inner = "params." + rest
+		if m := paramVar.FindStringSubmatch(inner); m != nil {
+			x.legacy[m[1]+m[2]+m[3]] = true
+		}
+	} else if m := paramVar.FindStringSubmatch(inner); m != nil && x.task {
+		x.modern[m[1]+m[2]+m[3]] = true
+	}
 	if m := paramVar.FindStringSubmatch(inner); m != nil {
 		name := m[1] + m[2] + m[3]
 		if !x.task {

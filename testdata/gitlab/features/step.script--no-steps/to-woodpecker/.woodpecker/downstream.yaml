@@ -1,12 +1,19 @@
 # pipemaster:emulated step.script pipeline/gitlab-ci/job/downstream
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/downstream
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/downstream
+# pipemaster:arg {"gitlab_default":true}
 when:
   - event: push
   - event: tag
+  - event:
+      - manual
+      - cron
 depends_on:
   - build
 steps:
   - name: noop
     image: ubuntu:latest
     commands:
-      - "true"
+      - 'printf ''%s\n'' ''pipemaster: lost: step.script pipeline/gitlab-ci/job/downstream: the job starts the pipeline of project group/other and the target has no cross-project trigger; start that pipeline by hand or with an API call'' >&2; exit 1'

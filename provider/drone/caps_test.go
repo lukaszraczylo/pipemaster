@@ -24,12 +24,12 @@ func TestCapsLedger(t *testing.T) {
 		caps.Emulated: {
 			caps.JobMatrix, caps.TriggerManual, caps.JobManual, caps.JobEnvironmentApproval, caps.JobAllowFailure,
 			caps.PipelineFinally, caps.JobCache, caps.JobArtifacts, caps.StepAction, caps.ProjectMultiPipeline,
-			caps.PipelineEnv, caps.TriggerFilterTags,
+			caps.PipelineEnv, caps.TriggerFilterTags, caps.StepShell,
 		},
-		caps.External: {caps.TriggerSchedule, caps.JobTimeout},
+		caps.External: {caps.TriggerSchedule, caps.JobTimeout, caps.JobRunner},
 		caps.Lost: {
-			caps.TriggerFilterPaths, caps.JobRetry, caps.JobOutputs, caps.JobRunner,
-			caps.PipelinePermissions, caps.PipelineInputs, caps.PipelineConcurrency, caps.StepTimeout, caps.StepShell,
+			caps.TriggerFilterPaths, caps.JobRetry, caps.JobOutputs,
+			caps.PipelinePermissions, caps.PipelineInputs, caps.PipelineConcurrency, caps.StepTimeout,
 			caps.JobEnvironment, caps.JobNeedsArtifacts, caps.TriggerAPI, caps.TriggerPipelineDone,
 			caps.TriggerResource,
 		},

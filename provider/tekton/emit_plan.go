@@ -7,6 +7,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 // ctxOrder lists the canonical context names in the order the pipeline declares their params.
@@ -28,10 +29,17 @@ type plan struct {
 	// renamed maps a Pipeline param that an input was renamed to back to the IR input name.
 	renamed map[string]string
 	// ctx names the reserved ctx-* params that some task reads.
-	ctx  map[string]bool
-	name string
-	path string
-	jobs []*jobPlan
+	ctx map[string]bool
+	// imageCtx maps the path of an image to the ctx-* params that its text reads. The pod pulls the image
+	// before any script runs, so a run that leaves a param empty cannot start.
+	imageCtx map[string][]string
+	// refTypes holds the job conditions written as a test of the ref type.
+	refTypes map[string]refTypeJob
+	// changes holds the path plans that the generated task pipemaster-changes computes.
+	changes []emitkit.ChangesPlan
+	name    string
+	path    string
+	jobs    []*jobPlan
 	// ws is true when a task mounts the shared workspace; checkout is true when one clones the repository.
 	ws, checkout bool
 }
@@ -39,10 +47,13 @@ type plan struct {
 // jobPlan holds the PipelineTask name and the Task name of one job.
 type jobPlan struct {
 	j       *ir.Job
+	nodeSel map[string]string
 	tname   string
 	kname   string
 	path    string
-	finally bool
+	// runnerLost holds the runner losses; reportNodeSelectors writes them after the external entry.
+	runnerLost []string
+	finally    bool
 }
 
 // ctxParams lists every reserved param name.
@@ -59,7 +70,7 @@ func ctxParams() []string {
 func (e *emitter) planNames(pls []*ir.Pipeline) {
 	pnames := map[string]bool{}
 	for _, pl := range pls {
-		pp := &plan{pl: pl, path: "pipeline/" + pl.ID, byID: map[string]*jobPlan{}, inputs: map[string]string{}, ctx: map[string]bool{}}
+		pp := &plan{pl: pl, path: "pipeline/" + pl.ID, byID: map[string]*jobPlan{}, inputs: map[string]string{}, ctx: map[string]bool{}, imageCtx: map[string][]string{}}
 		pp.name = e.dnsName(pnames, pp.path, "pipeline id", pl.ID, maxName, true)
 		e.planInputs(pp)
 		tnames := map[string]bool{}
@@ -67,6 +78,9 @@ func (e *emitter) planNames(pls []*ir.Pipeline) {
 			for _, j := range group {
 				if j == nil {
 					continue
+				}
+				if e.own && j != nil {
+					j = emitkit.WithoutAddedNeeds(j, dialect, ExtWorkspaceArtifacts)
 				}
 				jp := &jobPlan{j: j, finally: i == 1, path: pp.path + "/job/" + j.ID}
 				jp.tname = e.dnsName(tnames, jp.path, "job id", j.ID, maxName, true)

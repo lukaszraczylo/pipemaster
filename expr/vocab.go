@@ -16,7 +16,18 @@ const (
 	CtxRefType   = "ref_type"
 	CtxRef       = "ref"
 	CtxPRHeadRef = "pr.head_ref"
+	// CtxDefaultBranch is the default branch of the repository; a dialect without a variable for it cannot name it.
+	CtxDefaultBranch = "default_branch"
+	// CtxBeforeSHA is the commit a push replaced: all zeros when the push creates the ref.
+	CtxBeforeSHA = "before_sha"
+	// CtxDeleted is true on a push event that deletes the ref.
+	CtxDeleted = "deleted"
+	// CtxCreated is true on a push event that creates the ref.
+	CtxCreated   = "created"
 	CtxPRBaseRef = "pr.base_ref"
+	// CtxPRBaseSHA is the commit a pull request is compared with. Only the workflow engines that pass context
+	// parameters name it, so no dialect vocabulary has it.
+	CtxPRBaseSHA = "pr.base_sha"
 )
 
 // Canonical prefix families; the tail after the prefix is user-defined.

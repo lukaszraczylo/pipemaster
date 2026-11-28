@@ -13,6 +13,8 @@ func TestDefaultShellOfBashSourcesRunsBashIfPresent(t *testing.T) {
 		t.Run(origin, func(t *testing.T) {
 			p := project(scriptJob("build", bashOnly))
 			p.Origin = ir.Origin{Provider: origin, Dialect: origin}
+			// A GitLab source clones before the job; the test is about the preamble, so it turns the clone off.
+			p.Pipelines[0].Env = []ir.Var{{Name: "GIT_STRATEGY", Value: ir.Value{Lit: "none"}}}
 			files, rep := emitRaw(t, p)
 			text := joinFiles(files)
 			for _, l := range bashPreamble {

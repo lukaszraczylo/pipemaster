@@ -1,15 +1,18 @@
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://data.forgejo.org\n    owner: actions\n    repo: checkout\n    ref: v4\next:\n    gha:\n        _derived_id: true\nid: build-step-1\nkind: action\n","get":"source","params":"null"}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: setup-go\n    ref: v5\next:\n    gha:\n        _derived_id: true\nid: build-step-2\nkind: action\n","task":"build-step-2","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"build-step-2\"}"}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: setup-go\n    ref: v5\next:\n    gha:\n        _derived_id: true\nid: build-step-2\nkind: action\n","task":"build-step-2","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: Concourse does not run the action actions/setup-go@v5' \\u003e\\u00262; exit 1\"],\"path\":\"sh\"}},\"task\":\"build-step-2\"}"}
 # pipemaster:lost uses: org/tool/sub@v2
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-3
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://codeberg.org\n    owner: org\n    repo: tool\n    path: sub\n    ref: v2\next:\n    gha:\n        _derived_id: true\nid: build-step-3\nkind: action\n","task":"build-step-3","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"true\"],\"path\":\"sh\"}},\"task\":\"build-step-3\"}"}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://codeberg.org\n    owner: org\n    repo: tool\n    path: sub\n    ref: v2\next:\n    gha:\n        _derived_id: true\nid: build-step-3\nkind: action\n","task":"build-step-3","hold":"{\"config\":{\"image_resource\":{\"source\":{\"repository\":\"ubuntu\",\"tag\":\"latest\"},\"type\":\"registry-image\"},\"platform\":\"linux\",\"run\":{\"args\":[\"-ec\",\"printf '%s\\\\n' 'pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: Concourse does not run the action org/tool/sub@v2' \\u003e\\u00262; exit 1\"],\"path\":\"sh\"}},\"task\":\"build-step-3\"}"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"9a0f333c0d1469ba04d965f73a3e88c817c6a467514ab3d573f3227eab4fceec","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
+# pipemaster:arg {"digest":"8f815082380863b3d7f2c29e577cdb9e4ada3d297b64f2f36f1d4805d5930293","carry":"id: build\nrunner:\n    labels:\n        - docker\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
@@ -27,6 +30,34 @@ jobs:
     plan:
       - get: source
         trigger: true
+      - task: build-step-2
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          run:
+            path: sh
+            args:
+              - -ec
+              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: Concourse does not run the action actions/setup-go@v5'' >&2; exit 1'
+      - task: build-step-3
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          run:
+            path: sh
+            args:
+              - -ec
+              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: Concourse does not run the action org/tool/sub@v2'' >&2; exit 1'
+  - name: build-tag
+    plan:
       - get: source-tags
         trigger: true
       - task: build-step-2
@@ -41,7 +72,7 @@ jobs:
             path: sh
             args:
               - -ec
-              - "true"
+              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: Concourse does not run the action actions/setup-go@v5'' >&2; exit 1'
       - task: build-step-3
         config:
           platform: linux
@@ -54,4 +85,4 @@ jobs:
             path: sh
             args:
               - -ec
-              - "true"
+              - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: Concourse does not run the action org/tool/sub@v2'' >&2; exit 1'

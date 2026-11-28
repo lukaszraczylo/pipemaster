@@ -2,6 +2,7 @@ package expr
 
 import (
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -18,16 +19,37 @@ type Dialect struct {
 	Native func(Expr) Expr
 	// Events maps canonical event values to this dialect's values.
 	Events map[string]string
-	ID     string
 	Vocab  Vocab
 	Sem    Semantics
-	Class  Class
+	ID     string
+	// DeployEvent is the event of the dialect for a promotion or rollback (Woodpecker: deployment).
+	DeployEvent string
+	// PushEvents are the events that stand for canonical push when Events has no entry for it (Woodpecker: push and
+	// tag, as GHA and GitLab call a tag push a push).
+	PushEvents []string
+	// DeployEvents are the events of the dialect that no canonical name stands for and that a DeployEvent covers
+	// (Drone: promote, rollback).
+	DeployEvents []string
+	Class        Class
 	// BranchOnPR is true when the branch ref holds the target branch in a pull request run (Woodpecker, Drone).
 	// GitLab leaves it unset in a merge request pipeline.
 	BranchOnPR bool
 	// PRFamily is true when the dialect reports a pull request under more than one event (Woodpecker:
 	// pull_request, pull_request_closed, pull_request_metadata), each named by the one event name as a prefix.
 	PRFamily bool
+	// EventRx is true when the dialect reads an event only as a pattern test (Woodpecker: the subset proof covers
+	// event =~ /^v$/i, lean4/Pipemaster/Woodpecker.lean woodpecker_event_eq), so a same-class event == or != becomes one.
+	EventRx bool
+	// PRStates is true when the dialect's pull request event also covers the closed and metadata activity of a pull
+	// request (GHA), so a Woodpecker target states the event as the whole family. GitLab has none: a merge request
+	// pipeline starts on create, on a push to the source branch and on Run pipeline
+	// (https://docs.gitlab.com/ci/pipelines/merge_request_pipelines/). lean4/Pipemaster/TranslateFacts.lean: famX_mono.
+	PRStates bool
+	// TagEvent is true when the dialect reports a tag push as its own event named tag (Woodpecker, Drone).
+	TagEvent bool
+	// prPaired marks a source that variants rewrote so that each branch test is paired with the same test of the
+	// pull request target branch; the branch ref is then no risk on a pull request.
+	prPaired bool
 }
 
 // caseFlag is the inline flag every translator-made pattern starts with.
@@ -263,15 +285,29 @@ func native(t Expr, to Dialect) Expr {
 //   - Only the four modelled events (push, pull_request, schedule, workflow_dispatch) exist; an event
 //     literal without an entry in both dialects' Events tables is untranslatable.
 func Translate(e Expr, from, to Dialect) (Expr, bool) {
+	for _, v := range variants(e, from, to) {
+		if t, ok := translate(v.e, v.from, to, true); ok {
+			return v.finish(t), true
+		}
+	}
+	return nil, false
+}
+
+// translate is Translate; lists says whether a negated event test becomes a list of events (eventListsRx). TranslateFacts
+// turns it off for a condition that names no event, where the only event tests are its own pull request guards.
+func translate(e Expr, from, to Dialect, lists bool) (Expr, bool) {
 	var t Expr
 	var ok bool
 	switch {
 	case from.Class == 0 || to.Class == 0 || !reads(e, from):
 		return nil, false
 	case from.Class == to.Class:
-		t, ok = renameClass(e, from, to)
+		t, ok = renameClass(e, from, to, lists)
 	case from.Class == ClassGHA:
 		t, ok = toGitLab(e, from, to)
+		if ok && lists {
+			t, ok = eventListsRx(t, from, to)
+		}
 		ok = ok && from.names(e) && to.names(t) && supported(t, to)
 		t = native(t, to)
 	default:
@@ -287,17 +323,27 @@ func Translate(e Expr, from, to Dialect) (Expr, bool) {
 // Translatable reports whether e translates exactly; it is true exactly when Translate succeeds. The class
 // rules are stated separately from Translate, as in the Lean model, so tests can hold the two together.
 func Translatable(e Expr, from, to Dialect) bool {
+	return slices.ContainsFunc(variants(e, from, to), func(v variant) bool { return translatable(v.e, v.from, to, true) })
+}
+
+func translatable(e Expr, from, to Dialect, lists bool) bool {
 	switch {
 	case from.Class == 0 || to.Class == 0 || !reads(e, from):
 		return false
 	case from.Class == to.Class:
-		_, ok := renameClass(e, from, to)
+		_, ok := renameClass(e, from, to, lists)
 		return ok
 	case from.Class == ClassGHA:
 		if !okFwd(e, from, to) || !from.names(e) {
 			return false
 		}
 		t, _ := toGitLab(e, from, to)
+		if lists {
+			var ok bool
+			if t, ok = eventListsRx(t, from, to); !ok {
+				return false
+			}
+		}
 		return to.names(t) && supported(t, to)
 	}
 	if !okRev(e, from) || !from.names(e) {
@@ -549,6 +595,9 @@ func guardE(t string, p Expr) Expr {
 	return Binary{Op: OpAnd, L: Binary{Op: OpEq, L: ctxRef(CtxRefType), R: typ}, R: p}
 }
 
+// anyValue is the pattern of a ref that is set to a non-empty value.
+const anyValue = caseFlag + "^.+$"
+
 const (
 	refTypeBranch = "branch"
 	refTypeTag    = "tag"
@@ -573,6 +622,9 @@ func toGHA(e Expr, from, to Dialect) (Expr, bool) {
 	case Binary:
 		switch v.Op {
 		case OpMatch, OpNoMatch:
+			if n, ok := anyTest(v); ok {
+				return negE(v.Op == OpNoMatch, Binary{Op: OpEq, L: ctxRef(CtxRefType), R: strLit(n)}), true
+			}
 			return rxToGHA(v, from)
 		case OpAnd, OpOr:
 			if !boolValued(v.L) {
@@ -644,6 +696,9 @@ func okRev(e Expr, from Dialect) bool {
 	case Binary:
 		switch v.Op {
 		case OpMatch, OpNoMatch:
+			if _, ok := anyTest(v); ok {
+				return true
+			}
 			ref, m, s, ok := rxParts(v)
 			return ok && rxOK(ref, m, s, from)
 		case OpAnd, OpOr:
@@ -680,10 +735,19 @@ func userRef(r Ref) bool {
 // by the Lean theorems: only Translate and Translatable are proved, and tests check this function in Go
 // alone. An exact translation returns no caveats.
 func TranslateApprox(e Expr, from, to Dialect) (Expr, []string, bool) {
+	for _, v := range eventVariants(e, from, to) {
+		if t, cav, ok := translateApprox(v.e, v.from, to); ok {
+			return v.finish(t), cav, true
+		}
+	}
+	return nil, nil, false
+}
+
+func translateApprox(e Expr, from, to Dialect) (Expr, []string, bool) {
 	if _, ok := rewriteFacts(e, from, to, Facts{}); !ok {
 		return nil, nil, false
 	}
-	if t, ok := Translate(e, from, to); ok {
+	if t, ok := translate(e, from, to, true); ok {
 		return t, nil, true
 	}
 	if !reads(e, from) || from.Class != ClassGitLab || to.Class != ClassGHA {
@@ -762,7 +826,25 @@ func approxToGHA(e Expr, from, to Dialect, cav *caveats) (Expr, bool) {
 	return nil, false
 }
 
+// defaultBranchCmp recognises a comparison of the branch with the default branch, in either order.
+func defaultBranchCmp(b Binary) bool {
+	l, lok := b.L.(Ref)
+	r, rok := b.R.(Ref)
+	if !lok || !rok {
+		return false
+	}
+	return pathName(l) == CtxBranch && pathName(r) == CtxDefaultBranch || pathName(l) == CtxDefaultBranch && pathName(r) == CtxBranch
+}
+
+// zeroSHA is the commit a push replaces when it creates the ref.
+const zeroSHA = "0000000000000000000000000000000000000000"
+
 func approxCmp(b Binary, from Dialect, cav *caveats) (Expr, bool) {
+	if defaultBranchCmp(b) {
+		cav.add(ciCaveat)
+		cmp := guardE(CtxBranch, Binary{Op: OpEq, L: ctxRef(CtxRefName), R: ctxRef(CtxDefaultBranch)})
+		return negE(b.Op == OpNe, cmp), true
+	}
 	ref, lit, ok := refSide(b.L, b.R)
 	if !ok {
 		return nil, false
@@ -783,7 +865,13 @@ func approxCmp(b Binary, from Dialect, cav *caveats) (Expr, bool) {
 		}
 		cav.add(ciCaveat)
 		return Binary{Op: b.Op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: canon}}, true
-	case CtxRefName, CtxSHA:
+	case CtxBeforeSHA:
+		// The all-zero before commit means the push created the ref; GHA names that in the payload field created.
+		if lit != zeroSHA {
+			return nil, false
+		}
+		return negE(b.Op == OpNe, ctxRef(CtxCreated)), true
+	case CtxRefName, CtxSHA, CtxPRBaseRef:
 		addAll(cav, litCaveats(lit))
 		return Binary{Op: b.Op, L: copyRef(ref), R: Lit{Kind: LitStr, Str: lit}}, true
 	case CtxBranch, CtxTag:
@@ -801,4 +889,13 @@ func approxCmp(b Binary, from Dialect, cav *caveats) (Expr, bool) {
 		return nil, false
 	}
 	return negE(b.Op == OpNe, cmp), true
+}
+
+// anyTest recognises tag =~ anyValue (or !~) and returns the ref type it asks for.
+func anyTest(b Binary) (string, bool) {
+	pat, ok := isStr(b.R)
+	if !ok || pat != anyValue || !isRef(b.L, CtxTag) {
+		return "", false
+	}
+	return refTypeTag, true
 }

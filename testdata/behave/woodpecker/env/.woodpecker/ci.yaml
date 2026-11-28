@@ -1,0 +1,12 @@
+when:
+  - event: [push, tag, pull_request]
+
+steps:
+  - name: vars
+    image: alpine:3.20
+    environment:
+      FOO: bar
+    commands:
+      - echo "MARK env.branch:$CI_COMMIT_BRANCH" | tee -a trace.log
+      - echo "MARK env.sha:$(printf '%s' "$CI_COMMIT_SHA" | wc -c)" | tee -a trace.log
+      - echo "MARK env.foo:$FOO" | tee -a trace.log

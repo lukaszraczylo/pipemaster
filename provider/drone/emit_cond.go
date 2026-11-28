@@ -751,6 +751,9 @@ type jobCond struct {
 func (e *emitter) jobSet(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (jobCond, error) {
 	var out jobCond
 	filtered := false
+	if err := e.markDefaultTriggers(pl); err != nil {
+		return jobCond{}, err
+	}
 	if len(pl.Triggers) > 0 {
 		cs, ok := e.triggerSet(e.classify(pl))
 		if !ok {
@@ -759,6 +762,13 @@ func (e *emitter) jobSet(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (j
 			e.loseTriggers(pl)
 			return jobCond{set: disabledSet(), has: true}, nil
 		}
+		out.set, out.has = cs, true
+	}
+	cs, def, err := e.defaultEvents(pl)
+	if err != nil {
+		return jobCond{}, err
+	}
+	if def {
 		out.set, out.has = cs, true
 	}
 	switch {
@@ -794,8 +804,12 @@ func (e *emitter) jobSet(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (j
 				return jobCond{set: disabledSet(), has: true}, nil
 			}
 			out.set, out.has, filtered = merged, true, true
-		case guardableSteps(j.Steps) && gok && !windowsJob(j):
-			e.emulate(jp, caps.JobIf, "shell guard on the first script line of every step", "the condition has no Drone filter; each step shows success instead of skipped")
+		case guardableSteps(j.Steps) && gok && !windowsJob(j) && (!expr.HasChanges(j.If) || !hasStepDeps(j.Steps)):
+			if expr.HasChanges(j.If) {
+				e.emulate(jp, caps.JobIf, "generated step "+changesStepName+" and a shell guard on the first script line of every step", changesDetail)
+			} else {
+				e.emulate(jp, caps.JobIf, "shell guard on the first script line of every step", "the condition has no Drone filter; each step shows success instead of skipped")
+			}
 			if gfolded {
 				e.noteFold(jp, caps.JobIf)
 			}
@@ -843,6 +857,8 @@ func triggerFeature(t *ir.Trigger) caps.Feature {
 }
 
 // guardableSteps reports whether every step that Drone runs has a script, the only step a guard line can open.
+// A plugin step has no shell, even when the IR holds a script for it, so it never takes a guard. An action or a
+// pipeline call is either not written or written as a script step (failingStep, standStep), which takes one.
 // windowsJob is true when the document runs on Windows, where the docker runner reads commands as PowerShell and
 // a POSIX guard line is a syntax error.
 func windowsJob(j *ir.Job) bool {
@@ -860,6 +876,9 @@ func guardableSteps(steps []*ir.Step) bool {
 	for _, st := range steps {
 		if st == nil || st.Action != nil || st.Kind == ir.StepAction || st.Kind == ir.StepPipelineCall {
 			continue
+		}
+		if st.Kind == ir.StepPlugin {
+			return false
 		}
 		if st.Kind != ir.StepScript && len(st.Script) == 0 {
 			return false

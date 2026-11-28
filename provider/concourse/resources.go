@@ -2,12 +2,15 @@ package concourse
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -87,34 +90,53 @@ func (b *pipeBuilder) keepResources(k *sink) {
 		}
 		var kept []string
 		for _, key := range r.m.Order {
-			if key != "name" && key != "type" {
+			switch key {
+			case "name", "type":
+			case "check_every":
+				b.note(caps.ExtPassthrough, caps.External, k.Path, strategyExt,
+					fmt.Sprintf("resource %s: check_every %s is the poll interval of Concourse. The target starts jobs from its own events, so no interval exists; set up a webhook for the repository on the target", r.name, r.plainText("check_every")), r.line)
+			case "source":
+				if !b.carriedSource(r) {
+					kept = append(kept, key)
+				}
+			default:
 				kept = append(kept, key)
 			}
 		}
-		detail := fmt.Sprintf("resource %s (type %s): keys %s have no IR field; the definition is kept in Ext", r.name, r.typ, strings.Join(kept, ", "))
 		if len(kept) == 0 {
-			detail = fmt.Sprintf("resource %s (type %s) has no IR field; the definition is kept in Ext", r.name, r.typ)
+			continue
 		}
+		b.resLost = true
+		detail := fmt.Sprintf("resource %s (type %s): keys %s have no IR field; the target does not run the resource and ignores them; the definition is kept in Ext", r.name, r.typ, strings.Join(kept, ", "))
 		if !b.used[r.name] {
 			detail += "; the resource is unused: no job gets or puts it"
 		}
 		b.note(caps.ExtPassthrough, caps.Lost, k.Path, strategyExt, detail, r.line)
+	}
+	if !b.resLost {
+		k.Out[emitkit.CarriedKey] = []any{ExtResources}
 	}
 	k.Out[ExtResources] = list
 }
 
 // sourceTrigger is the IR trigger of one resource, or an api trigger when the source cannot be read.
 type sourceTrigger struct {
+	// cond is the condition that a job of this trigger alone adds to the pipeline trigger, or nil when the trigger
+	// has none (tags, schedules, path filters), so that a job on it cannot be narrowed.
+	cond expr.Expr
 	uri  string
 	trig ir.Trigger
 	// merge is true for a push trigger that can share one trigger with another that has the same repo and paths.
+	// A default-branch or branch-set trigger never merges: its resource is written back as the file held it.
 	merge bool
+	// wide is true when the pipeline trigger has no branch filter, so every job on it needs its condition.
+	wide bool
 }
 
 // triggers builds the pipeline triggers from the resources that the jobs trigger on. The IR trigger is pipeline-wide,
 // so a job whose own triggers are fewer than the union becomes manual and keeps its own in Ext, never running on a
 // trigger it did not have.
-func (b *pipeBuilder) triggers(pl *ir.Pipeline, jobs []*builtJob) {
+func (b *pipeBuilder) triggers(pl *ir.Pipeline, jobs []*builtJob) (undo func()) {
 	var order []string
 	seen := map[string]bool{}
 	for _, j := range jobs {
@@ -130,22 +152,166 @@ func (b *pipeBuilder) triggers(pl *ir.Pipeline, jobs []*builtJob) {
 		out = append(out, b.sourceTrigger(n))
 	}
 	pl.Triggers = b.mergePushes(out)
+	var undos []func()
+	undo = func() {
+		for _, u := range undos {
+			u()
+		}
+	}
+	conds := map[string]expr.Expr{}
+	wide := false
+	for i, n := range order {
+		conds[n] = out[i].cond
+		wide = wide || out[i].wide
+	}
 	for _, j := range jobs {
-		if len(j.roots) == 0 || len(j.roots) == len(order) {
+		if len(j.roots) == 0 {
+			continue
+		}
+		full := len(j.roots) == len(order)
+		prev := *j.job
+		undos = append(undos, func() {
+			j.job.If, j.job.Manual, j.job.Ext = prev.If, prev.Manual, prev.Ext
+			if m, ok := j.job.Ext[dialect].(map[string]any); ok {
+				delete(m, ExtTriggers)
+				delete(m, ExtTriggerIf)
+			}
+		})
+		if c, ok := orConds(j.roots, conds); ok && j.job.If == nil && (!full || wide) {
+			b.ownEvents(j, c)
+			continue
+		}
+		if full && !wide {
 			continue
 		}
 		j.job.Manual = true
-		refs := make([]any, len(j.roots))
-		for i, n := range j.roots {
-			refs[i] = n
-		}
-		if j.job.Ext == nil {
-			j.job.Ext = ir.Ext{dialect: map[string]any{}}
-		}
-		j.job.Ext[dialect].(map[string]any)[ExtTriggers] = refs
+		b.keepRoots(j)
 		b.note(caps.TriggerResource, caps.Lost, b.path()+"/job/"+j.job.ID, strategyExt,
-			fmt.Sprintf("job %s triggers on %s only, but an IR trigger is pipeline-wide; the job runs only on a manual start and its own triggers are kept in Ext", j.job.ID, strings.Join(j.roots, ", ")), 0)
+			fmt.Sprintf("job %s triggers on %s only, but an IR trigger is pipeline-wide and the job has no condition for its own triggers; the job runs only on a manual start and its own triggers are kept in Ext", j.job.ID, strings.Join(j.roots, ", ")), 0)
 	}
+	undos = append(undos, b.inheritConds(jobs)...)
+	return undo
+}
+
+// inheritConds gives a job that only follows passed jobs the conditions of those jobs. A job that needs a job
+// that does not run is never started, and GitLab rejects a pipeline in which a needed job is missing. It returns
+// the functions that undo the change.
+func (b *pipeBuilder) inheritConds(jobs []*builtJob) []func() {
+	byID := map[string]*builtJob{}
+	for _, j := range jobs {
+		byID[j.job.ID] = j
+	}
+	var undos []func()
+	done := map[string]bool{}
+	var visit func(j *builtJob)
+	visit = func(j *builtJob) {
+		if done[j.job.ID] {
+			return
+		}
+		done[j.job.ID] = true
+		var conds []expr.Expr
+		derivedUp := map[string]bool{}
+		for _, n := range j.job.Needs {
+			up := byID[n.JobID]
+			if up == nil {
+				continue
+			}
+			visit(up)
+			derived, _ := up.job.Ext[dialect].(map[string]any)[ExtTriggerIf].(string)
+			if up.job.If == nil || derived == "" {
+				continue
+			}
+			derivedUp[n.JobID] = true
+			if !slices.ContainsFunc(conds, func(c expr.Expr) bool { return expr.String(c) == expr.String(up.job.If) }) {
+				conds = append(conds, up.job.If)
+			}
+		}
+		if len(derivedUp) == 0 {
+			return
+		}
+		prev := *j.job
+		undos = append(undos, func() {
+			j.job.If, j.job.Ext, j.job.Needs, j.job.Manual = prev.If, prev.Ext, prev.Needs, prev.Manual
+			if m, ok := j.job.Ext[dialect].(map[string]any); ok {
+				delete(m, ExtTriggerIf)
+			}
+		})
+		path := b.path() + "/job/" + j.job.ID
+		follows := len(j.roots) == 0 && j.job.If == nil && !j.job.Manual
+		switch {
+		case follows && len(conds) == 1:
+			j.job.If = conds[0]
+			jobExt(j.job)[ExtTriggerIf] = expr.String(conds[0])
+			b.note(caps.JobIf, caps.Emulated, path, "job condition of the passed jobs",
+				fmt.Sprintf("job %s follows jobs that run only when %s; it takes their condition, so that it never waits for a job that does not run", j.job.ID, expr.String(conds[0])), 0)
+			return
+		case follows:
+			j.job.Manual = true
+			b.note(caps.JobIf, caps.Lost, path, strategyExt,
+				fmt.Sprintf("job %s follows %d jobs with different conditions, and no run can be sure to satisfy all of them; the job runs only on a manual start", j.job.ID, len(derivedUp)), 0)
+		}
+		// The job exists whether or not a conditioned job it needs does, and GitLab rejects a need on a job that is absent.
+		needs := slices.Clone(j.job.Needs)
+		for i := range needs {
+			needs[i].Optional = needs[i].Optional || derivedUp[needs[i].JobID]
+		}
+		j.job.Needs = needs
+		b.note(caps.JobNeeds, caps.Emulated, path, "optional need",
+			fmt.Sprintf("job %s needs a job that runs only on some events; the need is optional, so the job does not wait for a job that is absent", j.job.ID), 0)
+	}
+	for _, j := range jobs {
+		visit(j)
+	}
+	return undos
+}
+
+// orConds joins the conditions of the roots of a job with ||, and is false when a root has none.
+func orConds(roots []string, conds map[string]expr.Expr) (expr.Expr, bool) {
+	var out expr.Expr
+	for _, n := range roots {
+		c := conds[n]
+		if c == nil {
+			return nil, false
+		}
+		if out == nil {
+			out = c
+		} else {
+			out = expr.Binary{Op: expr.OpOr, L: out, R: c}
+		}
+	}
+	return out, out != nil
+}
+
+// jobExt is the concourse Ext map of a job, made when the job has none.
+func jobExt(j *ir.Job) map[string]any {
+	if j.Ext == nil {
+		j.Ext = ir.Ext{}
+	}
+	m, ok := j.Ext[dialect].(map[string]any)
+	if !ok {
+		m = map[string]any{}
+		j.Ext[dialect] = m
+	}
+	return m
+}
+
+// keepRoots writes the trigger resource names of the job to its Ext.
+func (b *pipeBuilder) keepRoots(j *builtJob) {
+	refs := make([]any, len(j.roots))
+	for i, n := range j.roots {
+		refs[i] = n
+	}
+	jobExt(j.job)[ExtTriggers] = refs
+}
+
+// ownEvents gives a job the condition of its own triggers, so it never runs on a push that its gets do not watch.
+// The text goes to Ext, so that a Concourse file written from the IR drops the condition it already holds.
+func (b *pipeBuilder) ownEvents(j *builtJob, c expr.Expr) {
+	b.keepRoots(j)
+	j.job.If = c
+	jobExt(j.job)[ExtTriggerIf] = expr.String(c)
+	b.note(caps.JobIf, caps.Emulated, b.path()+"/job/"+j.job.ID, "job condition on the pushes its gets watch",
+		fmt.Sprintf("job %s triggers on %s; the pipeline trigger is the union of every job trigger, so the job runs only when %s; a branch filter that ends in * reads as a prefix, and a target that folds case also runs the job on a branch that differs from the name only in case", j.job.ID, strings.Join(j.roots, ", "), expr.String(c)), 0)
 }
 
 // mergePushes joins the push triggers of one repo and one path filter into a trigger with several branches.
@@ -191,7 +357,7 @@ func resourceExt(names ...string) ir.Ext {
 	for i, n := range names {
 		refs[i] = n
 	}
-	return ir.Ext{dialect: map[string]any{ExtResourcesRef: refs}}
+	return ir.Ext{dialect: map[string]any{ExtResourcesRef: refs, emitkit.CarriedKey: []any{ExtResourcesRef}}}
 }
 
 // failSafe is the api trigger for a resource trigger that the parser cannot read exactly: it never fires.
@@ -241,8 +407,8 @@ func (b *pipeBuilder) gitTrigger(r *resource) sourceTrigger {
 	if src == nil {
 		return b.failSafe(r, r.name, "the git resource has no source map")
 	}
-	var branch, tag string
-	var paths, ignore []string
+	var branch, tag, versionType string
+	var paths, ignore, filters []string
 	// Sorted keys make the first unreadable key independent of the key order of the file.
 	keys := slices.Clone(src.Order)
 	slices.Sort(keys)
@@ -259,6 +425,23 @@ func (b *pipeBuilder) gitTrigger(r *resource) sourceTrigger {
 			} else {
 				tag = t
 			}
+		case "version_type":
+			t, ok := text(v)
+			if !ok || (t != versionCommits && t != versionBranches) {
+				return b.failSafe(r, r.name, "source.version_type is not commits or branches")
+			}
+			versionType = t
+		case "branch_filters":
+			l, ok := stringList(v)
+			if !ok || len(l) == 0 {
+				return b.failSafe(r, r.name, "source.branch_filters is not a non-empty list of strings")
+			}
+			for _, f := range l {
+				if !filterOK(f) {
+					return b.failSafe(r, r.name, "source.branch_filters has the entry "+f+", which is not a literal name or a prefix ending in *")
+				}
+			}
+			filters = l
 		case "paths", "ignore_paths":
 			l, ok := stringList(v)
 			if !ok || slices.ContainsFunc(l, func(s string) bool { return strings.Contains(s, varOpen) }) {
@@ -281,6 +464,10 @@ func (b *pipeBuilder) gitTrigger(r *resource) sourceTrigger {
 	}
 	t := ir.Trigger{Kind: ir.TriggerPush, Ext: resourceExt(r.name)}
 	t.Paths = ir.Filter{Include: paths, Exclude: ignore}
+	hasPaths := len(paths) > 0 || len(ignore) > 0
+	if versionType == versionBranches || len(filters) > 0 {
+		return b.branchSetTrigger(r, t, uri, versionType, branch, tag, filters, hasPaths)
+	}
 	if tag != "" {
 		if branch != "" {
 			return b.failSafe(r, r.name, "tag_filter with branch: Concourse needs the tagged commit on the branch and the IR tag trigger has no branch filter")
@@ -290,12 +477,91 @@ func (b *pipeBuilder) gitTrigger(r *resource) sourceTrigger {
 		b.watched(r, caps.TriggerTag, uri, "tags "+tag)
 		return sourceTrigger{trig: t}
 	}
+	st := sourceTrigger{trig: t, uri: "uri:" + uri, merge: uri != "" && !strings.Contains(uri, varOpen)}
 	if branch == "" {
-		return b.failSafe(r, r.name, "source.branch is not set and Concourse follows the default branch")
+		st.wide, st.merge = true, false
+		b.watched(r, caps.TriggerPush, uri, "the default branch")
+	} else {
+		st.trig.Branches.Include = []string{branch}
+		st.cond = pushTo(branchIs(branch))
+		b.watched(r, caps.TriggerPush, uri, "branch "+branch)
 	}
-	t.Branches.Include = []string{branch}
-	b.watched(r, caps.TriggerPush, uri, "branch "+branch)
-	return sourceTrigger{trig: t, uri: "uri:" + uri, merge: uri != "" && !strings.Contains(uri, varOpen)}
+	if hasPaths {
+		st.cond = nil
+	} else if st.wide {
+		st.cond = pushTo(expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{expr.CtxBranch}}, R: expr.Ref{Path: []string{expr.CtxDefaultBranch}}})
+	}
+	return st
+}
+
+// branchSetTrigger reads a git resource of version_type branches: it follows the branches that branch_filters name.
+func (b *pipeBuilder) branchSetTrigger(r *resource, t ir.Trigger, uri, versionType, branch, tag string, filters []string, hasPaths bool) sourceTrigger {
+	switch {
+	case versionType != versionBranches:
+		return b.failSafe(r, r.name, "source.branch_filters needs version_type: branches")
+	case len(filters) == 0:
+		return b.failSafe(r, r.name, "version_type: branches has no branch_filters, so it follows every branch")
+	case branch != "" || tag != "":
+		return b.failSafe(r, r.name, "version_type: branches with branch or tag_filter has no IR form")
+	case hasPaths:
+		return b.failSafe(r, r.name, "version_type: branches with paths has no IR form")
+	}
+	var cond expr.Expr
+	globs := make([]string, len(filters))
+	for i, f := range filters {
+		c := branchGlob(f)
+		if cond == nil {
+			cond = c
+		} else {
+			cond = expr.Binary{Op: expr.OpOr, L: cond, R: c}
+		}
+		// The check script matches a filter with bash [[ == ]], where * also matches /; a GHA glob spells that **.
+		globs[i] = strings.Replace(f, "*", "**", 1)
+	}
+	t.Branches.Include = globs
+	b.watched(r, caps.TriggerPush, uri, "branch_filters "+strings.Join(filters, ", ")+
+		"; Concourse emits a version when a matching branch is created or deleted (assets/check_branches.sh of git-resource v1.24.1), "+
+		"so the job runs only on a push that creates a matching branch: a deleted branch has no push event, and a push to an existing branch starts nothing")
+	created := expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{expr.CtxBeforeSHA}}, R: expr.Lit{Kind: expr.LitStr, Str: zeroSHA}}
+	return sourceTrigger{trig: t, uri: "uri:" + uri, cond: pushTo(created, cond)}
+}
+
+// zeroSHA is the commit a push replaces when it creates the ref.
+const zeroSHA = "0000000000000000000000000000000000000000"
+
+const (
+	versionCommits  = "commits"
+	versionBranches = "branches"
+)
+
+// pushTo is the condition of a push event that also satisfies each of tests. The tests nest to the left, as the
+// parsers of the other providers read a chain of &&.
+func pushTo(tests ...expr.Expr) expr.Expr {
+	var out expr.Expr = expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{expr.CtxEvent}}, R: expr.Lit{Kind: expr.LitStr, Str: "push"}}
+	for _, c := range tests {
+		out = expr.Binary{Op: expr.OpAnd, L: out, R: c}
+	}
+	return out
+}
+
+func branchIs(name string) expr.Expr {
+	return expr.Binary{Op: expr.OpEq, L: expr.Ref{Path: []string{expr.CtxBranch}}, R: expr.Lit{Kind: expr.LitStr, Str: name}}
+}
+
+// branchGlob is the test of a branch against one filter: a literal name, or a prefix that ends in *. The pattern
+// has no case flag, because the check script compares case-sensitively and * there also matches /.
+func branchGlob(f string) expr.Expr {
+	prefix, star := strings.CutSuffix(f, "*")
+	if !star {
+		return branchIs(f)
+	}
+	return expr.Binary{Op: expr.OpMatch, L: expr.Ref{Path: []string{expr.CtxBranch}}, R: expr.Lit{Kind: expr.LitStr, Str: "^" + regexp.QuoteMeta(prefix)}}
+}
+
+// filterOK is true for a literal name, or a name followed by one * at the end.
+func filterOK(f string) bool {
+	body := strings.TrimSuffix(f, "*")
+	return body != "" && !strings.ContainsAny(body, globChars+`\`) && !strings.Contains(body, varOpen)
 }
 
 // literalURI is true for a git uri that names one fixed repository.
@@ -429,4 +695,33 @@ func (b *pipeBuilder) concurrency(pl *ir.Pipeline, jobs []*builtJob) {
 		b.note(caps.PipelineConcurrency, caps.Lost, b.path(), strategyExt,
 			"serial and serial_groups name several groups, which one pipeline concurrency group cannot hold; the keys stay in the job Ext", 0)
 	}
+}
+
+// carriedKeys are the source keys that the IR holds, by resource type: the checkout and trigger of a git resource and
+// the image of a registry-image resource.
+var carriedKeys = map[string][]string{
+	typeGit:          {"uri", "branch", "paths", "ignore_paths", "tag_filter"},
+	"registry-image": {"repository", "tag", "digest"},
+	typeTime:         {"interval", "start", "stop", "days"},
+}
+
+// carriedSource is true when the resource is used and every key of its source is one that the targets run.
+func (b *pipeBuilder) carriedSource(r *resource) bool {
+	keys, ok := carriedKeys[r.typ]
+	src := r.source()
+	if !ok || src == nil || !b.builtin(r, r.typ) || !b.used[r.name] {
+		return false
+	}
+	for _, key := range src.Order {
+		if !slices.Contains(keys, key) {
+			return false
+		}
+	}
+	return true
+}
+
+// plainText is the text of a key of the resource, or a note that it is a var.
+func (r *resource) plainText(key string) string {
+	t, _ := text(r.m.Vals[key])
+	return t
 }

@@ -6,7 +6,9 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const workflowExt = ".yaml"
@@ -14,7 +16,13 @@ const workflowExt = ".yaml"
 // Emit writes one workflow file per job under .woodpecker/. Every feature use goes through the ledger;
 // Finish fails the call when one was never accounted for.
 func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	return inline.Emit(p, a.ID(), a.emitFlat)
+}
+
+func (a adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	p, vres := vars.Prepare(p, dialect)
 	files, rep, _, err := a.emit(p)
+	vres.Report(rep)
 	return files, rep, err
 }
 
@@ -27,6 +35,7 @@ func (a adapter) emit(p *ir.Project) (map[string][]byte, *report.Report, map[str
 		origin: origin, from: sourceDialect(origin), own: origin == dialect, led: emitkit.NewLedger("ir", dialect, a.Caps()),
 		stepIDs: map[string]string{},
 	}
+	e.gated = emitkit.GatedSteps(p)
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)

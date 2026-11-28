@@ -1,0 +1,22 @@
+default:
+  image: alpine:3.20
+stages: [build, after]
+build:
+  stage: build
+  script:
+    - echo "MARK onfail.build" | tee -a trace.log
+    - exit 1
+recover:
+  stage: after
+  when: on_failure
+  script:
+    - echo "MARK onfail.recover" | tee -a trace.log
+cleanup:
+  stage: after
+  when: always
+  script:
+    - echo "MARK onfail.cleanup" | tee -a trace.log
+deploy:
+  stage: after
+  script:
+    - echo "MARK onfail.deploy" | tee -a trace.log

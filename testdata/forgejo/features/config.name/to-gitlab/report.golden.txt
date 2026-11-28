@@ -1,2 +1,3 @@
 Loss report: forgejo -> gitlab
+[external] pipeline/ci/job/build job.runner: job tags (the job carries the tags docker; register a runner with these tags, or the job stays pending)
 [external] pipeline/ci/job/build/step/build-step-1 step.env: create DEPLOY_KEY as a masked CI/CD variable in the project settings, protected too for protected branches (a GitLab file cannot mark a secret as one; it writes DEPLOY_KEY as plain variable references and the operator sets the values there)

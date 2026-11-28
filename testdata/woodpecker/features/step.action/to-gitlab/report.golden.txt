@@ -1,2 +1,2 @@
 Loss report: woodpecker -> gitlab
-[lost] pipeline/woodpecker/job/ci/step/build step.image (GitLab sets the image per job, not per step)
+[lost] pipeline/woodpecker/job/ci/step/build step.image (GitLab sets the image per job, not per step; the job is not split because step checkout maps to a GitLab job keyword)

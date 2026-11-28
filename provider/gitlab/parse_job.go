@@ -1,9 +1,10 @@
 package gitlab
 
 import (
-	"go.yaml.in/yaml/v3"
 	"slices"
 	"strings"
+
+	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
@@ -83,6 +84,7 @@ func (s *state) parseJob(name string, merged, raw *yaml.Node, def []entry) (*job
 			list[i] = n
 		}
 		r.keep(extExtends, list)
+		r.carried = append(r.carried, extExtends)
 	}
 	if err := s.jobInherit(s.jobPath(j.ID), r); err != nil {
 		return nil, err

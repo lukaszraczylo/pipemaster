@@ -1,8 +1,9 @@
 workflow:
   name: allow
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 flaky:
-  tags:
-    - ubuntu-latest
   needs: []
   script:
     # pipemaster:step flaky-step-1

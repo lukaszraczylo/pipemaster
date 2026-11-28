@@ -1,9 +1,12 @@
+# pipemaster:emulated job.if pipeline/ci/job/test
+# pipemaster:arg {"from":"tekton","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/test
 name: services
 on:
   push:
 jobs:
   test:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     services:
       db:

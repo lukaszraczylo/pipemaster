@@ -1,3 +1,4 @@
 Loss report: gitea -> gitlab
 [lost] pipeline/ci pipeline.concurrency (cancel-in-progress has no GitLab form; a resource_group queues runs)
 [lost] pipeline/ci script.interpolation (no GitLab variable for expression ref)
+[external] pipeline/ci/job/build job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)

@@ -12,12 +12,14 @@ import (
 	exprconcourse "github.com/lukaszraczylo/pipemaster/expr/concourse"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 // stepSkip lists the step Ext keys that the emitter writes itself.
 var stepSkip = map[string]bool{
 	"file": true, ExtConfig: true, ExtParams: true, ExtShellFlags: true, ExtBashDefault: true, ExtCommand: true, ExtArgs: true, ExtScriptLine: true,
-	ExtEntrypoint: true, ExtImageResource: true, ExtRun: true, ExtKind: true, ExtStep: true,
+	ExtEntrypoint: true, ExtImageResource: true, ExtRun: true, ExtKind: true, ExtStep: true, ExtTaskDigest: true, ExtFileParams: true,
+	ExtLoadScript: true, ExtLoadRefs: true, ExtLayout: true, emitkit.CarriedKey: true,
 }
 
 // posixShells are the shells that run a script with -ec.
@@ -26,6 +28,7 @@ var posixShells = []string{"sh", "bash", "dash", "zsh", "ash"}
 // chain is a run of tasks that pass the workspace along: the first task maps it from the source.
 type chain struct {
 	jx     *jobEmitter
+	why    string
 	mapped bool
 	pos    int
 }
@@ -52,20 +55,50 @@ func (c *chain) step(st *ir.Step) []*yaml.Node {
 	}
 	switch st.Kind {
 	case ir.StepAction:
+		if n, ok := c.heldGet(st, path); ok {
+			return n
+		}
 		return c.action(st, path, at)
 	case ir.StepPipelineCall:
-		e.lose(path, caps.StepAction, "a call of another pipeline has no Concourse form; a placeholder task keeps its place")
-		return c.placeholder(st, path, actionArg{})
+		why := "a call of another pipeline has no Concourse form; a placeholder task keeps its place"
+		if r := emitkit.CallReason(st, "Concourse"); r != "" {
+			why = r + "; a placeholder task keeps its place"
+		}
+		e.lose(path, caps.StepAction, why)
+		return c.placeholder(st, path, actionArg{}, true)
 	case ir.StepScript, "":
+		if n := c.loadVar(st, path); n != nil {
+			return []*yaml.Node{n}
+		}
+		if n := c.taskFile(st, path); n != nil {
+			return []*yaml.Node{n}
+		}
 		return []*yaml.Node{c.script(st, path)}
 	case ir.StepResource, ir.StepPlugin, ir.StepTask:
+		pluginWhy := ""
 		if ext := extOf(st.Ext); !e.own || ext == nil {
 			feature := caps.ExtPassthrough
 			if st.Kind == ir.StepPlugin {
 				feature = caps.StepAction
 			}
-			e.lose(path, feature, "the "+string(st.Kind)+" step has no Concourse form outside a Concourse file; a placeholder task keeps its place")
-			return c.placeholder(st, path, actionArg{})
+			if st.Kind == ir.StepPlugin {
+				n, reason := c.pluginTask(st, path)
+				if n != nil {
+					return n
+				}
+				pluginWhy = reason
+			}
+			why := "the " + string(st.Kind) + " step has no Concourse form outside a Concourse file; a placeholder task keeps its place"
+			if r := emitkit.NoEntrypointReason(st); r != "" {
+				why = r
+			} else if pluginWhy != "" {
+				why = pluginWhy
+			}
+			e.lose(path, feature, why)
+			if st.Kind == ir.StepPlugin {
+				c.why = why
+			}
+			return c.placeholder(st, path, actionArg{}, true)
 		}
 		n := c.verbatim(st, path)
 		if n == nil {
@@ -103,6 +136,7 @@ func (c *chain) script(st *ir.Step, path string) *yaml.Node {
 	if e.own {
 		ext = extOf(st.Ext)
 	}
+	st = withoutLayout(st, ext)
 	name := jx.stepName(st, path)
 	dir := jx.runDir(st, path, name, ext)
 	sc := jx.newScope(dir)
@@ -110,7 +144,7 @@ func (c *chain) script(st *ir.Step, path string) *yaml.Node {
 	sc.envParams(path, st.Env)
 	sc.envParams(path, jx.j.Env)
 	sc.envParams(path, jx.pe.pl.Env)
-	body := sc.scriptLines(path, st.Script)
+	body := sc.scriptLines(path, dropLoadRefs(st.Script, ext))
 	script, disabled := jx.guarded(sc, path, name, st, body)
 	if len(script) == 0 {
 		script = []string{placeholderCmd}
@@ -139,8 +173,11 @@ func (c *chain) script(st *ir.Step, path string) *yaml.Node {
 	}
 	if ext != nil {
 		skip := stepSkip
+		if ext[ExtTaskDigest] != nil {
+			skip = withKey(skip, keyImage)
+		}
 		if !jx.ownInputs(ext) {
-			skip = withKey(stepSkip, "input_mapping")
+			skip = withKey(skip, "input_mapping")
 		}
 		if err := m.AddExtra(ext, skip); err != nil {
 			e.lose(path, caps.ExtPassthrough, "the Ext of the step cannot be written: "+err.Error())
@@ -219,22 +256,33 @@ func (jx *jobEmitter) guarded(sc *scope, path, name string, st *ir.Step, body []
 			cond = nil
 		}
 	}
-	if jx.guard != nil && cond != nil {
-		cond = expr.Binary{Op: expr.OpAnd, L: jx.guard, R: cond}
-	} else if jx.guard != nil {
-		cond = jx.guard
+	stepCond := cond
+	if cond != nil {
+		f, v := jx.foldRun(cond)
+		switch v {
+		case runNever:
+			e.markArg(caps.StepIf, jx.sm(name), disabledArg{If: expr.String(cond), Script: strings.Join(body, "\n")})
+			return append([]string{disabledScript}, body...), true
+		case runAlways:
+			cond = nil
+		default:
+			cond = f
+		}
 	}
+	orig := andGuard(jx.guard, stepCond)
+	cond = andGuard(jx.guard, cond)
 	if cond == nil {
+		jx.foldMark(name, orig, nil)
 		return body, false
 	}
 	if sc.ps && cond != nil {
 		e.lose(path, caps.StepIf, "the condition has no PowerShell guard form; the step runs exit 0 first and does nothing")
-		e.markArg(caps.StepIf, jx.sm(name), disabledArg{If: expr.String(cond), Script: strings.Join(body, "\n")})
+		e.markArg(caps.StepIf, jx.sm(name), disabledArg{If: expr.String(orig), Script: strings.Join(body, "\n")})
 		return append([]string{disabledScript}, body...), true
 	}
 	fail := func(why string) ([]string, bool) {
 		e.lose(path, caps.StepIf, why+"; the step runs exit 0 first and does nothing")
-		e.markArg(caps.StepIf, jx.sm(name), disabledArg{If: expr.String(cond), Script: strings.Join(body, "\n")})
+		e.markArg(caps.StepIf, jx.sm(name), disabledArg{If: expr.String(orig), Script: strings.Join(body, "\n")})
 		return append([]string{disabledScript}, body...), true
 	}
 	refs, ok := guardRefs(cond)
@@ -254,6 +302,7 @@ func (jx *jobEmitter) guarded(sc *scope, path, name string, st *ir.Step, body []
 	if st.If != nil {
 		e.emulate(path, caps.StepIf, "shell guard", "the script starts with a guard line, so the task shows success when the condition is false")
 	}
+	jx.foldMark(name, orig, cond)
 	return append([]string{line}, body...), false
 }
 
@@ -444,7 +493,7 @@ func (jx *jobEmitter) image(sc *scope, path string, st *ir.Step, ext map[string]
 		if n, ok := jx.imageNode(sc, ref); ok {
 			return n
 		}
-		e.lose(path, caps.StepImage, "the image "+ref+" has no Concourse spelling; the default image "+defaultImage+":"+defaultTag+" runs")
+		e.lose(path, caps.StepImage, "the image "+ref+" has no Concourse spelling; the script still runs, but in the default image "+defaultImage+":"+defaultTag+", not in that image")
 		return imageNode(defaultImage, "", defaultTag)
 	}
 	if raw, ok := ext[ExtImageResource]; ok {
@@ -497,7 +546,8 @@ func (jx *jobEmitter) imageNode(sc *scope, ref string) (*yaml.Node, bool) {
 // splitImage splits a reference into repository, tag and digest.
 func splitImage(ref string) (repo, tag, digest string) {
 	if i := strings.Index(ref, "@"); i >= 0 {
-		return ref[:i], "", ref[i+1:]
+		repo, tag, _ = splitImage(ref[:i])
+		return repo, tag, ref[i+1:]
 	}
 	slash := strings.LastIndex(ref, "/")
 	if i := strings.LastIndex(ref, ":"); i > slash {
@@ -512,12 +562,16 @@ func imageNode(repo, digest, tag string) *yaml.Node {
 	if tag != "" {
 		src.SetStr("tag", tag)
 	}
-	if digest != "" {
-		src.SetStr("digest", digest)
-	}
 	m := newMap()
 	m.SetStr("type", "registry-image")
 	m.Set("source", src.N)
+	// The registry-image source has no digest key; an anonymous resource pins the digest as its version
+	// (https://github.com/concourse/registry-image-resource#use-in-tasks).
+	if digest != "" {
+		v := newMap()
+		v.SetStr("digest", digest)
+		m.Set(keyVersion, v.N)
+	}
 	return m.N
 }
 
@@ -616,13 +670,71 @@ func (jx *jobEmitter) mixed() bool {
 	return ps && other
 }
 
-// workerTags returns the runner labels that a worker can carry. A label with an expression names no worker.
+// workerTags returns the runner labels that a worker can carry. A label with an expression names no worker, and a
+// hosted label names a GitHub image, not a worker tag.
 func (jx *jobEmitter) workerTags() []string {
-	var out []string
-	for _, l := range jx.j.Runner.Labels {
-		if !strings.Contains(l, "${{") {
-			out = append(out, l)
+	return emitkit.WorkerTags(jx.pe.e.origin, jx.j.Runner.Labels)
+}
+
+type runVerdict int
+
+const (
+	runUnknown runVerdict = iota
+	runNever
+	runAlways
+)
+
+// decideRun says whether a condition holds on every run or on none of the runs of one event, where the tag name is
+// set on a tag run only. A condition that reads anything else stays unknown.
+func decideRun(c expr.Expr, event string, tagSet bool) runVerdict {
+	switch v := c.(type) {
+	case expr.Ref:
+		if len(v.Path) == 1 && v.Path[0] == expr.CtxTag {
+			return verdictOf(tagSet)
+		}
+	case expr.Unary:
+		if v.Op == expr.OpNot {
+			switch decideRun(v.X, event, tagSet) {
+			case runNever:
+				return runAlways
+			case runAlways:
+				return runNever
+			}
+			return runUnknown
+		}
+	case expr.Binary:
+		if v.Op == expr.OpAnd || v.Op == expr.OpOr {
+			l, r := decideRun(v.L, event, tagSet), decideRun(v.R, event, tagSet)
+			if v.Op == expr.OpAnd {
+				switch {
+				case l == runNever || r == runNever:
+					return runNever
+				case l == runAlways && r == runAlways:
+					return runAlways
+				}
+			} else {
+				switch {
+				case l == runAlways || r == runAlways:
+					return runAlways
+				case l == runNever && r == runNever:
+					return runNever
+				}
+			}
+			return runUnknown
 		}
 	}
-	return out
+	switch {
+	case len(expr.EventsPossible(c, []string{event})) == 0:
+		return runNever
+	case len(expr.EventsPossible(expr.Unary{Op: expr.OpNot, X: c}, []string{event})) == 0:
+		return runAlways
+	}
+	return runUnknown
+}
+
+func verdictOf(b bool) runVerdict {
+	if b {
+		return runAlways
+	}
+	return runNever
 }

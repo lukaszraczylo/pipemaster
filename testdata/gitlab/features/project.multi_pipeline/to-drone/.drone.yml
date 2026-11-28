@@ -5,6 +5,8 @@
 kind: pipeline
 type: docker
 name: .shared-run
+node:
+  ubuntu-latest: "true"
 trigger:
   event:
     exclude:
@@ -13,7 +15,7 @@ steps:
   - name: run-step-1
     image: ubuntu:latest
     commands:
-      - echo run
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo run'
 ---
 # pipemaster:emulated project.multi_pipeline pipeline/ci
 # pipemaster:arg {"pipeline":"ci","job":"build","p":1,"j":0}
@@ -21,6 +23,8 @@ steps:
 kind: pipeline
 type: docker
 name: ci-build
+node:
+  ubuntu-latest: "true"
 trigger:
   event:
     - push
@@ -28,4 +32,4 @@ steps:
   - name: build-step-1
     image: ubuntu:latest
     commands:
-      - echo build
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo build'

@@ -10,16 +10,16 @@ stages:
 workflow:
   name: outputs
   rules:
-    - if: $CI_COMMIT_BRANCH
-    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 use:
   stage: stage-1
   needs:
     - version
   script:
-    # pipemaster:lost script.interpolation pipeline/ci/job/use/step/use-step-1: echo {{ needs.version.outputs.tag }}
-    - "true"
     # pipemaster:step use-step-1
+    # pipemaster:lost script.interpolation pipeline/ci/job/use/step/use-step-1: echo {{ needs.version.outputs.tag }}
+    - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/use/step/use-step-1: no GitLab variable for expression needs.version.outputs.tag; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'
 # pipemaster:lost job.outputs pipeline/ci/job/version: output tag is not written
 version:
   stage: stage-0

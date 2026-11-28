@@ -1,2 +1,3 @@
 Loss report: gitea -> gitlab
 [lost] pipeline/ci/job/call/step/call-step-1 step.action (step kind pipeline_call has no GitLab form)
+[external] pipeline/ci/job/plain job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)

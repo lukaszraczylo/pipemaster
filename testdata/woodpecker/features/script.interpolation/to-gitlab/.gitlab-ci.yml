@@ -1,9 +1,12 @@
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+# pipemaster:emulated step.image pipeline/woodpecker/job/ci
+# pipemaster:arg {"job":"ci","parts":["ci"],"own":["build"]}
 ci:
+  image: alpine:3.20
   needs: []
   script:
     # pipemaster:step build
-    - echo $CI_COMMIT_SHA on $CI_COMMIT_BRANCH
+    - 'export PIPEMASTER_VARS=1; CI_COMMIT_BRANCH="$(if [ "${CI_PIPELINE_SOURCE}" = merge_request_event ]; then printf %s "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"; else printf %s "${CI_COMMIT_BRANCH}"; fi)"; export CI_COMMIT_BRANCH; : pipemaster-end; echo $CI_COMMIT_SHA on ${CI_COMMIT_BRANCH}'
     - 'echo "cost: $5"'

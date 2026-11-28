@@ -8,4 +8,6 @@ spec:
   steps:
     - name: build-step-1
       image: alpine:3.22
-      script: '# pipemaster:lost script.interpolation: echo {{ opaque(gha): env[github.job] }}'
+      script: |-
+        # pipemaster:lost script.interpolation: echo {{ opaque(gha): env[github.job] }}
+        printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Tekton spelling for expression opaque(gha): env[github.job]; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1

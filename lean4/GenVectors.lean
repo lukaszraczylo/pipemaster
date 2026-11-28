@@ -460,7 +460,7 @@ def glPrCase (e : E) : Json × Json :=
   let out := match glPr e with
     | none => Json.mkObj [("tr", Json.null)]
     | some t0 =>
-      let t := fam t0
+      let t := famX false t0
       let wpAt (sfx : String) := Json.arr (glEnvs.map (fun env => Json.bool (holds .gitlab (Woodpecker.wpView (wpMapS env wpTarget sfx)) t))).toArray
       Json.mkObj [("tr", exprJson t), ("tr_plain", exprJson t0), ("src", Json.arr (src.map Json.bool).toArray),
         ("wp", wpAt ""), ("wp_closed", wpAt "_closed"), ("wp_metadata", wpAt "_metadata"),
@@ -628,7 +628,8 @@ def wpFileJson (f : Woodpecker.WFile) : Json :=
     ("finally", match f.fin with
       | some (ns, noIf) => Json.mkObj [("needs", Json.arr (ns.map needJ).toArray), ("no_if", noIf)]
       | none => Json.null),
-    ("tag_idx", optNat f.tagIdx), ("platform", match f.platform with | some x => Json.str x | none => Json.null)]
+    ("tag_idx", optNat f.tagIdx), ("platform", match f.platform with | some x => Json.str x | none => Json.null),
+    ("tags", strsJson f.tags)]
 
 open Pipemaster.Drone in
 def droneStepJson (s : Drone.DStep) : Json :=
@@ -642,7 +643,7 @@ def droneDocJson (d : Drone.DDoc) : Json :=
           ("status", strsJson t.status)]
       | none => Json.null),
     ("deps", strsJson d.deps), ("steps", Json.arr (d.steps.map droneStepJson).toArray), ("env", varsJson d.env),
-    ("platform", match d.platform with | some x => Json.str x | none => Json.null),
+    ("platform", match d.platform with | some x => Json.str x | none => Json.null), ("tags", strsJson d.tags),
     ("noop", d.noop), ("allow_failure", d.allowFailure),
     ("manual", match d.manual with | some ts => Json.arr (ts.map wpTrigJson).toArray | none => Json.null),
     ("finally", match d.fin with
@@ -896,10 +897,11 @@ def concJobJson (j : Concourse.CJob) : Json :=
 open Pipemaster.Concourse in
 def concDocJson (d : Concourse.CDoc) : Json :=
   Json.mkObj [("file", d.file), ("carry", coreJson d.carry), ("jobs", Json.arr (d.jobs.map concJobJson).toArray),
-    ("fin_job", d.finJob), ("fin_tasks", strsJson d.finTasks)]
+    ("fin_job", d.finJob), ("fin_tasks", strsJson d.finTasks),
+    ("fin_copies", Json.arr (d.finCopies.map fun c => Json.mkObj [("job", c.1), ("tasks", strsJson c.2)]).toArray)]
 
 /-- Pipelines that exercise what Concourse adds to the Woodpecker set: a need on a job with no step (the producer, the
-consumer and both), a three-job chain with a finally job on its sink, finally steps whose IDs clash with the steps of
+consumer and both), a three-job chain with a finally job on its sink and a failure copy on the other jobs, a fan-out and a fan-in with finally jobs (lost), finally steps whose IDs clash with the steps of
 the sink job (the emitter appends `-2`, `-3`), a pipeline with two sinks (the finally job has no hook), job and step
 names with digits, dashes and underscores, and script lines that read like markers. -/
 def concExtraPipes : List Core.Pipe :=
@@ -914,6 +916,9 @@ def concExtraPipes : List Core.Pipe :=
    pushAll [cj "a", { cj "b" with needs := needOn "a" false }, { cj "c" with needs := needOn "b" false }] [cj "f"],
    pushAll [cj "a", { cj "b" with needs := needOn "a" false }, { cj "c" with needs := [⟨"a", false⟩, ⟨"b", true⟩] }]
      [{ cj "f" with onFailure := true }],
+   pushAll [cj "a", { cj "b" with needs := needOn "a" false }, { cj "c" with needs := needOn "a" false }] [cj "f"],
+   pushAll [{ cj "a" with steps := two }, { cj "b" with needs := needOn "a" false }, { cj "c" with needs := needOn "b" false }]
+     [cj "f", cj "g"],
    pushAll [clash] [cj "f"], pushAll [{ cj "a" with steps := two }] [cj "f", cj "g"],
    pushAll [{ cj "a" with steps := two }, cj "b"] [cj "f"],
    pushAll [cj "a", cj "b"] [{ cj "f" with steps := [] }],

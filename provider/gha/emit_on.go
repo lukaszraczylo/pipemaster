@@ -9,6 +9,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
@@ -302,20 +303,28 @@ func (e *emitter) prEvent(b *onBuilder, path string, t *ir.Trigger) error {
 	if err := m.addExtra(ext, map[string]bool{extEvent: true}); err != nil {
 		return err
 	}
+	if e.origin == provider.GitLab && name == evPR {
+		e.emulate(path, caps.TriggerPullRequest, "pull_request: types: [opened, synchronize]", "GitLab runs a merge request pipeline in the fork project, but a GHA pull_request run from a fork is a run of the base repository; the jobs that admit the pull request also run for fork pull requests")
+	}
 	b.add(path, caps.TriggerPullRequest, name, orNull(m))
 	return nil
 }
 
 func (e *emitter) scheduleEntry(seq *yaml.Node, path string, t *ir.Trigger) (*yaml.Node, error) {
-	if t.Cron == "" {
-		e.lose(path, caps.TriggerSchedule, "the schedule names no cron expression; GHA needs one")
+	cron := t.Cron
+	if cron == "" {
+		if e.origin == provider.GitLab {
+			e.externalSchedule(path)
+		} else {
+			e.lose(path, caps.TriggerSchedule, "the schedule names no cron expression; GHA needs one")
+		}
 		return seq, nil
 	}
 	if seq == nil {
 		seq = seqOf()
 	}
 	m := newMap()
-	m.set("cron", str(t.Cron))
+	m.set("cron", str(cron))
 	if err := m.addExtra(e.ext(t.Ext), nil); err != nil {
 		return nil, err
 	}
@@ -428,4 +437,14 @@ func (e *emitter) workflowRun(b *onBuilder, path string, t *ir.Trigger) error {
 	}
 	b.add(path, caps.TriggerPipelineDone, evWorkflowRn, m.n)
 	return nil
+}
+
+// noteDefaultEvents reports the events a source runs on when its file names no trigger and the workflow has no event
+// for: each is lost.
+func (e *emitter) noteDefaultEvents(noForm map[string][]provider.SourceEvent) {
+	for id, events := range noForm {
+		for _, g := range provider.GroupByFeature(events) {
+			e.lose("pipeline/"+id, g.Feature, "the source runs on the events "+strings.Join(g.Names, ", ")+" and its file has no trigger form for them; "+e.d.title()+" has no event for them")
+		}
+	}
 }

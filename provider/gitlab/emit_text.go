@@ -13,17 +13,31 @@ import (
 	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 var identRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // emitter carries the state of one Emit call: the ledger and the lost-text comments waiting for a node.
 type emitter struct {
+	// injected names the pipelines whose triggers come from the default events of their source.
+	injected map[string]bool
+	// gated holds the action steps that a later step reads, which no target may drop.
+	gated    map[*ir.Step]bool
 	led      *emitkit.Ledger
+	originID string
 	pl       *ir.Pipeline
-	from     *expr.Dialect
-	fold     *folded
-	deadOut  map[string]bool
+	// wfGuard is the workflow condition that Parse ANDed into every job; the written workflow block already says it.
+	wfGuard   expr.Expr
+	from      *expr.Dialect
+	fold      *folded
+	splits    map[*ir.Job]splitPart
+	plugins   map[string]pluginUse
+	pluginWhy map[string]string
+	noSplit   map[string]string
+	deadOut   map[string]bool
+	// noVar holds the inputs that got no variable, because another input owns the name.
+	noVar    map[string]bool
 	secrets  map[ir.FeatureUse][]string
 	comments []string
 }
@@ -103,13 +117,37 @@ func (e *emitter) drain() []string {
 
 func isIdent(s string) bool { return identRE.MatchString(s) }
 
+// inputVar names the variable that carries a pipeline input. A name with a character that a shell variable
+// cannot hold, such as the hyphen of git-url, gets an underscore in its place. The marker of the pipeline keeps
+// the input name for the return trip.
+func inputVar(name string) string {
+	if name == "" {
+		return ""
+	}
+	v := strings.Map(func(r rune) rune {
+		if r == '_' || (r >= '0' && r <= '9') || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') {
+			return r
+		}
+		return '_'
+	}, name)
+	if v[0] >= '0' && v[0] <= '9' {
+		v = "_" + v
+	}
+	return v
+}
+
 // refVar maps a canonical or gitlab-native ref to the GitLab variable that holds it.
 func refVar(path []string) (string, bool) {
 	if len(path) == 0 {
 		return "", false
 	}
 	switch path[0] {
-	case exprgitlab.Dialect, expr.PrefixEnv, expr.PrefixSecrets, expr.PrefixVars, expr.PrefixInputs, expr.PrefixMatrix:
+	case expr.PrefixInputs:
+		if len(path) != 2 || inputVar(path[1]) == "" {
+			return "", false
+		}
+		return inputVar(path[1]), true
+	case exprgitlab.Dialect, expr.PrefixEnv, expr.PrefixSecrets, expr.PrefixVars, expr.PrefixMatrix:
 		if len(path) != 2 || !isIdent(path[1]) {
 			return "", false
 		}
@@ -133,15 +171,47 @@ func identPart(c byte) bool {
 
 // convert rewrites a canonical template as GitLab text. lost holds the canonical text of each
 // expression GitLab has no variable for; those parts are omitted from out.
-func convert(s string) (out string, lost []string, err error) {
+func convert(s string) (out string, lost []string, err error) { return convertIn(s, "") }
+
+// convertIn is convert for a line that follows the lines of ctx in one shell statement: a quote that a line of
+// ctx opened is still open.
+func convertIn(s, ctx string) (out string, lost []string, err error) {
 	parts, err := expr.ParseScriptTemplate(s)
 	if err != nil {
 		return "", nil, err
 	}
-	return convertParts(parts)
+	return convertPartsIn(parts, ctx)
 }
 
-func convertParts(parts []expr.Part) (string, []string, error) {
+func convertParts(parts []expr.Part) (string, []string, error) { return convertPartsIn(parts, "") }
+
+// lineCtx carries the shell state from one script line to the next: the converted lines of the statement that is
+// still open, so a quote that spans lines is known when the next line converts.
+type lineCtx struct{ open string }
+
+// prefix is the text that precedes the next line.
+func (c *lineCtx) prefix() string {
+	if c.open == "" {
+		return ""
+	}
+	return c.open + "\n"
+}
+
+// add records the converted text of a line.
+func (c *lineCtx) add(line string) {
+	c.open = strings.TrimSuffix(c.prefix()+line, "\n")
+	if !vars.Open(c.open) {
+		c.open = ""
+	}
+}
+
+// A variable inside single quotes does not expand, so the text leaves the quotes around it.
+const (
+	quoteBreakOpen  = `'"`
+	quoteBreakClose = `"'`
+)
+
+func convertPartsIn(parts []expr.Part, ctx string) (string, []string, error) {
 	var sb strings.Builder
 	var lost []string
 	for i, p := range parts {
@@ -166,7 +236,10 @@ func convertParts(parts []expr.Part) (string, []string, error) {
 		if i+1 < len(parts) && parts[i+1].Expr == nil && parts[i+1].Text != "" {
 			next = parts[i+1].Text[0]
 		}
-		if next != 0 && identPart(next) {
+		cur := ctx + sb.String()
+		if !strings.Contains(cur, "<<") && vars.Protected(cur + "$")[len(cur)] {
+			sb.WriteString(quoteBreakOpen + "$" + name + quoteBreakClose)
+		} else if next != 0 && identPart(next) {
 			sb.WriteString("${" + name + "}")
 		} else {
 			sb.WriteString("$" + name)
@@ -190,11 +263,18 @@ func litText(l expr.Lit) string {
 func refLines(src []string) []string {
 	seen := map[string]bool{}
 	var out []string
+	var ctx lineCtx
 	for _, l := range src {
 		if !strings.Contains(l, "${{") {
+			ctx.add(l)
 			continue
 		}
-		if t, _, err := convert(l); err == nil && t != l && !seen[t] {
+		t, _, err := convertIn(l, ctx.prefix())
+		if err != nil {
+			continue
+		}
+		ctx.add(t)
+		if t != l && !seen[t] {
 			seen[t] = true
 			out = append(out, t)
 		}
@@ -210,11 +290,12 @@ type refArg struct {
 
 // jobRefLines is refLines over a job's runner labels and step scripts.
 func jobRefLines(j *ir.Job) []string {
-	src := slices.Clone(j.Runner.Labels)
+	out := refLines(j.Runner.Labels)
 	for _, st := range j.Steps {
-		src = append(src, st.Script...)
+		out = append(out, refLines(st.Script)...)
 	}
-	return refLines(src)
+	slices.Sort(out)
+	return slices.Compact(out)
 }
 
 // field converts text that sits inside a YAML value; expressions with no GitLab variable are omitted and reported.
@@ -226,6 +307,7 @@ func (e *emitter) field(path string, f caps.Feature, s string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	lost = append(lost, e.noVarRefs(s)...)
 	for _, l := range lost {
 		e.lose(path, f, "no GitLab variable for expression "+l)
 		e.comment(string(f) + " " + path + ": {{ " + l + " }}")
@@ -236,17 +318,17 @@ func (e *emitter) field(path string, f caps.Feature, s string) (string, error) {
 // scriptLine converts one script entry. why is empty when the entry stays; otherwise it names the reason GitLab
 // cannot spell the entry, and the caller comments out the whole statement around it, because dropping the part
 // could change what the command does.
-func (e *emitter) scriptLine(s string) (out, why string, err error) {
+func (e *emitter) scriptLine(s, ctx string) (out, why string, err error) {
 	if !strings.Contains(s, "${{") {
 		return s, "", nil
 	}
-	out, lost, err := convert(s)
+	out, lost, err := convertIn(s, ctx)
 	if err != nil {
 		return "", "", err
 	}
-	if dead := e.deadOutputRefs(s); len(dead) > 0 {
-		lost = append(lost, dead...)
-	}
+	lost = append(lost, e.deadOutputRefs(s)...)
+	lost = append(lost, e.noVarRefs(s)...)
+	lost = append(lost, e.eventRefs(s)...)
 	if len(lost) == 0 && strings.Contains(out, rawExprOpen) {
 		return "", "the text holds a literal " + rawExprOpen + " that GitLab never expands", nil
 	}
@@ -423,7 +505,27 @@ func (e *emitter) condition(path string, f caps.Feature, x expr.Expr, what strin
 		}
 	}
 	if _, err := exprgitlab.Print(t); err != nil {
+		if g, ok := e.fromRestoredGHA(x); ok {
+			return g, true
+		}
 		e.disable(path, f, x, what)
+		return nil, false
+	}
+	return t, true
+}
+
+// fromRestoredGHA translates a full-ref test that a GHA file wrote and a marker restored in a GitLab-origin project:
+// GitLab cannot write that test, so its source was GHA.
+func (e *emitter) fromRestoredGHA(x expr.Expr) (expr.Expr, bool) {
+	gha, ok := expr.LangOf("gha")
+	if !ok || e.from != nil || !expr.StatesFullRef(x) {
+		return nil, false
+	}
+	t, ok := expr.TranslateFacts(x, *gha, exprgitlab.Lang, expr.Facts{})
+	if !ok {
+		return nil, false
+	}
+	if _, err := exprgitlab.Print(t); err != nil {
 		return nil, false
 	}
 	return t, true
@@ -477,6 +579,33 @@ func (e *emitter) markDeadOutputs(pl *ir.Pipeline) error {
 		}
 	}
 	return nil
+}
+
+// dropInput records an input that got no variable.
+func (e *emitter) dropInput(name string) {
+	if e.noVar == nil {
+		e.noVar = map[string]bool{}
+	}
+	e.noVar[name] = true
+}
+
+// noVarRefs lists the references in s to an input that has no variable of its own. The shared variable name
+// would read another input.
+func (e *emitter) noVarRefs(s string) []string {
+	if len(e.noVar) == 0 {
+		return nil
+	}
+	parts, err := expr.ParseScriptTemplate(s)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, p := range parts {
+		if r, ok := p.Expr.(expr.Ref); ok && len(r.Path) == 2 && r.Path[0] == expr.PrefixInputs && e.noVar[r.Path[1]] {
+			out = append(out, expr.String(r))
+		}
+	}
+	return out
 }
 
 // deadOutputRefs lists the needs.<job>.outputs.<name> references in s whose producer cannot write them.
@@ -534,4 +663,19 @@ func (e *emitter) flattenedNote(path string, f caps.Feature, s string) {
 	if parts, err := expr.ParseScriptTemplate(s); err == nil && flattens(parts) {
 		e.emulate(path, f, "namespace flattened", "namespace flattened; restored only with round-trip metadata")
 	}
+}
+
+// eventRefs lists the canonical refs of s that mean something else on some event on GitLab than at the source.
+func (e *emitter) eventRefs(s string) []string {
+	parts, err := expr.ParseScriptTemplate(s)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, p := range parts {
+		if r, ok := p.Expr.(expr.Ref); ok && vars.ScriptRefLost(r.Path, e.originID, dialect) {
+			out = append(out, expr.String(r))
+		}
+	}
+	return out
 }

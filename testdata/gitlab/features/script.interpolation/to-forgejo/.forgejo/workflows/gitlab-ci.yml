@@ -1,18 +1,27 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
 # pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"pre":1,"post":0}
 on:
+  workflow_dispatch:
   push:
 concurrency:
   group: ${{ github.run_id }}
   cancel-in-progress: false
 jobs:
   build:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: |
-          echo "building ${{ github.sha }} on ${{ github.ref_type == 'branch' && github.ref_name || '' }} for ${{ github.actor }}"
+          export PIPEMASTER_VARS=2; CI_COMMIT_BRANCH="$(if [ "${GITHUB_REF_TYPE}" = branch ] && [ "${GITHUB_EVENT_NAME}" != pull_request ]; then printf %s "${GITHUB_REF_NAME}"; fi)"; export CI_COMMIT_BRANCH; export GITLAB_USER_LOGIN="${GITHUB_ACTOR}"; : pipemaster-end; echo "building ${{ github.sha }} on ${CI_COMMIT_BRANCH} for $GITLAB_USER_LOGIN"
           echo "keeps $HOME and ${UNMAPPED}"
+        shell: bash

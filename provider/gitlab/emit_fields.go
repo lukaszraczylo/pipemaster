@@ -128,6 +128,9 @@ func (e *emitter) tags(path string, r ir.Runner) (*yaml.Node, error) {
 	}
 	out := seqOf()
 	for _, l := range r.Labels {
+		if emitkit.HostedHere(e.originID, l) != emitkit.NotHosted {
+			continue
+		}
 		t, err := e.field(path, caps.ScriptInterpolation, l)
 		if err != nil {
 			return nil, err
@@ -138,10 +141,22 @@ func (e *emitter) tags(path string, r ir.Runner) (*yaml.Node, error) {
 		}
 		out.Content = append(out.Content, str(t))
 	}
+	emitkit.ReportHosted(e.originID, r.Labels, "tag",
+		func(st, d string) { e.external(path, caps.JobRunner, st, d) },
+		func(d string) { e.lose(path, caps.JobRunner, d) })
 	if len(out.Content) == 0 {
 		return nil, nil
 	}
+	e.external(path, caps.JobRunner, "job tags", "the job carries the tags "+strings.Join(tagTexts(out), ", ")+"; register a runner with these tags, or the job stays pending")
 	return out, nil
+}
+
+func tagTexts(n *yaml.Node) []string {
+	out := make([]string, 0, len(n.Content))
+	for _, c := range n.Content {
+		out = append(out, c.Value)
+	}
+	return out
 }
 
 // retryNode writes retry: N, or the max/when form. Attempts counts runs, so max is one fewer.
@@ -295,6 +310,17 @@ func (e *emitter) cacheNodes(path string, p *jobPrep, extra any) (*yaml.Node, er
 		}
 		if c.Policy != "" {
 			m.set("policy", str(c.Policy))
+		}
+		if len(c.FallbackKeys) > 0 {
+			fks := make([]string, len(c.FallbackKeys))
+			for k, fk := range c.FallbackKeys {
+				t, err := e.field(path, caps.JobCache, fk)
+				if err != nil {
+					return nil, err
+				}
+				fks[k] = t
+			}
+			m.set("fallback_keys", strSeq(fks))
 		}
 		if err := m.addExtra(rest, nil); err != nil {
 			return nil, err

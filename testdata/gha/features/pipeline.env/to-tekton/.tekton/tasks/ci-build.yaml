@@ -2,6 +2,7 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated pipeline.env pipeline/ci/job/build
 # pipemaster:arg {"names":["CGO_ENABLED","VERSION","TOKEN"]}
+# pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 apiVersion: tekton.dev/v1
 kind: Task

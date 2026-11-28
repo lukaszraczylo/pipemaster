@@ -1,6 +1,7 @@
 Loss report: tekton -> forgejo
 [lost] pipeline/ci/job/version job.outputs (output tag has no value expression; it is written empty so that the jobs that read it stay valid)
 [lost] pipeline/ci/job/version/step/tag step.script (the line writes a Tekton result file, which has no form in this target; the write goes to /dev/null)
+[emulated] pipeline/ci job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/ci pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)
 [emulated] pipeline/ci/job/use job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [emulated] pipeline/ci/job/version job.runner: default runner label ubuntu-latest (the IR holds no runner label)

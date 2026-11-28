@@ -48,7 +48,8 @@ structure DStep where
 /-- One pipeline document; `name` is the job id. `env` is the document `environment`, `noop` the `step.script`
 marker, `allowFailure` the `job.allow_failure` marker, `manual` the `job.manual` marker with the pipeline triggers,
 `fin` the `pipeline.finally` marker (needs and `noIf`), `ifTrigs` the triggers of the `job.if` marker, and
-`platform` the label that `platform` holds (`os/arch` or `os/arch/variant`). -/
+`platform` the label that `platform` holds (`os/arch` or `os/arch/variant`), and `tags` the other `node` keys, each
+with the value `true`. -/
 structure DDoc where
   name : String
   trigger : Option DTrig
@@ -56,6 +57,7 @@ structure DDoc where
   steps : List DStep
   env : List Var
   platform : Option String
+  tags : List String
   noop : Bool
   allowFailure : Bool
   manual : Option (List Woodpecker.Trig)
@@ -154,6 +156,11 @@ theorem map_comp_unescVar_escVar (l : List Var) : l.map (unescVar ∘ escVar) = 
 /-- Mirrors drone.platformRE (provider/drone/emit_job.go): the label `os/arch` or `os/arch/variant`. -/
 def platformOf (r : List String) : Option String := Woodpecker.platformOf r
 
+/-- The runner labels that become `node` keys: a valid label name (`Woodpecker.tagKeyOk`) that is not the platform
+label. Any other label is lost. -/
+def tagsOf (r : List String) : List String :=
+  r.filter fun l => some l != platformOf r && Woodpecker.tagKeyOk l
+
 /-- The label that the parser reads back: `os` and `arch` only; the variant stays in Ext (parse_doc.go platform). -/
 def platDrop (l : String) : String := "/".intercalate ((l.splitOn "/").take 2)
 
@@ -200,6 +207,7 @@ def mainDoc (p : Pipe) (j : Core.Job) : DDoc where
   steps := stepsOf j
   env := j.env.map escVar
   platform := platformOf j.runner
+  tags := tagsOf j.runner
   noop := j.steps.isEmpty
   allowFailure := j.allowFailure
   manual := if j.manual then some (trigsOf p) else none
@@ -216,6 +224,7 @@ def finDoc (p : Pipe) (j : Core.Job) : DDoc where
   steps := stepsOf j
   env := j.env.map escVar
   platform := platformOf j.runner
+  tags := tagsOf j.runner
   noop := j.steps.isEmpty
   allowFailure := j.allowFailure
   manual := none
@@ -291,7 +300,7 @@ def parseDoc (d : DDoc) : Core.Job where
     | some (ns, _) => ns
     | none => d.deps.map fun n => ⟨n, false⟩
   env := d.env.map unescVar
-  runner := (d.platform.map platDrop).toList
+  runner := (d.platform.map platDrop).toList ++ d.tags
   steps := parseSteps d
   retry := 0
   timeout := 0
@@ -594,15 +603,15 @@ theorem readTriggers_toDrone (p : Pipe) (ht : TrigOk p) (hne : p.all ≠ []) :
       · rw [h]; exact Woodpecker.trigFind_trigsOf p
 
 /-- What Drone keeps of a main job before the metadata: no names, no artifacts flag on needs, no retry or timeout,
-and no runner label but the `os/arch` platform. -/
+and no runner label but the `os/arch` platform and the tags. -/
 def droneStripMain (j : Core.Job) : Core.Job :=
   { j with name := "", needs := j.needs.map fun n => { n with artifacts := false },
-           runner := ((platformOf j.runner).map platDrop).toList,
+           runner := ((platformOf j.runner).map platDrop).toList ++ tagsOf j.runner,
            steps := j.steps.map Woodpecker.stripName, retry := 0, timeout := 0 }
 
 /-- A finally job keeps its needs with the flags, because the `pipeline.finally` marker carries them. -/
 def droneStripFin (j : Core.Job) : Core.Job :=
-  { j with name := "", runner := ((platformOf j.runner).map platDrop).toList,
+  { j with name := "", runner := ((platformOf j.runner).map platDrop).toList ++ tagsOf j.runner,
            steps := j.steps.map Woodpecker.stripName, retry := 0, timeout := 0 }
 
 theorem parseStepD_dstep (j : Core.Job) (s : Core.Step) : parseStepD (dstep j s) = Woodpecker.stripName s := by
@@ -686,8 +695,8 @@ theorem restoreSteps_drone (p : Pipe) (j : Core.Job) (hj : j ∈ p.all) (hn : (p
   Woodpecker.restoreSteps_wp p j hj hn hs
 
 theorem runner_rt (r : List String) :
-    ((if r = [] then (none : Option (List String)) else some r).getD ((platformOf r).map platDrop).toList) = r := by
-  split <;> simp_all [platformOf, Woodpecker.platformOf]
+    ((if r = [] then (none : Option (List String)) else some r).getD (((platformOf r).map platDrop).toList ++ tagsOf r)) = r := by
+  split <;> simp_all [platformOf, Woodpecker.platformOf, tagsOf]
 
 theorem restoreJob_droneMain (p : Pipe) (hn : (p.all.map Core.Job.id).Nodup)
     (hs : ∀ j ∈ p.all, (j.steps.map Core.Step.id).Nodup) (j : Core.Job) (hj : j ∈ p.all) :
@@ -1045,6 +1054,7 @@ theorem tagOf_some {v t : String} (h : tagOf v = some t) : v = tagPrefix ++ t :=
 inductive FE where
   | eq (k v : String)
   | glob (k pat : String)
+  | pre (k p : String)
   | not (e : FE)
   | and (l r : FE)
   | or (l r : FE)
@@ -1054,9 +1064,13 @@ structure Filt where
   incl : List String
   excl : List String
 
-/-- Mirrors drone.valueExpr (expr/drone/filter.go). -/
+/-- The ref filter of every tag (expr/drone/filter.go anyTagGlob). -/
+def anyTagGlob : String := tagPrefix ++ "**"
+
+/-- Mirrors drone.valueExpr (expr/drone/filter.go). The ref filter of every tag becomes a prefix test (anyTag). -/
 def valueE (key v : String) : FE :=
-  if isLiteral v then
+  if key = "ref" ∧ v = anyTagGlob then .pre "ref" tagPrefix
+  else if isLiteral v then
     match tagOf v with
     | some t => if key = "ref" ∧ t ≠ "" then .eq "tag" t else .eq key v
     | none => .eq key v
@@ -1094,6 +1108,7 @@ variable (G : String → String → Bool) (env : String → String)
 def evalE : FE → Bool
   | .eq k v => env k == v
   | .glob k pat => G pat (env k)
+  | .pre k p => (env k).startsWith p
   | .not e => !evalE e
   | .and l r => evalE l && evalE r
   | .or l r => evalE l || evalE r
@@ -1111,9 +1126,14 @@ def matchF (f : Filt) (v : String) : Bool :=
 variable {G env}
 
 theorem valueE_eval (hG : ∀ pat v, isLiteral pat = true → G pat v = (pat == v))
-    (htag : ∀ t, t ≠ "" → ((env "tag" == t) = (env "ref" == tagPrefix ++ t))) (key v : String) :
+    (htag : ∀ t, t ≠ "" → ((env "tag" == t) = (env "ref" == tagPrefix ++ t)))
+    (hany : G anyTagGlob (env "ref") = (env "ref").startsWith tagPrefix) (key v : String) :
     evalE G env (valueE key v) = G v (env key) := by
   unfold valueE
+  by_cases hp : key = "ref" ∧ v = anyTagGlob
+  · obtain ⟨rfl, rfl⟩ := hp
+    simp [evalE, hany]
+  simp only [hp, ite_false]
   by_cases hl : isLiteral v = true
   · simp only [hl, ite_true]
     rw [hG v _ hl]
@@ -1131,7 +1151,8 @@ theorem valueE_eval (hG : ∀ pat v, isLiteral pat = true → G pat v = (pat == 
   · simp [hl, evalE]
 
 theorem orChain_eval (hG : ∀ pat v, isLiteral pat = true → G pat v = (pat == v))
-    (htag : ∀ t, t ≠ "" → ((env "tag" == t) = (env "ref" == tagPrefix ++ t))) (key : String) (vs : List String) :
+    (htag : ∀ t, t ≠ "" → ((env "tag" == t) = (env "ref" == tagPrefix ++ t)))
+    (hany : G anyTagGlob (env "ref") = (env "ref").startsWith tagPrefix) (key : String) (vs : List String) :
     evalAny G env (orChain key vs) = vs.any (fun pat => G pat (env key)) := by
   have gen : ∀ (o : Option FE) (vs : List String),
       evalAny G env (vs.foldl (fun o v => orO o (some (valueE key v))) o) =
@@ -1142,8 +1163,8 @@ theorem orChain_eval (hG : ∀ pat v, isLiteral pat = true → G pat v = (pat ==
     | cons a t ih =>
       rw [List.foldl_cons, ih, List.any_cons]
       cases o with
-      | none => simp [orO, evalAny, valueE_eval hG htag]
-      | some x => simp [orO, evalAny, evalE, valueE_eval hG htag, Bool.or_assoc]
+      | none => simp [orO, evalAny, valueE_eval hG htag hany]
+      | some x => simp [orO, evalAny, evalE, valueE_eval hG htag hany, Bool.or_assoc]
   unfold orChain
   rw [gen]
   simp [evalAny]
@@ -1160,10 +1181,11 @@ theorem orChain_some (key : String) (vs : List String) (h : vs ≠ []) : ∃ x, 
 
 /-- The filter lemma: the expression of `FilterExpr` evaluates to the `Match` result. -/
 theorem filterE_eval (hG : ∀ pat v, isLiteral pat = true → G pat v = (pat == v))
-    (htag : ∀ t, t ≠ "" → ((env "tag" == t) = (env "ref" == tagPrefix ++ t))) (key : String) (f : Filt) :
+    (htag : ∀ t, t ≠ "" → ((env "tag" == t) = (env "ref" == tagPrefix ++ t)))
+    (hany : G anyTagGlob (env "ref") = (env "ref").startsWith tagPrefix) (key : String) (f : Filt) :
     evalAll G env (filterE key f) = matchF G f (env key) := by
-  have hi := orChain_eval hG htag key f.incl
-  have he := orChain_eval hG htag key f.excl
+  have hi := orChain_eval hG htag hany key f.incl
+  have he := orChain_eval hG htag hany key f.excl
   unfold filterE matchF
   by_cases hI : f.incl = [] <;> by_cases hE : f.excl = []
   · simp [hI, hE, evalAll]
@@ -1192,7 +1214,8 @@ theorem filterE_eval (hG : ∀ pat v, isLiteral pat = true → G pat v = (pat ==
 
 /-- `ToExpr` (without the event key and the status call): the conjunction holds exactly when every key matches. -/
 theorem toE_eval (hG : ∀ pat v, isLiteral pat = true → G pat v = (pat == v))
-    (htag : ∀ t, t ≠ "" → ((env "tag" == t) = (env "ref" == tagPrefix ++ t))) (fs : List (String × Filt)) :
+    (htag : ∀ t, t ≠ "" → ((env "tag" == t) = (env "ref" == tagPrefix ++ t)))
+    (hany : G anyTagGlob (env "ref") = (env "ref").startsWith tagPrefix) (fs : List (String × Filt)) :
     evalAll G env (toE fs) = fs.all (fun kf => matchF G kf.2 (env kf.1)) := by
   have gen : ∀ (o : Option FE) (fs : List (String × Filt)),
       evalAll G env (fs.foldl (fun o kf => andO o (filterE kf.1 kf.2)) o) =
@@ -1201,7 +1224,7 @@ theorem toE_eval (hG : ∀ pat v, isLiteral pat = true → G pat v = (pat == v))
     induction fs generalizing o with
     | nil => simp
     | cons kf t ih =>
-      rw [List.foldl_cons, ih, List.all_cons, ← filterE_eval hG htag]
+      rw [List.foldl_cons, ih, List.all_cons, ← filterE_eval hG htag hany]
       cases o with
       | none => cases h : filterE kf.1 kf.2 <;> simp [andO, evalAll]
       | some x => cases h : filterE kf.1 kf.2 <;> simp [andO, evalAll, evalE, Bool.and_assoc]

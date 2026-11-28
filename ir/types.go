@@ -18,9 +18,23 @@ type Project struct {
 
 // Origin records where a project was parsed from.
 type Origin struct {
-	Provider string   `yaml:"provider,omitempty"`
-	Dialect  string   `yaml:"dialect,omitempty"`
-	Files    []string `yaml:"files,omitempty"`
+	// Guarded is set by the GHA parser, non-nil even when empty: Provider then names the dialect of restored
+	// conditions, not of every job, and the map holds the IR paths of the jobs whose deletion guard it stripped.
+	Guarded map[string]bool `yaml:"-"`
+	// DefaultTriggers holds the IDs of the pipelines whose triggers the emitter made from the default events of a
+	// Drone or GitLab source. The metadata restore drops them; without metadata they stay, as the file says.
+	DefaultTriggers map[string]bool `yaml:"-"`
+	Provider        string          `yaml:"provider,omitempty"`
+	Dialect         string          `yaml:"dialect,omitempty"`
+	Files           []string        `yaml:"files,omitempty"`
+}
+
+// MarkDefaultTriggers records that the triggers of pipeline id came from the default events of the source.
+func (o *Origin) MarkDefaultTriggers(id string) {
+	if o.DefaultTriggers == nil {
+		o.DefaultTriggers = map[string]bool{}
+	}
+	o.DefaultTriggers[id] = true
 }
 
 // Pipeline is one workflow, pipeline or CI file.
@@ -45,6 +59,7 @@ type Job struct {
 	Matrix       *Matrix      `yaml:"matrix,omitempty"`
 	Retry        *Retry       `yaml:"retry,omitempty"`
 	Environment  *Environment `yaml:"environment,omitempty"`
+	Child        *Child       `yaml:"child,omitempty"`
 	Ext          Ext          `yaml:"ext,omitempty"`
 	ID           string       `yaml:"id"`
 	Name         string       `yaml:"name,omitempty"`
@@ -58,6 +73,19 @@ type Job struct {
 	Outputs      []Output     `yaml:"outputs,omitempty"`
 	AllowFailure bool         `yaml:"allow_failure,omitempty"`
 	Manual       bool         `yaml:"manual,omitempty"`
+}
+
+// Child is the same-repository pipeline that a call job starts: a GitLab child pipeline or a local GHA reusable
+// workflow. The pipeline never stands alone in Project.Pipelines, so no emitter writes it as an independent one.
+type Child struct {
+	// Gate is the condition under which the child pipeline starts at all, such as its workflow:rules. Nil admits every start.
+	Gate     expr.Expr `yaml:"-"`
+	Pipeline *Pipeline `yaml:"pipeline"`
+	// Native lists the providers that write the child as the construct it came from; every other target gets the
+	// child's jobs inlined into the calling pipeline.
+	Native []string `yaml:"native,omitempty"`
+	// Files lists the input files that hold the child, in the order the source reads them.
+	Files []string `yaml:"files,omitempty"`
 }
 
 // StepKind says what a step runs.
@@ -214,9 +242,10 @@ type Environment struct {
 
 // Cache is a restorable path set.
 type Cache struct {
-	Key    string   `yaml:"key,omitempty"`
-	Policy string   `yaml:"policy,omitempty"`
-	Paths  []string `yaml:"paths,omitempty"`
+	Key          string   `yaml:"key,omitempty"`
+	Policy       string   `yaml:"policy,omitempty"`
+	Paths        []string `yaml:"paths,omitempty"`
+	FallbackKeys []string `yaml:"fallback_keys,omitempty"`
 }
 
 // Artifact is a file set a job produces.

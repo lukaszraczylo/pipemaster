@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
@@ -8,6 +11,10 @@ spec:
       default: ""
     - name: ctx-event
       default: ""
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: build
       taskRef:
@@ -17,3 +24,7 @@ spec:
           value: $(params.ctx-branch)
         - name: ctx-event
           value: $(params.ctx-event)
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)

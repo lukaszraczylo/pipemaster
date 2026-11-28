@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"fmt"
+	"github.com/lukaszraczylo/pipemaster/vars"
 	"slices"
 	"strings"
 
@@ -18,6 +19,7 @@ const (
 	secScript = "script"
 	secAfter  = "after_script"
 
+	// noopLine runs where the source holds no work and the file only needs a script line.
 	noopLine = "true"
 )
 
@@ -28,6 +30,7 @@ type jobPrep struct {
 	j        *ir.Job
 	sections map[string][]*yaml.Node
 	path     string
+	imgPath  string
 	image    string
 	vars     []ir.Var
 	caches   []*omap
@@ -160,7 +163,11 @@ func (e *emitter) stepGuard(sp string, st *ir.Step, sec string) (guard, arg, src
 // stepLosses reports the step fields a GitLab script cannot carry at all.
 func (e *emitter) stepLosses(sp string, st *ir.Step) {
 	if st.Image != nil {
-		e.lose(sp, caps.StepImage, "GitLab sets the image per job, not per step")
+		why := "GitLab sets the image per job, not per step"
+		if jp, _, _ := strings.Cut(sp, stepSep); e.noSplit[jp] != "" {
+			why += "; the job is not split because " + e.noSplit[jp]
+		}
+		e.lose(sp, caps.StepImage, why)
 	}
 	if st.Shell != "" {
 		e.lose(sp, caps.StepShell, "GitLab runs scripts in the runner's configured shell, not "+st.Shell)
@@ -178,7 +185,10 @@ func (e *emitter) scriptStep(p *jobPrep, st *ir.Step) error {
 	if err != nil {
 		return err
 	}
-	return e.placeLines(p, st, lines)
+	if err := e.placeLines(p, st, lines); err != nil {
+		return err
+	}
+	return e.pluginMark(p, st)
 }
 
 // movedArg is the marker argument of an always() step that moved to after_script: where its lines start in
@@ -261,7 +271,7 @@ func (e *emitter) placeLines(p *jobPrep, st *ir.Step, lines []string) error {
 	}
 	items, targets := wrapLines(st, sec, lines, guard, dir, exports)
 	if moved {
-		pos := slices.Index(p.j.Steps, st)
+		pos := slices.IndexFunc(p.j.Steps, func(o *ir.Step) bool { return o.ID == st.ID })
 		mv := movedArg{Moved: "always", Offset: p.lineCount(secAfter), COE: st.ContinueOnError, Pos: &pos}
 		for _, it := range items {
 			mv.Lines += lineCount(it)
@@ -288,14 +298,28 @@ func (e *emitter) placeLines(p *jobPrep, st *ir.Step, lines []string) error {
 // before_script and script; any wrapper turns the step into one item so it runs in one shell.
 func wrapLines(st *ir.Step, sec string, lines []string, guard, dir string, exports []string) (items, targets []string) {
 	sub := dir != "" || len(exports) > 0
+	if !sub && guard == "" && sec == secScript && beforeLines(st, sec, len(lines)) == 0 && len(lines) > 2 && lines[0] == "(" && lines[len(lines)-1] == ")" {
+		return []string{strings.Join(lines, "\n")}, []string{sec}
+	}
 	if !sub && guard == "" {
 		before := beforeLines(st, sec, len(lines))
+		// Lines that share an open quote or here-document are one shell statement, so they stay one block item.
+		var group string
 		for i, l := range lines {
 			t := sec
 			if i < before {
 				t = secBefore
 			}
-			items, targets = append(items, l), append(targets, t)
+			if group == "" {
+				group = l
+			} else {
+				group += "\n" + l
+			}
+			if vars.Open(group) && i+1 < len(lines) && (i+1 < before) == (i < before) {
+				continue
+			}
+			items, targets = append(items, group), append(targets, t)
+			group = ""
 		}
 		return items, targets
 	}
@@ -339,25 +363,35 @@ func (e *emitter) stepLines(sp string, st *ir.Step) ([]string, error) {
 	texts := make([]string, len(st.Script))
 	outs := make([]string, len(st.Script))
 	why := make([]string, len(st.Script))
+	var ctx lineCtx
 	for i, l := range st.Script {
 		texts[i] = emitkit.NeutralizeResultWrite(e.lose, sp, l)
 		var err error
-		if outs[i], why[i], err = e.scriptLine(texts[i]); err != nil {
+		if outs[i], why[i], err = e.scriptLine(texts[i], ctx.prefix()); err != nil {
 			return nil, err
 		}
+		if why[i] != "" {
+			ctx = lineCtx{}
+			continue
+		}
+		ctx.add(outs[i])
 	}
-	keep := emitkit.DropLost(texts, why, func(detail, text string) {
+	pieces := emitkit.ReplaceLost(texts, why, func(detail, text string) {
 		e.lose(sp, caps.ScriptInterpolation, detail)
 		e.comment("script.interpolation " + sp + ": " + text)
 	})
-	out := make([]string, 0, len(keep))
-	for _, i := range keep {
-		out = append(out, outs[i])
+	out := make([]string, 0, len(pieces))
+	for _, p := range pieces {
+		if p.Lost {
+			out = append(out, emitkit.FailLoud(caps.ScriptInterpolation, sp, p.Detail))
+			continue
+		}
+		out = append(out, outs[p.Index])
 	}
 	return out, nil
 }
 
-// exports renders step env as export lines; a value GitLab cannot carry on one line is lost.
+// exports renders step env as export lines; a value with a newline stays inside its double quotes across lines.
 func (e *emitter) exports(sp string, st *ir.Step) ([]string, error) {
 	var out []string
 	for _, v := range st.Env {
@@ -370,10 +404,6 @@ func (e *emitter) exports(sp string, st *ir.Step) ([]string, error) {
 			return nil, err
 		}
 		if !ok {
-			continue
-		}
-		if strings.Contains(t, "\n") {
-			e.lose(sp, caps.StepEnv, "variable "+v.Name+" holds a newline")
 			continue
 		}
 		out = append(out, "export "+v.Name+"="+dq(t))

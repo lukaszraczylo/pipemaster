@@ -14,9 +14,14 @@ import (
 // Marker ends a guard line so Parse can tell it from a script line that the author wrote.
 const Marker = "# pipemaster:guard"
 
+// SkipMessage is what a guard prints before it exits, so a step that the guard skipped says so in the log.
+const SkipMessage = "pipemaster: skipped: the condition of this step is false"
+
 const (
 	guardOpen  = "if ! "
-	guardClose = "; then exit 0; fi " + Marker
+	guardClose = "; then echo '" + SkipMessage + "'; exit 0; fi " + Marker
+	// legacyClose ends a guard that an earlier version wrote, which printed nothing. Parse still reads it.
+	legacyClose = "; then exit 0; fi " + Marker
 )
 
 // ErrNotGuardable marks a condition that has no POSIX test form.
@@ -43,6 +48,10 @@ type Dialect struct {
 	Canon func(expr.Binary) (expr.Expr, bool)
 	// Group rewrites a parsed parenthesised group. Nil keeps it.
 	Group func(expr.Expr) expr.Expr
+	// Atom prints a call node as one test; handled false leaves the node unguardable. Nil means no call prints.
+	Atom func(expr.Call) (text string, handled bool)
+	// AtomRead reads the test that Atom printed at the head of s and returns the node and the bytes it used.
+	AtomRead func(s string) (e expr.Expr, n int, ok bool)
 	// Sem is the equality semantics of the source that wrote the condition.
 	Sem expr.Semantics
 }
@@ -74,16 +83,24 @@ func (d Dialect) Parse(line string) (expr.Expr, bool) {
 	if !ok {
 		return nil, false
 	}
+	legacy := false
 	body, ok = strings.CutSuffix(body, guardClose)
 	if !ok {
-		return nil, false
+		if body, ok = strings.CutSuffix(body, legacyClose); !ok {
+			return nil, false
+		}
+		legacy = true
 	}
 	p := &parser{d: d, s: body}
 	e, ok := p.primary()
 	if !ok || p.i != len(p.s) {
 		return nil, false
 	}
-	if back, err := d.Print(e); err != nil || back != line {
+	back, err := d.Print(e)
+	if legacy {
+		back = strings.TrimSuffix(back, guardClose) + legacyClose
+	}
+	if err != nil || back != line {
 		return nil, false
 	}
 	return e, true
@@ -138,6 +155,12 @@ func (d Dialect) node(e expr.Expr) (string, error) {
 		return "! " + x, err
 	case expr.Binary:
 		return d.binary(v)
+	case expr.Call:
+		if d.Atom != nil {
+			if t, ok := d.Atom(v); ok {
+				return t, nil
+			}
+		}
 	}
 	return "", fmt.Errorf("%w: %T", ErrNotGuardable, e)
 }
@@ -279,6 +302,12 @@ func (p *parser) primary() (expr.Expr, bool) {
 			e = p.d.Group(e)
 		}
 		return e, ok && p.eat(" )")
+	}
+	if p.d.AtomRead != nil {
+		if e, n, ok := p.d.AtomRead(p.s[p.i:]); ok {
+			p.i += n
+			return e, true
+		}
 	}
 	if !p.eat("[ ") {
 		return nil, false

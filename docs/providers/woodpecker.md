@@ -13,10 +13,12 @@ The caps table gives the verdict external for three features. Set each one in th
 ## Conversion notes
 
 - The emitter writes one workflow file for each job in `.woodpecker/`. The parser reads the first form that exists and does not merge forms.
-- Woodpecker keeps only an `os/arch` runner label (`labels.platform`). The round-trip metadata restores the other labels when the chain returns to the origin. If a later hop emits GHA, Gitea or Forgejo, the emitter writes the default label `ubuntu-latest` and reports an emulated `job.runner` entry.
+- An `os/arch` runner label becomes `labels.platform`. Every other runner label becomes a `labels` key with the value `true`, and the report names the `WOODPECKER_AGENT_LABELS` value that an agent must carry. A label that is not a valid key is lost. The parser keeps these keys in Ext, and the round-trip metadata restores the labels when the chain returns to the origin. If a later hop emits GHA, Gitea or Forgejo, the emitter writes the default label `ubuntu-latest` and reports an emulated `job.runner` entry.
 - Woodpecker substitutes `${NAME}` in the raw YAML and turns `$$` into a literal `$`. Thus the emitter writes `$` in script and environment text as `$$`. The parser reverses this.
+- Woodpecker clones the repository before the steps. A target that does not clone by itself gets a checkout step. On GitHub Actions this is an `actions/checkout` step that the report marks as emulated. The clone settings of the source map to the step inputs. See `provider/emitkit/checkout.go`.
 - Woodpecker filters use doublestar globs. If a GHA filter uses `+` or `?`, doublestar cannot express it. The emitter then writes an anchored regular expression in `evaluate`.
-- The runner is lost. Only a platform label becomes `labels.platform`.
+- A script from a bash source (GHA, GitLab) becomes one command that runs the script under bash when the image has bash. The image `sh` can be dash, which fails on `[[ ]]` and arrays. The report marks the wrapper as emulated, and the return conversion removes it.
+- A script that reads a predefined variable of another provider, such as `$CI_PROJECT_DIR`, starts with a prelude that defines the name from the Woodpecker value. A variable with no Woodpecker source stops the step with a message. The table is `vars/vars.yaml`.
 
 ## Feature support
 
@@ -30,7 +32,7 @@ The following table comes from `pipemaster caps --to woodpecker --format md`.
 | ext.passthrough | native |  |
 | job.allow_failure | emulated | failure ignore on every step (later steps still run after a failed step) |
 | job.artifacts | emulated | shared workspace of the steps in one workflow (other workflows cannot read the files) |
-| job.cache | emulated | shared workspace of the steps in one workflow (nothing persists between runs) |
+| job.cache | emulated | shared workspace of the steps in one workflow (nothing persists between runs; for persistence add a cache plugin step (for example woodpecker-plugin-cache) with an S3-compatible bucket or a host volume, set up by the operator) |
 | job.container | native |  |
 | job.env | emulated | copied into the environment of every step (a step variable of the same name wins) |
 | job.environment | lost | (Woodpecker has no environment name or URL in the workflow) |
@@ -42,7 +44,7 @@ The following table comes from `pipemaster caps --to woodpecker --format md`.
 | job.needs.artifacts | lost | (workflows do not share a workspace) |
 | job.outputs | lost | (Woodpecker steps cannot pass values to other workflows) |
 | job.retry | lost | (Woodpecker has no retry key; restarts are manual) |
-| job.runner | lost | (only a platform label has a Woodpecker form (labels.platform); other labels are lost) |
+| job.runner | external | workers the operator provides (a platform label becomes labels.platform and every other label becomes a labels key with the value true; register an agent with WOODPECKER_AGENT_LABELS to match) |
 | job.services | native |  |
 | job.timeout | external | repo setting Timeout (Woodpecker limits the whole pipeline, not a workflow) |
 | pipeline.concurrency | native | workflow concurrency limit 1 with group (cancel-in-progress has no Woodpecker form) |
@@ -58,7 +60,7 @@ The following table comes from `pipemaster caps --to woodpecker --format md`.
 | step.if | native |  |
 | step.image | native |  |
 | step.script | native |  |
-| step.shell | lost | (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash) |
+| step.shell | emulated | bash-if-present wrapper command (Woodpecker runs commands through /bin/sh -e of the image; a step that runs under bash at the source becomes one command that re-runs the script under bash -e when the image has bash, else under sh -e, so bash-only syntax fails under sh; any other shell is lost) |
 | step.timeout | lost | (Woodpecker has only a pipeline timeout in the repo settings) |
 | step.workdir | native |  |
 | trigger.api | lost | (Woodpecker starts API pipelines as manual events) |

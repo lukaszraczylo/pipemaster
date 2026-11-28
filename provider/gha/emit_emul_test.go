@@ -80,7 +80,7 @@ func emulCases() map[string]emulCase {
 			mutate: func(p *ir.Project) {
 				job(p, "build").Cache = []ir.Cache{{Key: "deps-${{ sha }}", Paths: []string{"~/.cache", "vendor"}}}
 			},
-			want: []string{"# pipemaster:emulated job.cache " + jobBuild, "uses: actions/cache@v6", "key: deps-${{ github.sha }}", "~/.cache"},
+			want: []string{"uses: actions/cache@v6", "key: deps-${{ github.sha }}-run-${{ github.run_id }}", "~/.cache"},
 		},
 		"artifacts": {
 			feature: caps.JobArtifacts, path: jobBuild, level: caps.Emulated,

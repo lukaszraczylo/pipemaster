@@ -1,0 +1,12 @@
+default:
+  image: alpine:3.20
+variables:
+  PARENT: from-parent
+run_child:
+  variables:
+    PASSED: no
+  trigger:
+    include: ci/child.yml
+    strategy: depend
+    forward:
+      yaml_variables: false

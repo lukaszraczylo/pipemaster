@@ -1,14 +1,17 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"cond","id":"ci","written":"ci","kind":"pipeline"}
+# pipemaster:emulated job.if pipeline/ci/job/deploy
+# pipemaster:arg {"if":"(ref == 'refs/heads/main') \u0026\u0026 (event == 'push')","guard":"branch == 'main'","folded":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/step/deploy-step-1/carry
-# pipemaster:arg {"digest":"953f370b41a4f08708a33493a0dd491f8f92fc682f94cd9cab359e2bcad06aa9","carry":"id: deploy-step-1\nkind: script\n"}
-# pipemaster:emulated job.manual pipeline/ci/job/deploy
-# pipemaster:arg {"manual":false,"held":true,"cond":true}
+# pipemaster:arg {"digest":"d6972b66bdd7668d04d7936c5abf2f99908b9aab5306eddf6c101b9e316a25d8","carry":"id: deploy-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/deploy/carry
-# pipemaster:arg {"digest":"ddb08a7485442f1dbbf762f5ce7b44c88e2ed50b34b0dc926dc48dfd6876af5e","carry":"if: (ref == 'refs/heads/main') \u0026\u0026 (event == 'push')\nid: deploy\n"}
+# pipemaster:arg {"digest":"eb8a60460215c0fd52dadd4ca8281cef154ca5ac9af71f247b318531f44311fe","carry":"if: (ref == 'refs/heads/main') \u0026\u0026 (event == 'push')\nid: deploy\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/deploy-tag
+# pipemaster:arg {"twin_of":"deploy"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: ci\nname: cond\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"2ec1dcbc01c737771acd62a3d97bc835360b3443812a96f8981d095c821d1957","carry":"id: ci\nname: cond\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated step.image pipeline/ci/job/deploy/step/deploy-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
@@ -25,10 +28,36 @@ jobs:
   - name: deploy
     plan:
       - get: source
-      - get: source-tags
+        trigger: true
       - task: deploy-step-1
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - |-
+                PM_CTX_BRANCH="$(cat ../workspace/.git/branch)"; export PM_CTX_BRANCH # pipemaster:ctx
+                if ! [ "$PM_CTX_BRANCH" = 'main' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard
+                echo deploy
+            dir: workspace
+  - name: deploy-tag
+    plan:
+      - get: source-tags
+      - task: deploy-step-1
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

@@ -57,6 +57,9 @@ type folded struct {
 
 // pathOf is the IR path of a job as the ledger knows it, which a folded copy does not carry in its own ID.
 func (e *emitter) pathOf(pid string, j *ir.Job) string {
+	if s, ok := e.splits[j]; ok {
+		return s.path
+	}
 	if e.fold != nil {
 		if fj, ok := e.fold.jobs[j]; ok {
 			return fj.path
@@ -94,10 +97,10 @@ func (e *emitter) foldJobMarkers(j *ir.Job) []string {
 }
 
 // triggerParts lists the condition and path filter of each trigger that has a GitLab form.
-func triggerParts(pl *ir.Pipeline) []foldPart {
+func triggerParts(pl *ir.Pipeline, scoped bool) []foldPart {
 	var out []foldPart
 	for i := range pl.Triggers {
-		c, ok := triggerRule(&pl.Triggers[i])
+		c, ok := triggerRule(&pl.Triggers[i], scoped)
 		if !ok {
 			continue
 		}
@@ -140,12 +143,12 @@ func (e *emitter) foldPipelines(pls []*ir.Pipeline) (*ir.Pipeline, error) {
 		if err != nil {
 			return nil, err
 		}
-		parts := triggerParts(pl)
+		parts := triggerParts(pl, e.from != nil)
 		cond, plain := partsCond(parts)
 		if plain {
 			parts = nil
 		}
-		disabled := (len(pl.Triggers) > 0 || e.noTriggers(pl)) && len(triggerParts(pl)) == 0
+		disabled := (len(pl.Triggers) > 0 || e.noTriggers(pl)) && len(triggerParts(pl, e.from != nil)) == 0
 		if e.noTriggers(pl) {
 			e.loseNoTriggers(pl)
 		}
@@ -160,6 +163,9 @@ func (e *emitter) foldPipelines(pls []*ir.Pipeline) (*ir.Pipeline, error) {
 			merged.Finally = append(merged.Finally, f.add(pl, j, shared, group, folded1{cond: cond, parts: parts, disabled: disabled}, true))
 		}
 		arg := foldPipelineArg{Name: pl.Name, Triggers: pl.Triggers, Concurrency: pl.Concurrency}
+		if e.injected[pl.ID] {
+			arg.Triggers = nil
+		}
 		arg.Inputs = inputs
 		for _, v := range pl.Env {
 			arg.EnvNames = append(arg.EnvNames, v.Name)
@@ -183,11 +189,13 @@ func (e *emitter) foldPipelines(pls []*ir.Pipeline) (*ir.Pipeline, error) {
 func (e *emitter) foldShared(pp string, pl *ir.Pipeline) (vars []ir.Var, group string, inputs []ir.Input, err error) {
 	vars = append(vars, pl.Env...)
 	for _, in := range pl.Inputs {
-		if !isIdent(in.Name) || hasVar(vars, in.Name) {
-			e.lose(pp, caps.PipelineInputs, "input "+in.Name+" is not a unique variable name")
+		name := inputVar(in.Name)
+		if name == "" || hasVar(vars, name) {
+			e.lose(pp, caps.PipelineInputs, "input "+in.Name+" is not a unique variable name; the variable "+name+" is taken")
+			e.dropInput(in.Name)
 			continue
 		}
-		vars = append(vars, ir.Var{Name: in.Name, Value: ir.Value{Lit: in.Default}})
+		vars = append(vars, ir.Var{Name: name, Value: ir.Value{Lit: in.Default}})
 		inputs = append(inputs, in)
 		e.emulate(pp, caps.PipelineInputs, "variable copied into every job of the pipeline", "the pipeline marker keeps the input list")
 	}

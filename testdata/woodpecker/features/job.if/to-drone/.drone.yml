@@ -6,5 +6,5 @@ steps:
   - name: build
     image: golang:1.25
     commands:
-      - 'if ! ( ( [ "$$DRONE_BUILD_EVENT" = ''push'' ] || [ "$$DRONE_BUILD_EVENT" = ''tag'' ] ) && [ "$$DRONE_COMMIT_AUTHOR" = ''release-bot'' ] ); then exit 0; fi # pipemaster:guard'
+      - 'if ! ( ( [ "$$DRONE_BUILD_EVENT" = ''push'' ] || [ "$$DRONE_BUILD_EVENT" = ''tag'' ] ) && [ "$$DRONE_COMMIT_AUTHOR" = ''release-bot'' ] ); then echo ''pipemaster: skipped: the condition of this step is false''; exit 0; fi # pipemaster:guard'
       - go build ./...

@@ -1,0 +1,29 @@
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+      branch: main
+jobs:
+  - name: build
+    plan:
+      - get: source
+        trigger: true
+      - task: produce
+        file: source/.concourse/tasks/produce.yml
+      - task: consume
+        file: source/.concourse/tasks/consume.yml
+      - load_var: ver
+        file: out/version
+        reveal: true
+      - task: announce
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: alpine, tag: "3.20"}
+          params:
+            VERSION: ((.:ver))
+          run:
+            path: sh
+            args: [-ec, 'echo "MARK loadvar.announce:$VERSION"']

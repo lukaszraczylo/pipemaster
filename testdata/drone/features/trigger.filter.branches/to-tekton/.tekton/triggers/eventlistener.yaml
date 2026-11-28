@@ -25,6 +25,12 @@ spec:
           params:
             - name: filter
               value: body.ref.startsWith('refs/heads/') && (body.ref.replace('refs/heads/','',1).matches(r'^main$') || body.ref.replace('refs/heads/','',1).matches(r'^develop$')) && !(body.ref.replace('refs/heads/','',1).matches(r'^wip$'))
+            - name: overlays
+              value:
+                - key: ctx_sha
+                  expression: body.after
+                - key: ctx_repo
+                  expression: body.repository.full_name
       bindings:
         - ref: drone-github
       template:

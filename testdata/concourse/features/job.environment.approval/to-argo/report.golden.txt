@@ -1,5 +1,4 @@
 Loss report: concourse -> argo
-[lost] pipeline/drone ext.passthrough (Ext of provider concourse (resources) is not written to the Argo file; it is kept in round-trip metadata)
-[lost] pipeline/drone/job/deploy ext.passthrough (Ext of provider concourse (gets) is not written to the Argo file; it is kept in round-trip metadata)
 [lost] pipeline/drone/job/deploy job.environment (Argo has no environment name or URL; they stay in a comment marker only)
 [lost] pipeline/drone/job/deploy/step/deploy ext.passthrough (Ext of provider concourse (config, input_mapping) is not written to the Argo file; it is kept in round-trip metadata)
+[external] pipeline/drone/job/deploy/step/source-checkout step.action: input git artifact at /workspace (the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; a private repository needs usernameSecret and passwordSecret, or sshPrivateKeySecret, on the git artifact; the file names none)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
 )
 
@@ -19,6 +20,8 @@ const (
 	// ExtCommands records how the lines of a step script group into commands, because the IR keeps one script entry
 	// per line and a command may span lines.
 	ExtCommands = "_commands"
+	// ExtBashDefault marks a step whose command holds the bash-if-present wrapper, so the step has no IR shell.
+	ExtBashDefault = "bash_default"
 )
 
 // commandShape is one command of a step: how many script lines it holds and whether its text ends in a newline.
@@ -93,6 +96,7 @@ func (w *wf) step(m *omap, id string, idx int, derived bool, mapKey string) (*ir
 	}
 	st.Image = &img
 	var cmdShapes []any
+	var bash bool
 	cmds, isScript := r.take("commands")
 	if isScript {
 		st.Kind = ir.StepScript
@@ -103,6 +107,17 @@ func (w *wf) step(m *omap, id string, idx int, derived bool, mapKey string) (*ir
 		var shapes []any
 		spans := false
 		for _, c := range l {
+			if inner, wrapped := provider.BashUnwrapCommand(esc(provider.BashOrShScript), c); wrapped {
+				t, err := w.tx.template(inner)
+				if err != nil {
+					return nil, err
+				}
+				lines := strings.Split(t, "\n")
+				st.Script = append(st.Script, lines...)
+				shapes = append(shapes, map[string]any{"lines": len(lines), "final": false})
+				bash = true
+				continue
+			}
 			t, err := w.tx.template(c)
 			if err != nil {
 				return nil, err
@@ -147,6 +162,17 @@ func (w *wf) step(m *omap, id string, idx int, derived bool, mapKey string) (*ir
 			k.keep("failure", v, caps.StepContinueOnError, "failure: "+t+" has no IR form; kept in Ext", r.line("failure"))
 		}
 	}
+	if v, ok := r.take(keyDependsOn); ok {
+		dep, err := readStepDeps(v, r.line(keyDependsOn))
+		if err != nil {
+			return nil, fmt.Errorf("step %s: %w", id, err)
+		}
+		if w.deps == nil {
+			w.deps = map[string]stepDep{}
+		}
+		w.deps[id] = dep
+		k.vals[ExtDependsOn] = plain(v)
+	}
 	if v, ok := r.take(whenKey); ok {
 		spec, err := parseWhen(v, r.line(whenKey))
 		if err != nil {
@@ -157,6 +183,9 @@ func (w *wf) step(m *omap, id string, idx int, derived bool, mapKey string) (*ir
 		}
 	}
 	k.keepRest(r, nil)
+	if bash {
+		k.vals[ExtBashDefault] = true
+	}
 	if cmdShapes != nil {
 		k.vals[ExtCommands] = cmdShapes
 	}

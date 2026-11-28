@@ -2,5 +2,7 @@ Loss report: woodpecker -> forgejo
 [emulated] pipeline/woodpecker pipeline.concurrency: concurrency group per run (Forgejo cancels earlier push and pull_request runs while concurrency is unset; the source had no concurrency, so each run gets its own group)
 [emulated] pipeline/woodpecker/job/deploy job.manual: workflow_dispatch trigger
 [emulated] pipeline/woodpecker/job/deploy job.runner: default runner label ubuntu-latest (the IR holds no runner label)
+[emulated] pipeline/woodpecker/job/deploy step.action: actions/checkout step (Woodpecker clones the repository before the steps (https://woodpecker-ci.org/docs/usage/workflow-syntax); the depth and recursive settings of the clone map to the step inputs, and GHA does not clone)
 [emulated] pipeline/woodpecker/job/deploy/step/deploy step.image: uses: docker://<image> with entrypoint and args
 [emulated] pipeline/woodpecker/trigger/0 trigger.push: branches: '**' (GHA fires a push without filters for branches and tags; branches are named explicitly to leave tags out or beside a tag filter)
+[native] pipeline/woodpecker/job/deploy/synth/checkout step.action (printed as an absolute URL; an instance that cannot reach https://github.com needs the URL edited)

@@ -1,24 +1,34 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
 # pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/compile
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/compile
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/compile
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/cleanup
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/cleanup/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/cleanup
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/cleanup
 # pipemaster:arg {"needs":[{"JobID":"compile","Artifacts":false,"Optional":false}]}
 on:
+  workflow_dispatch:
   push:
 concurrency:
   group: ${{ github.run_id }}
   cancel-in-progress: false
 jobs:
   compile:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make build
+        shell: bash
   # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
   cleanup:
     needs:
@@ -30,3 +40,4 @@ jobs:
       # pipemaster:lost job.if pipeline/gitlab-ci/job/cleanup: opaque(gitlab): - if: $PIPELINE_TYPE =~ /_MR_PIPELINE$/\n
       - id: script
         run: make clean
+        shell: bash

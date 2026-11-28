@@ -1,2 +1,3 @@
 Loss report: forgejo -> gitlab
 [external] pipeline/ci/job/build job.env: create API_KEY as a masked CI/CD variable in the project settings, protected too for protected branches (a GitLab file cannot mark a secret as one; it writes API_KEY as plain variable references and the operator sets the values there)
+[external] pipeline/ci/job/build job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)

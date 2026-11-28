@@ -1,7 +1,12 @@
 Loss report: gitlab -> argo
-[external] pipeline/gitlab-ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[lost] pipeline/gitlab-ci trigger.api (the source runs on the events api, trigger and its file has no trigger form for them; Argo has no event for them, and the file names no schedule to copy)
+[lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline and its file has no trigger form for them; Argo has no event for them, and the file names no schedule to copy)
+[lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat and its file has no trigger form for them; Argo has no event for them, and the file names no schedule to copy)
+[lost] pipeline/gitlab-ci trigger.schedule (the source runs on the events schedule and its file has no trigger form for them; Argo has no event for them, and the file names no schedule to copy)
+[external] pipeline/gitlab-ci/job/experimental/step/source-checkout step.action: input git artifact at /workspace (the ctx-repo and ctx-sha workflow parameters carry the repository and the commit; a private repository needs credentials on the git artifact, which the file does not set; a private repository needs usernameSecret and passwordSecret, or sshPrivateKeySecret, on the git artifact; the file names none)
+[external] pipeline/gitlab-ci/trigger/0 trigger.manual: empty context parameters; argo submit --from workflowtemplate/gitlab-ci (a manual run starts the template with no value for ctx-repo, ctx-sha; a checkout then clones https://github.com/.git. Pass the values with argo submit -p, or set them under spec.workflowSpec.arguments; start a run with: argo submit --from workflowtemplate/gitlab-ci; the Workflow object needs a ServiceAccount with the rights in .argo/rbac/)
 [external] pipeline/gitlab-ci/trigger/1 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[external] pipeline/gitlab-ci/trigger/2 trigger.tag: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/gitlab-ci/job/experimental/step/script step.shell: container command sh with a bash-if-present wrapper (the source runs the step under bash when the image has it; the container runs bash -e when the image has bash, else sh -e, so bash-only syntax fails under sh)
-[emulated] pipeline/gitlab-ci/trigger/0 trigger.filter.branches
 [emulated] pipeline/gitlab-ci/trigger/1 trigger.filter.branches
-[emulated] pipeline/gitlab-ci/trigger/1 trigger.tag: EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only)
+[emulated] pipeline/gitlab-ci/trigger/2 trigger.filter.branches

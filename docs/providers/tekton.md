@@ -17,6 +17,8 @@ The caps table gives the verdict external for `trigger.manual`. A person starts 
 - A cron schedule becomes a CronJob. The job posts to a second EventListener, `pipemaster-schedule`, with the header `X-Pipemaster-Schedule: <pipeline>/<n>`, and the listener entry matches only that header. The webhook listener `pipemaster` does not hold schedule entries, because GitHub must reach it from outside the cluster. Do not expose `pipemaster-schedule` with an Ingress. Any pod that reaches its service can start a run, so limit it with a NetworkPolicy that admits only the CronJob pods. The post has an empty body, so every `ctx-*` param is empty, and a checkout step in that run cannot clone.
 - The pull request filter admits only pull requests from the same repository (`head.repo.full_name == repository.full_name`). The code of a fork would otherwise run with every secret of the Task. Remove that term from the filter to accept forks.
 - The generated RBAC objects and the CronJob URL use the namespace `default`. Deploy the listener and the CronJob in that namespace, or edit the host and the subjects.
+- A catalog `git-clone` Task of another repository becomes a clone step of that repository, from a script or from `actions/checkout`. It never clones the own repository in its place. See `provider/tekton/clone_foreign.go`.
+- Each runner label becomes a `nodeSelector` key in the TriggerTemplate, and the report says which nodes to label. A workspace that jobs share becomes a directory and, on a target with one runner per job, `ws-<name>-<writer>` artifacts.
 - A matrix passes only string values. The `finally` tasks run without an order among themselves, so a `needs` edge between them is lost. A step action becomes a StepAction reference.
 - The validator checks the emitted files against embedded Tekton and CronJob schemas, and the tests also run `kubeconform`. The pinned versions are in `docs/versions.md`. `make linters` runs `scripts/install-linters.sh`, which installs the pinned `kubeconform` into `.tools/bin` beside the other linters.
 
@@ -44,7 +46,7 @@ The following table comes from `pipemaster caps --to tekton --format md`.
 | job.needs.artifacts | emulated | workspace on a PVC from volumeClaimTemplate (tasks on different nodes need ReadWriteMany or the affinity assistant) |
 | job.outputs | native | Task results |
 | job.retry | native |  |
-| job.runner | lost | (Tekton schedules pods, not runner labels) |
+| job.runner | external | workers the operator provides (each runner label becomes a taskRunSpecs podTemplate nodeSelector key runner.pipemaster.io/<label>=true in the generated TriggerTemplate; label the nodes to match) |
 | job.services | emulated | Task sidecars (the service is at localhost, not at its name) |
 | job.timeout | native |  |
 | pipeline.concurrency | lost | (Tekton has no concurrency group or cancel-in-progress) |

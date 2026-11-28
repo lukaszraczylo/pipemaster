@@ -1,16 +1,24 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
 # pipemaster:arg {"digest":"b031fe97ca33ecbd3ab02ef7b3daed552051b278e3a390168ad1737b473f6423","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"0d3a8a0ea5028ead3a0d24cdb1390576f1a0c2b87d96b6418ef606091a236c88","carry":"id: build\n"}
+# pipemaster:arg {"digest":"7958d5c1795091d13f1e30a6e1b4c97d1e7517d34d35ab6cf7a7421df182923f","carry":"id: build\n"}
+# pipemaster:emulated step.script pipeline/gitlab-ci/job/downstream
+# pipemaster:arg {"task":"bridge"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/downstream/carry
-# pipemaster:arg {"digest":"0a8831e321912a9d97ec7e04263dacd10fb4b75240e329306e6e8fc4e567a0ca","carry":"id: downstream\nneeds:\n    - job: build\n"}
+# pipemaster:arg {"digest":"e88802bc1c3a69abbb93ac8851a7a9b5da40e0f9fcd0e37698981fb6cdd409c3","carry":"id: downstream\nneeds:\n    - job: build\n"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/downstream-tag
+# pipemaster:arg {"twin_of":"downstream"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"31077445882a502d3384a2cd30d749931d715d733c6d3bef3336333bf597ef4e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"d0b624eb5280656600d77624a48f34b27c381f42c66c61d8a9958d51e5376e95","carry":"id: gitlab-ci\ntriggers:\n    - kind: manual\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/build
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2
 resources:
   - name: source
     type: git
@@ -25,8 +33,6 @@ jobs:
   - name: build
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: script
         input_mapping:
@@ -56,4 +62,61 @@ jobs:
         passed:
           - build
         trigger: true
+      - task: bridge
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          run:
+            path: sh
+            args:
+              - -ec
+              - 'printf ''%s\n'' ''pipemaster: lost: step.script pipeline/gitlab-ci/job/downstream: the job starts the pipeline of project group/other and the target has no cross-project trigger; start that pipeline by hand or with an API call'' >&2; exit 1'
+  - name: build-tag
+    plan:
       - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make build
+            dir: workspace
+  - name: downstream-tag
+    plan:
+      - get: source-tags
+        passed:
+          - build-tag
+        trigger: true
+      - task: bridge
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          run:
+            path: sh
+            args:
+              - -ec
+              - 'printf ''%s\n'' ''pipemaster: lost: step.script pipeline/gitlab-ci/job/downstream: the job starts the pipeline of project group/other and the target has no cross-project trigger; start that pipeline by hand or with an API call'' >&2; exit 1'

@@ -3,7 +3,5 @@ when:
   - event: tag
 steps:
   - image: alpine:3.20
-    entrypoint:
-      - ""
     commands:
-      - make build
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make build'

@@ -1,0 +1,66 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+        - ci/push.yml
+pipelines:
+    - ext:
+        gitlab:
+            stages:
+                - build
+                - deploy
+      id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - ext:
+            gitlab:
+                stage: build
+          id: build
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make build
+        - child:
+            gate: event == 'push'
+            pipeline:
+                ext:
+                    gitlab:
+                        workflow:
+                            rules:
+                                - if: $CI_PIPELINE_SOURCE == "push"
+                id: gitlab-ci-po
+                triggers:
+                    - kind: push
+                    - kind: tag
+                jobs:
+                    - id: x
+                      steps:
+                        - ext:
+                            gitlab:
+                                section: script
+                          id: script
+                          kind: script
+                          script:
+                            - make only
+            native:
+                - gitlab
+            files:
+                - ci/push.yml
+          ext:
+            gitlab:
+                _derived_needs: true
+                _no_script: true
+                stage: deploy
+                trigger:
+                    include: ci/push.yml
+                    strategy: depend
+          id: po
+          needs:
+            - job: build

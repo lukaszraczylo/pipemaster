@@ -1,10 +1,12 @@
 # pipemaster:emulated trigger.push pipeline/woodpecker/trigger/0
 # pipemaster:emulated pipeline.concurrency pipeline/woodpecker
+# pipemaster:emulated job.if pipeline/woodpecker/job/ci
+# pipemaster:arg {"from":"woodpecker","guard":true}
 # pipemaster:emulated job.runner pipeline/woodpecker/job/ci
 # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/build
 # pipemaster:arg {"kind":"script","image":{"Ref":"golang:1.25","Entrypoint":null},"script":["go build ./..."]}
 # pipemaster:emulated job.cache pipeline/woodpecker/job/ci
-# pipemaster:arg {"cache":[{"Key":"go-mod","Policy":"pull-push","Paths":["~/go/pkg/mod"]}],"pre":1,"post":0}
+# pipemaster:arg {"cache":[{"Key":"go-mod","Policy":"pull-push","Paths":["~/go/pkg/mod"],"FallbackKeys":null}],"pre":2,"post":0}
 on:
   push:
     branches:
@@ -14,13 +16,16 @@ concurrency:
   cancel-in-progress: false
 jobs:
   ci:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
+      - uses: https://github.com/actions/checkout@v7
       # pipemaster:emulated job.cache pipeline/woodpecker/job/ci
       - uses: https://github.com/actions/cache@v6
         with:
           path: ~/go/pkg/mod
-          key: go-mod
+          key: go-mod-run-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: go-mod-run-
       # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/build
       - id: build
         uses: docker://golang:1.25

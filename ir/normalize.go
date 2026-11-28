@@ -54,6 +54,9 @@ func normalizeJob(j *Job) {
 	}
 	sort.SliceStable(j.Needs, func(a, b int) bool { return j.Needs[a].JobID < j.Needs[b].JobID })
 	sort.Strings(j.Runner.Labels)
+	if j.Child != nil && j.Child.Pipeline != nil {
+		Normalize(&Project{Pipelines: []*Pipeline{j.Child.Pipeline}})
+	}
 	if j.Matrix != nil {
 		for _, set := range [][]Combo{j.Matrix.Include, j.Matrix.Exclude} {
 			for _, c := range set {
@@ -82,6 +85,10 @@ func triggerKey(t *Trigger) string {
 	}
 	return b.String()
 }
+
+// NormalizeTriggers puts triggers into the order that Normalize gives them, so code that adds triggers to a parsed
+// project keeps the canonical order.
+func NormalizeTriggers(ts []Trigger) { normalizeTriggers(ts) }
 
 func normalizeTriggers(ts []Trigger) {
 	sort.SliceStable(ts, func(a, b int) bool { return triggerKey(&ts[a]) < triggerKey(&ts[b]) })

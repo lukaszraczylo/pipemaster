@@ -1,3 +1,4 @@
 Loss report: gha -> gitlab
+[external] pipeline/ci/job/build job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [external] pipeline/ci/trigger/0 trigger.schedule: pipeline schedule in project settings (create a pipeline schedule: Settings > CI/CD > Schedules, cron `0 0 * * 0`)
 [external] pipeline/ci/trigger/1 trigger.schedule: pipeline schedule in project settings (create a pipeline schedule: Settings > CI/CD > Schedules, cron `30 5 * * 1-5`)

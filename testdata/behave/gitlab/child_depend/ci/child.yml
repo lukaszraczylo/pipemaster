@@ -1,0 +1,11 @@
+default:
+  image: alpine:3.20
+stages: [a, b]
+first:
+  stage: a
+  script:
+    - echo "MARK child_depend.first" | tee -a trace.log
+second:
+  stage: b
+  script:
+    - echo "MARK child_depend.second" | tee -a trace.log

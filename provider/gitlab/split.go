@@ -144,7 +144,7 @@ func restoreFoldedInputs(pl *ir.Pipeline, inputs []ir.Input) {
 	pl.Inputs = append(pl.Inputs, inputs...)
 	for _, j := range append(append([]*ir.Job{}, pl.Jobs...), pl.Finally...) {
 		for _, in := range inputs {
-			j.Env = dropVar(j.Env, in.Name)
+			j.Env = dropVar(j.Env, inputVar(in.Name))
 		}
 	}
 }

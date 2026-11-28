@@ -8,17 +8,19 @@
 # pipemaster:arg {"id":"script","written":"script-3","kind":"step"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script-3/carry
 # pipemaster:arg {"digest":"d8af446ebb7c8cc404b93459c063e15a1bf0bc52a4f5da48d315aa2b53605863","carry":"id: script\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
+# pipemaster:arg {"digest":"ccfab8ae4a946aa84558740d822f7063866e2831f07fc012ce0841001afc97a8","carry":"id: build\n"}
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
 # pipemaster:arg {"job":"build","digest":"62abb73fa37a702df364ab7a003bd5e087b188beeda2908a03e350139d142f59","tasks":["script-2","script-3"]}
-# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"61a2f078ef1b292aa12c1111756881402e4b5857c8258b0e6b764795c3242d79","carry":"id: build\n"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\nfinally:\n    - if: failure()\n      id: alert\n      needs:\n        - job: build\n      steps:\n        - id: script\n          kind: script\n          script:\n            - ./page.sh\n    - id: report\n      needs:\n        - job: build\n      steps:\n        - id: script\n          kind: script\n          script:\n            - ./notify.sh\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/alert
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/alert/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/alert/step/script
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/build
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/report/step/script
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/report/step/script
@@ -37,8 +39,6 @@ jobs:
   - name: build
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: script
         input_mapping:
@@ -85,6 +85,72 @@ jobs:
       task: script-3
       input_mapping:
         workspace: source
+      config:
+        platform: linux
+        image_resource:
+          type: registry-image
+          source:
+            repository: ubuntu
+            tag: latest
+        inputs:
+          - name: workspace
+        outputs:
+          - name: workspace
+        run:
+          path: sh
+          args:
+            - -ec
+            - ./notify.sh
+          dir: workspace
+  - name: build-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - make build
+            dir: workspace
+    on_failure:
+      task: script-2
+      input_mapping:
+        workspace: source-tags
+      config:
+        platform: linux
+        image_resource:
+          type: registry-image
+          source:
+            repository: ubuntu
+            tag: latest
+        inputs:
+          - name: workspace
+        outputs:
+          - name: workspace
+        run:
+          path: sh
+          args:
+            - -ec
+            - ./page.sh
+          dir: workspace
+    ensure:
+      task: script-3
+      input_mapping:
+        workspace: source-tags
       config:
         platform: linux
         image_resource:

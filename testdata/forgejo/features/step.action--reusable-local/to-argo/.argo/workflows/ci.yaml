@@ -1,0 +1,127 @@
+# pipemaster:emulated job.env pipeline/ci/job/release-apply
+# pipemaster:arg {"vars":"- name: DEPLOY_TOKEN\n  value:\n    secret: DEPLOY_TOKEN\n","names":["DEPLOY_TOKEN"]}
+# pipemaster:emulated job.runner pipeline/ci/job/build
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
+# pipemaster:emulated job.runner pipeline/ci/job/notify
+# pipemaster:emulated step.shell pipeline/ci/job/notify/step/notify-step-1
+# pipemaster:emulated job.runner pipeline/ci/job/release-apply
+# pipemaster:emulated step.shell pipeline/ci/job/release-apply/step/release-apply-step-1
+# pipemaster:emulated job.runner pipeline/ci/job/release-plan
+# pipemaster:emulated step.shell pipeline/ci/job/release-plan/step/release-plan-step-1
+# pipemaster:emulated config.name pipeline/ci/ref/secrets.DEPLOY_TOKEN
+# pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
+# pipemaster:emulated trigger.push pipeline/ci/trigger/0
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ci
+  annotations:
+    workflows.argoproj.io/title: ci
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-ref-name
+        value: ""
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+          - name: notify
+            template: notify
+            dependencies:
+              - release-apply
+          - name: release-apply
+            template: release-apply
+            dependencies:
+              - release-plan
+            when: '{{= workflow.parameters[''ctx-ref-name''] == ''main'' }}'
+          - name: release-plan
+            template: release-plan
+            dependencies:
+              - build
+            when: '{{= workflow.parameters[''ctx-ref-name''] == ''main'' }}'
+    - name: build
+      containerSet:
+        containers:
+          - name: build-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -c
+            args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make build
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: notify
+      containerSet:
+        containers:
+          - name: notify-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -c
+            args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo released
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: release-apply
+      containerSet:
+        containers:
+          - name: release-apply-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -c
+            args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - deploy --env "staging"
+            workingDir: /workspace
+            env:
+              - name: DEPLOY_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: ci-secrets
+                    key: DEPLOY_TOKEN
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace
+    - name: release-plan
+      containerSet:
+        containers:
+          - name: release-plan-step-1
+            image: alpine:3.22
+            command:
+              - sh
+              - -c
+            args:
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo "planning for staging"
+            workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - emptyDir: {}
+          name: workspace

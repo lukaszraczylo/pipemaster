@@ -110,7 +110,7 @@ func sortedAny(m map[string]any) []string {
 // extOf returns the gitlab part of an Ext.
 func extOf(e map[string]any) map[string]any {
 	m, _ := e[dialect].(map[string]any)
-	return m
+	return emitkit.WithoutCarried(m)
 }
 
 // addExtra appends every Ext key not in skip and not already set, sorted by key.

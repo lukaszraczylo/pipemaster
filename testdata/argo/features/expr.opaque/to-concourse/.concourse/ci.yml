@@ -1,14 +1,17 @@
 # pipemaster:emulated display.name pipeline/ci
 # pipemaster:arg {"name":"opaque","id":"ci","written":"ci","kind":"pipeline"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"a36fd8277fad7e82a974fe93a25311015607d14182cd2a457e56cd96427280c0","carry":"id: build-step-1\nkind: script\nscript:\n    - 'echo $\u007b{ opaque(gha): env[github.job] }}'\n"}
+# pipemaster:arg {"digest":"c3d8259353488268e4e1f887a46ca5ad000a551e4cd80d65f3df8ad20ac8dcf6","carry":"id: build-step-1\nkind: script\nscript:\n    - 'echo $\u007b{ opaque(gha): env[github.job] }}'\n"}
 # pipemaster:emulated job.manual pipeline/ci/job/build
 # pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"0a50755cdbf483e19338b0909149b9220040e8fdc6bccbbb981b15fc6ba3a14c","carry":"if: 'opaque(gha): fromJSON(''{\"a\":1}'').a == 1'\nid: build\n"}
+# pipemaster:arg {"digest":"7aa43595a6127751a3de18f560f6bde4c38002177e1a966e955b9f959ed5c6ae","carry":"if: 'opaque(gha): fromJSON(''{\"a\":1}'').a == 1'\nid: build\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: ci\nname: opaque\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
@@ -25,7 +28,6 @@ jobs:
   - name: build
     plan:
       - get: source
-      - get: source-tags
       - task: build-step-1
         input_mapping:
           workspace: source
@@ -44,5 +46,32 @@ jobs:
             path: sh
             args:
               - -ec
-              - '# pipemaster:lost echo {{ opaque(gha): env[github.job] }}'
+              - |-
+                # pipemaster:lost echo {{ opaque(gha): env[github.job] }}
+                printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Concourse spelling for expression opaque(gha): env[github.job]; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
+            dir: workspace
+  - name: build-tag
+    plan:
+      - get: source-tags
+      - task: build-step-1
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - |-
+                # pipemaster:lost echo {{ opaque(gha): env[github.job] }}
+                printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Concourse spelling for expression opaque(gha): env[github.job]; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
             dir: workspace

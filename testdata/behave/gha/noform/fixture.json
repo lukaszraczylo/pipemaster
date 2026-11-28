@@ -1,0 +1,15 @@
+{
+  "features": [
+    "step.action",
+    "ext.passthrough"
+  ],
+  "events": [
+    "push-main",
+    "push-branch"
+  ],
+  "expect_failure": true,
+  "unordered": false,
+  "expect": [],
+  "owners": {},
+  "requires": []
+}

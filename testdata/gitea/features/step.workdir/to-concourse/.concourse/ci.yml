@@ -3,14 +3,16 @@
 # pipemaster:emulated step.workdir pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"workdir":"./cmd/app","wrote":"workspace/cmd/app"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"7036db62987952fff0145f9cd48a9ece2c6fe7f4475fc96a7e529ca778355e67","carry":"id: build-step-1\nkind: script\nworkdir: ./cmd/app\n"}
+# pipemaster:arg {"digest":"23080ded2634db992dafeede8d6f054a4e5ea5b0e66874afa982233a67cc6cf5","carry":"id: build-step-1\nkind: script\nworkdir: ./cmd/app\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"428c863a10042b8c764c954bb18ddb816ae6fb79ddb71247eeeabec1d8bc2732","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"0a55988aa0474864b29de7039455e0108050319eb78109f431815a75bd5b306d","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: workdir\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
-# pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
@@ -28,8 +30,6 @@ jobs:
   - name: build
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: build-step-1
         input_mapping:
@@ -53,5 +53,29 @@ jobs:
               - pipemaster
               - ls
             dir: workspace/cmd/app
-        tags:
-          - ubuntu-latest
+  - name: build-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - ls
+            dir: workspace/cmd/app

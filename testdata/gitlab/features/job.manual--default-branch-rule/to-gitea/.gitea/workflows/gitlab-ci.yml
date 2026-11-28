@@ -1,18 +1,22 @@
-# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/publish
+# pipemaster:arg {"src":"branch == default_branch"}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/publish
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/publish/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/publish
 # pipemaster:arg {"pre":1,"post":0}
 on:
-  push:
-  # pipemaster:emulated job.manual pipeline/gitlab-ci/job/publish
   workflow_dispatch:
+  push:
 jobs:
   # pipemaster:emulated job.manual pipeline/gitlab-ci/job/publish
   publish:
-    if: false
+    if: github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # pipemaster:lost job.if pipeline/gitlab-ci/job/publish: branch == gitlab.CI_DEFAULT_BRANCH
       - id: script
         run: make publish
+        shell: bash

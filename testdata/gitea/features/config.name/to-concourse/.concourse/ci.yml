@@ -3,14 +3,16 @@
 # pipemaster:emulated config.name pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"vars":["CI_MODE"]}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
-# pipemaster:arg {"digest":"01a8fd01058b318c9ca504479bb4d2247aec0054e986bf693ad8309130551bc3","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.CI_MODE }}\"\nenv:\n    - name: KEY\n      value:\n        secret: GITEA_DEPLOY\n    - name: TOKEN\n      value:\n        secret: GITHUB_TOKEN\n"}
+# pipemaster:arg {"digest":"714a7e7fb970b2848b0be3749e99c7b640f803fc59bd4a614ecf14163ca33d01","carry":"id: build-step-1\nkind: script\nscript:\n    - echo \"$\u007b{ vars.CI_MODE }}\"\nenv:\n    - name: KEY\n      value:\n        secret: GITEA_DEPLOY\n    - name: TOKEN\n      value:\n        secret: GITHUB_TOKEN\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"6a8f9500deade29e2ead7f1e89a6b531226556adea93c2c1ce01986d8e616e9d","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:arg {"digest":"6c0cd85b55c9e746f0b58a8911e7f67659ddb29860c8f3f0017bf2cc1dd19f60","carry":"id: build\nrunner:\n    labels:\n        - ubuntu-latest\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: config\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated job.runner pipeline/ci/job/build
-# pipemaster:emulated trigger.push pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
@@ -28,8 +30,6 @@ jobs:
   - name: build
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: build-step-1
         input_mapping:
@@ -57,5 +57,33 @@ jobs:
               - pipemaster
               - echo "${CI_MODE}"
             dir: workspace
-        tags:
-          - ubuntu-latest
+  - name: build-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          params:
+            KEY: ((GITEA_DEPLOY))
+            TOKEN: ((GITHUB_TOKEN))
+            CI_MODE: ((CI_MODE))
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - echo "${CI_MODE}"
+            dir: workspace

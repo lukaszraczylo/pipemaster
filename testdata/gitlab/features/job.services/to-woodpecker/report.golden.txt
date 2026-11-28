@@ -1,2 +1,5 @@
 Loss report: gitlab -> woodpecker
-[lost] pipeline/gitlab-ci/job/test/step/script step.shell (Woodpecker runs commands through /bin/sh -e of the image; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash)
+[lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline and its file has no trigger form for them; Woodpecker has no event for them)
+[lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat and its file has no trigger form for them; Woodpecker has no event for them)
+[emulated] pipeline/gitlab-ci trigger.manual: manual or deployment event (the source runs on these events and its file has no trigger form for them; Woodpecker starts each as its nearest event: api as manual, trigger as manual)
+[emulated] pipeline/gitlab-ci/job/test/step/script step.shell: bash-if-present wrapper command (the source runs the step under bash when the image has it; Woodpecker runs commands through /bin/sh -e of the image, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh)

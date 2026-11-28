@@ -1,9 +1,12 @@
+# pipemaster:emulated job.if pipeline/ci/job/build
+# pipemaster:arg {"from":"argo","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/build
 name: timeout
 on:
   push:
 jobs:
   build:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

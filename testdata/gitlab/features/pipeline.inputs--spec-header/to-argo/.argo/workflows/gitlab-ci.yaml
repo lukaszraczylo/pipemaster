@@ -1,13 +1,17 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/deploy/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:arg {"vars":"- name: TAG\n  value:\n    lit: $[[ inputs.image_tag ]]\n","names":["TAG"]}
 # pipemaster:emulated pipeline.inputs pipeline/gitlab-ci
 # pipemaster:arg {"types":{"dry_run":"boolean","image_tag":"string"}}
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/deploy/step/script
-# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/1
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/2
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
@@ -23,6 +27,10 @@ spec:
       - name: image_tag
         value: latest
         description: Image tag to deploy
+      - name: ctx-sha
+        value: ""
+      - name: ctx-repo
+        value: ""
   templates:
     - name: main
       dag:
@@ -32,7 +40,8 @@ spec:
     - name: deploy
       containerSet:
         containers:
-          - name: script
+          - # pipemaster:id script
+            name: main
             image: alpine:3.22
             command:
               - sh
@@ -48,6 +57,13 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+      inputs:
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       volumes:
         - emptyDir: {}
           name: workspace

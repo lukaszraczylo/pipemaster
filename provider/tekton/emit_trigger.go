@@ -1,7 +1,9 @@
 package tekton
 
 import (
+	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -43,6 +46,7 @@ type filterArg struct {
 	Branches ir.Filter      `json:"branches"`
 	Tags     ir.Filter      `json:"tags"`
 	Paths    ir.Filter      `json:"paths"`
+	Actions  []string       `json:"actions,omitempty"`
 }
 
 // globRegex turns a glob into an anchored RE2 text. It admits only `*` (not across `/`), `**`, `?` and literals;
@@ -93,6 +97,31 @@ func matchAny(target string, globs []string) (string, bool) {
 // filterTarget is a ref text with the ref prefix removed.
 func trimRef(prefix string) string { return "body.ref.replace('" + prefix + "','',1)" }
 
+// actionsExpr is the action test of a pull request filter: the default set when actions is empty.
+func actionsExpr(actions []string) string {
+	if len(actions) == 0 {
+		return prActionsExpr
+	}
+	return "body.action in ['" + strings.Join(actions, "','") + "']"
+}
+
+// triggerActions reads the pull request actions that a source names, as GHA types.
+func triggerActions(t ir.Trigger) []string {
+	m, _ := t.Ext["gha"].(map[string]any)
+	var out []string
+	switch v := m["types"].(type) {
+	case []string:
+		out = slices.Clone(v)
+	case []any:
+		for _, x := range v {
+			if s, ok := x.(string); ok {
+				out = append(out, s)
+			}
+		}
+	}
+	return out
+}
+
 // celFilter writes the CEL filter of a trigger. ok is false when a glob has no exact regex.
 func celFilter(a filterArg) (string, bool) {
 	var conds []string
@@ -111,7 +140,7 @@ func celFilter(a filterArg) (string, bool) {
 			return "", false
 		}
 	case ir.TriggerPR:
-		conds = append(conds, prActionsExpr, prSameRepoExpr)
+		conds = append(conds, actionsExpr(a.Actions), prSameRepoExpr)
 		if !branch("body.pull_request.base.ref") {
 			return "", false
 		}
@@ -170,8 +199,16 @@ var kindFeature = map[ir.TriggerKind]caps.Feature{ir.TriggerPush: caps.TriggerPu
 // overlayKey is the extensions key that carries a ctx param.
 func overlayKey(param string) string { return strings.ReplaceAll(param, "-", "_") }
 
+// overlayDialect holds what a source dialect means by the event and the branch of a run.
+// prTarget makes the branch of a pull request its base branch, when no other value carries the base.
+type overlayDialect struct{ tagEvent, prTarget bool }
+
+// overlayDialects lists every spelling that the emitter writes, so the parser accepts each one.
+var overlayDialects = []overlayDialect{{}, {tagEvent: true}, {prTarget: true}, {tagEvent: true, prTarget: true}}
+
 // ctxOverlay is the CEL expression that computes a context value for one trigger kind.
-func ctxOverlay(kind ir.TriggerKind, ctx string) string {
+func ctxOverlay(kind ir.TriggerKind, ctx string, d overlayDialect) string {
+	tagEvent := d.tagEvent
 	q := expr.QuoteSingle
 	push := kind == ir.TriggerPush
 	tag := kind == ir.TriggerTag
@@ -183,11 +220,18 @@ func ctxOverlay(kind ir.TriggerKind, ctx string) string {
 			return q("pull_request")
 		case ir.TriggerSchedule:
 			return q("schedule")
+		case ir.TriggerTag:
+			if tagEvent {
+				return q("tag")
+			}
 		}
 		return q("push")
 	case expr.CtxBranch:
 		if push {
 			return trimRef(refHeads)
+		}
+		if pr && d.prTarget {
+			return "body.pull_request.base.ref"
 		}
 	case expr.CtxTag:
 		if tag {
@@ -239,6 +283,14 @@ func ctxOverlay(kind ir.TriggerKind, ctx string) string {
 		if pr {
 			return "body.pull_request.head.ref"
 		}
+	case expr.CtxBeforeSHA:
+		if push || tag {
+			return "body.before"
+		}
+	case expr.CtxPRBaseSHA:
+		if pr {
+			return "body.pull_request.base.sha"
+		}
 	case expr.CtxPRBaseRef:
 		if pr {
 			return "body.pull_request.base.ref"
@@ -264,6 +316,9 @@ func cronFile(d *outDoc) string {
 func (e *emitter) eventTrigger(pp *plan, i int, path string, t ir.Trigger, ctxs []string, bname, tname string) (*yaml.Node, error) {
 	tn := triggerName(pp, t.Kind, i)
 	arg := filterArg{Kind: t.Kind, Branches: t.Branches, Tags: t.Tags, Paths: t.Paths, Name: tn}
+	if t.Kind == ir.TriggerPR {
+		arg.Actions = triggerActions(t)
+	}
 	filter, ok := celFilter(arg)
 	if !ok {
 		filter = "false"
@@ -329,7 +384,10 @@ func (e *emitter) triggerEntry(name string, kind ir.TriggerKind, filter string, 
 		p, _ := ctxparam.Param(strings.Split(c, "."))
 		o := newMap()
 		o.SetStr("key", overlayKey(p))
-		o.SetStr("expression", ctxOverlay(kind, c))
+		o.SetStr("expression", ctxOverlay(kind, c, overlayDialect{
+			tagEvent: emitkit.TagIsEvent(e.origin),
+			prTarget: emitkit.PRBranchIsTarget(e.origin) && !slices.Contains(ctxs, expr.CtxPRBaseRef),
+		}))
 		overlays.Content = append(overlays.Content, o.N)
 	}
 	cel := newMap()
@@ -380,6 +438,53 @@ func (e *emitter) bindingDoc(name string, ctxs []string) *outDoc {
 	return &outDoc{Root: root.N, Head: []string{generatedMarker}}
 }
 
+// taskRunSpecs writes one taskRunSpecs entry per task with runner tags: a podTemplate nodeSelector with one label
+// per tag. It returns nil when no task has a tag.
+func taskRunSpecs(pp *plan) *yaml.Node {
+	var specs []*yaml.Node
+	for _, jp := range pp.jobs {
+		if len(jp.nodeSel) == 0 {
+			continue
+		}
+		sel := newMap()
+		for _, k := range slices.Sorted(maps.Keys(jp.nodeSel)) {
+			sel.SetStr(k, jp.nodeSel[k])
+		}
+		pt := newMap()
+		pt.Set("nodeSelector", sel.N)
+		m := newMap()
+		m.SetStr("pipelineTaskName", jp.tname)
+		m.Set("podTemplate", pt.N)
+		specs = append(specs, m.N)
+	}
+	if len(specs) == 0 {
+		return nil
+	}
+	return seqOf(specs...)
+}
+
+// reportNodeSelectors reports the runner tags of the tasks of a plan. A TriggerTemplate that this emitter wrote
+// carries them; otherwise no PipelineRun of the output can hold them.
+func (e *emitter) reportNodeSelectors(pp *plan, templated bool) {
+	for _, jp := range pp.jobs {
+		if len(jp.nodeSel) > 0 {
+			var keys []string
+			for _, k := range slices.Sorted(maps.Keys(jp.nodeSel)) {
+				keys = append(keys, k+"="+jp.nodeSel[k])
+			}
+			if templated {
+				e.external(jp.path, caps.JobRunner, "workers the operator provides", "label the nodes "+strings.Join(keys, ", ")+" for the runner labels and selector (taskRunSpecs podTemplate nodeSelector of the TriggerTemplate; a run started with tkn pipeline start skips it)")
+			} else {
+				e.lose(jp.path, caps.JobRunner, "the runner labels need a taskRunSpecs podTemplate nodeSelector ("+strings.Join(keys, ", ")+") on the PipelineRun, and this output has no generated TriggerTemplate to hold it")
+			}
+		}
+		// The external entry goes first so the lost entry that follows holds both texts.
+		for _, m := range jp.runnerLost {
+			e.lose(jp.path, caps.JobRunner, m)
+		}
+	}
+}
+
 func (e *emitter) templateDoc(pp *plan, name string, ctxs []string) *outDoc {
 	root := newMap()
 	root.SetStr("apiVersion", apiTriggersV1)
@@ -420,6 +525,9 @@ func (e *emitter) templateDoc(pp *plan, name string, ctxs []string) *outDoc {
 		w.SetStr("name", workspaceName)
 		w.Set("volumeClaimTemplate", vc.N)
 		rs.Set("workspaces", seqOf(w.N))
+	}
+	if trs := taskRunSpecs(pp); trs != nil {
+		rs.Set("taskRunSpecs", trs)
 	}
 	run.Set("spec", rs.N)
 	spec := newMap()

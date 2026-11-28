@@ -1,4 +1,4 @@
 Loss report: forgejo -> gitea
-[emulated] pipeline/gitlab-ci/job/build job.cache: actions/cache step
+[emulated] pipeline/gitlab-ci/job/build job.cache: actions/cache step; policy pull is actions/cache/restore, policy push is actions/cache/save at job end (a key with no hashFiles call becomes a rolling key (<key>-run-<run_id>-<run_attempt>, restored by prefix) so each run saves a cache as GitLab does; GitHub restores only caches of the current branch, the base branch of a pull request and the default branch, while a GitLab key with no branch part is shared across branches)
 [emulated] pipeline/gitlab-ci/job/build job.runner: default runner label ubuntu-latest (the IR holds no runner label)
 [native] pipeline/gitlab-ci/job/build/synth/cache step.action (resolves against DEFAULT_ACTIONS_URL; default github)

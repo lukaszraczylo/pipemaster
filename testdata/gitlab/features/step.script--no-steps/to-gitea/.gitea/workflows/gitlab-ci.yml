@@ -1,20 +1,32 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/downstream
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/downstream
 # pipemaster:emulated step.script pipeline/gitlab-ci/job/downstream
 on:
+  workflow_dispatch:
   push:
 jobs:
   build:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - id: script
         run: make build
+        shell: bash
   downstream:
     needs:
       - build
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
-      - run: "true"
+      - run: 'printf ''%s\n'' ''pipemaster: lost: step.script pipeline/gitlab-ci/job/downstream: the job starts the pipeline of project group/other and the target has no cross-project trigger; start that pipeline by hand or with an API call'' >&2; exit 1'

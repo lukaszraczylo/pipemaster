@@ -167,6 +167,8 @@ func anchored(prefix string, globs []string) ([]string, bool) {
 }
 
 // triggerFilters builds the filters of the dependency of one IR trigger. why is empty when it succeeded.
+// A push trigger with no branch filter takes the filter of the branch refs, because a webhook for a tag push is
+// a push event and would otherwise start it.
 func triggerFilters(t ir.Trigger) (filters map[string]any, event, why string) {
 	var data, exprs []any
 	refFilter := func(prefix string, f ir.Filter) string {
@@ -177,7 +179,7 @@ func triggerFilters(t ir.Trigger) (filters map[string]any, event, why string) {
 		switch {
 		case len(vals) > 0:
 			data = append(data, dataFilterNode(pathRef, vals))
-		case t.Kind == ir.TriggerTag:
+		case t.Kind == ir.TriggerTag || t.Kind == ir.TriggerPush:
 			data = append(data, dataFilterNode(pathRef, []string{regexAnchorBeg + prefix + globAnyTail + regexAnchorEnd}))
 		}
 		for _, x := range f.Exclude {

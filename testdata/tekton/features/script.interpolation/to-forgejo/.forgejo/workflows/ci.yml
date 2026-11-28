@@ -1,4 +1,6 @@
 # pipemaster:emulated pipeline.concurrency pipeline/ci
+# pipemaster:emulated job.if pipeline/ci/job/build
+# pipemaster:arg {"from":"tekton","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/build
 name: interp
 on:
@@ -8,9 +10,12 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - id: build-step-1
         run: |
-          echo "sha ${{ github.sha }} on ${{ github.ref_name }}"
+          echo "sha ${{ github.sha }} on ${PIPEMASTER_REF_1}"
           # pipemaster:lost script.interpolation: echo "{{ gha.github.workspace }}"
+        env:
+          PIPEMASTER_REF_1: ${{ github.ref_name }}

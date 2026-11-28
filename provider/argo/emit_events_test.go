@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
@@ -137,5 +138,76 @@ func TestCronParseBack(t *testing.T) {
 	}
 	if strings.Contains(cron, "\n  schedule:") {
 		t.Errorf("the cron holds the schedule key:\n%s", cron)
+	}
+}
+
+func TestTagTriggerSetsTheEventOfTheSourceDialect(t *testing.T) {
+	for origin, want := range map[string]string{"gha": "value: push", "woodpecker": "value: tag", "drone": "value: tag", "concourse": "value: tag", "gitlab": "value: push", "gitea": "value: push"} {
+		t.Run(origin, func(t *testing.T) {
+			p := project(scriptJob("build", "echo ${{ event }}"))
+			p.Origin = ir.Origin{Provider: origin, Dialect: origin}
+			p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{"v1.*"}}}}
+			files, _ := emit(t, p)
+			s := files[".argo/events/sensor.yaml"]
+			if !strings.Contains(s, want) {
+				t.Fatalf("sensor lacks %q:\n%s", want, s)
+			}
+		})
+	}
+}
+
+func TestPushTriggerAdmitsBranchRefsOnly(t *testing.T) {
+	for name, tc := range map[string]struct {
+		triggers []ir.Trigger
+		want     bool
+	}{
+		"push and tag": {[]ir.Trigger{{Kind: ir.TriggerPush}, {Kind: ir.TriggerTag}}, true},
+		"push alone":   {[]ir.Trigger{{Kind: ir.TriggerPush}}, true},
+		"tag alone":    {[]ir.Trigger{{Kind: ir.TriggerTag}}, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := project(scriptJob("build", "x"))
+			p.Pipelines[0].Triggers = tc.triggers
+			files, _ := emit(t, p)
+			if got := strings.Contains(files[".argo/events/sensor.yaml"], "^refs/heads/.*$"); got != tc.want {
+				t.Fatalf("branch ref filter = %v, want %v:\n%s", got, tc.want, files[".argo/events/sensor.yaml"])
+			}
+			back := roundTrip(t, files)
+			stripExt(back)
+			ir.Normalize(p)
+			if ok, diff := ir.Equal(p, back); !ok {
+				t.Fatalf("round trip differs:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestEventTriggersReportTheirOwnFeature(t *testing.T) {
+	for kind, want := range map[ir.TriggerKind]caps.Feature{ir.TriggerPush: caps.TriggerPush, ir.TriggerPR: caps.TriggerPullRequest, ir.TriggerTag: caps.TriggerTag} {
+		t.Run(string(kind), func(t *testing.T) {
+			p := project(scriptJob("build", "x"))
+			p.Pipelines[0].Triggers = []ir.Trigger{{Kind: kind}}
+			_, rep := emit(t, p)
+			for _, e := range rep.Entries {
+				if e.Feature == want && e.Level == caps.External && strings.Contains(e.Strategy, "webhook secret") {
+					return
+				}
+			}
+			t.Fatalf("no external %s entry for the webhook secret: %+v", want, rep.Entries)
+		})
+	}
+}
+
+func TestPullRequestBranchIsTheTargetForDroneAndWoodpecker(t *testing.T) {
+	for origin, want := range map[string]string{"drone": "dataKey: body.pull_request.base.ref", "woodpecker": "dataKey: body.pull_request.base.ref", "gha": "dataKey: body.pull_request.head.ref"} {
+		t.Run(origin, func(t *testing.T) {
+			p := project(scriptJob("build", "echo ${{ branch }}"))
+			p.Origin = ir.Origin{Provider: origin, Dialect: origin}
+			p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerPR}}
+			files, _ := emit(t, p)
+			if s := files[".argo/events/sensor.yaml"]; !strings.Contains(s, want) {
+				t.Fatalf("sensor lacks %q:\n%s", want, s)
+			}
+		})
 	}
 }

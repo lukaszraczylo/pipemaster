@@ -3,6 +3,7 @@ package tekton
 import (
 	"maps"
 	"regexp"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -93,6 +94,7 @@ type taskCtx struct {
 	image        string
 	containerRef string
 	params       []string
+	steps        int
 	checkout     bool
 	ws           bool
 }
@@ -149,7 +151,10 @@ func (tc *taskCtx) inputParam(in string) (string, bool) {
 		return "", false
 	}
 	want := pname
-	if tc.matrix[pname] {
+	if n, ok := tc.boundName(pname); ok {
+		want = n
+	}
+	if tc.matrix[want] {
 		want = "input-" + pname
 	}
 	return tc.param(expr.PrefixInputs+"."+in, want, paramPrefix+pname+paramClose), true
@@ -297,11 +302,23 @@ func (tc *taskCtx) text(sc *stepScope, path string, f caps.Feature, m textMode, 
 		return "", false, err
 	}
 	out, lost := tc.convert(sc, path, m, parts)
+	if f == caps.StepImage || f == caps.JobContainer || f == caps.JobServices {
+		tc.noteImageCtx(path, out)
+	}
 	for _, l := range lost {
 		tc.e.lose(path, f, "no Tekton spelling for expression "+l)
 		tc.e.comment(path, string(f)+" "+path+": {{ "+l+" }}")
 	}
 	return out, len(lost) == 0, nil
+}
+
+// noteImageCtx records the ctx-* params that the converted image text reads.
+func (tc *taskCtx) noteImageCtx(path, img string) {
+	for _, p := range ctxParams() {
+		if strings.Contains(img, paramPrefix+p+paramClose) && !slices.Contains(tc.pp.imageCtx[path], p) {
+			tc.pp.imageCtx[path] = append(tc.pp.imageCtx[path], p)
+		}
+	}
 }
 
 // scriptLine converts one script line. why is empty when the line stays; otherwise it names the expressions that
@@ -365,8 +382,9 @@ func (tc *taskCtx) valueNode(sc *stepScope, path, name string, v ir.Value) (*yam
 	return nameValue(name, out), nil
 }
 
-// envList renders variables as a Kubernetes env list in order; a name already in sc is skipped.
-func (tc *taskCtx) envList(sc *stepScope, path string, vs []ir.Var) ([]*yaml.Node, error) {
+// envList renders variables as a Kubernetes env list in order; a name already in sc is skipped. A value that
+// still equals the IR text recorded in ws returns to its source text.
+func (tc *taskCtx) envList(sc *stepScope, path string, vs []ir.Var, ws any) ([]*yaml.Node, error) {
 	var out []*yaml.Node
 	seen := map[string]bool{}
 	for _, v := range vs {
@@ -374,6 +392,10 @@ func (tc *taskCtx) envList(sc *stepScope, path string, vs []ir.Var) ([]*yaml.Nod
 			continue
 		}
 		seen[v.Name] = true
+		if src, ok := tc.envSource(ws, v); ok {
+			out = append(out, nameValue(v.Name, src))
+			continue
+		}
 		n, err := tc.valueNode(sc, path, v.Name, v.Value)
 		if err != nil {
 			return nil, err
@@ -383,4 +405,58 @@ func (tc *taskCtx) envList(sc *stepScope, path string, vs []ir.Var) ([]*yaml.Nod
 		}
 	}
 	return out, nil
+}
+
+// envSource returns the source text of a value that the parser rewrote for a workspace path.
+func (tc *taskCtx) envSource(ws any, v ir.Var) (string, bool) {
+	m, _ := ws.(map[string]any)
+	pair, _ := m[v.Name].([]any)
+	if !tc.e.own || len(pair) != 2 || v.Value.Kind != ir.ValueLit {
+		return "", false
+	}
+	irText, _ := pair[0].(string)
+	src, _ := pair[1].(string)
+	return src, v.Value.Lit == irText
+}
+
+// legacySpelling writes $(inputs.params.x) back for the params that the parsed Task spelled that way.
+func legacySpelling(nodes []*yaml.Node, names any) {
+	list, _ := names.([]any)
+	if len(list) == 0 {
+		return
+	}
+	var pairs []string
+	for _, n := range list {
+		if s, ok := n.(string); ok {
+			pairs = append(pairs, paramPrefix+s+paramClose, varOpen+legacyParamPrefix+s+paramClose)
+		}
+	}
+	r := strings.NewReplacer(pairs...)
+	var walk func(n *yaml.Node)
+	walk = func(n *yaml.Node) {
+		if n.Kind == yaml.ScalarNode {
+			n.Value = r.Replace(n.Value)
+		}
+		for _, c := range n.Content {
+			walk(c)
+		}
+	}
+	for _, n := range nodes {
+		walk(n)
+	}
+}
+
+// boundName finds the Task param that the parsed PipelineTask bound to the pipeline param, so the Task keeps its
+// own param name.
+func (tc *taskCtx) boundName(pname string) (string, bool) {
+	if !tc.e.own {
+		return "", false
+	}
+	bound, _ := extOf(tc.jp.j.Ext)[ExtBoundParams].(map[string]any)
+	for _, name := range sortedKeys(bound) {
+		if v, _ := bound[name].(string); v == paramPrefix+pname+paramClose {
+			return name, true
+		}
+	}
+	return "", false
 }

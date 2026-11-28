@@ -1,0 +1,5 @@
+default:
+  image: alpine:3.20
+only_job:
+  script:
+    - echo "MARK child_nodepend.child" | tee -a trace.log

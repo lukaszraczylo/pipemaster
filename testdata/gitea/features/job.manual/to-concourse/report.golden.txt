@@ -1,6 +1,7 @@
 Loss report: gitea -> concourse
 [lost] pipeline/gitlab-ci/trigger/0 trigger.filter.branches (the push trigger has no branch filter, and a git resource follows one branch; the resource follows the default branch of the repository)
 [emulated] pipeline/gitlab-ci ext.passthrough: git-uri variable (the git resources read their uri from ((git-uri)); set it with fly set-pipeline -v git-uri=<uri> or in the credential manager)
+[emulated] pipeline/gitlab-ci trigger.tag: tag twin of each job (a job cannot wait on a branch push and on a tag, because a tag resource has no version on a push; each job has a twin named <job>-tag that follows the tag resource, and the twin of a needed job feeds the twin that needs it)
 [emulated] pipeline/gitlab-ci/job/deploy job.allow_failure: try around the plan (the job shows success when the plan fails)
 [emulated] pipeline/gitlab-ci/job/deploy job.manual: job with no triggering get (a person starts the job; Concourse has no approver identity)
 [emulated] pipeline/gitlab-ci/job/deploy/step/script step.image: default image (the task names no image, so it runs ubuntu:latest)

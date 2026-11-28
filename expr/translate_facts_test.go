@@ -200,7 +200,7 @@ func TestTranslateFactsTable(t *testing.T) {
 		{`'main' == github.ref_name`, "woodpecker",
 			`!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH matches "(?i)^main$"`, branchFacts},
 		{`github.ref_name == 'main' || github.event_name == 'schedule'`, "woodpecker",
-			`!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH matches "(?i)^main$" || CI_PIPELINE_EVENT matches "(?i)^cron$"`, branchFacts},
+			`(CI_PIPELINE_EVENT matches "(?i)^push$" || CI_PIPELINE_EVENT matches "(?i)^tag$" || CI_PIPELINE_EVENT matches "(?i)^cron$" || CI_PIPELINE_EVENT matches "(?i)^manual$") && CI_COMMIT_BRANCH matches "(?i)^main$" || CI_PIPELINE_EVENT matches "(?i)^cron$"`, branchFacts},
 		// No facts: refused as before.
 		{`github.ref_name == 'main'`, "woodpecker", ``, expr.Facts{}},
 		// A branch guard gains the pull request test: CI_COMMIT_BRANCH is the target branch there.

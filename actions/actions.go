@@ -8,7 +8,9 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -35,13 +37,15 @@ const versionFileCaveat = "version read from file at runtime"
 
 // Target is how one provider expresses an action.
 type Target struct {
-	With      map[string]any // string, or []string for list-valued keys
+	With      map[string]any
+	Env       map[string]string
+	EnvLit    map[string]string
 	Kind      string
 	Image     string
 	Support   caps.Support
 	Script    []string
-	Unmapped  []string // `with` keys the entry does not map; the emitter must report them
-	Templated []string // sorted With keys whose value still holds `${{ }}` for the emitter to translate
+	Unmapped  []string
+	Templated []string
 }
 
 // WritesEquivalent is true when the target file holds the real equivalent of the action, so the action
@@ -57,6 +61,9 @@ var embedded []byte
 var reverseKinds = []string{"checkout", "cache", "upload", "download"}
 
 var dockerTag = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$`)
+
+// inputName is the shape of an action input name.
+var inputName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
 
 var templateVar = regexp.MustCompile(`\{\{\s*([A-Za-z0-9_-]+)\s*\}\}`)
 
@@ -98,19 +105,53 @@ func (w *withDoc) UnmarshalYAML(n *yaml.Node) error {
 	return nil
 }
 
+// emulateDoc describes the script step that stands in for inputs with no keyword on a target.
+type emulateDoc struct {
+	// AfterNative names targets whose own clone keeps ref, repository and path; the script then carries only the rest.
+	AfterNative *afterNativeDoc   `yaml:"after_native"`
+	Env         map[string]string `yaml:"env"`
+	Defaults    map[string]string `yaml:"defaults"`
+	HostEnv     string            `yaml:"host_env"`
+	Image       string            `yaml:"image"`
+	Script      string            `yaml:"script"`
+	Strategy    string            `yaml:"strategy"`
+	Caveat      string            `yaml:"caveat"`
+	Inputs      []string          `yaml:"inputs"`
+	Targets     []string          `yaml:"targets"`
+	External    []string          `yaml:"external"`
+}
+
+// afterNativeDoc runs the emulate script after the native step on a target that clones with its own keywords.
+type afterNativeDoc struct {
+	// Env is set to 1 on the script so that it skips the clone and fetch.
+	Env     string   `yaml:"env"`
+	Targets []string `yaml:"targets"`
+	// Inputs trigger the script; Pass lists inputs that the script reads without triggering it.
+	Inputs []string `yaml:"inputs"`
+	Pass   []string `yaml:"pass"`
+}
+
 type targetDoc struct {
-	With     map[string]withDoc `yaml:"with"`
-	Defaults map[string]string  `yaml:"defaults"`
-	Support  supportDoc         `yaml:"support"`
-	Kind     string             `yaml:"kind"`
-	Image    string             `yaml:"image"`
-	Script   []string           `yaml:"script"`
+	With map[string]withDoc `yaml:"with"`
+	// Gating names inputs that make the step lost on this target alone.
+	Gating   map[string][]string `yaml:"gating"`
+	Defaults map[string]string   `yaml:"defaults"`
+	Support  supportDoc          `yaml:"support"`
+	Kind     string              `yaml:"kind"`
+	Image    string              `yaml:"image"`
+	Script   []string            `yaml:"script"`
 }
 
 type entryDoc struct {
 	Targets map[string]targetDoc `yaml:"targets"`
-	Match   string               `yaml:"match"`
-	Path    string               `yaml:"path"`
+	// Gating names inputs whose value makes the step fail or branch, which a target without that input cannot keep.
+	Gating map[string][]string `yaml:"gating"`
+	// Emulate turns a step with inputs that no keyword carries into a script step on every target but GHA.
+	Emulate *emulateDoc `yaml:"emulate"`
+	Match   string      `yaml:"match"`
+	Path    string      `yaml:"path"`
+	// Inputs lists every input of the action, from its action.yml at the pinned major version.
+	Inputs []string `yaml:"inputs"`
 }
 
 type fileDoc struct {
@@ -120,6 +161,8 @@ type fileDoc struct {
 
 type entry struct {
 	targets map[string]compiled
+	gating  map[string][]string
+	emulate *emulateDoc
 	owner   string
 	repo    string
 	path    string
@@ -167,7 +210,14 @@ func parse(src []byte) (*registry, error) {
 		if !ok || owner == "" || name == "" || strings.Contains(name, "/") {
 			return nil, fmt.Errorf("actions[%d]: match %q must be owner/repo", i, e.Match)
 		}
-		ent := entry{owner: owner, repo: name, path: e.Path, targets: map[string]compiled{}}
+		known, err := knownInputs(i, e)
+		if err != nil {
+			return nil, err
+		}
+		if err := validateEntry(i, e, known); err != nil {
+			return nil, err
+		}
+		ent := entry{owner: owner, repo: name, path: e.Path, gating: e.Gating, emulate: e.Emulate, targets: map[string]compiled{}}
 		for id, t := range e.Targets {
 			lvl, err := caps.ParseLevel(t.Support.Level)
 			if err != nil {
@@ -196,6 +246,95 @@ func parse(src []byte) (*registry, error) {
 		r.reverse[k] = ref
 	}
 	return r, nil
+}
+
+// knownInputs returns the declared inputs of an entry as a set.
+func knownInputs(i int, e entryDoc) (map[string]bool, error) {
+	if len(e.Inputs) == 0 {
+		return nil, fmt.Errorf("actions[%d] %s: inputs must list the inputs of the action", i, e.Match)
+	}
+	known := make(map[string]bool, len(e.Inputs))
+	for _, in := range e.Inputs {
+		if !inputName.MatchString(in) {
+			return nil, fmt.Errorf("actions[%d] %s: inputs: %q is not an input name", i, e.Match, in)
+		}
+		known[in] = true
+	}
+	return known, nil
+}
+
+// validateEntry fails when a gating, with, defaults, template or emulate name is not an input of the action, so a
+// typo cannot load clean and then never match.
+func validateEntry(i int, e entryDoc, known map[string]bool) error {
+	check := func(where, in string) error {
+		if !known[in] {
+			return fmt.Errorf("actions[%d] %s: %s %q is not an input of the action (inputs: %s)", i, e.Match, where, in, strings.Join(e.Inputs, ", "))
+		}
+		return nil
+	}
+	checkAll := func(where string, names []string) error {
+		for _, in := range names {
+			if err := check(where, in); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	checkGating := func(where string, g map[string][]string) error {
+		for _, in := range slices.Sorted(maps.Keys(g)) {
+			if len(g[in]) == 0 {
+				return fmt.Errorf("actions[%d] %s: %s %q needs at least one value", i, e.Match, where, in)
+			}
+			if err := check(where, in); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if err := checkGating("gating", e.Gating); err != nil {
+		return err
+	}
+	if em := e.Emulate; em != nil {
+		if len(em.Inputs) == 0 || em.Script == "" || len(em.Targets) == 0 {
+			return fmt.Errorf("actions[%d] %s: emulate needs inputs and a script", i, e.Match)
+		}
+		for _, names := range [][]string{em.Inputs, em.External, slices.Sorted(maps.Values(em.Env)), slices.Sorted(maps.Keys(em.Defaults))} {
+			if err := checkAll("emulate input", names); err != nil {
+				return err
+			}
+		}
+		if n := em.AfterNative; n != nil {
+			if len(n.Inputs) == 0 || len(n.Targets) == 0 || n.Env == "" {
+				return fmt.Errorf("actions[%d] %s: emulate after_native needs targets, inputs and env", i, e.Match)
+			}
+			if err := checkAll("emulate after_native input", append(slices.Clone(n.Inputs), n.Pass...)); err != nil {
+				return err
+			}
+		}
+		for v := range em.Env {
+			if v == "" {
+				return fmt.Errorf("actions[%d] %s: emulate env has an empty variable name", i, e.Match)
+			}
+		}
+	}
+	for _, id := range slices.Sorted(maps.Keys(e.Targets)) {
+		t := e.Targets[id]
+		if err := checkGating("target "+id+" gating", t.Gating); err != nil {
+			return err
+		}
+		if err := checkAll("target "+id+" with", slices.Sorted(maps.Keys(t.With))); err != nil {
+			return err
+		}
+		if err := checkAll("target "+id+" defaults", slices.Sorted(maps.Keys(t.Defaults))); err != nil {
+			return err
+		}
+		for _, m := range templateVar.FindAllStringSubmatch(t.Image, -1) {
+			if err := check("target "+id+" image template", m[1]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // githubHost is where the pinned actions live; Lookup ignores it.
@@ -240,9 +379,119 @@ func (r *registry) lookup(ref ir.ActionRef, target string, with map[string]strin
 		if !ok {
 			return Target{}, false
 		}
+		if provider.Family(target) != provider.GHA && (gates(e.gating, with) || gates(c.doc.Gating, with)) {
+			return Target{}, false
+		}
+		if fam := provider.Family(target); fam != provider.GHA && e.emulate != nil {
+			em, set := e.emulate, withoutDefaults(with, e.emulate.Defaults)
+			if slices.Contains(em.Targets, fam) && sets(set, em.Inputs) {
+				return emulated(*em, ref, set, resolve(c, target, with)), true
+			}
+			if n := em.AfterNative; n != nil && slices.Contains(n.Targets, fam) && sets(set, n.Inputs) {
+				return afterNative(*em, ref, set, resolve(c, target, with)), true
+			}
+		}
 		return resolve(c, target, with), true
 	}
 	return Target{}, false
+}
+
+// withoutDefaults drops the inputs that hold their default.
+func withoutDefaults(with, defaults map[string]string) map[string]string {
+	out := make(map[string]string, len(with))
+	for k, v := range with {
+		if d, ok := defaults[k]; !ok || strings.TrimSpace(v) != d {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+// sets is true when the step gives a non-empty value to one of the inputs.
+func sets(with map[string]string, inputs []string) bool {
+	for _, in := range inputs {
+		if strings.TrimSpace(with[in]) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// emulated builds the script target for a step whose inputs have no keyword.
+// The inputs that the target maps itself stay mapped, and the script carries only the ones it does not.
+func emulated(em emulateDoc, ref ir.ActionRef, with map[string]string, native Target) Target {
+	t := Target{Kind: KindScript, Script: []string{em.Script}, Image: em.Image, With: native.With, Env: map[string]string{}}
+	if t.With == nil {
+		t.With = map[string]any{}
+	}
+	for _, u := range native.Unmapped {
+		if !slices.Contains(em.Inputs, u) {
+			t.Unmapped = append(t.Unmapped, u)
+		}
+	}
+	for v, in := range em.Env {
+		if strings.TrimSpace(with[in]) != "" {
+			t.Env[v] = in
+		}
+	}
+	if em.HostEnv != "" {
+		host := ref.Host
+		if host == "" {
+			host = githubHost
+		}
+		t.EnvLit = map[string]string{em.HostEnv: host}
+	}
+	level := caps.Emulated
+	if sets(with, em.External) {
+		level = caps.External
+	}
+	t.Support = caps.Support{Level: level, Strategy: em.Strategy, Caveat: em.Caveat}
+	return t
+}
+
+// afterNative keeps the native step of a target and adds the emulate script for the inputs that the native step
+// cannot carry. The script skips the clone and fetch, which the native step did.
+func afterNative(em emulateDoc, ref ir.ActionRef, with map[string]string, native Target) Target {
+	n := em.AfterNative
+	script := emulated(em, ref, with, native)
+	out := native
+	out.Script, out.Image = script.Script, em.Image
+	out.Env = map[string]string{}
+	carried := append(slices.Clone(n.Inputs), n.Pass...)
+	for v, in := range script.Env {
+		if slices.Contains(carried, in) {
+			out.Env[v] = in
+		}
+	}
+	out.EnvLit = map[string]string{n.Env: "1"}
+	if script.EnvLit != nil {
+		for k, v := range script.EnvLit {
+			out.EnvLit[k] = v
+		}
+	}
+	out.Unmapped = slices.DeleteFunc(slices.Clone(native.Unmapped), func(u string) bool { return slices.Contains(n.Inputs, u) })
+	return out
+}
+
+// gatingAny in a gating list stands for every value except an empty one and false.
+const gatingAny = "*"
+
+// gates is true when an input of the step holds a value that makes the step fail or branch, which no other
+// target can keep; the step then has no mapping and the emitters write a failing step.
+func gates(gating map[string][]string, with map[string]string) bool {
+	for in, vals := range gating {
+		v, ok := with[in]
+		if !ok {
+			continue
+		}
+		v = strings.TrimSpace(v)
+		for _, want := range vals {
+			if want == gatingAny && v != "" && !strings.EqualFold(v, "false") || strings.EqualFold(v, want) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func resolve(c compiled, target string, with map[string]string) Target {
@@ -416,19 +665,30 @@ var transforms = map[string]func(string) (any, error){
 		}
 		return v, nil
 	},
-	"lines": func(v string) (any, error) {
-		if strings.Contains(v, "${{") {
-			return nil, errExpr
+	// git-clone takes sparse directories as one comma-separated list.
+	"commas": func(v string) (any, error) {
+		l, err := splitLines(v)
+		if err != nil {
+			return nil, err
 		}
-		var out []string
-		for _, l := range strings.Split(v, "\n") {
-			if l = strings.TrimSpace(l); l != "" {
-				out = append(out, l)
-			}
-		}
-		if len(out) == 0 {
-			return nil, errors.New("no paths")
-		}
-		return out, nil
+		return strings.Join(l.([]string), ","), nil
 	},
+	"lines": splitLines,
+}
+
+// splitLines reads a multi-line value as its non-empty trimmed lines.
+func splitLines(v string) (any, error) {
+	if strings.Contains(v, "${{") {
+		return nil, errExpr
+	}
+	var out []string
+	for _, l := range strings.Split(v, "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			out = append(out, l)
+		}
+	}
+	if len(out) == 0 {
+		return nil, errors.New("no paths")
+	}
+	return out, nil
 }

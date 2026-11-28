@@ -4,12 +4,14 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
 # pipemaster:arg {"digest":"eb65ce1260e04ba5c6a85d8dc9f238d495f97187a50027ea4da1d8e85e63f527","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"d1d05b4161243d82e293425def1cce37ef9a4e76be9a8315c49d58d38a249bab","carry":"id: build\n"}
+# pipemaster:arg {"digest":"ff4e680469c653f6d56db5219b64b07815fd6477f0937dc826a875d96ec3e503","carry":"id: build\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: env\ntriggers:\n    - kind: push\n    - kind: tag\nenv:\n    - name: CGO_ENABLED\n      value:\n        lit: \"0\"\n    - name: VERSION\n      value:\n        lit: \"3.1\"\n    - name: TOKEN\n      value:\n        secret: DEPLOY_TOKEN\n    - name: LABEL\n      value:\n        expr: format('build-{0}', gha.github.run_number)\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
 # pipemaster:emulated pipeline.env pipeline/ci
-# pipemaster:emulated trigger.push pipeline/ci/job/build
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
@@ -27,11 +29,37 @@ jobs:
     plan:
       - get: source
         trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          params:
+            CGO_ENABLED: "0"
+            VERSION: "3.1"
+            TOKEN: ((DEPLOY_TOKEN))
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo ok
+            dir: workspace
+  - name: build-tag
+    plan:
       - get: source-tags
         trigger: true
       - task: build-step-1
         input_mapping:
-          workspace: source
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

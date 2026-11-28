@@ -1,0 +1,23 @@
+default:
+  image: alpine:3.20
+stages: [build, test, .post]
+build:
+  stage: build
+  script:
+    - echo build
+mrjob:
+  stage: test
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - echo mr
+cleanup:
+  stage: .post
+  when: always
+  script:
+    - echo cleanup
+onfail:
+  stage: .post
+  when: on_failure
+  script:
+    - echo onfail

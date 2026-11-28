@@ -1,5 +1,6 @@
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated step.shell pipeline/ci/job/build/step/build-step-1
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -9,6 +10,6 @@ spec:
     - name: build-step-1
       image: alpine:3.22
       script: |-
-        #!bash
+        #!/usr/bin/env bash
         echo ok
       workingDir: app

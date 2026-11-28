@@ -1,0 +1,40 @@
+# pipemaster:emulated ext.passthrough pipeline/drone/job/ci/step/build/carry
+# pipemaster:arg {"digest":"eb7ab57cb73f349a9f0bd2810dd804d928c7a0e0506f5c6dfa666d5801a2803c","carry":"image:\n    ref: golang:1.25\nid: build\nkind: script\n"}
+# pipemaster:emulated ext.passthrough pipeline/drone/job/ci/carry
+# pipemaster:arg {"digest":"ec9a8003d97e3b5545c7d56ff2383ea151fb63a4537a36d8c47196b6a658d237","carry":"id: ci\nrunner:\n    labels:\n        - linux/arm64\n"}
+# pipemaster:emulated ext.passthrough pipeline/drone/carry
+# pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: drone\ntriggers:\n    - kind: push\n"}
+# pipemaster:emulated ext.passthrough pipeline/drone
+# pipemaster:emulated job.runner pipeline/drone/job/ci
+resources:
+  - name: source
+    type: git
+    source:
+      uri: ((git-uri))
+jobs:
+  - name: ci
+    plan:
+      - get: source
+        trigger: true
+      - task: build
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+              tag: "1.25"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - go build ./...
+            dir: workspace
+        tags:
+          - linux/arm64

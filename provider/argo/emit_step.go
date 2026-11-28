@@ -18,13 +18,14 @@ import (
 )
 
 const (
-	workspaceName     = "workspace"
-	workspaceMount    = "/workspace"
-	outputsDir        = workspaceMount + "/.pipemaster/outputs"
-	artifactsDir      = workspaceMount + "/artifacts"
-	shellCommand      = "sh"
-	shellFlags        = "-ec"
-	continueTrap      = "trap 'exit 0' EXIT # pipemaster:continue-on-error"
+	workspaceName  = "workspace"
+	workspaceMount = "/workspace"
+	outputsDir     = workspaceMount + "/.pipemaster/outputs"
+	artifactsDir   = workspaceMount + "/artifacts"
+	shellCommand   = "sh"
+	shellFlags     = "-ec"
+	continueTrap   = "trap 'exit 0' EXIT # pipemaster:continue-on-error"
+	// placeholderScript runs where the source holds no work and the file only needs a container.
 	placeholderScript = "true"
 	placeholderTask   = "noop"
 	disabledScript    = "exit 0 # pipemaster:lost the step condition has no shell form"
@@ -97,13 +98,17 @@ func (tc *jobCtx) stepScripts(sc *stepScope, path string, st *ir.Step) []string 
 		}
 		lines[i], why[i] = out, w
 	}
-	keep := emitkit.DropLost(st.Script, why, func(detail, text string) {
+	pieces := emitkit.ReplaceLost(st.Script, why, func(detail, text string) {
 		tc.e.lose(path, caps.ScriptInterpolation, detail)
 		tc.e.comment(path, "script "+path+": "+text)
 	})
 	var out []string
-	for _, i := range keep {
-		out = append(out, lines[i])
+	for _, p := range pieces {
+		if p.Lost {
+			out = append(out, emitkit.FailLoud(caps.ScriptInterpolation, path, p.Detail))
+			continue
+		}
+		out = append(out, lines[p.Index])
 	}
 	return out
 }
@@ -348,7 +353,7 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool, at int) *cont
 	if st.Action == nil || st.Action.Kind != ir.ActionRepo {
 		e.lose(path, caps.StepAction, "the action "+actionRef(st.Action)+" has no Argo form; the step is dropped")
 		e.comment(path, "uses: "+actionRef(st.Action))
-		return sx.placeholder(st)
+		return sx.placeholder(st, true)
 	}
 	with := map[string]string{}
 	for k, v := range st.With {
@@ -360,17 +365,18 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool, at int) *cont
 		with[k] = s
 	}
 	t, ok := actions.Lookup(*st.Action, dialect, with)
+	ok = ok && !e.gated[st]
 	if !ok {
 		e.lose(path, caps.StepAction, "the action "+actionRef(st.Action)+" has no Argo mapping; Argo does not run the step, and the marker and a comment keep the reference")
 		e.comment(path, "uses: "+actionRef(st.Action))
-		return sx.placeholder(st)
+		return sx.placeholder(st, true)
 	}
 	e.note(path, caps.StepAction, t.Support.Level, t.Support.Strategy, t.Support.Caveat)
 	for _, k := range t.Unmapped {
 		e.lose(path, caps.StepAction, "the input "+k+" of the action has no Argo form")
 	}
 	if t.Support.Level == caps.Lost {
-		return sx.placeholder(st)
+		return sx.placeholder(st, true)
 	}
 	sx.act.Kind = t.Kind
 	nIn, nOut := len(sx.artIn), len(sx.artOut)
@@ -383,6 +389,14 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool, at int) *cont
 		if len(sx.artIn) > nIn {
 			sx.act.Wrote = checkoutWrote
 			sx.act.Art = nodeCanon(sx.artIn[nIn])
+			if len(t.Script) > 0 {
+				// The git artifact cannot sparse-check-out; a container applies it after the clone.
+				cp := emitkit.ScriptStep(st, t, path, sx.image == "" && tc.jp.j.Container == nil)
+				if c := sx.containerFor(cp, name, last); c != nil {
+					sx.act.Hold = nodeCanon(c.m.N)
+					return c
+				}
+			}
 		}
 	case actions.KindUpload:
 		sx.upload(path, t)
@@ -393,9 +407,8 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool, at int) *cont
 	case actions.KindDownload:
 		sx.download(path, t)
 	case actions.KindScript:
-		cp := *st
-		cp.Script, cp.Kind, cp.Action = t.Script, ir.StepScript, nil
-		c := sx.containerFor(&cp, name, last)
+		cp := emitkit.ScriptStep(st, t, path, sx.image == "" && tc.jp.j.Container == nil)
+		c := sx.containerFor(cp, name, last)
 		if c != nil {
 			sx.act.Hold = nodeCanon(c.m.N)
 		}
@@ -404,12 +417,13 @@ func (sx *stepCtx) actionStep(st *ir.Step, name string, last bool, at int) *cont
 	if sx.act.Wrote == checkoutWrote && at == 0 {
 		return nil
 	}
-	return sx.placeholder(st)
+	return sx.placeholder(st, false)
 }
 
 // placeholder writes the container that keeps the place of an action that Argo does not run. The marker holds
-// the canonical text of the container, so the parser restores the action only when the file still has it.
-func (sx *stepCtx) placeholder(st *ir.Step) *container {
+// the canonical text of the container, so the parser restores the action only when the file still has it. A
+// lost action fails; an action that the file applied some other way runs a no-op.
+func (sx *stepCtx) placeholder(st *ir.Step, lost bool) *container {
 	tc := sx.tc
 	path := tc.jp.path + "/step/" + st.ID
 	name := tc.e.dnsName(sx.nameTaken, path, "step id", st.ID, maxName, true)
@@ -421,10 +435,18 @@ func (sx *stepCtx) placeholder(st *ir.Step) *container {
 	c.image = sx.imageOf(st, path)
 	c.m.SetStr("image", c.image)
 	c.m.Set("command", strSeq([]string{shellCommand, shellFlags}))
-	c.m.Set("args", seqOf(block(placeholderScript)))
+	script := placeholderScript
+	if lost {
+		script = emitkit.FailLoud(caps.StepAction, path, "Argo does not run the action"+refSuffix(st))
+	}
+	c.m.Set("args", seqOf(block(script)))
 	c.m.SetStr("workingDir", workspaceMount)
 	sx.act.Hold = nodeCanon(c.m.N)
-	tc.e.emulate(path, caps.StepAction, "placeholder container", "Argo does not run the action; a container that runs "+placeholderScript+" keeps its place")
+	if lost {
+		tc.e.emulate(path, caps.StepAction, "failing container", "Argo does not run the action; a container that prints the loss and exits 1 keeps its place")
+	} else {
+		tc.e.emulate(path, caps.StepAction, "placeholder container", "the action is applied without a step; a container that runs "+placeholderScript+" keeps its place")
+	}
 	return c
 }
 
@@ -512,4 +534,12 @@ func (sx *stepCtx) shellOf(st *ir.Step, path string) string {
 	}
 	sx.tc.e.lose(path, caps.StepShell, "the shell "+sh+" has no container command form; the script runs under "+shellCommand+" -ec")
 	return shellCommand
+}
+
+// refSuffix names the action of a lost step in the failing line.
+func refSuffix(st *ir.Step) string {
+	if st.Action == nil {
+		return ""
+	}
+	return " " + actionRef(st.Action)
 }

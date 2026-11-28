@@ -14,17 +14,20 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
 	placeholderName = "noop"
-	keyEnv          = "environment"
-	keySettings     = "settings"
-	keyCommands     = "commands"
-	keyDependsOn    = "depends_on"
-	keyWorkingDir   = "working_dir"
-	keyEntrypoint   = "entrypoint"
-	keyFailure      = "failure"
+	// noopScript runs in a step that only keeps the document valid and stands for no source work.
+	noopScript    = "true"
+	keyEnv        = "environment"
+	keySettings   = "settings"
+	keyCommands   = "commands"
+	keyDependsOn  = "depends_on"
+	keyWorkingDir = "working_dir"
+	keyEntrypoint = "entrypoint"
+	keyFailure    = "failure"
 	// defaultImage runs steps that name no image; the IR does not hold the runner image of a hosted runner.
 	defaultImage = "ubuntu:latest"
 )
@@ -126,6 +129,7 @@ func (e *emitter) steps(c *docCtx) (*yaml.Node, error) {
 		}
 		name := names[at]
 		at++
+		e.scriptLost = false
 		c.pos = len(done)
 		d, err := e.step(c, st, name)
 		if err != nil {
@@ -138,7 +142,7 @@ func (e *emitter) steps(c *docCtx) (*yaml.Node, error) {
 		if name != st.ID {
 			e.stepIDs[pipelinePth+"/job/"+c.name+"/step/"+name] = st.ID
 		}
-		c.hold(st, len(done))
+		c.hold(st, len(done), e.scriptLost)
 		done = append(done, d)
 	}
 	if len(done) == 0 {
@@ -150,6 +154,9 @@ func (e *emitter) steps(c *docCtx) (*yaml.Node, error) {
 	}
 	e.dependencies(c, done)
 	n := yseq()
+	if len(c.changes) > 0 {
+		n.Content = append(n.Content, e.changesStep(c.changes))
+	}
 	for _, d := range done {
 		n.Content = append(n.Content, d.m.n)
 	}
@@ -158,7 +165,7 @@ func (e *emitter) steps(c *docCtx) (*yaml.Node, error) {
 
 // hold records the text of a step of the first matrix cell that reads a matrix name, so the parser can put the
 // references back.
-func (c *docCtx) hold(st *ir.Step, pos int) {
+func (c *docCtx) hold(st *ir.Step, pos int, scriptLost bool) {
 	if c.j.Matrix == nil || !c.plan.first {
 		return
 	}
@@ -169,7 +176,7 @@ func (c *docCtx) hold(st *ir.Step, pos int) {
 	if readsMatrix(st.WorkDir) {
 		h.WorkDir = st.WorkDir
 	}
-	if slices.ContainsFunc(st.Script, readsMatrix) {
+	if !scriptLost && slices.ContainsFunc(st.Script, readsMatrix) {
 		h.Script = st.Script
 	}
 	if env := slices.DeleteFunc(slices.Clone(st.Env), func(v ir.Var) bool { return !valueReadsMatrix(v.Value) }); len(env) > 0 {
@@ -300,8 +307,11 @@ func (e *emitter) step(c *docCtx, st *ir.Step, name string) (stepDone, error) {
 	case st.Kind == ir.StepScript || len(st.Script) > 0:
 		m, err = e.scriptStep(c, sp, st)
 	default:
-		e.lose(sp, caps.StepAction, "step kind "+string(st.Kind)+" has no Drone form")
+		why := "step kind " + string(st.Kind) + " has no Drone form"
+		e.lose(sp, caps.StepAction, why)
 		e.comment("step " + sp + " kind " + string(st.Kind))
+		m, err = e.failingStep(c, sp, st, caps.StepAction, why)
+		carried = true
 	}
 	if err != nil {
 		return stepDone{}, err
@@ -309,7 +319,7 @@ func (e *emitter) step(c *docCtx, st *ir.Step, name string) (stepDone, error) {
 	if m == nil {
 		if !carried {
 			e.unapplied(sp, st)
-			err = e.markAction(sp, st, c.pos, "")
+			err = e.markAction(sp, st, c.pos, "", false)
 		}
 		return stepDone{}, err
 	}
@@ -457,24 +467,44 @@ func (e *emitter) scriptStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
 	seen := map[string]int{}
 	texts := slices.Clone(commandTexts(st))
 	why := make([]string, len(texts))
+	var stmt vars.Statement
+	ctxs := make([]string, len(texts))
 	for i, l := range texts {
 		texts[i] = emitkit.NeutralizeResultWrite(e.lose, sp, l)
-		_, lost, err := e.command(&bindings{}, texts[i])
+		ctxs[i] = stmt.Prefix()
+		out, lost, err := e.command(&bindings{}, texts[i], ctxs[i])
 		if err != nil {
 			return nil, err
 		}
 		why[i] = noSpelling(lost)
+		if why[i] != "" {
+			stmt.Reset()
+		} else {
+			stmt.Add(out)
+		}
 	}
-	for _, i := range e.commentSpans(sp, texts, why) {
+	var outs []string
+	for _, p := range e.commentSpans(sp, texts, why) {
+		if p.Lost {
+			e.scriptLost = true
+			fl := emitkit.FailLoud(caps.ScriptInterpolation, sp, p.Detail)
+			outs = append(outs, fl)
+			lines = append(lines, block(fl))
+			continue
+		}
 		b.hits = nil
-		out, _, err := e.command(b, texts[i])
+		out, _, err := e.command(b, texts[p.Index], ctxs[p.Index])
 		if err != nil {
 			return nil, err
 		}
+		outs = append(outs, out)
 		lines = append(lines, block(out))
 		b.place(out, seen)
 	}
 	b.total(seen)
+	if len(lines) > 0 && e.bashWrap(st) {
+		lines = []*yaml.Node{block(provider.BashWrapCommand(esc(provider.BashOrShScript), joinCommands(outs)))}
+	}
 	if len(lines) == 0 {
 		e.comment("step.script " + sp + ": the step has no command left")
 		e.lose(sp, caps.StepScript, "no command of the step has a Drone spelling; the step is not written")
@@ -552,19 +582,20 @@ func (e *emitter) stepLosses(sp string, st *ir.Step) {
 	if st.Timeout != nil {
 		e.lose(sp, caps.StepTimeout, "the Drone docker runner ignores a step timeout")
 	}
-	if st.Shell != "" {
+	if st.Shell != "" && !e.bashWrap(st) {
 		e.lose(sp, caps.StepShell, "Drone compiles commands into its own script, not "+st.Shell)
 	}
-	if strings.TrimSpace(st.Shell) == "" && len(st.Script) > 0 && provider.BashDefault(e.origin) {
-		e.emulate(sp, caps.StepShell, "commands run under the image sh", "the source runs the step under bash when the image has it; Drone compiles commands into a script that its runner pipes to /bin/sh, and the entrypoint cannot change it, so bash-only syntax fails when the image sh is dash")
+	if e.bashWrap(st) {
+		e.emulate(sp, caps.StepShell, "bash-if-present wrapper command", "the source runs the step under bash when the image has it; Drone pipes commands to /bin/sh, so one command re-runs the script under bash -e when the image has bash, else under sh -e, and bash-only syntax fails under sh")
 	}
 }
 
 func (e *emitter) pluginStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
 	if st.Image == nil || st.Image.Ref == "" {
-		e.lose(sp, caps.StepAction, "a plugin step needs an image")
+		why := "a plugin step needs an image"
+		e.lose(sp, caps.StepAction, why)
 		e.comment("step " + sp + ": plugin without an image")
-		return nil, nil
+		return e.failingStep(c, sp, st, caps.StepAction, why)
 	}
 	m := newYMap()
 	if err := e.common(c, sp, st, m, false); err != nil {
@@ -578,7 +609,7 @@ func (e *emitter) pluginStep(c *docCtx, sp string, st *ir.Step) (*ymap, error) {
 		}
 		set.set(k, n)
 	}
-	if err := set.mergeMap(extOf(st.Ext)[keySettings]); err != nil {
+	if err := set.mergeMap(emitkit.ExtSettings(st.Ext, dialect)); err != nil {
 		return nil, err
 	}
 	if !set.empty() {
@@ -601,9 +632,26 @@ func (e *emitter) settingNode(sp string, v ir.Value) (*yaml.Node, error) {
 
 // placeholder is the one step of a document that has none Drone can run; Drone rejects a pipeline without steps.
 func (e *emitter) placeholder(c *docCtx) (stepDone, error) {
-	e.emulate(c.jp, caps.StepScript, "no-op step", "Drone needs a step; no step of the job has a Drone form, so a no-op step stands in")
+	script := noopScript
+	reason, bridge := emitkit.BridgeWork(c.j)
+	bridge = bridge && len(c.j.Steps) == 0
+	if bridge {
+		script = emitkit.FailLoud(caps.StepScript, c.jp, reason)
+		e.emulate(c.jp, caps.StepScript, "failing step", "Drone needs a step; "+reason+", so a step that prints the loss and exits 1 stands in")
+	} else if e.lostStepWork(c.jp) {
+		script = emitkit.FailLoud(caps.StepScript, c.jp, "no step of the job has a Drone form")
+		e.emulate(c.jp, caps.StepScript, "failing step", "Drone needs a step; no step of the job has a Drone form, so a step that prints the loss and exits 1 stands in")
+	} else {
+		e.emulate(c.jp, caps.StepScript, "no-op step", "Drone needs a step; the job has no step to run, so a no-op step stands in")
+	}
 	e.mark(caps.StepScript, c.jp)
-	e.lose(c.jp+"/step/script", caps.StepScript, "the job has no steps; a no-op step keeps the document valid")
+	why := "the job has no steps; a no-op step keeps the document valid"
+	if bridge {
+		why = reason + "; a step that prints the loss and exits 1 keeps the document valid and the pipeline honest"
+	} else if script != noopScript {
+		why = "no step of the job has a Drone form; a step that prints the loss and exits 1 keeps the document valid and the pipeline honest"
+	}
+	e.note(c.jp+"/step/script", caps.StepScript, caps.Lost, "", why)
 	m := newYMap()
 	m.set("name", ystr(placeholderName))
 	img, err := e.stepImage(c, c.jp, &ir.Step{})
@@ -611,7 +659,7 @@ func (e *emitter) placeholder(c *docCtx) (stepDone, error) {
 		return stepDone{}, err
 	}
 	m.set(keyImage, ystr(img))
-	m.set(keyCommands, ystrSeq([]string{"true"}))
+	m.set(keyCommands, ystrSeq([]string{script}))
 	return stepDone{m: m}, nil
 }
 
@@ -650,4 +698,29 @@ func uniqueNames(bases []string, valid func(string) bool) []string {
 		out[i], taken[cand] = cand, true
 	}
 	return out
+}
+
+// bashWrap is true when a step with no shell runs under bash-if-present: the source default is bash, or a Drone
+// file held the wrapper.
+func (e *emitter) bashWrap(st *ir.Step) bool {
+	if len(st.Script) == 0 || emitkit.IsFailLoud(st.Script) {
+		return false
+	}
+	if strings.TrimSpace(st.Shell) != "" {
+		return false
+	}
+	if b, _ := extOf(st.Ext)[ExtBashDefault].(bool); b {
+		return true
+	}
+	return !provider.SameFamily(e.origin, dialect) && provider.BashDefault(e.origin)
+}
+
+// joinCommands makes one script of the commands: each command ends with one newline, and a trailing newline of a
+// command text is not doubled.
+func joinCommands(cmds []string) string {
+	lines := make([]string, len(cmds))
+	for i, c := range cmds {
+		lines[i] = strings.TrimSuffix(c, "\n")
+	}
+	return strings.Join(lines, "\n")
 }

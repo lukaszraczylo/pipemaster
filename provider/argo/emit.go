@@ -10,9 +10,12 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/dnsid"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 // Output paths. The parser reads every YAML file under .argo/, so the split is for people.
@@ -38,6 +41,14 @@ var fit = dnsid.Fit
 // Emit writes the project as Argo files under .argo/. Every feature use goes through the ledger; Finish fails
 // the call when one was never accounted for.
 func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	return inline.Emit(p, a.ID(), a.emitFlat)
+}
+
+func (a adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	p, vres := vars.Prepare(p, dialect)
+	p, checkouts := emitkit.WithSourceCheckout(p)
+	p, noForm, injected := provider.WithDefaultTriggers(p, dialect)
+	p = provider.CanonEventNames(p)
 	origin := ""
 	if p != nil {
 		origin = p.Origin.Provider
@@ -45,12 +56,15 @@ func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) 
 	e := &emitter{
 		led: emitkit.NewLedger("ir", dialect, a.Caps()), origin: origin, own: origin == dialect,
 		files: map[string][]*outDoc{}, owners: map[string]*outDoc{}, marked: map[ir.FeatureUse]bool{},
-		taken: map[string]bool{}, made: map[string]bool{},
+		taken: map[string]bool{}, made: map[string]bool{}, injected: injected,
 	}
+	emitkit.RetainSourceCheckout(e.led, checkouts)
+	e.gated = emitkit.GatedSteps(p)
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)
 	}
+	e.noteDefaultEvents(noForm)
 	if err := e.project(livePipelines(p)); err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", dialect, err)
 	}
@@ -63,6 +77,7 @@ func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) 
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", dialect, err)
 	}
+	vres.Report(rep)
 	return files, rep, nil
 }
 
@@ -81,18 +96,22 @@ func livePipelines(p *ir.Project) []*ir.Pipeline {
 
 // emitter carries the state of one Emit call.
 type emitter struct {
-	led     *emitkit.Ledger
-	said    map[ir.FeatureUse][2]string
-	files   map[string][]*outDoc
-	owners  map[string]*outDoc
-	marked  map[ir.FeatureUse]bool
-	taken   map[string]bool
-	made    map[string]bool
-	events  *eventDocs
-	origin  string
-	plans   []*plan
-	own     bool
-	needsSA bool
+	// gated holds the action steps that a later step reads, which no target may drop.
+	gated  map[*ir.Step]bool
+	led    *emitkit.Ledger
+	said   map[ir.FeatureUse][2]string
+	files  map[string][]*outDoc
+	owners map[string]*outDoc
+	marked map[ir.FeatureUse]bool
+	taken  map[string]bool
+	made   map[string]bool
+	// injected names the pipelines whose triggers were made from the default events of their source.
+	injected map[string]bool
+	events   *eventDocs
+	origin   string
+	plans    []*plan
+	own      bool
+	needsSA  bool
 	// nlost counts the Lost entries, so a caller can tell whether a step lost something.
 	nlost int
 }
@@ -267,4 +286,13 @@ func sortedPaths(m map[string]bool) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// noteDefaultEvents reports the default events of the source that have no IR trigger.
+func (e *emitter) noteDefaultEvents(noForm map[string][]provider.SourceEvent) {
+	for id, events := range noForm {
+		for _, g := range provider.GroupByFeature(events) {
+			e.lose("pipeline/"+id, g.Feature, provider.NoFormDetail(g.Names, "Argo"))
+		}
+	}
 }

@@ -311,41 +311,52 @@ func (s *shScanner) keyword(w string, plain bool) {
 	}
 }
 
-// SpanDetail words the report entry for one commented-out span: why is the cause of the first lost entry and n
+// SpanDetail words the report entry for one replaced span: why is the cause of the first lost entry and n
 // the number of entries the span holds.
 func SpanDetail(why string, n int, open bool) string {
 	switch {
 	case open:
-		return why + "; the statement never closes, so it and the rest of the script are commented out"
+		return why + "; the statement never closes, so a failing line stands in for it and the rest of the script"
 	case n > 1:
-		return why + "; the whole statement of " + strconv.Itoa(n) + " lines is commented out so the shell stays valid"
+		return why + "; the whole statement of " + strconv.Itoa(n) + " lines is replaced by a line that prints the loss and exits 1"
 	}
-	return why + "; the line is commented out"
+	return why + "; the line is replaced by a line that prints the loss and exits 1"
 }
 
-// DropLost comments out the whole statement around every entry of texts whose why is not empty and returns the
-// indexes of the entries that stay. report runs once per commented span with the report detail and the span text.
-func DropLost(texts, why []string, report func(detail, text string)) []int {
+// Piece is one slot of a script after the lost statements are replaced: either the entry at Index, or, when Lost
+// is true, a failing line standing for a whole lost statement. Detail is the report detail of that statement.
+type Piece struct {
+	Detail string
+	Index  int
+	Lost   bool
+}
+
+// ReplaceLost swaps the whole statement around every entry of texts whose why is not empty for one Lost piece and
+// returns the pieces in script order. report runs once per replaced span with the report detail and the span text.
+func ReplaceLost(texts, why []string, report func(detail, text string)) []Piece {
 	lost := make([]bool, len(texts))
 	for i, w := range why {
 		lost[i] = w != ""
 	}
-	drop := make([]bool, len(texts))
+	spanAt := map[int]Span{}
 	for _, sp := range CommentSpans(texts, lost) {
+		spanAt[sp.From] = sp
+	}
+	var out []Piece
+	for i := 0; i < len(texts); i++ {
+		sp, ok := spanAt[i]
+		if !ok {
+			out = append(out, Piece{Index: i})
+			continue
+		}
 		first := ""
-		for i := sp.From; i <= sp.To; i++ {
-			drop[i] = true
-			if first == "" {
-				first = why[i]
-			}
+		for k := sp.From; k <= sp.To && first == ""; k++ {
+			first = why[k]
 		}
-		report(SpanDetail(first, sp.To-sp.From+1, sp.Open), strings.Join(texts[sp.From:sp.To+1], "\n"))
+		detail := SpanDetail(first, sp.To-sp.From+1, sp.Open)
+		report(detail, strings.Join(texts[sp.From:sp.To+1], "\n"))
+		out = append(out, Piece{Index: i, Lost: true, Detail: detail})
+		i = sp.To
 	}
-	var keep []int
-	for i := range texts {
-		if !drop[i] {
-			keep = append(keep, i)
-		}
-	}
-	return keep
+	return out
 }

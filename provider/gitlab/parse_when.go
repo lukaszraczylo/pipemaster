@@ -1,6 +1,9 @@
 package gitlab
 
 import (
+	"strconv"
+	"strings"
+
 	"go.yaml.in/yaml/v3"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
@@ -25,15 +28,34 @@ func (s *state) jobWhenRules(info *jobInfo, r *reader) error {
 		}
 	}
 	rulesNode := r.take("rules")
+	keyword := when
 	var cond expr.Expr
 	manualFromRules := false
+	keepRules, rulesDropped := false, false
 	if rulesNode != nil {
-		res, ok := s.compileRules(rulesNode, when)
+		var rr ruleResult
+		ok := false
+		if af, afOK := jobAllowFailure(r); afOK {
+			rr, ok = s.compileRules(rulesNode, when, af)
+		}
 		if ok {
-			cond, manualFromRules = res.cond, res.manual
+			cond, manualFromRules = rr.cond, rr.manual
 			if cond == nil && !manualFromRules {
 				// Rules that always match still replace the rules of an extended job.
 				r.keep(ExtRulesAlways, true)
+			}
+			if rr.dropped {
+				keepRules, rulesDropped = true, true
+				s.note(s.jobPath(j.ID), caps.JobManual, "manual arm dropped; the rules stay in Ext[gitlab][rules]",
+					"the rules mix automatic and manual arms and the IR has one manual flag per job: the job runs on the automatic arms only and no manual start is written", rulesNode)
+			}
+			if expr.HasChanges(cond) {
+				keepRules = true
+			}
+			if s.impliedByWorkflow(cond) {
+				// A run that reaches the job already satisfies the workflow rules, which say the same. Only a
+				// condition that other targets cannot state is dropped: a stated one keeps the job's own text.
+				cond, keepRules = nil, true
 			}
 			// The keyword when only supplies the rules' default, already applied by compileRules.
 			when = whenOnSuccess
@@ -44,7 +66,7 @@ func (s *state) jobWhenRules(info *jobInfo, r *reader) error {
 				return err
 			}
 			cond = op
-			s.note(s.jobPath(j.ID), caps.ExprOpaque, "kept as an opaque gitlab expression and in Ext[gitlab][rules]", "rules use features that have no canonical condition (changes, exists, variables, needs, allow_failure, when other than manual) or an expression the parser cannot model", rulesNode)
+			s.note(s.jobPath(j.ID), caps.ExprOpaque, "kept as an opaque gitlab expression and in Ext[gitlab][rules]", "rules use features that have no canonical condition (exists, variables, needs, allow_failure that differs from the job, compare_to, a path variable, when other than manual) or an expression the parser cannot model", rulesNode)
 		}
 	}
 	native, err := s.nativeConditions(r, delayed)
@@ -70,10 +92,69 @@ func (s *state) jobWhenRules(info *jobInfo, r *reader) error {
 		cond = and(cond, native)
 	}
 	j.If = cond
+	if keepRules {
+		v, err := s.plain(rulesNode)
+		if err != nil {
+			return err
+		}
+		r.keep("rules", v)
+		s.note(s.jobPath(j.ID), caps.ExtPassthrough, "kept in Ext[gitlab][rules]", "the rules text stays in Ext so a return to GitLab writes it unchanged; other targets get the compiled condition", rulesNode)
+		r.keep(ExtRulesFP, rulesFP(j.If, j.Manual))
+		if !rulesDropped {
+			r.carried = append(r.carried, "rules")
+		}
+		if keyword != whenOnSuccess {
+			r.keep(ExtRulesWhen, keyword)
+		}
+	}
 	if j.Manual && rulesNode == nil && r.peek("allow_failure") == nil {
 		j.AllowFailure = true
 	}
 	return nil
+}
+
+// impliedByWorkflow is true when cond is the workflow condition and has a form the translator refuses: a truthiness
+// test as an operand of && or ||, or the merge request number, which only GitLab and GHA name.
+func (s *state) impliedByWorkflow(cond expr.Expr) bool {
+	if cond == nil || s.wfCond == nil || expr.String(cond) != expr.String(s.wfCond) {
+		return false
+	}
+	_, lit := cond.(expr.Lit)
+	return !lit && unstatable(cond)
+}
+
+func unstatable(x expr.Expr) bool {
+	switch v := x.(type) {
+	case expr.Ref:
+		return strings.Join(v.Path, ".") == expr.CtxPRNumber
+	case expr.Unary:
+		return unstatable(v.X)
+	case expr.Binary:
+		if v.Op == expr.OpAnd || v.Op == expr.OpOr {
+			_, lref := v.L.(expr.Ref)
+			_, rref := v.R.(expr.Ref)
+			return lref || rref || unstatable(v.L) || unstatable(v.R)
+		}
+	}
+	return false
+}
+
+// jobAllowFailure reads the job's own allow_failure; ok is false for the exit_codes form, which a rule cannot match.
+func jobAllowFailure(r *reader) (value, ok bool) {
+	n := r.peek("allow_failure")
+	if n == nil {
+		return false, true
+	}
+	return boolScalar(n)
+}
+
+// rulesFP names the condition and manual flag that compiled rules produced. The emitter writes the kept rules
+// text back only while the job still has them, so an edit of either field wins over the text.
+func rulesFP(x expr.Expr, manual bool) string {
+	if x == nil {
+		return "|" + strconv.FormatBool(manual)
+	}
+	return expr.String(x) + "|" + strconv.FormatBool(manual)
 }
 
 func (s *state) opaqueRules(n *yaml.Node) (expr.Expr, error) {

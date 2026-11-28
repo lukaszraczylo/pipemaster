@@ -87,6 +87,25 @@ func walkRefs(e Expr, fn func(Ref) bool) bool {
 	return true
 }
 
+// MapRefs returns e with each Ref replaced by fn of it.
+func MapRefs(e Expr, fn func(Ref) Expr) Expr {
+	switch v := e.(type) {
+	case Ref:
+		return fn(v)
+	case Unary:
+		return Unary{Op: v.Op, X: MapRefs(v.X, fn)}
+	case Binary:
+		return Binary{Op: v.Op, L: MapRefs(v.L, fn), R: MapRefs(v.R, fn)}
+	case Call:
+		args := make([]Expr, len(v.Args))
+		for i, a := range v.Args {
+			args[i] = MapRefs(a, fn)
+		}
+		return Call{Name: v.Name, Args: args}
+	}
+	return e
+}
+
 // names reports whether d's vocabulary names every ref of e.
 func (d Dialect) names(e Expr) bool {
 	return walkRefs(e, func(r Ref) bool { _, ok := d.Vocab.Dialect(r.Path); return ok })
@@ -95,13 +114,18 @@ func (d Dialect) names(e Expr) bool {
 // renameClass is the same-class rule: both vocabularies name every ref, and the target can print the result.
 // The canonical name sits between the two, so refs keep their nodes. Event literals are native strings, so
 // they map through the Events tables. An Opaque node is dialect text that no vocabulary renames.
-func renameClass(e Expr, from, to Dialect) (Expr, bool) {
+func renameClass(e Expr, from, to Dialect, lists bool) (Expr, bool) {
 	if HasOpaque(e) || !from.names(e) || !to.names(e) {
 		return nil, false
 	}
 	t, ok := mapEvents(e, from, to)
 	if !ok {
 		return nil, false
+	}
+	if lists {
+		if t, ok = eventListsRx(t, from, to); !ok {
+			return nil, false
+		}
 	}
 	if to.Supports != nil && !to.Supports(t) {
 		return nil, false
@@ -170,9 +194,15 @@ func mapEventBinary(b Binary, from, to Dialect) (Expr, bool) {
 		if !ok {
 			return nil, false
 		}
-		t, ok := mapEventLit(from, to, s, from.Class == ClassGHA)
+		fold := from.Class == ClassGHA
+		t, ok := mapEventLit(from, to, s, fold)
 		if !ok {
 			return nil, false
+		}
+		if to.EventRx && from.Class == ClassGitLab {
+			// A GitLab-class == compares exactly, so the literal is a value of the source table (mapEventLit fold false)
+			// and the /i pattern of the target value names the same event: both tables are injective after lowercasing.
+			return rx(b.Op == OpNe, Ref{Path: []string{CtxEvent}}, ModeExact, t), true
 		}
 		*lit = Lit{Kind: LitStr, Str: t}
 		return Binary{Op: b.Op, L: l, R: r}, true

@@ -82,7 +82,7 @@ deploy:
 	}
 }
 
-func TestGitlabWorkflowRulesWithoutTriggerFormDisableGHAJobs(t *testing.T) {
+func TestGitlabWorkflowRulesWithoutTriggerFormGuardGHAJobs(t *testing.T) {
 	const src = `workflow:
   rules:
     - if: $CI_COMMIT_TAG
@@ -92,8 +92,9 @@ deploy:
   script: [./deploy.sh]
 `
 	doc, _ := convert(t, provider.GitLab, provider.GHA, gitlabCI, src)
-	if !strings.Contains(jobBlock(doc, "deploy"), "if: false") {
-		t.Errorf("deploy runs unguarded:\n%s", doc)
+	const want = "if: '!(github.ref_type == ''tag'' && github.ref_name) && !github.event.deleted'"
+	if block := jobBlock(doc, "deploy"); !strings.Contains(block, want) {
+		t.Errorf("deploy condition is not exactly the workflow rule plus the deletion guard (want %s):\n%s", want, doc)
 	}
 }
 
@@ -136,7 +137,7 @@ func onBlock(doc string) string {
 	return strings.Join(out, "\n")
 }
 
-func TestUnfilteredGHAPushKeepsTagsInGitlab(t *testing.T) {
+func TestUnfilteredGHAPushKeepsTagsInGitlabAndNothingElse(t *testing.T) {
 	const src = `on: push
 jobs:
   build:
@@ -145,8 +146,10 @@ jobs:
       - run: make
 `
 	doc, _ := convert(t, provider.GHA, provider.GitLab, ghaWorkflow, src)
-	if strings.Contains(doc, "workflow:") {
-		t.Errorf("a push without filters must run on branches and tags; GitLab's default does, a workflow rule would narrow it:\n%s", doc)
+	for _, want := range []string{`$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH`, `$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG`} {
+		if !strings.Contains(doc, want) {
+			t.Errorf("a push without filters must run on branches and tags, and on no other pipeline source (web, api, schedule): want rule %s\n%s", want, doc)
+		}
 	}
 }
 

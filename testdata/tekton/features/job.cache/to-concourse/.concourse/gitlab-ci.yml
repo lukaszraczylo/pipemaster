@@ -1,12 +1,14 @@
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/script/carry
 # pipemaster:arg {"digest":"7ae53b7b2cc952537bd6ea03d30cbc7e89b97a2f083b52e7092bfc828ef3c180","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/carry
-# pipemaster:arg {"digest":"35a6cf8c80814f176a7104367f52f2f43193035137d34a2efbd4cd0cbb1052e6","carry":"id: build\ncache:\n    - key: $\u007b{ hashFiles('go.sum') }}\n      policy: pull-push\n      paths:\n        - .cache/go-build\n"}
+# pipemaster:arg {"digest":"d5c4c2b46d091328b70ad53c78fab786fd1b89a870657e3df127ce484ce9df9f","carry":"id: build\ncache:\n    - key: $\u007b{ hashFiles('go.sum') }}\n      policy: pull-push\n      paths:\n        - .cache/go-build\n"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci
 # pipemaster:emulated job.cache pipeline/gitlab-ci/job/build
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/build
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 resources:
@@ -24,11 +26,35 @@ jobs:
     plan:
       - get: source
         trigger: true
+      - task: script
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          caches:
+            - path: .cache/go-build
+          run:
+            path: sh
+            args:
+              - -ec
+              - make
+            dir: workspace
+  - name: build-tag
+    plan:
       - get: source-tags
         trigger: true
       - task: script
         input_mapping:
-          workspace: source
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

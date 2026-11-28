@@ -2,12 +2,14 @@
 # pipemaster:arg {"kind":"push","branches":{"Include":["main"],"Exclude":null}}
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-# pipemaster:lost job.if pipeline/ci/job/build: branch == 'main'
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+# pipemaster:emulated step.image pipeline/ci/job/build
+# pipemaster:arg {"job":"build","parts":["build"],"own":["build-run"]}
 build:
+  image: ubuntu:latest
   needs: []
   rules:
-    - when: never
+    - if: $CI_COMMIT_BRANCH == "main"
   script:
     # pipemaster:step build-run
     - make

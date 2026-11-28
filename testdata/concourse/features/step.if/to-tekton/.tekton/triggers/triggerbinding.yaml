@@ -7,3 +7,7 @@ spec:
   params:
     - name: ctx-event
       value: $(extensions.ctx_event)
+    - name: ctx-sha
+      value: $(extensions.ctx_sha)
+    - name: ctx-repo
+      value: $(extensions.ctx_repo)

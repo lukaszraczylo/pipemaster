@@ -7,6 +7,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -26,15 +27,19 @@ var ctxOrder = ctxparam.Names()
 
 // plan is the names and shared state of one pipeline.
 type plan struct {
-	pl   *ir.Pipeline
-	doc  *outDoc
-	byID map[string]*jobPlan
+	// changes holds the path plans that the generated task pipemaster-changes computes.
+	changes []emitkit.ChangesPlan
+	pl      *ir.Pipeline
+	doc     *outDoc
+	byID    map[string]*jobPlan
 	// inputs maps an IR input name to its parameter name.
 	inputs map[string]string
 	// renamed maps a parameter that an input was renamed to back to the IR input name.
 	renamed map[string]string
 	// ctx names the reserved ctx-* params that something reads.
 	ctx map[string]bool
+	// refTypes holds the job conditions written as a test of the ref type.
+	refTypes map[string]refTypeJob
 	// tmpls holds the template names in use.
 	tmpls map[string]bool
 	// claims are the volumeClaimTemplates that caches need, by claim name.
@@ -100,7 +105,7 @@ func (e *emitter) planNames(pls []*ir.Pipeline) {
 				if j == nil {
 					continue
 				}
-				jp := &jobPlan{j: j, finally: i == 1, path: pp.path + "/job/" + j.ID}
+				jp := &jobPlan{j: e.withoutSharedVolumes(j), finally: i == 1, path: pp.path + "/job/" + j.ID}
 				jp.task = e.dnsName(tnames, jp.path, "job id", j.ID, maxName, true)
 				jp.tmpl = unique(pp.tmpls, jp.task, maxName)
 				pp.jobs = append(pp.jobs, jp)

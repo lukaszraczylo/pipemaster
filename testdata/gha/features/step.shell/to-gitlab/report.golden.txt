@@ -1,2 +1,3 @@
 Loss report: gha -> gitlab
 [lost] pipeline/ci/job/build/step/build-step-1 step.shell (GitLab runs scripts in the runner's configured shell, not bash)
+[external] pipeline/ci/job/build job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)

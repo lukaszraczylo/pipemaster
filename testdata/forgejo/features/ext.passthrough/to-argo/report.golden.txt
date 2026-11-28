@@ -1,10 +1,9 @@
 Loss report: forgejo -> argo
 [lost] pipeline/ci ext.passthrough (Ext of provider gha (events, run-name) is not written to the Argo file; it is kept in round-trip metadata)
-[lost] pipeline/ci/job/build job.runner (Argo schedules pods; a runner label has no form)
+[external] pipeline/ci/job/build job.runner: no node selector (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [external] pipeline/ci/trigger/0 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
-[external] pipeline/ci/trigger/1 trigger.push: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
+[external] pipeline/ci/trigger/1 trigger.tag: EventSource webhook secret (Secret pipemaster-github-webhook with key token must exist and match the GitHub webhook; the repository owner and name are placeholders; set them in the EventSource)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.shell: container command bash -ec (the container runs bash -ec, so the image must provide bash)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.workdir: under the workspace (the relative working directory app is written under /workspace)
 [emulated] pipeline/ci/trigger/0 trigger.filter.branches
 [emulated] pipeline/ci/trigger/1 trigger.filter.branches
-[emulated] pipeline/ci/trigger/1 trigger.tag: EventSource and Sensor with a k8s trigger that creates a Workflow (the EventSource is github and serves GitHub webhooks only)

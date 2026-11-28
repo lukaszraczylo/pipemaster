@@ -2,10 +2,10 @@
 # pipemaster:arg {"digest":"aff55752408a94ea8e52e4642edb7ea910edbcfb6c72d530adaa7bd8dad8c2d8","carry":"image:\n    ref: golang:1.25\nid: build\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/build/step/notify/carry
 # pipemaster:arg {"digest":"dbe5c4b9a0a498cfce5d607ba0e2a2b0c60bd8c0955f7f87e16740b10de66f56","carry":"image:\n    ref: alpine:3.20\nid: notify\nkind: script\n"}
-# pipemaster:emulated pipeline.finally pipeline/woodpecker
-# pipemaster:arg {"job":"build","digest":"64a38f7cc03127086b1480a1505b528068c677c73fe0e114815be2ded50584cc","tasks":["notify"]}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/build/carry
 # pipemaster:arg {"digest":"c37d6e82cf85b0e1fd99f542720f67d6c82e09cd5507e6e6161e1538943e592f","carry":"id: build\n"}
+# pipemaster:emulated pipeline.finally pipeline/woodpecker
+# pipemaster:arg {"job":"build","digest":"64a38f7cc03127086b1480a1505b528068c677c73fe0e114815be2ded50584cc","tasks":["notify"]}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: woodpecker\ntriggers:\n    - kind: push\nfinally:\n    - id: notify\n      needs:\n        - job: build\n      steps:\n        - image:\n            ref: alpine:3.20\n          id: notify\n          kind: script\n          script:\n            - ./notify.sh\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker

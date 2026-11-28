@@ -189,13 +189,25 @@ func (tc *taskCtx) cond(path string, f caps.Feature, e expr.Expr, sc scope) cond
 	if e == nil {
 		return condition{}
 	}
+	orig := e
+	if f == caps.JobIf {
+		e = expr.RefTypeForm(e)
+	}
 	switch {
 	case f == caps.JobIf && !tc.jp.finally && len(tc.jp.j.Needs) > 0 && callsAlways(e):
 		tc.e.lose(path, f, "always() has no Tekton form outside finally; Tekton skips the task when a dependency fails")
 	case f == caps.StepIf && callsAlways(e):
 		tc.e.lose(path, f, "always() has no Tekton form for a step; Tekton does not run a step after a step fails")
 	}
-	if en, ok := tc.whenEntries(e, sc); ok {
+	// A step when reads back as a != test, and only a job condition has a marker that restores the written form.
+	if en, ok := tc.whenEntries(e, sc); ok && (f == caps.JobIf || !hasNegEq(e)) {
+		if f == caps.JobIf {
+			written := e
+			if hasNegEq(e) {
+				written = negEqToNe(e)
+			}
+			tc.noteRefType(orig, written)
+		}
 		return condition{when: en}
 	}
 	if !expr.HasOpaque(e) {
@@ -215,6 +227,34 @@ func (tc *taskCtx) cond(path string, f caps.Feature, e expr.Expr, sc scope) cond
 	}
 	tc.e.lose(path, f, why+"; the "+map[caps.Feature]string{caps.JobIf: "task", caps.StepIf: "step"}[f]+" never runs")
 	return condition{disabled: true, when: exprtekton.DisabledWhen()}
+}
+
+// negEqToNe spells each negated equality of e as the inequality that a notin entry reads back as.
+func negEqToNe(e expr.Expr) expr.Expr {
+	switch v := e.(type) {
+	case expr.Unary:
+		if b, ok := v.X.(expr.Binary); ok && v.Op == expr.OpNot && b.Op == expr.OpEq {
+			return expr.Binary{Op: expr.OpNe, L: b.L, R: b.R}
+		}
+		return expr.Unary{Op: v.Op, X: negEqToNe(v.X)}
+	case expr.Binary:
+		return expr.Binary{Op: v.Op, L: negEqToNe(v.L), R: negEqToNe(v.R)}
+	}
+	return e
+}
+
+// hasNegEq reports whether e holds a negated equality, which a notin entry reads back as a != test.
+func hasNegEq(e expr.Expr) bool {
+	switch v := e.(type) {
+	case expr.Unary:
+		if b, ok := v.X.(expr.Binary); ok && v.Op == expr.OpNot && b.Op == expr.OpEq {
+			return true
+		}
+		return hasNegEq(v.X)
+	case expr.Binary:
+		return hasNegEq(v.L) || hasNegEq(v.R)
+	}
+	return false
 }
 
 func firstOpaque(e expr.Expr) *expr.Opaque {

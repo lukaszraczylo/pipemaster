@@ -1,0 +1,23 @@
+{
+  "features": [
+    "step.image"
+  ],
+  "events": [
+    "push-main",
+    "push-branch"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": [],
+  "owners": {
+    "images.a": [
+      "a",
+      "build"
+    ],
+    "images.b": [
+      "b",
+      "build"
+    ]
+  },
+  "requires": []
+}

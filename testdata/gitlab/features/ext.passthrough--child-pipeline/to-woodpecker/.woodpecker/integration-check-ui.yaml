@@ -1,0 +1,27 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/integration-check-ui
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/integration-check-ui
+# pipemaster:arg {"gitlab_default":true}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/integration-check-ui
+# pipemaster:arg {"src":"branch == 'main'","from":"gitlab","gate":false}
+# pipemaster:emulated job.env pipeline/gitlab-ci/job/integration-check-ui
+# pipemaster:arg "- name: TARGET\n  value:\n    lit: staging\n"
+when:
+  - event: push
+    evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "main"'
+  - event: tag
+    evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "main"'
+  - event:
+      - manual
+      - cron
+    evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH == "main"'
+depends_on:
+  - integration-seed
+steps:
+  - name: script
+    image: ubuntu:latest
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo "checking ui on $$TARGET"'
+    environment:
+      TARGET: staging

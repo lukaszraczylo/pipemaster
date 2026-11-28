@@ -2,11 +2,11 @@
 # pipemaster:arg {"arts":"- paths:\n    - bin/\n","names":["artifact"],"outs":["{\"name\":\"artifact\",\"path\":\"/workspace/bin/\"}"]}
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/compile/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/docs/step/script
+# pipemaster:emulated job.needs.artifacts pipeline/gitlab-ci/job/unit
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/unit/step/script
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/1
 # pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate

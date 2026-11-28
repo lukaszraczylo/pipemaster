@@ -1,0 +1,116 @@
+origin:
+    provider: gha
+    dialect: gha
+    files:
+        - .github/workflows/ci.yml
+        - .github/workflows/deploy.yml
+pipelines:
+    - id: ci
+      name: ci
+      triggers:
+        - kind: push
+          branches:
+            include:
+                - main
+      jobs:
+        - id: build
+          runner:
+            labels:
+                - ubuntu-latest
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: build-step-1
+              kind: script
+              script:
+                - make build
+        - id: notify
+          runner:
+            labels:
+                - ubuntu-latest
+          needs:
+            - job: release
+          steps:
+            - ext:
+                gha:
+                    _derived_id: true
+              id: notify-step-1
+              kind: script
+              script:
+                - echo released
+        - if: ref_name == 'main'
+          child:
+            pipeline:
+                id: deploy
+                name: deploy
+                triggers:
+                    - ext:
+                        gha:
+                            event: workflow_call
+                            inputs:
+                                dry-run:
+                                    default: true
+                                    type: boolean
+                                environment:
+                                    required: true
+                                    type: string
+                            secrets:
+                                token:
+                                    required: true
+                      kind: api
+                jobs:
+                    - if: '!inputs.dry-run'
+                      id: apply
+                      runner:
+                        labels:
+                            - ubuntu-latest
+                      needs:
+                        - job: plan
+                      steps:
+                        - ext:
+                            gha:
+                                _derived_id: true
+                          id: apply-step-1
+                          kind: script
+                          script:
+                            - deploy --env "${{ inputs.environment }}"
+                      env:
+                        - name: DEPLOY_TOKEN
+                          value:
+                            secret: token
+                    - id: plan
+                      runner:
+                        labels:
+                            - ubuntu-latest
+                      steps:
+                        - ext:
+                            gha:
+                                _derived_id: true
+                          id: plan-step-1
+                          kind: script
+                          script:
+                            - echo "planning for ${{ inputs.environment }}"
+            native:
+                - gha
+            files:
+                - .github/workflows/deploy.yml
+          id: release
+          needs:
+            - job: build
+          steps:
+            - action:
+                kind: local
+                path: ./.github/workflows/deploy.yml
+              with:
+                dry-run:
+                    lit: "false"
+                environment:
+                    lit: staging
+              ext:
+                gha:
+                    _derived_id: true
+                    secrets:
+                        token: ${{ secrets.DEPLOY_TOKEN }}
+              id: release-step-1
+              kind: pipeline_call

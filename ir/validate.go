@@ -63,6 +63,9 @@ func validatePipeline(pl *Pipeline, add func(path, format string, a ...any)) {
 			continue
 		}
 		byID[j.ID] = j
+		if j.Child != nil && j.Child.Pipeline != nil {
+			validatePipeline(j.Child.Pipeline, add)
+		}
 		seenS := map[string]bool{}
 		for _, s := range j.Steps {
 			if s != nil && s.Action != nil && !ValidHost(s.Action.Host) {

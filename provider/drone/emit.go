@@ -10,8 +10,11 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	dexpr "github.com/lukaszraczylo/pipemaster/expr/drone"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 // emptyJobID names the document that holds a pipeline with no job: Drone needs a document to carry its triggers.
@@ -58,7 +61,13 @@ func (s *planSet) namesOf(pl *ir.Pipeline, id string) []string { return s.byJob[
 // Emit writes one .drone.yml with one YAML document per job, or per matrix cell. Every feature use goes through
 // the ledger; Finish fails the call when one was never accounted for.
 func (a adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	return inline.Emit(p, a.ID(), a.emitFlat)
+}
+
+func (a adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	p, vres := vars.Prepare(p, dialect)
 	files, rep, _, err := a.emit(p)
+	vres.Report(rep)
 	return files, rep, err
 }
 
@@ -67,17 +76,24 @@ func (a adapter) emit(p *ir.Project) (map[string][]byte, *report.Report, map[str
 	if p != nil {
 		origin = p.Origin.Provider
 	}
-	e := &emitter{led: emitkit.NewLedger("ir", dialect, a.Caps()), origin: origin, stepIDs: map[string]string{}}
+	var noForm map[string][]provider.SourceEvent
+	var injected map[string]bool
+	if origin == provider.GitLab {
+		p, noForm, injected = withSourceDefaults(p)
+	}
+	e := &emitter{led: emitkit.NewLedger("ir", dialect, a.Caps()), origin: origin, stepIDs: map[string]string{}, injected: injected}
 	if lang, ok := expr.LangOf(origin); ok && origin != dialect {
 		e.sem = lang.Sem
 		if from := expr.SourceFor(origin, dexpr.Lang); from != nil && from.Class == dexpr.Lang.Class {
 			e.from = from
 		}
 	}
+	e.gated = emitkit.GatedSteps(p)
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)
 	}
+	e.noteDefaultEvents(noForm)
 	pls := livePipelines(p)
 	plans := newPlanSet(pls, origin == dialect)
 	data, err := e.project(plans, pls)

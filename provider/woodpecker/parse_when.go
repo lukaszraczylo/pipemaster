@@ -2,6 +2,7 @@ package woodpecker
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -39,12 +40,12 @@ var triggerKinds = map[string]ir.TriggerKind{
 
 // itemInfo is one when entry: the part the expression package models, and what it does not.
 type itemInfo struct {
-	item wpexpr.Item
-	path wpexpr.Filter
-	// status is the entry's status list; hasStatus tells an absent list from an empty one.
-	status    []string
-	extras    []string
-	hasStatus bool
+	item        wpexpr.Item
+	path        wpexpr.Filter
+	status      []string
+	extras      []string
+	pathNoEmpty bool
+	hasStatus   bool
 }
 
 // whenSpec is a parsed when, kept as written so a lossy part can go to Ext whole.
@@ -68,7 +69,10 @@ type whenSpec struct {
 	sharedStatus bool
 	// stripped is true when a marker named the evaluate text of a trigger filter, so what is left is the job condition.
 	stripped bool
-	disabled bool
+	// gitlabDefault is true when a marker says the event lists hold the default events of a GitLab pipeline, whose
+	// triggers are the bare push and tag.
+	gitlabDefault bool
+	disabled      bool
 }
 
 // configure sets how the trigger reading treats the when, from the markers of its file.
@@ -82,14 +86,82 @@ func (s *whenSpec) configure(m *marks) {
 	s.sharedStatus = s.sharedStatusList()
 	for _, u := range m.uses {
 		var g gateArg
-		if u.Feature == caps.JobIf && decodeArg(m.args[u], &g) && g.Gate {
-			s.gated = true
+		if u.Feature == caps.JobIf && decodeArg(m.args[u], &g) {
+			s.gated = s.gated || g.Gate
+			s.lenient = s.lenient || g.Paths != nil
+			s.stripChanges(g.Paths)
+		}
+		var gd gitlabDefaultArg
+		if u.Feature == caps.TriggerPush && decodeArg(m.args[u], &gd) && gd.Default {
+			s.dropEvents()
+		}
+		var d defaultEventsArg
+		if u.Feature == caps.TriggerPush && decodeArg(m.args[u], &d) && len(d.Events) > 0 {
+			s.dropDefaultEvents(d.Events)
 		}
 		switch u.Feature {
 		case caps.TriggerFilterBranch, caps.TriggerFilterPaths, caps.TriggerFilterTags:
 			s.lenient = s.lenient || u.IRPath == pipelinePth
 		case caps.PipelineFinally:
 			s.ignoreStatus = true
+		}
+	}
+}
+
+// dropEvents reads the entries as if they had no event filter: the emitter listed the events of a GitLab pipeline with
+// the default triggers in each of them.
+func (s *whenSpec) dropEvents() {
+	s.gitlabDefault = true
+	var kept []itemInfo
+	for _, it := range s.items {
+		it.item.Event = wpexpr.Filter{}
+		if !slices.ContainsFunc(kept, func(k itemInfo) bool { return reflect.DeepEqual(k, it) }) {
+			kept = append(kept, it)
+		}
+	}
+	s.items = kept
+}
+
+// dropDefaultEvents reads the event list that the emitter wrote for a source with no event filter as no filter.
+func (s *whenSpec) dropDefaultEvents(events []string) {
+	for i := range s.items {
+		ev := s.items[i].item.Event
+		if ev.Exclude == nil && len(ev.Include) == len(events) && !slices.ContainsFunc(events, func(x string) bool { return !slices.Contains(ev.Include, x) }) {
+			s.items[i].item.Event = wpexpr.Filter{}
+		}
+	}
+}
+
+// stripChanges removes the path filter an emitter wrote for a path predicate, so the entries read as the triggers
+// the pipeline had. The entries the emitter made for a pipeline with no triggers are dropped whole.
+func (s *whenSpec) stripChanges(a *changesArg) {
+	if a == nil {
+		return
+	}
+	src, err := expr.ParseCanonical(a.Src)
+	if err != nil || !expr.HasChanges(src) {
+		return
+	}
+	var globs [][]string
+	for _, at := range expr.ChangesAtoms(src) {
+		g, _ := expr.ChangesGlobs(at)
+		globs = append(globs, g)
+	}
+	if a.Synth {
+		s.items = nil
+		return
+	}
+	for i := range s.items {
+		if slices.ContainsFunc(globs, func(g []string) bool { return slices.Equal(s.items[i].path.Include, g) }) && len(s.items[i].path.Exclude) == 0 {
+			s.items[i].path, s.items[i].pathNoEmpty = wpexpr.Filter{}, false
+		}
+		if a.Evaluate != "" {
+			ev := s.items[i].item.Evaluate
+			if rest, ok := strings.CutSuffix(ev, ") && ("+a.Evaluate+")"); ok && strings.HasPrefix(rest, "(") {
+				s.items[i].item.Evaluate = strings.TrimPrefix(rest, "(")
+			} else if ev == a.Evaluate {
+				s.items[i].item.Evaluate = ""
+			}
 		}
 	}
 }
@@ -132,7 +204,9 @@ func (s *whenSpec) sharedEvaluate() string {
 
 // gates says whether a gate that every entry repeats belongs to the job, not to each trigger. A lone workflow with
 // one entry keeps the whole entry as its condition.
-func (s *whenSpec) gates() bool { return len(s.items) >= 2 || s.multi || s.stripped || s.gated }
+func (s *whenSpec) gates() bool {
+	return len(s.items) >= 2 || s.multi || s.stripped || s.gated || s.gitlabDefault
+}
 
 func (s *whenSpec) sharedStatusList() bool {
 	if len(s.items) < 1 || !s.items[0].hasStatus {
@@ -207,6 +281,26 @@ func filterOf(v any) (wpexpr.Filter, bool) {
 	return f, true
 }
 
+// withoutOnEmpty splits on_empty: false off a path filter, the one form of that key the emitter writes.
+func withoutOnEmpty(v any) (any, bool) {
+	m, ok := asMap(v)
+	if !ok {
+		return v, false
+	}
+	b, has := m.vals["on_empty"]
+	on, isBool := boolOf(b)
+	if !has || !isBool || on {
+		return v, false
+	}
+	var rest []string
+	for _, k := range m.keys {
+		if k != "on_empty" {
+			rest = append(rest, k)
+		}
+	}
+	return m.subset(rest), true
+}
+
 func parseItem(m *omap) itemInfo {
 	var out itemInfo
 	for _, k := range m.keys {
@@ -242,6 +336,11 @@ func parseItem(m *omap) itemInfo {
 		default:
 			out.extras = append(out.extras, k)
 			continue
+		}
+		if k == "path" {
+			if rest, noEmpty := withoutOnEmpty(v); noEmpty {
+				v, out.pathNoEmpty = rest, true
+			}
 		}
 		f, ok := filterOf(v)
 		if !ok {
@@ -344,12 +443,15 @@ func (s *whenSpec) triggers() ([]ir.Trigger, bool) {
 	if s == nil || len(s.items) == 0 || len(s.runsOn) > 0 {
 		return nil, false
 	}
+	if s.gitlabDefault {
+		return []ir.Trigger{{Kind: ir.TriggerPush}, {Kind: ir.TriggerTag}}, true
+	}
 	var out []ir.Trigger
 	for _, raw := range s.items {
 		it := s.view(raw)
 		tagRef, tagOK := tagGlobs(it.item.Ref)
 		refBlocks := !it.item.Ref.Empty() && (!tagOK || !slices.Equal(it.item.Event.Include, []string{eventTag}))
-		if it.item.Evaluate != "" || refBlocks || !it.item.Repo.Empty() || !it.item.Instance.Empty() ||
+		if it.pathNoEmpty || it.item.Evaluate != "" || refBlocks || !it.item.Repo.Empty() || !it.item.Instance.Empty() ||
 			it.hasStatus || len(it.extras) > 0 || len(it.item.Event.Exclude) > 0 || len(it.item.Event.Include) == 0 {
 			return nil, false
 		}

@@ -121,7 +121,7 @@ func TestMatrixCells(t *testing.T) {
 		}
 	}
 	cmd := stepsOf(docNamed(t, docs, "test-1.21-a-b"))[0]["commands"].([]any)[0].(string)
-	if !strings.HasPrefix(cmd, "go test 1.21 a") {
+	if !strings.Contains(cmd, "go test 1.21 a") {
 		t.Fatalf("cell values are not substituted: %q", cmd)
 	}
 	if n := countLines(out, "# pipemaster:emulated job.matrix pipeline/drone/job/test"); n != 4 {
@@ -297,7 +297,7 @@ func TestRunnerPlatformAndNode(t *testing.T) {
 	if pf["os"] != "linux" || pf["arch"] != "arm64" || d["node"].(map[string]any)["disk"] != "ssd" {
 		t.Fatalf("platform %v node %v", pf, d["node"])
 	}
-	wantLevel(t, rep, caps.JobRunner, "job/build", caps.Lost)
+	wantLevel(t, rep, caps.JobRunner, "job/build", caps.External)
 }
 
 func TestEmitServices(t *testing.T) {
@@ -704,7 +704,7 @@ func TestNoPosixGuardOnWindows(t *testing.T) {
 }
 
 func TestDependencyOnAnUnwrittenStepIsReported(t *testing.T) {
-	a := gstep("a", "echo ${{ steps.x.outputs.y }}")
+	a := gstep("a")
 	b := gstep("b", "make")
 	b.Ext = ir.Ext{"drone": map[string]any{"depends_on": []any{"a"}}}
 	_, rep := emitText(t, gproject("drone", gjob("j", a, b)))
@@ -740,5 +740,18 @@ func TestBranchFilterCarriesThePullRequestCaveat(t *testing.T) {
 				t.Errorf("no pull request caveat on %s: %+v", tc.f, rep.Entries)
 			}
 		})
+	}
+}
+
+func TestTagConditionIsANativeRefFilter(t *testing.T) {
+	j := gjob("tag-only", gstep("x", "1"))
+	j.If = expr.Call{Name: "startsWith", Args: []expr.Expr{expr.Ref{Path: []string{"ref"}}, expr.Lit{Kind: expr.LitStr, Str: "refs/tags/"}}}
+	out, rep := emitText(t, gproject(ghaOrigin, j))
+	trig, _ := docsOf(t, out)[0]["trigger"].(map[string]any)
+	if refs, _ := trig["ref"].([]any); len(refs) != 1 || refs[0] != "refs/tags/**" {
+		t.Fatalf("trigger = %v, want ref refs/tags/**", trig)
+	}
+	if lv, ok := levelOf(rep, caps.JobIf, "job/tag-only"); ok && lv == caps.Lost {
+		t.Fatalf("a tag condition has a Drone form, the report says lost: %v", rep.Entries)
 	}
 }

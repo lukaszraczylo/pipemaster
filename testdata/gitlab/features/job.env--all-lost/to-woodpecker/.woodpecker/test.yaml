@@ -1,13 +1,20 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/test
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/test
+# pipemaster:arg {"gitlab_default":true}
 # pipemaster:emulated job.env pipeline/gitlab-ci/job/test
 # pipemaster:arg "- name: IMAGE\n  value:\n    expr: format('$$CI_REGISTRY_IMAGE/tmp:{0}', sha)\n"
 when:
   - event: push
   - event: tag
+  - event:
+      - manual
+      - cron
 steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make test
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make test'
     environment:
       IMAGE: $$CI_REGISTRY_IMAGE/tmp:${CI_COMMIT_SHA}

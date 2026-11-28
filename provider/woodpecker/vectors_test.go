@@ -14,6 +14,8 @@ import (
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/internal/vectors"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/woodpecker"
 )
 
@@ -53,6 +55,7 @@ type (
 		Finally      *vFinally     `json:"finally"`
 		TagIdx       *int          `json:"tag_idx"`
 		Platform     *string       `json:"platform"`
+		Tags         []string      `json:"tags"`
 		Name         string        `json:"name"`
 		Whens        []vEntry      `json:"whens"`
 		Deps         []vDep        `json:"deps"`
@@ -151,6 +154,7 @@ func decodeStep(n *yaml.Node) (vStep, error) {
 		case "image":
 		case "commands":
 			s.Cmds, err = vectors.Strings(kv.Val)
+			s.Cmds = unwrapBash(s.Cmds)
 			for i := range s.Cmds {
 				s.Cmds[i] = unescape(s.Cmds[i])
 			}
@@ -174,21 +178,26 @@ func decodeStep(n *yaml.Node) (vStep, error) {
 	return s, nil
 }
 
-// decodeLabels reads the labels.platform key; any other label key is not modelled.
-func decodeLabels(n *yaml.Node) (*string, error) {
+// decodeLabels reads the labels.platform key and the tag keys; a tag key must have the value true.
+func decodeLabels(n *yaml.Node) (*string, []string, error) {
 	es, err := vectors.Entries(n)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var platform *string
+	tags := []string{}
 	for _, kv := range es {
-		if kv.Key != "platform" {
-			return nil, fmt.Errorf("label key %q is not modelled", kv.Key)
-		}
 		v := kv.Val.Value
-		platform = &v
+		if kv.Key == "platform" {
+			platform = &v
+			continue
+		}
+		if v != emitkit.TagValue {
+			return nil, nil, fmt.Errorf("label key %q has the value %q, want %q", kv.Key, v, emitkit.TagValue)
+		}
+		tags = append(tags, kv.Key)
 	}
-	return platform, nil
+	return platform, tags, nil
 }
 
 func decodeSeq[T any](n *yaml.Node, one func(*yaml.Node) (T, error)) ([]T, error) {
@@ -313,7 +322,7 @@ func applyMark(f *vFile, m vectors.Mark) error {
 }
 
 func decodeFile(name string, src []byte) (vFile, error) {
-	f := vFile{Name: strings.TrimSuffix(strings.TrimPrefix(name, workflowDir), workflowExt)}
+	f := vFile{Name: strings.TrimSuffix(strings.TrimPrefix(name, workflowDir), workflowExt), Tags: []string{}}
 	es, err := vectors.RootMapping(src)
 	if err != nil {
 		return f, err
@@ -327,7 +336,7 @@ func decodeFile(name string, src []byte) (vFile, error) {
 		case "steps":
 			f.Steps, err = decodeSeq(e.Val, decodeStep)
 		case "labels":
-			f.Platform, err = decodeLabels(e.Val)
+			f.Platform, f.Tags, err = decodeLabels(e.Val)
 		default:
 			err = fmt.Errorf("key %q is not modelled", e.Key)
 		}
@@ -418,4 +427,18 @@ func TestWoodpeckerVectors(t *testing.T) {
 			return
 		}
 	}
+}
+
+// unwrapBash reads the script back from the bash-if-present wrapper that a step of a bash source gets, one
+// command per script line.
+func unwrapBash(cmds []string) []string {
+	var out []string
+	for _, c := range cmds {
+		if inner, ok := provider.BashUnwrapCommand(strings.ReplaceAll(provider.BashOrShScript, "$", "$$"), c); ok {
+			out = append(out, strings.Split(inner, "\n")...)
+			continue
+		}
+		out = append(out, c)
+	}
+	return out
 }

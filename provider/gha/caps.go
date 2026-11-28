@@ -12,7 +12,7 @@ func (a *adapter) Caps() caps.Matrix {
 		caps.JobRetry:               {Level: caps.Emulated, Strategy: "step-level retry loop via shell", Caveat: "Retry.Attempts is the total number of runs, so GitLab retry: N is Attempts N+1"},
 		caps.JobManual:              {Level: caps.Emulated, Strategy: "workflow_dispatch trigger"},
 		caps.TriggerPipelineDone:    {Level: caps.Native, Strategy: "workflow_run"},
-		caps.JobCache:               {Level: caps.Emulated, Strategy: "actions/cache step"},
+		caps.JobCache:               {Level: caps.Emulated, Strategy: "actions/cache step; policy pull is actions/cache/restore, policy push is actions/cache/save at job end", Caveat: "a key with no hashFiles call becomes a rolling key (<key>-run-<run_id>-<run_attempt>, restored by prefix) so each run saves a cache as GitLab does; " + cacheScopeCaveat},
 		caps.JobArtifacts:           {Level: caps.Emulated, Strategy: "upload-artifact step at job end"},
 		caps.JobNeedsArtifacts:      {Level: caps.Emulated, Strategy: "download-artifact step at job start"},
 		caps.PipelineFinally:        {Level: caps.Emulated, Strategy: "job with if: always() that needs every other job"},

@@ -13,7 +13,9 @@ import (
 	"github.com/lukaszraczylo/pipemaster/internal/roundtrip"
 	"github.com/lukaszraczylo/pipemaster/internal/vectors"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/drone"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 // The abstract documents below mirror lean4/Pipemaster/Drone.lean; their JSON keys are the ones GenVectors writes.
@@ -48,6 +50,7 @@ type (
 		Finally      *vFinally     `json:"finally"`
 		IfTrigs      *[]vTrig      `json:"if_trigs"`
 		Platform     *string       `json:"platform"`
+		Tags         []string      `json:"tags"`
 		Name         string        `json:"name"`
 		Deps         []string      `json:"deps"`
 		Steps        []vStep       `json:"steps"`
@@ -166,7 +169,7 @@ func decodeStep(n *yaml.Node) (vStep, error) {
 			}
 		case "commands":
 			if s.Cmds, err = vectors.Strings(kv.Val); err == nil {
-				s.Cmds = unescapeAll(s.Cmds)
+				s.Cmds = unescapeAll(unwrapBash(s.Cmds))
 			}
 		case "environment":
 			var vs []vectors.Var
@@ -203,6 +206,22 @@ func decodePlatform(n *yaml.Node) (*string, error) {
 		label += "/" + v
 	}
 	return &label, nil
+}
+
+// decodeNode reads the node keys: each is a runner tag with the value true.
+func decodeNode(n *yaml.Node) ([]string, error) {
+	es, err := vectors.Entries(n)
+	if err != nil {
+		return nil, err
+	}
+	tags := []string{}
+	for _, kv := range es {
+		if kv.Val.Value != emitkit.TagValue {
+			return nil, fmt.Errorf("node key %q has the value %q, want %q", kv.Key, kv.Val.Value, emitkit.TagValue)
+		}
+		tags = append(tags, kv.Key)
+	}
+	return tags, nil
 }
 
 // yamlArg reads the marker argument that holds a YAML document as a JSON string.
@@ -297,7 +316,7 @@ func checkHeader(key string, val *yaml.Node) error {
 }
 
 func decodeDoc(src []byte) (vDoc, error) {
-	d := vDoc{Deps: []string{}, Steps: []vStep{}, Env: []vectors.Var{}}
+	d := vDoc{Deps: []string{}, Steps: []vStep{}, Env: []vectors.Var{}, Tags: []string{}}
 	es, err := vectors.RootMapping(src)
 	if err != nil {
 		return d, err
@@ -314,6 +333,8 @@ func decodeDoc(src []byte) (vDoc, error) {
 			d.Deps, err = vectors.Strings(e.Val)
 		case "platform":
 			d.Platform, err = decodePlatform(e.Val)
+		case "node":
+			d.Tags, err = decodeNode(e.Val)
 		case "environment":
 			var vs []vectors.Var
 			if vs, err = vectors.Vars(e.Val); err == nil {
@@ -411,4 +432,18 @@ func TestDroneVectors(t *testing.T) {
 			return
 		}
 	}
+}
+
+// unwrapBash reads the script back from the bash-if-present wrapper that a step of a bash source gets, one
+// command per script line.
+func unwrapBash(cmds []string) []string {
+	var out []string
+	for _, c := range cmds {
+		if inner, ok := provider.BashUnwrapCommand(strings.ReplaceAll(provider.BashOrShScript, "$", "$$"), c); ok {
+			out = append(out, strings.Split(inner, "\n")...)
+			continue
+		}
+		out = append(out, c)
+	}
+	return out
 }

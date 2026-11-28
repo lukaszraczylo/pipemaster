@@ -8,6 +8,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr/ctxparam"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 )
 
 const (
@@ -56,6 +57,11 @@ func (e *emitter) pipelineDoc(pp *plan) error {
 	d := &outDoc{}
 	pp.doc = d
 	e.add(workflowsDir+pp.name+".yaml", d, pp.path)
+	if e.injected[pl.ID] {
+		if err := e.markArg(caps.TriggerPush, pp.path, provider.DefaultMarker(pl)); err != nil {
+			return err
+		}
+	}
 	root := newMap()
 	root.SetStr("apiVersion", apiVersion)
 	root.SetStr("kind", kindTemplate)
@@ -75,6 +81,13 @@ func (e *emitter) pipelineDoc(pp *plan) error {
 			tasks = append(tasks, out.tasks...)
 		}
 		tmpls = append(tmpls, out.tmpls...)
+	}
+	if err := e.markRefTypes(pp); err != nil {
+		return err
+	}
+	if len(pp.changes) > 0 {
+		task, tmpl := e.changesTemplate(pp)
+		tasks, tmpls = append([]*yaml.Node{task}, tasks...), append([]*yaml.Node{tmpl}, tmpls...)
 	}
 	e.markPipelineEnv(pl, pp.path)
 	if len(tasks) == 0 {

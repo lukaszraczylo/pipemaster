@@ -1,4 +1,10 @@
 Loss report: gitlab -> gha
+[lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline and its file has no trigger form for them; GHA has no event for them)
+[lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat and its file has no trigger form for them; GHA has no event for them)
 [lost] pipeline/gitlab-ci/job/build job.container (container entrypoint has no GHA key)
+[external] pipeline/gitlab-ci/trigger/3 trigger.schedule: add on: schedule: - cron: <the cron of your GitLab pipeline schedule> to the workflow: GitLab keeps the schedule in the project settings, so the workflow has no schedule event and the job starts by workflow_dispatch (the schedule names no cron expression)
+[emulated] pipeline/gitlab-ci job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/gitlab-ci/job/build job.runner: default runner label ubuntu-latest (the IR holds no runner label)
-[emulated] pipeline/gitlab-ci/job/build step.action: actions/checkout step (GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs)
+[emulated] pipeline/gitlab-ci/job/build step.action: actions/checkout step (GitLab clones the repository before every job; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs, and GHA does not clone)
+[emulated] pipeline/gitlab-ci/job/build/step/script step.shell: bash-if-present wrapper (the source runs the step under bash when the image has it, and a runner such as act runs a step with no shell under sh; the script re-executes under bash when the image has bash, else under sh -e)
+[emulated] pipeline/gitlab-ci/trigger/4 trigger.api: repository_dispatch (the API trigger names no event; repository_dispatch is used)

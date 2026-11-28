@@ -2,6 +2,7 @@ package tekton
 
 import (
 	"encoding/json"
+	"path"
 	"regexp"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/actions"
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
+	exprtekton "github.com/lukaszraczylo/pipemaster/expr/tekton"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
@@ -143,10 +145,14 @@ func (tc *taskCtx) markAction(b *stepBook, sp string, st *ir.Step, image string,
 
 // actionStep maps an action step through the actions table. Every mapped action leaves a marker that holds the step.
 func (tc *taskCtx) actionStep(b *stepBook, st *ir.Step, sp, name string) (*wmap, error) {
-	if st.Action == nil || st.Kind == ir.StepPipelineCall {
+	if st.Action == nil || st.Kind == ir.StepPipelineCall || tc.e.own && extOf(st.Ext)["ref"] != nil {
 		m := tc.extAction(st, sp, name)
 		if m == nil {
-			return nil, tc.markAction(b, sp, st, "", nil)
+			why := "the step has no action reference and no Tekton ref"
+			if r := emitkit.CallReason(st, "Tekton"); r != "" {
+				why = r
+			}
+			return tc.failedAction(b, st, sp, name, why)
 		}
 		return m, nil
 	}
@@ -160,9 +166,11 @@ func (tc *taskCtx) actionStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 		with[k] = s
 	}
 	t, ok := actions.Lookup(*st.Action, dialect, with)
+	ok = ok && !tc.e.gated[st]
 	if !ok {
-		tc.dropAction(st, sp, "no Tekton mapping for action "+actionRef(st.Action))
-		return nil, tc.markAction(b, sp, st, "", nil)
+		why := "no Tekton mapping for action " + actionRef(st.Action)
+		tc.dropAction(st, sp, why)
+		return tc.failedAction(b, st, sp, name, why)
 	}
 	tc.e.led.Note(use(sp, caps.StepAction), t.Support, t.Support.Caveat)
 	for _, k := range t.Unmapped {
@@ -170,13 +178,50 @@ func (tc *taskCtx) actionStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 	}
 	if t.Support.Level == caps.Lost {
 		tc.dropAction(st, sp, t.Support.Caveat)
-		return nil, tc.markAction(b, sp, st, "", nil)
+		return tc.failedAction(b, st, sp, name, "the action has no Tekton form: "+t.Support.Caveat)
 	}
 	m, image, err := tc.applyTarget(b, st, sp, name, t)
 	if err != nil {
 		return nil, err
 	}
+	if m == nil && image == "" && t.Kind != actions.KindCache {
+		return tc.failedAction(b, st, sp, name, "action kind "+t.Kind+" has no Tekton form")
+	}
 	return m, tc.markAction(b, sp, st, image, m)
+}
+
+// failedAction writes the step that stands for a step with no Tekton form: it prints the loss and exits 1.
+func (tc *taskCtx) failedAction(b *stepBook, st *ir.Step, sp, name, why string) (*wmap, error) {
+	m, err := tc.failStep(b, st, sp, name, why)
+	if err != nil {
+		return nil, err
+	}
+	return m, tc.markAction(b, sp, st, "", m)
+}
+
+func (tc *taskCtx) failStep(b *stepBook, st *ir.Step, sp, name, why string) (*wmap, error) {
+	sc := newScope()
+	m := newMap()
+	m.SetStr("name", name)
+	img, _ := tc.stepImage(sc, &ir.Step{}, sp)
+	if img != "" {
+		m.SetStr("image", img)
+	}
+	cond := tc.cond(sp, caps.StepIf, st.If, taskScope)
+	lines := []string{emitkit.FailLoud(caps.StepAction, sp, why)}
+	if guard := andGuard(b.guard, cond.guard); guard != nil {
+		var err error
+		if lines, err = exprtekton.AddGuard(lines, guard); err != nil {
+			return nil, err
+		}
+		guardEnv(sc, guard)
+	}
+	m.Set("script", block(strings.Join(lines, "\n")))
+	if len(sc.env) > 0 {
+		m.Set("env", seqOf(sc.env...))
+	}
+	tc.stepTail(m, st, cond)
+	return m, nil
 }
 
 func (tc *taskCtx) dropAction(st *ir.Step, sp, why string) {
@@ -241,7 +286,7 @@ func (tc *taskCtx) applyTarget(b *stepBook, st *ir.Step, sp, name string, t acti
 		dest, _ := t.With["path"].(string)
 		return tc.copyStep(st, sp, name, downloadScript(artifactName(an), dest)), "", nil
 	case actions.KindScript:
-		m, err := tc.scriptStep(b, &ir.Step{ID: st.ID, Kind: ir.StepScript, Script: t.Script, Env: st.Env, WorkDir: st.WorkDir, If: st.If, Timeout: st.Timeout, ContinueOnError: st.ContinueOnError}, sp, name)
+		m, err := tc.scriptStep(b, emitkit.ScriptStep(st, t, sp, tc.image == "" && (tc.jp.j.Container == nil || tc.containerRef == "")), sp, name)
 		return m, "", err
 	}
 	tc.e.lose(sp, caps.StepAction, "action kind "+t.Kind+" has no Tekton form")
@@ -280,23 +325,58 @@ func (tc *taskCtx) useWorkspace() {
 // cloneStep writes the StepAction ref to git-clone through the git resolver, at a pinned tag.
 func (tc *taskCtx) cloneStep(st *ir.Step, sp, name string, t actions.Target) *wmap {
 	tc.checkout, tc.pp.checkout = true, true
-	repoParam := tc.ctxParam("ctx-repo")
-	shaParam := tc.ctxParam("ctx-sha")
-	ref := newMap()
-	ref.SetStr("resolver", "git")
-	ref.Set("params", seqOf(
+	url, revision, outPath := "", "", workspaceDir
+	// The repository, the ref and the path of the checkout go to the clone parameters.
+	given := func(in string) (string, bool, bool) {
+		v, ok := t.With[in].(string)
+		if !ok || v == "" {
+			return "", false, true
+		}
+		out, good, err := tc.text(newScope(), sp, caps.StepAction, valueText, v)
+		return out, true, good && err == nil
+	}
+	repo, hasRepo, good := given("repository")
+	if !good {
+		return nil
+	}
+	if hasRepo {
+		url = cloneHost + repo + ".git"
+	} else {
+		url = cloneHost + param(tc.ctxParam("ctx-repo")) + ".git"
+	}
+	ref, hasRef, good := given("ref")
+	if !good {
+		return nil
+	}
+	switch {
+	case hasRef:
+		revision = ref
+	case !hasRepo:
+		revision = param(tc.ctxParam("ctx-sha"))
+	}
+	if p, hasPath, good := given("path"); !good {
+		return nil
+	} else if hasPath {
+		outPath = path.Join(workspaceDir, p)
+	}
+	stepRef := newMap()
+	stepRef.SetStr("resolver", "git")
+	stepRef.Set("params", seqOf(
 		nameValue("url", gitCloneURL), nameValue("revision", gitCloneRevision), nameValue("pathInRepo", gitClonePath)))
-	params := seqOf(
-		nameValue("url", cloneHost+param(repoParam)+".git"),
-		nameValue("revision", param(shaParam)),
-		nameValue("output-path", workspaceDir),
-	)
+	params := seqOf(nameValue("url", url))
+	if revision != "" {
+		params.Content = append(params.Content, nameValue("revision", revision))
+	}
+	params.Content = append(params.Content, nameValue("output-path", outPath))
 	if d, ok := t.With["depth"].(string); ok {
 		params.Content = append(params.Content, nameValue("depth", d))
 	}
+	if sp, ok := t.With["sparseCheckoutDirectories"].(string); ok {
+		params.Content = append(params.Content, nameValue("sparseCheckoutDirectories", sp))
+	}
 	m := newMap()
 	m.SetStr("name", name)
-	m.Set("ref", ref.N)
+	m.Set("ref", stepRef.N)
 	m.Set("params", params)
 	tc.unapplied(st, sp, "the clone step takes no env or working directory")
 	tc.stepTail(m, st, tc.cond(sp, caps.StepIf, st.If, taskScope))

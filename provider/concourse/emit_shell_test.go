@@ -46,6 +46,8 @@ func TestDefaultShellOfBashSourcesRunsBashIfPresent(t *testing.T) {
 		t.Run(origin, func(t *testing.T) {
 			p := project(scriptJob("build", bashOnly))
 			p.Origin = ir.Origin{Provider: origin, Dialect: origin}
+			// A GitLab file with no trigger also runs on tags, which gives the job a tag twin; one push trigger keeps one task.
+			p.Pipelines[0].Triggers = []ir.Trigger{pushOn("main")}
 			files, rep := emit(t, p)
 			runs := runsOf(pipelineDoc(t, files))
 			if len(runs) != 1 || runs[0]["path"] != "sh" {

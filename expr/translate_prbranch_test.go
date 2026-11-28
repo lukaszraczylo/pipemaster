@@ -44,12 +44,20 @@ func (r prRun) holds(t *testing.T, e expr.Expr, d expr.Dialect) bool {
 		if pr {
 			c.RefName = sp("7/merge")
 		}
-		return holdsOf(t, e, c.ghaView(), gha.Lang.Sem)
+		return holdsOf(t, e, withBase(c.ghaView(), pr), gha.Lang.Sem)
 	case gitlab.Dialect:
 		// CI_COMMIT_REF_NAME holds the source branch in a merge request pipeline (see AssumeRefName), which c.RefName is.
-		return holdsOf(t, e, c.glView(), gitlab.Lang.Sem)
+		return holdsOf(t, e, withBase(c.glView(), pr), gitlab.Lang.Sem)
 	}
 	return woodpeckerHolds(t, e, c.factWoodpeckerView(r.sfx))
+}
+
+// withBase sets the target branch of a pull request run, which the Woodpecker run of the same name holds in its branch.
+func withBase(v view, pr bool) view {
+	if pr {
+		v["pr.base_ref"] = wpTarget
+	}
+	return v
 }
 
 var prSources = map[string][]string{

@@ -9,6 +9,10 @@ spec:
       default: ""
     - name: ctx-event
       default: ""
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
     - name: ctx-actor
       default: ""
   resourcetemplates:
@@ -24,5 +28,9 @@ spec:
             value: $(tt.params.ctx-branch)
           - name: ctx-event
             value: $(tt.params.ctx-event)
+          - name: ctx-sha
+            value: $(tt.params.ctx-sha)
+          - name: ctx-repo
+            value: $(tt.params.ctx-repo)
           - name: ctx-actor
             value: $(tt.params.ctx-actor)

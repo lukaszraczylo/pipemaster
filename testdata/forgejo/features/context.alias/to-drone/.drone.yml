@@ -1,19 +1,28 @@
 # pipemaster:lost script.interpolation pipeline/ci/job/build/step/build-step-1: echo {{ ref_name }}
-# pipemaster:lost step.script pipeline/ci/job/build/step/build-step-1: the step has no command left
-# pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
-# pipemaster:arg {"step":"id: build-step-1\nkind: script\nscript:\n    - echo $$\u007b{ ref_name }}\n","at":0}
 # pipemaster:emulated job.container pipeline/ci/job/build
+# pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-1
+# pipemaster:arg {"if":"ref_name == 'main'","back":"(ref == 'refs/heads/main') || (tag == 'main')"}
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
 kind: pipeline
 type: docker
 name: build
+node:
+  docker: "true"
 trigger:
   event:
     - push
     - tag
 steps:
+  - name: build-step-1
+    image: ubuntu:latest
+    commands:
+      - 'sh -c ''if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"'' pipemaster ''printf ''\''''%s\n''\'''' ''\''''pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Drone spelling for expression ref_name; the line is replaced by a line that prints the loss and exits 1''\'''' >&2; exit 1'''
+    when:
+      ref:
+        - refs/heads/main
+        - refs/tags/main
   - name: build-step-2
     image: ubuntu:latest
     commands:
-      - 'if ! [ "$$DRONE_COMMIT_SHA" != '''' ]; then exit 0; fi # pipemaster:guard'
-      - echo $${DRONE_COMMIT_SHA}
+      - 'if ! [ "$$DRONE_COMMIT_SHA" != '''' ]; then echo ''pipemaster: skipped: the condition of this step is false''; exit 0; fi # pipemaster:guard'
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo $${DRONE_COMMIT_SHA}'

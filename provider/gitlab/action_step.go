@@ -18,6 +18,7 @@ const (
 	actCache    = "cache"
 	actUpload   = "upload"
 	actDownload = "download"
+	actScript   = "script"
 )
 
 type wireValue struct {
@@ -39,6 +40,7 @@ type wireStep struct {
 	Timeout         *ir.Duration         `json:"timeout,omitempty"`
 	ID              string               `json:"id"`
 	Name            string               `json:"name,omitempty"`
+	Image           string               `json:"image,omitempty"`
 	If              string               `json:"if,omitempty"`
 	Shell           string               `json:"shell,omitempty"`
 	WorkDir         string               `json:"workdir,omitempty"`
@@ -69,6 +71,9 @@ func (w wireValue) value() (ir.Value, bool) {
 func toWireStep(st *ir.Step) wireStep {
 	w := wireStep{Action: st.Action, Timeout: st.Timeout, ID: st.ID, Name: st.Name, Shell: st.Shell,
 		WorkDir: st.WorkDir, ContinueOnError: st.ContinueOnError}
+	if st.Kind == ir.StepPlugin && st.Image != nil {
+		w.Image = st.Image.Ref
+	}
 	if st.If != nil {
 		w.If = expr.String(st.If)
 	}
@@ -87,6 +92,9 @@ func toWireStep(st *ir.Step) wireStep {
 func (w wireStep) step() (*ir.Step, bool) {
 	st := &ir.Step{Kind: ir.StepAction, Action: w.Action, Timeout: w.Timeout, ID: w.ID, Name: w.Name, Shell: w.Shell,
 		WorkDir: w.WorkDir, ContinueOnError: w.ContinueOnError}
+	if w.Image != "" {
+		st.Kind, st.Image = ir.StepPlugin, &ir.Image{Ref: w.Image}
+	}
 	if w.If != "" {
 		x, err := expr.ParseCanonical(w.If)
 		if err != nil {
@@ -136,7 +144,10 @@ type actionStepArg struct {
 	Step  *wireStep `json:"step,omitempty"`
 	Kind  string    `json:"kind"`
 	Jobs  []downJob `json:"jobs,omitempty"`
-	Pos   int       `json:"pos"`
+	// Script is the text of the script lines that stand for the step.
+	Script string   `json:"script,omitempty"`
+	Vars   []string `json:"vars,omitempty"`
+	Pos    int      `json:"pos"`
 }
 
 // markActionStep carries the original step beside the keyword it became.
@@ -165,6 +176,11 @@ func collapseActionStep(c *collapseCtx, a actionStepArg) bool {
 		return false
 	}
 	at := slices.IndexFunc(j.Steps, func(o *ir.Step) bool { return o.ID == st.ID })
+	if a.Kind == actScript && at >= 0 && strings.Join(j.Steps[at].Script, "\n") == a.Script {
+		j.Env = slices.DeleteFunc(slices.Clone(j.Env), func(v ir.Var) bool { return slices.Contains(a.Vars, v.Name) })
+		j.Steps[at] = st
+		return true
+	}
 	if at >= 0 && len(j.Steps[at].Script) > 0 {
 		c.ignore(editedNote(st.ID, "script"))
 		return false

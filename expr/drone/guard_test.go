@@ -18,21 +18,21 @@ func TestPrintGuard(t *testing.T) {
 		e          expr.Expr
 		name, want string
 	}{
-		{eq(branch, "main"), "equality", `if ! [ "$DRONE_BRANCH" = 'main' ]; then exit 0; fi # pipemaster:guard`},
-		{bin(expr.OpNe, event, str("tag")), "inequality", `if ! [ "$DRONE_BUILD_EVENT" != 'tag' ]; then exit 0; fi # pipemaster:guard`},
-		{eq(r("env", "DEPLOY"), "yes"), "user env", `if ! [ "$DEPLOY" = 'yes' ]; then exit 0; fi # pipemaster:guard`},
-		{bin(expr.OpEq, branch, r("repo")), "ref against ref", `if ! [ "$DRONE_BRANCH" = "$DRONE_REPO" ]; then exit 0; fi # pipemaster:guard`},
-		{eq(r("tag"), ""), "empty literal", `if ! [ "$DRONE_TAG" = '' ]; then exit 0; fi # pipemaster:guard`},
-		{eq(branch, "it's"), "single quote", `if ! [ "$DRONE_BRANCH" = 'it'\''s' ]; then exit 0; fi # pipemaster:guard`},
-		{eq(branch, "$HOME `id` ${x}"), "dollar and backtick", "if ! [ \"$DRONE_BRANCH\" = '$HOME `id` ${x}' ]; then exit 0; fi # pipemaster:guard"},
-		{eq(branch, `a "b" c`), "spaces and double quote", `if ! [ "$DRONE_BRANCH" = 'a "b" c' ]; then exit 0; fi # pipemaster:guard`},
-		{eq(branch, "-n"), "test operators as data", `if ! [ "$DRONE_BRANCH" = '-n' ]; then exit 0; fi # pipemaster:guard`},
-		{bin(expr.OpAnd, bin(expr.OpAnd, eq(branch, "a"), eq(r("repo"), "b")), eq(r("tag"), "c")), "and chains bare", `if ! ( [ "$DRONE_BRANCH" = 'a' ] && [ "$DRONE_REPO" = 'b' ] && [ "$DRONE_TAG" = 'c' ] ); then exit 0; fi # pipemaster:guard`},
-		{bin(expr.OpOr, bin(expr.OpAnd, eq(event, "pull_request"), eq(branch, "main")), eq(event, "schedule")), "mixed operators group", `if ! ( ( [ "$DRONE_BUILD_EVENT" = 'pull_request' ] && [ "$DRONE_BRANCH" = 'main' ] ) || [ "$DRONE_BUILD_EVENT" = 'cron' ] ); then exit 0; fi # pipemaster:guard`},
-		{bin(expr.OpAnd, eq(branch, "a"), bin(expr.OpAnd, eq(r("repo"), "b"), eq(r("tag"), "c"))), "right nesting groups", `if ! ( [ "$DRONE_BRANCH" = 'a' ] && ( [ "$DRONE_REPO" = 'b' ] && [ "$DRONE_TAG" = 'c' ] ) ); then exit 0; fi # pipemaster:guard`},
-		{not(eq(branch, "a")), "not", `if ! ( ! [ "$DRONE_BRANCH" = 'a' ] ); then exit 0; fi # pipemaster:guard`},
-		{not(bin(expr.OpOr, eq(branch, "a"), eq(branch, "b"))), "not of group", `if ! ( ! ( [ "$DRONE_BRANCH" = 'a' ] || [ "$DRONE_BRANCH" = 'b' ] ) ); then exit 0; fi # pipemaster:guard`},
-		{not(not(eq(branch, "a"))), "double not", `if ! ( ! ( ! [ "$DRONE_BRANCH" = 'a' ] ) ); then exit 0; fi # pipemaster:guard`},
+		{eq(branch, "main"), "equality", `if ! [ "$DRONE_BRANCH" = 'main' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{bin(expr.OpNe, event, str("tag")), "inequality", `if ! [ "$DRONE_BUILD_EVENT" != 'tag' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{eq(r("env", "DEPLOY"), "yes"), "user env", `if ! [ "$DEPLOY" = 'yes' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{bin(expr.OpEq, branch, r("repo")), "ref against ref", `if ! [ "$DRONE_BRANCH" = "$DRONE_REPO" ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{eq(r("tag"), ""), "empty literal", `if ! [ "$DRONE_TAG" = '' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{eq(branch, "it's"), "single quote", `if ! [ "$DRONE_BRANCH" = 'it'\''s' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{eq(branch, "$HOME `id` ${x}"), "dollar and backtick", "if ! [ \"$DRONE_BRANCH\" = '$HOME `id` ${x}' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard"},
+		{eq(branch, `a "b" c`), "spaces and double quote", `if ! [ "$DRONE_BRANCH" = 'a "b" c' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{eq(branch, "-n"), "test operators as data", `if ! [ "$DRONE_BRANCH" = '-n' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{bin(expr.OpAnd, bin(expr.OpAnd, eq(branch, "a"), eq(r("repo"), "b")), eq(r("tag"), "c")), "and chains bare", `if ! ( [ "$DRONE_BRANCH" = 'a' ] && [ "$DRONE_REPO" = 'b' ] && [ "$DRONE_TAG" = 'c' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{bin(expr.OpOr, bin(expr.OpAnd, eq(event, "pull_request"), eq(branch, "main")), eq(event, "schedule")), "mixed operators group", `if ! ( ( [ "$DRONE_BUILD_EVENT" = 'pull_request' ] && [ "$DRONE_BRANCH" = 'main' ] ) || [ "$DRONE_BUILD_EVENT" = 'cron' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{bin(expr.OpAnd, eq(branch, "a"), bin(expr.OpAnd, eq(r("repo"), "b"), eq(r("tag"), "c"))), "right nesting groups", `if ! ( [ "$DRONE_BRANCH" = 'a' ] && ( [ "$DRONE_REPO" = 'b' ] && [ "$DRONE_TAG" = 'c' ] ) ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{not(eq(branch, "a")), "not", `if ! ( ! [ "$DRONE_BRANCH" = 'a' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{not(bin(expr.OpOr, eq(branch, "a"), eq(branch, "b"))), "not of group", `if ! ( ! ( [ "$DRONE_BRANCH" = 'a' ] || [ "$DRONE_BRANCH" = 'b' ] ) ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{not(not(eq(branch, "a"))), "double not", `if ! ( ! ( ! [ "$DRONE_BRANCH" = 'a' ] ) ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			got, err := drone.PrintGuard(c.e, exact)
@@ -87,18 +87,18 @@ func TestParseGuardRejectsOtherText(t *testing.T) {
 	}
 	for name, line := range map[string]string{
 		"no marker":        strings.TrimSuffix(good, " "+drone.GuardMarker),
-		"author line":      `if ! [ "$DRONE_BRANCH" = 'main' ]; then exit 0; fi`,
+		"author line":      `if ! [ "$DRONE_BRANCH" = 'main' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi`,
 		"other script":     "echo hi",
 		"empty":            "",
 		"extra spaces":     strings.Replace(good, "[ ", "[  ", 1),
 		"unquoted var":     strings.Replace(good, `"$DRONE_BRANCH"`, "$DRONE_BRANCH", 1),
 		"adjacent pieces":  strings.Replace(good, `'main'`, `'ma''in'`, 1),
 		"trailing command": good + "; rm -rf /",
-		"mixed chain":      `if ! ( [ "$A" = 'a' ] && [ "$B" = 'b' ] || [ "$C" = 'c' ] ); then exit 0; fi ` + drone.GuardMarker,
-		"double bang":      `if ! ( ! ! [ "$A" = 'a' ] ); then exit 0; fi ` + drone.GuardMarker,
-		"unterminated":     `if ! [ "$A" = 'a ]; then exit 0; fi ` + drone.GuardMarker,
-		"bad var name":     `if ! [ "$A B" = 'a' ]; then exit 0; fi ` + drone.GuardMarker,
-		"command in group": `if ! ( rm x ); then exit 0; fi ` + drone.GuardMarker,
+		"mixed chain":      `if ! ( [ "$A" = 'a' ] && [ "$B" = 'b' ] || [ "$C" = 'c' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi ` + drone.GuardMarker,
+		"double bang":      `if ! ( ! ! [ "$A" = 'a' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi ` + drone.GuardMarker,
+		"unterminated":     `if ! [ "$A" = 'a ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi ` + drone.GuardMarker,
+		"bad var name":     `if ! [ "$A B" = 'a' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi ` + drone.GuardMarker,
+		"command in group": `if ! ( rm x ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi ` + drone.GuardMarker,
 	} {
 		if e, ok := drone.ParseGuard(line); ok {
 			t.Errorf("%s: ParseGuard accepted %q as %#v", name, line, e)
@@ -235,7 +235,7 @@ func TestGuardAgreesWithShell(t *testing.T) {
 
 func TestGuardEventsTranslate(t *testing.T) {
 	got, err := drone.PrintGuard(bin(expr.OpNe, event, str("schedule")), exact)
-	want := `if ! [ "$DRONE_BUILD_EVENT" != 'cron' ]; then exit 0; fi # pipemaster:guard`
+	want := `if ! [ "$DRONE_BUILD_EVENT" != 'cron' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`
 	if err != nil || got != want {
 		t.Fatalf("PrintGuard = %q, %v; want %q", got, err, want)
 	}
@@ -244,7 +244,7 @@ func TestGuardEventsTranslate(t *testing.T) {
 		t.Errorf("ParseGuard = %#v, %v; want the canonical event", back, ok)
 	}
 	// A bare Drone push is push without tag; the canonical AST has no node for it.
-	if e, ok := drone.ParseGuard(`if ! [ "$DRONE_BUILD_EVENT" = 'push' ]; then exit 0; fi # pipemaster:guard`); ok {
+	if e, ok := drone.ParseGuard(`if ! [ "$DRONE_BUILD_EVENT" = 'push' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`); ok {
 		t.Errorf("a Drone push guard parsed as %#v", e)
 	}
 }
@@ -324,13 +324,13 @@ func TestGuardPush(t *testing.T) {
 		name string
 		want string
 	}{
-		{eq(event, "push"), "equals", `if ! ( [ ` + v + ` = 'push' ] || [ ` + v + ` = 'tag' ] ); then exit 0; fi # pipemaster:guard`},
-		{bin(expr.OpNe, event, str("push")), "not equals", `if ! ( [ ` + v + ` != 'push' ] && [ ` + v + ` != 'tag' ] ); then exit 0; fi # pipemaster:guard`},
-		{not(eq(event, "push")), "negation", `if ! ( ! ( [ ` + v + ` = 'push' ] || [ ` + v + ` = 'tag' ] ) ); then exit 0; fi # pipemaster:guard`},
+		{eq(event, "push"), "equals", `if ! ( [ ` + v + ` = 'push' ] || [ ` + v + ` = 'tag' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{bin(expr.OpNe, event, str("push")), "not equals", `if ! ( [ ` + v + ` != 'push' ] && [ ` + v + ` != 'tag' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
+		{not(eq(event, "push")), "negation", `if ! ( ! ( [ ` + v + ` = 'push' ] || [ ` + v + ` = 'tag' ] ) ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
 		{bin(expr.OpAnd, eq(event, "push"), eq(branch, "main")), "with branch",
-			`if ! ( ( [ ` + v + ` = 'push' ] || [ ` + v + ` = 'tag' ] ) && [ "$DRONE_BRANCH" = 'main' ] ); then exit 0; fi # pipemaster:guard`},
+			`if ! ( ( [ ` + v + ` = 'push' ] || [ ` + v + ` = 'tag' ] ) && [ "$DRONE_BRANCH" = 'main' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
 		{bin(expr.OpOr, eq(event, "push"), eq(event, "tag")), "push or tag",
-			`if ! ( ( [ ` + v + ` = 'push' ] || [ ` + v + ` = 'tag' ] ) || [ ` + v + ` = 'tag' ] ); then exit 0; fi # pipemaster:guard`},
+			`if ! ( ( [ ` + v + ` = 'push' ] || [ ` + v + ` = 'tag' ] ) || [ ` + v + ` = 'tag' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			got, err := drone.PrintGuard(c.e, exact)
@@ -351,9 +351,9 @@ func TestGuardPush(t *testing.T) {
 	}
 	// Half a pair is the Drone push-without-tag set, which the canonical AST cannot name.
 	for _, in := range []string{
-		`if ! ( [ ` + v + ` = 'push' ] || [ ` + v + ` = 'cron' ] ); then exit 0; fi # pipemaster:guard`,
-		`if ! ( [ ` + v + ` = 'tag' ] || [ ` + v + ` = 'push' ] ); then exit 0; fi # pipemaster:guard`,
-		`if ! ( [ ` + v + ` != 'push' ] || [ ` + v + ` != 'tag' ] ); then exit 0; fi # pipemaster:guard`,
+		`if ! ( [ ` + v + ` = 'push' ] || [ ` + v + ` = 'cron' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`,
+		`if ! ( [ ` + v + ` = 'tag' ] || [ ` + v + ` = 'push' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`,
+		`if ! ( [ ` + v + ` != 'push' ] || [ ` + v + ` != 'tag' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard`,
 	} {
 		if e, ok := drone.ParseGuard(in); ok {
 			t.Errorf("ParseGuard(%q) = %#v; want a refusal", in, e)

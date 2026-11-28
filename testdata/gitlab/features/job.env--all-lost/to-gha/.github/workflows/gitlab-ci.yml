@@ -1,13 +1,26 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/test
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/test
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/test/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/test
 # pipemaster:arg {"pre":1,"post":0}
 on:
+  workflow_dispatch:
   push:
+  repository_dispatch:
+    types:
+      - api
+      - trigger
 jobs:
   test:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       # pipemaster:lost expr.opaque pipeline/gitlab-ci/job/test: format('$CI_REGISTRY_IMAGE/tmp:{0}', sha)
       - id: script
         run: make test
+        shell: bash

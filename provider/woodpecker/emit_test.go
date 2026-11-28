@@ -59,12 +59,12 @@ func TestDollarParsedFromWoodpecker(t *testing.T) {
 
 func TestExpressionSpelling(t *testing.T) {
 	st := wpStep("s",
-		"echo ${{ matrix.GO }} ${{ branch }}",
+		"echo ${{ matrix.GO }} ${{ sha }}",
 		"echo ${{ env.NAME }} ${{ secrets.TOKEN }}",
 		"echo ${{ needs.a.outputs.x }}",
 	)
 	body, rep := one(t, wpProject(ghaOrigin, wpJob("ci", st)))
-	for _, want := range []string{"echo ${GO} ${CI_COMMIT_BRANCH}", "echo $${NAME} $${TOKEN}", "from_secret: TOKEN"} {
+	for _, want := range []string{"echo ${GO} ${CI_COMMIT_SHA}", "echo $${NAME} $${TOKEN}", "from_secret: TOKEN"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q in\n%s", want, body)
 		}
@@ -225,8 +225,8 @@ func TestEnvironmentAndLabels(t *testing.T) {
 	j = wpJob("ci", wpStep("s", "x"))
 	j.Runner = ir.Runner{Labels: []string{"ubuntu-latest"}}
 	body, rep := one(t, wpProject(ghaOrigin, j))
-	if strings.Contains(body, "ubuntu-latest") || !reportHas(rep, caps.JobRunner, caps.Lost) {
-		t.Errorf("a hosted runner label is lost, never a platform:\n%s", body)
+	if strings.Contains(body, "ubuntu-latest") || !reportHas(rep, caps.JobRunner, caps.External) {
+		t.Errorf("a hosted runner label is external, never a platform:\n%s", body)
 	}
 }
 
@@ -591,7 +591,7 @@ var capCases = map[caps.Feature]func(*ir.Project){
 	},
 	caps.JobRetry:   func(p *ir.Project) { p.Pipelines[0].Jobs[0].Retry = &ir.Retry{Attempts: 2} },
 	caps.JobOutputs: func(p *ir.Project) { p.Pipelines[0].Jobs[0].Outputs = []ir.Output{{Name: "o", Value: "v"}} },
-	caps.JobRunner:  func(p *ir.Project) { p.Pipelines[0].Jobs[0].Runner = ir.Runner{Labels: []string{"self-hosted"}} },
+	caps.JobRunner:  func(p *ir.Project) { p.Pipelines[0].Jobs[0].Runner = ir.Runner{Labels: []string{"ubuntu-latest"}} },
 	caps.PipelinePermissions: func(p *ir.Project) {
 		p.Pipelines[0].Permissions = &ir.Permissions{Scopes: map[string]string{"contents": "read"}}
 	},
@@ -600,7 +600,7 @@ var capCases = map[caps.Feature]func(*ir.Project){
 		d := ir.Duration(time.Minute)
 		p.Pipelines[0].Jobs[0].Steps[0].Timeout = &d
 	},
-	caps.StepShell:      func(p *ir.Project) { p.Pipelines[0].Jobs[0].Steps[0].Shell = "bash" },
+	caps.StepShell:      func(p *ir.Project) { p.Pipelines[0].Jobs[0].Steps[0].Shell = "" },
 	caps.JobEnvironment: func(p *ir.Project) { p.Pipelines[0].Jobs[0].Environment = &ir.Environment{Name: "prod"} },
 	caps.JobNeedsArtifacts: func(p *ir.Project) {
 		p.Pipelines[0].Jobs = append(p.Pipelines[0].Jobs, wpJob("b", wpStep("s", "y")))

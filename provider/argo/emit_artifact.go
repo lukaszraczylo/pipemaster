@@ -14,6 +14,13 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 )
 
+// repositoryNeed is the detail of the external verdict of every Argo artifact. The source of the rule is
+// https://argo-workflows.readthedocs.io/en/latest/configure-artifact-repository/.
+const repositoryNeed = "Argo saves and loads artifacts through an artifact repository, which the files do not configure; set one in the workflow-controller-configmap or with artifactRepositoryRef"
+
+// layoutNeed is the detail of the emulated verdict of an artifact that a need loads.
+const layoutNeed = "the artifact is loaded into " + artifactsDir + "/<name>, not at the path where the producer wrote it"
+
 var globChars = regexp.MustCompile(`[*?\[]`)
 
 // textOrLose converts template text for a value field; ok is false when it has no Argo spelling.
@@ -139,6 +146,7 @@ func (sx *stepCtx) addOutputArtifacts(path, name string, paths []string, expire 
 		a.SetStr("path", artifactPath(p))
 		sx.artOut = append(sx.artOut, a.N)
 	}
+	tc.e.external(path, caps.JobArtifacts, "artifact repository", repositoryNeed)
 	if expire != "" {
 		tc.e.lose(path, caps.JobArtifacts, "the expiry "+expire+" has no form; the artifact repository sets retention")
 	}
@@ -272,6 +280,8 @@ func (sx *stepCtx) needArtifacts() {
 			}
 			sx.dests[dst] = true
 			sx.inputArtifact(jp, name, dst)
+			tc.e.emulate(tc.jp.path, caps.JobNeedsArtifacts, "artifacts directory", layoutNeed)
+			tc.e.external(tc.jp.path, caps.JobNeedsArtifacts, "artifact repository", repositoryNeed)
 		}
 	}
 }

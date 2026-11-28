@@ -18,17 +18,21 @@ const pacPrefix = "pipelinesascode.tekton.dev/"
 
 // plCtx is the pipeline being read: the task names that references can point at.
 type plCtx struct {
-	// env holds the pipeline variables that the emitter copied into every Task, by name.
-	env  map[string]ir.Var
-	p    *project
-	k    *sink
-	ids  map[string]string
-	file string
-	plID string
-	// ws is true when a job restored the workspace marker.
-	ws bool
-	// envBad is true when a Task no longer holds the copied variables as written.
-	envBad bool
+	env   map[string]ir.Var
+	p     *project
+	k     *sink
+	ids   map[string]string
+	srcWS map[string]bool
+	// srcClone maps a source workspace to the clone of another repository that filled it.
+	srcClone map[string]*sourceClone
+	wsDir    map[string]string
+	runWS    map[string]runBinding
+	binds    map[string][]string
+	pipeWS   any
+	file     string
+	plID     string
+	ws       bool
+	envBad   bool
 }
 
 func (c *plCtx) taskID(name string) (string, bool) {
@@ -50,7 +54,7 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 	pl := &ir.Pipeline{ID: id}
 	k := newSink(p.rep, src.doc.File, "pipeline/"+id)
 	r := newReader(src.spec)
-	c := &plCtx{p: p, k: k, ids: map[string]string{}, file: src.doc.File, plID: id}
+	c := &plCtx{p: p, k: k, ids: map[string]string{}, file: src.doc.File, plID: id, binds: map[string][]string{}}
 	if name, ok := textOf(r.Take("displayName")); ok {
 		pl.Name = name
 	}
@@ -71,12 +75,14 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 		return nil, fmt.Errorf("%s: Pipeline %q needs spec.tasks", src.doc.Loc(0), id)
 	}
 	finally, _ := r.Take("finally")
+	c.pipeWS, c.runWS = pipeWS, p.runBindings(src)
 	k.KeepRest(r)
 	envVars := c.copiedEnv(src, id)
 	if err := c.jobs(pl, tasks, finally); err != nil {
 		return nil, fmt.Errorf("%s: %w", src.doc.File, err)
 	}
 	emitkit.RewriteInputRefs(pl, renames)
+	restoreRefTypes(pl, src.doc.Head)
 	if envVars != nil && !c.envBad {
 		pl.Env = envVars
 	}
@@ -85,7 +91,7 @@ func (p *project) pipeline(src *pipeSrc) (*ir.Pipeline, error) {
 			pipeWS = withoutWorkspace(pipeWS)
 		}
 		if pipeWS != nil {
-			k.Keep("workspaces", pipeWS, caps.ExtPassthrough, "pipeline workspaces have no IR field; kept in Ext", r.Line("workspaces"))
+			c.keepPipelineWorkspaces(pipeWS, r.Line("workspaces"))
 		}
 	}
 	pl.Ext = k.Ext()

@@ -2,6 +2,7 @@ package argo_test
 
 import (
 	"os/exec"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -173,7 +174,7 @@ func TestEditsAroundThePlaceholderLeaveTheActionNextToIt(t *testing.T) {
 
 func TestEditedPlaceholderKeepsTheFile(t *testing.T) {
 	ids, j, rep := frobParse(t, func(_ *testing.T, ce *containerEdit) {
-		ce.blocks["frob"] = strings.Replace(ce.blocks["frob"], `- "true"`, "- echo hi", 1)
+		ce.blocks["frob"] = replaceFailLoud(ce.blocks["frob"], "- echo hi")
 	})
 	wantIDs(t, ids, "one", "frob", "two", "three")
 	if st := stepByID(j, "frob"); st == nil || !slices.Equal(st.Script, []string{"echo hi"}) {
@@ -214,11 +215,23 @@ func TestPlaceholderPassesShAndArgoLint(t *testing.T) {
 	if out, err := exec.Command("sh", "-n", "-c", "true").CombinedOutput(); err != nil {
 		t.Fatalf("sh -n: %v %s", err, out)
 	}
-	if !strings.Contains(files[ciFile], "- \"true\"") {
-		t.Fatalf("the placeholder does not run true:\n%s", files[ciFile])
+	if !failLoudItem.MatchString(files[ciFile]) {
+		t.Fatalf("the placeholder does not fail loudly:\n%s", files[ciFile])
 	}
 	linttool.RequireArgo(t)
 	if out, err := linttool.ArgoLint(t, ciFile, []byte(files[ciFile])); err != nil {
 		t.Fatalf("argo lint: %v\n%s", err, out)
 	}
+}
+
+// failLoudItem matches the list item of a failing script that an emitter wrote for a lost step.
+var failLoudItem = regexp.MustCompile(`(?m)- '?printf [^\n]*pipemaster: lost: [^\n]*exit 1'?$`)
+
+// replaceFailLoud swaps the first failing script item in src for repl.
+func replaceFailLoud(src, repl string) string {
+	loc := failLoudItem.FindStringIndex(src)
+	if loc == nil {
+		return src
+	}
+	return src[:loc[0]] + repl + src[loc[1]:]
 }

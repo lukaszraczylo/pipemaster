@@ -6,6 +6,8 @@ origin:
 pipelines:
     - ext:
         gitlab:
+            _carried:
+                - hidden
             hidden:
                 .template:
                     script:

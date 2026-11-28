@@ -1,10 +1,8 @@
 Loss report: gha -> drone
 [lost] pipeline/ci display.name (the Drone pipeline name is its id; the display name is kept in round-trip metadata)
-[lost] pipeline/ci/job/build job.runner (only the platform has a Drone form; other runner labels are lost)
 [lost] pipeline/ci/job/build/step/build-step-1 step.action (input token has no Drone equivalent)
 [lost] pipeline/ci/job/build/step/build-step-2 ext.passthrough (the action reference actions/setup-go@v5 is not in the Drone file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (no Drone mapping for action docker://alpine:3.20)
 [lost] pipeline/ci/job/build/step/local step.action (no Drone mapping for action ./.github/actions/setup)
-[lost] pipeline/ci/job/build/step/script step.script (the job has no steps; a no-op step keeps the document valid)
-[emulated] pipeline/ci/job/build step.script: no-op step (Drone needs a step; no step of the job has a Drone form, so a no-op step stands in)
+[external] pipeline/ci/job/build job.runner: no platform (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [emulated] pipeline/ci/job/build/step/build-step-2 step.action: image selection (later steps without an image run in this image)

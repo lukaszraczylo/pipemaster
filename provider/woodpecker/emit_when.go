@@ -12,6 +12,8 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	wpexpr "github.com/lukaszraczylo/pipemaster/expr/woodpecker"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -29,6 +31,8 @@ type whenEntry struct {
 	wpexpr.Item
 	path   wpexpr.Filter
 	status []string
+	// pathNoEmpty writes on_empty: false into the path filter, so a push with no changed paths does not match.
+	pathNoEmpty bool
 }
 
 func (w whenEntry) empty() bool {
@@ -36,26 +40,40 @@ func (w whenEntry) empty() bool {
 		w.Instance.Empty() && w.path.Empty() && len(w.status) == 0
 }
 
-func filterNode(f wpexpr.Filter) *yaml.Node {
-	escAll := func(vs []string) []string {
-		out := make([]string, len(vs))
-		for i, v := range vs {
-			out[i] = esc(v)
-		}
-		return out
+func escList(vs []string) []string {
+	out := make([]string, len(vs))
+	for i, v := range vs {
+		out[i] = esc(v)
 	}
+	return out
+}
+
+func filterNode(f wpexpr.Filter) *yaml.Node {
 	if len(f.Exclude) == 0 {
-		if vs := escAll(f.Include); len(vs) == 1 {
+		if vs := escList(f.Include); len(vs) == 1 {
 			return str(vs[0])
 		}
-		return strSeq(escAll(f.Include))
+		return strSeq(escList(f.Include))
 	}
 	// The object form takes lists only (path.include and path.exclude in the pinned schema).
 	m := newMap()
 	if len(f.Include) > 0 {
-		m.set("include", strSeq(escAll(f.Include)))
+		m.set("include", strSeq(escList(f.Include)))
 	}
-	m.set("exclude", strSeq(escAll(f.Exclude)))
+	m.set("exclude", strSeq(escList(f.Exclude)))
+	return m.n
+}
+
+// pathNoEmptyNode writes a path filter in its object form with on_empty: false.
+func pathNoEmptyNode(f wpexpr.Filter) *yaml.Node {
+	m := newMap()
+	if len(f.Include) > 0 {
+		m.set("include", strSeq(escList(f.Include)))
+	}
+	if len(f.Exclude) > 0 {
+		m.set("exclude", strSeq(escList(f.Exclude)))
+	}
+	m.set("on_empty", boolNode(false))
 	return m.n
 }
 
@@ -68,9 +86,14 @@ func (w whenEntry) node() *yaml.Node {
 		{wpexpr.KeyEvent, w.Event}, {wpexpr.KeyBranch, w.Branch}, {wpexpr.KeyRef, w.Ref},
 		{wpexpr.KeyRepo, w.Repo}, {wpexpr.KeyInstance, w.Instance}, {keyPath, w.path},
 	} {
-		if !k.f.Empty() {
-			m.set(k.key, filterNode(k.f))
+		if k.f.Empty() {
+			continue
 		}
+		if k.key == keyPath && w.pathNoEmpty {
+			m.set(k.key, pathNoEmptyNode(k.f))
+			continue
+		}
+		m.set(k.key, filterNode(k.f))
 	}
 	if len(w.status) > 0 {
 		m.set(keyStatus, strSeq(w.status))
@@ -205,7 +228,9 @@ func (e *emitter) condition(path string, f caps.Feature, x expr.Expr, what strin
 		return nil, nil, false
 	}
 	if e.from != nil {
-		if t, ok = expr.TranslateFacts(rest, *e.from, wpexpr.Lang, e.facts); !ok {
+		facts := e.facts
+		facts.Exact = hasStatusCall(x) // a condition with a status call carries no source marker
+		if t, ok = expr.TranslateFacts(rest, *e.from, wpexpr.Lang, facts); !ok {
 			e.disable(path, f, x, what)
 			return nil, nil, false
 		}
@@ -218,8 +243,15 @@ func (e *emitter) condition(path string, f caps.Feature, x expr.Expr, what strin
 	return items, status, true
 }
 
+// eventEquals is the text before a promote or rollback event name in a rendered condition.
+const eventEquals = "== '"
+
 func (e *emitter) disable(path string, f caps.Feature, x expr.Expr, what string) {
-	e.lose(path, f, "condition not expressible in Woodpecker CI; "+what+" disabled")
+	detail := "condition not expressible in Woodpecker CI; " + what + " disabled"
+	if s := expr.String(x); strings.Contains(s, eventEquals+"promote'") || strings.Contains(s, eventEquals+"rollback'") {
+		detail += "; a Drone promote or rollback is nearest to the Woodpecker deployment event, and the Drone target filter (https://docs.drone.io/pipeline/triggers/) has no Woodpecker form"
+	}
+	e.lose(path, f, detail)
 	if expr.HasOpaque(x) && f != caps.ExprOpaque {
 		e.lose(path, caps.ExprOpaque, "an opaque expression of another dialect has no Woodpecker form")
 	}
@@ -250,11 +282,20 @@ func (e *emitter) sourceArg(x expr.Expr) (a srcArg, usedFacts, ok bool) {
 	return srcArg{Src: expr.String(x), From: e.from.ID, Branch: e.facts.Branch}, usedFacts, true
 }
 
-// jobSource carries a job condition in its source dialect only when the trigger facts shaped its translation:
-// without them the translation reads back as written.
-func (e *emitter) jobSource(x expr.Expr) (srcArg, bool) {
-	a, usedFacts, ok := e.sourceArg(x)
-	return a, ok && usedFacts
+// jobSource carries a job condition in its source dialect when the trigger facts shaped its translation or when
+// the translation does not read back as written (a complement of events becomes a list of them). Otherwise the
+// translation reads back as written. facts is true when the trigger facts shaped it.
+func (e *emitter) jobSource(x expr.Expr) (a srcArg, has, facts bool) {
+	a, facts, ok := e.sourceArg(x)
+	if !ok {
+		return a, false, false
+	}
+	if facts {
+		return a, true, true
+	}
+	t, _, _ := e.translate(x)
+	back, bok := expr.Translate(wpexpr.ReadIf(t), wpexpr.Lang, *e.from)
+	return a, !bok || expr.String(back) != expr.String(x), false
 }
 
 // notePullRequestTest reports a condition whose translation differs from the plain one: Woodpecker holds the
@@ -425,6 +466,9 @@ func regexTest(ref string, f ir.Filter) (string, bool) {
 // gateArg says that the evaluate text of the one when entry is the job condition, not part of a trigger. It also
 // carries the condition in its source dialect when the translation changed its text.
 type gateArg struct {
+	Paths *changesArg `json:"paths,omitempty"`
+	// Full is the whole condition, when the marker holds only the part without the status calls.
+	Full string `json:"full,omitempty"`
 	srcArg
 	Gate bool `json:"gate"`
 }
@@ -567,6 +611,10 @@ func (e *emitter) tagRefs(tp string, in ir.Filter) (wpexpr.Filter, string) {
 func (e *emitter) jobWhen(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) ([]whenEntry, error) {
 	e.inexact = ""
 	base := e.triggerEntries(pl)
+	base, err := e.gitlabDefaultEvents(pl, jp, base)
+	if err != nil {
+		return nil, err
+	}
 	if e.inexact != "" {
 		if err := e.markTriggers(e.inexact, "pipeline/"+pl.ID, pl.Triggers); err != nil {
 			return nil, err
@@ -579,6 +627,9 @@ func (e *emitter) jobWhen(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (
 	}
 	var cond []wpexpr.Item
 	var status []string
+	if j.If != nil && expr.HasChanges(j.If) {
+		return e.changesWhen(j, jp, finally, base)
+	}
 	if j.If != nil {
 		var ok bool
 		if cond, status, ok = e.condition(jp, caps.JobIf, j.If, "the workflow"); !ok {
@@ -598,7 +649,64 @@ func (e *emitter) jobWhen(pl *ir.Pipeline, j *ir.Job, jp string, finally bool) (
 	if finally && status == nil {
 		status = []string{statusOK, statusFail}
 	}
-	return withStatus(e.mergeCond(jp, j.If, base, cond), status), nil
+	srcCond := j.If
+	e.gateFull = ""
+	if j.If != nil && hasStatusCall(j.If) {
+		// The marker holds the pull request gate, which a status call beside it would hide.
+		if rest, _, ok := splitStatus(j.If); ok && rest != nil && provider.IsGate(rest) {
+			srcCond, e.gateFull = rest, expr.String(j.If)
+		}
+	}
+	entries, err := e.reachable(pl, jp, e.mergeCond(jp, srcCond, base, cond))
+	if err != nil {
+		return nil, err
+	}
+	return withStatus(entries, status), nil
+}
+
+// reachable checks that a condition can hold on some event of its entry. A GitLab pipeline with no workflow:rules
+// runs for every pipeline source, and the IR lists only push and tag for it, so an event the condition names (web
+// is manual) joins the entry, and a marker keeps the original triggers. Any other entry that no event can satisfy
+// never runs: the report says so.
+func (e *emitter) reachable(pl *ir.Pipeline, jp string, entries []whenEntry) ([]whenEntry, error) {
+	out := slices.Clone(entries)
+	widened, dead := false, 0
+	var last []string
+	for i, ent := range out {
+		if len(ent.Event.Include) == 0 || ent.Evaluate == "" {
+			continue
+		}
+		it := ent.Item
+		it.Event = wpexpr.Filter{}
+		cond, err := wpexpr.ItemExpr(it)
+		if err != nil || cond == nil || len(expr.EventsPossible(cond, ent.Event.Include)) > 0 {
+			continue
+		}
+		add := expr.EventsPossible(cond, allEvents)
+		if e.origin == "gitlab" && !gitlabHasWorkflow(pl) && isDefaultPushTag(pl.Triggers) && len(add) > 0 {
+			out[i].Event.Include = append(slices.Clone(ent.Event.Include), add...)
+			widened = true
+			e.emulate(jp, caps.JobIf, "event "+strings.Join(add, ", "), "the condition names events that the default push and tag triggers lack; GitLab runs a pipeline with no workflow:rules for every source, so the entry lists them")
+			continue
+		}
+		dead++
+		last = ent.Event.Include
+	}
+	if dead == len(out) && dead > 0 {
+		e.lose(jp, caps.JobIf, "the condition holds on none of the events the workflow triggers on ("+strings.Join(last, ", ")+"); the workflow never runs")
+	}
+	if widened {
+		if err := e.markTriggers(caps.TriggerManual, "pipeline/"+pl.ID, pl.Triggers); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+func gitlabHasWorkflow(pl *ir.Pipeline) bool {
+	m, _ := pl.Ext["gitlab"].(map[string]any)
+	_, ok := m["workflow"]
+	return ok
 }
 
 // mergeCond ANDs the condition with every base entry. Two entries cannot be merged key by key, so the
@@ -612,9 +720,9 @@ func (e *emitter) mergeCond(jp string, orig expr.Expr, base []whenEntry, cond []
 		for i, it := range cond {
 			out[i] = whenEntry{Item: it}
 		}
-		if src, hasSrc := e.jobSource(orig); hasSrc {
-			e.notePullRequestTest(jp, caps.JobIf, true)
-			if err := e.markArg(caps.JobIf, jp, gateArg{srcArg: src}); err != nil {
+		if src, hasSrc, facts := e.jobSource(orig); hasSrc {
+			e.notePullRequestTest(jp, caps.JobIf, facts)
+			if err := e.markArg(caps.JobIf, jp, gateArg{srcArg: src, Full: e.gateFull}); err != nil {
 				e.comment("job condition marker not carried: " + err.Error())
 			}
 		}
@@ -637,10 +745,10 @@ func (e *emitter) mergeCond(jp string, orig expr.Expr, base []whenEntry, cond []
 	for i := range out {
 		out[i].Evaluate = andText(out[i].Evaluate, text)
 	}
-	src, hasSrc := e.jobSource(orig)
-	e.notePullRequestTest(jp, caps.JobIf, hasSrc)
+	src, hasSrc, facts := e.jobSource(orig)
+	e.notePullRequestTest(jp, caps.JobIf, facts)
 	if len(out) == 1 || hasSrc {
-		if err := e.markArg(caps.JobIf, jp, gateArg{srcArg: src, Gate: len(out) == 1}); err != nil {
+		if err := e.markArg(caps.JobIf, jp, gateArg{srcArg: src, Gate: len(out) == 1, Full: e.gateFull}); err != nil {
 			e.comment("job condition marker not carried: " + err.Error())
 		}
 	}
@@ -661,17 +769,290 @@ func withStatus(entries []whenEntry, status []string) []whenEntry {
 	return out
 }
 
+// sourceEvents are the events a foreign source starts by itself when its file names none, as Woodpecker events. A
+// Drone pipeline with no trigger:event runs for push, pull_request, tag, cron, custom, promote and rollback
+// (https://docs.drone.io/pipeline/docker/syntax/trigger/), and a GitLab pipeline with no workflow:rules for every
+// pipeline source. Woodpecker has pull_request_closed, pull_request_metadata and release as well
+// (https://woodpecker-ci.org/docs/usage/workflow-syntax, event), which no foreign source fires, so a filter that
+// lists every Woodpecker event would run on events the source never sees.
+func (e *emitter) sourceEvents() []string {
+	events, _, _ := provider.WoodpeckerEvents(e.origin)
+	return events
+}
+
+// noteSourceEvents reports, once per pipeline, the source events that Woodpecker only approximates or cannot start on.
+func (e *emitter) noteSourceEvents(pipelineID string) {
+	if e.eventsNoted[pipelineID] {
+		return
+	}
+	if e.eventsNoted == nil {
+		e.eventsNoted = map[string]bool{}
+	}
+	e.eventsNoted[pipelineID] = true
+	_, approx, lost := provider.WoodpeckerEvents(e.origin)
+	path := "pipeline/" + pipelineID
+	// The nearest event is the manual or deployment event, so the entry sits on the manual trigger, not the API one.
+	var names []string
+	for _, ev := range approx {
+		names = append(names, ev.Name+" as "+ev.Woodpecker)
+	}
+	if len(names) > 0 {
+		e.emulate(path, caps.TriggerManual, "manual or deployment event",
+			"the source runs on these events and its file has no trigger form for them; Woodpecker starts each as its nearest event: "+strings.Join(names, ", "))
+	}
+	for _, g := range provider.GroupByFeature(lost) {
+		e.noteLost(path, g.Feature, "the source runs on the events "+strings.Join(g.Names, ", ")+" and its file has no trigger form for them; Woodpecker has no event for them")
+	}
+}
+
 // completeEvents gives every entry an event filter: woodpecker-cli lint --strict rejects a workflow whose
-// when entries lack one. Listing all events keeps the run condition, because a run has exactly one of them.
-func completeEvents(entries []whenEntry) []whenEntry {
+// when entries lack one. A Woodpecker source keeps all events, because it named none. A source that can name none
+// (namesNoEvents) gets the events it fires (sourceEvents), and an entry that only excludes events gets the positive
+// list without them.
+func (e *emitter) completeEvents(entries []whenEntry, foreign bool) (out []whenEntry, filled bool) {
+	all := allEvents
+	if foreign {
+		all = e.sourceEvents()
+	}
 	if len(entries) == 0 {
 		entries = []whenEntry{{}}
 	}
-	out := slices.Clone(entries)
+	out = slices.Clone(entries)
 	for i := range out {
-		if out[i].Event.Empty() {
-			out[i].Event.Include = slices.Clone(allEvents)
+		list := all
+		if out[i].Evaluate == "false" {
+			list = allEvents // the workflow never runs; every event keeps it readable as no trigger
+		}
+		switch {
+		case out[i].Event.Empty():
+			out[i].Event.Include = slices.Clone(list)
+			filled = filled || foreign && out[i].Evaluate != "false"
+		case foreign && len(out[i].Event.Include) == 0:
+			out[i].Event.Include = slices.DeleteFunc(slices.Clone(all), func(ev string) bool { return slices.Contains(out[i].Event.Exclude, ev) })
+			out[i].Event.Exclude = nil
+			filled = true
 		}
 	}
-	return out
+	return out, filled
+}
+
+// changesArg marks a workflow whose job condition is a path predicate that the file states as a path filter on its
+// push and pull request entries. Synth is true when the emitter made the entries, so the pipeline had no triggers.
+type changesArg struct {
+	Src  string `json:"src"`
+	From string `json:"from,omitempty"`
+	// Evaluate is the text of the rest of the condition, which the entries carry beside the path filter.
+	Evaluate string `json:"evaluate,omitempty"`
+	Synth    bool   `json:"synth,omitempty"`
+}
+
+// fnmatchExact is true for a GitLab glob (Ruby fnmatch with FNM_PATHNAME) that doublestar reads the same: literal
+// characters, * and ? inside a segment, **/ as a whole segment and {a,b} lists. A class, an escape or a ** inside a
+// segment has no certain equal.
+func fnmatchExact(g string) bool {
+	if g == "" || strings.ContainsAny(g, `[]\+!`) {
+		return false
+	}
+	for i := 0; i+1 < len(g); i++ {
+		if g[i] == '*' && g[i+1] == '*' && (i > 0 && g[i-1] != '/' || !strings.HasPrefix(g[i:], "**/")) {
+			return false
+		}
+	}
+	return !strings.HasSuffix(g, "**")
+}
+
+// changesWhen states a job condition that holds path predicates. Woodpecker applies a path filter to push and pull
+// request events only and treats any other event as a match, as GitLab does for changes. A when list is an OR of
+// entries, and the keys of one entry are an AND, so the condition must read as "one of these predicates, and the
+// rest": each predicate gets an entry with its path filter, and the rest of the condition goes into the evaluate
+// text of the same entry. A push that creates a branch is compared with its own commits, where GitLab counts every
+// path as changed, so the filter can skip a run GitLab makes; it never runs one GitLab skips. Any other condition
+// shape is disabled and reported.
+func (e *emitter) changesWhen(j *ir.Job, jp string, finally bool, base []whenEntry) ([]whenEntry, error) {
+	atoms, rest, ok := e.pathAtoms(jp, j.If)
+	if !ok {
+		e.disable(jp, caps.JobIf, j.If, "the workflow")
+		if j.Manual {
+			e.lose(jp, caps.JobManual, "a workflow that never runs has no manual start")
+		}
+		return neverEntries(base), nil
+	}
+	if j.Manual {
+		base = []whenEntry{{Item: wpexpr.Item{Event: wpexpr.Filter{Include: []string{eventMan}}}}}
+	}
+	synth := len(base) == 0
+	if synth {
+		base = []whenEntry{{}}
+	}
+	var out []whenEntry
+	for _, ent := range base {
+		if !ent.path.Empty() || len(ent.Event.Exclude) > 0 {
+			e.disable(jp, caps.JobIf, j.If, "the workflow")
+			return neverEntries(base), nil
+		}
+		events := ent.Event.Include
+		if ent.Event.Empty() {
+			events = allEvents
+		}
+		var with, without []string
+		for _, ev := range events {
+			if ev == eventPush || ev == eventPR {
+				with = append(with, ev)
+			} else {
+				without = append(without, ev)
+			}
+		}
+		if len(with) > 0 {
+			for _, globs := range atoms {
+				w := ent
+				w.Event.Include = with
+				w.path, w.pathNoEmpty = wpexpr.Filter{Include: slices.Clone(globs)}, true
+				w.Evaluate = andText(w.Evaluate, rest)
+				out = append(out, w)
+			}
+		}
+		if len(without) > 0 {
+			w := ent
+			w.Event.Include = without
+			w.Evaluate = andText(w.Evaluate, rest)
+			out = append(out, w)
+		}
+	}
+	detail := "the path filter applies to push and pull request events and every other event runs, as GitLab rules:changes does; a push that creates a branch is compared with its own commits; on_empty: false skips a push with no changed paths, as GitLab does; a project setting ignore_message can skip path conditions altogether"
+	if rest != "" {
+		detail += "; the rest of the condition is the evaluate text of the same entries"
+	}
+	e.emulate(jp, caps.JobIf, "when path", detail)
+	if err := e.markArg(caps.JobIf, jp, gateArg{Paths: &changesArg{Src: expr.String(j.If), From: e.from.ID, Synth: synth, Evaluate: rest}}); err != nil {
+		e.comment("job condition marker not carried: " + err.Error())
+	}
+	var status []string
+	if finally {
+		status = []string{statusOK, statusFail}
+	}
+	return withStatus(out, status), nil
+}
+
+// pathAtoms splits a condition into the globs of the predicates that any one of them satisfies and the evaluate
+// text of the rest. ok is false when the condition is not "one of these predicates and the rest".
+func (e *emitter) pathAtoms(jp string, x expr.Expr) (atoms [][]string, rest string, ok bool) {
+	plan, ok := emitkit.DecomposeChanges(x)
+	if !ok || e.from == nil || e.from.ID != provider.GitLab {
+		return nil, "", false
+	}
+	for _, a := range plan.Atoms {
+		if slices.ContainsFunc(a.Globs, func(g string) bool { return !fnmatchExact(g) }) {
+			return nil, "", false
+		}
+	}
+	// The terms must be exactly the assignments in which some chosen predicate holds.
+	var pick int
+	for i := range plan.Atoms {
+		if slices.ContainsFunc(plan.Terms, func(t []bool) bool { return onlyBit(t, i) }) {
+			pick |= 1 << i
+		}
+	}
+	want := 0
+	for m := 1; m < 1<<len(plan.Atoms); m++ {
+		if m&pick != 0 {
+			want++
+		}
+	}
+	if pick == 0 || len(plan.Terms) != want {
+		return nil, "", false
+	}
+	for _, t := range plan.Terms {
+		m := 0
+		for i, v := range t {
+			if v {
+				m |= 1 << i
+			}
+		}
+		if m&pick == 0 {
+			return nil, "", false
+		}
+	}
+	for i, a := range plan.Atoms {
+		if pick&(1<<i) != 0 {
+			atoms = append(atoms, a.Globs)
+		}
+	}
+	if plan.Residual == nil {
+		return atoms, "", true
+	}
+	items, status, good := e.condition(jp, caps.JobIf, plan.Residual, "the workflow")
+	if !good || status != nil {
+		return nil, "", false
+	}
+	we, err := wpexpr.WhenExpr(items)
+	if err != nil || we == nil {
+		return nil, "", false
+	}
+	text, err := wpexpr.Print(we)
+	if err != nil {
+		return nil, "", false
+	}
+	return atoms, text, true
+}
+
+func onlyBit(t []bool, i int) bool {
+	for j, v := range t {
+		if v != (j == i) {
+			return false
+		}
+	}
+	return true
+}
+
+// namesNoEvents is true when the source can leave a pipeline without a trigger. A GHA workflow always names its
+// events, so for that family an entry with no event is the core subset that lean4/Pipemaster/Woodpecker.lean models
+// and keeps every event (allEvents).
+func (e *emitter) namesNoEvents() bool {
+	return e.from != nil && provider.Family(e.origin) != provider.GHA
+}
+
+// defaultEventsArg marks a workflow whose event filter the emitter wrote for a source with none, so the parser reads
+// the filter back as no filter.
+type defaultEventsArg struct {
+	Events []string `json:"default_events"`
+}
+
+// gitlabDefaultArg marks a workflow whose event lists come from the default events of a GitLab pipeline, so the parser
+// reads the entries without them.
+type gitlabDefaultArg struct {
+	Default bool `json:"gitlab_default"`
+}
+
+// gitlabDefaultEvents adds the events a GitLab pipeline with no workflow:rules also runs on. The IR holds only its push
+// and tag triggers, so the other events that map to a Woodpecker event join as one entry, and a marker keeps the
+// original triggers for the way back.
+func (e *emitter) gitlabDefaultEvents(pl *ir.Pipeline, jp string, base []whenEntry) ([]whenEntry, error) {
+	if e.origin != provider.GitLab || gitlabHasWorkflow(pl) || !isDefaultPushTag(pl.Triggers) {
+		return base, nil
+	}
+	e.noteSourceEvents(pl.ID)
+	var extra []string
+	for _, ev := range e.sourceEvents() {
+		if ev != eventPush && ev != eventPR && ev != eventTag {
+			extra = append(extra, ev)
+		}
+	}
+	if len(extra) == 0 {
+		return base, nil
+	}
+	if err := e.markTriggers(caps.TriggerManual, "pipeline/"+pl.ID, pl.Triggers); err != nil {
+		return nil, err
+	}
+	if err := e.markArg(caps.TriggerPush, jp, gitlabDefaultArg{Default: true}); err != nil {
+		return nil, err
+	}
+	return append(base, whenEntry{Item: wpexpr.Item{Event: wpexpr.Filter{Include: extra}}}), nil
+}
+
+// isDefaultPushTag is true for the two bare triggers that the GitLab parser gives a pipeline with no workflow:rules.
+func isDefaultPushTag(ts []ir.Trigger) bool {
+	return len(ts) == 2 && ts[0].Kind == ir.TriggerPush && ts[1].Kind == ir.TriggerTag &&
+		!slices.ContainsFunc(ts, func(t ir.Trigger) bool {
+			return len(t.Branches.Include)+len(t.Branches.Exclude)+len(t.Tags.Include)+len(t.Tags.Exclude)+len(t.Paths.Include)+len(t.Paths.Exclude) > 0
+		})
 }

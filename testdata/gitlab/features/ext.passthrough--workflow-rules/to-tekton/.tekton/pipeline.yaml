@@ -3,10 +3,32 @@ kind: Pipeline
 metadata:
   name: gitlab-ci
 spec:
+  params:
+    - name: ctx-branch
+      default: ""
+    - name: ctx-tag
+      default: ""
+    - name: ctx-event
+      default: ""
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: build
       taskRef:
         name: gitlab-ci-build
+      params:
+        - name: ctx-event
+          value: $(params.ctx-event)
+        - name: ctx-tag
+          value: $(params.ctx-tag)
+        - name: ctx-branch
+          value: $(params.ctx-branch)
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       when:
         - input: pipemaster-disabled
           operator: in

@@ -14,8 +14,10 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/lukaszraczylo/pipemaster/caps"
+	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
 
@@ -60,7 +62,7 @@ var fieldFeatures = map[string][]caps.Feature{
 	"WorkDir":         {caps.StepWorkdir},
 	"Image":           {caps.StepImage},
 	"ContinueOnError": {caps.StepContinueOnError},
-	"<node>":          {caps.StepAction, caps.StepScript, caps.PipelineFinally, caps.ProjectMultiPipeline},
+	"<node>":          {caps.StepAction, caps.StepScript, caps.ScriptInterpolation, caps.PipelineFinally, caps.ProjectMultiPipeline},
 }
 
 // diffNodes lists the fields that differ per node path; a node present on one side only differs as "<node>".
@@ -159,6 +161,35 @@ func isDisabledCall(e report.Entry, d irDiff) bool {
 	return d.Field == "If" && e.Feature == caps.StepAction && strings.HasPrefix(e.IRPath, d.Path+"/step/")
 }
 
+// inlineCovers is true when the inline entry of a call explains the difference. The entry is emulated, because the
+// child work runs in the target, and it says that a return without metadata keeps the jobs inline. It covers the
+// call job, the jobs that took its place, and the needs of the jobs of the same pipeline that it rewired.
+func inlineCovers(e report.Entry, d irDiff) bool {
+	if e.Strategy != inline.EntryStrategy || e.Level != caps.Emulated || pipelineRE.FindString(e.IRPath) != pipelineRE.FindString(d.Path) {
+		return false
+	}
+	switch d.Field {
+	case "Needs":
+		return true
+	case "<node>":
+		return d.Path == e.IRPath || strings.HasPrefix(d.Path, e.IRPath+"/") || strings.HasPrefix(d.Path, e.IRPath+"-")
+	}
+	return false
+}
+
+// dockerCovers is true when the emulated entry of a docker step explains the difference: a return without metadata
+// keeps the script step that the emit wrote in its place.
+func dockerCovers(e report.Entry, d irDiff) bool {
+	if e.Strategy != emitkit.DockerRewrite || e.Level != caps.Emulated || e.IRPath != d.Path {
+		return false
+	}
+	switch d.Field {
+	case "Kind", "Action", "With", "Image", "Script":
+		return true
+	}
+	return false
+}
+
 // covered reports whether a lost or external entry at the node, or below it, names a feature that
 // accounts for the differing field.
 func covered(d irDiff, reps ...*report.Report) bool {
@@ -173,12 +204,54 @@ func covered(d irDiff, reps ...*report.Report) bool {
 			if e.Level >= caps.External && isDisabledCall(e, d) {
 				return true
 			}
+			if inlineCovers(e, d) || dockerCovers(e, d) {
+				return true
+			}
 		}
 	}
 	return false
 }
 
 var pipelineRE = regexp.MustCompile(`^pipeline/[^/]+`)
+
+// defaultTriggersRead is true for a Drone pipeline with no trigger that came back with the triggers of its default
+// events: with no metadata the file means what it says, so the source default events are now written out.
+func defaultTriggersRead(d irDiff, src, back *ir.Project, provider string) bool {
+	if d.Field != "Triggers" || provider != "drone" || len(src.Pipelines) != 1 || len(back.Pipelines) != 1 {
+		return false
+	}
+	return len(src.Pipelines[0].Triggers) == 0 && len(back.Pipelines[0].Triggers) > 0
+}
+
+// statusRulesRead is true for the If or Ext of a job that holds the GitLab rules of a finally job with a condition. The
+// emitter writes them with when: always or when: on_failure, and the GitLab parser keeps such rules as opaque text
+// with the list in Ext (TestRulesFallbackOpaque).
+func statusRulesRead(d irDiff, back *ir.Project) bool {
+	if d.Field != "If" && d.Field != "Ext" {
+		return false
+	}
+	for _, pl := range back.Pipelines {
+		for _, j := range append(slices.Clone(pl.Jobs), pl.Finally...) {
+			if "pipeline/"+pl.ID+"/job/"+j.ID != d.Path {
+				continue
+			}
+			o, ok := j.If.(expr.Opaque)
+			gl, _ := j.Ext["gitlab"].(map[string]any)
+			rules, _ := gl["rules"].([]any)
+			if !ok || o.Dialect != "gitlab" || len(rules) == 0 {
+				return false
+			}
+			for _, r := range rules {
+				m, _ := r.(map[string]any)
+				if w, _ := m["when"].(string); w != "always" && w != "on_failure" {
+					return false
+				}
+			}
+			return true
+		}
+	}
+	return false
+}
 
 func TestRoundTripWithoutMetaBestEffort(t *testing.T) {
 	n := 0
@@ -198,8 +271,17 @@ func TestRoundTripWithoutMetaBestEffort(t *testing.T) {
 					for i := range r.backRep.Entries {
 						r.backRep.Entries[i].IRPath = pipelineRE.ReplaceAllLiteralString(r.backRep.Entries[i].IRPath, "pipeline/"+r.src.Pipelines[0].ID)
 					}
+					for i := range r.backRep.Retained {
+						r.backRep.Retained[i].IRPath = pipelineRE.ReplaceAllLiteralString(r.backRep.Retained[i].IRPath, "pipeline/"+r.src.Pipelines[0].ID)
+					}
 				}
 				for _, d := range diffNodes(r.src, r.back) {
+					if defaultTriggersRead(d, r.src, r.back, f.provider) {
+						continue
+					}
+					if statusRulesRead(d, r.back) {
+						continue
+					}
 					if !covered(d, r.srcRep, r.toRep, r.backRep) {
 						t.Errorf("%s: %s differs after A->B->A with no metadata and no lost or external report entry covers it", d.Path, d.Field)
 					}

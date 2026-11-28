@@ -1,2 +1,2 @@
 Loss report: gha -> gitlab
-[lost] pipeline/ci/job/deploy job.if (condition not expressible in GitLab CI; job disabled)
+[external] pipeline/ci/job/deploy job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)

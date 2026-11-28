@@ -1,5 +1,6 @@
 # pipemaster:emulated step.image pipeline/ci/job/use/step/use-step-1
 # pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated job.runner pipeline/ci/job/use
 # pipemaster:emulated step.shell pipeline/ci/job/use/step/use-step-1
 apiVersion: tekton.dev/v1
 kind: Task

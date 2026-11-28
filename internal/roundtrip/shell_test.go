@@ -66,6 +66,11 @@ func powershellTasks(data []byte) (int, error) {
 		if err != nil {
 			return 0, err
 		}
+		if m, ok := root.(map[string]any); ok {
+			if jobs, ok := m["jobs"].([]any); ok {
+				m["jobs"] = withoutTagTwins(jobs)
+			}
+		}
 		roots = append(roots, root)
 	}
 	n := 0
@@ -233,7 +238,7 @@ func concourseTasks(data []byte) ([]concourseTask, error) {
 			return nil, err
 		}
 		jobs, _ := root["jobs"].([]any)
-		for _, j := range jobs {
+		for _, j := range withoutTagTwins(jobs) {
 			jm, _ := j.(map[string]any)
 			job, _ := jm["name"].(string)
 			var walk func(v any)
@@ -288,4 +293,24 @@ func TestPowershellReportCoversOnlyItsOwnTask(t *testing.T) {
 			t.Fatalf("%+v is covered by the entry of another task", other)
 		}
 	}
+}
+
+// withoutTagTwins drops the <job>-tag copy of a Concourse job: it repeats the tasks of its job, which the report names once.
+func withoutTagTwins(jobs []any) []any {
+	have := map[string]bool{}
+	for _, j := range jobs {
+		jm, _ := j.(map[string]any)
+		name, _ := jm["name"].(string)
+		have[name] = true
+	}
+	var out []any
+	for _, j := range jobs {
+		jm, _ := j.(map[string]any)
+		name, _ := jm["name"].(string)
+		if base, twin := strings.CutSuffix(name, "-tag"); twin && have[base] {
+			continue
+		}
+		out = append(out, j)
+	}
+	return out
 }

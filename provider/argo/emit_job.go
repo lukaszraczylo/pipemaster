@@ -2,6 +2,7 @@ package argo
 
 import (
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ymap"
+	"maps"
 	"reflect"
 	"regexp"
 	"slices"
@@ -13,6 +14,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/actions"
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -32,7 +34,7 @@ var jobSkip = map[string]bool{
 	ExtImplicitNeeds: true, ExtDepends: true, ExtGates: true, ExtArguments: true, keyInputs: true, keyOutputs: true,
 	"sidecars": true, "continueOn": true, "templateRef": true, "withItems": true, "withParam": true, "withSequence": true,
 	"retryStrategy": true, "timeout": true, "activeDeadlineSeconds": true, "containerSet": true, "hooks": true, "onExit": true,
-	"argument_artifacts": true, "volumes": true, "nodeSelector": true,
+	"argument_artifacts": true, "volumes": true, "nodeSelector": true, ExtMountPaths: true, ExtWorkspaceArtifacts: true,
 }
 
 // taskKeys are the job Ext keys that belong to the DAG task, not the template.
@@ -102,7 +104,7 @@ func (e *emitter) runsContainer(st *ir.Step) bool {
 		return len(st.Script) > 0 || extOf(st.Ext)[ExtScriptLine] != nil
 	case ir.StepAction:
 		t, ok := actionTarget(st)
-		return ok && t.Kind == actions.KindScript && t.Support.Level != caps.Lost
+		return ok && (t.Kind == actions.KindScript || t.Kind == actions.KindImplicit && len(t.Script) > 0) && t.Support.Level != caps.Lost
 	}
 	return false
 }
@@ -143,6 +145,7 @@ func (e *emitter) job(pp *plan, jp *jobPlan) (jobOut, error) {
 		e.containerTemplate(tc, tm, conts, jx)
 	}
 	e.templateKeys(tc, tm, sx, jx, taskStep != nil)
+	restoreMountPaths(tm.N, jx[ExtMountPaths])
 	d := e.finalDeps(tc, cond, jx)
 	d.depends = e.keptDepends(tc, jx, d.depends)
 	var gate string
@@ -188,8 +191,42 @@ func (e *emitter) jobFeatures(tc *jobCtx) {
 		e.lose(path, caps.JobRetry, "retry conditions "+strings.Join(j.Retry.On, ", ")+" have no form; Argo retries on failure and error")
 	}
 	r := j.Runner
-	if len(r.Labels) > 0 || r.Platform != "" || len(r.Selector) > 0 {
-		e.lose(path, caps.JobRunner, "Argo schedules pods; a runner label has no form")
+	emitkit.ReportHosted(e.origin, r.Labels, "node selector",
+		func(st, d string) { e.external(path, caps.JobRunner, st, d) },
+		func(d string) { e.lose(path, caps.JobRunner, d) })
+	var keys, lostMsgs []string
+	for _, l := range emitkit.Unplaced(e.origin, r.Labels) {
+		if k, ok := emitkit.NodeKey(l); ok {
+			if tc.nodeSel == nil {
+				tc.nodeSel = map[string]any{}
+			}
+			tc.nodeSel[k] = emitkit.TagValue
+			keys = append(keys, k+"="+emitkit.TagValue)
+			continue
+		}
+		lostMsgs = append(lostMsgs, "the runner label "+l+" has no node selector key: "+emitkit.TagHint)
+	}
+	for _, k := range slices.Sorted(maps.Keys(r.Selector)) {
+		v := r.Selector[k]
+		if !emitkit.ValidNodeLabel(k, v) {
+			lostMsgs = append(lostMsgs, "the runner selector "+k+"="+v+" is not a Kubernetes label, so a nodeSelector cannot hold it")
+			continue
+		}
+		if tc.nodeSel == nil {
+			tc.nodeSel = map[string]any{}
+		}
+		tc.nodeSel[k] = v
+		keys = append(keys, k+"="+v)
+	}
+	if len(keys) > 0 {
+		e.external(path, caps.JobRunner, "workers the operator provides", "label the nodes "+strings.Join(keys, ", ")+" for the runner labels and selector (template nodeSelector)")
+	}
+	if r.Platform != "" {
+		lostMsgs = append(lostMsgs, "Argo schedules pods; a runner platform has no form")
+	}
+	// The external entry goes first so the lost entry that follows holds both texts.
+	for _, m := range lostMsgs {
+		e.lose(path, caps.JobRunner, m)
 	}
 }
 
@@ -234,7 +271,7 @@ func (sx *stepCtx) containers(jx map[string]any) (conts []*container, taskStep *
 					e.lose(path, caps.StepScript, "the step has no script; no container runs it")
 				}
 				sx.act, sx.disabled = actionArg{}, false
-				conts = append(conts, sx.placeholder(st))
+				conts = append(conts, sx.placeholder(st, false))
 				sx.markAction(st)
 			}
 		case ir.StepTask:
@@ -244,12 +281,18 @@ func (sx *stepCtx) containers(jx map[string]any) (conts []*container, taskStep *
 			}
 			e.lose(path, caps.StepAction, "a task step has no Argo form; the step is dropped")
 			sx.act, sx.disabled = actionArg{}, false
-			conts = append(conts, sx.placeholder(st))
+			conts = append(conts, sx.placeholder(st, true))
 			sx.markAction(st)
 		default:
+			sx.act, sx.disabled = actionArg{}, false
+			if c := sx.pluginContainer(st, names[st], last); c != nil {
+				conts = append(conts, c)
+				sx.markAction(st)
+				continue
+			}
 			e.lose(path, caps.StepAction, "a "+string(st.Kind)+" step has no Argo form; the step is dropped")
 			sx.act, sx.disabled = actionArg{}, false
-			conts = append(conts, sx.placeholder(st))
+			conts = append(conts, sx.placeholder(st, true))
 			sx.markAction(st)
 		}
 	}
@@ -273,13 +316,25 @@ func (e *emitter) containerTemplate(tc *jobCtx, tm *wmap, conts []*container, jx
 		c.m.SetStr("name", mainStep)
 		c.m.SetStr("image", tc.jobImage())
 		c.m.Set("command", strSeq([]string{shellCommand, shellFlags}))
-		c.m.Set("args", seqOf(str("true")))
+		reason, bridge := emitkit.BridgeWork(tc.jp.j)
+		bridge = bridge && len(tc.jp.j.Steps) == 0
+		if bridge {
+			c.m.Set("args", seqOf(str(emitkit.FailLoud(caps.StepScript, path, reason))))
+		} else {
+			c.m.Set("args", seqOf(str(placeholderScript)))
+		}
 		c.m.SetStr("workingDir", workspaceMount)
 		conts = append(conts, c)
-		if len(tc.jp.j.Steps) == 0 {
+		switch {
+		case bridge:
+			e.lose(path+"/step/"+placeholderStepID, caps.StepScript, reason+"; a container that prints the loss and exits 1 keeps the template valid and the pipeline honest")
+			e.emulate(path, caps.StepScript, "failing container", "the job runs no script, so a container named main prints the loss and exits 1")
+		case len(tc.jp.j.Steps) == 0:
 			e.lose(path+"/step/"+placeholderStepID, caps.StepScript, "the job has no steps; a no-op container keeps the template valid")
+			fallthrough
+		default:
+			e.emulate(path, caps.StepScript, "no-op container", "the job runs no script, so a container named main carries its inputs and outputs")
 		}
-		e.emulate(path, caps.StepScript, "no-op container", "the job runs no script, so a container named main carries its inputs and outputs")
 		if err := e.markArg(caps.StepScript, path, struct{}{}); err != nil {
 			e.lose(path, caps.StepScript, "the no-op marker cannot be written: "+err.Error())
 		}
@@ -394,7 +449,7 @@ func (tc *jobCtx) cacheMounts() []*yaml.Node {
 			sub := "p" + itoa(k+1)
 			out = append(out, mountNode(claim, artifactPath(strings.TrimPrefix(p, "~/")), sub))
 		}
-		tc.e.emulate(tc.jp.path, caps.JobCache, "PVC from volumeClaimTemplates", "the cache "+c.Key+" is a claim per job and holds the paths; it lives for one Workflow unless the claim is shared")
+		tc.e.emulate(tc.jp.path, caps.JobCache, "PVC from volumeClaimTemplates", "the cache "+c.Key+" is a claim per job and holds the paths; it lives for one Workflow; to persist, the operator provides a shared PVC or an artifact repository (S3) for the key")
 	}
 	return out
 }
@@ -448,6 +503,18 @@ func (e *emitter) templateKeys(tc *jobCtx, tm *wmap, sx *stepCtx, jx map[string]
 	}
 	if ns, ok := jx["nodeSelector"]; ok {
 		rest["nodeSelector"] = ns
+	}
+	if len(tc.nodeSel) > 0 {
+		merged := map[string]any{}
+		if ns, ok := rest["nodeSelector"].(map[string]any); ok {
+			maps.Copy(merged, ns)
+		}
+		for k, v := range tc.nodeSel {
+			if _, dup := merged[k]; !dup {
+				merged[k] = v
+			}
+		}
+		rest["nodeSelector"] = merged
 	}
 	if err := tm.AddExtra(rest, nil); err != nil {
 		e.lose(path, caps.ExtPassthrough, "the template keys of the Argo file cannot be written: "+err.Error())

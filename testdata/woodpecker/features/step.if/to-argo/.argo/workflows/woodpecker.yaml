@@ -1,3 +1,5 @@
+# pipemaster:emulated step.action pipeline/woodpecker/job/ci/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated step.image pipeline/woodpecker/job/ci
 # pipemaster:arg {"steps":{"deploy":"ref: alpine:3.20\n"},"wrote":{"deploy":"alpine:3.20"}}
 # pipemaster:emulated step.if pipeline/woodpecker/job/ci/step/deploy
@@ -15,6 +17,10 @@ spec:
         value: ""
       - name: ctx-event
         value: ""
+      - name: ctx-sha
+        value: ""
+      - name: ctx-repo
+        value: ""
       - name: ctx-actor
         value: ""
   templates:
@@ -26,14 +32,15 @@ spec:
     - name: ci
       containerSet:
         containers:
-          - name: deploy
+          - # pipemaster:id deploy
+            name: main
             image: alpine:3.20
             command:
               - sh
               - -ec
             args:
               - |-
-                if ! ( ( [ "$PM_CTX_EVENT" = 'tag' ] || [ "$PM_CTX_BRANCH" = 'main' ] ) && [ "$PM_CTX_ACTOR" = 'release-bot' ] ); then exit 0; fi # pipemaster:guard
+                if ! ( ( [ "$PM_CTX_EVENT" = 'tag' ] || [ "$PM_CTX_BRANCH" = 'main' ] ) && [ "$PM_CTX_ACTOR" = 'release-bot' ] ); then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard
                 ./deploy.sh
             workingDir: /workspace
             env:
@@ -46,6 +53,13 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+      inputs:
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       volumes:
         - emptyDir: {}
           name: workspace

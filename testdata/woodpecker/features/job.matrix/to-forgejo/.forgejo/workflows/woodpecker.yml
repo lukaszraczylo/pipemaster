@@ -1,6 +1,12 @@
 # pipemaster:emulated trigger.push pipeline/woodpecker/trigger/0
 # pipemaster:emulated pipeline.concurrency pipeline/woodpecker
+# pipemaster:emulated job.if pipeline/woodpecker/job/ci
+# pipemaster:arg {"from":"woodpecker","guard":true}
 # pipemaster:emulated job.runner pipeline/woodpecker/job/ci
+# pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/test
+# pipemaster:arg {"kind":"script","image":{"Ref":"golang:$\u007b{ matrix.GO_VERSION }}","Entrypoint":null},"script":["go test ./...","echo $\u007b{ matrix.OS }}"],"run":true}
+# pipemaster:emulated job.artifacts pipeline/woodpecker/job/ci
+# pipemaster:arg {"pre":1,"post":0}
 on:
   push:
     branches:
@@ -10,6 +16,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   ci:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -20,7 +27,12 @@ jobs:
           - linux
           - darwin
     steps:
+      - uses: https://github.com/actions/checkout@v7
+      # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/test
       - id: test
-        run: |
-          go test ./...
-          echo ${{ matrix.OS }}
+        run: docker run --rm -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" --entrypoint /bin/sh -- "$PIPEMASTER_IMAGE" -ec "$PIPEMASTER_SCRIPT"
+        env:
+          PIPEMASTER_IMAGE: golang:${{ matrix.GO_VERSION }}
+          PIPEMASTER_SCRIPT: |
+            go test ./...
+            echo ${{ matrix.OS }}

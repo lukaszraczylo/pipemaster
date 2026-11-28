@@ -11,9 +11,13 @@ The caps table gives the verdict external for two features:
 
 ## Conversion notes
 
+- A Drone pipeline with no trigger, or with only `exclude:`, runs on the default events of Drone. The source events of those pipelines get triggers on every target. The report lists each event that the target cannot express. The same rule applies to a GitLab file with no `workflow:`. See `WithDefaultTriggers` in `provider/events.go`.
+- Drone clones the repository before the steps. A target that does not clone by itself gets a checkout step. On GitHub Actions this is an `actions/checkout` step that the report marks as emulated. The clone settings of the source map to the step inputs. See `provider/emitkit/checkout.go`.
 - Drone replaces `${NAME}` in the raw YAML before it parses the file. The literal `$` escape is `$$`.
 - A matrix becomes one pipeline document per cell. Each document carries a marker, so a return conversion can fold the cells into one matrix job.
 - The Drone OSS server does not evaluate `paths` filters. The converter reports them as lost and never emits them.
+- A script from a bash source (GHA, GitLab) becomes one command that runs the script under bash when the image has bash. The image `sh` can be dash, which fails on `[[ ]]` and arrays. The report marks the wrapper as emulated, and the return conversion removes it.
+- A script that reads a predefined variable of another provider, such as `$CI_PROJECT_DIR`, starts with a prelude that defines the name from the Drone value. A variable with no Drone source stops the step with a message. The table is `vars/vars.yaml`.
 
 ## Feature support
 
@@ -27,7 +31,7 @@ The following table comes from `pipemaster caps --to drone --format md`.
 | ext.passthrough | native |  |
 | job.allow_failure | emulated | failure ignore on every step (later steps still run after a failed step) |
 | job.artifacts | emulated | shared workspace of the steps in one document (other documents cannot read the files) |
-| job.cache | emulated | shared workspace of the steps in one document (nothing persists between runs) |
+| job.cache | emulated | shared workspace of the steps in one document (nothing persists between runs; for persistence add a cache plugin step (for example drone-cache) with an S3-compatible bucket or a host volume, set up by the operator) |
 | job.container | native |  |
 | job.env | native | pipeline environment |
 | job.environment | lost | (Drone has no environment name or URL in the pipeline file) |
@@ -39,7 +43,7 @@ The following table comes from `pipemaster caps --to drone --format md`.
 | job.needs.artifacts | lost | (documents share no workspace) |
 | job.outputs | lost | (Drone steps cannot pass values to other pipelines) |
 | job.retry | lost | (Drone has no retry key; only clone.retries exists) |
-| job.runner | lost | (only the platform has a Drone form; other runner labels are lost) |
+| job.runner | external | workers the operator provides (the os/arch platform becomes platform and every other runner label becomes a node key with the value true; register a runner with DRONE_RUNNER_LABELS to match) |
 | job.services | native |  |
 | job.timeout | external | repo setting timeout (the setting has no per-pipeline or per-step form) |
 | pipeline.concurrency | lost | (Drone concurrency.limit is a count and the IR models a group and cancel-in-progress, not a limit) |
@@ -55,7 +59,7 @@ The following table comes from `pipemaster caps --to drone --format md`.
 | step.if | native | step when (only the translatable expression subset; any other condition is emulated or lost) |
 | step.image | native |  |
 | step.script | native |  |
-| step.shell | lost | (Drone compiles commands into its own set -e script that runs under /bin/sh; a step with no shell from a GHA or GitLab source runs under bash there, so bash-only syntax fails when the image sh is dash) |
+| step.shell | emulated | bash-if-present wrapper command (Drone pipes commands to /bin/sh; a step that runs under bash at the source becomes one command that re-runs the script under bash -e when the image has bash, else under sh -e, so bash-only syntax fails under sh; any other shell is lost) |
 | step.timeout | lost | (the docker runner ignores a step timeout) |
 | step.workdir | native |  |
 | trigger.api | lost | (Drone starts API builds as event custom) |

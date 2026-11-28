@@ -38,14 +38,35 @@ type Meta struct {
 	// Emitted holds what the target file parsed to for the fields in Lost. A restore of an edited file applies a
 	// stored field only where the file still reads as emitted.
 	Emitted map[string]Lost `yaml:"emitted,omitempty"`
-	Source  string          `yaml:"source,omitempty"`
+	// Calls holds each child call that the emit inlined into jobs, by the IR path of the call job. A return to
+	// the source provider replaces the inlined jobs with the stored call job.
+	Calls map[string]Call `yaml:"calls,omitempty"`
+	// DockerSteps holds each docker:// action step that the emit rewrote as a script step, as the source had it,
+	// by source IR path. A return to the source provider puts the action step back.
+	DockerSteps map[string]*ir.Step `yaml:"docker_steps,omitempty"`
+	Source      string              `yaml:"source,omitempty"`
 	// Target is the provider whose files Files hashes. A layer written before this field existed has none.
 	Target  string `yaml:"target,omitempty"`
 	Dialect string `yaml:"dialect,omitempty"`
 	// SourceInvalid holds the schema findings of the files the first conversion read, so a full return that
 	// restores them can tell a finding the user already had from a new one.
 	SourceInvalid []string `yaml:"source_invalid,omitempty"`
-	Version       int      `yaml:"version,omitempty"`
+	// Guarded holds the source IR paths of the jobs whose deletion guard the GHA parser stripped. GuardScoped
+	// tells an empty list from a source that kept no such record, where every job from another provider is guarded.
+	Guarded []string `yaml:"guarded,omitempty"`
+	// Gated holds the jobs, as pipeline ID and job ID, that the emit gated for a pull request trigger that it made
+	// from the default events of a GitLab source, so a return to GitLab removes the gate.
+	Gated       []string `yaml:"gated,omitempty"`
+	Version     int      `yaml:"version,omitempty"`
+	GuardScoped bool     `yaml:"guard_scoped,omitempty"`
+}
+
+// Call records one child call that an emit inlined: the call job as the source holds it, with its child pipeline,
+// the IDs of the jobs that replaced it, and the needs of every other job that the inline rewired.
+type Call struct {
+	Job     *ir.Job              `yaml:"job"`
+	Needs   map[string][]ir.Need `yaml:"needs,omitempty"`
+	Inlined []string             `yaml:"inlined"`
 }
 
 // Collect copies the Ext of every IR node that has one, keyed by IR path.

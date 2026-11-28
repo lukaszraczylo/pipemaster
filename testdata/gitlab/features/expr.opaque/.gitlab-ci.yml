@@ -2,5 +2,5 @@ build:
   script: [make]
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
-      changes:
-        - src/**/*
+      exists:
+        - Makefile

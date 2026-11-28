@@ -1,0 +1,12 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  vars:
+    runs-on: ubuntu-latest
+    env:
+      FOO: bar
+    steps:
+      - run: |
+          echo "MARK env.branch:$GITHUB_REF_NAME" | tee -a trace.log
+          echo "MARK env.sha:$(printf '%s' "$GITHUB_SHA" | wc -c)" | tee -a trace.log
+          echo "MARK env.foo:$FOO" | tee -a trace.log

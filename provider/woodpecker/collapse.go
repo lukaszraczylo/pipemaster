@@ -16,6 +16,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
@@ -144,13 +145,31 @@ func collapseRefs(c *collapseCtx) bool {
 		return false
 	}
 	st := c.j.Steps[a.Pos]
+	seen := map[string]int{}
 	for _, ref := range a.Refs {
 		ns, name, ok := strings.Cut(ref, ".")
 		if !ok {
 			return false
 		}
+		held := "${" + name + "}"
 		for i, l := range st.Script {
-			st.Script[i] = strings.ReplaceAll(l, "${"+name+"}", "${{ "+ref+" }}")
+			var sb strings.Builder
+			for {
+				k := strings.Index(l, held)
+				if k < 0 {
+					break
+				}
+				start, end := k, k+len(held)
+				if slices.Contains(a.Q[name], seen[name]) && strings.HasSuffix(l[:start], vars.QuoteBreakOpen) && strings.HasPrefix(l[end:], vars.QuoteBreakClose) {
+					start -= len(vars.QuoteBreakOpen)
+					end += len(vars.QuoteBreakClose)
+				}
+				seen[name]++
+				sb.WriteString(l[:start] + "${{ " + ref + " }}")
+				l = l[end:]
+			}
+			sb.WriteString(l)
+			st.Script[i] = sb.String()
 		}
 		if ns == expr.PrefixSecrets || ns == expr.PrefixVars {
 			st.Env = slices.DeleteFunc(st.Env, func(v ir.Var) bool {
@@ -368,6 +387,25 @@ func collapseActions(rep *report.Report, j *ir.Job, m *marks) {
 	for _, am := range found {
 		st := am.st
 		at := min(am.arg.At, len(j.Steps))
+		if am.arg.Stand != "" {
+			if at >= len(j.Steps) || !sameScript(strings.Join(j.Steps[at].Script, "\n"), am.arg.Stand) {
+				reportIgnored(rep, am.use, "the script step was edited after pipemaster wrote it")
+				continue
+			}
+			st.If = j.Steps[at].If
+			j.Steps[at] = &st
+			continue
+		}
+		if am.arg.Fail {
+			if at >= len(j.Steps) || !emitkit.IsFailLoud(j.Steps[at].Script) {
+				reportIgnored(rep, am.use, "the failing step was edited after pipemaster wrote it")
+				continue
+			}
+			// The held step keeps no condition; the one the file carries is the one the source had.
+			st.If = j.Steps[at].If
+			j.Steps[at] = &st
+			continue
+		}
 		if am.arg.Image != "" {
 			for _, later := range j.Steps[at:] {
 				if later.Image != nil && later.Image.Ref == am.arg.Image && len(later.Image.Entrypoint) == 0 {
@@ -486,6 +524,16 @@ func collapseTriggers(rep *report.Report, wfs []*workflow, specs []*whenSpec) tr
 			}
 		}
 	}
+	for _, w := range wfs {
+		if u, ok := w.marks.markedWith(caps.TriggerManual, pipelinePth); ok && len(sel) > 0 {
+			orig, aok := triggersArg(w.marks.args[u])
+			if !aok || !isSubset(kindsOf(orig), kindsOf(out.list)) {
+				reportUncollapsed(rep, u, "the file edit removed a trigger event of the original list")
+				continue
+			}
+			out.list = representable(orig)
+		}
+	}
 	for _, w := range manual {
 		u, _ := w.marks.markedWith(caps.JobManual, "")
 		if orig, ok := triggersArg(w.marks.args[u]); ok {
@@ -495,6 +543,11 @@ func collapseTriggers(rep *report.Report, wfs []*workflow, specs []*whenSpec) tr
 		}
 	}
 	return out
+}
+
+// isSubset reports whether every kind of sub is in all.
+func isSubset(sub, all []ir.TriggerKind) bool {
+	return !slices.ContainsFunc(sub, func(k ir.TriggerKind) bool { return !slices.Contains(all, k) })
 }
 
 func triggersArg(args []string) ([]ir.Trigger, bool) {
@@ -523,6 +576,9 @@ func collapsePipeline(rep *report.Report, pl *ir.Pipeline, wfs []*workflow) {
 	for _, w := range wfs {
 		if _, ok := w.marks.markedWith(caps.JobManual, ""); ok {
 			w.job.Manual = true
+			if isManualEvent(w.job.If) {
+				w.job.If = nil
+			}
 		}
 		if u, ok := w.marks.markedWith(caps.PipelineFinally, ""); ok {
 			var a finallyArg
@@ -542,6 +598,17 @@ func collapsePipeline(rep *report.Report, pl *ir.Pipeline, wfs []*workflow) {
 	}
 	pl.Jobs = slices.DeleteFunc(pl.Jobs, func(j *ir.Job) bool { return slices.Contains(finally, j) })
 	pl.Finally = finally
+}
+
+// isManualEvent is true for the bare test that a manual workflow carries when the pipeline lists no manual trigger.
+func isManualEvent(x expr.Expr) bool {
+	b, ok := x.(expr.Binary)
+	if !ok || b.Op != "==" {
+		return false
+	}
+	r, rok := b.L.(expr.Ref)
+	l, lok := b.R.(expr.Lit)
+	return rok && lok && len(r.Path) == 1 && r.Path[0] == "event" && l.Str == eventMan
 }
 
 func isAlways(x expr.Expr) bool {
@@ -631,6 +698,7 @@ func (g *group) build(rep *report.Report) (*ir.Pipeline, error) {
 		}
 	}
 	for _, w := range g.wfs {
+		restoreChanges(rep, w)
 		restoreJobIf(rep, w)
 	}
 	collapsePipeline(rep, pl, g.wfs)
@@ -694,7 +762,7 @@ func collapseStepIf(c *collapseCtx) bool {
 		return false
 	}
 	for _, st := range c.j.Steps {
-		if st.ID == id && st.If != nil && sameCondition(st.If, t) {
+		if st.ID == id && st.If != nil && (sameCondition(st.If, t) || sameCondition(st.If, wpexpr.ReadIf(t))) {
 			st.If = src
 			return true
 		}
@@ -730,11 +798,43 @@ func collapseJobIf(c *collapseCtx) bool {
 		return false
 	}
 	t, ok := expr.TranslateFacts(src, *from, wpexpr.Lang, expr.Facts{Branch: a.Branch})
-	if !ok || !sameCondition(c.j.If, t) {
+	if !ok {
+		return false
+	}
+	got := withoutStatus(c.j.If, a.Full != "")
+	if !sameCondition(got, t) && !sameCondition(got, wpexpr.ReadIf(t)) {
 		return false
 	}
 	c.j.If = src
+	if a.Full != "" {
+		full, err := expr.ParseCanonical(a.Full)
+		if err != nil {
+			return false
+		}
+		c.j.If = full
+	}
 	return true
+}
+
+// withoutStatus drops the status conjunct that the status entry of a workflow reads back as.
+// Only always() goes unless the marker holds the whole condition, so a status that a file edit added stays.
+func withoutStatus(x expr.Expr, all bool) expr.Expr {
+	b, ok := x.(expr.Binary)
+	if !ok || b.Op != expr.OpAnd {
+		return x
+	}
+	switch {
+	case isStatusCall(b.L, all):
+		return b.R
+	case isStatusCall(b.R, all):
+		return b.L
+	}
+	return x
+}
+
+func isStatusCall(x expr.Expr, all bool) bool {
+	c, ok := x.(expr.Call)
+	return ok && len(c.Args) == 0 && (c.Name == "always" || all && (c.Name == statusFail || c.Name == statusOK))
 }
 
 // sameCondition reports whether two conditions print as the same Woodpecker text: a !~ test is written, and read
@@ -746,4 +846,27 @@ func sameCondition(a, b expr.Expr) bool {
 		return expr.String(a) == expr.String(b)
 	}
 	return ta == tb
+}
+
+// restoreChanges puts the path predicate back as the job condition; the parser already took the filter the emitter
+// wrote out of the triggers.
+func restoreChanges(rep *report.Report, w *workflow) {
+	for _, u := range w.marks.uses {
+		var a gateArg
+		if u.Feature != caps.JobIf || !decodeArg(w.marks.args[u], &a) || a.Paths == nil {
+			continue
+		}
+		src, err := expr.ParseCanonical(a.Paths.Src)
+		if err != nil || !expr.HasChanges(src) || w.job.If != nil {
+			reportUncollapsed(rep, u, "the file edit changed the path filter, so the parsed one stands")
+			continue
+		}
+		w.job.If = src
+	}
+}
+
+// sameScript compares script text apart from the dollar escape and the final newline the file adds.
+func sameScript(a, b string) bool {
+	norm := func(s string) string { return strings.TrimRight(strings.ReplaceAll(s, "$$", "$"), "\n") }
+	return norm(a) == norm(b)
 }

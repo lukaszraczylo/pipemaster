@@ -68,13 +68,13 @@ jobs:
       - run: make
   release:
     needs: build
-    if: ${{ always() && github.ref == 'refs/heads/main' }}
+    if: ${{ always() && github.run_number == 1 }}
     runs-on: ubuntu-latest
     steps:
       - run: ./release.sh
   notify:
     needs: build
-    if: ${{ always() && github.ref == 'refs/heads/dev' }}
+    if: ${{ always() && github.run_number == 2 }}
     runs-on: ubuntu-latest
     steps:
       - run: ./notify.sh
@@ -118,13 +118,13 @@ jobs:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(out), "refs/heads/main") {
+	if strings.Contains(string(out), "github.run_number == 1") {
 		t.Errorf("stored metadata overwrote the edited condition:\n%s", out)
 	}
 	if !strings.Contains(string(out), "tag") {
 		t.Errorf("the edited condition is missing:\n%s", out)
 	}
-	for _, want := range []string{"refs/heads/dev", "uses: org/repo/.github/workflows/r.yml@v1", "secrets: inherit"} {
+	for _, want := range []string{"github.run_number == 2", "uses: org/repo/.github/workflows/r.yml@v1", "secrets: inherit"} {
 		if !strings.Contains(string(out), want) {
 			t.Errorf("an unedited job lost %q although it still reads as emitted:\n%s", want, out)
 		}

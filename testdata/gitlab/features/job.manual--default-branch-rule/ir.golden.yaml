@@ -9,7 +9,7 @@ pipelines:
         - kind: push
         - kind: tag
       jobs:
-        - if: branch == gitlab.CI_DEFAULT_BRANCH
+        - if: branch == default_branch
           id: publish
           steps:
             - ext:

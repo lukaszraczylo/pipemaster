@@ -1,0 +1,19 @@
+{
+  "features": [
+    "trigger.pull_request"
+  ],
+  "events": [
+    "push-main",
+    "push-branch",
+    "pr"
+  ],
+  "expect_failure": false,
+  "unordered": true,
+  "expect": [],
+  "owners": {
+    "excludepushtag.pr": [
+      "pr-only"
+    ]
+  },
+  "requires": []
+}

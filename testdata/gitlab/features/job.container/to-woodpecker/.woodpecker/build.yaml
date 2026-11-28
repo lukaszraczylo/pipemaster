@@ -1,10 +1,17 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/build
 # pipemaster:arg {"Ref":"golang:1.22","Entrypoint":[""]}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/build
+# pipemaster:arg {"gitlab_default":true}
 when:
   - event: push
   - event: tag
+  - event:
+      - manual
+      - cron
 steps:
   - name: script
     image: golang:1.22
     commands:
-      - make
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make'

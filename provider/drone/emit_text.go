@@ -13,6 +13,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
@@ -32,7 +33,9 @@ const (
 
 // emitter carries the state of one Emit call: the ledger and the comment lines of the document being written.
 type emitter struct {
-	led *emitkit.Ledger
+	// gated holds the action steps that a later step reads, which no target may drop.
+	gated map[*ir.Step]bool
+	led   *emitkit.Ledger
 	// origin is the provider ID the project was parsed from.
 	origin string
 	said   map[ir.FeatureUse][2]string
@@ -47,14 +50,33 @@ type emitter struct {
 	// from is the source dialect of a condition that shares the Drone class, so its event names map to Drone's.
 	from *expr.Dialect
 	head []string
+	// injected names the pipelines whose triggers were made from the default events of their source.
+	injected map[string]bool
+	// lostWork holds the path of every step that lost script or image work; a lost action is a failing step.
+	lostWork []string
 	// cut is set when an image or workdir lost an expression; the step or service being written owns it.
 	cut bool
+	// scriptLost is set when the step being written holds a failing line for a lost statement.
+	scriptLost bool
 }
 
 func use(path string, f caps.Feature) ir.FeatureUse { return ir.FeatureUse{IRPath: path, Feature: f} }
 
 func (e *emitter) lose(path string, f caps.Feature, detail string) {
+	e.noteLostWork(path, f)
 	e.note(path, f, caps.Lost, "", detail)
+}
+
+// noteLostWork remembers a step whose work has no Drone form, so an empty job can tell it from one with no work.
+func (e *emitter) noteLostWork(path string, f caps.Feature) {
+	if strings.Contains(path, "/step/") && (f == caps.StepScript || f == caps.StepImage) {
+		e.lostWork = append(e.lostWork, path)
+	}
+}
+
+// lostStepWork is true when a step of the job at jp lost its work.
+func (e *emitter) lostStepWork(jp string) bool {
+	return slices.ContainsFunc(e.lostWork, func(p string) bool { return strings.HasPrefix(p, jp+"/step/") })
 }
 
 // emulate notes an emulation. A second note for the same path and feature adds its text to the first, so the
@@ -138,15 +160,18 @@ type bindings struct {
 
 // refHit is one converted reference and the offset of its variable in the written command.
 type refHit struct {
-	ref  string
-	name string
-	off  int
+	ref    string
+	name   string
+	off    int
+	broken bool
 }
 
 // refAt says which ${NAME} of a step script the conversion wrote for a reference, and how many there are of that
 // name, so the parser can tell them from a ${NAME} that the author wrote.
 type refAt struct {
 	At []int `json:"at"`
+	// Q lists the ordinals that the conversion wrote inside a quote break.
+	Q  []int `json:"q,omitempty"`
 	Of int   `json:"of"`
 }
 
@@ -181,6 +206,9 @@ func (b *bindings) place(out string, seen map[string]int) {
 				}
 				a := b.at[h.ref]
 				a.At = append(a.At, seen[name])
+				if h.broken {
+					a.Q = append(a.Q, seen[name])
+				}
 				b.at[h.ref] = a
 			}
 		}
@@ -228,6 +256,9 @@ func (e *emitter) refText(b *bindings, mode textMode, path []string, off int) (s
 			return dollarEsc + "{" + path[1] + "}", true
 		}
 	}
+	if mode == commandText && vars.ScriptRefLost(path, e.origin, dialect) {
+		return "", false
+	}
 	if dp, ok := dexpr.Vocab.Dialect(path); ok && len(dp) == 1 {
 		if mode == commandText {
 			return dollarEsc + "{" + dp[0] + "}", true
@@ -248,7 +279,7 @@ func litText(l expr.Lit) string {
 }
 
 // convertParts joins the parts as Drone text. lost holds the canonical text of each expression that has no spelling.
-func (e *emitter) convertParts(b *bindings, mode textMode, parts []expr.Part) (out string, lost []string) {
+func (e *emitter) convertParts(b *bindings, mode textMode, parts []expr.Part, ctx string) (out string, lost []string) {
 	var sb strings.Builder
 	for _, p := range parts {
 		switch x := p.Expr.(type) {
@@ -258,6 +289,15 @@ func (e *emitter) convertParts(b *bindings, mode textMode, parts []expr.Part) (o
 			sb.WriteString(esc(litText(x)))
 		case expr.Ref:
 			if t, ok := e.refText(b, mode, x.Path, sb.Len()); ok {
+				if mode == commandText && strings.HasPrefix(t, dollarEsc) {
+					if broken := vars.BreakOut(ctx, sb.String(), t); broken != t {
+						t = broken
+						if b != nil && len(b.hits) > 0 && b.hits[len(b.hits)-1].off == sb.Len() {
+							b.hits[len(b.hits)-1].off += len(vars.QuoteBreakOpen)
+							b.hits[len(b.hits)-1].broken = true
+						}
+					}
+				}
 				sb.WriteString(t)
 			} else {
 				lost = append(lost, expr.String(x))
@@ -275,7 +315,7 @@ func (e *emitter) text(b *bindings, path string, f caps.Feature, mode textMode, 
 	if err != nil {
 		return "", err
 	}
-	out, lost := e.convertParts(b, mode, parts)
+	out, lost := e.convertParts(b, mode, parts, "")
 	for _, l := range lost {
 		e.lose(path, f, "no Drone spelling for expression "+l)
 		e.comment(string(f) + " " + path + ": {{ " + l + " }}")
@@ -288,18 +328,18 @@ func (e *emitter) text(b *bindings, path string, f caps.Feature, mode textMode, 
 
 // command converts one script entry. lost names the expressions Drone cannot spell; the caller comments the
 // entry out whole, because dropping the part could change what the command does.
-func (e *emitter) command(b *bindings, s string) (out string, lost []string, err error) {
+func (e *emitter) command(b *bindings, s, ctx string) (out string, lost []string, err error) {
 	parts, err := expr.ParseScriptTemplate(s)
 	if err != nil {
 		return "", nil, err
 	}
-	out, lost = e.convertParts(b, commandText, parts)
+	out, lost = e.convertParts(b, commandText, parts, ctx)
 	return out, lost, nil
 }
 
-// commentSpans comments out every statement of texts that holds a lost entry and returns the entries that stay.
-func (e *emitter) commentSpans(path string, texts, why []string) []int {
-	return emitkit.DropLost(texts, why, func(detail, text string) {
+// commentSpans swaps every statement of texts that holds a lost entry for a failing piece and returns the pieces in order.
+func (e *emitter) commentSpans(path string, texts, why []string) []emitkit.Piece {
+	return emitkit.ReplaceLost(texts, why, func(detail, text string) {
 		e.lose(path, caps.ScriptInterpolation, detail)
 		e.comment("script.interpolation " + path + ": " + text)
 	})
@@ -326,7 +366,7 @@ func (e *emitter) valueNode(path string, v ir.Value) (*yaml.Node, error) {
 				parts = mixed
 			}
 		}
-		out, lost := e.convertParts(nil, valueText, parts)
+		out, lost := e.convertParts(nil, valueText, parts, "")
 		for _, l := range lost {
 			e.lose(path, caps.ExprOpaque, "no Drone spelling for expression "+l)
 			e.comment("expr.opaque " + path + ": " + l)

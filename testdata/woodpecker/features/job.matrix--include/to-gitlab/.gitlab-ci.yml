@@ -2,7 +2,7 @@
 # pipemaster:arg [{"k":"t","p":"job/ci/step/test/script/0","g":"go test -tags $TAGS ./...","s":"go test -tags $\u007b{ matrix.TAGS }} ./..."},{"k":"t","p":"job/ci/step/test/image","g":"golang:$GO_VERSION","s":"golang:$\u007b{ matrix.GO_VERSION }}"}]
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
 ci:
   needs: []
   script:

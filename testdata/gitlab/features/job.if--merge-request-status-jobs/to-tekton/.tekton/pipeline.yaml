@@ -1,0 +1,67 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated job.if pipeline/gitlab-ci
+# pipemaster:arg {"ref_type_jobs":{"build":{"if":"!(event == 'pull_request')","back":"event != 'pull_request'"},"cleanup":{"if":"!(event == 'pull_request')","back":"event != 'pull_request'"},"onfail":{"if":"!(event == 'pull_request') \u0026\u0026 failure()","back":"(event != 'pull_request') \u0026\u0026 failure()"}}}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  params:
+    - name: ctx-event
+      default: ""
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
+  tasks:
+    - name: build
+      taskRef:
+        name: gitlab-ci-build
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
+      when:
+        - input: $(params.ctx-event)
+          operator: notin
+          values:
+            - pull_request
+    - name: mrjob
+      taskRef:
+        name: gitlab-ci-mrjob
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
+      runAfter:
+        - build
+      when:
+        - input: $(params.ctx-event)
+          operator: in
+          values:
+            - pull_request
+  finally:
+    - name: cleanup
+      taskRef:
+        name: gitlab-ci-cleanup
+      when:
+        - input: $(params.ctx-event)
+          operator: notin
+          values:
+            - pull_request
+    - name: onfail
+      taskRef:
+        name: gitlab-ci-onfail
+      when:
+        - input: $(params.ctx-event)
+          operator: notin
+          values:
+            - pull_request
+        - input: $(tasks.status)
+          operator: in
+          values:
+            - Failed

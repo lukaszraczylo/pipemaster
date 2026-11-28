@@ -1,0 +1,61 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:arg {"guard":true}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/po-created
+# pipemaster:arg {"guard":true}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/po-created
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/po-created/step/fail
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/po-created/step/pass
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/po-created
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/po-x
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/po-x/step/script
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/po-x
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  workflow_dispatch:
+  push:
+  repository_dispatch:
+    types:
+      - api
+      - trigger
+jobs:
+  build:
+    if: '!github.event.deleted'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: script
+        run: make build
+        shell: bash
+  po-created:
+    needs:
+      - build
+    if: '!github.event.deleted'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: fail
+        run: exit 1
+        shell: bash
+      - id: pass
+        run: "true"
+        shell: bash
+  po-x:
+    needs:
+      - build
+      - po-created
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # pipemaster:lost job.if pipeline/gitlab-ci/job/po-x: false
+      - id: script
+        run: make only
+        shell: bash

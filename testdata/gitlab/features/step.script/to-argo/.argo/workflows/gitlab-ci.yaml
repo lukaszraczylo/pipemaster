@@ -1,20 +1,29 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated step.action pipeline/gitlab-ci/job/build/step/after_script
-# pipemaster:arg {"step":"if: always()\nid: after_script\nkind: script\nscript:\n    - echo cleanup\ncontinue_on_error: true\n","hold":"{\"args\":[\"if command -v bash \\u003e/dev/null 2\\u003e\\u00261; then exec bash -e -c \\\"$1\\\"; fi; exec sh -e -c \\\"$1\\\"\",\"pipemaster\",\"trap 'exit 0' EXIT # pipemaster:continue-on-error\\nexit 0 # pipemaster:lost the step condition has no shell form\"],\"command\":[\"sh\",\"-c\"],\"image\":\"alpine:3.22\",\"name\":\"after-script\",\"workingDir\":\"/workspace\"}"}
-# pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/build/step/after_script
+# pipemaster:arg {"step":"if: always()\nid: after_script\nkind: script\nscript:\n    - echo cleanup\ncontinue_on_error: true\n","hold":"{\"args\":[\"if command -v bash \\u003e/dev/null 2\\u003e\\u00261; then exec bash -e -c \\\"$1\\\"; fi; exec sh -e -c \\\"$1\\\"\",\"pipemaster\",\"trap 'exit 0' EXIT # pipemaster:continue-on-error\\nexit 0 # pipemaster:lost the step condition has no shell form\"],\"command\":[\"sh\",\"-c\"],\"image\":\"alpine:3.22\",\"name\":\"main\",\"workingDir\":\"/workspace\"}","seq":1}
 # pipemaster:emulated step.continue_on_error pipeline/gitlab-ci/job/build/step/after_script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/after_script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
-# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/0
-# pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/0
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/1
 # pipemaster:emulated trigger.push pipeline/gitlab-ci/trigger/1
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.filter.branches pipeline/gitlab-ci/trigger/2
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: gitlab-ci
 spec:
   entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-sha
+        value: ""
+      - name: ctx-repo
+        value: ""
   templates:
     - name: main
       dag:
@@ -38,7 +47,7 @@ spec:
                 make test
             workingDir: /workspace
           - # pipemaster:id after_script
-            name: after-script
+            name: main
             image: alpine:3.22
             command:
               - sh
@@ -55,6 +64,13 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+      inputs:
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       volumes:
         - emptyDir: {}
           name: workspace

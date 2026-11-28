@@ -1,2 +1,2 @@
 Loss report: tekton -> gitlab
-No losses: every feature converted natively.
+[lost] pipeline/ci/job/build/step/build-step-1 script.interpolation (no GitLab variable for expression ref_name; the line is replaced by a line that prints the loss and exits 1)

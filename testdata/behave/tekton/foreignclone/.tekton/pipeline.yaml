@@ -1,0 +1,41 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci
+spec:
+  workspaces:
+    - name: shared
+  tasks:
+    - name: fetch
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/tektoncd-catalog/git-clone.git
+          - name: revision
+            value: v1.7.1
+          - name: pathInRepo
+            value: task/git-clone/git-clone.yaml
+      workspaces:
+        - name: output
+          workspace: shared
+      params:
+        - name: url
+          value: https://github.com/tektoncd-catalog/git-clone
+        - name: revision
+          value: v1.7.1
+    - name: check
+      runAfter:
+        - fetch
+      workspaces:
+        - name: ws
+          workspace: shared
+      taskSpec:
+        workspaces:
+          - name: ws
+        steps:
+          - name: read
+            image: alpine
+            script: |
+              cd $(workspaces.ws.path)
+              echo "MARK foreignclone.readme:$(test -f README.md && echo yes)"

@@ -50,15 +50,31 @@ type jobBuilder struct {
 	written map[*ir.Step]string
 	// tried holds the steps whose carry said continue_on_error; a try in the file must still say it.
 	tried map[*ir.Step]string
-	path  string
+	// gets holds the gets of the plan by artifact name; fresh holds the steps whose image or script a task file or
+	// an image get gave; axes holds the vars of the across that became the job matrix.
+	gets  map[string]getInfo
+	fresh map[*ir.Step]bool
+	axes  map[string]bool
+	used  map[string]bool
+	// outputs holds the task outputs that earlier file tasks of the job made as directories.
+	outputs map[string]string
+	// loadVars holds the names of the load_var steps that became script steps.
+	loadVars map[string]bool
+	// credNoted holds the image resources whose credentials the report named for this job.
+	credNoted map[string]bool
+	path      string
 	// caches holds the paths that every inline task of the plan caches; the job reads them as its cache.
 	caches []string
+	// inFile is true while the config of a task file is read.
+	inFile bool
+	// getsKept is true when a source get has a key that the target checkout ignores.
+	getsKept bool
 }
 
 func (b *pipeBuilder) job(m *omap) *builtJob {
 	name, _ := text(m.Vals["name"])
 	j := &ir.Job{ID: name}
-	jb := &jobBuilder{b: b, job: j, ids: map[string]int{}, taken: map[string]bool{}, written: map[*ir.Step]string{}, path: b.path() + "/job/" + name}
+	jb := &jobBuilder{b: b, job: j, ids: map[string]int{}, taken: map[string]bool{}, written: map[*ir.Step]string{}, fresh: map[*ir.Step]bool{}, outputs: map[string]string{}, credNoted: map[string]bool{}, path: b.path() + "/job/" + name}
 	jb.k = newSink(b.rep, b.file, jb.path)
 	b.present[jb.path] = true
 	r := newReader(m)
@@ -73,29 +89,45 @@ func (b *pipeBuilder) job(m *omap) *builtJob {
 	bj.hookDigest = digestOf(hookText)
 	plan, _ := r.Take(keyPlan)
 	steps, _ := plan.([]any)
+	jb.collectGets(plan)
+	jb.used = imageNames(plan)
 	jb.caches = commonCaches(steps)
 	steps = jb.allowFailure(steps)
 	steps = jb.unwrap(steps)
 	gets := jb.leadingGets(&steps)
-	steps, _ = jb.matrixMarker(steps)
+	steps, matrixed := jb.matrixMarker(steps)
+	if !matrixed {
+		steps = jb.acrossMatrix(steps)
+	}
 	if co := jb.checkoutMarker(gets); co != nil {
 		j.Steps = append(j.Steps, co)
 	}
 	for _, s := range steps {
 		j.Steps = append(j.Steps, jb.step(s)...)
 	}
+	jb.bridgeMarker()
 	jb.ifMarker()
 	if len(jb.caches) > 0 {
 		j.Cache = []ir.Cache{{Paths: jb.caches}}
 	}
 	jb.hooks(r)
+	jb.hoistImage()
 	b.collect(bj, plan, m)
 	jb.serial(r, bj)
 	jb.needs(bj, plan)
 	needCarry := jb.gateMarker(bj)
 	jb.k.Out[ExtGets] = gets
+	jb.sourceCheckout(gets, len(steps) > 0)
 	if len(gets) == 0 {
 		jb.k.Out[ExtGets] = []any{}
+	}
+	if v, ok := r.Take("public"); ok {
+		jb.k.Out["public"] = plain(v)
+		jb.k.Rep.Add(jb.entry(caps.ExtPassthrough, caps.External, strategyExt,
+			"public makes the builds visible to everyone. Visibility is a server setting of the target: the repository or project visibility on GitHub, GitLab, Gitea and Forgejo, the repository visibility on Drone and Woodpecker, and the dashboard access of Tekton and Argo", r.Line("public")))
+	}
+	if jb.getsKept {
+		jb.b.getsKept[jb.job] = true
 	}
 	jb.k.KeepRest(r)
 	j.Ext = jb.k.Ext()
@@ -242,11 +274,10 @@ func (jb *jobBuilder) describeGet(m *omap) any {
 		}
 	}
 	name, _ := text(m.Vals["get"])
-	detail := "get " + name + " is read as the job source and the pipeline trigger; it is kept in Ext"
 	if len(kept) > 0 {
-		detail = fmt.Sprintf("get %s: keys %s have no IR field; the get is kept in Ext", name, strings.Join(kept, ", "))
+		jb.getsKept = true
+		jb.k.Note(caps.ExtPassthrough, fmt.Sprintf("get %s: keys %s have no IR field; the target checkout ignores them and the get is kept in Ext", name, strings.Join(kept, ", ")), m.Lines["get"])
 	}
-	jb.k.Note(caps.ExtPassthrough, detail, m.Lines["get"])
 	return plain(m)
 }
 

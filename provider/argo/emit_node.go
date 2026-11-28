@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ymap"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 	"github.com/lukaszraczylo/pipemaster/report"
@@ -31,7 +32,7 @@ func sortedKeys[V any](m map[string]V) []string { return ymap.SortedKeys(m) }
 
 func extOf(e map[string]any) map[string]any {
 	m, _ := e[dialect].(map[string]any)
-	return m
+	return emitkit.WithoutCarried(m)
 }
 
 // commentSafe makes s fit on one comment line.

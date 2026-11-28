@@ -6,6 +6,12 @@ spec:
   dependencies:
     - eventName: push
       eventSourceName: pipemaster-github
+      filters:
+        data:
+          - path: body.ref
+            type: string
+            value:
+              - ^refs/heads/.*$
       name: gitlab-ci-push
     - eventName: push
       eventSourceName: pipemaster-github
@@ -28,6 +34,10 @@ spec:
               src:
                 dataKey: body.after
                 dependencyName: gitlab-ci-push
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dataKey: body.repository.full_name
+                dependencyName: gitlab-ci-push
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -38,6 +48,8 @@ spec:
                 arguments:
                   parameters:
                     - name: ctx-sha
+                      value: ""
+                    - name: ctx-repo
                       value: ""
                 serviceAccountName: pipemaster-workflow
                 workflowTemplateRef:
@@ -52,6 +64,10 @@ spec:
               src:
                 dataKey: body.after
                 dependencyName: gitlab-ci-tag
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dataKey: body.repository.full_name
+                dependencyName: gitlab-ci-tag
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -62,6 +78,8 @@ spec:
                 arguments:
                   parameters:
                     - name: ctx-sha
+                      value: ""
+                    - name: ctx-repo
                       value: ""
                 serviceAccountName: pipemaster-workflow
                 workflowTemplateRef:

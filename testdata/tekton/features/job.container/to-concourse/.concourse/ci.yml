@@ -3,11 +3,13 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
 # pipemaster:arg {"digest":"69144ed66cad46b0cbe000410c4b60eb6202f5e35ad5c8130cbaf03febe949a6","carry":"id: build-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"2f50d3eba2174a8836f1548f4d0c14463717196b22832323cf5686cc00d49d1b","carry":"container:\n    ref: golang:1.24\nid: build\n"}
+# pipemaster:arg {"digest":"2d776164b87e06f7c0d0f5b6aab2e9d9ee9ff942955bc88dd4b36e27fe29bcf2","carry":"container:\n    ref: golang:1.24\nid: build\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: container\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
-# pipemaster:emulated trigger.push pipeline/ci/job/build
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
   - name: source
@@ -24,11 +26,33 @@ jobs:
     plan:
       - get: source
         trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+              tag: "1.24"
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - go version
+            dir: workspace
+  - name: build-tag
+    plan:
       - get: source-tags
         trigger: true
       - task: build-step-1
         input_mapping:
-          workspace: source
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

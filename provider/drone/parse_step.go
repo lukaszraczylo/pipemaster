@@ -8,12 +8,17 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	dexpr "github.com/lukaszraczylo/pipemaster/expr/drone"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/container"
 )
 
 // ExtCommands records how the lines of a step script group into commands, because the IR keeps one script entry
 // per line and a command may span lines.
 const ExtCommands = "_commands"
+
+// ExtBashDefault marks a step whose command holds the bash-if-present wrapper, so the step has no IR shell.
+const ExtBashDefault = "bash_default"
 
 const (
 	failureIgnore = "ignore"
@@ -34,6 +39,9 @@ func (d *doc) steps(v any) error {
 		name, _ := text(m.vals["name"])
 		if name == "" {
 			return fmt.Errorf("step %d needs a name", i+1)
+		}
+		if img, _ := text(m.vals[keyImage]); name == changesStepName && img == emitkit.ChangesImage {
+			continue
 		}
 		st, err := d.step(m, name)
 		if err != nil {
@@ -81,8 +89,12 @@ func (d *doc) step(m *omap, id string) (*ir.Step, error) {
 	if isScript {
 		st.Kind = ir.StepScript
 		var err error
-		if st.Script, shapes, err = d.script(id, cmds); err != nil {
+		var bash bool
+		if st.Script, shapes, bash, err = d.script(id, cmds); err != nil {
 			return nil, err
+		}
+		if bash {
+			k.vals[ExtBashDefault] = true
 		}
 	} else {
 		st.Kind = ir.StepPlugin
@@ -124,14 +136,25 @@ func (d *doc) step(m *omap, id string) (*ir.Step, error) {
 
 // script reads commands as canonical script lines. shapes is non-nil when a command spans lines or ends in a
 // newline.
-func (d *doc) script(id string, v any) (lines []string, shapes []any, err error) {
+func (d *doc) script(id string, v any) (lines []string, shapes []any, bash bool, err error) {
 	l, ok := textList(v)
 	if !ok {
-		return nil, nil, fmt.Errorf("step %s: commands must be a string or a list of strings", id)
+		return nil, nil, false, fmt.Errorf("step %s: commands must be a string or a list of strings", id)
 	}
 	var all []any
 	spans := false
 	for _, c := range l {
+		if inner, wrapped := provider.BashUnwrapCommand(esc(provider.BashOrShScript), c); wrapped {
+			t, err := d.tx.template(inner)
+			if err != nil {
+				return nil, nil, false, err
+			}
+			cl := strings.Split(t, "\n")
+			lines = append(lines, cl...)
+			all = append(all, map[string]any{"lines": len(cl), "final": false})
+			bash = true
+			continue
+		}
 		if _, guard := dexpr.ParseGuard(unescape(c)); guard {
 			lines = append(lines, unescape(c))
 			all = append(all, map[string]any{"lines": 1, "final": false})
@@ -139,7 +162,7 @@ func (d *doc) script(id string, v any) (lines []string, shapes []any, err error)
 		}
 		t, err := d.tx.template(c)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, false, err
 		}
 		cl := strings.Split(strings.TrimSuffix(t, "\n"), "\n")
 		lines = append(lines, cl...)
@@ -149,7 +172,7 @@ func (d *doc) script(id string, v any) (lines []string, shapes []any, err error)
 	if spans {
 		shapes = all
 	}
-	return lines, shapes, nil
+	return lines, shapes, bash, nil
 }
 
 // stepMaps reads environment and settings.

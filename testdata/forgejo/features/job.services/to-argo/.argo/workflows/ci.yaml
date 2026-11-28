@@ -1,12 +1,12 @@
 # pipemaster:emulated job.services pipeline/ci/job/test/service/db
 # pipemaster:arg {"ports":["5432:5432"]}
+# pipemaster:emulated job.runner pipeline/ci/job/test
 # pipemaster:emulated job.services pipeline/ci/job/test
 # pipemaster:emulated step.shell pipeline/ci/job/test/step/test-step-1
 # pipemaster:emulated config.name pipeline/ci/ref/secrets.DB_PASSWORD
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
-# pipemaster:emulated trigger.push pipeline/ci/trigger/1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate

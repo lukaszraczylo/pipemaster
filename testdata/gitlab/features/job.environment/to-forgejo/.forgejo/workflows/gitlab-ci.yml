@@ -1,14 +1,22 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
 # pipemaster:emulated pipeline.concurrency pipeline/gitlab-ci
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/deploy
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/deploy
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/deploy/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/deploy
 # pipemaster:arg {"pre":1,"post":0}
 on:
+  workflow_dispatch:
   push:
 concurrency:
   group: ${{ github.run_id }}
   cancel-in-progress: false
 jobs:
   deploy:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -17,3 +25,4 @@ jobs:
       - uses: https://github.com/actions/checkout@v7
       - id: script
         run: make deploy
+        shell: bash

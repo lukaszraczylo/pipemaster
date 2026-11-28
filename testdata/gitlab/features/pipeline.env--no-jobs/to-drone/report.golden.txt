@@ -1,6 +1,10 @@
 Loss report: gitlab -> drone
-[lost] pipeline/gitlab-ci ext.passthrough (Ext of provider gitlab (hidden) is not written to the Drone file; it is kept in round-trip metadata)
+[lost] pipeline/gitlab-ci trigger.api (the source runs on the events api, trigger and its file has no trigger form for them; Drone has no event for them, and the file names no schedule to copy)
+[lost] pipeline/gitlab-ci trigger.pipeline_done (the source runs on the events pipeline, parent_pipeline and its file has no trigger form for them; Drone has no event for them, and the file names no schedule to copy)
+[lost] pipeline/gitlab-ci trigger.resource (the source runs on the events external, chat and its file has no trigger form for them; Drone has no event for them, and the file names no schedule to copy)
 [lost] pipeline/gitlab-ci/job/empty/step/script step.script (the job has no steps; a no-op step keeps the document valid)
+[external] pipeline/gitlab-ci/trigger/2 trigger.schedule: trigger event cron with the cron job name (Drone keeps the schedule in the repo settings: run drone cron add <repo> gitlab-ci-schedule-2 "")
 [emulated] pipeline/gitlab-ci pipeline.env: copied into the environment of every pipeline document (a step variable of the same name wins)
 [emulated] pipeline/gitlab-ci/job/empty job.container: default image ubuntu:latest (the job names no image, so steps without one run in ubuntu:latest)
-[emulated] pipeline/gitlab-ci/job/empty step.script: no-op step (Drone needs a step; no step of the job has a Drone form, so a no-op step stands in)
+[emulated] pipeline/gitlab-ci/job/empty step.script: no-op step (Drone needs a step; the job has no step to run, so a no-op step stands in)
+[emulated] pipeline/gitlab-ci/trigger/0 trigger.manual: trigger event custom (a person starts the build through the API or drone build create)

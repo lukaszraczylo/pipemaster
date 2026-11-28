@@ -1,15 +1,21 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/release/step/script/carry
 # pipemaster:arg {"digest":"59ccdba0fcb2f6b265c93cef407a61ab9bae469bfc3bb3a6c998d2ccb80884bd","carry":"id: script\nkind: script\n"}
 # pipemaster:emulated job.manual pipeline/gitlab-ci/job/release
 # pipemaster:arg {"manual":false,"held":true,"cond":true}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/job/release/carry
-# pipemaster:arg {"digest":"c0b6748c4f215c51de9399a9b80a3a77d3fae8e20cc81a14d5575bb8a616b9c2","carry":"if: tag\nid: release\n"}
+# pipemaster:arg {"digest":"b49eadeb5271f4773995285e10182daa3b14ebe46f418c6e7513be1fb442569f","carry":"if: tag\nid: release\n"}
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/job/release-tag
+# pipemaster:arg {"twin_of":"release"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci/carry
-# pipemaster:arg {"digest":"0fdb942e2c64579515df17799a0a9588abe5c5416cc9457b5b70edca19a9e80c","carry":"id: gitlab-ci\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"0f45901365abffb8331b0a5a80e5640d01bb309bb4866bab3637de98133a8342","carry":"id: gitlab-ci\ntriggers:\n    - kind: manual\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/gitlab-ci
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/release
 # pipemaster:emulated step.image pipeline/gitlab-ci/job/release/step/script
 # pipemaster:emulated step.shell pipeline/gitlab-ci/job/release/step/script
-# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/1
+# pipemaster:emulated trigger.tag pipeline/gitlab-ci/trigger/2
 resources:
   - name: source
     type: git
@@ -24,10 +30,35 @@ jobs:
   - name: release
     plan:
       - get: source
-      - get: source-tags
       - task: script
         input_mapping:
           workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -c
+              - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
+              - pipemaster
+              - make release
+            dir: workspace
+  - name: release-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: script
+        input_mapping:
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

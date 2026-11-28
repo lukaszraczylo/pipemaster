@@ -1,8 +1,4 @@
 # pipemaster:lost script.interpolation pipeline/ci/job/test/step/test-step-1: echo {{ matrix.os }} {{ matrix.go }} {{ needs.prod.outputs.ver }}
-# pipemaster:lost step.script pipeline/ci/job/test/step/test-step-1: the step has no command left
-# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1
-# pipemaster:arg {"step":"id: test-step-1\nkind: script\nscript:\n    - echo $$\u007b{ matrix.os }} $$\u007b{ matrix.go }} $$\u007b{ needs.prod.outputs.ver }}\n","at":0}
-# pipemaster:emulated step.script pipeline/ci/job/test
 # pipemaster:emulated job.container pipeline/ci/job/test
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"FailFast":null,"Axes":[{"Name":"os","Values":["linux","mac"]},{"Name":"go","Values":["1.24","1.25"]}],"Include":null,"Exclude":[[{"Key":"go","Value":"1.24"},{"Key":"os","Value":"mac"}]],"MaxParallel":0}
@@ -20,7 +16,6 @@ matrix:
 depends_on:
   - prod
 steps:
-  - name: noop
-    image: ubuntu:latest
+  - image: ubuntu:latest
     commands:
-      - "true"
+      - 'sh -c ''if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"'' pipemaster ''printf ''\''''%s\n''\'''' ''\''''pipemaster: lost: script.interpolation pipeline/ci/job/test/step/test-step-1: no Woodpecker spelling for expression needs.prod.outputs.ver; the line is replaced by a line that prints the loss and exits 1''\'''' >&2; exit 1'''

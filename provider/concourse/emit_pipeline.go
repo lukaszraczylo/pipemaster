@@ -7,6 +7,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 )
 
@@ -15,25 +16,28 @@ var topExt = []string{ExtResourceTypes, ExtVarSources, ExtGroups, ExtDisplay, Ex
 
 // pipeEmitter is the state of one pipeline file.
 type pipeEmitter struct {
-	e       *emitter
-	pl      *ir.Pipeline
-	doc     *outDoc
-	primary *source
-	extRes  map[string]map[string]any
-	// extOrder is the position of each resource name in the Concourse file the IR came from.
+	ext      map[string]any
+	pl       *ir.Pipeline
+	doc      *outDoc
+	primary  *source
+	extRes   map[string]map[string]any
 	extOrder map[string]int
 	byName   map[string]*source
 	jobName  map[string]string
-	ext      map[string]any
+	e        *emitter
+	mpath    string
 	path     string
 	file     string
-	// mpath is the path of the pipeline in a marker: it holds the file name, which the parser reads as the ID.
-	mpath   string
-	sources []*source
-	// sinks is the jobs that no other job needs.
-	sinks []*ir.Job
-	// serial is true when a job Ext keeps serial or serial_groups, so the pipeline group is not added to the others.
-	serial bool
+	sources  []*source
+	sinks    []*ir.Job
+	// finCopies lists the jobs of the pass whose hooks hold finally tasks.
+	finCopies []finallyHold
+	tagSplit  bool
+	// twinPass is true while the tag twins are written.
+	twinPass bool
+	serial   bool
+	// chain is true when the jobs form one linear path, so one run fails in at most one job.
+	chain bool
 }
 
 // pipeline writes one IR pipeline as one file.
@@ -62,6 +66,9 @@ func (e *emitter) pipeline(pl *ir.Pipeline, first bool) {
 	}
 	if !e.own {
 		e.foreignExt(pp, pl.Ext)
+	}
+	if e.injected[pl.ID] {
+		e.markArg(caps.TriggerPush, pe.mpath, provider.DefaultMarker(pl))
 	}
 	pe.loadExt(first)
 	pe.pipelineMeta()

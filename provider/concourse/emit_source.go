@@ -36,6 +36,8 @@ type source struct {
 	// trigger is true when the resource starts the jobs that have no needs.
 	trigger bool
 	used    bool
+	// tagOnly is true for a tag resource of a pipeline that also follows a push: only the tag twins of the jobs get it.
+	tagOnly bool
 }
 
 func (pe *pipeEmitter) add(s *source) *source {
@@ -82,6 +84,7 @@ func isGlob(s string) bool { return strings.ContainsAny(s, globChars) }
 // first git resource, or a generated one when no trigger gives a git resource, so every job gets one source and
 // a passed list can order jobs.
 func (pe *pipeEmitter) buildSources() {
+	pushes := slices.ContainsFunc(pe.pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerPush })
 	for i := range pe.pl.Triggers {
 		t := &pe.pl.Triggers[i]
 		tp := fmt.Sprintf("%s/trigger/%d", pe.path, i)
@@ -90,7 +93,15 @@ func (pe *pipeEmitter) buildSources() {
 		case ir.TriggerPush:
 			pe.push(t, tp)
 		case ir.TriggerTag:
+			before := len(pe.sources)
 			pe.tag(t, tp)
+			if pushes && !pe.e.own {
+				// A job waits for a version of every resource it gets, and a tag resource has none on a branch push,
+				// so the tag resource belongs to a twin of each job (tagTwins).
+				for _, s := range pe.sources[before:] {
+					s.tagOnly = true
+				}
+			}
 		case ir.TriggerSchedule:
 			pe.schedule(t, tp)
 		case ir.TriggerPR:
@@ -189,6 +200,10 @@ func srcOf(def map[string]any) map[string]any {
 // push writes one git resource for each exact branch. A glob has no resource, because a git resource follows one branch.
 func (pe *pipeEmitter) push(t *ir.Trigger, tp string) {
 	e := pe.e
+	if names := pe.ownNames(t); len(names) > 0 && pe.allBranchSets(names) {
+		pe.restore(t, tp)
+		return
+	}
 	var exact []string
 	for _, b := range t.Branches.Include {
 		if isGlob(b) || strings.Contains(b, varOpen) {
@@ -243,6 +258,17 @@ func (pe *pipeEmitter) push(t *ir.Trigger, tp string) {
 			fmt.Sprintf("the branches %s are %d git resources, and the job runs once per branch event", strings.Join(exact, ", "), len(exact)))
 		e.emulate(tp, caps.TriggerFilterBranch, "one git resource per branch", "the job runs once per branch event of the listed branches")
 	}
+}
+
+// allBranchSets is true when every named resource of the file is a git resource of version_type branches.
+func (pe *pipeEmitter) allBranchSets(names []string) bool {
+	for _, n := range names {
+		src, _ := pe.extDef(n)[keySource].(map[string]any)
+		if src == nil || src["version_type"] != versionBranches {
+			return false
+		}
+	}
+	return true
 }
 
 // sanitize makes text a resource name part.

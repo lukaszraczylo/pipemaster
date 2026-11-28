@@ -1,10 +1,17 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/prod
 # pipemaster:arg {"Ref":"alpine:3","Entrypoint":null}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/prod
+# pipemaster:arg {"gitlab_default":true}
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:arg "- name: SHARED\n  value:\n    lit: \"1\"\n"
 when:
   - event: push
   - event: tag
+  - event:
+      - manual
+      - cron
 depends_on:
   - build
   - common
@@ -12,6 +19,6 @@ steps:
   - name: script
     image: alpine:3
     commands:
-      - ./deploy.sh
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster './deploy.sh'
     environment:
       SHARED: "1"

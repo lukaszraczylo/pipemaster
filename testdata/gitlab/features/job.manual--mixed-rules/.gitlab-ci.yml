@@ -1,0 +1,6 @@
+release:
+  script: [make release]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual

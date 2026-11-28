@@ -1,0 +1,125 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+        - ci/child.yml
+pipelines:
+    - ext:
+        gitlab:
+            stages:
+                - build
+                - test
+                - deploy
+      id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - ext:
+            gitlab:
+                stage: build
+          id: compile
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make build
+        - if: branch == 'main'
+          child:
+            pipeline:
+                ext:
+                    gitlab:
+                        stages:
+                            - prepare
+                            - verify
+                        workflow:
+                            rules:
+                                - if: $CI_PIPELINE_SOURCE == "parent_pipeline"
+                id: gitlab-ci-integration
+                triggers:
+                    - kind: push
+                    - kind: tag
+                jobs:
+                    - if: event == 'parent_pipeline'
+                      ext:
+                        gitlab:
+                            _derived_needs: true
+                            stage: verify
+                      id: check-api
+                      needs:
+                        - job: seed
+                      steps:
+                        - ext:
+                            gitlab:
+                                section: script
+                          id: script
+                          kind: script
+                          script:
+                            - echo "checking api on $TARGET"
+                    - if: event == 'parent_pipeline'
+                      ext:
+                        gitlab:
+                            _derived_needs: true
+                            stage: verify
+                      id: check-ui
+                      needs:
+                        - job: seed
+                      steps:
+                        - ext:
+                            gitlab:
+                                section: script
+                          id: script
+                          kind: script
+                          script:
+                            - echo "checking ui on $TARGET"
+                    - if: event == 'parent_pipeline'
+                      ext:
+                        gitlab:
+                            stage: prepare
+                      id: seed
+                      steps:
+                        - ext:
+                            gitlab:
+                                section: script
+                          id: script
+                          kind: script
+                          script:
+                            - echo "seeding $TARGET"
+            native:
+                - gitlab
+            files:
+                - ci/child.yml
+          ext:
+            gitlab:
+                _no_script: true
+                stage: test
+                trigger:
+                    include: ci/child.yml
+                    strategy: depend
+          id: integration
+          needs:
+            - job: compile
+          env:
+            - name: TARGET
+              value:
+                lit: staging
+        - ext:
+            gitlab:
+                _derived_needs: true
+                stage: deploy
+          id: ship
+          needs:
+            - job: compile
+            - job: integration
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make ship

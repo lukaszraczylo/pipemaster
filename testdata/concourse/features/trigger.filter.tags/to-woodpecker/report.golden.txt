@@ -1,9 +1,5 @@
 Loss report: concourse -> woodpecker
 [lost] pipeline/ci display.name (the Woodpecker workflow name is its file name; the display name is kept in round-trip metadata)
-[lost] pipeline/ci ext.passthrough (Ext of provider concourse (resources) is not written to the Woodpecker file; it is kept in round-trip metadata)
-[lost] pipeline/ci/job/build ext.passthrough (Ext of provider concourse (gets) is not written to the Woodpecker file; it is kept in round-trip metadata)
 [lost] pipeline/ci/job/build/step/build-step-1 ext.passthrough (Ext of provider concourse (config, input_mapping, tags) is not written to the Woodpecker file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/0 ext.passthrough (Ext of provider concourse (resources) is not written to the Woodpecker file; it is kept in round-trip metadata)
-[lost] pipeline/ci/trigger/1 ext.passthrough (Ext of provider concourse (resources) is not written to the Woodpecker file; it is kept in round-trip metadata)
 [emulated] pipeline/ci/trigger/0 trigger.filter.tags: doublestar glob; ref filter refs/tags/<pattern> (pattern !v*-rc* has a different meaning in doublestar than in the source; it is written as is; the tag name filter is written as a ref filter on the tag event)
 [emulated] pipeline/ci/trigger/1 trigger.filter.tags: evaluate matches (pattern with + or ? has no doublestar form; it is written as a regular expression test on tag)

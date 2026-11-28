@@ -1,0 +1,17 @@
+{
+  "features": [
+    "ext.passthrough"
+  ],
+  "events": [
+    "push-main",
+    "push-branch"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": [
+    "child_forward_off.parent:",
+    "child_forward_off.passed:"
+  ],
+  "owners": {},
+  "requires": []
+}

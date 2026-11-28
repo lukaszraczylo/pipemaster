@@ -1,6 +1,7 @@
 package concourse_test
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -65,6 +66,35 @@ func TestStepImageKeepsRepositoryAndTag(t *testing.T) {
 	src := dict(dict(dict(task["config"])["image_resource"])["source"])
 	if src["repository"] != "golang" || src["tag"] != "1.22" {
 		t.Fatalf("source = %v", src)
+	}
+}
+
+func TestStepImageDigestIsTheResourceVersion(t *testing.T) {
+	const digest = "sha256:29cff258cbdd4b4c8b3b5e4f0bb6d0b3f1e7f5ad0b1c7c6b8a2d3e4f5a6b7c8d"
+	for _, tc := range []struct {
+		name, ref, tag string
+	}{
+		{"tag and digest", "alpine/git:v2.54.1@" + digest, "v2.54.1"},
+		{"digest only", "alpine/git@" + digest, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			j := scriptJob("build", "make")
+			j.Steps[0].Image = &ir.Image{Ref: tc.ref}
+			files, _ := emit(t, project(j))
+			task := dict(list(jobDoc(t, pipelineDoc(t, files), "build")["plan"])[1])
+			img := dict(dict(task["config"])["image_resource"])
+			src := dict(img["source"])
+			if _, has := src["digest"]; has {
+				t.Fatalf("the registry-image source has no digest key: %v", img)
+			}
+			if dict(img["version"])["digest"] != digest || src["repository"] != "alpine/git" || (tc.tag != "" && src["tag"] != tc.tag) {
+				t.Fatalf("image_resource = %v", img)
+			}
+			back, _ := reparse(t, files)
+			if got := back.Pipelines[0].Jobs[0].Steps[0].Image; got == nil || got.Ref != tc.ref {
+				t.Fatalf("parsed back image = %+v, want %s", got, tc.ref)
+			}
+		})
 	}
 }
 
@@ -374,7 +404,7 @@ func TestFinallyWithNoSingleSinkIsLost(t *testing.T) {
 	p := project(scriptJob("a", "true"), scriptJob("b", "true"))
 	p.Pipelines[0].Finally = []*ir.Job{scriptJob("cleanup", "rm -rf x")}
 	files, rep := emit(t, p)
-	if strings.Contains(files[".concourse/ci.yml"], "ensure") || !hasFeatureEntry(rep, string(caps.PipelineFinally), "single sink") {
+	if strings.Contains(files[".concourse/ci.yml"], "ensure") || !hasFeatureEntry(rep, string(caps.PipelineFinally), "one chain") {
 		t.Fatalf("finally must be lost: %v\n%s", rep.Entries, files[".concourse/ci.yml"])
 	}
 }
@@ -398,7 +428,7 @@ func TestStepGuardEditIsKept(t *testing.T) {
 	j := scriptJob("build", "make")
 	j.Steps[0].If = eqRef("branch", "main")
 	files, _ := emit(t, project(j))
-	edited := strings.Replace(files[".concourse/ci.yml"], "then exit 0; fi # pipemaster:guard", "then exit 3; fi # pipemaster:guard", 1)
+	edited := strings.Replace(files[".concourse/ci.yml"], "exit 0; fi # pipemaster:guard", "exit 3; fi # pipemaster:guard", 1)
 	if edited == files[".concourse/ci.yml"] {
 		t.Fatalf("guard text changed shape:\n%s", files[".concourse/ci.yml"])
 	}
@@ -617,7 +647,7 @@ func TestScriptTheArgsCannotSayComesBackExact(t *testing.T) {
 		if got := back.Pipelines[0].Jobs[0].Steps[0].Script; !slices.Equal(got, script) {
 			t.Fatalf("script %q came back as %q", script, got)
 		}
-		if !hasFeatureEntry(rep, string(caps.StepScript), "carry marker holds the script") {
+		if !hasFeatureEntry(rep, string(caps.StepScript), "carry marker also holds the exact text") {
 			t.Fatalf("no entry for script %q: %v", script, rep.Entries)
 		}
 	}
@@ -787,14 +817,108 @@ func TestTwoTriggeringResourcesUseTheFirstAndSayIt(t *testing.T) {
 	}
 }
 
-func TestBranchAndTagTriggersSayWhichResourceTheWorkspaceFollows(t *testing.T) {
-	p := project(scriptJob("publish", "make publish"))
+// gets lists the source gets of a job as "resource", with "+" when the get triggers and "(passed)" when it has a passed list.
+func gets(t *testing.T, files map[string]string, job string) []string {
+	t.Helper()
+	var out []string
+	for _, s := range list(jobDoc(t, pipelineDoc(t, files), job)["plan"]) {
+		m := dict(s)
+		name, _ := m["get"].(string)
+		if name == "" {
+			continue
+		}
+		if m["trigger"] == true {
+			name += "+"
+		}
+		if m["passed"] != nil {
+			name += "(passed)"
+		}
+		out = append(out, name)
+	}
+	return out
+}
+
+// A job waits for a version of every get, and a tag resource has none on a branch push, so a source that triggers on
+// push and on tag gets a tag twin of each job: the job follows the push resource, the twin follows the tag resource.
+func TestPushAndTagSourceKeepsTagRunsInATwinJob(t *testing.T) {
+	p := project(scriptJob("build", "make"), scriptJob("publish", "make publish"))
+	p.Pipelines[0].Jobs[1].Needs = []ir.Need{{JobID: "build"}}
 	p.Pipelines[0].Triggers = []ir.Trigger{pushOn("main"), {Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{"v*"}}}}
 	files, rep := emit(t, p)
-	if got := workspaceSource(t, files, "publish"); got != "source" {
-		t.Fatalf("the workspace comes from %q", got)
+	want := map[string][]string{
+		"build":       {"source+"},
+		"build-tag":   {"source-tags+"},
+		"publish":     {"source+(passed)"},
+		"publish-tag": {"source-tags+(passed)"},
 	}
-	if !hasFeatureEntry(rep, "trigger.push", "a push to source-tags") {
-		t.Fatalf("no entry says that a tag push builds the first resource: %v", rep.Entries)
+	for job, w := range want {
+		if got := gets(t, files, job); !slices.Equal(got, w) {
+			t.Errorf("job %s gets %v, want %v", job, got, w)
+		}
+	}
+	passed := func(job string) any {
+		for _, s := range list(jobDoc(t, pipelineDoc(t, files), job)["plan"]) {
+			if m := dict(s); m["passed"] != nil {
+				return m["passed"]
+			}
+		}
+		return nil
+	}
+	if got := fmt.Sprint(passed("publish-tag")); got != "[build-tag]" {
+		t.Errorf("publish-tag passed = %s, want [build-tag]", got)
+	}
+	if got := fmt.Sprint(passed("publish")); got != "[build]" {
+		t.Errorf("publish passed = %s, want [build]", got)
+	}
+	if !hasFeatureEntry(rep, "trigger.tag", "a twin named") {
+		t.Errorf("no entry names the tag twin: %v", rep.Entries)
+	}
+	for _, e := range rep.Entries {
+		if e.Level == caps.Lost && e.Feature == caps.TriggerTag {
+			t.Errorf("the tag trigger is reported lost: %v", e)
+		}
+	}
+}
+
+// A source that triggers on a tag only has no twin.
+func TestTagOnlySourceHasNoTwin(t *testing.T) {
+	p := project(scriptJob("publish", "make publish"))
+	p.Pipelines[0].Triggers = []ir.Trigger{{Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{"v*"}}}}
+	files, _ := emit(t, p)
+	if got := gets(t, files, "publish"); !slices.Equal(got, []string{"source-tags+"}) {
+		t.Errorf("publish gets %v", got)
+	}
+	if strings.Contains(files[".concourse/ci.yml"], "publish-tag") {
+		t.Errorf("a tag-only source has a twin:\n%s", files[".concourse/ci.yml"])
+	}
+}
+
+// A job of a split source runs on one event, so a step that needs a tag runs in the twin and never in the push job.
+func TestTagOnlyStepRunsOnlyInTheTwin(t *testing.T) {
+	p := project(scriptJob("publish", "make publish"))
+	p.Pipelines[0].Jobs[0].Steps[0].If = expr.Ref{Path: []string{expr.CtxTag}}
+	p.Pipelines[0].Triggers = []ir.Trigger{pushOn("main"), {Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{"v*"}}}}
+	files, _ := emit(t, p)
+	doc := pipelineDoc(t, files)
+	script := func(job string) string { return fmt.Sprint(jobDoc(t, doc, job)["plan"]) }
+	if !strings.Contains(script("publish"), "exit 0") {
+		t.Errorf("the push job runs the tag step: %s", script("publish"))
+	}
+	if strings.Contains(script("publish-tag"), "exit 0") || !strings.Contains(script("publish-tag"), "make publish") {
+		t.Errorf("the twin does not run the tag step: %s", script("publish-tag"))
+	}
+}
+
+// A pipeline with no job has only the placeholder, which has no twin: the lost tag run is reported.
+func TestPushAndTagSourceWithNoJobReportsTheLostTagRun(t *testing.T) {
+	p := project()
+	p.Pipelines[0].Triggers = []ir.Trigger{pushOn("main"), {Kind: ir.TriggerTag, Tags: ir.Filter{Include: []string{"v*"}}}}
+	_, rep := emit(t, p)
+	found := false
+	for _, e := range rep.Entries {
+		found = found || e.Level == caps.Lost && e.Feature == caps.TriggerTag
+	}
+	if !found {
+		t.Errorf("no lost trigger.tag entry: %v", rep.Entries)
 	}
 }

@@ -1,15 +1,21 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
 # pipemaster:emulated job.if pipeline/gitlab-ci/job/build
-# pipemaster:arg {"src":"(branch == 'main') || ((event == 'schedule') \u0026\u0026 !(branch == 'main'))"}
+# pipemaster:arg {"src":"(branch == 'main') || ((event == 'schedule') \u0026\u0026 !(branch == 'main'))","guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"pre":1,"post":0}
 on:
+  workflow_dispatch:
   push:
 jobs:
   build:
-    if: github.ref_type == 'branch' && github.ref_name == 'main' || github.event_name == 'schedule' && !(github.ref_type == 'branch' && github.ref_name == 'main')
+    if: (github.ref_type == 'branch' && github.ref_name == 'main' || github.event_name == 'schedule' && !(github.ref_type == 'branch' && github.ref_name == 'main')) && !github.event.deleted
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - id: script
         run: make
+        shell: bash

@@ -2,7 +2,11 @@
 // per non-native feature decision.
 package report
 
-import "github.com/lukaszraczylo/pipemaster/caps"
+import (
+	"slices"
+
+	"github.com/lukaszraczylo/pipemaster/caps"
+)
 
 // Entry records the verdict for one feature use at one IR location.
 type Entry struct {
@@ -22,6 +26,9 @@ type Report struct {
 	// Retained holds source fields the round-trip metadata keeps although the target file holds an equivalent,
 	// so they are no loss to report. They stay out of the printed and JSON report.
 	Retained []Entry `json:"-"`
+	// Withdrawn names entries of an earlier stage that this stage makes untrue. Merge drops each entry of the
+	// receiver with the same IR path, feature and strategy.
+	Withdrawn []Entry `json:"-"`
 }
 
 // Add appends e.
@@ -31,6 +38,13 @@ func (r *Report) Add(e Entry) { r.Entries = append(r.Entries, e) }
 func (r *Report) Merge(o *Report) {
 	if o == nil {
 		return
+	}
+	if len(o.Withdrawn) > 0 {
+		r.Entries = slices.DeleteFunc(r.Entries, func(e Entry) bool {
+			return slices.ContainsFunc(o.Withdrawn, func(w Entry) bool {
+				return w.IRPath == e.IRPath && w.Feature == e.Feature && w.Strategy == e.Strategy
+			})
+		})
 	}
 	r.Entries = append(r.Entries, o.Entries...)
 	r.Retained = append(r.Retained, o.Retained...)

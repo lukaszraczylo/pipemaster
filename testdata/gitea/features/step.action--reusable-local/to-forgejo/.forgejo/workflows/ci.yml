@@ -1,0 +1,36 @@
+# pipemaster:emulated pipeline.concurrency pipeline/ci
+name: ci
+on:
+  push:
+    branches:
+      - main
+concurrency:
+  group: ${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: make build
+  notify:
+    needs:
+      - release-apply
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo released
+  release-apply:
+    needs:
+      - release-plan
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+    steps:
+      - run: deploy --env "staging"
+  release-plan:
+    needs:
+      - build
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "planning for staging"

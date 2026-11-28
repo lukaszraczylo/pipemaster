@@ -5,9 +5,9 @@ metadata:
   name: drone-run
 spec:
   params:
-    - name: ctx-branch
-      default: ""
     - name: ctx-sha
+      default: ""
+    - name: ctx-repo
       default: ""
   resourcetemplates:
     - apiVersion: tekton.dev/v1
@@ -18,7 +18,7 @@ spec:
         pipelineRef:
           name: drone
         params:
-          - name: ctx-branch
-            value: $(tt.params.ctx-branch)
           - name: ctx-sha
             value: $(tt.params.ctx-sha)
+          - name: ctx-repo
+            value: $(tt.params.ctx-repo)

@@ -1,4 +1,7 @@
+# pipemaster:emulated step.action pipeline/.shared/job/run/step/source-checkout
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v7\nid: source-checkout\nkind: action\n","wrote":"git-artifact","kind":"implicit","art":"{\"git\":{\"repo\":\"https://github.com/{{workflow.parameters.ctx-repo}}.git\",\"revision\":\"{{workflow.parameters.ctx-sha}}\"},\"name\":\"source\",\"path\":\"/workspace\"}"}
 # pipemaster:emulated ext.passthrough pipeline/.shared
+# pipemaster:emulated job.runner pipeline/.shared/job/run
 # pipemaster:emulated step.shell pipeline/.shared/job/run/step/run-step-1
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
@@ -9,6 +12,12 @@ metadata:
     workflows.argoproj.io/title: shared
 spec:
   entrypoint: main
+  arguments:
+    parameters:
+      - name: ctx-sha
+        value: ""
+      - name: ctx-repo
+        value: ""
   templates:
     - name: main
       dag:
@@ -18,7 +27,8 @@ spec:
     - name: run
       containerSet:
         containers:
-          - name: run-step-1
+          - # pipemaster:id run-step-1
+            name: main
             image: alpine:3.22
             command:
               - sh
@@ -31,6 +41,15 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
+      inputs:
+        artifacts:
+          - name: source
+            path: /workspace
+            git:
+              repo: https://github.com/{{workflow.parameters.ctx-repo}}.git
+              revision: '{{workflow.parameters.ctx-sha}}'
       volumes:
         - emptyDir: {}
           name: workspace
+      nodeSelector:
+        runner.pipemaster.io/ubuntu-latest: "true"

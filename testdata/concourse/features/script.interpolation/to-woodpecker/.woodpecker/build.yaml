@@ -1,3 +1,4 @@
+# pipemaster:lost script.interpolation pipeline/ci/job/build/step/build-run: echo on {{ branch }}
 when:
   - event: push
     branch: main
@@ -5,4 +6,4 @@ steps:
   - name: build-run
     image: ubuntu:latest
     commands:
-      - echo on ${CI_COMMIT_BRANCH}
+      - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-run: no Woodpecker spelling for expression branch; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'

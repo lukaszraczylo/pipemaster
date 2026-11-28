@@ -1,0 +1,72 @@
+# Entrypoints of well-known Drone and Woodpecker plugin images. Embedded in the binary.
+# A plugin image runs its ENTRYPOINT (or CMD) with PLUGIN_ variables. Targets with no "run the image entrypoint"
+# form (GitLab, Concourse) need the command. Each entry cites the Dockerfile line it comes from.
+#
+# plugins:
+#   - image: owner/name     Docker Hub name without registry, tag or digest; matching ignores case
+#     entrypoint: [argv]    the ENTRYPOINT (CMD where the Dockerfile has no ENTRYPOINT) of the image
+#     privileged: true      the image starts a Docker daemon and needs a privileged container
+#     shell: false          the image is FROM scratch: it holds no shell, so a target that runs a script in it cannot start
+#     source: URL           the Dockerfile that holds the line
+plugins:
+  - image: plugins/docker
+    entrypoint: [/usr/local/bin/dockerd-entrypoint.sh, /bin/drone-docker]
+    privileged: true
+    source: https://github.com/drone-plugins/drone-docker/blob/master/docker/docker/Dockerfile.linux.amd64
+  - image: plugins/gcr
+    entrypoint: [/usr/local/bin/dockerd-entrypoint.sh, /bin/drone-gcr]
+    privileged: true
+    source: https://github.com/drone-plugins/drone-docker/blob/master/docker/gcr/Dockerfile.linux.amd64
+  - image: plugins/ecr
+    entrypoint: [/usr/local/bin/dockerd-entrypoint.sh, /bin/drone-ecr]
+    privileged: true
+    source: https://github.com/drone-plugins/drone-docker/blob/master/docker/ecr/Dockerfile.linux.amd64
+  - image: plugins/s3
+    entrypoint: [/bin/drone-s3]
+    shell: false
+    source: https://github.com/drone-plugins/drone-s3/blob/master/docker/Dockerfile.linux.amd64
+  - image: plugins/slack
+    entrypoint: [/bin/drone-slack]
+    source: https://github.com/drone-plugins/drone-slack/blob/master/docker/Dockerfile.linux.amd64
+  - image: plugins/webhook
+    entrypoint: [/bin/drone-webhook]
+    source: https://github.com/drone-plugins/drone-webhook/blob/master/docker/Dockerfile.linux.amd64
+  - image: plugins/git
+    entrypoint: [/bin/drone-git]
+    source: https://github.com/drone-plugins/drone-git/blob/master/docker/Dockerfile.linux.amd64
+  - image: plugins/manifest
+    entrypoint: [/bin/drone-manifest]
+    source: https://github.com/drone-plugins/drone-manifest/blob/master/docker/Dockerfile.linux.amd64
+  - image: plugins/github-release
+    entrypoint: [/bin/drone-github-release]
+    source: https://github.com/drone-plugins/drone-github-release/blob/master/docker/Dockerfile.linux.amd64
+  - image: plugins/gitea-release
+    entrypoint: [/bin/drone-gitea-release]
+    source: https://github.com/drone-plugins/drone-gitea-release/blob/master/docker/Dockerfile.linux.amd64
+  - image: plugins/downstream
+    entrypoint: [/bin/drone-downstream]
+    source: https://github.com/drone-plugins/drone-downstream/blob/master/docker/Dockerfile.linux.amd64
+  - image: appleboy/drone-ssh
+    entrypoint: [/bin/drone-ssh]
+    source: https://github.com/appleboy/drone-ssh/blob/master/docker/Dockerfile
+  - image: appleboy/drone-scp
+    entrypoint: [/bin/drone-scp]
+    source: https://github.com/appleboy/drone-scp/blob/master/docker/Dockerfile
+  - image: woodpeckerci/plugin-docker-buildx
+    entrypoint: [/usr/local/bin/dockerd-entrypoint.sh, plugin-docker-buildx]
+    privileged: true
+    source: https://github.com/woodpecker-ci/plugin-docker-buildx/blob/main/Dockerfile
+  - image: woodpeckerci/plugin-git
+    entrypoint: [/bin/plugin-git]
+    source: https://github.com/woodpecker-ci/plugin-git/blob/main/docker/Dockerfile.multiarch
+  - image: woodpeckerci/plugin-s3
+    entrypoint: [/bin/plugin-s3]
+    shell: false
+    source: https://github.com/woodpecker-ci/plugin-s3/blob/main/Dockerfile.multiarch
+  - image: woodpeckerci/plugin-github-release
+    entrypoint: [/bin/plugin-github-release]
+    shell: false
+    source: https://github.com/woodpecker-ci/plugin-github-release/blob/main/Dockerfile.multiarch
+  - image: woodpeckerci/plugin-ready-release-go
+    entrypoint: [/app/node_modules/.bin/tsx, /app/src/run.ts]
+    source: https://github.com/woodpecker-ci/plugin-ready-release-go/blob/main/Dockerfile

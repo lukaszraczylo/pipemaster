@@ -1,0 +1,65 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:arg {"guard":true}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/release-created
+# pipemaster:arg {"guard":true}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/release-created
+# pipemaster:emulated step.if pipeline/gitlab-ci/job/release-created/step/fail
+# pipemaster:arg {"src":"!(branch == 'main')"}
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/release-created/step/fail
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/release-created/step/pass
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/release-created
+# pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/release-publish
+# pipemaster:arg {"src":"branch == 'main'","guard":true}
+# pipemaster:emulated job.runner pipeline/gitlab-ci/job/release-publish
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/release-publish/step/script
+# pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/release-publish
+# pipemaster:arg {"pre":1,"post":0}
+on:
+  workflow_dispatch:
+  push:
+  repository_dispatch:
+    types:
+      - api
+      - trigger
+jobs:
+  build:
+    if: '!github.event.deleted'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: script
+        run: make build
+        shell: bash
+  release-created:
+    needs:
+      - build
+    if: '!github.event.deleted'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: fail
+        if: '!(github.ref_type == ''branch'' && github.ref_name == ''main'')'
+        run: exit 1
+        shell: bash
+      - id: pass
+        run: "true"
+        shell: bash
+  release-publish:
+    needs:
+      - build
+      - release-created
+    if: github.ref_type == 'branch' && github.ref_name == 'main' && !github.event.deleted
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: script
+        run: make publish
+        shell: bash

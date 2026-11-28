@@ -143,6 +143,19 @@ func (jb *jobBuilder) ifMarker() {
 		jb.b.ignored(jb.path, caps.JobIf, "the condition of the marker cannot be read")
 		return
 	}
+	strip := cond
+	if a.Folded {
+		if a.Guard == "" {
+			jb.job.If = cond
+			return
+		}
+		g, gerr := expr.ParseCanonical(a.Guard)
+		if gerr != nil {
+			jb.b.ignored(jb.path, caps.JobIf, "the guard of the marker cannot be read")
+			return
+		}
+		strip = g
+	}
 	var scripts []*ir.Step
 	for _, st := range jb.job.Steps {
 		if st.Kind == ir.StepScript {
@@ -151,8 +164,9 @@ func (jb *jobBuilder) ifMarker() {
 	}
 	rest := make([]expr.Expr, len(scripts))
 	for i, st := range scripts {
-		x, ok := stripLead(st.If, cond)
+		x, ok := stripLead(st.If, strip)
 		if !ok {
+
 			jb.b.ignored(jb.path, caps.JobIf, "a script task no longer starts with the guard of the job condition; the guards stay in the tasks")
 			return
 		}
@@ -316,6 +330,7 @@ func (jb *jobBuilder) guardLines(st *ir.Step) {
 	body := script[i:]
 	if len(pre) == 0 && cond == nil {
 		jb.disabled(st)
+		jb.folded(st, nil)
 		return
 	}
 	body = refsBack(pre, body)
@@ -323,6 +338,26 @@ func (jb *jobBuilder) guardLines(st *ir.Step) {
 	if cond != nil {
 		st.If = cond
 	}
+	jb.folded(st, cond)
+}
+
+// folded puts back the condition that the emitter folded by the event of the job, when the guard of the task is
+// still the folded one.
+func (jb *jobBuilder) folded(st *ir.Step, guard expr.Expr) {
+	var a foldArg
+	if !jb.b.arg(jb.path+"/step/"+st.ID, caps.StepIf, &a) || !a.Fold {
+		return
+	}
+	cond, err := expr.ParseCanonical(a.If)
+	if err != nil {
+		jb.b.ignored(jb.path+"/step/"+st.ID, caps.StepIf, "the condition of the marker cannot be read")
+		return
+	}
+	if (guard == nil && a.Guard == "") || (guard != nil && expr.String(guard) == a.Guard) {
+		st.If = cond
+		return
+	}
+	jb.b.ignored(jb.path+"/step/"+st.ID, caps.StepIf, "the guard of the task was edited after pipemaster wrote it; the guard stays")
 }
 
 // preludeVar is the variable that a prelude line fills, or "" when the line is no prelude line.
@@ -368,7 +403,7 @@ func isDotsWorkspace(s string) bool {
 
 // disabled reads a task whose first line is exit 0 with the guard marker: the original lines follow it.
 func (jb *jobBuilder) disabled(st *ir.Step) {
-	if len(st.Script) == 0 || st.Script[0] != disabledScript {
+	if len(st.Script) == 0 || st.Script[0] != disabledScript && st.Script[0] != legacyDisabledScript {
 		return
 	}
 	path := jb.path + "/step/" + st.ID
@@ -502,7 +537,7 @@ func (jb *jobBuilder) carryStep(m *omap, written string, st *ir.Step) {
 		script = c.Script
 	}
 	c.Script, c.Ext = script, st.Ext
-	if _, bare := statusOf(c.If); bare {
+	if _, bare := statusOf(c.If); bare || c.If == nil || guardLeads(st.If, c.If) {
 		c.If = st.If
 	}
 	if c.ContinueOnError {
@@ -518,6 +553,13 @@ func (jb *jobBuilder) carryStep(m *omap, written string, st *ir.Step) {
 		st.ID = id
 		jb.b.ignored(jb.path+"/step/"+written, caps.ExtPassthrough, "the carry ID "+c.ID+" is already used by another step of the job")
 	}
+}
+
+// guardLeads is true when the condition read from the guard of a task is the step condition of its carry with
+// another condition before it, the guard of the job.
+func guardLeads(guard, step expr.Expr) bool {
+	b, ok := guard.(expr.Binary)
+	return ok && b.Op == expr.OpAnd && expr.String(b.R) == expr.String(step)
 }
 
 // untried reports the steps whose carry held continue_on_error and that no try wraps any more.
@@ -548,7 +590,7 @@ func (jb *jobBuilder) carryJob(m *omap) bool {
 }
 
 // carryPipeline puts back the pipeline fields that the resources and gets cannot say.
-func (b *pipeBuilder) carryPipeline(top *omap, list []any, pl *ir.Pipeline) {
+func (b *pipeBuilder) carryPipeline(top *omap, list []any, pl *ir.Pipeline) bool {
 	var res any
 	if v := top.Vals["resources"]; v != nil {
 		res = plainValue(v)
@@ -568,10 +610,11 @@ func (b *pipeBuilder) carryPipeline(top *omap, list []any, pl *ir.Pipeline) {
 	}
 	var c ir.Pipeline
 	if !b.carryOf(b.path(), digestOf([]any{res, gets}), &c) {
-		return
+		return false
 	}
 	c.ID, c.Jobs, c.Ext = pl.ID, pl.Jobs, pl.Ext
 	*pl = c
+	return true
 }
 
 // refsBack drops the context prelude lines and writes each ${PM_CTX_*} use in the body as the reference it stands for.
@@ -748,28 +791,83 @@ func (b *pipeBuilder) finallyHooks(pl *ir.Pipeline, built []*builtJob) {
 	if !b.arg(b.path(), caps.PipelineFinally, &a) {
 		return
 	}
-	var sink *builtJob
+	byName := map[string]*builtJob{}
 	for _, bj := range built {
-		if bj.name == a.Job {
-			sink = bj
+		byName[bj.name] = bj
+	}
+	holds := append([]finallyCopy{{Job: a.Job, Digest: a.Digest, Tasks: a.Tasks}}, a.Copies...)
+	taskSets := make([]map[string]bool, len(holds))
+	for i, h := range holds {
+		bj := byName[h.Job]
+		taskSets[i] = map[string]bool{}
+		for _, t := range h.Tasks {
+			taskSets[i][t] = true
 		}
-	}
-	taskSet := map[string]bool{}
-	for _, t := range a.Tasks {
-		taskSet[t] = true
-	}
-	found := 0
-	if sink != nil {
-		for _, st := range sink.job.Steps {
-			if taskSet[sink.written[st]] {
-				found++
+		found := 0
+		if bj != nil {
+			for _, st := range bj.job.Steps {
+				if taskSets[i][bj.written[st]] {
+					found++
+				}
 			}
 		}
+		if bj == nil || bj.hookDigest != h.Digest || found != len(h.Tasks) {
+			pl.Finally = nil
+			b.ignored(b.path(), caps.PipelineFinally, "the hooks of the job "+h.Job+" were edited after pipemaster wrote them; the finally jobs are not restored and the hook steps stay")
+			return
+		}
 	}
-	if sink == nil || sink.hookDigest != a.Digest || found != len(a.Tasks) {
-		pl.Finally = nil
-		b.ignored(b.path(), caps.PipelineFinally, "the hooks of the job "+a.Job+" were edited after pipemaster wrote them; the finally jobs are not restored and the hook steps stay")
+	for i, h := range holds {
+		bj := byName[h.Job]
+		bj.job.Steps = slices.DeleteFunc(bj.job.Steps, func(st *ir.Step) bool { return taskSets[i][bj.written[st]] })
+	}
+}
+
+// mergeTagTwins folds each tag twin into the job it follows: the twin leaves the pipeline and its triggering
+// resources become triggers of that job, so the pair reads as one job with a push and a tag trigger.
+func (b *pipeBuilder) mergeTagTwins(pl *ir.Pipeline, built []*builtJob) []*builtJob {
+	byName := map[string]*builtJob{}
+	for _, bj := range built {
+		byName[bj.name] = bj
+	}
+	twins := map[*builtJob]bool{}
+	for _, bj := range built {
+		var a tagTwinArg
+		if !b.arg(b.path()+"/job/"+bj.name, caps.TriggerTag, &a) || a.Of == "" {
+			continue
+		}
+		orig := byName[a.Of]
+		if orig == nil || orig == bj {
+			b.ignored(b.path()+"/job/"+bj.name, caps.TriggerTag, "the job "+a.Of+" that this job follows a tag for is no longer in the file")
+			continue
+		}
+		for _, r := range bj.roots {
+			if !slices.Contains(orig.roots, r) {
+				orig.roots = append(orig.roots, r)
+			}
+		}
+		twins[bj] = true
+	}
+	if len(twins) == 0 {
+		return built
+	}
+	pl.Jobs = slices.DeleteFunc(pl.Jobs, func(j *ir.Job) bool {
+		return slices.ContainsFunc(built, func(bj *builtJob) bool { return bj.job == j && twins[bj] })
+	})
+	return slices.DeleteFunc(slices.Clone(built), func(bj *builtJob) bool { return twins[bj] })
+}
+
+// bridgeMarker drops the failing task that pipemaster wrote for a job with no steps, when the task is still there.
+func (jb *jobBuilder) bridgeMarker() {
+	var a bridgeArg
+	if !jb.b.arg(jb.path, caps.StepScript, &a) {
 		return
 	}
-	sink.job.Steps = slices.DeleteFunc(sink.job.Steps, func(st *ir.Step) bool { return taskSet[sink.written[st]] })
+	steps := jb.job.Steps
+	last := len(steps) - 1
+	if last < 0 || steps[last].ID != a.Task || !emitkit.IsFailLoud(steps[last].Script) {
+		jb.b.ignored(jb.path, caps.StepScript, "the failing task of the job was edited after pipemaster wrote it")
+		return
+	}
+	jb.job.Steps = steps[:last]
 }

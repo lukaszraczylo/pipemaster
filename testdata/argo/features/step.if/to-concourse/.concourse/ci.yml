@@ -3,15 +3,17 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-1/carry
 # pipemaster:arg {"digest":"940fc408ab5e6d091897522ab470e5b677876c184d2af8d90f0f8c27291d9b5f","carry":"if: always()\nid: build-step-1\nkind: script\n"}
 # pipemaster:emulated step.if pipeline/ci/job/build/step/build-step-2
-# pipemaster:arg {"if":"event == 'push'","script":"echo push"}
+# pipemaster:arg {"if":"event == 'push'","fold":true}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/step/build-step-2/carry
-# pipemaster:arg {"digest":"b8fa1c0967ecc4e19f31161f8b0bd79bce5fe49a766a0ba655a238d10c04618d","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
+# pipemaster:arg {"digest":"9a679dce7762e62fdd1d5aa728686de17ae932e642fb585a74329e2e27c74052","carry":"if: event == 'push'\nid: build-step-2\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/build/carry
-# pipemaster:arg {"digest":"c237094fae9ec6a40688b9dd1426e715364c81841bebff9048784a8500b7d004","carry":"id: build\n"}
+# pipemaster:arg {"digest":"9286425243146bdbe59dabd3d1ddfb54d982d147524b87343fd36ced262a7a23","carry":"id: build\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/build-tag
+# pipemaster:arg {"twin_of":"build"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
 # pipemaster:arg {"digest":"05a65f5f9bcecbb684b8888d1ab6b1e9eab4a29fc8d5f30dc1c8245c0ae4e97e","carry":"id: ci\nname: stepif\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
-# pipemaster:emulated trigger.push pipeline/ci/job/build
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-2
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
@@ -29,8 +31,6 @@ jobs:
   - name: build
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: build-step-1
         input_mapping:
@@ -68,7 +68,47 @@ jobs:
             path: sh
             args:
               - -ec
-              - |-
-                exit 0 # pipemaster:guard the step condition has no shell form
-                echo push
+              - echo push
+            dir: workspace
+  - name: build-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: build-step-1
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo cleanup
+            dir: workspace
+      - task: build-step-2
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo push
             dir: workspace

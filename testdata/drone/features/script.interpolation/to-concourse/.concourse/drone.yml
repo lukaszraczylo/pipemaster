@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/step/build/carry
-# pipemaster:arg {"digest":"ff8ad0e0e70129ce8d6c549b31d77f88fd8b89128989cecf843b9708b65b05a9","carry":"image:\n    ref: alpine:3.20\nid: build\nkind: script\nscript:\n    - echo $\u007b{ sha }} on $\u007b{ branch }}\n    - 'echo \"cost: $5\"'\n"}
+# pipemaster:arg {"digest":"d5417384cd9897deb34d44c284f0e7c9c717a0effe0545f03a9122c657c5217e","carry":"image:\n    ref: alpine:3.20\nid: build\nkind: script\nscript:\n    - 'export PIPEMASTER_VARS=1; : \"${DRONE_BRANCH:?pipemaster: lost: variable DRONE_BRANCH has no concourse source}\"; : pipemaster-end; echo $\u007b{ sha }} on ${DRONE_BRANCH}'\n    - 'echo \"cost: $5\"'\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/carry
-# pipemaster:arg {"digest":"84c29678e320ed29d6290207784831d33cc4afff3a27bd8c9f10f435bb09bc27","carry":"id: ci\n"}
+# pipemaster:arg {"digest":"005b91dc8617112eb840cbe9e506082c2fedea198416f4839e6bfc9dea080f3e","carry":"id: ci\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: drone\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone
@@ -35,7 +35,6 @@ jobs:
               - -ec
               - |-
                 PM_CTX_SHA="$(cat ../workspace/.git/commit)"; export PM_CTX_SHA # pipemaster:ctx
-                PM_CTX_BRANCH="$(cat ../workspace/.git/branch)"; export PM_CTX_BRANCH # pipemaster:ctx
-                echo ${PM_CTX_SHA} on ${PM_CTX_BRANCH}
+                export PIPEMASTER_VARS=1; : "${DRONE_BRANCH:?pipemaster: lost: variable DRONE_BRANCH has no concourse source}"; : pipemaster-end; echo ${PM_CTX_SHA} on ${DRONE_BRANCH}
                 echo "cost: $5"
             dir: workspace

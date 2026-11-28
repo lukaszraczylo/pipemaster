@@ -1,8 +1,8 @@
 Loss report: gitea -> tekton
-[lost] pipeline/ci/job/build job.runner (Tekton schedules pods, not runner labels)
 [lost] pipeline/ci/job/build/step/build-step-1 step.action (input token has no Tekton equivalent)
 [lost] pipeline/ci/job/build/step/build-step-3 step.action (no Tekton mapping for action docker://alpine:3.20)
 [lost] pipeline/ci/job/build/step/local step.action (no Tekton mapping for action ./.github/actions/setup)
+[external] pipeline/ci/job/build job.runner: no node selector (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [external] pipeline/ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [external] pipeline/ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [emulated] pipeline/ci/job/build/step/build-step-2 step.action: image selection (later steps without an image run in this image)

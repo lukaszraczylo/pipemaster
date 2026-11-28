@@ -67,9 +67,10 @@ func TestFeaturesCoversEveryField(t *testing.T) {
 
 var structural = map[string]map[string]bool{
 	"Pipeline": {"ID": true, "Name": true, "Jobs": true, "Triggers": true},
-	"Job":      {"ID": true, "Name": true, "Steps": true},
-	"Step":     {"ID": true, "Name": true, "Kind": true},
-	"Trigger":  {"Kind": true},
+	// Child carries no feature of its own: Flatten turns it into jobs, or the native emitter writes it through a second Emit.
+	"Job":     {"ID": true, "Name": true, "Steps": true, "Child": true},
+	"Step":    {"ID": true, "Name": true, "Kind": true},
+	"Trigger": {"Kind": true},
 }
 
 func fill(v reflect.Value) {
@@ -81,6 +82,9 @@ func fill(v reflect.Value) {
 	case reflect.Int, reflect.Int64, reflect.Uint8:
 		v.Set(reflect.ValueOf(1).Convert(v.Type()))
 	case reflect.Pointer:
+		if v.Type() == reflect.TypeOf((*ir.Child)(nil)) {
+			return
+		}
 		v.Set(reflect.New(v.Type().Elem()))
 		fill(v.Elem())
 	case reflect.Slice:

@@ -13,6 +13,12 @@ spec:
           params:
             - name: filter
               value: header.canonical('X-Pipemaster-Schedule') == 'woodpecker/0'
+            - name: overlays
+              value:
+                - key: ctx_sha
+                  expression: ''''''
+                - key: ctx_repo
+                  expression: ''''''
       bindings:
         - ref: woodpecker-github
       template:

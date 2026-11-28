@@ -1,7 +1,10 @@
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+# pipemaster:emulated step.image pipeline/woodpecker/job/build
+# pipemaster:arg {"job":"build","parts":["build"],"own":["build"]}
 build:
+  image: golang:1.25
   needs: []
   script:
     # pipemaster:step build

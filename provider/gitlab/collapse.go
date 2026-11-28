@@ -13,6 +13,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -111,7 +112,7 @@ func unguard(st *ir.Step, lines []string, arg, src string) ([]string, bool) {
 	if !ok {
 		return nil, false
 	}
-	want, err := canonText("if " + guard + "; then")
+	want, err := canonScript("if " + guard + "; then")
 	if err != nil || lines[0] != want {
 		return nil, false
 	}
@@ -214,7 +215,8 @@ func unsub(st *ir.Step, lines []string, workdir, env bool) ([]string, bool) {
 	if env {
 		n := 0
 		for n < len(inner) {
-			m := exportRE.FindStringSubmatch(inner[n])
+			line, used := exportLine(inner[n:])
+			m := exportRE.FindStringSubmatch(line)
 			if m == nil {
 				break
 			}
@@ -223,7 +225,7 @@ func unsub(st *ir.Step, lines []string, workdir, env bool) ([]string, bool) {
 				return nil, false
 			}
 			st.Env = append(st.Env, ir.Var{Name: m[1], Value: v})
-			n++
+			n += used
 		}
 		if n == 0 {
 			return nil, false
@@ -233,9 +235,44 @@ func unsub(st *ir.Step, lines []string, workdir, env bool) ([]string, bool) {
 	return inner, len(inner) > 0
 }
 
+// exportLine joins the lines of one export whose double-quoted value holds newlines, and says how many it used.
+func exportLine(lines []string) (string, int) {
+	if !strings.HasPrefix(lines[0], "export ") {
+		return lines[0], 1
+	}
+	open := false
+	for used := 1; used <= len(lines); used++ {
+		open = quoteOpen(lines[used-1], open)
+		if !open {
+			return strings.Join(lines[:used], "\n"), used
+		}
+	}
+	return lines[0], 1
+}
+
+// quoteOpen reports whether a double quote is still open after line, given the state before it.
+func quoteOpen(line string, open bool) bool {
+	for i := 0; i < len(line); i++ {
+		switch line[i] {
+		case '\\':
+			i++
+		case '"':
+			open = !open
+		}
+	}
+	return open
+}
+
 // envValue reads an exported value back as the IR holds a variable: text, a secret reference, or an
 // expression when the canonical script text carries ${{ }} references. Text it cannot parse is not restored.
 func envValue(text string) (ir.Value, bool) {
+	// The emitter wrote the line from an IR value, so a GitLab name in it stands for the canonical ref even
+	// where script text keeps the name.
+	if !strings.Contains(text, "${{") {
+		if canon, err := canonText(text); err == nil {
+			text = canon
+		}
+	}
 	if !strings.Contains(text, "${{") {
 		return ir.Value{Lit: text}, true
 	}
@@ -514,13 +551,13 @@ func collapseInputs(c *collapseCtx) bool {
 	}
 	extras, _ := extOf(c.pl.Ext)[extVariables].(map[string]any)
 	for _, in := range inputs {
-		if !varIs(c.pl.Env, in.Name, in.Default) || !extraIs(extras[in.Name], in.Description) {
+		if !varIs(c.pl.Env, inputVar(in.Name), in.Default) || !extraIs(extras[inputVar(in.Name)], in.Description) {
 			return false
 		}
 	}
 	for _, in := range inputs {
-		c.pl.Env = dropVar(c.pl.Env, in.Name)
-		dropExt(&c.pl.Ext, extVariables, in.Name)
+		c.pl.Env = dropVar(c.pl.Env, inputVar(in.Name))
+		dropExt(&c.pl.Ext, extVariables, inputVar(in.Name))
 	}
 	c.pl.Inputs = inputs
 	return true
@@ -597,6 +634,11 @@ func (s *state) restoreTriggers(pl *ir.Pipeline, uses []ir.FeatureUse, args map[
 		m := triggerPathRE.FindStringSubmatch(u.IRPath)
 		if m == nil || !strings.HasPrefix(u.IRPath, "pipeline/"+pl.ID+"/") || len(args[u]) != 1 {
 			continue
+		}
+		var d provider.DefaultTriggersArg
+		if m[1] == strconv.Itoa(defaultMarkIndex) && json.Unmarshal([]byte(args[u][0]), &d) == nil && d.Default {
+			s.defaulted = append(s.defaulted, pl.ID)
+			return
 		}
 		var w wireTrigger
 		if json.Unmarshal([]byte(args[u][0]), &w) != nil {

@@ -3,22 +3,27 @@
 # pipemaster:emulated ext.passthrough pipeline/ci/job/lint/step/lint-step-1/carry
 # pipemaster:arg {"digest":"fc6f3846c7a779ff8b946a056d4f8fcca3a1a902b025f274dedd223bb13fb328","carry":"id: lint-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/lint/carry
-# pipemaster:arg {"digest":"f98eac7129d66550605ae9355c89a6be3b20d313dd3d2b9e33907ff45d55b83b","carry":"id: lint\n"}
+# pipemaster:arg {"digest":"8273a0094e96bf947544e35aac9158c761fa80cb7475279d3ad4f198a9573ea4","carry":"id: lint\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/ship/step/ship-step-1/carry
 # pipemaster:arg {"digest":"8881b84f82caff00fb91a6bf6379c3214178b36918f5530297c2af0f52d08895","carry":"id: ship-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/ship/carry
-# pipemaster:arg {"digest":"da8809b9619b51cd137a3b312ec7a04bd88b9869351765cf215bb66d4770a64e","carry":"id: ship\nneeds:\n    - job: lint\n    - job: test\n"}
+# pipemaster:arg {"digest":"de7d3a05caad96c7a71cfa9287e68683542e9737f65f4aec9ae2e6c4bfe0e8e2","carry":"id: ship\nneeds:\n    - job: lint\n    - job: test\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/step/test-step-1/carry
 # pipemaster:arg {"digest":"e1ba9c3b3e1bf1a2f01c6fef58aa52889fff70241bfe03266553d7b53cc2577c","carry":"id: test-step-1\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci/job/test/carry
-# pipemaster:arg {"digest":"fc82e4a6dd97737f5d4b2aa99b1eec97ac1a255022048653ab72e7504bd43950","carry":"id: test\n"}
+# pipemaster:arg {"digest":"8c4bb44e93a76f377d56140bf7670821af40c4f54679c260a776bf80872b2437","carry":"id: test\n"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/lint-tag
+# pipemaster:arg {"twin_of":"lint"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/ship-tag
+# pipemaster:arg {"twin_of":"ship"}
+# pipemaster:emulated trigger.tag pipeline/ci/job/test-tag
+# pipemaster:arg {"twin_of":"test"}
 # pipemaster:emulated ext.passthrough pipeline/ci/carry
-# pipemaster:arg {"digest":"118728fcc00220d3b4f3c4532f56a42ecf11cec63d03c7fac4a3b80c66b8a9a1","carry":"id: ci\nname: needs\ntriggers:\n    - kind: push\n    - kind: tag\n"}
+# pipemaster:arg {"digest":"f3447d78b91bccddba1d44513e04ea86e2d8ac2ea9e9d35cbf6af9e38718b181","carry":"id: ci\nname: needs\ntriggers:\n    - kind: push\n    - kind: tag\n"}
 # pipemaster:emulated ext.passthrough pipeline/ci
-# pipemaster:emulated trigger.push pipeline/ci/job/lint
+# pipemaster:emulated trigger.tag pipeline/ci
 # pipemaster:emulated step.image pipeline/ci/job/lint/step/lint-step-1
 # pipemaster:emulated step.image pipeline/ci/job/ship/step/ship-step-1
-# pipemaster:emulated trigger.push pipeline/ci/job/test
 # pipemaster:emulated step.image pipeline/ci/job/test/step/test-step-1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 resources:
@@ -35,8 +40,6 @@ jobs:
   - name: lint
     plan:
       - get: source
-        trigger: true
-      - get: source-tags
         trigger: true
       - task: lint-step-1
         input_mapping:
@@ -65,7 +68,6 @@ jobs:
           - lint
           - test
         trigger: true
-      - get: source-tags
       - task: ship-step-1
         input_mapping:
           workspace: source
@@ -90,11 +92,84 @@ jobs:
     plan:
       - get: source
         trigger: true
+      - task: test-step-1
+        input_mapping:
+          workspace: source
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo test
+            dir: workspace
+  - name: lint-tag
+    plan:
+      - get: source-tags
+        trigger: true
+      - task: lint-step-1
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo lint
+            dir: workspace
+  - name: ship-tag
+    plan:
+      - get: source-tags
+        passed:
+          - lint-tag
+          - test-tag
+        trigger: true
+      - task: ship-step-1
+        input_mapping:
+          workspace: source-tags
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: workspace
+          outputs:
+            - name: workspace
+          run:
+            path: sh
+            args:
+              - -ec
+              - echo ship
+            dir: workspace
+  - name: test-tag
+    plan:
       - get: source-tags
         trigger: true
       - task: test-step-1
         input_mapping:
-          workspace: source
+          workspace: source-tags
         config:
           platform: linux
           image_resource:

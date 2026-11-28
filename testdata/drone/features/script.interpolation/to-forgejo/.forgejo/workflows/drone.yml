@@ -1,8 +1,12 @@
 # pipemaster:emulated trigger.push pipeline/drone/trigger/0
 # pipemaster:emulated pipeline.concurrency pipeline/drone
+# pipemaster:emulated job.if pipeline/drone/job/ci
+# pipemaster:arg {"from":"drone","guard":true}
 # pipemaster:emulated job.runner pipeline/drone/job/ci
 # pipemaster:emulated step.image pipeline/drone/job/ci/step/build
-# pipemaster:arg {"kind":"script","image":{"Ref":"alpine:3.20","Entrypoint":null},"script":["echo $\u007b{ sha }} on $\u007b{ branch }}","echo \"cost: $5\""]}
+# pipemaster:arg {"kind":"script","image":{"Ref":"alpine:3.20","Entrypoint":null},"script":["export PIPEMASTER_VARS=1; DRONE_BRANCH=\"$(if [ \"${GITHUB_EVENT_NAME}\" = pull_request ]; then printf %s \"${GITHUB_BASE_REF}\"; elif [ \"${GITHUB_REF_TYPE}\" = branch ]; then printf %s \"${GITHUB_REF_NAME}\"; fi)\"; export DRONE_BRANCH; : pipemaster-end; echo $\u007b{ sha }} on ${DRONE_BRANCH}","echo \"cost: $5\""]}
+# pipemaster:emulated job.artifacts pipeline/drone/job/ci
+# pipemaster:arg {"pre":1,"post":0}
 on:
   push:
     branches:
@@ -12,13 +16,15 @@ concurrency:
   cancel-in-progress: false
 jobs:
   ci:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
+      - uses: https://github.com/actions/checkout@v7
       # pipemaster:emulated step.image pipeline/drone/job/ci/step/build
       - id: build
         uses: docker://alpine:3.20
         with:
           entrypoint: /bin/sh
           args: |-
-            -ec 'echo ${{ github.sha }} on ${{ github.ref_type == 'branch' && github.ref_name || '' }}
+            -ec 'export PIPEMASTER_VARS=1; DRONE_BRANCH="$(if [ "${GITHUB_EVENT_NAME}" = pull_request ]; then printf %s "${GITHUB_BASE_REF}"; elif [ "${GITHUB_REF_TYPE}" = branch ]; then printf %s "${GITHUB_REF_NAME}"; fi)"; export DRONE_BRANCH; : pipemaster-end; echo ${{ github.sha }} on ${DRONE_BRANCH}
             echo "cost: $5"'

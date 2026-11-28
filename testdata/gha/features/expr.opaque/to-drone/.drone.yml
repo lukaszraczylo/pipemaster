@@ -1,9 +1,5 @@
 # pipemaster:lost job.if pipeline/ci/job/build: opaque(gha): fromJSON('{"a":1}').a == 1
 # pipemaster:lost script.interpolation pipeline/ci/job/build/step/build-step-1: echo {{ opaque(gha): env[github.job] }}
-# pipemaster:lost step.script pipeline/ci/job/build/step/build-step-1: the step has no command left
-# pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
-# pipemaster:arg {"step":"id: build-step-1\nkind: script\nscript:\n    - 'echo $$\u007b{ opaque(gha): env[github.job] }}'\n","at":0}
-# pipemaster:emulated step.script pipeline/ci/job/build
 # pipemaster:emulated job.container pipeline/ci/job/build
 kind: pipeline
 type: docker
@@ -13,7 +9,7 @@ trigger:
     exclude:
       - '**'
 steps:
-  - name: noop
+  - name: build-step-1
     image: ubuntu:latest
     commands:
-      - "true"
+      - 'sh -c ''if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"'' pipemaster ''printf ''\''''%s\n''\'''' ''\''''pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no Drone spelling for expression opaque(gha): env[github.job]; the line is replaced by a line that prints the loss and exits 1''\'''' >&2; exit 1'''

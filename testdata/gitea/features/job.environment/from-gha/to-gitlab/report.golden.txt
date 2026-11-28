@@ -1,2 +1,2 @@
 Loss report: gitea -> gitlab
-No losses: every feature converted natively.
+[external] pipeline/ci/job/deploy job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)

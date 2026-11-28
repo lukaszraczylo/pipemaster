@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated pipeline.env pipeline/gitlab-ci
 # pipemaster:arg "- name: REGION\n  value:\n    lit: eu\n"
 # pipemaster:emulated step.script pipeline/gitlab-ci/job/empty
@@ -11,6 +14,8 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
 steps:
   - name: noop
     image: ubuntu:latest

@@ -5,11 +5,13 @@
 workflow:
   name: interp
   rules:
-    - if: $CI_COMMIT_BRANCH
-    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 build:
   needs: []
   script:
     # pipemaster:step build-step-1
+    # pipemaster:lost script.interpolation pipeline/ci/job/build/step/build-step-1: echo "sha {{ sha }} on {{ ref_name }}"
     # pipemaster:lost script.interpolation pipeline/ci/job/build/step/build-step-1: echo "{{ gha.github.workspace }}"
-    - echo "sha $CI_COMMIT_SHA on $CI_COMMIT_REF_NAME"
+    - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no GitLab variable for expression ref_name; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'
+    - 'printf ''%s\n'' ''pipemaster: lost: script.interpolation pipeline/ci/job/build/step/build-step-1: no GitLab variable for expression gha.github.workspace; the line is replaced by a line that prints the loss and exits 1'' >&2; exit 1'

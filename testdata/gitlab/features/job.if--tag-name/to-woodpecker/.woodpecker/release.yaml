@@ -1,11 +1,19 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/release
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/release
+# pipemaster:arg {"gitlab_default":true}
 when:
   - event: push
     evaluate: CI_COMMIT_TAG != ""
   - event: tag
     evaluate: CI_COMMIT_TAG != ""
+  - event:
+      - manual
+      - cron
+    evaluate: CI_COMMIT_TAG != ""
 steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make release
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make release'

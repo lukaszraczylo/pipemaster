@@ -15,4 +15,4 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - ./page.sh
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster './page.sh'

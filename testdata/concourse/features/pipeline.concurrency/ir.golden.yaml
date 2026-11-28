@@ -8,6 +8,8 @@ pipelines:
         group: ci-${{ ref }}
       ext:
         concourse:
+            _carried:
+                - resources
             resources:
                 - name: source
                   source:
@@ -24,6 +26,8 @@ pipelines:
       triggers:
         - ext:
             concourse:
+                _carried:
+                    - resources
                 resources:
                     - source
           kind: push
@@ -32,6 +36,8 @@ pipelines:
                 - main
         - ext:
             concourse:
+                _carried:
+                    - resources
                 resources:
                     - source-tags
           kind: tag
@@ -41,6 +47,9 @@ pipelines:
       jobs:
         - ext:
             concourse:
+                _carried:
+                    - gets
+                _checkout: {}
                 gets:
                     - get: source
                       trigger: true

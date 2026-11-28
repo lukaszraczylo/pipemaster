@@ -24,7 +24,7 @@ func TestStepsKeepOrderInBothForms(t *testing.T) {
 // Woodpecker names an unnamed list step step-<index>, so a depends_on that says so must find it.
 func TestDerivedStepIDMatchesDependsOn(t *testing.T) {
 	_, j, _ := single(t, "steps:\n  - image: a\n    commands: [x]\n  - name: b\n    image: a\n    commands: [x]\n    depends_on: [step-0]\n")
-	dep, _ := ext(step(t, j, "b").Ext)["depends_on"].([]any)
+	dep, _ := ext(step(t, j, "b").Ext)["_depends_on"].([]any)
 	if step(t, j, "step-0") == nil || !reflect.DeepEqual(dep, []any{"step-0"}) {
 		t.Fatalf("depends_on %v does not resolve against %+v", dep, j.Steps)
 	}
@@ -143,20 +143,20 @@ func TestStepFieldsWithoutIRFormStayInExt(t *testing.T) {
         optional: true
 `)
 	a := ext(step(t, j, "a").Ext)
-	for _, k := range []string{"pull", "detach", "privileged", "volumes", "depends_on", "backend_options"} {
+	for _, k := range []string{"pull", "detach", "privileged", "volumes", "_depends_on", "backend_options"} {
 		if _, ok := a[k]; !ok {
 			t.Errorf("key %s not kept in Ext: %v", k, a)
 		}
 	}
-	if !reflect.DeepEqual(a["depends_on"], []any{}) {
-		t.Errorf("an empty depends_on means start at once and must stay present: %#v", a["depends_on"])
+	if !reflect.DeepEqual(a["_depends_on"], []any{}) {
+		t.Errorf("an empty depends_on means start at once and must stay present: %#v", a["_depends_on"])
 	}
 	b := ext(step(t, j, "b").Ext)
 	want := []any{"a", map[string]any{"name": "c", "optional": true}}
-	if !reflect.DeepEqual(b["depends_on"], want) {
-		t.Errorf("depends_on = %#v", b["depends_on"])
+	if !reflect.DeepEqual(b["_depends_on"], want) {
+		t.Errorf("depends_on = %#v", b["_depends_on"])
 	}
-	for _, k := range []string{"pull", "detach", "privileged", "volumes", "depends_on", "backend_options"} {
+	for _, k := range []string{"pull", "detach", "privileged", "volumes", "backend_options"} {
 		if !hasEntry(rep, "key "+k) {
 			t.Errorf("no report entry for step key %s", k)
 		}
@@ -178,7 +178,7 @@ steps:
 	got := step(t, j, "s").Script
 	want := []string{
 		"echo $HOME ${FOO}",
-		"echo ${{ branch }} ${{ matrix.GO }} ${{ env.CUSTOM }} ${{ woodpecker.CI_REPO_URL }}",
+		"echo ${CI_COMMIT_BRANCH} ${{ matrix.GO }} ${{ env.CUSTOM }} ${{ woodpecker.CI_REPO_URL }}",
 		"echo ${CI_COMMIT_TAG##v}",
 		"echo $PLAIN",
 	}
@@ -237,7 +237,7 @@ func TestServicesMapForm(t *testing.T) {
 
 func TestEscapedBuiltinVariableReadsAsReference(t *testing.T) {
 	_, j, _ := single(t, "steps:\n  - name: s\n    image: x\n    commands:\n      - 'echo $${CI_COMMIT_BRANCH} $${HOME} ${CI_COMMIT_SHA}'\n")
-	if got := j.Steps[0].Script[0]; got != "echo ${{ branch }} ${HOME} ${{ sha }}" {
+	if got := j.Steps[0].Script[0]; got != "echo ${CI_COMMIT_BRANCH} ${HOME} ${{ sha }}" {
 		t.Fatalf("script = %q", got)
 	}
 }

@@ -13,8 +13,11 @@ var dqEscaper = strings.NewReplacer(`\`, `\\`, `"`, `\"`, "`", "\\`")
 // dq quotes s for a shell double-quoted word; "$" stays active so GitLab variables expand.
 func dq(s string) string { return `"` + dqEscaper.Replace(s) + `"` }
 
+// dqLitEscaper escapes "$" in the same pass as the other specials; a second pass would escape the backslash it adds.
+var dqLitEscaper = strings.NewReplacer(`\`, `\\`, `"`, `\"`, "`", "\\`", "$", `\$`)
+
 // dqLit quotes a literal, with "$" escaped so it is not expanded.
-func dqLit(s string) string { return `"` + dqEscaper.Replace(strings.ReplaceAll(s, "$", `\$`)) + `"` }
+func dqLit(s string) string { return `"` + dqLitEscaper.Replace(s) + `"` }
 
 func sq(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
 

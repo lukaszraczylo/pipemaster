@@ -125,7 +125,7 @@ func TestGitLabBranchTestExcludesPullRequests(t *testing.T) {
 	for name, c := range map[string]struct{ cond, want string }{
 		"equals":     {`$CI_COMMIT_BRANCH == "main"`, prExclusion + ` && CI_COMMIT_BRANCH == "main"`},
 		"matches":    {`$CI_COMMIT_BRANCH =~ /^main$/i`, prExclusion + ` && ` + branchIsMain},
-		"not equals": {`$CI_COMMIT_BRANCH != "main"`, `CI_PIPELINE_EVENT matches "(?i)^pull_request" || CI_COMMIT_BRANCH != "main"`},
+		"not equals": {`$CI_COMMIT_BRANCH != "main"`, `CI_PIPELINE_EVENT matches "(?i)^pull_request$$" || CI_COMMIT_BRANCH != "main"`},
 	} {
 		t.Run(name, func(t *testing.T) {
 			p := parseProject(t, "gitlab", glWorkflow(c.cond))

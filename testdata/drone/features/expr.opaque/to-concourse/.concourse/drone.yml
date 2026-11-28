@@ -1,9 +1,9 @@
 # pipemaster:emulated step.if pipeline/drone/job/ci/step/release
 # pipemaster:arg {"if":"opaque(drone): when.ref glob \"refs/tags/v*\"","script":"./release.sh"}
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/step/release/carry
-# pipemaster:arg {"digest":"aaa311d815a570144fd95be7de58668e32e190604cf7f9aeded4ca310e978466","carry":"if: 'opaque(drone): when.ref glob \"refs/tags/v*\"'\nimage:\n    ref: alpine:3.20\nid: release\nkind: script\n"}
+# pipemaster:arg {"digest":"ed3b2b6795ba39c70a7193355ba99bf864a3eac962324a9dcd6095dd8125d620","carry":"if: 'opaque(drone): when.ref glob \"refs/tags/v*\"'\nimage:\n    ref: alpine:3.20\nid: release\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/carry
-# pipemaster:arg {"digest":"bb0e06680e6f1e0fa7f88aacb2d0c8f18d1b0ec5f419496169bb8e0d40131f8c","carry":"id: ci\n"}
+# pipemaster:arg {"digest":"dadaef4eaaa731df5cfe0309dee8da098d0485665208927d8670d2219e433581","carry":"id: ci\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: drone\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone
@@ -36,6 +36,6 @@ jobs:
             args:
               - -ec
               - |-
-                exit 0 # pipemaster:guard the step condition has no shell form
+                echo 'pipemaster: skipped: the step condition has no shell form'; exit 0 # pipemaster:guard the step condition has no shell form
                 ./release.sh
             dir: workspace

@@ -125,9 +125,16 @@ func (e *emitter) actionStep(p *jobPrep, st *ir.Step) error {
 	e.stepLosses(sp, st)
 	if st.Action == nil || st.Kind == ir.StepPipelineCall {
 		e.lose(sp, caps.StepAction, "step kind "+string(st.Kind)+" has no GitLab form")
-		p.pending = append(p.pending, lostPrefix+commentSafe("step "+st.ID+" kind "+string(st.Kind)))
 		e.unappliedFields(sp, st, "the step is lost")
-		return nil
+		why := "the step kind has no GitLab form"
+		if r := emitkit.CallReason(st, "GitLab"); r != "" {
+			why = r
+		} else if r := emitkit.NoEntrypointReason(st); r != "" {
+			why = r
+		} else if r := e.pluginWhy[pluginKey(p.j.ID, st.ID)]; r != "" {
+			why = r
+		}
+		return e.lostStep(p, st, "kind "+string(st.Kind), why)
 	}
 	with := map[string]string{}
 	for k, v := range st.With {
@@ -139,20 +146,19 @@ func (e *emitter) actionStep(p *jobPrep, st *ir.Step) error {
 		with[k] = s
 	}
 	t, ok := actions.Lookup(*st.Action, "gitlab", with)
+	ok = ok && !e.gated[st]
 	if !ok {
 		e.lose(sp, caps.StepAction, "no GitLab mapping for action "+ghaRef(st.Action))
-		p.pending = append(p.pending, lostPrefix+commentSafe("step "+st.ID+" uses "+ghaRef(st.Action)))
 		e.unappliedFields(sp, st, "the step is lost")
-		return nil
+		return e.lostStep(p, st, "uses "+ghaRef(st.Action), "no GitLab mapping for the action")
 	}
 	e.led.Note(e.use(sp, caps.StepAction), t.Support, t.Support.Caveat)
 	for _, k := range t.Unmapped {
 		e.lose(sp, caps.StepAction, "input "+k+" has no GitLab equivalent")
 	}
 	if t.Support.Level == caps.Lost {
-		p.pending = append(p.pending, lostPrefix+commentSafe("step "+st.ID+" uses "+ghaRef(st.Action)+": "+t.Support.Caveat))
 		e.unappliedFields(sp, st, "the step is lost")
-		return nil
+		return e.lostStep(p, st, "uses "+ghaRef(st.Action)+": "+t.Support.Caveat, "the action has no GitLab form")
 	}
 	if !carriedKind(t.Kind) {
 		const detail = "the action reference %s is not in the GitLab file; it is kept in round-trip metadata"
@@ -190,7 +196,18 @@ func (e *emitter) unappliedEnvFields(sp string, st *ir.Step, why string) {
 func (e *emitter) applyTarget(p *jobPrep, sp string, st *ir.Step, t actions.Target) error {
 	switch t.Kind {
 	case actions.KindScript:
-		return e.placeLines(p, st, t.Script)
+		cp := emitkit.ScriptStep(st, t, sp, false)
+		if err := e.placeLines(p, cp, cp.Script); err != nil {
+			return err
+		}
+		var names []string
+		for _, k := range []string{"GIT_DEPTH", "GIT_SUBMODULE_STRATEGY"} {
+			if v, ok := t.With[k].(string); ok {
+				p.vars = append(p.vars, ir.Var{Name: k, Value: ir.Value{Lit: v}})
+				names = append(names, k)
+			}
+		}
+		return e.markActionStep(p, sp, st, actionStepArg{Kind: actScript, Script: strings.Join(cp.Script, "\n"), Vars: names})
 	case actions.KindUpload:
 		e.unappliedEnvFields(sp, st, "the upload becomes the job's artifacts block")
 		art, err := e.uploadAction(p, sp, st, t)
@@ -220,6 +237,7 @@ func (e *emitter) applyTarget(p *jobPrep, sp string, st *ir.Step, t actions.Targ
 		c, err := e.cacheAction(p, sp, t)
 		if err != nil || c == nil {
 			if err == nil {
+				// A cache only saves time, so its loss keeps the comment and fails nothing.
 				p.pending = append(p.pending, lostPrefix+commentSafe("step "+st.ID+" uses "+ghaRef(st.Action)))
 			}
 			return err
@@ -233,9 +251,24 @@ func (e *emitter) applyTarget(p *jobPrep, sp string, st *ir.Step, t actions.Targ
 		}
 	default:
 		e.lose(sp, caps.StepAction, "action kind "+t.Kind+" has no GitLab form")
-		p.pending = append(p.pending, lostPrefix+commentSafe("step "+st.ID+" uses "+ghaRef(st.Action)))
+		return e.lostStep(p, st, "uses "+ghaRef(st.Action), "the action kind has no GitLab form")
 	}
 	return nil
+}
+
+// lostStep keeps the lost step in the file as a comment and as a script line that prints the loss and exits 1, so
+// the job stops where the source step would have run. The condition and continue-on-error of the step still apply.
+func (e *emitter) lostStep(p *jobPrep, st *ir.Step, what, why string) error {
+	sp := stepPath(p.path, st.ID)
+	p.pending = append(p.pending, lostPrefix+commentSafe("step "+st.ID+" "+what))
+	if st.If != nil {
+		if _, status, _ := splitStatus(st.If); status != "" && status != "success" {
+			e.lose(sp, caps.StepIf, "an always() or failure() step runs in after_script, which cannot fail the job: the loss shows in the job log only and the job does not fail for it")
+		}
+	}
+	c := *st
+	c.Env, c.WorkDir = nil, ""
+	return e.placeLines(p, &c, []string{emitkit.FailLoud(caps.StepAction, sp, why)})
 }
 
 func (e *emitter) setImage(p *jobPrep, sp, image string) error {

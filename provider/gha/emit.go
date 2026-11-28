@@ -11,8 +11,11 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
@@ -27,13 +30,35 @@ const (
 // Emit writes one workflow file per pipeline at <Dirs[0]>/<pipeline id>.yml. Every feature use goes
 // through the ledger; Finish fails the call when one was never accounted for.
 func (a *adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
-	p, idRenames := withValidJobIDs(p)
-	e := &emitter{d: a.d, from: sourceDialect(originProvider(p)), led: emitkit.NewLedger("ir", a.d.ID, a.Caps())}
+	return inline.Emit(p, a.d.ID, a.emitFlat)
+}
+
+func (a *adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	p, idRenames := withValidJobIDs(withNativeChildren(p, a.d.ID))
+	p, vres := vars.Prepare(p, a.d.ID)
+	p = bindRefEnv(p, a.d.ID)
+	fresh := provider.FreshGitLabDefaults(p, a.d.ID)
+	// The gated jobs come from the source conditions: a rule of the source can have the shape of the gate.
+	gated := provider.GatedJobs(p, a.d.ID)
+	p, noForm, injected := provider.WithDefaultTriggers(p, a.d.ID)
+	p, srcEvents, srcLost := withGitLabSources(p, a.d.ID, fresh, gated)
+	e := &emitter{origin: originProvider(p), d: a.d, from: sourceDialect(originProvider(p)), led: emitkit.NewLedger("ir", a.d.ID, a.Caps()),
+		jobGuards: p.Origin.Guarded}
+	e.injected = injected
+	for id, arg := range srcEvents {
+		// A GitLab file with the default triggers keeps its push and tag triggers, so only the added kinds need a marker.
+		if len(arg.Kinds) > 0 && fresh[id] {
+			delete(e.injected, id)
+		}
+	}
+	e.srcEvents = srcEvents
+	e.srcLost = srcLost
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)
 		e.dialectNotes(u)
 	}
+	e.noteDefaultEvents(noForm)
 	for _, r := range idRenames {
 		e.emulate(r.path, caps.ExtPassthrough, "job id renamed",
 			"job id "+r.from+" is not valid on "+a.d.ID+"; written as "+r.to+", restored only with round-trip metadata")
@@ -58,6 +83,7 @@ func (a *adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error)
 	if err != nil {
 		return nil, rep, fmt.Errorf("%s: %w", a.d.ID, err)
 	}
+	vres.Report(rep)
 	return files, rep, nil
 }
 
@@ -96,6 +122,17 @@ func (e *emitter) pipelineFile(pl *ir.Pipeline) (string, []byte, error) {
 	if pl.ID == "" || strings.ContainsAny(pl.ID, `/\`) || pl.ID == "." || pl.ID == ".." {
 		return "", nil, fmt.Errorf("pipeline id %q cannot be a file name", pl.ID)
 	}
+	if e.injected[pl.ID] {
+		if err := e.markArg(caps.TriggerPush, "pipeline/"+pl.ID, provider.DefaultTriggersArg{Default: true}); err != nil {
+			return "", nil, err
+		}
+	}
+	if arg, ok := e.srcEvents[pl.ID]; ok {
+		if err := e.markArg(caps.TriggerPush, "pipeline/"+pl.ID, arg); err != nil {
+			return "", nil, err
+		}
+	}
+	e.loseSources(pl)
 	root, err := e.workflow(pl)
 	if err != nil {
 		return "", nil, fmt.Errorf("pipeline %s: %w", pl.ID, err)
@@ -170,10 +207,14 @@ func (e *emitter) workflow(pl *ir.Pipeline) (*yaml.Node, error) {
 func (e *emitter) jobs(pl *ir.Pipeline) (*yaml.Node, error) {
 	jm := newMap()
 	c := jobCtx{pl: pl}
+	e.changeAtoms, e.changesBlocked = nil, false
 	for _, j := range pl.Jobs {
 		if j != nil {
 			c.mainIDs = append(c.mainIDs, j.ID)
 		}
+	}
+	for _, j := range append(slices.Clone(pl.Jobs), pl.Finally...) {
+		e.changesBlocked = e.changesBlocked || (j != nil && j.ID == changesJobID)
 	}
 	for _, group := range []struct {
 		jobs    []*ir.Job
@@ -193,6 +234,14 @@ func (e *emitter) jobs(pl *ir.Pipeline) (*yaml.Node, error) {
 			}
 			jm.setComment(j.ID, n, comments)
 		}
+	}
+	if len(e.changeAtoms) > 0 {
+		n, err := e.changesJob(pl)
+		if err != nil {
+			return nil, err
+		}
+		jm.n.Content = append([]*yaml.Node{str(changesJobID), n}, jm.n.Content...)
+		jm.keys[changesJobID] = true
 	}
 	if jm.empty() {
 		e.placeholderJob(jm, pl)

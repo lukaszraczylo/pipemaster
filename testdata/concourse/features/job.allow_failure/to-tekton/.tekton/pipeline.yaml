@@ -4,8 +4,18 @@ metadata:
   name: ci
 spec:
   displayName: allow
+  params:
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
   tasks:
     - name: flaky
       taskRef:
         name: ci-flaky
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
       onError: continue

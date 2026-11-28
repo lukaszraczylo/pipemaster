@@ -16,12 +16,12 @@ steps:
   - name: build-step-3
     image: ubuntu:latest
     commands:
-      - make build
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make build'
 ---
 # pipemaster:lost step pipeline/ci/job/test/step/test-step-1 downloads dist
-# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\nid: test-step-1\nkind: action\n","at":0}
 # pipemaster:emulated job.container pipeline/ci/job/test
+# pipemaster:emulated step.action pipeline/ci/job/test/step/test-step-1
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: download-artifact\n    ref: v4\nwith:\n    name:\n        lit: dist\nid: test-step-1\nkind: action\n","at":0,"fail":true}
 kind: pipeline
 type: docker
 name: test
@@ -32,7 +32,11 @@ trigger:
 depends_on:
   - build
 steps:
+  - name: test-step-1
+    image: ubuntu:latest
+    commands:
+      - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/test/step/test-step-1: no upload of the artifact in this document'' >&2; exit 1'
   - name: test-step-2
     image: ubuntu:latest
     commands:
-      - make test
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make test'

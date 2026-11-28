@@ -23,9 +23,11 @@ type workflow struct {
 
 // wf is the state of one workflow parse.
 type wf struct {
-	tx   *texts
-	rep  *report.Report
-	ext  *sink
+	tx  *texts
+	rep *report.Report
+	ext *sink
+	// deps holds the depends_on of the steps, by step ID.
+	deps map[string]stepDep
 	file string
 	id   string
 }
@@ -64,6 +66,9 @@ func parseWorkflow(rep *report.Report, file string, data []byte) (*workflow, err
 	if err := w.steps(j, stepsNode); err != nil {
 		return nil, err
 	}
+	if err := w.checkStepDeps(j); err != nil {
+		return nil, err
+	}
 	if v, ok := r.take("services"); ok {
 		if err := w.services(j, v); err != nil {
 			return nil, err
@@ -81,6 +86,7 @@ func parseWorkflow(rep *report.Report, file string, data []byte) (*workflow, err
 	w.ext.keepRest(r, map[string]caps.Feature{"concurrency": caps.PipelineConcurrency})
 	spec.configure(m)
 	pipeEnv := collapseJob(rep, j, m)
+	w.orderSteps(j)
 	w.noteKept()
 	w.noteRuntimeVars()
 	j.Ext = w.ext.ext()

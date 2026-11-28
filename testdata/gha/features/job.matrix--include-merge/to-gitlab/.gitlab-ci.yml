@@ -2,11 +2,12 @@
 # pipemaster:arg [{"k":"t","p":"job/test/step/test-step-1/script/0","g":"go test $go","s":"go test $\u007b{ matrix.go }}"}]
 workflow:
   name: ci
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 # pipemaster:emulated job.matrix pipeline/ci/job/test
 # pipemaster:arg {"Axes":[{"Name":"go","Values":["1.21","1.22"]}],"Include":[[{"Key":"experimental","Value":"true"},{"Key":"go","Value":"1.22"}]],"Exclude":null,"lines":["go test $go"]}
 test:
-  tags:
-    - ubuntu-latest
   needs: []
   script:
     # pipemaster:step test-step-1

@@ -1,2 +1,4 @@
 Loss report: woodpecker -> tekton
+[lost] pipeline/woodpecker/job/ci/step/build script.interpolation (the script reads CI_COMMIT_BRANCH, which tekton has no source for; the step stops with a message when it starts)
 [external] pipeline/woodpecker/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
+[emulated] pipeline/woodpecker/job/ci/step/source-checkout step.action: StepAction ref to the tektoncd-catalog git-clone through the git resolver (the ctx-repo and ctx-sha params carry the repository and the commit)

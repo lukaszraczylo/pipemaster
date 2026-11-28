@@ -1,9 +1,9 @@
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/test/carry
-# pipemaster:arg {"digest":"e622baf90a1cc4bc99b9d87d081186ba512a636e4374f852f2c24b8fd564663d","carry":"image:\n    ref: golang:$\u007b{ matrix.GO_VERSION }}\nid: test\nkind: script\nscript:\n    - go test -tags $\u007b{ matrix.TAGS }} ./...\n"}
+# pipemaster:arg {"digest":"1164846a21095bd62885da128559404a89cc8c07317dd6db89bcace4dfefbd70","carry":"image:\n    ref: golang:$\u007b{ matrix.GO_VERSION }}\nid: test\nkind: script\nscript:\n    - go test -tags $\u007b{ matrix.TAGS }} ./...\n"}
 # pipemaster:emulated job.matrix pipeline/woodpecker/job/ci
 # pipemaster:arg {"matrix":"include:\n    - - key: GO_VERSION\n        value: \"1.24\"\n      - key: TAGS\n        value: nethttp\n    - - key: GO_VERSION\n        value: \"1.25\"\n      - key: TAGS\n        value: netgo\n","across":"[{\"max_in_flight\":\"all\",\"values\":[{\"GO_VERSION\":\"1.24\",\"TAGS\":\"nethttp\"},{\"GO_VERSION\":\"1.25\",\"TAGS\":\"netgo\"}],\"var\":\"matrix\"}]"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry
-# pipemaster:arg {"digest":"da922cd2ab1d7385c913d657fece48d86212ddc82123106a0c29130e824df0fd","carry":"matrix:\n    include:\n        - - key: GO_VERSION\n            value: \"1.24\"\n          - key: TAGS\n            value: nethttp\n        - - key: GO_VERSION\n            value: \"1.25\"\n          - key: TAGS\n            value: netgo\nid: ci\n"}
+# pipemaster:arg {"digest":"1c8d22dff76fb648a963a6e36072b0080295ab6f8a7c873c647dcc51084f79ed","carry":"matrix:\n    include:\n        - - key: GO_VERSION\n            value: \"1.24\"\n          - key: TAGS\n            value: nethttp\n        - - key: GO_VERSION\n            value: \"1.25\"\n          - key: TAGS\n            value: netgo\nid: ci\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: woodpecker\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker
@@ -36,7 +36,9 @@ jobs:
                 path: sh
                 args:
                   - -ec
-                  - '# pipemaster:lost go test -tags {{ matrix.TAGS }} ./...'
+                  - |-
+                    # pipemaster:lost go test -tags {{ matrix.TAGS }} ./...
+                    printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/woodpecker/job/ci/step/test: no Concourse spelling for expression matrix.TAGS; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
                 dir: workspace
         across:
           - var: matrix

@@ -1,0 +1,10 @@
+platform: linux
+image_resource: {type: registry-image, source: {repository: alpine}}
+inputs:
+- name: repo
+outputs:
+- name: out
+  path: result
+run:
+  path: sh
+  args: [-ec, "echo hi; false; echo after"]

@@ -6,6 +6,19 @@ Website, with live sample conversions and the full capability matrix: <https://p
 
 Status: pre-alpha.
 
+## What it does
+
+- Reads the pipelines of one provider and writes the equivalent files for another provider.
+- Gives each feature one verdict, and lists the verdicts in a loss report.
+- Keeps the triggers of the source. A Drone pipeline with no trigger, or with only `exclude:`, and a GitLab file with no `workflow:` run on their default events. Every target gets the triggers of those events, and the report lists each event that has no form in the target.
+- Adds a checkout step for a target that does not clone the repository by itself, when the source cloned it.
+- Clones the other repository for a Tekton catalog `git-clone` Task. The converted pipeline never clones its own repository in its place.
+- Writes GitHub Actions cache steps with a rolling key when the source key has no content hash. The scope of a GitHub cache is narrower than a GitLab cache, and the report states this.
+- Converts runner labels, workspaces, volumes and artifact handoff between jobs. Tekton workspaces and Argo volumes become directories and `ws-<name>-<writer>` artifacts on targets that run each job on its own runner.
+- Converts Concourse `load_var` steps to script steps, and reports a resource `check_every` as an external setting. A task image digest becomes the `version.digest` of the image resource.
+- Writes the unset command in the shell of the step. In variable values, only a GitLab source keeps `$$` as an escape for one `$`.
+- Does not report an `Ext` key as lost when the IR carries the key to the trip back.
+
 ## Supported providers
 
 The provider ID is the value that you pass to `--from`, `--to`, `--via` and `--as`. Each ID links to a page with the setup outside the pipeline files, the conversion notes and the feature table.
@@ -83,6 +96,8 @@ The report gives one verdict for each feature that the pipeline uses:
 
 `convert` writes `.pipemaster/meta.yaml` beside the converted files. The file holds what the target format cannot hold. With `--embed-meta`, the metadata goes into the converted file as comments instead.
 
+If a converted file has no `.pipemaster/meta.yaml` when you read it, the file keeps the triggers that the conversion wrote.
+
 Convert the output again, and the metadata adds one layer for each conversion. A chain through several providers can then return to the first provider exactly. If you edit a converted file and convert it again, the command exits with code 4. With `--force`, the command drops the older layers and reports each one.
 
 Secret names map between providers. Secret values, runner registration, webhooks and branch protection do not move.
@@ -92,13 +107,18 @@ Secret names map between providers. Secret values, runner registration, webhooks
 | Target | What it runs |
 | --- | --- |
 | `make check` | `go test -short ./...` (a deterministic sample of the chain matrix), `golangci-lint` and the Lean checks. It needs the pinned linters, so run `make linters` first. |
-| `make chains` | The full chain matrix. It took about 285 seconds and 1.4 GB of memory at nine providers. |
+| `make matrix` | The full chain matrix with a 40 minute timeout. On 2026-11-27 it took 505 seconds at nine providers on a loaded 16-core machine, which is close to the 10 minute default of `go test`. |
+| `make behave` | The behaviour tests. They run each converted pipeline on a real engine (act, gitlab-ci-local, Drone, Woodpecker, Tekton, Argo and Concourse) and compare its trace with the trace of the source. The run is opt-in, uses the Kiri container runtime and has a timeout of 3 hours. `make behave-tools` installs the engines. The latest run is in [testdata/behave/RESULTS.md](testdata/behave/RESULTS.md). |
 | `make linters` | Builds or downloads the pinned linters into `.tools/bin`: actionlint, woodpecker-cli, drone, kubeconform, argo and fly. |
 | `make lint-real` | Every test except the chain matrix, without `-short`, with every pinned linter required, then `golangci-lint`. |
 | `make release-check` | `goreleaser check`, then a snapshot build of every target into `dist/` without publishing. |
 | `make lean`, `make vectors` | Builds the Lean 4 model in `lean4/` and regenerates the test vectors in `testdata/lean-vectors`. |
 
 The website lives in `docs/index.html` and reads `docs/data/`. `go test ./internal/roundtrip -run TestSiteData -update` regenerates that data from `testdata/site` and six corpus pipelines, and the test fails when the two disagree.
+
+## Related tools
+
+[Dagger](https://dagger.io) takes a different approach: it defines pipelines as code.
 
 ## Licence
 

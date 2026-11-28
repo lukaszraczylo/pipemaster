@@ -25,13 +25,19 @@ func Unmarshal(b []byte) (*Project, error) {
 
 // jobAlias and stepAlias drop the methods so the marshalers below do not recurse.
 type (
-	jobAlias  Job
-	stepAlias Step
+	jobAlias   Job
+	stepAlias  Step
+	childAlias Child
 )
 
 type jobYAML struct {
 	If       string `yaml:"if,omitempty"`
 	jobAlias `yaml:",inline"`
+}
+
+type childYAML struct {
+	Gate       string `yaml:"gate,omitempty"`
+	childAlias `yaml:",inline"`
 }
 
 type stepYAML struct {
@@ -153,5 +159,29 @@ func (v *Value) UnmarshalYAML(n *yaml.Node) error {
 		}
 		*v = Value{Kind: ValueExpr, Expr: e}
 	}
+	return nil
+}
+
+// MarshalYAML renders Gate as text because Expr is an interface.
+func (c Child) MarshalYAML() (any, error) {
+	g, err := optExprText(c.Gate)
+	if err != nil {
+		return nil, fmt.Errorf("child gate: %w", err)
+	}
+	return childYAML{childAlias: childAlias(c), Gate: g}, nil
+}
+
+// UnmarshalYAML parses Gate from text.
+func (c *Child) UnmarshalYAML(n *yaml.Node) error {
+	var a childYAML
+	if err := decodeKnown(n, &a); err != nil {
+		return err
+	}
+	*c = Child(a.childAlias)
+	e, err := optParseExpr(a.Gate)
+	if err != nil {
+		return fmt.Errorf("line %d: child gate: %w", n.Line, err)
+	}
+	c.Gate = e
 	return nil
 }

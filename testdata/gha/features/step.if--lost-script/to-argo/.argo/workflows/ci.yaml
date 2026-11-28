@@ -2,14 +2,14 @@
 # pipemaster:arg {"name":"Inspect"}
 # pipemaster:lost script pipeline/ci/job/check/step/check-step-2: docker inspect {{ steps.meta.outputs.version }}
 # pipemaster:emulated step.action pipeline/ci/job/check/step/check-step-2
-# pipemaster:arg {"step":"if: event != 'pull_request'\nid: check-step-2\nname: Inspect\nkind: script\nscript:\n    - docker inspect $\u007b{ steps.meta.outputs.version }}\n","hold":"{\"args\":[\"if command -v bash \\u003e/dev/null 2\\u003e\\u00261; then exec bash -e -c \\\"$1\\\"; fi; exec sh -e -c \\\"$1\\\"\",\"pipemaster\",\"if ! [ \\\"$PM_CTX_EVENT\\\" != 'pull_request' ]; then exit 0; fi # pipemaster:guard\"],\"command\":[\"sh\",\"-c\"],\"env\":[{\"name\":\"PM_CTX_EVENT\",\"value\":\"{{workflow.parameters.ctx-event}}\"}],\"image\":\"alpine:3.22\",\"name\":\"check-step-2\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:arg {"step":"if: event != 'pull_request'\nid: check-step-2\nname: Inspect\nkind: script\nscript:\n    - docker inspect $\u007b{ steps.meta.outputs.version }}\n","hold":"{\"args\":[\"if command -v bash \\u003e/dev/null 2\\u003e\\u00261; then exec bash -e -c \\\"$1\\\"; fi; exec sh -e -c \\\"$1\\\"\",\"pipemaster\",\"if ! [ \\\"$PM_CTX_EVENT\\\" != 'pull_request' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard\\nprintf '%s\\\\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/check/step/check-step-2: no Argo spelling for expression steps.meta.outputs.version; the line is replaced by a line that prints the loss and exits 1' \\u003e\\u00262; exit 1\"],\"command\":[\"sh\",\"-c\"],\"env\":[{\"name\":\"PM_CTX_EVENT\",\"value\":\"{{workflow.parameters.ctx-event}}\"}],\"image\":\"alpine:3.22\",\"name\":\"check-step-2\",\"workingDir\":\"/workspace\"}"}
+# pipemaster:emulated job.runner pipeline/ci/job/check
 # pipemaster:emulated step.if pipeline/ci/job/check/step/check-step-2
 # pipemaster:emulated step.shell pipeline/ci/job/check/step/check-step-2
 # pipemaster:emulated step.shell pipeline/ci/job/check/step/meta
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/0
 # pipemaster:emulated trigger.push pipeline/ci/trigger/0
 # pipemaster:emulated trigger.filter.branches pipeline/ci/trigger/1
-# pipemaster:emulated trigger.push pipeline/ci/trigger/1
 # pipemaster:emulated trigger.tag pipeline/ci/trigger/1
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
@@ -50,7 +50,9 @@ spec:
             args:
               - if command -v bash >/dev/null 2>&1; then exec bash -e -c "$1"; fi; exec sh -e -c "$1"
               - pipemaster
-              - 'if ! [ "$PM_CTX_EVENT" != ''pull_request'' ]; then exit 0; fi # pipemaster:guard'
+              - |-
+                if ! [ "$PM_CTX_EVENT" != 'pull_request' ]; then echo 'pipemaster: skipped: the condition of this step is false'; exit 0; fi # pipemaster:guard
+                printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/check/step/check-step-2: no Argo spelling for expression steps.meta.outputs.version; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
             workingDir: /workspace
             env:
               - name: PM_CTX_EVENT

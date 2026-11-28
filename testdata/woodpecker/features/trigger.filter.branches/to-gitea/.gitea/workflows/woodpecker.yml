@@ -1,8 +1,12 @@
 # pipemaster:emulated trigger.filter.branches pipeline/woodpecker/trigger/0
 # pipemaster:arg {"Include":["main","develop"],"Exclude":["wip"]}
+# pipemaster:emulated job.if pipeline/woodpecker/job/ci
+# pipemaster:arg {"from":"woodpecker","guard":true}
 # pipemaster:emulated job.runner pipeline/woodpecker/job/ci
 # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/build
 # pipemaster:arg {"kind":"script","image":{"Ref":"golang:1.25","Entrypoint":null},"script":["go build ./..."]}
+# pipemaster:emulated job.artifacts pipeline/woodpecker/job/ci
+# pipemaster:arg {"pre":1,"post":0}
 on:
   push:
     branches:
@@ -11,8 +15,10 @@ on:
       - '!wip'
 jobs:
   ci:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       # pipemaster:emulated step.image pipeline/woodpecker/job/ci/step/build
       - id: build
         uses: docker://golang:1.25

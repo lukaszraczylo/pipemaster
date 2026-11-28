@@ -1,0 +1,10 @@
+stages: [build, deploy]
+build:
+  stage: build
+  script:
+    - make build
+release:
+  stage: deploy
+  trigger:
+    include: ci/release.yml
+    strategy: depend

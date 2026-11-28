@@ -15,5 +15,5 @@ pipelines:
               id: build
               kind: script
               script:
-                - echo ${{ sha }} on ${{ branch }}
+                - echo ${{ sha }} on ${CI_COMMIT_BRANCH}
                 - 'echo "cost: $5"'

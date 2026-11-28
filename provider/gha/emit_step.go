@@ -11,6 +11,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
@@ -98,8 +99,12 @@ func (e *emitter) reidentify(j *ir.Job, st *ir.Step, pos int) *ir.Step {
 	return &c
 }
 
-// noopScript runs for a script step whose lines an earlier conversion could not carry.
+// noopScript runs where the source holds no work: a job with no steps, a workflow with no jobs, or a script step
+// with no lines. It only keeps the file valid. Source work with no GHA form uses failLoud instead.
 const noopScript = "true"
+
+// failLoud makes the run text of a step that stands in for source work with no GHA form.
+func failLoud(f caps.Feature, sp, why string) *yaml.Node { return str(emitkit.FailLoud(f, sp, why)) }
 
 func retryable(shell string) bool { return shell == "" || shell == shellBash || shell == shellSh }
 
@@ -132,6 +137,7 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 			return nil, false, uerr
 		}
 	}
+	var markers []string
 	dockerOK := st.Image == nil || !strings.Contains(st.Image.Ref, "$")
 	switch {
 	case !usesOK:
@@ -141,13 +147,22 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 	case st.If != nil:
 		m.set("if", e.condition(sp, caps.StepIf, st.If, "step"))
 	}
-	var markers []string
 	wrapped := false
 	var err error
+	runOK := false
+	if !dockerOK {
+		var err error
+		if runOK, err = e.dockerRunStep(m, sp, st); err != nil {
+			return nil, false, err
+		}
+	}
 	switch {
+	case runOK:
+		markers = append(markers, emitkit.Marker(caps.StepImage, sp))
 	case !dockerOK && len(st.Script) == 0:
-		e.lose(sp, caps.StepImage, "a docker step needs a literal image reference and the reference holds a variable; the step does not run")
-		m.set("run", str(noopScript))
+		why := "a docker step needs a literal image reference and the reference holds a variable"
+		e.lose(sp, caps.StepImage, why+"; the step fails with a message")
+		m.set("run", failLoud(caps.StepImage, sp, why))
 	case !dockerOK:
 		e.lose(sp, caps.StepImage, "a docker step needs a literal image reference and the reference holds a variable; the script runs on the runner")
 		lines := e.withoutRemoteRefs(sp, st.Script)
@@ -161,7 +176,7 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 	case st.Kind == ir.StepScript && len(st.Script) > 0:
 		lines := e.withoutRemoteRefs(sp, st.Script)
 		if len(lines) == 0 {
-			lines = []string{noopScript}
+			lines = []string{emitkit.FailLoud(caps.StepScript, sp, "every line of the script is a remote reference with no GHA form")}
 		}
 		if attempts > 0 && retryable(st.Shell) {
 			lines, wrapped = retryScript(lines, attempts), true
@@ -169,11 +184,16 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 		}
 		var ts []string
 		if ts, err = e.templates(sp, lines); err == nil {
+			if attempts == 0 && e.bashWrap(st) {
+				ts = strings.Split(provider.BashWrapCommand(provider.BashOrShScript, strings.Join(ts, "\n")), "\n")
+				e.emulate(sp, caps.StepShell, "bash-if-present wrapper", "the source runs the step under bash when the image has it, and a runner such as act runs a step with no shell under sh; the script re-executes under bash when the image has bash, else under sh -e")
+				markers = append(markers, emitkit.Marker(caps.StepShell, sp))
+			}
 			m.set("run", block(ts))
 		}
 	case (st.Kind == ir.StepAction || st.Kind == ir.StepPipelineCall) && st.Action != nil:
 		if !usesOK {
-			m.set("run", str(noopScript))
+			m.set("run", failLoud(caps.StepAction, sp, whyDisabled))
 			break
 		}
 		m.set("uses", str(usesText))
@@ -181,14 +201,17 @@ func (e *emitter) stepNode(jp string, st *ir.Step, attempts int) (*yaml.Node, bo
 	case st.Kind == ir.StepScript && st.Image == nil:
 		m.set("run", str(noopScript))
 	case st.Kind == ir.StepAction && st.Action == nil:
-		e.lose(sp, caps.StepAction, "the step names no action GHA can run; the step runs "+noopScript)
-		m.set("run", str(noopScript))
+		why := "the step names no action GHA can run"
+		e.lose(sp, caps.StepAction, why+"; the step fails with a message")
+		m.set("run", failLoud(caps.StepAction, sp, why))
 	case st.Kind == ir.StepTask:
-		e.lose(sp, caps.StepAction, "a task reference has no GHA form; the step runs "+noopScript)
-		m.set("run", str(noopScript))
+		why := "a task reference has no GHA form"
+		e.lose(sp, caps.StepAction, why+"; the step fails with a message")
+		m.set("run", failLoud(caps.StepAction, sp, why))
 	default:
-		e.lose(sp, caps.StepAction, "a step of kind "+string(st.Kind)+" has no GHA form; the step runs "+noopScript)
-		m.set("run", str(noopScript))
+		why := "a step of kind " + string(st.Kind) + " has no GHA form"
+		e.lose(sp, caps.StepAction, why+"; the step fails with a message")
+		m.set("run", failLoud(caps.StepAction, sp, why))
 	}
 	if err != nil {
 		return nil, false, err
@@ -262,6 +285,12 @@ func (e *emitter) shellName(sp, shell string) string {
 }
 
 func (e *emitter) stepTail(m *omap, sp string, st *ir.Step, ext map[string]any) error {
+	// In a container image the unset shell is bash when the image has it and sh when not, as the source runner does.
+	if st.Shell == "" && st.Image == nil && !e.inContainer && len(st.Script) > 0 && m.has("run") && provider.BashDefault(e.origin) && !provider.SameFamily(e.origin, e.d.ID) {
+		// A runner without a shell setting may pick sh, and the source ran the script under bash.
+		m.set("shell", str(shellBash))
+		e.mark(caps.StepShell, sp)
+	}
 	if st.Shell != "" {
 		if st.Image == nil {
 			m.set("shell", str(e.shellName(sp, st.Shell)))
@@ -404,6 +433,8 @@ type imageArg struct {
 	Image    ir.Image    `json:"image"`
 	Script   []string    `json:"script,omitempty"`
 	Settings []string    `json:"settings,omitempty"`
+	Passed   []string    `json:"passed,omitempty"`
+	Run      bool        `json:"run,omitempty"`
 }
 
 // jobSteps lists a job's steps with the emulation steps around them: downloads and cache first, uploads last.
@@ -423,11 +454,12 @@ func (e *emitter) jobSteps(c jobCtx, j *ir.Job) (*yaml.Node, error) {
 		}
 	}
 	e.stepIDs = stepIDMap(j)
+	e.passEnv = append(varNames(c.pl.Env), varNames(j.Env)...)
 	for _, st := range j.Steps {
 		if st == nil {
 			continue
 		}
-		n, w, err := e.stepNode(jp, e.reidentify(j, st, len(seq.Content)+1), attempts)
+		n, w, err := e.stepNode(jp, e.reidentify(j, st, len(seq.Content)-len(pre)+1), attempts)
 		if err != nil {
 			return nil, err
 		}
@@ -457,10 +489,22 @@ func (e *emitter) jobSteps(c jobCtx, j *ir.Job) (*yaml.Node, error) {
 	if len(seq.Content) == 0 {
 		// A trigger job or an override of an included job has no script, and a GHA job needs a step.
 		n := newMap()
-		n.set("run", str(noopScript))
+		why := "the job has no steps; a no-op step keeps the workflow valid"
+		if reason, ok := emitkit.BridgeWork(j); ok {
+			n.set("run", str(emitkit.FailLoud(caps.StepScript, jp, reason)))
+			why = reason + "; a step that prints the loss and exits 1 keeps the workflow valid and the pipeline honest"
+		} else {
+			n.set("run", str(noopScript))
+		}
 		seq.Content = append(seq.Content, n.n)
-		e.lose(stepPath(jp, "script"), caps.StepScript, "the job has no steps; a no-op step keeps the workflow valid")
+		e.lose(stepPath(jp, "script"), caps.StepScript, why)
 		e.mark(caps.StepScript, jp)
 	}
 	return seq, nil
+}
+
+// bashWrap is true for a script step in a container job whose source ran it under bash when the image has it.
+// The step has no shell setting there, because a pinned bash fails on an image without bash.
+func (e *emitter) bashWrap(st *ir.Step) bool {
+	return e.inContainer && st.Shell == "" && provider.BashDefault(e.origin) && !provider.SameFamily(e.origin, e.d.ID)
 }

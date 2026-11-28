@@ -16,6 +16,7 @@ const Prefix = "ctx-"
 var names = []string{
 	expr.CtxBranch, expr.CtxTag, expr.CtxEvent, expr.CtxSHA, expr.CtxRepo, expr.CtxActor, expr.CtxPRNumber,
 	expr.CtxRefName, expr.CtxRefType, expr.CtxRef, expr.CtxPRHeadRef, expr.CtxPRBaseRef,
+	expr.CtxBeforeSHA, expr.CtxPRBaseSHA,
 }
 
 var namer = strings.NewReplacer(".", "-", "_", "-")

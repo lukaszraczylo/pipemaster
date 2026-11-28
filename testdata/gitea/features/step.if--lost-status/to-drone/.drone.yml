@@ -11,22 +11,22 @@ steps:
   - name: build-step-1
     image: ubuntu:latest
     commands:
-      - echo build
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo build'
   - name: build-step-2
     image: ubuntu:latest
     commands:
-      - echo cleanup
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo cleanup'
     when:
       status:
         - failure
   - name: config
     image: ubuntu:latest
     commands:
-      - echo "configured=true" >> "$$GITHUB_OUTPUT"
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo "configured=true" >> "$$GITHUB_OUTPUT"'
   - name: build-step-4
     image: ubuntu:latest
     commands:
-      - echo configured
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo configured'
     when:
       event:
         exclude:

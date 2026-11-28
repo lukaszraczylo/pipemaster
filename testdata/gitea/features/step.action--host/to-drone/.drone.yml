@@ -1,16 +1,15 @@
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v4\nid: build-step-1\nkind: action\n","at":0}
 # pipemaster:lost step pipeline/ci/job/build/step/build-step-2 uses org/tool@v2
+# pipemaster:emulated job.container pipeline/ci/job/build
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://git.example.com\n    owner: org\n    repo: tool\n    ref: v2\nid: build-step-2\nkind: action\n","at":0}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://git.example.com\n    owner: org\n    repo: tool\n    ref: v2\nid: build-step-2\nkind: action\n","at":0,"fail":true}
 # pipemaster:lost step pipeline/ci/job/build/step/build-step-3 uses org/local-action@main
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-3
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'self:'\n    owner: org\n    repo: local-action\n    ref: main\nid: build-step-3\nkind: action\n","at":0}
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'self:'\n    owner: org\n    repo: local-action\n    ref: main\nid: build-step-3\nkind: action\n","at":1,"fail":true}
 # pipemaster:lost step pipeline/ci/job/build/step/build-step-4 uses /checkout
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-4
-# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'builtin:'\n    repo: checkout\nid: build-step-4\nkind: action\n","at":0}
-# pipemaster:emulated step.script pipeline/ci/job/build
-# pipemaster:emulated job.container pipeline/ci/job/build
+# pipemaster:arg {"step":"action:\n    kind: repo\n    host: 'builtin:'\n    repo: checkout\nid: build-step-4\nkind: action\n","at":2,"fail":true}
 kind: pipeline
 type: docker
 name: build
@@ -19,7 +18,15 @@ trigger:
     - push
     - tag
 steps:
-  - name: noop
+  - name: build-step-2
     image: ubuntu:latest
     commands:
-      - "true"
+      - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-2: no Drone mapping for action org/tool@v2'' >&2; exit 1'
+  - name: build-step-3
+    image: ubuntu:latest
+    commands:
+      - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: no Drone mapping for action org/local-action@main'' >&2; exit 1'
+  - name: build-step-4
+    image: ubuntu:latest
+    commands:
+      - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-4: no Drone mapping for action /checkout'' >&2; exit 1'

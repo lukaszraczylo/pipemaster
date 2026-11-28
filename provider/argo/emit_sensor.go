@@ -8,6 +8,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -22,7 +23,7 @@ const (
 // eventParams maps a context parameter to the event data it reads, per event class. A value entry is a literal.
 type eventSrc struct{ key, tmpl, value string }
 
-func ctxSource(name, event string, tag bool) (eventSrc, bool) {
+func ctxSource(name, event string, tag, tagEvent, prTarget bool) (eventSrc, bool) {
 	push := event == eventPush
 	switch name {
 	case "ctx-ref":
@@ -32,10 +33,16 @@ func ctxSource(name, event string, tag bool) (eventSrc, bool) {
 		return eventSrc{key: "body.pull_request.head.ref"}, true
 	case "ctx-branch", "ctx-ref-name":
 		switch {
+		case push && tag && name == "ctx-branch":
+			// A tag run has no branch: a branch test must not read the tag name.
+			return eventSrc{}, false
 		case push && tag:
 			return eventSrc{tmpl: trimTags}, true
 		case push:
 			return eventSrc{tmpl: trimHeads}, true
+		}
+		if prTarget && name == "ctx-branch" {
+			return eventSrc{key: "body.pull_request.base.ref"}, true
 		}
 		return eventSrc{key: "body.pull_request.head.ref"}, true
 	case "ctx-tag":
@@ -43,12 +50,23 @@ func ctxSource(name, event string, tag bool) (eventSrc, bool) {
 			return eventSrc{tmpl: trimTags}, true
 		}
 	case "ctx-event":
+		if tag && tagEvent {
+			return eventSrc{value: "tag"}, true
+		}
 		return eventSrc{value: event}, true
 	case "ctx-sha":
 		if push {
 			return eventSrc{key: "body.after"}, true
 		}
 		return eventSrc{key: "body.pull_request.head.sha"}, true
+	case "ctx-before-sha":
+		if push {
+			return eventSrc{key: "body.before"}, true
+		}
+	case "ctx-pr-base-sha":
+		if !push {
+			return eventSrc{key: "body.pull_request.base.sha"}, true
+		}
 	case "ctx-repo":
 		return eventSrc{key: pathRepo}, true
 	case "ctx-actor":
@@ -104,6 +122,9 @@ func (e *emitter) eventTrigger(pp *plan, path string, tr ir.Trigger, x map[strin
 	e.addSensorTrigger(pp, path, tr, dn, event, dep)
 	e.emulate(path, caps.TriggerFilterBranch, "", "")
 }
+
+// kindFeature names the trigger feature that an event trigger of a kind reports.
+var kindFeature = map[ir.TriggerKind]caps.Feature{ir.TriggerPush: caps.TriggerPush, ir.TriggerPR: caps.TriggerPullRequest, ir.TriggerTag: caps.TriggerTag}
 
 func filterFeature(t ir.Trigger) caps.Feature {
 	if t.Kind == ir.TriggerTag {
@@ -179,7 +200,7 @@ func (e *emitter) addSensorTrigger(pp *plan, path string, tr ir.Trigger, dn, eve
 		if !a.ctx {
 			continue
 		}
-		src, ok := ctxSource(a.name, event, tr.Kind == ir.TriggerTag)
+		src, ok := ctxSource(a.name, event, tr.Kind == ir.TriggerTag, emitkit.TagIsEvent(e.origin), emitkit.PRBranchIsTarget(e.origin))
 		if !ok {
 			continue
 		}
@@ -216,10 +237,10 @@ func (e *emitter) addSensorTrigger(pp *plan, path string, tr ir.Trigger, dn, eve
 	trig := map[string]any{"template": map[string]any{"name": dn, "conditions": dn, "k8s": k8s}}
 	appendSpec(sensor, "triggers", trig)
 	e.needsSA = true
-	e.external(path, caps.TriggerPush, "EventSource webhook secret", "Secret "+webhookSecret+" with key "+webhookKey+" must exist and match the GitHub webhook; "+placeholder)
 	if tr.Kind == ir.TriggerPR {
 		e.emulate(path, caps.TriggerPullRequest, "", forkCaveat)
 	}
+	e.external(path, kindFeature[tr.Kind], "EventSource webhook secret", "Secret "+webhookSecret+" with key "+webhookKey+" must exist and match the GitHub webhook; "+placeholder)
 }
 
 // sameAsFile is true when the IR trigger equals the triggers that the Ext of an Argo file derives.

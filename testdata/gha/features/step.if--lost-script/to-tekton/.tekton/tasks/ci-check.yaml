@@ -2,6 +2,9 @@
 # pipemaster:arg {"image":"alpine:3.22"}
 # pipemaster:emulated step.image pipeline/ci/job/check/step/check-step-2
 # pipemaster:arg {"image":"alpine:3.22"}
+# pipemaster:emulated step.workdir pipeline/ci/job/check
+# pipemaster:arg {"dir":"/workspace"}
+# pipemaster:emulated job.runner pipeline/ci/job/check
 # pipemaster:emulated step.shell pipeline/ci/job/check/step/check-step-2
 # pipemaster:emulated step.shell pipeline/ci/job/check/step/meta
 apiVersion: tekton.dev/v1
@@ -11,6 +14,8 @@ metadata:
 spec:
   params:
     - name: ctx-event
+  stepTemplate:
+    workingDir: /workspace
   steps:
     - name: meta
       image: alpine:3.22
@@ -27,6 +32,7 @@ spec:
         if [ -z "${PIPEMASTER_BASH:-}" ] && command -v bash >/dev/null 2>&1; then PIPEMASTER_BASH=1 exec bash -e "$0"; fi
         set -e
         # pipemaster:lost script.interpolation: docker inspect {{ steps.meta.outputs.version }}
+        printf '%s\n' 'pipemaster: lost: script.interpolation pipeline/ci/job/check/step/check-step-2: no Tekton spelling for expression steps.meta.outputs.version; the line is replaced by a line that prints the loss and exits 1' >&2; exit 1
       when:
         - input: $(params.ctx-event)
           operator: notin

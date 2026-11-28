@@ -1,4 +1,8 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/alert
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/alert
+# pipemaster:arg {"gitlab_default":true}
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
 # pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}]}
 when:
@@ -8,6 +12,11 @@ when:
   - event: tag
     status:
       - failure
+  - event:
+      - manual
+      - cron
+    status:
+      - failure
 depends_on:
   - name: build
     optional: true
@@ -15,4 +24,4 @@ steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - ./page.sh
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster './page.sh'

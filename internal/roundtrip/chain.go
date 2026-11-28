@@ -42,6 +42,10 @@ func Hop(proj *ir.Project, in *meta.Stack, srcFS fs.FS, source, target string, f
 	if stale, err := in.Top().Stale(srcFS); err != nil {
 		return staleHop(proj, in, stale, err, target, force, rep)
 	}
+	// The metadata names the source of these files, so the triggers an emitter made from its default events go.
+	if in.Top().Source != "" {
+		dropDefaultTriggers(proj)
+	}
 	if i := in.Find(target); i >= 0 {
 		for j := len(in.Layers) - 1; j >= i; j-- {
 			AddOrphans(rep, Restore(proj, in.Layers[j]))
@@ -112,7 +116,7 @@ func plural(n int) string {
 }
 
 func entryCount(m *meta.Meta) int {
-	return len(m.Ext) + len(m.Residual) + len(m.Lost)
+	return len(m.Ext) + len(m.Residual) + len(m.Lost) + len(m.Calls) + len(m.DockerSteps)
 }
 
 // AddOrphans reports each stored path that matches no node in the converted pipeline.

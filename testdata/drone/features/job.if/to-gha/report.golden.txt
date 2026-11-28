@@ -1,4 +1,6 @@
 Loss report: drone -> gha
 [lost] pipeline/drone/job/ci job.if (condition not expressible in GitHub Actions; job disabled)
 [emulated] pipeline/drone/job/ci job.runner: default runner label ubuntu-latest (the IR holds no runner label)
+[emulated] pipeline/drone/job/ci step.action: actions/checkout step (Drone clones the repository before the steps (https://docs.drone.io/pipeline/docker/syntax/cloning/); clone.depth maps to the step input, and GHA does not clone)
 [emulated] pipeline/drone/job/ci/step/build step.image: uses: docker://<image> with entrypoint and args
+[emulated] pipeline/drone/trigger/0 trigger.push: branches: '**' (GHA fires a push without filters for branches and tags; branches are named explicitly to leave tags out or beside a tag filter)

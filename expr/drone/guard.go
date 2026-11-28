@@ -29,9 +29,11 @@ func guardDialect(sem expr.Semantics, o options) shguard.Dialect {
 			t, err := eventCompare(b, sem)
 			return t, true, err
 		},
-		Exact: func(s string) bool { return o.exact(s, sem) },
-		Canon: canonEventCompare,
-		Group: collapsePush,
+		Exact:    func(s string) bool { return o.exact(s, sem) },
+		Canon:    canonEventCompare,
+		Group:    collapsePush,
+		Atom:     atomText,
+		AtomRead: atomRead,
 	}
 }
 

@@ -1,7 +1,7 @@
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/step/build/carry
-# pipemaster:arg {"digest":"ff8ad0e0e70129ce8d6c549b31d77f88fd8b89128989cecf843b9708b65b05a9","carry":"image:\n    ref: alpine:3.20\nid: build\nkind: script\nscript:\n    - echo $\u007b{ sha }} on $\u007b{ branch }}\n    - 'echo \"cost: $5\"'\n"}
+# pipemaster:arg {"digest":"7b8bffca4b35a543b86d8029d0705e04b670f676413861051d9c877e80b126f3","carry":"image:\n    ref: alpine:3.20\nid: build\nkind: script\nscript:\n    - 'export PIPEMASTER_VARS=1; : \"${CI_COMMIT_BRANCH:?pipemaster: lost: variable CI_COMMIT_BRANCH has no concourse source}\"; : pipemaster-end; echo $\u007b{ sha }} on ${CI_COMMIT_BRANCH}'\n    - 'echo \"cost: $5\"'\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/job/ci/carry
-# pipemaster:arg {"digest":"84c29678e320ed29d6290207784831d33cc4afff3a27bd8c9f10f435bb09bc27","carry":"id: ci\n"}
+# pipemaster:arg {"digest":"a78cb84f2873fa0184ace4de4c572e468ee0cbe85f7f806465e59d6cdf8ee7e8","carry":"id: ci\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: woodpecker\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/woodpecker
@@ -35,7 +35,6 @@ jobs:
               - -ec
               - |-
                 PM_CTX_SHA="$(cat ../workspace/.git/commit)"; export PM_CTX_SHA # pipemaster:ctx
-                PM_CTX_BRANCH="$(cat ../workspace/.git/branch)"; export PM_CTX_BRANCH # pipemaster:ctx
-                echo ${PM_CTX_SHA} on ${PM_CTX_BRANCH}
+                export PIPEMASTER_VARS=1; : "${CI_COMMIT_BRANCH:?pipemaster: lost: variable CI_COMMIT_BRANCH has no concourse source}"; : pipemaster-end; echo ${PM_CTX_SHA} on ${CI_COMMIT_BRANCH}
                 echo "cost: $5"
             dir: workspace

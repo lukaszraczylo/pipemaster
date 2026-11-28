@@ -1,0 +1,68 @@
+origin:
+    provider: gitlab
+    dialect: gitlab
+    files:
+        - .gitlab-ci.yml
+        - ci/release.yml
+pipelines:
+    - ext:
+        gitlab:
+            stages:
+                - build
+                - deploy
+      id: gitlab-ci
+      triggers:
+        - kind: push
+        - kind: tag
+      jobs:
+        - ext:
+            gitlab:
+                stage: build
+          id: build
+          steps:
+            - ext:
+                gitlab:
+                    section: script
+              id: script
+              kind: script
+              script:
+                - make build
+        - child:
+            gate: branch == 'main'
+            pipeline:
+                ext:
+                    gitlab:
+                        workflow:
+                            rules:
+                                - if: $CI_COMMIT_BRANCH == "main"
+                id: gitlab-ci-release
+                triggers:
+                    - kind: push
+                      branches:
+                        include:
+                            - main
+                jobs:
+                    - id: publish
+                      steps:
+                        - ext:
+                            gitlab:
+                                section: script
+                          id: script
+                          kind: script
+                          script:
+                            - make publish
+            native:
+                - gitlab
+            files:
+                - ci/release.yml
+          ext:
+            gitlab:
+                _derived_needs: true
+                _no_script: true
+                stage: deploy
+                trigger:
+                    include: ci/release.yml
+                    strategy: depend
+          id: release
+          needs:
+            - job: build

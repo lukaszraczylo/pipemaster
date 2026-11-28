@@ -5,7 +5,7 @@ when:
 steps:
   - image: ubuntu:latest
     commands:
-      - echo "$$GREETING"
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo "$$GREETING"'
     environment:
       GREETING: hello ${CI_COMMIT_AUTHOR}
       KEY:

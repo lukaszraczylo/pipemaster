@@ -1,7 +1,11 @@
 # pipemaster:emulated pipeline.concurrency pipeline/ci
+# pipemaster:emulated job.if pipeline/ci/job/build
+# pipemaster:arg {"from":"concourse","guard":true}
 # pipemaster:emulated job.runner pipeline/ci/job/build
 # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"kind":"script","image":{"Ref":"ubuntu:latest","Entrypoint":null},"script":["sleep 1"]}
+# pipemaster:emulated job.artifacts pipeline/ci/job/build
+# pipemaster:arg {"pre":1,"post":0}
 name: stepto
 on:
   push:
@@ -14,8 +18,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
+      - uses: https://github.com/actions/checkout@v7
       # pipemaster:emulated step.image pipeline/ci/job/build/step/build-step-1
       - id: build-step-1
         uses: docker://ubuntu:latest

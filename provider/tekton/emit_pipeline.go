@@ -9,6 +9,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 )
 
 const (
@@ -61,6 +62,11 @@ func (e *emitter) pipeline(pp *plan) error {
 	d := &outDoc{Root: root.N}
 	pp.doc = d
 	e.add(pipelineFile, d, pp.path)
+	if e.injected[pl.ID] {
+		if err := e.markArg(caps.TriggerPush, pp.path, provider.DefaultMarker(pl)); err != nil {
+			return err
+		}
+	}
 	if pl.Concurrency != nil || pl.Permissions != nil {
 		// Decide already reported both as lost.
 		e.comment(pp.path, "pipeline concurrency and permissions have no Tekton form")
@@ -91,6 +97,12 @@ func (e *emitter) pipeline(pp *plan) error {
 		} else {
 			tasks = append(tasks, pt.N)
 		}
+	}
+	if err := e.markRefTypes(pp); err != nil {
+		return err
+	}
+	if len(pp.changes) > 0 {
+		tasks = append([]*yaml.Node{e.changesPipelineTask(pp)}, tasks...)
 	}
 	spec := newMap()
 	if v, ok := x["description"]; ok {

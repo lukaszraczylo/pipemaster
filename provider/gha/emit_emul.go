@@ -9,7 +9,6 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/actions"
 	"github.com/lukaszraczylo/pipemaster/caps"
-	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
@@ -17,9 +16,18 @@ import (
 const (
 	cachePolicyPull = "pull"
 	cachePolicyPush = "push"
-	monthDays       = 30
-	weekDays        = 7
-	hoursPerDay     = 24
+	// gitlabDefaultCacheKey is the key GitLab gives a cache with no key; every such job shares it
+	// (https://docs.gitlab.com/ci/yaml/#cachekey).
+	gitlabDefaultCacheKey = "default"
+	cacheScopeCaveat      = "GitHub restores only caches of the current branch, the base branch of a pull request and the default branch, while a GitLab key with no branch part is shared across branches"
+	cacheRunSep           = "-run-"
+	// cacheRunID is run_id plus run_attempt: run_id stays the same on a re-run, so it alone would repeat the key
+	// (https://docs.github.com/en/actions/reference/workflows-and-actions/contexts).
+	cacheRunID    = "${{ github.run_id }}-${{ github.run_attempt }}"
+	hashFilesCall = "hashfiles("
+	monthDays     = 30
+	weekDays      = 7
+	hoursPerDay   = 24
 )
 
 var expireRE = regexp.MustCompile(`^(\d+)\s*(hours?|days?|weeks?|months?)$`)
@@ -57,7 +65,7 @@ func (e *emitter) templateNode(path, s string) (*yaml.Node, error) {
 	return str(t), err
 }
 
-// preSteps are the steps that run before the job's own: the checkout, artifact downloads, then the cache restore.
+// preSteps are the steps that run before the job's own: the checkout, artifact downloads, then the cache restore; a push-only cache has no restore.
 func (e *emitter) preSteps(c jobCtx, jp string, j *ir.Job) ([]*yaml.Node, error) {
 	var out []*yaml.Node
 	if n, err := e.checkoutStep(c, jp, j); err != nil {
@@ -95,13 +103,26 @@ func (e *emitter) preSteps(c jobCtx, jp string, j *ir.Job) ([]*yaml.Node, error)
 		}
 	}
 	for _, ch := range j.Cache {
-		n, err := e.cacheStep(jp, j, ch)
+		if ch.Policy == cachePolicyPush {
+			continue
+		}
+		n, err := e.cacheStep(jp, ch)
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, n)
 	}
 	return out, nil
+}
+
+// cacheRollDetail names the effect of a rewritten key. GitHub scoping:
+// https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching
+func cacheRollDetail(shared bool) string {
+	d := "the key is <key>-run-<run_id>-<run_attempt> and the restore prefix is <key>-run-: each run saves a new cache and restores the newest by prefix, because actions/cache never overwrites a key; two jobs of one run that share a key race on the same key and the first to save wins, where on GitLab the last upload wins; the new entries grow toward the 10 GB repository cache limit and evict the least recently used caches, including caches of other keys; " + cacheScopeCaveat
+	if shared {
+		d = "the source has no key, so GitLab shares one cache named default across jobs; " + d
+	}
+	return d
 }
 
 func withOf(kv ...any) *yaml.Node {
@@ -112,7 +133,7 @@ func withOf(kv ...any) *yaml.Node {
 	return m.n
 }
 
-func (e *emitter) cacheStep(jp string, j *ir.Job, ch ir.Cache) (*yaml.Node, error) {
+func (e *emitter) cacheStep(jp string, ch ir.Cache) (*yaml.Node, error) {
 	sub := ""
 	switch ch.Policy {
 	case cachePolicyPull:
@@ -129,11 +150,14 @@ func (e *emitter) cacheStep(jp string, j *ir.Job, ch ir.Cache) (*yaml.Node, erro
 	}
 	key := ch.Key
 	if key == "" {
-		key = j.ID + "-cache"
+		key = gitlabDefaultCacheKey
 	}
-	kn, err := e.templateNode(jp, key)
+	kn, restore, changed, err := e.cacheKeys(jp, key, ch.FallbackKeys)
 	if err != nil {
 		return nil, err
+	}
+	if changed {
+		e.emulate(jp, caps.JobCache, "actions/cache step with a rolling key", cacheRollDetail(ch.Key == ""))
 	}
 	m := newMap()
 	uses, err := e.synthUses(jp, "cache", ref)
@@ -141,8 +165,54 @@ func (e *emitter) cacheStep(jp string, j *ir.Job, ch ir.Cache) (*yaml.Node, erro
 		return nil, err
 	}
 	m.set("uses", str(uses))
-	m.set("with", withOf("path", pathNode(ch.Paths), "key", kn))
+	with := newMap()
+	with.set("path", pathNode(ch.Paths))
+	with.set("key", kn)
+	if len(restore) > 0 && sub != "save" {
+		with.set("restore-keys", block(restore))
+	}
+	m.set("with", with.n)
 	return marked(m, emitkit.Marker(caps.JobCache, jp)), nil
+}
+
+// cacheKeys writes the key and the restore-keys. actions/cache never overwrites an existing key, but GitLab uploads
+// the cache again after every run, so a key with no content hash becomes the rolling pair <key>-run-<run_id>-<run_attempt> and
+// <key>-run-: each run saves a new entry and the next run restores the newest. The "-run-" part keeps the prefix of
+// "main" from matching the keys of "main-hotfix". A hashFiles key already names its content. The bool is true
+// when a key was rewritten.
+func (e *emitter) cacheKeys(jp, key string, fallback []string) (*yaml.Node, []string, bool, error) {
+	changed := false
+	rolled := func(k string) (string, string, error) {
+		t, err := e.template(jp, k)
+		if err != nil {
+			return "", "", err
+		}
+		if hashesContent(k) {
+			return t, t, nil
+		}
+		changed = true
+		return t + cacheRunSep + cacheRunID, t + cacheRunSep, nil
+	}
+	k, restore, err := rolled(key)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	var restoreKeys []string
+	if !hashesContent(key) {
+		restoreKeys = append(restoreKeys, restore)
+	}
+	for _, fb := range fallback {
+		_, r, err := rolled(fb)
+		if err != nil {
+			return nil, nil, false, err
+		}
+		restoreKeys = append(restoreKeys, r)
+	}
+	return str(k), restoreKeys, changed, nil
+}
+
+func hashesContent(key string) bool {
+	return strings.Contains(strings.ToLower(key), hashFilesCall)
 }
 
 func artifactName(j *ir.Job, i int, a ir.Artifact) string {
@@ -169,9 +239,19 @@ func (e *emitter) producerArtifacts(pl *ir.Pipeline, id string) []string {
 	return nil
 }
 
-// postSteps are the upload steps that close the job.
+// postSteps are the cache saves of a push policy and the uploads that close the job.
 func (e *emitter) postSteps(jp string, j *ir.Job) ([]*yaml.Node, error) {
 	var out []*yaml.Node
+	for _, ch := range j.Cache {
+		if ch.Policy != cachePolicyPush {
+			continue
+		}
+		n, err := e.cacheStep(jp, ch)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
 	for i, a := range j.Artifacts {
 		ref, err := reverseAction("upload", "")
 		if err != nil {
@@ -254,31 +334,11 @@ func (e *emitter) markCarried(jp string, j *ir.Job, pre, post int) error {
 	return e.markArg(f, jp, c)
 }
 
-const (
-	gitStrategyVar   = "GIT_STRATEGY"
-	gitStrategyNone  = "none"
-	gitDepthVar      = "GIT_DEPTH"
-	gitSubmodulesVar = "GIT_SUBMODULE_STRATEGY"
-	submodulesNormal = "normal"
-	submodulesDeep   = "recursive"
-)
-
-// envLit is the literal value of a variable the job or its pipeline sets; the job wins.
-func envLit(c jobCtx, j *ir.Job, name string) string {
-	for _, vars := range [][]ir.Var{j.Env, c.pl.Env} {
-		for _, v := range vars {
-			if v.Name == name && v.Value.Kind == ir.ValueLit {
-				return v.Value.Lit
-			}
-		}
-	}
-	return ""
-}
-
-// checkoutStep is the clone GitLab runs before every job, which a GHA job must ask for. It is nil for any other
-// origin, for a job with no steps and for GIT_STRATEGY none. The step is counted as a pre step, so Parse removes it again.
+// checkoutStep is the clone that the CI system of the source runs before the steps, which a GHA job must ask for.
+// It is nil when the origin does not clone for the job. The step is counted as a pre step, so Parse removes it again.
 func (e *emitter) checkoutStep(c jobCtx, jp string, j *ir.Job) (*yaml.Node, error) {
-	if e.from == nil || e.from.ID != exprgitlab.Dialect || len(j.Steps) == 0 || envLit(c, j, gitStrategyVar) == gitStrategyNone {
+	co, ok := emitkit.SourceCheckout(e.origin, c.pl, j)
+	if !ok {
 		return nil, nil
 	}
 	ref, err := reverseAction("checkout", "")
@@ -292,18 +352,18 @@ func (e *emitter) checkoutStep(c jobCtx, jp string, j *ir.Job) (*yaml.Node, erro
 	}
 	m.set("uses", str(uses))
 	with := newMap()
-	if d, err := strconv.Atoi(envLit(c, j, gitDepthVar)); err == nil {
-		with.set("fetch-depth", intNode(d))
+	if co.Depth > 0 {
+		with.set("fetch-depth", intNode(co.Depth))
 	}
-	switch envLit(c, j, gitSubmodulesVar) {
-	case submodulesNormal:
+	switch co.Submodules {
+	case emitkit.SubmodulesOn:
 		with.set("submodules", boolNodeOf(true))
-	case submodulesDeep:
-		with.set("submodules", str(submodulesDeep))
+	case emitkit.SubmodulesDeep:
+		with.set("submodules", str(emitkit.SubmodulesDeep))
 	}
 	if len(with.n.Content) > 0 {
 		m.set("with", with.n)
 	}
-	e.emulate(jp, caps.StepAction, "actions/checkout step", "GitLab clones the repository before every job and GHA does not; GIT_DEPTH and GIT_SUBMODULE_STRATEGY map to the step inputs")
+	e.emulate(jp, caps.StepAction, "actions/checkout step", emitkit.SourceCheckoutDetail(e.origin))
 	return m.n, nil
 }

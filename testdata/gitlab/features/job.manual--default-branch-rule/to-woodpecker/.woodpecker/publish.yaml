@@ -1,12 +1,20 @@
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/publish
-# pipemaster:lost job.if pipeline/gitlab-ci/job/publish: branch == gitlab.CI_DEFAULT_BRANCH
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/publish
+# pipemaster:arg {"gitlab_default":true}
+# pipemaster:lost job.if pipeline/gitlab-ci/job/publish: branch == default_branch
 when:
   - event: push
     evaluate: "false"
   - event: tag
     evaluate: "false"
+  - event:
+      - manual
+      - cron
+    evaluate: "false"
 steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make publish
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make publish'

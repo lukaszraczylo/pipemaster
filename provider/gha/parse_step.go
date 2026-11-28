@@ -111,6 +111,7 @@ func (fp *fileParser) parseStep(job string, n int, node *yaml.Node) (*ir.Step, e
 	if s.Kind == "" {
 		return nil, fp.errf(node, "step %d of job %s needs run or uses", n, job)
 	}
+	foldRefEnv(s)
 	if s.Ext, err = m.ext(fp.d.Extra[NodeStep]); err != nil {
 		return nil, err
 	}

@@ -44,17 +44,18 @@ func (tc *taskCtx) stepName(b *stepBook, sp string, st *ir.Step) (string, string
 // stepOutputs holds a written step; node is nil when the step is not written.
 func (tc *taskCtx) step(b *stepBook, st *ir.Step, sp string) (*wmap, error) {
 	name, comment := tc.stepName(b, sp, st)
-	var m *wmap
-	var err error
+	m, ok, err := tc.pluginStep(b, st, sp, name)
 	switch {
+	case err != nil || ok:
 	case st.Kind == ir.StepAction || st.Action != nil || len(st.With) > 0:
 		m, err = tc.actionStep(b, st, sp, name)
 	case st.Kind == ir.StepScript || st.Kind == "":
 		m, err = tc.scriptStep(b, st, sp, name)
 	default:
-		tc.e.lose(sp, caps.StepAction, "step kind "+string(st.Kind)+" has no Tekton form")
+		why := "step kind " + string(st.Kind) + " has no Tekton form"
+		tc.e.lose(sp, caps.StepAction, why)
 		tc.e.comment(sp, "step "+sp+" has kind "+string(st.Kind))
-		err = tc.markAction(b, sp, st, "", nil)
+		m, err = tc.failedAction(b, st, sp, name, why)
 	}
 	if m != nil && comment != "" {
 		m.N.HeadComment = comment
@@ -70,7 +71,7 @@ func (tc *taskCtx) scriptStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 	if st.Name != "" {
 		m.SetStr("displayName", st.Name)
 	}
-	userEnv, err := tc.envList(sc, sp, st.Env)
+	userEnv, err := tc.envList(sc, sp, st.Env, extOf(st.Ext)[ExtEnvWorkspace])
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +101,10 @@ func (tc *taskCtx) scriptStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 		guardEnv(sc, guard)
 	}
 	if st.Shell != "" {
-		lines = append([]string{shebang + st.Shell}, lines...)
+		if strings.HasPrefix(shebangShell(st.Shell), envShebang) {
+			tc.e.emulate(sp, caps.StepShell, "env shebang", "the script starts with #!"+envShebang+st.Shell+"; the image must provide "+st.Shell+", else the step stops with env: can't execute '"+st.Shell+"' and exit code 127")
+		}
+		lines = append([]string{shebang + shebangShell(st.Shell)}, lines...)
 	} else if len(lines) > 0 && tc.bashDefault(st) {
 		tc.e.emulate(sp, caps.StepShell, "bash-if-present preamble in the script", "the source runs the step under bash when the image has it; the script starts with a line that re-runs it under bash -e when the image has bash, else it runs under sh -e, so bash-only syntax fails under sh")
 		lines = append(bashPreamble(), lines...)
@@ -111,7 +115,9 @@ func (tc *taskCtx) scriptStep(b *stepBook, st *ir.Step, sp, name string) (*wmap,
 	if len(userEnv)+len(sc.env) > 0 {
 		m.Set("env", seqOf(append(userEnv, sc.env...)...))
 	}
-	if st.WorkDir != "" {
+	if orig, ok := tc.sourceWorkDir(st); ok {
+		m.SetStr("workingDir", orig)
+	} else if st.WorkDir != "" {
 		wd, ok, err := tc.text(sc, sp, caps.StepWorkdir, valueText, st.WorkDir)
 		if err != nil {
 			return nil, err
@@ -158,7 +164,7 @@ func (tc *taskCtx) stepExt(m *wmap, st *ir.Step) error {
 	if len(x) == 0 || !tc.e.own {
 		return nil
 	}
-	skip := map[string]bool{ExtCommand: true, ExtArgs: true, ExtScriptLine: true, ExtBashDefault: true, "ref": true, "params": true, "taskRef": true, "timeout": true, "onError": true}
+	skip := map[string]bool{ExtWorkspaceDir: true, ExtWorkspaceDirIR: true, ExtScriptSource: true, ExtScriptIR: true, ExtSourceCheckout: true, ExtWorkspaceDirs: true, ExtEnvWorkspace: true, ExtCommand: true, ExtArgs: true, ExtScriptLine: true, ExtBashDefault: true, "ref": true, "params": true, "taskRef": true, "timeout": true, "onError": true}
 	for _, k := range sortedKeys(x) {
 		if skip[k] || m.Has(k) {
 			continue
@@ -182,29 +188,57 @@ func (tc *taskCtx) stepExt(m *wmap, st *ir.Step) error {
 }
 
 // scriptLines converts the script of a step. A line with no spelling is commented out with the rest of its
-// statement, line by line, so the lines that stay are valid shell.
+// statement, and a failing line takes its place so the step stops where the source would have run it.
 func (tc *taskCtx) scriptLines(sc *stepScope, st *ir.Step, sp string) ([]string, error) {
-	outs := make([]string, len(st.Script))
-	why := make([]string, len(st.Script))
-	lost := make([]bool, len(st.Script))
-	for i, l := range st.Script {
+	script := st.Script
+	if x := extOf(st.Ext); tc.e.own && x[ExtScriptIR] == strings.Join(script, "\n") {
+		switch src := x[ExtScriptSource].(type) {
+		case []string:
+			script = src
+		case []any:
+			script = make([]string, 0, len(src))
+			for _, l := range src {
+				s, _ := l.(string)
+				script = append(script, s)
+			}
+		}
+	}
+	outs := make([]string, len(script))
+	why := make([]string, len(script))
+	lost := make([]bool, len(script))
+	for i, l := range script {
 		var err error
 		if outs[i], why[i], err = tc.scriptLine(sc, sp, l); err != nil {
 			return nil, err
 		}
 		lost[i] = why[i] != ""
 	}
-	for _, span := range emitkit.CommentSpans(st.Script, lost) {
-		first := ""
-		for i := span.From; i <= span.To; i++ {
-			outs[i] = "# pipemaster:lost script.interpolation: " + commentSafe(st.Script[i])
-			if first == "" {
-				first = why[i]
-			}
-		}
-		tc.e.lose(sp, caps.ScriptInterpolation, emitkit.SpanDetail(first, span.To-span.From+1, span.Open))
+	spans := emitkit.CommentSpans(script, lost)
+	if len(spans) == 0 {
+		return outs, nil
 	}
-	return outs, nil
+	var out []string
+	next := 0
+	for i := 0; i < len(script); i++ {
+		if next < len(spans) && spans[next].From == i {
+			span := spans[next]
+			next++
+			first := ""
+			for k := span.From; k <= span.To; k++ {
+				out = append(out, "# pipemaster:lost script.interpolation: "+commentSafe(script[k]))
+				if first == "" {
+					first = why[k]
+				}
+			}
+			detail := emitkit.SpanDetail(first, span.To-span.From+1, span.Open)
+			tc.e.lose(sp, caps.ScriptInterpolation, detail)
+			out = append(out, emitkit.FailLoud(caps.ScriptInterpolation, sp, detail))
+			i = span.To
+			continue
+		}
+		out = append(out, outs[i])
+	}
+	return out, nil
 }
 
 // stepImage picks the image of a step: its own, the one a setup action chose, or the default. The job
@@ -364,4 +398,27 @@ func (tc *taskCtx) markShell(sc *stepScope, sp string, lines []string) error {
 		}
 	}
 	return tc.e.markArg(caps.ScriptInterpolation, sp, arg)
+}
+
+// sourceWorkDir returns the working directory text that the file held, while the IR directory is as parsed.
+func (tc *taskCtx) sourceWorkDir(st *ir.Step) (string, bool) {
+	x := extOf(st.Ext)
+	orig, ok := x[ExtWorkspaceDir].(string)
+	rel, _ := x[ExtWorkspaceDirIR].(string)
+	return orig, tc.e.own && ok && rel == st.WorkDir
+}
+
+const (
+	envShebang = "/usr/bin/env "
+	// shellSh keeps its env form in the IR: Argo runs sh as its default command, so a bare sh would not come back.
+	shellSh = "sh"
+)
+
+// shebangShell names the interpreter of a script. The kernel needs a path, so a bare shell name such as bash
+// goes through env.
+func shebangShell(shell string) string {
+	if strings.HasPrefix(shell, "/") || strings.ContainsAny(shell, " \t") {
+		return shell
+	}
+	return envShebang + shell
 }

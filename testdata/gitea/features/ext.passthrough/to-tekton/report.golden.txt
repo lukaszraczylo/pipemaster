@@ -1,6 +1,7 @@
 Loss report: gitea -> tekton
 [lost] pipeline/ci ext.passthrough (Ext of provider gha (events, run-name) is not written to the Tekton file; it is kept in round-trip metadata)
-[lost] pipeline/ci/job/build job.runner (Tekton schedules pods, not runner labels)
+[external] pipeline/ci/job/build job.runner: no node selector (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)
 [external] pipeline/ci/trigger/0 trigger.push: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [external] pipeline/ci/trigger/1 trigger.tag: Secret pipemaster-github-webhook (create the Secret pipemaster-github-webhook with key token holding the GitHub webhook secret; the github interceptor rejects a webhook that it does not sign)
 [emulated] pipeline/ci/job/build/step/build-step-1 step.image: default image (the step names no image and Tekton requires one; alpine:3.22 runs it)
+[emulated] pipeline/ci/job/build/step/build-step-1 step.shell: env shebang (the script starts with #!/usr/bin/env bash; the image must provide bash, else the step stops with env: can't execute 'bash' and exit code 127)

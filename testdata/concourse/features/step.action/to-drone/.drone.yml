@@ -1,16 +1,15 @@
 # pipemaster:emulated trigger.filter.branches pipeline/ci
-# pipemaster:arg "- ext:\n    concourse:\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
+# pipemaster:arg "- ext:\n    concourse:\n        _carried:\n            - resources\n        resources:\n            - source\n  kind: push\n  branches:\n    include:\n        - main\n- ext:\n    concourse:\n        _carried:\n            - resources\n        resources:\n            - source-tags\n  kind: tag\n  tags:\n    include:\n        - '*'\n"
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-1
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: checkout\n    ref: v4\nwith:\n    fetch-depth:\n        lit: \"0\"\n    token:\n        secret: PAT\nid: build-step-1\nkind: action\n","at":0}
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
 # pipemaster:arg {"step":"action:\n    kind: repo\n    host: https://github.com\n    owner: actions\n    repo: setup-go\n    ref: v5\nwith:\n    go-version:\n        lit: \"1.24\"\nid: build-step-2\nkind: action\n","image":"golang:1.24","at":0}
 # pipemaster:lost step pipeline/ci/job/build/step/build-step-3 uses docker://alpine:3.20
 # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-3
-# pipemaster:arg {"step":"action:\n    kind: docker\n    image: alpine:3.20\nid: build-step-3\nkind: action\n","at":0}
+# pipemaster:arg {"step":"action:\n    kind: docker\n    image: alpine:3.20\nid: build-step-3\nkind: action\n","at":0,"fail":true}
 # pipemaster:lost step pipeline/ci/job/build/step/local uses ./.github/actions/setup
 # pipemaster:emulated step.action pipeline/ci/job/build/step/local
-# pipemaster:arg {"step":"action:\n    kind: local\n    path: ./.github/actions/setup\nid: local\nkind: action\n","at":0}
-# pipemaster:emulated step.script pipeline/ci/job/build
+# pipemaster:arg {"step":"action:\n    kind: local\n    path: ./.github/actions/setup\nid: local\nkind: action\n","at":1,"fail":true}
 kind: pipeline
 type: docker
 name: build
@@ -24,7 +23,11 @@ trigger:
     - refs/heads/main
     - refs/tags/*
 steps:
-  - name: noop
+  - name: build-step-3
     image: golang:1.24
     commands:
-      - "true"
+      - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/build-step-3: no Drone mapping for action docker://alpine:3.20'' >&2; exit 1'
+  - name: local
+    image: golang:1.24
+    commands:
+      - 'printf ''%s\n'' ''pipemaster: lost: step.action pipeline/ci/job/build/step/local: no Drone mapping for action ./.github/actions/setup'' >&2; exit 1'

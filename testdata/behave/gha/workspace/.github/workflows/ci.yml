@@ -1,0 +1,11 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo data > shared.txt
+          echo "MARK workspace.s1" | tee -a trace.log
+      - run: |
+          echo "MARK workspace.s2:$(cat shared.txt)" | tee -a trace.log

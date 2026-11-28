@@ -4,7 +4,7 @@
 # pipemaster:arg {"name":"CI","triggers":[{"Resource":null,"Ext":null,"Kind":"push","Cron":"","Branches":{"Include":null,"Exclude":null},"Tags":{"Include":null,"Exclude":null},"Paths":{"Include":null,"Exclude":null}}]}
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
 # pipemaster:jobid .shared:run
 # pipemaster:emulated project.multi_pipeline pipeline/.shared/job/run
 # pipemaster:arg {}
@@ -20,7 +20,7 @@ shared:run-job:
 ci:build:
   needs: []
   rules:
-    - if: $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
   script:
     # pipemaster:step build-step-1
     - echo build

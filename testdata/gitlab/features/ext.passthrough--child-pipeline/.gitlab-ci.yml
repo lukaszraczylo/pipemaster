@@ -1,0 +1,20 @@
+stages: [build, test, deploy]
+
+compile:
+  stage: build
+  script: [make build]
+
+integration:
+  stage: test
+  needs: [compile]
+  trigger:
+    include: ci/child.yml
+    strategy: depend
+  variables:
+    TARGET: staging
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+ship:
+  stage: deploy
+  script: [make ship]

@@ -1,17 +1,19 @@
 stages:
   - stage-0
   - stage-1
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
 build:
   stage: stage-0
-  tags:
-    - ubuntu-latest
   needs: []
   script:
     # pipemaster:step build-step-1
     # pipemaster:step build-step-2
     # pipemaster:step build-step-3
     # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-2
-    # pipemaster:arg {"cache":{"Key":"go-mod","Policy":"","Paths":["~/go/pkg/mod"]},"step":{"action":{"Kind":"repo","Host":"https://github.com","Owner":"actions","Repo":"cache","Path":"","Ref":"v4","Image":""},"with":{"key":{"l":"go-mod"},"path":{"l":"~/go/pkg/mod"}},"id":"build-step-2"},"kind":"cache","pos":1}
+    # pipemaster:arg {"cache":{"Key":"go-mod","Policy":"","Paths":["~/go/pkg/mod"],"FallbackKeys":null},"step":{"action":{"Kind":"repo","Host":"https://github.com","Owner":"actions","Repo":"cache","Path":"","Ref":"v4","Image":""},"with":{"key":{"l":"go-mod"},"path":{"l":"~/go/pkg/mod"}},"id":"build-step-2"},"kind":"cache","pos":1}
     - make build
     # pipemaster:step build-step-4
     # pipemaster:emulated step.action pipeline/ci/job/build/step/build-step-4
@@ -28,8 +30,6 @@ build:
 # pipemaster:arg {"step":{"action":{"Kind":"repo","Host":"https://github.com","Owner":"actions","Repo":"download-artifact","Path":"","Ref":"v4","Image":""},"with":{"name":{"l":"dist"}},"id":"test-step-1"},"kind":"download","jobs":[{"id":"build"}],"pos":0}
 test:
   stage: stage-1
-  tags:
-    - ubuntu-latest
   needs:
     - job: build
       artifacts: true

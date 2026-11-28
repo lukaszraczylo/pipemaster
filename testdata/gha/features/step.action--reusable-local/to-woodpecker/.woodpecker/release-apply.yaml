@@ -1,0 +1,18 @@
+# pipemaster:emulated job.container pipeline/ci/job/release-apply
+# pipemaster:emulated job.if pipeline/ci/job/release-apply
+# pipemaster:arg {"src":"ref_name == 'main'","from":"gha","branch":true,"gate":true}
+# pipemaster:emulated job.env pipeline/ci/job/release-apply
+# pipemaster:arg "- name: DEPLOY_TOKEN\n  value:\n    secret: DEPLOY_TOKEN\n"
+when:
+  - event: push
+    branch: main
+    evaluate: '!(CI_PIPELINE_EVENT matches "(?i)^pull_request") && CI_COMMIT_BRANCH matches "(?i)^main$$"'
+depends_on:
+  - release-plan
+steps:
+  - image: ubuntu:latest
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'deploy --env "staging"'
+    environment:
+      DEPLOY_TOKEN:
+        from_secret: DEPLOY_TOKEN

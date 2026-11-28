@@ -15,6 +15,7 @@ func (b *jobBuilder) body(spec *omap, r *reader) error {
 	if r == nil {
 		r = newReader(spec)
 	}
+	b.mounts = declaredMounts(valueOf(spec, "workspaces"))
 	if v, ok := r.Take("params"); ok {
 		if err := b.taskParams(v, r.Line("params")); err != nil {
 			return err
@@ -41,7 +42,7 @@ func (b *jobBuilder) body(spec *omap, r *reader) error {
 		b.results(v, r.Line("results"))
 	}
 	if v, ok := r.Take("workspaces"); ok && b.ws == nil {
-		b.k.Keep("task_workspaces", v, caps.ExtPassthrough, "Task workspaces have no IR field; kept in Ext", r.Line("workspaces"))
+		b.keepWorkspaces("task_workspaces", v, workspaceNames(v, "name"), r.Line("workspaces"))
 	}
 	if v, ok := r.Take("description"); ok {
 		b.k.Out["task_description"] = plain(v)

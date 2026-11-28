@@ -1,5 +1,8 @@
 Loss report: drone -> gitea
+[emulated] pipeline/drone job.if: !github.event.deleted on every job (GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard)
 [emulated] pipeline/drone/job/ci job.runner: default runner label ubuntu-latest (the IR holds no runner label)
+[emulated] pipeline/drone/job/ci step.action: actions/checkout step (Drone clones the repository before the steps (https://docs.drone.io/pipeline/docker/syntax/cloning/); clone.depth maps to the step input, and GHA does not clone)
 [emulated] pipeline/drone/job/ci/step/build step.image: uses: docker://<image> with entrypoint and args
 [emulated] pipeline/drone/job/ci/step/publish step.image: settings as PLUGIN_ environment variables (the plugin settings are passed as PLUGIN_<NAME> variables, the Woodpecker convention; a GHA docker action reads its inputs as INPUT_<NAME>)
 [emulated] pipeline/drone/trigger/0 trigger.push: branches: '**' (GHA fires a push without filters for branches and tags; branches are named explicitly to leave tags out or beside a tag filter)
+[native] pipeline/drone/job/ci/synth/checkout step.action (resolves against DEFAULT_ACTIONS_URL; default github)

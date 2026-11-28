@@ -54,21 +54,29 @@ func (b *jobBuilder) inline(sm *omap) error {
 }
 
 // reference reads a taskRef. A name with no resolver that a Task document of the files carries is read as the
-// body. Any other reference is one StepTask step with the ref in Ext.
+// body. A reference that names a catalog task is read as that task's mapping. Any other reference is one
+// StepTask step with the ref in Ext.
 func (b *jobBuilder) reference(rm *omap, line int) error {
 	name, _ := text(rm.Vals["name"])
 	_, resolver := rm.Vals["resolver"]
 	kind, _ := text(rm.Vals["kind"])
 	_, bundle := rm.Vals["bundle"]
+	why := "remote taskRef (" + remoteKind(rm) + ")"
 	if !resolver && !bundle && name != "" && (kind == "" || kind == kindTaskName) {
 		if doc, ok := b.c.p.tasks[name]; ok {
 			b.c.p.taskUsed[name] = true
 			return b.document(doc, name)
 		}
-		b.remote(rm, line, "taskRef "+name+" names no Task in the parsed files")
-		return nil
+		why = "taskRef " + name + " names no Task in the parsed files"
 	}
-	b.remote(rm, line, "remote taskRef ("+remoteKind(rm)+")")
+	entry, ok, err := catalogEntry(rm)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return b.catalog(rm, line, entry)
+	}
+	b.remote(rm, line, why)
 	return nil
 }
 
@@ -110,6 +118,7 @@ func (b *jobBuilder) document(doc *rawDoc, name string) error {
 	}
 	if name != b.c.plID+"-"+b.job.ID {
 		b.k.Out["task_name"] = name
+		b.k.Carry("task_name")
 	}
 	spec, ok := asMap(doc.Top.Vals["spec"])
 	if !ok {

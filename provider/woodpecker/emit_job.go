@@ -2,9 +2,11 @@ package woodpecker
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -12,6 +14,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/expr"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
 const (
@@ -40,19 +43,15 @@ type wfCtx struct {
 	j       *ir.Job
 	names   map[string]string
 	uploads map[string]bool
-	// multi is set when several pipelines share the directory.
-	multi *multiArg
-	// image is what a step without its own image runs in; a setup action replaces it for the steps after it.
-	image string
-	name  string
-	// depth is the clone depth that an actions/checkout step asked for; empty means the default clone.
-	depth string
-	jp    string
-	// pos is the place the step being written takes in the file, which the parser reads steps by.
+	multi   *multiArg
+	emul    *ir.Step
+	name    string
+	depth   string
+	jp      string
+	image   string
 	pos     int
 	finally bool
 	defImg  bool
-	// mapForm is true when the steps are written as a map keyed by name.
 	mapForm bool
 }
 
@@ -120,7 +119,14 @@ func (e *emitter) workflowHeader(m *wmap, c *wfCtx, ext map[string]any) error {
 		if err != nil {
 			return err
 		}
-		m.set(keyWhen, whenNode(completeEvents(entries)))
+		completed, filled := e.completeEvents(entries, e.namesNoEvents())
+		m.set(keyWhen, whenNode(completed))
+		if filled {
+			e.noteSourceEvents(c.pl.ID)
+			if err := e.markArg(caps.TriggerPush, c.jp, defaultEventsArg{Events: e.sourceEvents()}); err != nil {
+				return err
+			}
+		}
 	}
 	if c.j.Matrix != nil {
 		n, err := e.matrix(c.jp, c.j.Matrix, ext)
@@ -247,6 +253,11 @@ func (e *emitter) labels(m *wmap, c *wfCtx, ext map[string]any) error {
 			platform = l
 		}
 	}
+	var hostedStrategy string
+	var hostedExt, lostMsgs []string
+	emitkit.ReportHosted(e.origin, r.Labels, "backend label",
+		func(st, d string) { hostedStrategy = st; hostedExt = append(hostedExt, d) },
+		func(d string) { lostMsgs = append(lostMsgs, d) })
 	n := newMap()
 	if platform != "" {
 		v, err := e.text(nil, c.jp, caps.JobRunner, valueText, platform)
@@ -254,6 +265,44 @@ func (e *emitter) labels(m *wmap, c *wfCtx, ext map[string]any) error {
 			return err
 		}
 		n.set("platform", str(v))
+	}
+	var tags []string
+	for _, l := range emitkit.Unplaced(e.origin, r.Labels) {
+		if l == platform {
+			continue
+		}
+		if k, ok := emitkit.TagKey(l); ok && k != "platform" {
+			n.set(k, str(emitkit.TagValue))
+			tags = append(tags, k+"="+emitkit.TagValue)
+			continue
+		}
+		lostMsgs = append(lostMsgs, "the runner label "+l+" has no Woodpecker label key: "+emitkit.TagHint)
+	}
+	for _, k := range slices.Sorted(maps.Keys(r.Selector)) {
+		v := r.Selector[k]
+		if _, ok := emitkit.TagKey(k); !ok || k == "platform" || v == "" || n.has(k) {
+			lostMsgs = append(lostMsgs, "the runner selector "+k+"="+v+" has no Woodpecker label: the key must be a label key other than platform, and the value must not be empty")
+			continue
+		}
+		t, err := e.text(nil, c.jp, caps.JobRunner, valueText, v)
+		if err != nil {
+			return err
+		}
+		n.set(k, str(t))
+		tags = append(tags, k+"="+t)
+	}
+	setup := hostedExt
+	strategy := hostedStrategy
+	if len(tags) > 0 {
+		setup = append(setup, "register a Woodpecker agent with WOODPECKER_AGENT_LABELS="+strings.Join(tags, ",")+" for the runner labels")
+		strategy = joinNew(strategy, "workers the operator provides")
+	}
+	switch {
+	case len(lostMsgs) > 0:
+		// One lost entry holds every text, because the ledger keeps one entry per job and a lost entry replaces an earlier one.
+		e.lose(c.jp, caps.JobRunner, strings.Join(append(lostMsgs, setup...), "; "))
+	case len(setup) > 0:
+		e.external(c.jp, caps.JobRunner, strategy, strings.Join(setup, "; "))
 	}
 	if err := n.mergeMap(ext[keyLabels]); err != nil {
 		return err

@@ -2,3 +2,4 @@ Loss report: gitea -> gitlab
 [lost] pipeline/ci/trigger/0 trigger.filter.paths (rules:changes has no exclude patterns)
 [lost] pipeline/ci/trigger/1 trigger.filter.paths (rules:changes has no exclude patterns)
 [lost] pipeline/ci/trigger/2 trigger.filter.paths (rules:changes has no exclude patterns)
+[external] pipeline/ci/job/build job.runner: no tag (the hosted label ubuntu-latest runs on any Linux worker; the GitHub-hosted image tools are not present)

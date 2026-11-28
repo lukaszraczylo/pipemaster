@@ -2,7 +2,6 @@ package drone_test
 
 import (
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/lukaszraczylo/pipemaster/expr"
@@ -118,7 +117,8 @@ func TestSubstitutionEscape(t *testing.T) {
 func TestSubstitutionBuiltinBecomesRef(t *testing.T) {
 	j, rep := parseJob(t, "kind: pipeline\nname: p\nsteps:\n- name: s\n  image: x\n  commands:\n  - echo ${DRONE_BRANCH} ${X##v}\n  environment:\n    TAG: ${DRONE_TAG}\n")
 	s := step(t, j, "s")
-	if len(s.Script) != 1 || !strings.Contains(s.Script[0], "${{ ") || !strings.Contains(s.Script[0], "${X##v}") {
+	// DRONE_BRANCH is the target branch on a pull request, so the script keeps the name and the prelude spells it.
+	if len(s.Script) != 1 || s.Script[0] != "echo ${DRONE_BRANCH} ${X##v}" {
 		t.Fatalf("script = %q", s.Script)
 	}
 	if s.Env[0].Value.Kind != ir.ValueExpr {

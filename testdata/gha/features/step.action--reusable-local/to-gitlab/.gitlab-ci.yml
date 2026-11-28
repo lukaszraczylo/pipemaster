@@ -1,0 +1,46 @@
+stages:
+  - stage-0
+  - stage-1
+  - stage-2
+  - stage-3
+workflow:
+  name: ci
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+build:
+  stage: stage-0
+  needs: []
+  script:
+    # pipemaster:step build-step-1
+    - make build
+notify:
+  stage: stage-3
+  needs:
+    - release-apply
+  script:
+    # pipemaster:step notify-step-1
+    - echo released
+# pipemaster:emulated job.if pipeline/ci/job/release-apply
+# pipemaster:arg {"src":"ref_name == 'main'","from":"gha"}
+release-apply:
+  stage: stage-2
+  needs:
+    - release-plan
+  rules:
+    - if: $CI_PIPELINE_SOURCE !~ /^merge_request_event$/i && $CI_COMMIT_REF_NAME =~ /^main$/i
+  variables:
+    DEPLOY_TOKEN: $DEPLOY_TOKEN
+  script:
+    # pipemaster:step release-apply-step-1
+    - deploy --env "staging"
+# pipemaster:emulated job.if pipeline/ci/job/release-plan
+# pipemaster:arg {"src":"ref_name == 'main'","from":"gha"}
+release-plan:
+  stage: stage-1
+  needs:
+    - build
+  rules:
+    - if: $CI_PIPELINE_SOURCE !~ /^merge_request_event$/i && $CI_COMMIT_REF_NAME =~ /^main$/i
+  script:
+    # pipemaster:step release-plan-step-1
+    - echo "planning for staging"

@@ -1,0 +1,16 @@
+{
+  "features": [
+    "step.script"
+  ],
+  "events": [
+    "push-main",
+    "push-branch"
+  ],
+  "expect_failure": false,
+  "unordered": false,
+  "expect": [
+    "workspace.s2:data"
+  ],
+  "owners": {},
+  "requires": []
+}

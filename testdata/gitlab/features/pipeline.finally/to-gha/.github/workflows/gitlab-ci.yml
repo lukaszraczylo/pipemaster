@@ -1,42 +1,63 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"source_events":["manual","schedule","api"]}
+# pipemaster:emulated trigger.api pipeline/gitlab-ci/trigger/4
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/build
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/build
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/build/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/build
 # pipemaster:arg {"pre":1,"post":0}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/alert
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/alert
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/alert/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/alert
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/alert
 # pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}]}
+# pipemaster:emulated job.if pipeline/gitlab-ci/job/report
+# pipemaster:arg {"guard":true}
 # pipemaster:emulated job.runner pipeline/gitlab-ci/job/report
+# pipemaster:emulated step.shell pipeline/gitlab-ci/job/report/step/script
 # pipemaster:emulated job.artifacts pipeline/gitlab-ci/job/report
 # pipemaster:arg {"pre":1,"post":0}
 # pipemaster:emulated pipeline.finally pipeline/gitlab-ci/job/report
 # pipemaster:arg {"needs":[{"JobID":"build","Artifacts":false,"Optional":false}]}
 on:
+  workflow_dispatch:
   push:
+  repository_dispatch:
+    types:
+      - api
+      - trigger
 jobs:
   build:
+    if: '!github.event.deleted'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - id: script
         run: make build
+        shell: bash
   # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
   alert:
     needs:
       - build
-    if: always() && failure()
+    if: always() && failure() && !github.event.deleted
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - id: script
         run: ./page.sh
+        shell: bash
   # pipemaster:emulated pipeline.finally pipeline/gitlab-ci
   report:
     needs:
       - build
-    if: always()
+    if: always() && !github.event.deleted
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - id: script
         run: ./notify.sh
+        shell: bash

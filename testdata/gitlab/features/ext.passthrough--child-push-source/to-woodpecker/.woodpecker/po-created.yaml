@@ -1,0 +1,22 @@
+# pipemaster:emulated job.container pipeline/gitlab-ci/job/po-created
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci
+# pipemaster:arg "- kind: push\n- kind: tag\n"
+# pipemaster:emulated trigger.push pipeline/gitlab-ci/job/po-created
+# pipemaster:arg {"gitlab_default":true}
+when:
+  - event: push
+  - event: tag
+  - event:
+      - manual
+      - cron
+depends_on:
+  - build
+steps:
+  - name: fail
+    image: ubuntu:latest
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'exit 1'
+  - name: pass
+    image: ubuntu:latest
+    commands:
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'true'

@@ -263,7 +263,7 @@ func TestStepGuardReturnsAsTheCondition(t *testing.T) {
 
 func TestEditedStepGuardStays(t *testing.T) {
 	p, rep := back(t, guardJobs(), func(s string) string {
-		return strings.Replace(s, "; then exit 0; fi # pipemaster:guard", "; then exit 1; fi # pipemaster:guard", 1)
+		return strings.Replace(s, "exit 0; fi # pipemaster:guard", "exit 1; fi # pipemaster:guard", 1)
 	})
 	j := jobOf(t, p, "b")
 	if j.Steps[0].If != nil || !ignored(rep, caps.StepIf) {
@@ -639,7 +639,7 @@ func TestEditInLaterMatrixCellKeepsTheCells(t *testing.T) {
 	cases := map[string]func(string) string{
 		"a plain command": func(s string) string { return strings.Replace(s, "make test", "make test-race", 1) },
 		"an added when": func(s string) string {
-			return strings.Replace(s, "      - make test\n", "      - make test\n    when:\n      branch:\n        - main\n", 1)
+			return strings.Replace(s, "'make test'\n", "'make test'\n    when:\n      branch:\n        - main\n", 1)
 		},
 		"the image": func(s string) string { return strings.Replace(s, "image: alpine:3", "image: busybox", 1) },
 		"the trigger": func(s string) string {

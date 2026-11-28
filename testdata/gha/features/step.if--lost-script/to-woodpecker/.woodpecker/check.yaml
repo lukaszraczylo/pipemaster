@@ -1,8 +1,9 @@
 # pipemaster:emulated job.container pipeline/ci/job/check
 # pipemaster:lost script.interpolation pipeline/ci/job/check/step/check-step-2: docker inspect {{ steps.meta.outputs.version }}
-# pipemaster:lost step.script pipeline/ci/job/check/step/check-step-2: the step has no command left
-# pipemaster:emulated step.action pipeline/ci/job/check/step/check-step-2
-# pipemaster:arg {"step":"id: check-step-2\nname: Inspect\nkind: script\nscript:\n    - docker inspect $$\u007b{ steps.meta.outputs.version }}\n","at":1}
+# pipemaster:emulated display.name pipeline/ci/job/check/step/check-step-2
+# pipemaster:arg {"name":"Inspect","pos":1}
+# pipemaster:emulated step.if pipeline/ci/job/check/step/check-step-2
+# pipemaster:arg {"src":"event != 'pull_request'","from":"gha"}
 when:
   - event: push
   - event: tag
@@ -10,4 +11,13 @@ steps:
   - name: meta
     image: ubuntu:latest
     commands:
-      - echo "version=1" >> "$$GITHUB_OUTPUT"
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'echo "version=1" >> "$$GITHUB_OUTPUT"'
+  - name: Inspect
+    image: ubuntu:latest
+    commands:
+      - 'sh -c ''if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"'' pipemaster ''printf ''\''''%s\n''\'''' ''\''''pipemaster: lost: script.interpolation pipeline/ci/job/check/step/check-step-2: no Woodpecker spelling for expression steps.meta.outputs.version; the line is replaced by a line that prints the loss and exits 1''\'''' >&2; exit 1'''
+    when:
+      - evaluate: CI_PIPELINE_EVENT matches "(?i)^push$$"
+      - evaluate: CI_PIPELINE_EVENT matches "(?i)^tag$$"
+      - evaluate: CI_PIPELINE_EVENT matches "(?i)^cron$$"
+      - evaluate: CI_PIPELINE_EVENT matches "(?i)^manual$$"

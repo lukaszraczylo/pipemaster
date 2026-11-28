@@ -11,6 +11,7 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/provider/internal/ynode"
 )
 
@@ -59,7 +60,11 @@ func (jx *jobEmitter) carryStep(st *ir.Step, name string, node *yaml.Node, body 
 		if jx.pe.e.own {
 			jx.pe.e.lose(jx.sm(name), caps.StepScript, "the args of a task cannot say an empty last line or a newline inside a line, so the parser reads the script trimmed or split")
 		} else {
-			jx.pe.e.emulate(jx.sm(name), caps.StepScript, "script in the carry marker", "the args of a task cannot say an empty last line or a newline inside a line, so the carry marker holds the script")
+			what := "the task runs the script from its args"
+			if slices.ContainsFunc(body, emitkit.IsFailLoudLine) {
+				what = "the args hold a failing line where a statement has no Concourse spelling, so the task fails"
+			}
+			jx.pe.e.emulate(jx.sm(name), caps.StepScript, "exact script copy in the carry marker", what+"; the args cannot say an empty last line or a newline inside a line, so the carry marker also holds the exact text for the return trip")
 		}
 	}
 	jx.pe.e.carry(jx.sm(name), &s, nodeText(node))

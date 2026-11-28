@@ -1,9 +1,9 @@
 # pipemaster:emulated step.if pipeline/drone/job/ci/step/deploy
 # pipemaster:arg {"if":"((event == 'tag') || (branch == 'main')) \u0026\u0026 (actor == 'release-bot')","script":"./deploy.sh"}
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/step/deploy/carry
-# pipemaster:arg {"digest":"f679714f80fc61ae6af062672a01eb983293032f706f72eeac493d361ab9868f","carry":"if: ((event == 'tag') || (branch == 'main')) \u0026\u0026 (actor == 'release-bot')\nimage:\n    ref: alpine:3.20\nid: deploy\nkind: script\n"}
+# pipemaster:arg {"digest":"735eb2c6fafda933be3cd427e908ead5b756159689c49f4d248d5c1be4db2112","carry":"if: ((event == 'tag') || (branch == 'main')) \u0026\u0026 (actor == 'release-bot')\nimage:\n    ref: alpine:3.20\nid: deploy\nkind: script\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/job/ci/carry
-# pipemaster:arg {"digest":"8eacd248ea827c75591530b25c7a860751254e9f7d4e4c5e61f52b54d3675029","carry":"id: ci\n"}
+# pipemaster:arg {"digest":"e1f8395f97e947bb178f94a22ac4ac458caad759e6648ef348a514cede363b7e","carry":"id: ci\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone/carry
 # pipemaster:arg {"digest":"84e3ed402ae75035df238d685414e1191982cea52ea59daaba420920dbeb7a5b","carry":"id: drone\ntriggers:\n    - kind: push\n"}
 # pipemaster:emulated ext.passthrough pipeline/drone
@@ -36,6 +36,6 @@ jobs:
             args:
               - -ec
               - |-
-                exit 0 # pipemaster:guard the step condition has no shell form
+                echo 'pipemaster: skipped: the step condition has no shell form'; exit 0 # pipemaster:guard the step condition has no shell form
                 ./deploy.sh
             dir: workspace

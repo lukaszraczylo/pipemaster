@@ -3,7 +3,9 @@ package gha
 import (
 	"fmt"
 	"math"
+	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -14,7 +16,10 @@ import (
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 )
 
-const defaultRunner = "ubuntu-latest"
+const (
+	defaultRunner   = "ubuntu-latest"
+	selfHostedLabel = "self-hosted"
+)
 
 // jobCtx tells jobNode how the job sits in its pipeline.
 type jobCtx struct {
@@ -52,6 +57,7 @@ func minutesNode(d ir.Duration) *yaml.Node {
 
 func (e *emitter) jobNode(c jobCtx, j *ir.Job) (*yaml.Node, []string, error) {
 	jp := jobPath(c.pl.ID, j.ID)
+	e.changesNeeded = false
 	ext := e.ext(j.Ext)
 	e.foreignExt(jp, j.Ext)
 	consumed := map[string]bool{}
@@ -131,6 +137,9 @@ func (e *emitter) jobNode(c jobCtx, j *ir.Job) (*yaml.Node, []string, error) {
 	if err := e.outputsKey(m, jp, j); err != nil {
 		return nil, nil, err
 	}
+	if e.changesNeeded {
+		needChanges(m)
+	}
 	if c.finally {
 		markers = append(markers, emitkit.Marker(caps.PipelineFinally, "pipeline/"+c.pl.ID))
 		if err := e.markArg(caps.PipelineFinally, jp, finallyArg{Needs: j.Needs}); err != nil {
@@ -171,6 +180,11 @@ func (e *emitter) needIDs(c jobCtx, j *ir.Job) []string {
 // A condition GHA cannot state disables the job rather than running it unguarded.
 func (e *emitter) jobCondition(c jobCtx, jp string, j *ir.Job, call *ir.Step) (*yaml.Node, []string) {
 	cond := j.If
+	guard := !j.Manual && e.deletionGuarded(c.pl, jp)
+	e.guardJob, e.guardMarked = "", false
+	if guard {
+		e.guardJob = jp
+	}
 	if cond != nil {
 		t, ok := e.source(jp, caps.JobIf, cond)
 		if ok {
@@ -204,6 +218,10 @@ func (e *emitter) jobCondition(c jobCtx, jp string, j *ir.Job, call *ir.Step) (*
 	}
 	if c.finally {
 		cond = andExpr(expr.Call{Name: "always"}, cond)
+	}
+	if guard {
+		cond = andExpr(cond, deletedGuard())
+		e.guardMarker(c.pl, jp)
 	}
 	if cond == nil {
 		return nil, markers
@@ -311,6 +329,7 @@ func (e *emitter) runsOn(m *omap, jp string, j *ir.Job, ext map[string]any, cons
 			return err
 		}
 	}
+	labels = e.selfHosted(jp, labels)
 	rest, _ := ext[extRunsOn].(map[string]any)
 	switch {
 	case group == "" && len(labels) == 0:
@@ -350,6 +369,7 @@ func anyMap(m map[string]string) map[string]any {
 }
 
 func (e *emitter) containerKey(m *omap, jp string, j *ir.Job, ext map[string]any, consumed map[string]bool) error {
+	e.inContainer = j.Container != nil
 	if j.Container == nil {
 		return nil
 	}
@@ -525,4 +545,57 @@ func narrowsMatrix(j *ir.Job, id string) bool {
 	_, inst := n["_instance"]
 	_, par := n["parallel"]
 	return inst || par
+}
+
+// deletionGuarded is true when the job at jp needs the deletion guard: GHA starts a push workflow when a branch is
+// deleted, and every other provider starts nothing, so a job from another provider must not run there. A project the
+// GHA parser read guards exactly the jobs whose guard it stripped; a hand-written job never gains one.
+func (e *emitter) deletionGuarded(pl *ir.Pipeline, jp string) bool {
+	return (e.jobGuards[jp] || (e.from != nil && e.jobGuards == nil)) && e.pushes(pl)
+}
+
+func (e *emitter) pushes(pl *ir.Pipeline) bool {
+	if slices.ContainsFunc(pl.Triggers, func(t ir.Trigger) bool { return t.Kind == ir.TriggerPush || t.Kind == ir.TriggerTag }) {
+		return true
+	}
+	events, _ := e.ext(pl.Ext)[extEvents].(map[string]any)
+	_, ok := events["push"]
+	return ok
+}
+
+// guardMarker tags a job's deletion guard so Parse strips it, and reports it once for the workflow.
+func (e *emitter) guardMarker(pl *ir.Pipeline, jp string) {
+	if !e.guarded[pl.ID] {
+		if e.guarded == nil {
+			e.guarded = map[string]bool{}
+		}
+		e.guarded[pl.ID] = true
+		e.emulate("pipeline/"+pl.ID, caps.JobIf, "!github.event.deleted on every job",
+			"GitHub Actions runs a push workflow when a branch is deleted and the source starts no run for that; each job condition ends with the guard")
+	}
+	if e.guardMarked {
+		return
+	}
+	if err := e.markArg(caps.JobIf, jp, srcArg{Guard: true, From: markFrom(e.from)}); err != nil {
+		e.comment("deletion guard not carried: " + err.Error())
+	}
+}
+
+// tagOrigins lists the dialects whose runner labels are tags of a self-managed worker, not names of a hosted image.
+var tagOrigins = map[string]bool{"gitlab": true, "concourse": true}
+
+// selfHosted puts the self-hosted label before worker tags from another dialect, so a tag never reads as a
+// GitHub-hosted image such as ubuntu-latest.
+func (e *emitter) selfHosted(jp string, labels []string) []string {
+	if !tagOrigins[e.origin] || len(labels) == 0 {
+		return labels
+	}
+	for _, l := range labels {
+		if l == selfHostedLabel || emitkit.HostedRunner(l) != emitkit.NotHosted {
+			return labels
+		}
+	}
+	e.external(jp, caps.JobRunner, "runs-on self-hosted", "the tags "+strings.Join(labels, ", ")+" name self-managed runners; register GitHub runners with the labels self-hosted, "+strings.Join(labels, ", "))
+	e.mark(caps.JobRunner, jp)
+	return append([]string{selfHostedLabel}, labels...)
 }

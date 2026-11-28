@@ -9,8 +9,11 @@ import (
 
 	"github.com/lukaszraczylo/pipemaster/caps"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
+	"github.com/lukaszraczylo/pipemaster/provider/inline"
 	"github.com/lukaszraczylo/pipemaster/report"
+	"github.com/lukaszraczylo/pipemaster/vars"
 )
 
 const (
@@ -25,14 +28,37 @@ const (
 // fails the call when one was never accounted for. Local include files are not re-emitted: Parse
 // merged them into the jobs, so the emitted file stands alone.
 func (adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	return inline.Emit(p, dialect, adapter{}.emitFlat)
+}
+
+func (a adapter) emitFlat(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	p, notes := singleIncludes(p)
+	files, rep, err := a.emitMain(p)
+	if err != nil {
+		return files, rep, err
+	}
+	rep.Entries = append(rep.Entries, notes...)
+	return files, rep, a.emitChildren(p, files, rep)
+}
+
+func (adapter) emitMain(p *ir.Project) (map[string][]byte, *report.Report, error) {
+	p, vres := vars.Prepare(p, dialect)
+	p, noForm, injected := provider.WithDefaultTriggers(p, dialect)
 	origin := ""
 	if p != nil {
 		origin = p.Origin.Provider
 	}
-	e := &emitter{from: sourceDialect(origin), led: emitkit.NewLedger("ir", dialect, adapter{}.Caps())}
+	e := &emitter{originID: origin, splits: map[*ir.Job]splitPart{}, plugins: map[string]pluginUse{}, pluginWhy: map[string]string{}, noSplit: map[string]string{}, from: sourceDialect(origin), led: emitkit.NewLedger("ir", dialect, adapter{}.Caps())}
+	e.gated = emitkit.GatedSteps(p)
+	e.injected = injected
 	uses := ir.Features(p)
 	for _, u := range uses {
 		e.led.Decide(u)
+	}
+	for id, events := range noForm {
+		for _, g := range provider.GroupByFeature(events) {
+			e.lose("pipeline/"+id, g.Feature, "the source runs on the events "+strings.Join(g.Names, ", ")+" and its file has no trigger form for them; GitLab has no pipeline source for them")
+		}
 	}
 	files := map[string][]byte{}
 	if p != nil {
@@ -57,6 +83,7 @@ func (adapter) Emit(p *ir.Project) (map[string][]byte, *report.Report, error) {
 	if err != nil {
 		return nil, rep, fmt.Errorf("%s: %w", dialect, err)
 	}
+	vres.Report(rep)
 	return files, rep, nil
 }
 
@@ -93,6 +120,7 @@ func (e *emitter) pipelineFile(pls []*ir.Pipeline) ([]byte, error) {
 }
 
 func (e *emitter) document(pl *ir.Pipeline) (*yaml.Node, error) {
+	pl = e.splitImages(pl)
 	plan, err := e.stagePlan(pl)
 	if err != nil {
 		return nil, err
@@ -100,6 +128,7 @@ func (e *emitter) document(pl *ir.Pipeline) (*yaml.Node, error) {
 	if err := e.markDeadOutputs(pl); err != nil {
 		return nil, err
 	}
+	e.markUnownedInputs(pl)
 	e.foreignExt("pipeline/"+pl.ID, pl.Ext)
 	if !pipelineName(pl.Name) {
 		e.loseName("pipeline/"+pl.ID, pl.Name, "")
@@ -111,6 +140,7 @@ func (e *emitter) document(pl *ir.Pipeline) (*yaml.Node, error) {
 			return nil, fmt.Errorf("job id %q is used twice", j.ID)
 		}
 		p := newJobPrep(e.pathOf(pl.ID, j), j)
+		p.imgPath = e.splits[j].imgPath
 		if err := e.prepSteps(p); err != nil {
 			return nil, err
 		}
@@ -246,6 +276,23 @@ func (e *emitter) headerKeys(m *omap, pl *ir.Pipeline, ext map[string]any, c *pi
 	return append(marks, rm...), nil
 }
 
+// markUnownedInputs records the inputs of pl that pipelineVars leaves without a variable, before any script
+// that reads them is converted.
+func (e *emitter) markUnownedInputs(pl *ir.Pipeline) {
+	if _, header := extOf(pl.Ext)[extSpec]; header {
+		return
+	}
+	vars := append([]ir.Var{}, pl.Env...)
+	for _, in := range pl.Inputs {
+		name := inputVar(in.Name)
+		if name == "" || hasVar(vars, name) {
+			e.dropInput(in.Name)
+			continue
+		}
+		vars = append(vars, ir.Var{Name: name})
+	}
+}
+
 // pipelineVars joins pipeline env with the inputs, which GitLab can only carry as variables with a description.
 func (e *emitter) pipelineVars(pp string, pl *ir.Pipeline, ext map[string]any) ([]ir.Var, map[string]any, []string, error) {
 	vars := append([]ir.Var{}, pl.Env...)
@@ -260,18 +307,19 @@ func (e *emitter) pipelineVars(pp string, pl *ir.Pipeline, ext map[string]any) (
 	}
 	var kept []ir.Input
 	for _, in := range pl.Inputs {
-		if !isIdent(in.Name) || hasVar(vars, in.Name) {
-			e.lose(pp, caps.PipelineInputs, "input "+in.Name+" is not a unique variable name")
+		name := inputVar(in.Name)
+		if name == "" || hasVar(vars, name) {
+			e.lose(pp, caps.PipelineInputs, "input "+in.Name+" is not a unique variable name; the variable "+name+" is taken")
 			continue
 		}
-		vars = append(vars, ir.Var{Name: in.Name, Value: ir.Value{Lit: in.Default}})
+		vars = append(vars, ir.Var{Name: name, Value: ir.Value{Lit: in.Default}})
 		if in.Description != "" {
 			e.flattenedNote(pp+"/input/"+in.Name, caps.PipelineInputs, in.Description)
 			d, err := e.field(pp, caps.PipelineInputs, in.Description)
 			if err != nil {
 				return nil, nil, nil, err
 			}
-			extras[in.Name] = map[string]any{"description": d}
+			extras[name] = map[string]any{"description": d}
 		}
 		kept = append(kept, in)
 	}
@@ -293,7 +341,7 @@ func (e *emitter) jobEntries(m *omap, c *pipeCtx) error {
 		if err != nil {
 			return fmt.Errorf("job %s: %w", j.ID, err)
 		}
-		comments = append(e.foldJobMarkers(j), comments...)
+		comments = append(append(e.foldJobMarkers(j), e.splitMarkers(c.pl.ID, j)...), comments...)
 		key := c.key(j.ID)
 		if m.has(key) {
 			return fmt.Errorf("job id %q collides with a top-level key", key)

@@ -1,3 +1,6 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/test
 # pipemaster:emulated job.matrix pipeline/gitlab-ci/job/test
 # pipemaster:arg {"matrix":{"FailFast":null,"Axes":null,"Include":[[{"Key":"GO","Value":"1.21"},{"Key":"OS","Value":"linux"}],[{"Key":"GO","Value":"1.21"},{"Key":"OS","Value":"mac"}],[{"Key":"GO","Value":"1.22"},{"Key":"OS","Value":"linux"}],[{"Key":"GO","Value":"1.22"},{"Key":"OS","Value":"mac"}],[{"Key":"GO","Value":"1.20"},{"Key":"OS","Value":"linux"}]],"Exclude":null,"MaxParallel":0},"job":"test","cell":[{"Key":"GO","Value":"1.21"},{"Key":"OS","Value":"linux"}],"index":0}
@@ -8,12 +11,17 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
 steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make test
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make test'
 ---
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/test
 # pipemaster:emulated job.matrix pipeline/gitlab-ci/job/test
 # pipemaster:arg {"job":"test","cell":[{"Key":"GO","Value":"1.21"},{"Key":"OS","Value":"mac"}],"index":1}
@@ -24,12 +32,17 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
 steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make test
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make test'
 ---
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/test
 # pipemaster:emulated job.matrix pipeline/gitlab-ci/job/test
 # pipemaster:arg {"job":"test","cell":[{"Key":"GO","Value":"1.22"},{"Key":"OS","Value":"linux"}],"index":2}
@@ -40,12 +53,17 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
 steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make test
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make test'
 ---
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/test
 # pipemaster:emulated job.matrix pipeline/gitlab-ci/job/test
 # pipemaster:arg {"job":"test","cell":[{"Key":"GO","Value":"1.22"},{"Key":"OS","Value":"mac"}],"index":3}
@@ -56,12 +74,17 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
 steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make test
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make test'
 ---
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
 # pipemaster:emulated job.container pipeline/gitlab-ci/job/test
 # pipemaster:emulated job.matrix pipeline/gitlab-ci/job/test
 # pipemaster:arg {"job":"test","cell":[{"Key":"GO","Value":"1.20"},{"Key":"OS","Value":"linux"}],"index":4}
@@ -72,8 +95,10 @@ trigger:
   event:
     - push
     - tag
+    - cron
+    - custom
 steps:
   - name: script
     image: ubuntu:latest
     commands:
-      - make test
+      - sh -c 'if command -v bash >/dev/null 2>&1; then exec bash -e -c "$$1"; fi; exec sh -e -c "$$1"' pipemaster 'make test'

@@ -24,6 +24,12 @@ spec:
           params:
             - name: filter
               value: body.ref.startsWith('refs/heads/')
+            - name: overlays
+              value:
+                - key: ctx_sha
+                  expression: body.after
+                - key: ctx_repo
+                  expression: body.repository.full_name
       bindings:
         - ref: drone-github
       template:

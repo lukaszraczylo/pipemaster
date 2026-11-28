@@ -14,6 +14,7 @@ import (
 	"github.com/lukaszraczylo/pipemaster/expr"
 	exprgitlab "github.com/lukaszraczylo/pipemaster/expr/gitlab"
 	"github.com/lukaszraczylo/pipemaster/ir"
+	"github.com/lukaszraczylo/pipemaster/provider"
 	"github.com/lukaszraczylo/pipemaster/provider/emitkit"
 	"github.com/lukaszraczylo/pipemaster/report"
 )
@@ -22,10 +23,14 @@ const (
 	scheduleInstruction = "create a pipeline schedule: Settings > CI/CD > Schedules, cron `%s`"
 	apiInstruction      = "create a pipeline trigger token (Settings > CI/CD > Pipeline trigger tokens) or call the pipelines API"
 	sourceMR            = "merge_request_event"
+	sourcePush          = "push"
 	globChars           = "*?["
 )
 
 var globLiteral = regexp.MustCompile(`^[A-Za-z0-9_\-/]*$`)
+
+// defaultMarkIndex is the trigger index of the marker that tells a parser the triggers were synthesised.
+const defaultMarkIndex = 9999
 
 func triggerPath(pid string, i int) string { return "pipeline/" + pid + "/trigger/" + strconv.Itoa(i) }
 
@@ -135,13 +140,22 @@ func filterCond(v expr.Expr, f ir.Filter) expr.Expr {
 }
 
 // triggerRule builds the workflow rule for one trigger; ok is false when GitLab has no pipeline source for it.
-func triggerRule(t *ir.Trigger) (cond expr.Expr, ok bool) {
+// A foreign source says push or tag and means a push. The branch and the tag are set on every other source too (web,
+// api, trigger, schedule, pipeline), so scoped adds the push source: the rule then admits no pipeline that the source
+// never starts.
+func triggerRule(t *ir.Trigger, scoped bool) (cond expr.Expr, ok bool) {
 	source := func(s string) expr.Expr { return binary(expr.OpEq, ref1(expr.CtxEvent), strLit(s)) }
+	pushOnly := func(c expr.Expr) expr.Expr {
+		if scoped {
+			return andAll(source(sourcePush), c)
+		}
+		return c
+	}
 	switch t.Kind {
 	case ir.TriggerPush:
-		return filterCond(ref1(expr.CtxBranch), t.Branches), true
+		return pushOnly(filterCond(ref1(expr.CtxBranch), t.Branches)), true
 	case ir.TriggerTag:
-		return filterCond(ref1(expr.CtxTag), t.Tags), true
+		return pushOnly(filterCond(ref1(expr.CtxTag), t.Tags)), true
 	case ir.TriggerPR:
 		c := source(sourceMR)
 		if hasFilter(t.Branches) {
@@ -208,6 +222,10 @@ func (e *emitter) workflowRules(pl *ir.Pipeline) (*yaml.Node, error) {
 		ts, ok, _ := s.workflowTriggers(n)
 		// Parse gives the default triggers to a block it cannot model, so the block is still the source.
 		if (ok && sameTriggers(ts, pl.Triggers)) || (!ok && sameTriggers(pl.Triggers, defaultTriggers())) {
+			e.wfGuard = nil
+			if c, cok := s.workflowCond(n); cok && !ok {
+				e.wfGuard = c
+			}
 			return n, nil
 		}
 	}
@@ -217,7 +235,7 @@ func (e *emitter) workflowRules(pl *ir.Pipeline) (*yaml.Node, error) {
 		w.set("rules", seqOf(ruleNever()))
 		return w.n, nil
 	}
-	if len(pl.Triggers) == 0 || (raw == nil && sameTriggers(pl.Triggers, defaultTriggers())) {
+	if len(pl.Triggers) == 0 || (raw == nil && e.from == nil && sameTriggers(pl.Triggers, defaultTriggers())) {
 		return nil, nil
 	}
 	rules := seqOf()
@@ -237,7 +255,7 @@ func (e *emitter) workflowRules(pl *ir.Pipeline) (*yaml.Node, error) {
 // triggerRuleNode is the workflow rule for trigger i of a pipeline, with a key that names its text so callers
 // can drop duplicates. It is nil when GitLab has no form for the trigger.
 func (e *emitter) triggerRuleNode(pid string, i int, t *ir.Trigger) (*yaml.Node, string) {
-	cond, ok := triggerRule(t)
+	cond, ok := triggerRule(t, e.from != nil)
 	if !ok {
 		return nil, ""
 	}
@@ -305,6 +323,10 @@ var triggerFeatures = map[ir.TriggerKind]caps.Feature{
 
 // triggerMarks carries the pipeline's triggers in the file when workflow:rules would not read back as them.
 func (e *emitter) triggerMarks(pl *ir.Pipeline, w *yaml.Node) ([]string, error) {
+	if e.injected[pl.ID] {
+		line, err := markerArg(provider.DefaultTriggersArg{Default: true})
+		return []string{emitkit.Marker(caps.TriggerPush, triggerPath(pl.ID, defaultMarkIndex)), line}, err
+	}
 	if len(pl.Triggers) == 0 {
 		return nil, nil
 	}

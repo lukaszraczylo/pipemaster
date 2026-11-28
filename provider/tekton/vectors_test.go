@@ -79,6 +79,9 @@ const (
 	featImage       = "step.image"
 	featNoop        = "step.script"
 	featShell       = "step.shell"
+	featRunner      = "job.runner"
+	featWorkdir     = "step.workdir"
+	sharedWorkDir   = "/workspace"
 	featNeeds       = "job.needs"
 	minutes         = time.Minute
 	triggerSegment  = "/trigger/"
@@ -215,11 +218,16 @@ func decodeTask(src []byte) (vTask, error) {
 		if err != nil {
 			return t, err
 		}
-		if err := onlyKeys(es, "stepTemplate", "env"); err != nil {
+		if err := onlyKeys(es, "stepTemplate", "env", "workingDir"); err != nil {
 			return t, err
 		}
-		if t.Env, err = decodeEnv(lookup(es, "env")); err != nil {
-			return t, err
+		if wd := lookup(es, "workingDir"); wd != nil && wd.Value != sharedWorkDir {
+			return t, fmt.Errorf("stepTemplate workingDir %q, want %q", wd.Value, sharedWorkDir)
+		}
+		if env := lookup(es, "env"); env != nil {
+			if t.Env, err = decodeEnv(env); err != nil {
+				return t, err
+			}
 		}
 	}
 	for _, c := range lookup(spec, "steps").Content {
@@ -253,6 +261,19 @@ func applyTaskMarks(t *vTask, src []byte) error {
 				return err
 			}
 			t.Noop = true
+		case featWorkdir:
+			// The emulation gives the steps of a Task with no checkout the shared directory; it has no effect on the model.
+			var a struct {
+				Dir string `json:"dir"`
+			}
+			if err := m.DecodeArg(&a); err != nil {
+				return err
+			}
+			if a.Dir != sharedWorkDir {
+				return fmt.Errorf("shared directory marker %q, want %q", a.Dir, sharedWorkDir)
+			}
+		case featRunner:
+			// The note says the runner labels are node selectors of the TriggerTemplate, which the model leaves out.
 		case featShell:
 			// The note says a step from a bash-default source starts with the bash-if-present preamble, which the decoder strips.
 		case featNeeds:

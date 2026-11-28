@@ -6,6 +6,12 @@ spec:
   dependencies:
     - eventName: push
       eventSourceName: pipemaster-github
+      filters:
+        data:
+          - path: body.ref
+            type: string
+            value:
+              - ^refs/heads/.*$
       name: gitlab-ci-push
     - eventName: push
       eventSourceName: pipemaster-github
@@ -28,6 +34,14 @@ spec:
               src:
                 dataTemplate: '{{ trimPrefix "refs/heads/" .Input.body.ref }}'
                 dependencyName: gitlab-ci-push
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dataKey: body.after
+                dependencyName: gitlab-ci-push
+            - dest: spec.arguments.parameters.2.value
+              src:
+                dataKey: body.repository.full_name
+                dependencyName: gitlab-ci-push
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -39,6 +53,10 @@ spec:
                   parameters:
                     - name: ctx-branch
                       value: ""
+                    - name: ctx-sha
+                      value: ""
+                    - name: ctx-repo
+                      value: ""
                 serviceAccountName: pipemaster-workflow
                 workflowTemplateRef:
                   name: gitlab-ci
@@ -48,9 +66,13 @@ spec:
         k8s:
           operation: create
           parameters:
-            - dest: spec.arguments.parameters.0.value
+            - dest: spec.arguments.parameters.1.value
               src:
-                dataTemplate: '{{ trimPrefix "refs/tags/" .Input.body.ref }}'
+                dataKey: body.after
+                dependencyName: gitlab-ci-tag
+            - dest: spec.arguments.parameters.2.value
+              src:
+                dataKey: body.repository.full_name
                 dependencyName: gitlab-ci-tag
           source:
             resource:
@@ -62,6 +84,10 @@ spec:
                 arguments:
                   parameters:
                     - name: ctx-branch
+                      value: ""
+                    - name: ctx-sha
+                      value: ""
+                    - name: ctx-repo
                       value: ""
                 serviceAccountName: pipemaster-workflow
                 workflowTemplateRef:

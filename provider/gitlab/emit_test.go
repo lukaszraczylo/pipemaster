@@ -136,13 +136,10 @@ func TestEmitValidatesSchema(t *testing.T) {
 		for _, name := range dirNames(t, dir) {
 			t.Run(filepath.Base(filepath.Dir(dir))+"/"+name, func(t *testing.T) {
 				files, _ := emitFiles(t, load(name))
-				if len(files) == 0 {
-					t.Fatal("no files emitted")
+				if _, ok := files[rootFile]; !ok {
+					t.Fatalf("no %s emitted", rootFile)
 				}
 				for fname, data := range files {
-					if fname != rootFile {
-						t.Fatalf("unexpected path %s", fname)
-					}
 					if err := validate.File("gitlab", fname, data); err != nil {
 						t.Fatalf("%v\n%s", err, data)
 					}
@@ -178,7 +175,8 @@ func TestNoRawGhaExprInOutput(t *testing.T) {
 
 func TestScriptInterpolationMapsCanonicalRefs(t *testing.T) {
 	doc := emitDoc(t, ghaFixture(t, "script.interpolation"))
-	for _, want := range []string{`echo "sha $CI_COMMIT_SHA on $CI_COMMIT_REF_NAME"`} {
+	// ref_name is lost: GHA gives <n>/merge on a pull request and GitLab gives the source branch.
+	for _, want := range []string{`# pipemaster:lost script.interpolation`, `echo "sha {{ sha }} on {{ ref_name }}"`} {
 		if !strings.Contains(doc, want) {
 			t.Errorf("missing %q in\n%s", want, doc)
 		}
@@ -329,4 +327,13 @@ func TestCapsLedger(t *testing.T) {
 
 func gitlabParse(files map[string][]byte) (*ir.Project, *report.Report, error) {
 	return gitlab.New().Parse(asFS(files))
+}
+
+func TestIdentityKeepsSubshellLinesInBeforeAndScript(t *testing.T) {
+	src := "j:\n  before_script:\n    - (\n    - cd sub\n    - make\n    - )\n  script:\n    - (\n    - echo x\n    - )\n"
+	p, _ := parseFiles(t, map[string]string{".gitlab-ci.yml": src})
+	back, files := roundTrip(t, p)
+	if ok, diff := ir.Equal(p, back); !ok {
+		t.Fatalf("identity broken:\n%s\n--- emitted ---\n%s", diff, dumpFiles(files))
+	}
 }

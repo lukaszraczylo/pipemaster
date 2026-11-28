@@ -1,0 +1,29 @@
+# pipemaster:emulated trigger.push pipeline/gitlab-ci
+# pipemaster:arg {"default_triggers":true,"manual":true}
+# pipemaster:emulated trigger.manual pipeline/gitlab-ci/trigger/0
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitlab-ci
+spec:
+  params:
+    - name: ctx-branch
+      default: ""
+    - name: ctx-sha
+      default: ""
+    - name: ctx-repo
+      default: ""
+  tasks:
+    - name: release
+      taskRef:
+        name: gitlab-ci-release
+      params:
+        - name: ctx-repo
+          value: $(params.ctx-repo)
+        - name: ctx-sha
+          value: $(params.ctx-sha)
+      when:
+        - input: $(params.ctx-branch)
+          operator: in
+          values:
+            - dev
